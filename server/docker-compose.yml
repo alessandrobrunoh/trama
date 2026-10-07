@@ -1,0 +1,23 @@
+# Dedicated Postgres for the Nabla API (container name kept: `delta-postgres`) (host port 5434 — 5432/5433 belong to other projects).
+name: delta
+services:
+  postgres:
+    image: postgres:17
+    container_name: delta-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: delta
+      POSTGRES_PASSWORD: delta
+      POSTGRES_DB: nabla
+    ports:
+      - '5434:5432'
+    volumes:
+      - delta-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U delta -d nabla']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  delta-pgdata:

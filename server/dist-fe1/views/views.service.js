@@ -1,0 +1,96 @@
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+import { ForbiddenException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { hasRole } from '../auth/request-context.js';
+import { notFound, uid } from '../common/util.js';
+import { SavedViewEntity } from '../database/entities/index.js';
+import { EventsService } from '../events/events.service.js';
+let ViewsService = class ViewsService {
+    events;
+    repo;
+    constructor(events, repo) {
+        this.events = events;
+        this.repo = repo;
+    }
+    async list(workspaceId, userId) {
+        return this.repo
+            .createQueryBuilder('v')
+            .where('v.workspaceId = :workspaceId AND (v.shared = true OR v.ownerId = :userId)', { workspaceId, userId: userId ?? '' })
+            .orderBy('v.createdAt', 'ASC')
+            .getMany();
+    }
+    async get(ctx, id) {
+        const row = await this.repo.findOneBy({ id, workspaceId: ctx.workspace.id });
+        if (!row || (!row.shared && row.ownerId !== ctx.userId))
+            throw notFound('View', id);
+        return row;
+    }
+    async create(ctx, input) {
+        if (!ctx.userId)
+            throw new ForbiddenException('Agents cannot own saved views');
+        const row = await this.repo.save(this.repo.create({
+            id: uid('vw'),
+            workspaceId: ctx.workspace.id,
+            ownerId: ctx.userId,
+            name: input.name.trim(),
+            entity: input.entity,
+            filters: input.filters ?? [],
+            sort: input.sort ?? null,
+            groupBy: input.groupBy ?? null,
+            layout: input.layout ?? 'list',
+            shared: input.shared ?? false,
+        }));
+        this.events.publish(ctx.workspace.id, { type: 'created', entity: 'view', id: row.id });
+        return row;
+    }
+    assertCanEdit(ctx, row) {
+        if (row.ownerId !== ctx.userId && !(row.shared && hasRole(ctx.role, 'admin')))
+            throw new ForbiddenException('Only the owner (or an admin, for shared views) can change a view');
+    }
+    async update(ctx, id, patch) {
+        const row = await this.get(ctx, id);
+        this.assertCanEdit(ctx, row);
+        if (patch.name !== undefined)
+            row.name = patch.name.trim();
+        if (patch.entity !== undefined)
+            row.entity = patch.entity;
+        if (patch.filters !== undefined)
+            row.filters = patch.filters;
+        if (patch.sort !== undefined)
+            row.sort = patch.sort;
+        if (patch.groupBy !== undefined)
+            row.groupBy = patch.groupBy;
+        if (patch.layout !== undefined)
+            row.layout = patch.layout;
+        if (patch.shared !== undefined)
+            row.shared = patch.shared;
+        row.updatedAt = new Date();
+        await this.repo.save(row);
+        this.events.publish(ctx.workspace.id, { type: 'updated', entity: 'view', id });
+        return row;
+    }
+    async remove(ctx, id) {
+        const row = await this.get(ctx, id);
+        this.assertCanEdit(ctx, row);
+        await this.repo.delete({ id });
+        this.events.publish(ctx.workspace.id, { type: 'deleted', entity: 'view', id });
+    }
+};
+ViewsService = __decorate([
+    Injectable(),
+    __param(1, InjectRepository(SavedViewEntity)),
+    __metadata("design:paramtypes", [EventsService, Function])
+], ViewsService);
+export { ViewsService };
+//# sourceMappingURL=views.service.js.map

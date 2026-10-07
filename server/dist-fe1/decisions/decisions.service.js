@@ -1,0 +1,206 @@
+var __decorate = (this && this.__decorate) || function (decorators, target, key, desc) {
+    var c = arguments.length, r = c < 3 ? target : desc === null ? desc = Object.getOwnPropertyDescriptor(target, key) : desc, d;
+    if (typeof Reflect === "object" && typeof Reflect.decorate === "function") r = Reflect.decorate(decorators, target, key, desc);
+    else for (var i = decorators.length - 1; i >= 0; i--) if (d = decorators[i]) r = (c < 3 ? d(r) : c > 3 ? d(target, key, r) : d(target, key)) || r;
+    return c > 3 && r && Object.defineProperty(target, key, r), r;
+};
+var __metadata = (this && this.__metadata) || function (k, v) {
+    if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
+};
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
+import { BadRequestException, ConflictException, ForbiddenException, Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { CountersService } from '../common/counters.service.js';
+import { RefsService } from '../common/refs.service.js';
+import { notFound, uid, unique } from '../common/util.js';
+import { DecisionEntity, ExecutionEntity } from '../database/entities/index.js';
+import { EventsService } from '../events/events.service.js';
+import { WorkstreamBus } from '../events/workstream-bus.js';
+const KEY_RE = /^ADR-\d+$/i;
+let DecisionsService = class DecisionsService {
+    ds;
+    refs;
+    counters;
+    events;
+    bus;
+    repo;
+    constructor(ds, refs, counters, events, bus, repo) {
+        this.ds = ds;
+        this.refs = refs;
+        this.counters = counters;
+        this.events = events;
+        this.bus = bus;
+        this.repo = repo;
+    }
+    list(workspaceId, f = {}) {
+        const qb = this.repo.createQueryBuilder('d').where('d.workspaceId = :workspaceId', { workspaceId }).orderBy('d.number', 'DESC');
+        if (f.status)
+            qb.andWhere('d.status = :s', { s: f.status });
+        if (f.workstreamId)
+            qb.andWhere('(d.originWorkstreamId = :w OR d.relatedWorkstreamIds @> :wj::jsonb)', { w: f.workstreamId, wj: JSON.stringify([f.workstreamId]) });
+        if (f.tag)
+            qb.andWhere('d.tags @> :tag::jsonb', { tag: JSON.stringify([f.tag]) });
+        if (f.q)
+            qb.andWhere('(d.title ILIKE :q OR d.statement ILIKE :q OR d.key ILIKE :q)', { q: `%${f.q}%` });
+        return qb.getMany();
+    }
+    async get(workspaceId, idOrKey) {
+        const row = await this.repo.findOneBy(KEY_RE.test(idOrKey) ? { workspaceId, key: idOrKey.toUpperCase() } : { workspaceId, id: idOrKey });
+        if (!row)
+            throw notFound('Decision', idOrKey);
+        return row;
+    }
+    touched(row) {
+        return unique([row.originWorkstreamId, ...row.relatedWorkstreamIds].filter((x) => !!x));
+    }
+    async validate(workspaceId, input) {
+        await this.refs.workstreams(workspaceId, [...(input.relatedWorkstreamIds ?? []), ...(input.originWorkstreamId ? [input.originWorkstreamId] : [])]);
+        if (input.originExecutionId && !(await this.ds.getRepository(ExecutionEntity).existsBy({ id: input.originExecutionId, workspaceId })))
+            throw new BadRequestException(`Unknown execution "${input.originExecutionId}"`);
+    }
+    requireHuman(actor) {
+        if (actor.type !== 'user' || !actor.id)
+            throw new ForbiddenException('Decisions must be accepted or rejected by a person');
+        return actor.id;
+    }
+    async create(workspaceId, actor, input) {
+        await this.validate(workspaceId, input);
+        const status = input.status ?? 'proposed';
+        if (status === 'superseded')
+            throw new BadRequestException('Use /supersede to supersede a decision');
+        const decidedById = status === 'accepted' || status === 'rejected' ? this.requireHuman(actor) : null;
+        const row = await this.ds.transaction(async (m) => {
+            const number = await this.counters.next(m, workspaceId, 'adr');
+            return m.save(m.create(DecisionEntity, {
+                id: uid('dc'),
+                workspaceId,
+                key: `ADR-${number}`,
+                number,
+                title: input.title.trim(),
+                statement: input.statement,
+                rationale: input.rationale ?? null,
+                status,
+                originWorkstreamId: input.originWorkstreamId ?? null,
+                originExecutionId: input.originExecutionId ?? null,
+                relatedWorkstreamIds: unique(input.relatedWorkstreamIds),
+                proposedBy: actor,
+                decidedById,
+                decidedAt: decidedById ? new Date() : null,
+                tags: unique(input.tags),
+            }));
+        });
+        await this.record(row, actor, status === 'proposed' ? 'decision.proposed' : `decision.${status}`, { title: row.title });
+        await this.bus.touchMany(workspaceId, this.touched(row), 'decision.created');
+        return row;
+    }
+    record(row, actor, type, data = {}) {
+        return this.events.record({
+            workspaceId: row.workspaceId,
+            actor,
+            type,
+            subject: { type: 'decision', id: row.id },
+            workstreamId: row.originWorkstreamId,
+            data: { key: row.key, ...data },
+        });
+    }
+    async update(workspaceId, actor, idOrKey, patch) {
+        const row = await this.get(workspaceId, idOrKey);
+        if (patch.status !== undefined)
+            throw new BadRequestException('Use /accept, /reject or /supersede to change the status');
+        await this.validate(workspaceId, patch);
+        const before = this.touched(row);
+        if (patch.title !== undefined)
+            row.title = patch.title.trim();
+        if (patch.statement !== undefined)
+            row.statement = patch.statement;
+        if (patch.rationale !== undefined)
+            row.rationale = patch.rationale;
+        if (patch.originWorkstreamId !== undefined)
+            row.originWorkstreamId = patch.originWorkstreamId;
+        if (patch.originExecutionId !== undefined)
+            row.originExecutionId = patch.originExecutionId;
+        if (patch.relatedWorkstreamIds !== undefined)
+            row.relatedWorkstreamIds = unique(patch.relatedWorkstreamIds);
+        if (patch.tags !== undefined)
+            row.tags = unique(patch.tags);
+        row.updatedAt = new Date();
+        await this.repo.save(row);
+        await this.record(row, actor, 'decision.updated', { fields: Object.keys(patch) });
+        await this.bus.touchMany(workspaceId, [...before, ...this.touched(row)], 'decision.updated');
+        return row;
+    }
+    async accept(workspaceId, actor, idOrKey) {
+        const userId = this.requireHuman(actor);
+        const row = await this.get(workspaceId, idOrKey);
+        if (row.status !== 'proposed')
+            throw new ConflictException(`Decision is ${row.status}, only proposed decisions can be accepted`);
+        row.status = 'accepted';
+        row.decidedById = userId;
+        row.decidedAt = new Date();
+        row.updatedAt = new Date();
+        await this.repo.save(row);
+        await this.record(row, actor, 'decision.accepted', { title: row.title });
+        await this.bus.touchMany(workspaceId, this.touched(row), 'decision.accepted');
+        return row;
+    }
+    async reject(workspaceId, actor, idOrKey) {
+        const userId = this.requireHuman(actor);
+        const row = await this.get(workspaceId, idOrKey);
+        if (row.status !== 'proposed')
+            throw new ConflictException(`Decision is ${row.status}, only proposed decisions can be rejected`);
+        row.status = 'rejected';
+        row.decidedById = userId;
+        row.decidedAt = new Date();
+        row.updatedAt = new Date();
+        await this.repo.save(row);
+        await this.record(row, actor, 'decision.rejected', { title: row.title });
+        await this.bus.touchMany(workspaceId, this.touched(row), 'decision.rejected');
+        return row;
+    }
+    async supersede(workspaceId, actor, idOrKey, byId) {
+        const row = await this.get(workspaceId, idOrKey);
+        const by = await this.get(workspaceId, byId);
+        if (by.id === row.id)
+            throw new BadRequestException('A decision cannot supersede itself');
+        if (row.status !== 'accepted' && row.status !== 'proposed')
+            throw new ConflictException(`Decision is ${row.status} and cannot be superseded`);
+        if (by.status === 'superseded' || by.status === 'rejected')
+            throw new ConflictException(`Decision ${by.key} is ${by.status} and cannot supersede another`);
+        for (let cursor = by, i = 0; cursor?.supersededById && i < 100; i++) {
+            if (cursor.supersededById === row.id)
+                throw new ConflictException('This would create a supersede cycle');
+            cursor = await this.repo.findOneBy({ id: cursor.supersededById, workspaceId });
+        }
+        row.status = 'superseded';
+        row.supersededById = by.id;
+        row.updatedAt = new Date();
+        await this.repo.save(row);
+        await this.record(row, actor, 'decision.superseded', { title: row.title, supersededBy: by.key });
+        await this.bus.touchMany(workspaceId, [...this.touched(row), ...this.touched(by)], 'decision.superseded');
+        return row;
+    }
+    async remove(workspaceId, actor, idOrKey) {
+        const row = await this.get(workspaceId, idOrKey);
+        await this.ds.transaction(async (m) => {
+            await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = $2`, [workspaceId, row.id]);
+            await m.query(`UPDATE "decisions" SET "supersededById" = NULL WHERE "workspaceId" = $1 AND "supersededById" = $2`, [workspaceId, row.id]);
+            await m.delete(DecisionEntity, { id: row.id });
+        });
+        await this.record(row, actor, 'decision.deleted', { title: row.title });
+        await this.bus.touchMany(workspaceId, this.touched(row), 'decision.deleted');
+    }
+};
+DecisionsService = __decorate([
+    Injectable(),
+    __param(5, InjectRepository(DecisionEntity)),
+    __metadata("design:paramtypes", [DataSource,
+        RefsService,
+        CountersService,
+        EventsService,
+        WorkstreamBus, Function])
+], DecisionsService);
+export { DecisionsService };
+//# sourceMappingURL=decisions.service.js.map

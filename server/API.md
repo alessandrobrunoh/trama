@@ -1,0 +1,241 @@
+# Nabla API
+
+REST + SSE backend (NestJS 12, TypeORM, Postgres 17). Everything lives under the `/api` prefix. Entity shapes are defined in
+[`contracts/domain.ts`](../contracts/domain.ts) (synced to `src/contracts/domain.ts`); this file documents routes, auth and behaviour.
+Architecture and extension points: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after first boot: **demo@nabla.dev / nabla-demo** (workspace slug `acme`).
+
+## Conventions
+
+- JSON in, JSON out. Optional fields are **omitted**, never `null`, in responses. In `PATCH` bodies `null` clears an optional field; unknown fields are dropped silently.
+- Ids are opaque prefixed strings (`wk_…`, `ex_…`). Workstreams, intake items, decisions and teams can also be addressed by **key** (`AUTH-42`, `BUG-142`, `ADR-21`, `AUTH`) wherever the route says `:idOrKey`.
+- Dates are ISO-8601. Lists have no pagination except `events`.
+- Errors: `{ "statusCode": 400, "message": "…" | ["field validation messages"], "error": "Bad Request" }`. 400 validation / unknown reference, 401 not authenticated, 403 role too low (or missing CSRF header), 404 not found **or not a member of that workspace**, 409 conflict (duplicate key, cycle, wrong state), 415 non-JSON body.
+- Mutations return the updated entity (`204` for deletes). Actions (`/answer`, `/accept`, `/triage`, …) return the updated entity with `200`.
+
+## Authentication
+
+Two ways, accepted on every route except the public ones (`/health`, `/auth/signup`, `/auth/login`):
+
+1. **Cookie session** (browser). `POST /auth/login` or `/auth/signup` set an httpOnly `nabla_session` cookie (`SameSite=Lax`, `Secure` in production, 30 days; stored in Postgres as a sha256). The SPA must send credentials (`withCredentials: true`) and, on every **mutating** request (POST/PUT/PATCH/DELETE), a custom header **`X-Client-Id`** (or `X-Requested-With`) — requests without it get `403`. Bodies must be `application/json` (`415` otherwise). CORS allows `http://localhost:4300` and `:4301` (and `CORS_ORIGIN`) with credentials.
+2. **API token**: `Authorization: Bearer nbl_…`. Tokens belong to one workspace and act either as a **user** (same role as that user) or as an **agent** (role `member`). No CSRF header needed. Tokens are created via `POST /w/:slug/tokens`; the secret is returned once, only its sha256 and a display prefix are stored.
+
+| Route | Body | Result |
+|---|---|---|
+| `POST /auth/signup` | `{ name, email, password (≥ 8) }` | `201 { user, workspaces: [] }` + cookie. `409` if the email exists. |
+| `POST /auth/login` | `{ email, password }` | `200 { user, workspaces }` + cookie. `401` on bad credentials. |
+| `POST /auth/logout` | – | `204`, clears the session. |
+| `GET /auth/me` | – | `{ user, workspaces }`. `workspaces` = `Array<Workspace & { role }>`. Agent tokens get `403`. |
+| `GET /health` | – | `{ status: 'ok', db: 'up' }` or `503`. |
+
+## Roles (RBAC)
+
+`viewer` < `member` < `admin` < `owner`. Default: GET needs `viewer`, every write on domain entities needs `member`.
+`admin` additionally: create/update/delete **teams, repositories, agents, integrations**, add/change/remove **members**, edit the workspace, see all tokens.
+`owner` additionally: delete the workspace, grant/modify the `owner` role. A workspace always keeps at least one owner (`409`).
+Agent tokens act as `member` (they cannot accept/reject decisions, own views, mint tokens or call `/snapshot` and `/auth/me`).
+A caller who is not a member of `:slug` (or whose token belongs to another workspace) gets **404**.
+
+## Workspaces, members, agents, tokens
+
+| Route | Role | Notes |
+|---|---|---|
+| `GET /workspaces` | user | Mine, each `Workspace & { role }`. |
+| `POST /workspaces` | user | `{ name, slug? }`. Creator becomes `owner`. Slug auto-derived from the name (unique; reserved: `login`, `signup`, `new-workspace`, `settings`, …). `409` if an explicit slug is taken. |
+| `GET /w/:slug` | viewer | `Workspace & { role }` |
+| `PATCH /w/:slug` | admin | `{ name?, slug? }` |
+| `DELETE /w/:slug` | owner | `204`, cascades everything |
+| `GET /w/:slug/members` | viewer | `Array<Membership & { user: User }>` |
+| `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
+| `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Last owner cannot be demoted (`409`). |
+| `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
+| `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |
+| `GET /w/:slug/tokens` | member | Admins see all tokens, others only their own. `ApiToken[]` (never contains the hash). |
+| `POST /w/:slug/tokens` | member (user) | `{ name, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. |
+| `DELETE /w/:slug/tokens/:id` | own or admin | revoke |
+
+## Workspace snapshot
+
+`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, workstreams, executions, inputRequests, intake, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
+
+## Domain routes (all under `/w/:slug`)
+
+`PATCH` is partial. List filters are query params. “member” = default write role.
+
+### Teams — `/teams` (writes: admin)
+`GET`, `GET /:idOrKey`, `POST { name, key (^[A-Z][A-Z0-9]{1,7}$), color?, description?, memberIds? }`, `PATCH /:idOrKey { name?, color?, description?, memberIds? }` (the key is immutable), `DELETE /:idOrKey` (`409` while it owns workstreams; detaches it from participating lists, intake and executions otherwise). `memberIds` must be workspace members.
+
+### Repositories — `/repositories` (writes: admin)
+`POST { provider: github|gitlab, fullName: "owner/name", url?, defaultBranch?, teamIds? }` (unique per provider+name), `PATCH { url?, defaultBranch?, teamIds? }`, `DELETE` (removes it from workstreams/executions).
+
+### Workstreams — `/workstreams`
+- `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
+- `GET /:idOrKey`
+- `POST { title, ownerTeamId, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|canceled, targetDate? }`
+  - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
+  - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.
+- `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
+- `DELETE /:idOrKey` (cascades executions, input requests, artifacts, dependencies, comments; unlinks intake/decisions).
+- Criteria (each returns the updated workstream): `POST /:idOrKey/criteria { text, state? }`, `PATCH /:idOrKey/criteria/:criterionId { text?, state? }`, `DELETE /:idOrKey/criteria/:criterionId`. States: `pending|in_progress|met`.
+- `status` / `derivedStatus` / `shippedAt` are written by the status engine (see *Derived workstream status* below); `status = statusOverride ?? derivedStatus`.
+
+### Executions — `/executions`
+- `GET ?workstreamId&state&parentExecutionId&teamId`, `GET /:id`
+- `POST { workstreamId, title, parentExecutionId?, description?, teamId?, repositoryIds?, performers?: [{type: user|agent|team, id}], provider?, state?, dependsOnExecutionIds?, sessionUrl?, branch?, progressNote? }`. Performers default to the caller; `provider` defaults from the first agent performer (else `human`); state default `queued`. The parent must be an execution of the same workstream.
+- `PATCH /:id` (same fields, no `workstreamId`). Moving the state sets `startedAt` / `completedAt`; parent cycles → `400`.
+- `POST /:id/progress { note, state? }` → sets `progressNote`, optionally moves the state. `POST /:id/complete { note? }` → state `completed`.
+- `dependsOnExecutionIds` is **derived from `dependencies`** (execution→execution edges); writing it creates/removes those edges (cycles → `409`).
+
+### Input requests — `/input-requests`
+`GET ?state&workstreamId&executionId&assigneeUserId`, `GET /:id`, `POST { question, executionId?, workstreamId?, options?, assigneeUserId? }` (one of workstreamId/executionId required; `requestedBy` = caller), `PATCH` (open only), `POST /:id/answer { answer }`, `POST /:id/dismiss` (`409` if not open), `DELETE`.
+
+### Intake — `/intake`
+- `GET ?kind&state&teamId&workstreamId&q`, `GET /:idOrKey` (`BUG-142` or id)
+- `POST { kind, title, body?, source?, reporterName?, teamId?, priority?, externalUrl? }` → key `BUG-n|FEAT-n|INC-n|DEBT-n|FB-n|IDEA-n|SEC-n`, numbering per kind. State `new`.
+- `PATCH /:idOrKey { title?, body?, reporterName?, teamId?, priority?, externalUrl?, workstreamIds? }`
+- `POST /:idOrKey/triage { state: new|triaged|accepted|declined|duplicate, workstreamIds?, createWorkstream?: { title, ownerTeamId, objective?, … same as workstream create }, duplicateOfId?, teamId?, priority? }` — links existing and/or newly created workstreams (created atomically); `duplicate` requires `duplicateOfId` (id or key); `declined`/`duplicate` cannot link workstreams.
+- `DELETE /:idOrKey`
+
+### Artifacts — `/artifacts`
+`GET ?workstreamId&executionId&repositoryId&kind&state`, `POST { workstreamId, kind, title, executionId?, repositoryId?, provider?, url?, externalId?, state?, ci?, review?, hasConflicts?, environment? }`, `PATCH` (same fields), `DELETE`. Defaults: PR/MR → `open`, ci `pending`, review `none`, no conflicts; provider `github`/`gitlab` by kind; document/design/release → `published`, commit → `merged`, build/deployment → `pending`. `review.requested` is recorded when review becomes `requested`.
+
+### Decisions — `/decisions`
+`GET ?status&workstreamId&tag&q`, `GET /:idOrKey` (`ADR-21`), `POST { title, statement, rationale?, status?: proposed|accepted|rejected, originWorkstreamId?, originExecutionId?, relatedWorkstreamIds?, tags? }` (key `ADR-n` per workspace; `accepted`/`rejected` at creation need a person), `PATCH` (content only), `POST /:idOrKey/accept` and `/reject` (people only; `409` unless `proposed`), `POST /:idOrKey/supersede { byId }` (id or key; `409` on cycles or when the replacement is itself superseded/rejected), `DELETE`.
+
+### Dependencies — `/dependencies`
+`GET ?fromId&toId`, `POST { fromType, fromId, toType, toId }` (types `workstream|execution`; `from` blocks `to`; `400` for self/unknown nodes, `409` for duplicates and **cycles**), `DELETE /:id`.
+
+### Comments — `/comments`
+`GET ?subjectType&subjectId`, `POST { subject: { type, id }, body }` (subject must exist in the workspace; types: workstream, execution, intake, artifact, decision, input_request, repository, team), `PATCH /:id { body }` (author only), `DELETE /:id` (author or admin).
+
+### Views — `/views`
+`GET` (shared + your private), `GET /:id`, `POST { name, entity: workstream|intake|execution|decision, filters?, sort?, groupBy?, layout?: list|board|graph, shared? }`, `PATCH`, `DELETE`. Only the owner (or an admin, for shared views) can change a view; other people's private views are `404`.
+
+### Attention — `/attention` (human attention: agent tokens get `403`)
+`GET /attention?scope=mine|all&state=open|snoozed|dismissed|active` → `AttentionItem[]` for the caller (PLAN.md §3). `scope=all` (admin+, else `403`) returns every item of the workspace. `state=active` = open + snoozed. Without `state` dismissed/snoozed items are included with their `state` (the snapshot's `attention` is this unfiltered list). Sorted by severity (high → low), then `since` ascending (longest waiting first).
+
+- **Relevance**: accountable user, members of the owner/participating teams. Narrower: `input_requested` goes to the assignee (else the accountable user, else the owner team); `review_requested` to the accountable user + owner team; `triage` to members of the item's team (intake without a team: workspace admins/owners, id `triage:workspace`). Workstreams with a `statusOverride` and shipped workstreams raise nothing.
+- **Kinds / severity**: `input_requested` high, `needs_decision` high, `ci_failed` high, `blocked` high (blocked/failed executions; CI, conflicts and dependencies have their own kinds), `review_requested` medium, `conflict` medium, `ready_to_land` medium, `deadline` medium (high when overdue; within 3 days), `dependency` low (another team's unshipped workstream), `ready_to_ship` low, `triage` low (one item per team, with a count).
+- **Ids** are stable: `${kind}:${sourceEntityId}` (`ci_failed:ar_…`, `triage:tm_…`). URL-encode the colon in paths if your client does not.
+- `since` is when the condition started (event log where available, else the entity timestamp). A **dismissed item reappears only if its `since` changes**; a **snoozed item reappears after `until`**.
+- `POST /attention/:id/dismiss` · `POST /attention/:id/snooze { until: ISO (future) }` · `POST /attention/:id/restore` → the updated `AttentionItem` (`404` when the item does not currently exist for you, `400` for a past `until`). State is per user (`attention_state`).
+- A `LiveEvent { type: 'attention', entity: 'workstream', id }` is published whenever a workstream is touched (any underlying change) and on dismiss/snooze/restore; refetch `GET /attention`.
+
+### Graph — `GET /graph`, `GET /workstreams/:idOrKey/graph`
+Query (all optional): `teamId` (workstreams owned by / participating the team), `workstreamId`, `includeArtifacts` (default `true`), `includeActors` (users, agents, teams; default `true`), `includeRepositories` (default `true`). Dependency edges that leave the selection pull in the other end as nodes with `data.external = true`. Types (copy into the client):
+
+```ts
+export type GraphNodeType = 'workstream' | 'execution' | 'artifact' | 'agent' | 'user' | 'team' | 'repository';
+export type GraphEdgeKind = 'contains' | 'subthread' | 'depends_on' | 'produces' | 'performed_by' | 'targets';
+
+export interface GraphNode {
+  id: string;                 // the entity id (wk_…, ex_…, ar_…, ag_…, usr_…, tm_…, rp_…)
+  type: GraphNodeType;
+  label: string;              // workstream: "AUTH-42 Title"; others: title / name / fullName
+  status?: string;            // workstreams only: effective WorkstreamStatus
+  state?: string;             // executions and artifacts: ExecutionState / ArtifactState
+  parentId?: string;          // execution → parent execution or workstream; artifact → execution or workstream; workstream → owner team
+  data: Record<string, unknown>; // workstream: key, title, priority, derivedStatus, ownerTeamId, participatingTeamIds, accountableUserId?, targetDate?, external?
+                                 // execution: workstreamId, provider, parentExecutionId?, progressNote?, sessionUrl?, branch?
+                                 // artifact: kind, workstreamId, executionId?, url?, externalId?, ci?, review?, hasConflicts?, environment?
+                                 // agent: provider · user: email, avatarHue · team: key, color · repository: fullName, provider, url, defaultBranch
+}
+
+export interface GraphEdge {
+  id: string;                 // `${kind}:${source}>${target}`
+  source: string;
+  target: string;
+  kind: GraphEdgeKind;
+}
+
+export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
+```
+
+Edge semantics: `contains` team → workstream, workstream → top-level execution, workstream → artifact without an execution; `subthread` parent execution → child execution; `produces` execution → artifact; `performed_by` execution → agent/user/team; `targets` workstream/execution → repository; **`depends_on` source depends on (waits for) target**, i.e. it points from the blocked node to its blocker (workstream↔workstream or execution↔execution, as stored in `dependencies`).
+
+### Search — `GET /search?q=&types=&limit=`
+`types` is a comma list of `workstream,intake,decision,execution,artifact,repository,team` (default all); `limit` 1–100 (default 20). ILIKE on key / title / body (workstream objective, decision statement, intake body, execution description, artifact title + externalId, repository fullName, team name + key); every whitespace-separated term must match. Response `{ results: [{ type, id, key?, title, subtitle, workstreamKey?, score }] }` sorted by score (exact key 100, key prefix 80, key contains 60, title exact 70 / prefix 55 / contains 40, all terms in title 30, body 20), ties broken by type (workstream, decision, intake, execution, artifact, repository, team). `workstreamKey` is set for executions and artifacts. Readable by agent tokens.
+
+### Agent Context — `GET /workstreams/:idOrKey/context`
+Viewer+ and agent tokens. `text/markdown` by default; JSON with `Accept: application/json` or `?format=json`. Markdown sections: `# KEY — title`, status line, Objective, Acceptance Criteria (`- [x]` met, `- [ ]` pending, `- [ ] … _(in progress)_`), Context, Repositories (fullName — url, default branch), Teams, Dependencies (what it waits on with resolution state, what it blocks), Decisions (accepted with rationale one-liners; proposed flagged; superseded marked "do not follow"), Related intake, Artifacts (state, CI, review, conflicts), Executions, Open input requests, Recent progress (last 10 progress notes / state changes / answers). Empty sections are omitted. The JSON mirrors the same data (`AgentContext` in `src/agent-context/agent-context.service.ts`).
+
+### MCP
+Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools over the same services; see PLAN.md §4). Agents can use the REST API with a `Bearer nbl_…` agent token in the meantime.
+
+## Derived workstream status
+
+`status` / `derivedStatus` / `shippedAt` are written by the status engine (`src/status`), never by clients: after any change to a workstream or its criteria, executions, input requests, artifacts, originating decisions or dependencies (and on boot / after seed reset) it re-derives PLAN.md §2 (first match wins; `status = statusOverride ?? derivedStatus`), sets `shippedAt` the first time it ships, and on a change records a `workstream.status_changed` event (`actor: system`, `data: { key, title, from, to, derivedStatus }`). Workstreams that depend on it are re-derived too. Clarifications: closed (abandoned) PRs/MRs do not hold back "all PRs merged"; a failed execution stops blocking once a later-created completed execution with the same parent exists; only `open` PRs (not `draft`) count for CI/conflict/review rules; dependency edges into an already-terminal execution are ignored.
+
+## Events (activity log + live updates)
+
+- `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `intake.created|triaged|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
+- `GET /events/stream` — **Server-Sent Events**, one `LiveEvent` JSON per message (`{ type: created|updated|deleted|attention, entity, id, clientId?, at }`), plus a named `ping` event every 25 s. `clientId` echoes the `X-Client-Id` header of the request that caused the change, so a tab can ignore its own echoes. Use `new EventSource(url, { withCredentials: true })` (cookie auth; EventSource cannot send headers).
+
+## Dev utilities
+
+`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 intake items, comments, 5 saved views and ~300 events over the last 6 weeks.
+
+## Configuration
+
+`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/nabla`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
+
+## Integrations — `/w/:slug/integrations` (admin and above)
+
+Connections to GitHub, GitLab (including GitHub Enterprise / self-hosted GitLab) and Delta. Tokens and webhook secrets are encrypted at rest (AES-256-GCM, key `NABLA_ENCRYPTION_KEY`) and **never returned**. Responses are the contract `IntegrationConnection` plus `webhookUrl`, `repositoryIds` (linked repositories) and `lastWebhookAt` (last delivery seen).
+
+| Route | Notes |
+|---|---|
+| `GET /integrations`, `GET /integrations/:id` | list / one. |
+| `POST /integrations` | `{ provider: github\|gitlab\|delta, token, baseUrl? }` → `201 { connection, webhook? }`. The token is checked against the provider's "current user" API (`400` when rejected or rate limited, `502` when unreachable); `account` is taken from the answer. `baseUrl`: GitHub Enterprise (`https://ghe.example.com`, API at `/api/v3`) or self-hosted GitLab (default `https://gitlab.com`). Delta needs `baseUrl` and is a stub (stored, no validation call, no webhook). `409` for a duplicate provider+account+baseUrl. `webhook = { url, secret, contentType, events }`: **the secret is only ever shown here and in `rotate-webhook-secret`**. |
+| `PATCH /integrations/:id` | `{ token?, baseUrl? }` — re-validates and updates `account`/`status`. |
+| `DELETE /integrations/:id` | `204`. Repositories and artifacts stay; webhook calls then answer `404`. |
+| `POST /integrations/:id/rotate-webhook-secret` | `200 { connection, webhook }` with a new secret; the old one stops working immediately. |
+| `GET /integrations/:id/remote-repositories?page&perPage(≤100, default 30)` | `{ items: [{ fullName, url, defaultBranch, private?, description?, linked, repositoryId? }], page, perPage, hasMore }` — repositories visible to the token. |
+| `POST /integrations/:id/link-repository` | `{ fullName, teamIds? }` — checks the repository is visible to the token, creates the `Repository` (url + default branch from the provider; `201`) or adopts the existing row (`200`), and attaches it to the connection. |
+| `DELETE /integrations/:id/repositories/:repositoryId` | `204`, detaches (the Repository row stays). |
+
+### Required token scopes
+- **GitHub**: a fine-grained token with *Metadata: read* and *Pull requests: read* (and *Webhooks: read/write* if you want to create the webhook through the API) on the linked repositories, or a classic PAT with `repo` (or `public_repo`). The token is used for "current user" and repository discovery.
+- **GitLab**: a personal/project access token with `read_api` (use `api` if you want Nabla to manage hooks later).
+
+### Webhook setup (shown in Settings → Integrations)
+**GitHub** — repository (or organization) *Settings → Webhooks → Add webhook*:
+1. *Payload URL*: the `webhook.url` returned on creation (`${PUBLIC_URL}/api/webhooks/github/<connectionId>`).
+2. *Content type*: **`application/json`** (form-encoded is rejected with `415`).
+3. *Secret*: the `webhook.secret`.
+4. *Events*: "Let me select individual events" → **Pull requests, Check suites, Check runs, Statuses** (more events are harmless: unknown ones answer `202`).
+5. Link the repository to the connection (`link-repository`); events for unlinked repositories are ignored (`202`).
+
+**GitLab** — project *Settings → Webhooks → Add new webhook*:
+1. *URL*: `webhook.url` (`${PUBLIC_URL}/api/webhooks/gitlab/<connectionId>`).
+2. *Secret token*: the `webhook.secret`.
+3. *Triggers*: **Merge request events, Pipeline events**. Keep *Enable SSL verification* on.
+
+`PUBLIC_URL` must be the externally reachable base URL of this API (falls back to the request's own host when unset).
+
+## Webhooks — `POST /webhooks/github/:connectionId`, `POST /webhooks/gitlab/:connectionId` (public)
+
+No session or token: authenticity is the signature. GitHub: `X-Hub-Signature-256` (HMAC-SHA256 of the **raw** body, timing-safe compare); GitLab: `X-Gitlab-Token` equals the secret. Raw bytes are captured for `/api/webhooks/*` only, the global JSON parser is unchanged. Bodies must be JSON.
+
+| Result | Meaning |
+|---|---|
+| `200 { status: 'processed', artifactsCreated, artifactsUpdated, workstreams }` | applied (also `{ status: 'pong' }` for GitHub `ping`, `{ status: 'duplicate' }` for a replayed delivery id) |
+| `202 { status: 'ignored', reason }` | accepted but nothing to do: unhandled event/action, repository not linked, no workstream key found, CI for an untracked commit |
+| `400` | unparsable JSON or a payload that does not have the documented shape (never `500`) |
+| `401` | missing / wrong signature or token |
+| `404` | unknown connection id (or wrong provider) |
+
+Idempotency: `X-GitHub-Delivery` / `X-Gitlab-Event-UUID` ids are stored in `webhook_deliveries` (pruned after 7 days); the artifact upsert is also idempotent on its own.
+
+**Handled events**
+- GitHub `pull_request` (opened, reopened, edited, synchronize, closed, ready_for_review, converted_to_draft, review_requested, review_request_removed), `check_suite`, `check_run`, `status`, `ping`.
+- GitLab `merge_request` (any action; approved/unapproved set the review state), `pipeline`.
+
+**Mapping.** A PR/MR becomes an Artifact (`pull_request` `#182` / `merge_request` `!12`) per linked workstream, upserted by (repository, kind, externalId, workstream). Workstreams are found by keys (`\b[A-Z][A-Z0-9]{1,9}-\d+\b`, validated against the workspace's real keys) in the title and body, and — case-insensitively, `auth-42/rotation` — in the branch name. The artifact attaches to the execution of that workstream whose `branch` equals the head branch. State: `draft|open|merged|closed`; `hasConflicts` from `mergeable(_state)` / `detailed_merge_status`; new commits reset `ci` to `pending`; `review` follows review requests (GitHub) and approvals (GitLab). CI events (`check_suite`/`check_run`/`status`, `pipeline`) carry only a commit sha (and PR numbers when available) and update `ci` (`passing` / `failing` / `pending`) of the PR/MRs whose head is that sha; cancelled/stale runs count as `pending`. Every change goes through `ArtifactsService`, i.e. it records `artifact.attached` / `artifact.updated` (with `changes`) / `review.requested` events by the `system` actor and touches the workstream so the status engine recomputes.
+
+### Not implemented yet (documented TODOs)
+- `POST /integrations/:id/sync` (history backfill: open + recently closed PRs/MRs, reviews, mergeability, deployments, releases). Until it exists, only events received after the webhook is set up are reflected.
+- GitHub `pull_request_review`, `push` (commit and branch artifacts), `deployment_status`, `release`; GitLab `push`, `deployment`, `release`.
+- Delta: connection type only (no session discovery; `sessionUrl` links on executions work as before).
+- CI is derived from the single event received, not re-aggregated across all check suites of a commit.

@@ -1,0 +1,1277 @@
+// NablaStore — the client-side copy of the current workspace (WorkspaceSnapshot) in signals,
+// with lookup selectors and optimistic mutations. See ../CONTRACT.md for the full API.
+//
+// Write model
+//  - updates/deletes/dismissals are OPTIMISTIC (applied locally at once, rolled back on error);
+//  - creates wait for the server (ids, keys and derived fields are server-assigned) and then
+//    insert the returned entity;
+//  - all writes go through one serial queue, so edits apply on the server in call order;
+//  - after writes settle the snapshot is re-fetched (debounced) because the server derives
+//    status + attention; unchanged entities keep their object identity;
+//  - mutation methods NEVER reject: they toast on failure and resolve `undefined` / `false`.
+import { Injectable, computed, inject, signal, type WritableSignal } from '@angular/core';
+import { ApiClient } from '../api/api-client';
+import { ApiError } from '../api/api-error';
+import type {
+  AddMemberInput,
+  CreateAgentInput,
+  CreateArtifactInput,
+  CreateDecisionInput,
+  CreateDependencyInput,
+  CreateExecutionInput,
+  CreateInputRequestInput,
+  CreateIntakeInput,
+  CreateIntegrationInput,
+  CreateRepositoryInput,
+  CreateTeamInput,
+  CreateTokenInput,
+  CreatedToken,
+  CreateViewInput,
+  CreateWorkstreamInput,
+  CriterionInput,
+  CriterionPatch,
+  EventsQuery,
+  ReportProgressInput,
+  TriageIntakeInput,
+  UpdateAgentInput,
+  UpdateArtifactInput,
+  UpdateDecisionInput,
+  UpdateExecutionInput,
+  UpdateIntakeInput,
+  UpdateRepositoryInput,
+  UpdateTeamInput,
+  UpdateViewInput,
+  UpdateWorkstreamInput,
+} from '../api/api.types';
+import type {
+  AcceptanceCriterion,
+  ActorRef,
+  ActorType,
+  Agent,
+  ApiToken,
+  Artifact,
+  AttentionItem,
+  AttentionKind,
+  Comment,
+  Decision,
+  Dependency,
+  DomainEvent,
+  Execution,
+  ExecutionProvider,
+  ID,
+  InputRequest,
+  IntakeItem,
+  IntegrationConnection,
+  Membership,
+  Repository,
+  Role,
+  SavedView,
+  SubjectRef,
+  Team,
+  User,
+  Workspace,
+  WorkspaceSnapshot,
+  Workstream,
+} from '../contracts/domain';
+import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
+import { Notifier } from '../notify/notifier';
+import { reconcileList, reconcileOne } from '../sync/reconcile';
+import { SyncStatus } from '../sync/sync-status';
+
+type Row = { id: string };
+type Rec = Record<string, unknown>;
+
+export type LoadResult = 'ok' | 'not-found' | 'error';
+export type StoreStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+/** An actor (user / agent / team / system) resolved to display data. */
+export interface ResolvedActor {
+  type: ActorType;
+  id?: ID;
+  name: string;
+  /** Users: avatar hue. */
+  hue?: number;
+  /** Teams: team colour. */
+  color?: string;
+  /** Teams: key (AUTH). Agents: provider. */
+  key?: string;
+  provider?: Exclude<ExecutionProvider, 'human'>;
+  known: boolean;
+}
+
+export interface ExecutionNode {
+  execution: Execution;
+  children: ExecutionNode[];
+}
+
+export interface MemberRow {
+  membership: Membership;
+  user: User;
+}
+
+const REFETCH_DEBOUNCE_MS = 400;
+
+function newest<T extends { at: string }>(a: T, b: T): number {
+  return b.at < a.at ? -1 : b.at > a.at ? 1 : 0;
+}
+
+function groupBy<T, K>(list: readonly T[], keyOf: (item: T) => K | K[] | undefined): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const item of list) {
+    const key = keyOf(item);
+    if (key === undefined) continue;
+    for (const k of Array.isArray(key) ? key : [key]) {
+      const bucket = map.get(k);
+      if (bucket) bucket.push(item);
+      else map.set(k, [item]);
+    }
+  }
+  return map;
+}
+
+function indexById<T extends Row>(list: readonly T[]): Map<string, T> {
+  return new Map(list.map((x) => [x.id, x]));
+}
+
+/** Apply a PATCH-style body locally: `null` clears the field, `undefined` is ignored. */
+function applyPatch<T>(entity: T, patch: object): T {
+  const out = { ...(entity as Rec) };
+  for (const [k, v] of Object.entries(patch)) {
+    if (v === undefined) continue;
+    if (v === null) delete out[k];
+    else out[k] = v;
+  }
+  return out as T;
+}
+
+const subjectKey = (type: string, id: string) => `${type}:${id}`;
+
+@Injectable({ providedIn: 'root' })
+export class NablaStore {
+  private readonly api = inject(ApiClient);
+  private readonly notifier = inject(Notifier);
+  private readonly sync = inject(SyncStatus);
+
+  // ─────────────────────────── meta ───────────────────────────
+
+  /** Slug of the workspace currently loaded (or loading). */
+  readonly slug = signal<string | null>(null);
+  readonly status = signal<StoreStatus>('idle');
+  readonly ready = computed(() => this.status() === 'ready');
+  readonly loadError = signal<ApiError | null>(null);
+
+  private readonly _workspace = signal<Workspace | null>(null);
+  private readonly _me = signal<User | null>(null);
+  private readonly _myRole = signal<Role | null>(null);
+  readonly workspace = this._workspace.asReadonly();
+  readonly me = this._me.asReadonly();
+  readonly myRole = this._myRole.asReadonly();
+
+  // ─────────────────────────── collections (one signal each) ───────────────────────────
+
+  private readonly _users = signal<readonly User[]>([]);
+  private readonly _memberships = signal<readonly Membership[]>([]);
+  private readonly _agents = signal<readonly Agent[]>([]);
+  private readonly _teams = signal<readonly Team[]>([]);
+  private readonly _repositories = signal<readonly Repository[]>([]);
+  private readonly _workstreams = signal<readonly Workstream[]>([]);
+  private readonly _executions = signal<readonly Execution[]>([]);
+  private readonly _inputRequests = signal<readonly InputRequest[]>([]);
+  private readonly _intake = signal<readonly IntakeItem[]>([]);
+  private readonly _artifacts = signal<readonly Artifact[]>([]);
+  private readonly _decisions = signal<readonly Decision[]>([]);
+  private readonly _dependencies = signal<readonly Dependency[]>([]);
+  private readonly _comments = signal<readonly Comment[]>([]);
+  private readonly _events = signal<readonly DomainEvent[]>([]);
+  private readonly _attention = signal<readonly AttentionItem[]>([]);
+  private readonly _views = signal<readonly SavedView[]>([]);
+  private readonly _integrations = signal<readonly IntegrationConnection[]>([]);
+  private readonly _tokens = signal<readonly ApiToken[]>([]);
+
+  readonly users = this._users.asReadonly();
+  readonly memberships = this._memberships.asReadonly();
+  readonly agents = this._agents.asReadonly();
+  readonly teams = this._teams.asReadonly();
+  readonly repositories = this._repositories.asReadonly();
+  readonly workstreams = this._workstreams.asReadonly();
+  readonly executions = this._executions.asReadonly();
+  readonly inputRequests = this._inputRequests.asReadonly();
+  readonly intake = this._intake.asReadonly();
+  readonly artifacts = this._artifacts.asReadonly();
+  readonly decisions = this._decisions.asReadonly();
+  readonly dependencies = this._dependencies.asReadonly();
+  readonly comments = this._comments.asReadonly();
+  /** Newest first. */
+  readonly events = this._events.asReadonly();
+  /** All attention items for me (open, snoozed and dismissed). */
+  readonly attention = this._attention.asReadonly();
+  readonly views = this._views.asReadonly();
+  readonly integrations = this._integrations.asReadonly();
+  /** Loaded on demand by `loadTokens()` (not part of the snapshot). */
+  readonly tokens = this._tokens.asReadonly();
+
+  // ─────────────────────────── lookups ───────────────────────────
+
+  readonly userById = computed(() => indexById(this._users()));
+  readonly agentById = computed(() => indexById(this._agents()));
+  readonly teamById = computed(() => indexById(this._teams()));
+  readonly teamByKey = computed(() => new Map(this._teams().map((t) => [t.key.toUpperCase(), t])));
+  readonly repositoryById = computed(() => indexById(this._repositories()));
+  readonly workstreamById = computed(() => indexById(this._workstreams()));
+  /** Keyed by upper-case key (`AUTH-42`). */
+  readonly workstreamByKey = computed(
+    () => new Map(this._workstreams().map((w) => [w.key.toUpperCase(), w])),
+  );
+  readonly executionById = computed(() => indexById(this._executions()));
+  readonly inputRequestById = computed(() => indexById(this._inputRequests()));
+  readonly intakeById = computed(() => indexById(this._intake()));
+  readonly intakeByKey = computed(() => new Map(this._intake().map((i) => [i.key.toUpperCase(), i])));
+  readonly artifactById = computed(() => indexById(this._artifacts()));
+  readonly decisionById = computed(() => indexById(this._decisions()));
+  readonly decisionByKey = computed(
+    () => new Map(this._decisions().map((d) => [d.key.toUpperCase(), d])),
+  );
+  readonly viewById = computed(() => indexById(this._views()));
+  readonly integrationById = computed(() => indexById(this._integrations()));
+  readonly membershipByUserId = computed(
+    () => new Map(this._memberships().map((m) => [m.userId, m])),
+  );
+
+  /** Memberships joined with their users (settings → members). */
+  readonly members = computed<MemberRow[]>(() => {
+    const users = this.userById();
+    const rows: MemberRow[] = [];
+    for (const membership of this._memberships()) {
+      const user = users.get(membership.userId);
+      if (user) rows.push({ membership, user });
+    }
+    return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
+  });
+
+  /** Executions of a workstream (created order), by workstream id. */
+  readonly executionsByWorkstream = computed(() =>
+    groupBy(this._executions(), (e) => e.workstreamId),
+  );
+  /** Direct sub-executions, by parent execution id. */
+  readonly childExecutions = computed(() =>
+    groupBy(this._executions(), (e) => e.parentExecutionId),
+  );
+  /** Execution tree (roots with nested children), by workstream id. */
+  readonly executionTrees = computed(() => {
+    const children = this.childExecutions();
+    const build = (execution: Execution, seen: Set<string>): ExecutionNode => {
+      seen.add(execution.id);
+      return {
+        execution,
+        children: (children.get(execution.id) ?? [])
+          .filter((c) => !seen.has(c.id))
+          .map((c) => build(c, seen)),
+      };
+    };
+    const byId = this.executionById();
+    const trees = new Map<ID, ExecutionNode[]>();
+    for (const [wsId, list] of this.executionsByWorkstream()) {
+      const roots = list.filter((e) => !e.parentExecutionId || !byId.has(e.parentExecutionId));
+      trees.set(wsId, roots.map((r) => build(r, new Set())));
+    }
+    return trees;
+  });
+  readonly inputRequestsByWorkstream = computed(() =>
+    groupBy(this._inputRequests(), (r) => r.workstreamId),
+  );
+  readonly inputRequestsByExecution = computed(() =>
+    groupBy(this._inputRequests(), (r) => r.executionId),
+  );
+  /** Open input requests, newest first. */
+  readonly openInputRequests = computed(() =>
+    this._inputRequests()
+      .filter((r) => r.state === 'open')
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
+  );
+  readonly artifactsByWorkstream = computed(() =>
+    groupBy(this._artifacts(), (a) => a.workstreamId),
+  );
+  readonly artifactsByExecution = computed(() => groupBy(this._artifacts(), (a) => a.executionId));
+  readonly artifactsByRepository = computed(() =>
+    groupBy(this._artifacts(), (a) => a.repositoryId),
+  );
+  /** Decisions that originate from, or are related to, a workstream. */
+  readonly decisionsByWorkstream = computed(() =>
+    groupBy(this._decisions(), (d) => {
+      const ids = new Set(d.relatedWorkstreamIds);
+      if (d.originWorkstreamId) ids.add(d.originWorkstreamId);
+      return [...ids];
+    }),
+  );
+  readonly intakeByWorkstream = computed(() =>
+    groupBy(this._intake(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
+  );
+  readonly intakeByTeam = computed(() => groupBy(this._intake(), (i) => i.teamId));
+  /** Workstreams owned by a team (by team id). */
+  readonly workstreamsByOwnerTeam = computed(() =>
+    groupBy(this._workstreams(), (w) => w.ownerTeamId),
+  );
+  /** Workstreams a team participates in, excluding ones it owns (by team id). */
+  readonly workstreamsByParticipatingTeam = computed(() =>
+    groupBy(this._workstreams(), (w) => w.participatingTeamIds),
+  );
+  readonly workstreamsByRepository = computed(() =>
+    groupBy(this._workstreams(), (w) => w.repositoryIds),
+  );
+  /** Dependencies pointing AT a node (what blocks it), keyed by node id (workstream or execution). */
+  readonly incomingDependencies = computed(() => groupBy(this._dependencies(), (d) => d.toId));
+  /** Dependencies leaving a node (what it blocks), keyed by node id. */
+  readonly outgoingDependencies = computed(() => groupBy(this._dependencies(), (d) => d.fromId));
+  /** Comments by `type:id` (e.g. `workstream:ws_1`), oldest first. */
+  readonly commentsBySubject = computed(() => {
+    const map = groupBy(this._comments(), (c) => subjectKey(c.subject.type, c.subject.id));
+    for (const list of map.values()) list.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+    return map;
+  });
+  /** Events by workstream id, newest first. */
+  readonly eventsByWorkstream = computed(() => {
+    const map = groupBy(this._events(), (e) => e.workstreamId);
+    for (const list of map.values()) list.sort(newest);
+    return map;
+  });
+  /** Events by `type:id` of their subject, newest first. */
+  readonly eventsBySubject = computed(() => {
+    const map = groupBy(this._events(), (e) => subjectKey(e.subject.type, e.subject.id));
+    for (const list of map.values()) list.sort(newest);
+    return map;
+  });
+
+  // ─────────────────────────── me / attention ───────────────────────────
+
+  /** Teams I'm a member of. */
+  readonly myTeams = computed(() => {
+    const id = this._me()?.id;
+    return id ? this._teams().filter((t) => t.memberIds.includes(id)) : [];
+  });
+  readonly myTeamIds = computed(() => new Set(this.myTeams().map((t) => t.id)));
+  /** Workstreams I'm accountable for. */
+  readonly myWorkstreams = computed(() => {
+    const id = this._me()?.id;
+    return id ? this._workstreams().filter((w) => w.accountableUserId === id) : [];
+  });
+
+  /** Open attention items, severity then newest first. */
+  readonly openAttention = computed(() =>
+    this._attention()
+      .filter((a) => a.state === 'open')
+      .sort(
+        (a, b) =>
+          SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity] ||
+          (a.since < b.since ? 1 : a.since > b.since ? -1 : 0),
+      ),
+  );
+  readonly snoozedAttention = computed(() => this._attention().filter((a) => a.state === 'snoozed'));
+  /** Open attention items grouped by kind (only kinds that have items). */
+  readonly attentionByKind = computed(() => groupBy(this.openAttention(), (a) => a.kind));
+  /** Open attention count per kind (0 for kinds without items). */
+  readonly attentionCounts = computed(() => {
+    const counts = Object.fromEntries(ATTENTION_KINDS.map((k) => [k, 0])) as Record<
+      AttentionKind,
+      number
+    >;
+    for (const item of this.openAttention()) counts[item.kind]++;
+    return counts;
+  });
+  /** Total open attention items (sidebar badge). */
+  readonly attentionCount = computed(() => this.openAttention().length);
+  readonly highAttentionCount = computed(
+    () => this.openAttention().filter((a) => a.severity === 'high').length,
+  );
+  /** Intake items still in state `new`. */
+  readonly newIntake = computed(() => this._intake().filter((i) => i.state === 'new'));
+  readonly intakeNewCount = computed(() => this.newIntake().length);
+
+  // ─────────────────────────── actor resolution ───────────────────────────
+
+  /** Everything that can perform work or be assigned: users, agents, teams. */
+  readonly actors = computed<ResolvedActor[]>(() => [
+    ...this._users().map((u) => this.resolveActor({ type: 'user', id: u.id })),
+    ...this._agents().map((a) => this.resolveActor({ type: 'agent', id: a.id })),
+    ...this._teams().map((t) => this.resolveActor({ type: 'team', id: t.id })),
+  ]);
+
+  resolveActor(ref: ActorRef | null | undefined): ResolvedActor {
+    if (!ref) return { type: 'system', name: 'Nabla', known: false };
+    switch (ref.type) {
+      case 'user': {
+        const u = ref.id ? this.userById().get(ref.id) : undefined;
+        return { type: 'user', id: ref.id, name: u?.name ?? 'Unknown user', hue: u?.avatarHue, known: !!u };
+      }
+      case 'agent': {
+        const a = ref.id ? this.agentById().get(ref.id) : undefined;
+        return { type: 'agent', id: ref.id, name: a?.name ?? 'Unknown agent', provider: a?.provider, known: !!a };
+      }
+      case 'team': {
+        const t = ref.id ? this.teamById().get(ref.id) : undefined;
+        return { type: 'team', id: ref.id, name: t?.name ?? 'Unknown team', color: t?.color, key: t?.key, known: !!t };
+      }
+      default:
+        return { type: 'system', name: 'Nabla', known: true };
+    }
+  }
+
+  actorName(ref: ActorRef | null | undefined): string {
+    return this.resolveActor(ref).name;
+  }
+
+  /** Build an ActorRef for a user id (e.g. the current user). */
+  userRef(id: ID): ActorRef {
+    return { type: 'user', id };
+  }
+
+  // ─────────────────────────── point lookups (id or key) ───────────────────────────
+
+  /** By id or key (`AUTH-42`, case-insensitive). */
+  getWorkstream(ref: string | null | undefined): Workstream | undefined {
+    if (!ref) return undefined;
+    return this.workstreamById().get(ref) ?? this.workstreamByKey().get(ref.toUpperCase());
+  }
+  getExecution(id: string | null | undefined): Execution | undefined {
+    return id ? this.executionById().get(id) : undefined;
+  }
+  /** By id or key (`BUG-142`). */
+  getIntake(ref: string | null | undefined): IntakeItem | undefined {
+    if (!ref) return undefined;
+    return this.intakeById().get(ref) ?? this.intakeByKey().get(ref.toUpperCase());
+  }
+  /** By id or key (`ADR-7`). */
+  getDecision(ref: string | null | undefined): Decision | undefined {
+    if (!ref) return undefined;
+    return this.decisionById().get(ref) ?? this.decisionByKey().get(ref.toUpperCase());
+  }
+  /** By id or key (`AUTH`). */
+  getTeam(ref: string | null | undefined): Team | undefined {
+    if (!ref) return undefined;
+    return this.teamById().get(ref) ?? this.teamByKey().get(ref.toUpperCase());
+  }
+  getRepository(id: string | null | undefined): Repository | undefined {
+    return id ? this.repositoryById().get(id) : undefined;
+  }
+  getUser(id: string | null | undefined): User | undefined {
+    return id ? this.userById().get(id) : undefined;
+  }
+  getArtifact(id: string | null | undefined): Artifact | undefined {
+    return id ? this.artifactById().get(id) : undefined;
+  }
+  getView(id: string | null | undefined): SavedView | undefined {
+    return id ? this.viewById().get(id) : undefined;
+  }
+  /** Comments on a subject, oldest first. */
+  commentsFor(subject: SubjectRef): readonly Comment[] {
+    return this.commentsBySubject().get(subjectKey(subject.type, subject.id)) ?? [];
+  }
+  /** Whether the current user may act at `minRole` or above. */
+  can(minRole: Role): boolean {
+    const order: Role[] = ['viewer', 'member', 'admin', 'owner'];
+    const mine = this._myRole();
+    return !!mine && order.indexOf(mine) >= order.indexOf(minRole);
+  }
+
+  // ─────────────────────────── loading ───────────────────────────
+
+  private loading: { slug: string; promise: Promise<LoadResult> } | null = null;
+  private refetchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Bumped when a write starts and when it settles; a refetch started before is stale. */
+  private epoch = 0;
+  private pending = 0;
+  private chain: Promise<unknown> = Promise.resolve();
+
+  /**
+   * Load the snapshot for `slug` (no-op refresh if already loaded). Resolves:
+   * `ok`, `not-found` (404/403: no such workspace / not a member) or `error`.
+   */
+  load(slug: string): Promise<LoadResult> {
+    if (this.loading?.slug === slug) return this.loading.promise;
+    if (this.slug() === slug && this.status() === 'ready') {
+      this.scheduleRefetch(0);
+      return Promise.resolve('ok');
+    }
+    this.reset();
+    this.slug.set(slug);
+    this.status.set('loading');
+    const promise = this.doLoad(slug).finally(() => {
+      if (this.loading?.promise === promise) this.loading = null;
+    });
+    this.loading = { slug, promise };
+    return promise;
+  }
+
+  private async doLoad(slug: string): Promise<LoadResult> {
+    try {
+      const snapshot = await this.api.workspaces.snapshot(slug);
+      if (this.slug() !== slug) return 'error';
+      this.applySnapshot(snapshot, false);
+      this.status.set('ready');
+      this.loadError.set(null);
+      return 'ok';
+    } catch (e) {
+      if (this.slug() !== slug) return 'error';
+      const err = ApiError.from(e);
+      this.loadError.set(err);
+      this.status.set('error');
+      this.sync.lastError.set(err.message);
+      return err.status === 404 || err.status === 403 ? 'not-found' : 'error';
+    }
+  }
+
+  /** Forget the loaded workspace (logout / workspace switch). */
+  reset(): void {
+    if (this.refetchTimer) clearTimeout(this.refetchTimer);
+    this.refetchTimer = null;
+    this.slug.set(null);
+    this.status.set('idle');
+    this.loadError.set(null);
+    this._workspace.set(null);
+    this._me.set(null);
+    this._myRole.set(null);
+    for (const c of [
+      this._users, this._memberships, this._agents, this._teams, this._repositories,
+      this._workstreams, this._executions, this._inputRequests, this._intake, this._artifacts,
+      this._decisions, this._dependencies, this._comments, this._events, this._attention,
+      this._views, this._integrations, this._tokens,
+    ] as WritableSignal<readonly Row[]>[]) {
+      c.set([]);
+    }
+  }
+
+  /** Re-fetch the snapshot now and merge it, preserving identity of unchanged entities. */
+  async refetch(): Promise<void> {
+    const slug = this.slug();
+    if (!slug || this.status() === 'loading') return;
+    if (this.pending > 0) return this.scheduleRefetch(REFETCH_DEBOUNCE_MS);
+    const startEpoch = this.epoch;
+    try {
+      const snapshot = await this.api.workspaces.snapshot(slug);
+      if (this.slug() !== slug) return;
+      // A write started/finished meanwhile: this snapshot may predate it. Try again.
+      if (this.epoch !== startEpoch || this.pending > 0) return this.scheduleRefetch(REFETCH_DEBOUNCE_MS);
+      this.applySnapshot(snapshot, true);
+      if (this.status() === 'error') this.status.set('ready');
+    } catch (e) {
+      this.sync.lastError.set(ApiError.from(e).message);
+    }
+  }
+
+  /** Debounced `refetch()`; used by writes and by LiveSync. */
+  scheduleRefetch(ms = REFETCH_DEBOUNCE_MS): void {
+    if (this.refetchTimer) clearTimeout(this.refetchTimer);
+    this.refetchTimer = setTimeout(() => {
+      this.refetchTimer = null;
+      void this.refetch();
+    }, ms);
+  }
+
+  private applySnapshot(s: WorkspaceSnapshot, merge: boolean): void {
+    const list = <T extends Row>(sig: WritableSignal<readonly T[]>, next: readonly T[]) =>
+      sig.set(merge ? reconcileList(sig(), next) : next);
+    this._workspace.update((p) => (merge ? reconcileOne(p, s.workspace) : s.workspace));
+    this._me.update((p) => (merge ? reconcileOne(p, s.me) : s.me));
+    this._myRole.set(s.myRole);
+    list(this._users, s.users);
+    list(this._memberships, s.memberships);
+    list(this._agents, s.agents);
+    list(this._teams, s.teams);
+    list(this._repositories, s.repositories);
+    list(this._workstreams, s.workstreams);
+    list(this._executions, s.executions);
+    list(this._inputRequests, s.inputRequests);
+    list(this._intake, s.intake);
+    list(this._artifacts, s.artifacts);
+    list(this._decisions, s.decisions);
+    list(this._dependencies, s.dependencies);
+    list(this._comments, s.comments);
+    // Events beyond the snapshot window (loaded via loadOlderEvents) are kept.
+    const older = merge ? this._events().filter((e) => !s.events.some((n) => n.id === e.id)) : [];
+    const oldest = s.events.reduce((m, e) => (e.at < m ? e.at : m), '9999');
+    list(this._events, [...s.events, ...older.filter((e) => e.at < oldest)].sort(newest));
+    list(this._attention, s.attention);
+    list(this._views, s.views);
+    list(this._integrations, s.integrations);
+    this.sync.lastSyncedAt.set(new Date().toISOString());
+    this.sync.lastError.set(null);
+  }
+
+  /** Load events older than the oldest one in memory (activity "load more"). Returns how many arrived. */
+  async loadOlderEvents(query: Omit<EventsQuery, 'before'> = {}): Promise<number> {
+    const slug = this.slug();
+    if (!slug) return 0;
+    const events = this._events();
+    const before = events.length ? events[events.length - 1].at : undefined;
+    try {
+      const older = await this.api.events.list(slug, { limit: 100, ...query, before });
+      const known = new Set(events.map((e) => e.id));
+      const fresh = older.filter((e) => !known.has(e.id));
+      if (fresh.length) this._events.set([...events, ...fresh].sort(newest));
+      return fresh.length;
+    } catch {
+      return 0;
+    }
+  }
+
+  // ─────────────────────────── write machinery ───────────────────────────
+
+  private requireSlug(): string {
+    const slug = this.slug();
+    if (!slug) throw new ApiError(0, 'No workspace loaded');
+    return slug;
+  }
+
+  private tx() {
+    const undo: (() => void)[] = [];
+    return {
+      /** Patch an entity (PATCH semantics: null clears, undefined ignored). */
+      patch: <T extends Row>(sig: WritableSignal<readonly T[]>, id: string, change: object) => {
+        const prev = sig().find((x) => x.id === id);
+        if (!prev) return;
+        const next = applyPatch(prev, change);
+        sig.update((list) => list.map((x) => (x.id === id ? next : x)));
+        undo.push(() =>
+          sig.update((list) =>
+            list.some((x) => x.id === id) ? list.map((x) => (x.id === id ? prev : x)) : [...list, prev],
+          ),
+        );
+      },
+      remove: <T extends Row>(sig: WritableSignal<readonly T[]>, id: string) => {
+        const prev = sig().find((x) => x.id === id);
+        if (!prev) return;
+        sig.update((list) => list.filter((x) => x.id !== id));
+        undo.push(() => sig.update((list) => (list.some((x) => x.id === id) ? list : [...list, prev])));
+      },
+      rollback: () => {
+        for (const fn of undo.reverse()) fn();
+        undo.length = 0;
+      },
+    };
+  }
+
+  /** Insert or replace an entity (used for server responses). */
+  private upsert<T extends Row>(sig: WritableSignal<readonly T[]>, entity: T): void {
+    sig.update((list) => {
+      const i = list.findIndex((x) => x.id === entity.id);
+      if (i < 0) return [...list, entity];
+      if (JSON.stringify(list[i]) === JSON.stringify(entity)) return list;
+      return list.map((x, idx) => (idx === i ? entity : x));
+    });
+  }
+
+  private enqueue<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.chain.then(job, job);
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  /**
+   * Run a server write through the serial queue. On error: roll back the optimistic tx,
+   * toast, resolve `{ ok: false }`. On settle: schedule a snapshot refetch.
+   */
+  private async attempt<T>(
+    label: string,
+    run: (slug: string) => Promise<T>,
+    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+  ): Promise<{ ok: true; value: T } | { ok: false }> {
+    this.pending++;
+    this.epoch++;
+    this.sync.pendingWrites.set(this.pending);
+    try {
+      const slug = this.requireSlug();
+      const value = await this.enqueue(() => run(slug));
+      options.onResult?.(value);
+      this.sync.lastError.set(null);
+      return { ok: true, value };
+    } catch (e) {
+      options.tx?.rollback();
+      const err = ApiError.from(e);
+      this.sync.lastError.set(err.message);
+      // 401 → session handling; 403 → ApiClient already toasted.
+      if (err.status !== 401 && err.status !== 403) {
+        this.notifier.error(`Could not ${label}`, { description: err.message });
+      }
+      return { ok: false };
+    } finally {
+      this.pending--;
+      this.epoch++;
+      this.sync.pendingWrites.set(this.pending);
+      this.scheduleRefetch();
+    }
+  }
+
+  /** Resolves the response body, or `undefined` on failure. */
+  private async write<T>(
+    label: string,
+    run: (slug: string) => Promise<T>,
+    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+  ): Promise<T | undefined> {
+    const r = await this.attempt(label, run, options);
+    return r.ok ? r.value : undefined;
+  }
+
+  /** Resolves `true` on success regardless of the response body. */
+  private async writeOk<T>(
+    label: string,
+    run: (slug: string) => Promise<T>,
+    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+  ): Promise<boolean> {
+    return (await this.attempt(label, run, options)).ok;
+  }
+
+  /** `write` for void results: resolves `true` on success, `false` on failure. */
+  private async ok(
+    label: string,
+    run: (slug: string) => Promise<unknown>,
+    options: { tx?: { rollback: () => void } } = {},
+  ): Promise<boolean> {
+    return this.writeOk(label, run, options);
+  }
+
+  private nowIso(): string {
+    return new Date().toISOString();
+  }
+
+  // ─────────────────────────── workstreams ───────────────────────────
+
+  async createWorkstream(input: CreateWorkstreamInput): Promise<Workstream | undefined> {
+    return this.write('create workstream', (s) => this.api.workstreams.create(s, input), {
+      onResult: (w) => this.upsert(this._workstreams, w),
+    });
+  }
+
+  /** `ref` = id or key. Optimistic; the server then re-derives status. */
+  async updateWorkstream(ref: string, patch: UpdateWorkstreamInput): Promise<boolean> {
+    const ws = this.getWorkstream(ref);
+    if (!ws) return false;
+    const tx = this.tx();
+    tx.patch(this._workstreams, ws.id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update workstream', (s) => this.api.workstreams.update(s, ws.id, patch), {
+      tx,
+      onResult: (w) => this.upsert(this._workstreams, w),
+    }).then((r) => !!r);
+  }
+
+  async deleteWorkstream(ref: string): Promise<boolean> {
+    const ws = this.getWorkstream(ref);
+    if (!ws) return false;
+    const tx = this.tx();
+    tx.remove(this._workstreams, ws.id);
+    for (const e of this._executions().filter((x) => x.workstreamId === ws.id)) tx.remove(this._executions, e.id);
+    for (const a of this._artifacts().filter((x) => x.workstreamId === ws.id)) tx.remove(this._artifacts, a.id);
+    for (const r of this._inputRequests().filter((x) => x.workstreamId === ws.id)) tx.remove(this._inputRequests, r.id);
+    return this.ok('delete workstream', (s) => this.api.workstreams.remove(s, ws.id), { tx });
+  }
+
+  // criteria ----------------------------------------------------------------
+
+  /** Waits for the server (the criterion id is server-assigned). Resolves the new criterion. */
+  async addCriterion(ref: string, input: CriterionInput): Promise<AcceptanceCriterion | undefined> {
+    const ws = this.getWorkstream(ref);
+    if (!ws) return undefined;
+    const before = new Set(ws.acceptanceCriteria.map((c) => c.id));
+    let created: AcceptanceCriterion | undefined;
+    await this.write('add criterion', (s) => this.api.workstreams.addCriterion(s, ws.id, input), {
+      onResult: (res) => {
+        const r = res as Rec | null;
+        if (r && Array.isArray(r['acceptanceCriteria'])) {
+          this.upsert(this._workstreams, r as unknown as Workstream);
+          created = (r['acceptanceCriteria'] as AcceptanceCriterion[]).find((c) => !before.has(c.id));
+        } else if (r && typeof r['id'] === 'string' && typeof r['text'] === 'string') {
+          created = r as unknown as AcceptanceCriterion;
+          const c = created;
+          this._workstreams.update((list) =>
+            list.map((w) =>
+              w.id === ws.id && !w.acceptanceCriteria.some((x) => x.id === c.id)
+                ? { ...w, acceptanceCriteria: [...w.acceptanceCriteria, c] }
+                : w,
+            ),
+          );
+        }
+      },
+    });
+    return created;
+  }
+
+  async updateCriterion(ref: string, criterionId: ID, patch: CriterionPatch): Promise<boolean> {
+    const ws = this.getWorkstream(ref);
+    if (!ws) return false;
+    const tx = this.tx();
+    tx.patch(this._workstreams, ws.id, {
+      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? { ...c, ...patch } : c)),
+    });
+    return this.ok('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), { tx });
+  }
+
+  async removeCriterion(ref: string, criterionId: ID): Promise<boolean> {
+    const ws = this.getWorkstream(ref);
+    if (!ws) return false;
+    const tx = this.tx();
+    tx.patch(this._workstreams, ws.id, {
+      acceptanceCriteria: ws.acceptanceCriteria.filter((c) => c.id !== criterionId),
+    });
+    return this.ok('remove criterion', (s) => this.api.workstreams.removeCriterion(s, ws.id, criterionId), { tx });
+  }
+
+  // ─────────────────────────── executions & input requests ───────────────────────────
+
+  async createExecution(input: CreateExecutionInput): Promise<Execution | undefined> {
+    return this.write('create execution', (s) => this.api.executions.create(s, input), {
+      onResult: (e) => this.upsert(this._executions, e),
+    });
+  }
+
+  async updateExecution(id: ID, patch: UpdateExecutionInput): Promise<boolean> {
+    if (!this.getExecution(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._executions, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update execution', (s) => this.api.executions.update(s, id, patch), {
+      tx,
+      onResult: (e) => this.upsert(this._executions, e),
+    }).then((r) => !!r);
+  }
+
+  async deleteExecution(id: ID): Promise<boolean> {
+    if (!this.getExecution(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._executions, id);
+    return this.ok('delete execution', (s) => this.api.executions.remove(s, id), { tx });
+  }
+
+  /** Post a progress note (and optionally move the execution to `state`). */
+  async reportProgress(id: ID, input: ReportProgressInput): Promise<boolean> {
+    if (!this.getExecution(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._executions, id, {
+      progressNote: input.note,
+      ...(input.state ? { state: input.state } : {}),
+      updatedAt: this.nowIso(),
+    });
+    return this.writeOk('report progress', (s) => this.api.executions.progress(s, id, input), {
+      tx,
+      onResult: (e) => e && this.upsert(this._executions, e),
+    });
+  }
+
+  async completeExecution(id: ID, note?: string): Promise<boolean> {
+    if (!this.getExecution(id)) return false;
+    const now = this.nowIso();
+    const tx = this.tx();
+    tx.patch(this._executions, id, {
+      state: 'completed',
+      completedAt: now,
+      updatedAt: now,
+      ...(note ? { progressNote: note } : {}),
+    });
+    return this.writeOk('complete execution', (s) => this.api.executions.complete(s, id, note), {
+      tx,
+      onResult: (e) => e && this.upsert(this._executions, e),
+    });
+  }
+
+  async createInputRequest(input: CreateInputRequestInput): Promise<InputRequest | undefined> {
+    return this.write('request input', (s) => this.api.inputRequests.create(s, input), {
+      onResult: (r) => this.upsert(this._inputRequests, r),
+    });
+  }
+
+  /** Answer an open input request (also clears its attention item). */
+  async answerInput(id: ID, answer: string): Promise<boolean> {
+    if (!this.inputRequestById().has(id)) return false;
+    const tx = this.tx();
+    const now = this.nowIso();
+    tx.patch(this._inputRequests, id, {
+      state: 'answered',
+      answer,
+      answeredById: this._me()?.id,
+      answeredAt: now,
+    });
+    this.hideAttentionWhere(tx, (a) => a.inputRequestId === id);
+    return this.writeOk('answer', (s) => this.api.inputRequests.answer(s, id, answer), {
+      tx,
+      onResult: (r) => r && this.upsert(this._inputRequests, r),
+    });
+  }
+
+  async dismissInput(id: ID): Promise<boolean> {
+    if (!this.inputRequestById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._inputRequests, id, { state: 'dismissed' });
+    this.hideAttentionWhere(tx, (a) => a.inputRequestId === id);
+    return this.writeOk('dismiss request', (s) => this.api.inputRequests.dismiss(s, id), {
+      tx,
+      onResult: (r) => r && this.upsert(this._inputRequests, r),
+    });
+  }
+
+  private hideAttentionWhere(tx: ReturnType<NablaStore['tx']>, test: (a: AttentionItem) => boolean): void {
+    for (const a of this._attention().filter(test)) tx.patch(this._attention, a.id, { state: 'dismissed' });
+  }
+
+  // ─────────────────────────── intake ───────────────────────────
+
+  async createIntake(input: CreateIntakeInput): Promise<IntakeItem | undefined> {
+    return this.write('create intake item', (s) => this.api.intake.create(s, input), {
+      onResult: (i) => this.upsert(this._intake, i),
+    });
+  }
+
+  async updateIntake(id: ID, patch: UpdateIntakeInput): Promise<boolean> {
+    if (!this.intakeById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._intake, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update intake item', (s) => this.api.intake.update(s, id, patch), {
+      tx,
+      onResult: (i) => this.upsert(this._intake, i),
+    }).then((r) => !!r);
+  }
+
+  async deleteIntake(id: ID): Promise<boolean> {
+    if (!this.intakeById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._intake, id);
+    return this.ok('delete intake item', (s) => this.api.intake.remove(s, id), { tx });
+  }
+
+  /**
+   * Triage into existing workstream(s), a new workstream (`createWorkstream`), or mark
+   * declined / duplicate. Resolves the updated item; a workstream created by the server
+   * shows up with the next refetch (`item.workstreamIds`).
+   */
+  async triageIntake(id: ID, input: TriageIntakeInput): Promise<IntakeItem | undefined> {
+    if (!this.intakeById().has(id)) return undefined;
+    const tx = this.tx();
+    tx.patch(this._intake, id, {
+      state: input.state,
+      ...(input.workstreamIds ? { workstreamIds: input.workstreamIds } : {}),
+      ...(input.duplicateOfId ? { duplicateOfId: input.duplicateOfId } : {}),
+    });
+    this.hideAttentionWhere(tx, (a) => a.intakeId === id);
+    return this.write('triage', (s) => this.api.intake.triage(s, id, input), {
+      tx,
+      onResult: (res) => {
+        const r = res as Rec | null;
+        const item = (r && 'intake' in r ? r['intake'] : r) as IntakeItem | null;
+        if (item && typeof item.id === 'string') this.upsert(this._intake, item);
+        const ws = r && 'workstream' in r ? (r['workstream'] as Workstream | null) : null;
+        if (ws && typeof ws.id === 'string') this.upsert(this._workstreams, ws);
+      },
+    }).then((res) => {
+      if (res === undefined) return undefined;
+      return this.intakeById().get(id);
+    });
+  }
+
+  // ─────────────────────────── artifacts ───────────────────────────
+
+  async attachArtifact(input: CreateArtifactInput): Promise<Artifact | undefined> {
+    return this.write('attach artifact', (s) => this.api.artifacts.create(s, input), {
+      onResult: (a) => this.upsert(this._artifacts, a),
+    });
+  }
+
+  async updateArtifact(id: ID, patch: UpdateArtifactInput): Promise<boolean> {
+    if (!this.artifactById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._artifacts, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update artifact', (s) => this.api.artifacts.update(s, id, patch), {
+      tx,
+      onResult: (a) => this.upsert(this._artifacts, a),
+    }).then((r) => !!r);
+  }
+
+  async removeArtifact(id: ID): Promise<boolean> {
+    if (!this.artifactById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._artifacts, id);
+    return this.ok('remove artifact', (s) => this.api.artifacts.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── decisions ───────────────────────────
+
+  /** Propose (default) or directly record (`status: 'accepted'`) a decision. */
+  async proposeDecision(input: CreateDecisionInput): Promise<Decision | undefined> {
+    return this.write('propose decision', (s) => this.api.decisions.create(s, input), {
+      onResult: (d) => this.upsert(this._decisions, d),
+    });
+  }
+
+  async updateDecision(id: ID, patch: UpdateDecisionInput): Promise<boolean> {
+    if (!this.decisionById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._decisions, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update decision', (s) => this.api.decisions.update(s, id, patch), {
+      tx,
+      onResult: (d) => this.upsert(this._decisions, d),
+    }).then((r) => !!r);
+  }
+
+  async acceptDecision(id: ID): Promise<boolean> {
+    if (!this.decisionById().has(id)) return false;
+    const now = this.nowIso();
+    const tx = this.tx();
+    tx.patch(this._decisions, id, { status: 'accepted', decidedById: this._me()?.id, decidedAt: now, updatedAt: now });
+    this.hideAttentionWhere(tx, (a) => a.decisionId === id);
+    return this.writeOk('accept decision', (s) => this.api.decisions.accept(s, id), {
+      tx,
+      onResult: (d) => d && this.upsert(this._decisions, d),
+    });
+  }
+
+  async rejectDecision(id: ID): Promise<boolean> {
+    if (!this.decisionById().has(id)) return false;
+    const now = this.nowIso();
+    const tx = this.tx();
+    tx.patch(this._decisions, id, { status: 'rejected', decidedById: this._me()?.id, decidedAt: now, updatedAt: now });
+    this.hideAttentionWhere(tx, (a) => a.decisionId === id);
+    return this.writeOk('reject decision', (s) => this.api.decisions.reject(s, id), {
+      tx,
+      onResult: (d) => d && this.upsert(this._decisions, d),
+    });
+  }
+
+  /** Mark `id` superseded by decision `byId`. */
+  async supersedeDecision(id: ID, byId: ID): Promise<boolean> {
+    if (!this.decisionById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._decisions, id, { status: 'superseded', supersededById: byId, updatedAt: this.nowIso() });
+    return this.writeOk('supersede decision', (s) => this.api.decisions.supersede(s, id, byId), {
+      tx,
+      onResult: (d) => d && this.upsert(this._decisions, d),
+    });
+  }
+
+  async deleteDecision(id: ID): Promise<boolean> {
+    if (!this.decisionById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._decisions, id);
+    return this.ok('delete decision', (s) => this.api.decisions.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── dependencies ───────────────────────────
+
+  async addDependency(input: CreateDependencyInput): Promise<Dependency | undefined> {
+    return this.write('add dependency', (s) => this.api.dependencies.create(s, input), {
+      onResult: (d) => this.upsert(this._dependencies, d),
+    });
+  }
+
+  async removeDependency(id: ID): Promise<boolean> {
+    if (!this._dependencies().some((d) => d.id === id)) return false;
+    const tx = this.tx();
+    tx.remove(this._dependencies, id);
+    return this.ok('remove dependency', (s) => this.api.dependencies.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── comments ───────────────────────────
+
+  async addComment(subject: SubjectRef, body: string): Promise<Comment | undefined> {
+    return this.write('post comment', (s) => this.api.comments.create(s, { subject, body }), {
+      onResult: (c) => this.upsert(this._comments, c),
+    });
+  }
+
+  async editComment(id: ID, body: string): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._comments, id, { body, updatedAt: this.nowIso() });
+    return this.writeOk('edit comment', (s) => this.api.comments.update(s, id, body), {
+      tx,
+      onResult: (c) => c && this.upsert(this._comments, c),
+    });
+  }
+
+  async deleteComment(id: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._comments, id);
+    return this.ok('delete comment', (s) => this.api.comments.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── attention ───────────────────────────
+
+  /** `id` is `AttentionItem.id` (e.g. `input_requested:ir_1`). */
+  async dismissAttention(id: string): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._attention, id, { state: 'dismissed' });
+    return this.ok('dismiss', (s) => this.api.attention.dismiss(s, id), { tx });
+  }
+
+  /** Hide an item until `until` (ISO date-time). */
+  async snoozeAttention(id: string, until: string): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._attention, id, { state: 'snoozed', snoozedUntil: until });
+    return this.ok('snooze', (s) => this.api.attention.snooze(s, id, until), { tx });
+  }
+
+  /** Bring a dismissed / snoozed item back (additive, used by the My Attention "Snoozed & dismissed" tab). */
+  async restoreAttention(id: string): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._attention, id, { state: 'open', snoozedUntil: undefined });
+    return this.ok('restore', (s) => this.api.attention.restore(s, id), { tx });
+  }
+
+  // ─────────────────────────── views ───────────────────────────
+
+  async createView(input: CreateViewInput): Promise<SavedView | undefined> {
+    return this.write('save view', (s) => this.api.views.create(s, input), {
+      onResult: (v) => this.upsert(this._views, v),
+    });
+  }
+
+  async updateView(id: ID, patch: UpdateViewInput): Promise<boolean> {
+    if (!this.viewById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._views, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update view', (s) => this.api.views.update(s, id, patch), {
+      tx,
+      onResult: (v) => this.upsert(this._views, v),
+    }).then((r) => !!r);
+  }
+
+  async deleteView(id: ID): Promise<boolean> {
+    if (!this.viewById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._views, id);
+    return this.ok('delete view', (s) => this.api.views.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── admin: teams, repositories ───────────────────────────
+
+  async createTeam(input: CreateTeamInput): Promise<Team | undefined> {
+    return this.write('create team', (s) => this.api.teams.create(s, input), {
+      onResult: (t) => this.upsert(this._teams, t),
+    });
+  }
+
+  async updateTeam(id: ID, patch: UpdateTeamInput): Promise<boolean> {
+    if (!this.teamById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._teams, id, patch);
+    return this.write('update team', (s) => this.api.teams.update(s, id, patch), {
+      tx,
+      onResult: (t) => this.upsert(this._teams, t),
+    }).then((r) => !!r);
+  }
+
+  async deleteTeam(id: ID): Promise<boolean> {
+    if (!this.teamById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._teams, id);
+    return this.ok('delete team', (s) => this.api.teams.remove(s, id), { tx });
+  }
+
+  async createRepository(input: CreateRepositoryInput): Promise<Repository | undefined> {
+    return this.write('add repository', (s) => this.api.repositories.create(s, input), {
+      onResult: (r) => this.upsert(this._repositories, r),
+    });
+  }
+
+  async updateRepository(id: ID, patch: UpdateRepositoryInput): Promise<boolean> {
+    if (!this.repositoryById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._repositories, id, patch);
+    return this.write('update repository', (s) => this.api.repositories.update(s, id, patch), {
+      tx,
+      onResult: (r) => this.upsert(this._repositories, r),
+    }).then((r) => !!r);
+  }
+
+  async deleteRepository(id: ID): Promise<boolean> {
+    if (!this.repositoryById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._repositories, id);
+    return this.ok('remove repository', (s) => this.api.repositories.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── admin: members, agents, tokens, integrations ───────────────────────────
+
+  /** Add a member by email (admin). The user appears after the next refetch. */
+  async addMember(input: AddMemberInput): Promise<Membership | undefined> {
+    return this.write('add member', (s) => this.api.members.add(s, input), {
+      onResult: (m) => this.upsert(this._memberships, m),
+    });
+  }
+
+  async updateMemberRole(membershipId: ID, role: Role): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._memberships, membershipId, { role });
+    return this.ok('change role', (s) => this.api.members.update(s, membershipId, { role }), { tx });
+  }
+
+  async removeMember(membershipId: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._memberships, membershipId);
+    return this.ok('remove member', (s) => this.api.members.remove(s, membershipId), { tx });
+  }
+
+  async createAgent(input: CreateAgentInput): Promise<Agent | undefined> {
+    return this.write('create agent', (s) => this.api.agents.create(s, input), {
+      onResult: (a) => this.upsert(this._agents, a),
+    });
+  }
+
+  async updateAgent(id: ID, patch: UpdateAgentInput): Promise<boolean> {
+    const tx = this.tx();
+    tx.patch(this._agents, id, patch);
+    return this.write('update agent', (s) => this.api.agents.update(s, id, patch), {
+      tx,
+      onResult: (a) => this.upsert(this._agents, a),
+    }).then((r) => !!r);
+  }
+
+  async deleteAgent(id: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._agents, id);
+    return this.ok('delete agent', (s) => this.api.agents.remove(s, id), { tx });
+  }
+
+  /** Fetch API tokens into `tokens()`. */
+  async loadTokens(): Promise<void> {
+    const slug = this.slug();
+    if (!slug) return;
+    try {
+      this._tokens.set(await this.api.tokens.list(slug));
+    } catch (e) {
+      const err = ApiError.from(e);
+      if (err.status !== 401 && err.status !== 403) {
+        this.notifier.error('Could not load tokens', { description: err.message });
+      }
+    }
+  }
+
+  /** Create a token. The returned `secret` is shown once - surface it to the user immediately. */
+  async createToken(input: CreateTokenInput): Promise<CreatedToken | undefined> {
+    return this.write('create token', (s) => this.api.tokens.create(s, input), {
+      onResult: (r) => this.upsert(this._tokens, r.token),
+    });
+  }
+
+  async deleteToken(id: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._tokens, id);
+    return this.ok('revoke token', (s) => this.api.tokens.remove(s, id), { tx });
+  }
+
+  async createIntegration(input: CreateIntegrationInput): Promise<IntegrationConnection | undefined> {
+    return this.write('connect integration', (s) => this.api.integrations.create(s, input), {
+      onResult: (c) => this.upsert(this._integrations, c),
+    });
+  }
+
+  async deleteIntegration(id: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._integrations, id);
+    return this.ok('disconnect integration', (s) => this.api.integrations.remove(s, id), { tx });
+  }
+
+  /** Trigger a sync of one connection; the updated status arrives with the refetch. */
+  async syncIntegration(id: ID): Promise<boolean> {
+    return this.writeOk('sync integration', (s) => this.api.integrations.sync(s, id), {
+      onResult: (c) => {
+        if (c && typeof c === 'object' && 'id' in c) this.upsert(this._integrations, c);
+      },
+    });
+  }
+}

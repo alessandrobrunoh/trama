@@ -1,0 +1,284 @@
+import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
+
+/* ───────────── tiny, safe markdown → AST → Angular template (no innerHTML) ───────────── */
+
+type Inline =
+  | { t: 'text'; v: string }
+  | { t: 'code'; v: string }
+  | { t: 'strong'; c: Inline[] }
+  | { t: 'em'; c: Inline[] }
+  | { t: 'del'; c: Inline[] }
+  | { t: 'link'; href: string; c: Inline[] };
+
+interface ListItem {
+  checked?: boolean;
+  inline: Inline[];
+  children: Block[];
+}
+
+type Block =
+  | { t: 'heading'; level: 1 | 2 | 3 | 4; inline: Inline[] }
+  | { t: 'p'; inline: Inline[] }
+  | { t: 'ul'; items: ListItem[] }
+  | { t: 'ol'; items: ListItem[] }
+  | { t: 'code'; lang: string; v: string }
+  | { t: 'quote'; blocks: Block[] }
+  | { t: 'hr' };
+
+const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
+
+/** Parse inline markup: `code`, **bold**, *em* / _em_, ~~del~~, [text](url), bare URLs. */
+export function parseInline(src: string): Inline[] {
+  const out: Inline[] = [];
+  let i = 0;
+  let buf = '';
+  const flush = () => {
+    if (buf) out.push({ t: 'text', v: buf });
+    buf = '';
+  };
+  while (i < src.length) {
+    const rest = src.slice(i);
+    let m: RegExpMatchArray | null;
+    if ((m = rest.match(/^`([^`]+)`/))) {
+      flush();
+      out.push({ t: 'code', v: m[1] });
+      i += m[0].length;
+    } else if ((m = rest.match(/^\*\*(.+?)\*\*/)) || (m = rest.match(/^__(.+?)__/))) {
+      flush();
+      out.push({ t: 'strong', c: parseInline(m[1]) });
+      i += m[0].length;
+    } else if ((m = rest.match(/^~~(.+?)~~/))) {
+      flush();
+      out.push({ t: 'del', c: parseInline(m[1]) });
+      i += m[0].length;
+    } else if ((m = rest.match(/^\*([^*\s][^*]*?)\*/)) || (m = rest.match(/^_([^_\s][^_]*?)_(?!\w)/))) {
+      flush();
+      out.push({ t: 'em', c: parseInline(m[1]) });
+      i += m[0].length;
+    } else if ((m = rest.match(/^\[([^\]]+)\]\(([^)\s]+)\)/))) {
+      flush();
+      if (SAFE_HREF.test(m[2])) out.push({ t: 'link', href: m[2], c: parseInline(m[1]) });
+      else out.push({ t: 'text', v: m[1] });
+      i += m[0].length;
+    } else if ((m = rest.match(/^https?:\/\/[^\s<)]+/)) && (buf === '' || /\s$/.test(buf))) {
+      flush();
+      out.push({ t: 'link', href: m[0], c: [{ t: 'text', v: m[0] }] });
+      i += m[0].length;
+    } else {
+      buf += src[i];
+      i++;
+    }
+  }
+  flush();
+  return out;
+}
+
+const LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
+
+/** Parse block structure. Exported for tests / reuse. */
+export function parseMarkdown(src: string): Block[] {
+  const lines = src.replace(/\r\n?/g, '\n').split('\n');
+  return parseBlocks(lines);
+}
+
+function parseBlocks(lines: string[]): Block[] {
+  const blocks: Block[] = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line.trim()) {
+      i++;
+      continue;
+    }
+    // fenced code
+    let m = line.match(/^```\s*([\w+-]*)\s*$/);
+    if (m) {
+      const body: string[] = [];
+      i++;
+      while (i < lines.length && !/^```\s*$/.test(lines[i])) body.push(lines[i++]);
+      i++; // closing fence
+      blocks.push({ t: 'code', lang: m[1], v: body.join('\n') });
+      continue;
+    }
+    // heading
+    m = line.match(/^(#{1,6})\s+(.*?)\s*#*\s*$/);
+    if (m) {
+      blocks.push({ t: 'heading', level: Math.min(m[1].length, 4) as 1 | 2 | 3 | 4, inline: parseInline(m[2]) });
+      i++;
+      continue;
+    }
+    // hr
+    if (/^\s*([-*_])(\s*\1){2,}\s*$/.test(line)) {
+      blocks.push({ t: 'hr' });
+      i++;
+      continue;
+    }
+    // quote
+    if (/^\s*>/.test(line)) {
+      const q: string[] = [];
+      while (i < lines.length && /^\s*>/.test(lines[i])) q.push(lines[i++].replace(/^\s*>\s?/, ''));
+      blocks.push({ t: 'quote', blocks: parseBlocks(q) });
+      continue;
+    }
+    // list
+    m = line.match(LIST_RE);
+    if (m) {
+      const ordered = /\d/.test(m[2]);
+      const baseIndent = m[1].length;
+      const items: ListItem[] = [];
+      while (i < lines.length) {
+        const lm = lines[i].match(LIST_RE);
+        if (!lm || lm[1].length !== baseIndent) break;
+        let text = lm[3];
+        let checked: boolean | undefined;
+        const task = text.match(/^\[( |x|X)\]\s+(.*)$/);
+        if (task) {
+          checked = task[1] !== ' ';
+          text = task[2];
+        }
+        i++;
+        const nested: string[] = [];
+        while (i < lines.length) {
+          const nl = lines[i];
+          if (!nl.trim()) break;
+          const nm = nl.match(LIST_RE);
+          if (nm && nm[1].length > baseIndent) nested.push(nl.slice(Math.min(baseIndent + 2, nm[1].length)));
+          else if (!nm && /^\s{2,}\S/.test(nl)) text += ' ' + nl.trim();
+          else break;
+          i++;
+        }
+        items.push({ checked, inline: parseInline(text), children: nested.length ? parseBlocks(nested) : [] });
+      }
+      blocks.push({ t: ordered ? 'ol' : 'ul', items });
+      continue;
+    }
+    // paragraph (until blank line / block start)
+    const para: string[] = [];
+    while (
+      i < lines.length &&
+      lines[i].trim() &&
+      !/^```/.test(lines[i]) &&
+      !/^#{1,6}\s/.test(lines[i]) &&
+      !/^\s*>/.test(lines[i]) &&
+      !LIST_RE.test(lines[i])
+    ) {
+      para.push(lines[i++].trim());
+    }
+    blocks.push({ t: 'p', inline: parseInline(para.join(' ')) });
+  }
+  return blocks;
+}
+
+/**
+ * Safe markdown renderer — headings, paragraphs, bold/italic/strike, inline + fenced code,
+ * links (http/https/mailto/relative only), (task) lists with nesting, quotes, rules.
+ * Raw HTML in the source is shown as text; nothing is ever bound through innerHTML.
+ *   <app-markdown [source]="ws.objective" />
+ */
+@Component({
+  selector: 'app-markdown',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [NgTemplateOutlet],
+  host: { class: 'block text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words' },
+  template: `
+    <ng-template #inl let-nodes>
+      @for (n of nodes; track $index) {
+        @switch (n.t) {
+          @case ('text') {{{ n.v }}}
+          @case ('code') {
+            <code class="bg-muted rounded px-1 py-0.5 font-mono text-[0.92em]">{{ n.v }}</code>
+          }
+          @case ('strong') {
+            <strong class="font-semibold"><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }" /></strong>
+          }
+          @case ('em') {
+            <em><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }" /></em>
+          }
+          @case ('del') {
+            <del class="text-muted-foreground"><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }" /></del>
+          }
+          @case ('link') {
+            <a
+              class="text-primary underline underline-offset-2 hover:opacity-80"
+              [attr.href]="n.href"
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
+            /></a>
+          }
+        }
+      }
+    </ng-template>
+
+    <ng-template #blk let-blocks>
+      @for (b of blocks; track $index) {
+        @switch (b.t) {
+          @case ('heading') {
+            @switch (b.level) {
+              @case (1) {
+                <h2 class="mt-5 mb-2 text-lg font-semibold tracking-tight"><ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" /></h2>
+              }
+              @case (2) {
+                <h3 class="mt-4 mb-1.5 text-base font-semibold tracking-tight"><ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" /></h3>
+              }
+              @default {
+                <h4 class="mt-3 mb-1 text-sm font-semibold"><ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" /></h4>
+              }
+            }
+          }
+          @case ('p') {
+            <p class="my-2"><ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" /></p>
+          }
+          @case ('ul') {
+            <ul class="my-2 space-y-1 ps-5 [&_ul]:my-1">
+              @for (it of b.items; track $index) {
+                <li [class]="it.checked === undefined ? 'list-disc marker:text-muted-foreground' : 'list-none -ms-5 flex items-start gap-2'">
+                  @if (it.checked !== undefined) {
+                    <span
+                      class="mt-[3px] inline-flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border text-[10px] leading-none"
+                      [class]="it.checked ? 'bg-primary border-primary text-primary-foreground' : 'border-input'"
+                      aria-hidden="true"
+                      >{{ it.checked ? '✓' : '' }}</span
+                    >
+                  }
+                  <span [class.text-muted-foreground]="it.checked" [class.line-through]="it.checked">
+                    <ng-container *ngTemplateOutlet="inl; context: { $implicit: it.inline }" />
+                    <ng-container *ngTemplateOutlet="blk; context: { $implicit: it.children }" />
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+          @case ('ol') {
+            <ol class="my-2 list-decimal space-y-1 ps-5 marker:text-muted-foreground">
+              @for (it of b.items; track $index) {
+                <li>
+                  <ng-container *ngTemplateOutlet="inl; context: { $implicit: it.inline }" />
+                  <ng-container *ngTemplateOutlet="blk; context: { $implicit: it.children }" />
+                </li>
+              }
+            </ol>
+          }
+          @case ('code') {
+            <pre class="bg-muted my-3 overflow-x-auto rounded-md border px-3 py-2 font-mono text-xs leading-relaxed"><code>{{ b.v }}</code></pre>
+          }
+          @case ('quote') {
+            <blockquote class="text-muted-foreground my-3 border-s-2 ps-3">
+              <ng-container *ngTemplateOutlet="blk; context: { $implicit: b.blocks }" />
+            </blockquote>
+          }
+          @case ('hr') {
+            <hr class="my-4" />
+          }
+        }
+      }
+    </ng-template>
+
+    <ng-container *ngTemplateOutlet="blk; context: { $implicit: blocks() }" />
+  `,
+})
+export class Markdown {
+  readonly source = input<string | null | undefined>('');
+  protected readonly blocks = computed(() => parseMarkdown(this.source() ?? ''));
+}
