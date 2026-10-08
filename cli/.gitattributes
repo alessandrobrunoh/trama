@@ -1,0 +1,2 @@
+# The installer is piped into sh: it must keep LF endings on every checkout.
+/install/install.sh text eol=lf

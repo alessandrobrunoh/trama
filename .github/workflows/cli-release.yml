@@ -1,0 +1,85 @@
+name: CLI release
+
+# Publish with:  git tag cli-v0.1.0 && git push origin cli-v0.1.0
+# Each release carries one raw binary per target (trama-<target>[.exe]) and SHA256SUMS,
+# which is exactly what `trama update`, install.sh and install.ps1 download and verify.
+on:
+  push:
+    tags: ['cli-v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { os: ubuntu-22.04-arm, target: aarch64-unknown-linux-gnu }
+          - { os: macos-14, target: aarch64-apple-darwin }
+          - { os: macos-14, target: x86_64-apple-darwin }
+          - { os: windows-2022, target: x86_64-pc-windows-msvc }
+          - { os: windows-11-arm, target: aarch64-pc-windows-msvc }
+    steps:
+      - uses: actions/checkout@v4
+      - name: The tag must match the crate version
+        shell: bash
+        run: |
+          crate=$(sed -n 's/^version = "\(.*\)"/\1/p' cli/Cargo.toml | head -n 1)
+          tag="${GITHUB_REF_NAME#cli-v}"
+          if [ "$crate" != "$tag" ]; then echo "tag $GITHUB_REF_NAME does not match cli/Cargo.toml version $crate"; exit 1; fi
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: ilammy/setup-nasm@v1
+        if: runner.os == 'Windows' && matrix.target == 'x86_64-pc-windows-msvc'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+          key: ${{ matrix.target }}
+      # The x86_64 macOS binary is cross-compiled on an arm64 runner and cannot run there: it is covered by
+      # the native arm64 test run (same code) and by cli-ci.yml.
+      - run: cargo test --locked --release --target ${{ matrix.target }}
+        if: matrix.target != 'x86_64-apple-darwin'
+        working-directory: cli
+      - run: cargo build --locked --release --target ${{ matrix.target }}
+        working-directory: cli
+      - name: Stage the asset
+        shell: bash
+        run: |
+          mkdir -p dist
+          ext=""; case "${{ matrix.target }}" in *windows*) ext=".exe" ;; esac
+          cp "cli/target/${{ matrix.target }}/release/trama$ext" "dist/trama-${{ matrix.target }}$ext"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: trama-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: trama-*
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: |
+          ls -l
+          sha256sum trama-* > SHA256SUMS
+          cat SHA256SUMS
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          flags=""
+          case "$GITHUB_REF_NAME" in *-*) flags="--prerelease" ;; esac
+          gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" \
+            --title "trama CLI ${GITHUB_REF_NAME#cli-v}" --generate-notes $flags
