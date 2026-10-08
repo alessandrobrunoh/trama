@@ -14,8 +14,10 @@ import { requestStoreMiddleware } from './events/request-store.js';
 import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
+import { InvitesModule } from './invites/invites.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { IssuesModule } from './issues/issues.module.js';
+import { MailModule } from './mail/mail.module.js';
 import { MilestonesModule } from './milestones/milestones.module.js';
 import { RepositoriesModule } from './repositories/repositories.module.js';
 import { SearchModule } from './search/search.module.js';
@@ -32,9 +34,11 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
   imports: [
     DatabaseModule,
     CommonModule,
+    MailModule,
     EventsModule,
     AuthModule,
     WorkspacesModule,
+    InvitesModule,
     TeamsModule,
     RepositoriesModule,
     WorkstreamsModule,

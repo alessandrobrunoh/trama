@@ -28,12 +28,13 @@ core/
 
 ## 1. Routes (`src/app/app.routes.ts`)
 
-Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (redirects to `/register`), `blog`, `roadmap`, `changelog`, `brand`, `new-workspace`, `404`.
+Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (redirects to `/register`), `invite`, `blog`, `roadmap`, `changelog`, `brand`, `new-workspace`, `404`.
 
 | path | page class (file) | guards |
 |---|---|---|
 | `/login` | `LoginPage` (features/auth/login-page.ts) | guestGuard |
 | `/register` | `SignupPage` (features/auth/signup-page.ts) | guestGuard |
+| `/invite/:token` | `InvitePage` (features/auth/invite-page.ts); public, `?next=`/`?email=` flow through login and register | - |
 | `/blog`, `/blog/:slug` | `BlogIndexPage`, `BlogPostPage` (features/blog/), posts in blog-posts.ts | - |
 | `/roadmap`, `/changelog` | `RoadmapPage`, `ChangelogPage` (features/roadmap/, features/changelog/) | - |
 | `/brand` | `BrandPage` (features/brand/), logo copy/download via `BrandAssets` | - |

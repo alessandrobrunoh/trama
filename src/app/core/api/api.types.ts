@@ -79,6 +79,10 @@ export interface UpdateWorkspaceSettingsInput {
   iconColor?: string | null;
   iconInitial?: string | null;
 }
+export interface CreateInviteInput {
+  email: string;
+  role: Role;
+}
 export interface AddMemberInput {
   /** The person must already have an account. */
   email: string;

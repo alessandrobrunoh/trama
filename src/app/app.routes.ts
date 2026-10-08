@@ -11,7 +11,7 @@ import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/sess
  * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
  * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
- * Reserved top-level paths (cannot be workspace slugs): login, register, signup, blog, roadmap,
+ * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, blog, roadmap,
  * changelog, brand, new-workspace, 404.
  */
 export const routes: Routes = [
@@ -29,6 +29,12 @@ export const routes: Routes = [
   },
   // Old links: /signup → /register (query params such as `next` are kept).
   { path: 'signup', pathMatch: 'full', redirectTo: 'register' },
+  {
+    // Public on purpose: shows the invitation, then asks to sign in or sign up (see InvitePage).
+    path: 'invite/:token',
+    title: 'Join a workspace · Trama',
+    loadComponent: () => import('./features/auth/invite-page').then((m) => m.InvitePage),
+  },
   {
     path: 'blog',
     title: 'Blog · Trama',

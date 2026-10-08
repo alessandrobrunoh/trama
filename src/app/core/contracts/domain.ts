@@ -44,6 +44,43 @@ export interface Membership {
   createdAt: ISODate;
 }
 
+/** Days an invitation stays valid. Resending an invitation starts a new period. */
+export const INVITE_TTL_DAYS = 7;
+
+/**
+ * A pending invitation to join a workspace, bound to one email address. The secret link is returned
+ * only when the invitation is created or resent (`InviteLink`); the server stores just its hash.
+ */
+export interface WorkspaceInvite {
+  /** `inv_…` */
+  id: ID;
+  workspaceId: ID;
+  email: string;
+  role: Role;
+  invitedByUserId?: ID;
+  createdAt: ISODate;
+  expiresAt: ISODate;
+  /** When an email was last sent (absent when the server has no mail configured). */
+  emailedAt?: ISODate;
+}
+
+/** Response of creating or resending an invitation: share `url` if the email did not arrive. */
+export interface InviteLink {
+  invite: WorkspaceInvite;
+  url: string;
+  /** False when the server has no mail transport configured (SMTP_URL), so the link must be shared by hand. */
+  emailed: boolean;
+}
+
+/** What anyone holding an invitation link may see before signing in. */
+export interface InvitePreview {
+  workspaceName: string;
+  role: Role;
+  email: string;
+  invitedByName?: string;
+  expiresAt: ISODate;
+}
+
 /** Runtimes that can act in a workspace. `human` = a person. */
 export type ExecutionProvider = 'human' | 'delta' | 'claude_code' | 'codex' | 'cursor' | 'other';
 
@@ -809,7 +846,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;

@@ -63,6 +63,14 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
 | `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Last owner cannot be demoted (`409`). |
 | `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
+| `GET /w/:slug/invites` | `inviteMembers` | Pending invitations (`WorkspaceInvite[]`), expired ones included so they can be resent. |
+| `POST /w/:slug/invites` | `inviteMembers` | `{ email, role }` → `{ invite, url, emailed }`. The person does not need an account yet. Same address again refreshes the invite (new link and expiry, the old link stops working). Already a member → `409`; a role above your own → `403`. `url` is the only time the secret link is returned (only its hash is stored). |
+| `POST /w/:slug/invites/:id/resend` | `inviteMembers` | New link and expiry, emailed again. Same response as create. |
+| `DELETE /w/:slug/invites/:id` | `inviteMembers` | Revoke. |
+| `GET /invites/:token` | public | `InvitePreview` (`workspaceName`, `role`, `email`, `invitedByName`, `expiresAt`). `404` when unknown, used, revoked or expired. |
+| `POST /invites/:token/accept` | signed-in user | Joins the workspace; the account email must equal the invited one (`403` otherwise). → `{ workspace: { slug, name }, role }`. Single use; an existing member keeps their role. |
+
+Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP_URL`; without it `emailed` is `false` and the UI shows the link to share by hand. Not exposed to API tokens with custom permissions.
 | `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |
 | `GET /w/:slug/tokens` | member | Admins see all tokens, others only their own. `ApiToken[]` (never contains the hash). |
 | `POST /w/:slug/tokens` | member (user) | `{ name, scope?, permissions?, limits?, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. See *Custom tokens* below. |

@@ -115,6 +115,35 @@ export class MembershipEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 }
 
+/** Pending (or finished) invitation by email. Only the sha256 of the secret link token is stored. */
+@Entity('invites')
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['invitedByUserId'], ['id'], { onDelete: 'SET NULL' })
+export class InviteEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Index('IDX_invites_workspace')
+  @Column({ type: 'varchar' })
+  workspaceId: string;
+  /** Lower-cased. */
+  @Index('IDX_invites_email')
+  @Column({ type: 'varchar' })
+  email: string;
+  @Column({ type: 'varchar' }) role: Role;
+  @Index('UQ_invites_token', { unique: true })
+  @Column({ type: 'varchar' })
+  tokenHash: string;
+  @Column({ type: 'varchar', nullable: true }) invitedByUserId: string | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz' }) expiresAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) emailedAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) acceptedAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) revokedAt: Date | null;
+
+  protected override hidden() {
+    return ['tokenHash', 'acceptedAt', 'revokedAt'];
+  }
+}
+
 @Entity('agents')
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
@@ -594,6 +623,7 @@ export const ENTITIES = [
   SessionEntity,
   WorkspaceEntity,
   MembershipEntity,
+  InviteEntity,
   AgentEntity,
   TeamEntity,
   RepositoryEntity,

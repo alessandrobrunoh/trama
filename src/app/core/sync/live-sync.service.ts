@@ -8,7 +8,9 @@
 //   to catch missed events. Also refetches when the tab becomes visible / the browser goes online.
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, effect, inject, untracked } from '@angular/core';
+import { Subject } from 'rxjs';
 import { ApiClient } from '../api/api-client';
+import type { LiveEvent } from '../contracts/domain';
 import { NablaStore } from '../stores/nabla.store';
 import { CLIENT_ID } from './client-id';
 import { SyncStatus } from './sync-status';
@@ -22,6 +24,10 @@ export class LiveSync {
   private readonly nabla = inject(NablaStore);
   private readonly status = inject(SyncStatus);
   private readonly document = inject(DOCUMENT);
+
+  private readonly incoming = new Subject<LiveEvent>();
+  /** Every event from another client (or an agent), after it was received. Lets screens react to specific entities. */
+  readonly events$ = this.incoming.asObservable();
 
   /** Connection state: 'idle' | 'connecting' | 'open' | 'reconnecting'. */
   readonly state = this.status.live;
@@ -106,7 +112,7 @@ export class LiveSync {
       this.status.live.set('open');
     };
     source.onmessage = (message: MessageEvent<string>) => {
-      let event: { type?: string; clientId?: string };
+      let event: Omit<Partial<LiveEvent>, 'type'> & { type?: string };
       try {
         event = JSON.parse(message.data) as typeof event;
       } catch {
@@ -114,6 +120,7 @@ export class LiveSync {
       }
       if (!event || event.type === 'ping' || event.type === 'hello') return;
       if (event.clientId && event.clientId === CLIENT_ID) return;
+      this.incoming.next(event as LiveEvent);
       this.nabla.scheduleRefetch(EVENT_REFETCH_DEBOUNCE_MS);
     };
     source.onerror = () => {

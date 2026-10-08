@@ -21,16 +21,20 @@ import type {
   DomainEvent,
   ID,
   InputRequest,
+  InviteLink,
+  InvitePreview,
   Issue,
   Membership,
   Milestone,
   OutgoingWebhook,
   Repository,
+  Role,
   SavedView,
   Team,
   User,
   WebhookDeliveryLog,
   Workspace,
+  WorkspaceInvite,
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
@@ -45,6 +49,7 @@ import type {
   CreateDecisionInput,
   CreateDependencyInput,
   CreateInputRequestInput,
+  CreateInviteInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
   UpdateInputRequestInput,
@@ -194,6 +199,27 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+  };
+
+  /** Invitations by email (admins). `create` and `resend` return the secret link once. */
+  readonly invites = {
+    list: (slug: string) => this.get<WorkspaceInvite[]>(`${this.w(slug)}/invites`),
+    create: (slug: string, input: CreateInviteInput) =>
+      this.post<InviteLink>(`${this.w(slug)}/invites`, input),
+    resend: (slug: string, id: ID) => this.post<InviteLink>(`${this.w(slug)}/invites/${id}/resend`),
+    revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
+  };
+
+  /** The page behind an invitation link: `preview` is public, `accept` needs a signed-in user. */
+  readonly inviteLinks = {
+    preview: (token: string) =>
+      this.get<InvitePreview>(`/invites/${encodeURIComponent(token)}`, undefined, { quiet: true }),
+    accept: (token: string) =>
+      this.post<{ workspace: { slug: string; name: string }; role: Role }>(
+        `/invites/${encodeURIComponent(token)}/accept`,
+        undefined,
+        { quiet: true },
+      ),
   };
 
   readonly agents = {

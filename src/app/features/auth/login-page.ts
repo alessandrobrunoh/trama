@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, isDevMode, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, isDevMode, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { LucideCircleAlert, LucideDynamicIcon } from '@lucide/angular';
@@ -79,19 +79,28 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         <a
           class="text-foreground underline underline-offset-4"
           routerLink="/register"
-          [queryParams]="next() ? { next: next() } : null"
+          [queryParams]="authQuery()"
           >Create an account</a
         >
       </ng-container>
     </app-auth-shell>
   `,
 })
-export class LoginPage {
+export class LoginPage implements OnInit {
   private readonly session = inject(SessionStore);
 
   /** Query param `?next=` (a same-origin path to return to). */
   readonly next = input<string>();
+  /** `?email=` from an invitation link: prefilled, still editable. */
+  readonly emailHint = input<string>(undefined, { alias: 'email' });
   readonly workspaceSlug = input<string>();
+  /** Query params kept when switching between sign in and sign up. */
+  protected readonly authQuery = computed(() => {
+    const q: Record<string, string> = {};
+    if (this.next()) q['next'] = this.next()!;
+    if (this.emailHint()) q['email'] = this.emailHint()!;
+    return Object.keys(q).length ? q : null;
+  });
 
   protected readonly alertIcon = LucideCircleAlert;
   protected readonly demo = isDevMode();
@@ -100,6 +109,11 @@ export class LoginPage {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   private readonly submitted = signal(false);
+
+  ngOnInit(): void {
+    const hint = this.emailHint();
+    if (hint) this.email.set(hint);
+  }
 
   protected emailError(): string | null {
     if (!this.submitted()) return null;
