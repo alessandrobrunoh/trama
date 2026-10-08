@@ -186,10 +186,7 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'varchar', default: 'draft' }) status: WorkstreamStatus;
   @Column({ type: 'varchar', default: 'draft' })
   derivedStatus: WorkstreamStatus;
-  @Column({ type: 'varchar', nullable: true }) statusOverride:
-    | 'draft'
-    | 'canceled'
-    | null;
+  @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
   @Column({ type: 'varchar' }) createdById: string;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;

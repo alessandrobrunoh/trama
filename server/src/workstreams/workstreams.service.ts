@@ -35,7 +35,7 @@ export interface WorkstreamInput {
   acceptanceCriteria?: CriterionInput[];
   priority?: Priority;
   labels?: string[];
-  statusOverride?: 'draft' | 'canceled' | null;
+  statusOverride?: WorkstreamStatus | null;
   targetDate?: string | null;
 }
 

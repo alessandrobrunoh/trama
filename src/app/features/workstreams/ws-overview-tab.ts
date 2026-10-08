@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideBellRing, LucideDynamicIcon } from '@lucide/angular';
+import { RouterLink } from '@angular/router';
 import { ATTENTION_KIND_META, ISSUE_STATUS_META, NablaStore, isDeltaThreadUrl, type AttentionItem, type IssueStatus, type Workstream } from '../../core';
 import { IssueKindLabel } from '../../shared/issue';
 import { KeyChip } from '../../shared/key-chip';

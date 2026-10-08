@@ -22,7 +22,7 @@ export const HIT_LABEL: Record<HitType, string> = {
   decision: 'Decisions',
   issue: 'Issues',
   artifact: 'Artifacts',
-  repository: 'Repositories',
+  repository: 'Projects',
   team: 'Teams',
 };
 export const HIT_SINGULAR: Record<HitType, string> = {
@@ -30,7 +30,7 @@ export const HIT_SINGULAR: Record<HitType, string> = {
   decision: 'Decision',
   issue: 'Issue',
   artifact: 'Artifact',
-  repository: 'Repository',
+  repository: 'Project',
   team: 'Team',
 };
 
@@ -40,6 +40,9 @@ const TYPE_ALIASES: Record<string, HitType> = {
   issues: 'issue',
   artifacts: 'artifact',
   repositories: 'repository',
+  repository: 'repository',
+  projects: 'repository',
+  project: 'repository',
   teams: 'team',
 };
 
@@ -141,7 +144,7 @@ export class SearchService {
       case 'issue':
         return ['issues', h.key ?? h.id];
       case 'repository':
-        return ['repositories', h.id];
+        return ['projects', h.id];
       case 'team':
         return ['teams', h.key ?? h.id];
       case 'artifact': {

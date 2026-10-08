@@ -43,7 +43,7 @@ const SWITCHER: KindDef[] = [
 ];
 const EXTRA: Partial<Record<CreateKind, KindDef>> = {
   team: { kind: 'team', label: 'Team', icon: LucideUsers },
-  repository: { kind: 'repository', label: 'Repository', icon: LucideFolderGit2 },
+  repository: { kind: 'repository', label: 'Project', icon: LucideFolderGit2 },
   view: { kind: 'view', label: 'View', icon: LucideLayers },
 };
 
@@ -137,8 +137,8 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
                 </app-form-row>
               </div>
               @if (repoOptions().length) {
-                <app-form-row label="Repositories" [optional]="true">
-                  <app-multi-select [options]="repoOptions()" [(value)]="repositoryIds" placeholder="None selected" label="Repositories" />
+                <app-form-row label="Projects" [optional]="true">
+                  <app-multi-select [options]="repoOptions()" [(value)]="repositoryIds" placeholder="None selected" label="Projects" />
                 </app-form-row>
               }
             }
@@ -206,8 +206,8 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
                 <app-form-row label="Provider">
                   <app-select [options]="gitProviderOptions" [(value)]="gitProvider" label="Provider" />
                 </app-form-row>
-                <app-form-row label="Repository" [error]="err('title')">
-                  <input hlmInput class="font-mono" placeholder="acme/api" [(ngModel)]="title" name="fullName" autocomplete="off" autofocus aria-label="Repository full name" />
+                <app-form-row label="Project" [error]="err('title')">
+                  <input hlmInput class="font-mono" placeholder="acme/api" [(ngModel)]="title" name="fullName" autocomplete="off" autofocus aria-label="Project name" />
                 </app-form-row>
               </div>
               <app-form-row label="Default branch" [optional]="true">
@@ -488,7 +488,7 @@ export class CreateDialog {
             fullName: title,
             defaultBranch: this.text().trim() || undefined,
           });
-          if (r) done = { label: `${r.fullName} added`, path: ['repositories', r.id] };
+          if (r) done = { label: `${r.fullName} added`, path: ['projects', r.id] };
           break;
         }
         case 'view': {

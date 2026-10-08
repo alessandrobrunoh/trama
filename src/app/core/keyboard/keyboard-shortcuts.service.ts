@@ -82,7 +82,7 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
 const INTERACTIVE = 'button, a[href], [role="button"], [role="menuitem"], [role="option"], summary, [role="tab"]';
 
 /** Detail routes where Esc goes back to the list: /:slug/<area>/:id. */
-const ESC_UP = /^\/([^/]+)\/(workstreams|issues|decisions|repositories|teams|views)\/[^/?#]+/;
+const ESC_UP = /^\/([^/]+)\/(workstreams|issues|decisions|projects|repositories|teams|views)\/[^/?#]+/;
 
 @Injectable({ providedIn: 'root' })
 export class KeyboardShortcuts {
@@ -157,6 +157,7 @@ export class KeyboardShortcuts {
         return key
           ? { kind: 'workstream', defaults: { ownerTeamId: this.nabla.getTeam(key)?.id } }
           : { kind: 'team', defaults: {} };
+      case 'projects':
       case 'repositories':
         return key
           ? { kind: 'workstream', defaults: { repositoryIds: [key] } }

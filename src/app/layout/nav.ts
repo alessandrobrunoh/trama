@@ -26,7 +26,7 @@ export const MAIN_NAV: NavItem[] = [
   { segment: 'workstreams', label: 'Workstreams', icon: LucideWorkflow, keys: 'g w' },
   { segment: 'graph', label: 'Graph', icon: LucideNetwork, keys: 'g x' },
   { segment: 'decisions', label: 'Decisions', icon: LucideScale, keys: 'g d' },
-  { segment: 'repositories', label: 'Repositories', icon: LucideFolderGit2, keys: 'g r' },
+  { segment: 'projects', label: 'Projects', icon: LucideFolderGit2, keys: 'g p' },
 ];
 
 /** Breadcrumb section labels for every first path segment. */
@@ -37,7 +37,8 @@ export const SECTION_LABELS: Record<string, string> = {
   workstreams: 'Workstreams',
   graph: 'Graph',
   decisions: 'Decisions',
-  repositories: 'Repositories',
+  projects: 'Projects',
+  repositories: 'Projects',
   teams: 'Teams',
   views: 'Views',
   settings: 'Settings',
@@ -48,6 +49,7 @@ export const SECTIONS_WITH_LIST = new Set([
   'workstreams',
   'issues',
   'decisions',
+  'projects',
   'repositories',
   'teams',
   'views',

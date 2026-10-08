@@ -190,7 +190,7 @@ export function commandFilter(value: string, search: string): boolean {
         } @else if (!isSearching() && !recent().length) {
           <div class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm">
             <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-            <p>Search workstreams, issues, decisions, artifacts and repositories.</p>
+            <p>Search workstreams, issues, decisions, artifacts and projects.</p>
           </div>
         }
       </hlm-command-list>
@@ -254,6 +254,7 @@ export class CommandPanel {
     const out: Cmd[] = MAIN_NAV.map((n) => ({
       id: 'nav:' + n.segment,
       label: n.label,
+      keywords: n.segment === 'projects' ? 'repository repositories repo git' : undefined,
       icon: n.icon,
       keys: n.keys,
       run: go(n.segment),

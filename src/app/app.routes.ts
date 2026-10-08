@@ -101,19 +101,21 @@ export const routes: Routes = [
           import('./features/decisions/decision-detail-page').then((m) => m.DecisionDetailPage),
       },
       {
-        path: 'repositories',
-        title: 'Repositories · Nabla',
+        path: 'projects',
+        title: 'Projects · Nabla',
         loadComponent: () =>
           import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
       },
       {
-        path: 'repositories/:id',
-        title: 'Repository · Nabla',
+        path: 'projects/:id',
+        title: 'Project · Nabla',
         loadComponent: () =>
           import('./features/repositories/repository-detail-page').then(
             (m) => m.RepositoryDetailPage,
           ),
       },
+      { path: 'repositories', pathMatch: 'full', redirectTo: 'projects' },
+      { path: 'repositories/:id', redirectTo: 'projects/:id' },
       {
         path: 'teams',
         title: 'Teams · Nabla',

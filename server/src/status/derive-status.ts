@@ -2,7 +2,7 @@ import type { ArtifactKind, ArtifactState, CiState, ReviewState, WorkstreamStatu
 
 /** Minimal shapes the engine needs; entities satisfy them structurally. */
 export interface StatusWorkstream {
-  statusOverride?: 'draft' | 'canceled' | null;
+  statusOverride?: WorkstreamStatus | null;
   acceptanceCriteria: readonly { state?: string }[];
 }
 export interface StatusInputRequest {

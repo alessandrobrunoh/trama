@@ -105,7 +105,7 @@ export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
 /**
  * Derived from artifacts / input requests / decisions / dependencies.
- * `draft` and `canceled` can also be set manually via `statusOverride`.
+ * Any status can be pinned manually via `statusOverride` (the board does this). `null` clears it.
  */
 export type WorkstreamStatus =
   | 'draft'
@@ -154,7 +154,7 @@ export interface Workstream {
   status: WorkstreamStatus;
   /** The derived status, ignoring the override. Computed by the server. */
   derivedStatus: WorkstreamStatus;
-  statusOverride?: 'draft' | 'canceled';
+  statusOverride?: WorkstreamStatus;
   targetDate?: ISODate;
   createdById: ID;
   createdAt: ISODate;

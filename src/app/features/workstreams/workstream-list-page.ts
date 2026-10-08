@@ -1,11 +1,8 @@
-import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import {
   LucideArrowDownWideNarrow,
   LucideArrowUpNarrowWide,
   LucideBookmarkPlus,
-  LucideChevronDown,
-  LucideChevronRight,
   LucideDynamicIcon,
   LucideLayoutList,
   LucideListFilter,
@@ -32,11 +29,13 @@ import {
   queryGroups,
   setFilter,
   usePageShortcuts,
+  type Priority,
   type ViewFilter,
   type Workstream,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
+import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -107,9 +106,11 @@ function loadLayout(): Layout {
     ActorAvatar,
     WorkstreamRow,
     WorkstreamCard,
+    Kanban,
+    KanbanItemDirective,
+    KanbanLabelDirective,
     CreateWorkstreamDialog,
     TopBarActions,
-    NgTemplateOutlet,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -154,7 +155,7 @@ function loadLayout(): Layout {
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Accountable" [multiple]="true" [options]="users()" [value]="fv('accountableUserId')" (valueChange)="setF('accountableUserId', $event)" />
-        <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
+        <app-picker variant="chip" label="Project" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
         @if (labels().length) {
           <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         }
@@ -214,51 +215,23 @@ function loadLayout(): Layout {
       <app-empty-state [icon]="filterIcon" title="No workstreams match" description="Try removing a filter or changing the search.">
         <button hlmBtn size="sm" variant="outline" (click)="clearAll()">Clear filters</button>
       </app-empty-state>
-    } @else if (layout() === 'list') {
-      <div class="min-h-0 flex-1 overflow-y-auto" role="list">
-        @for (g of columns(); track g.key) {
-          <section>
-            <button
-              type="button"
-              class="bg-muted/40 hover:bg-muted/70 sticky top-0 z-[1] flex min-h-8 w-full items-center gap-2 border-b px-4 text-left text-xs sm:px-6"
-              [attr.aria-expanded]="!collapsed().has(g.key)"
-              (click)="toggleGroup(g.key)"
-            >
-              <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="13" class="text-muted-foreground"></svg>
-              <ng-container *ngTemplateOutlet="groupLabel; context: { $implicit: g.key }" />
-              <span class="text-muted-foreground tabular-nums">{{ g.items.length }}</span>
-            </button>
-            @if (!collapsed().has(g.key)) {
-              @for (s of g.items; track s.ws.id) {
-                <app-workstream-row [summary]="s" [focused]="ui.focusedRowId() === s.ws.id" />
-              }
-            }
-          </section>
-        }
-      </div>
     } @else {
-      <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
-        <div class="flex h-full min-w-max gap-3 px-4 py-3 sm:px-6">
-          @for (g of columns(); track g.key) {
-            <section class="bg-muted/30 flex h-full w-[17.5rem] shrink-0 flex-col rounded-lg border">
-              <header class="flex h-9 shrink-0 items-center gap-2 px-3 text-xs font-medium">
-                <ng-container *ngTemplateOutlet="groupLabel; context: { $implicit: g.key }" />
-                <span class="text-muted-foreground font-normal tabular-nums">{{ g.items.length }}</span>
-              </header>
-              <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
-                @for (s of g.items; track s.ws.id) {
-                  <app-workstream-card [summary]="s" [focused]="ui.focusedRowId() === s.ws.id" />
-                } @empty {
-                  <p class="text-muted-foreground px-1 py-4 text-center text-xs">Nothing here</p>
-                }
-              </div>
-            </section>
+      <app-kanban
+        [columns]="columns()"
+        [layout]="layout()"
+        [disabled]="!canEdit()"
+        prefix="workstreams"
+        [track]="trackSummary"
+        (moved)="move($event.item, $event.to)"
+      >
+        <ng-template kanbanItem let-s>
+          @if (layout() === 'list') {
+            <app-workstream-row [summary]="s" [focused]="ui.focusedRowId() === s.ws.id" />
+          } @else {
+            <app-workstream-card [summary]="s" [focused]="ui.focusedRowId() === s.ws.id" />
           }
-        </div>
-      </div>
-    }
-
-    <ng-template #groupLabel let-key>
+        </ng-template>
+        <ng-template kanbanLabel let-key>
       @switch (effectiveGroup()) {
         @case ('status') {
           <app-status-icon [status]="$any(key)" />
@@ -285,7 +258,9 @@ function loadLayout(): Layout {
           }
         }
       }
-    </ng-template>
+        </ng-template>
+      </app-kanban>
+    }
 
     <app-create-workstream-dialog [(open)]="createOpen" />
   `,
@@ -304,7 +279,6 @@ export class WorkstreamListPage {
   protected readonly search = signal('');
   protected readonly sortField = signal<string>('updatedAt');
   protected readonly sortDir = signal<'asc' | 'desc'>('desc');
-  protected readonly collapsed = signal<ReadonlySet<string>>(new Set());
   protected readonly createOpen = signal(false);
   protected readonly saveState = signal<'open' | 'closed'>('closed');
   protected readonly viewName = signal('');
@@ -329,8 +303,6 @@ export class WorkstreamListPage {
   protected readonly bookmark = LucideBookmarkPlus;
   protected readonly ascIcon = LucideArrowUpNarrowWide;
   protected readonly descIcon = LucideArrowDownWideNarrow;
-  protected readonly down = LucideChevronDown;
-  protected readonly right = LucideChevronRight;
   protected readonly flow = LucideWorkflow;
   protected readonly filterIcon = LucideListFilter;
 
@@ -421,13 +393,23 @@ export class WorkstreamListPage {
     this.sortDir.update((d) => (d === 'asc' ? 'desc' : 'asc'));
   }
 
-  protected toggleGroup(key: string): void {
-    this.collapsed.update((s) => {
-      const next = new Set(s);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  protected readonly trackSummary = (s: { ws: { id: string } }): string => s.ws.id;
+
+  /** Drag between columns. A status drop pins `statusOverride` so the card stays in that column. */
+  protected move(summary: { ws: Workstream }, to: string): void {
+    const w = summary.ws;
+    const group = this.effectiveGroup();
+    if (group === 'status') {
+      if (w.status === to) return;
+      void this.store.updateWorkstream(w.id, { statusOverride: to as Workstream['status'] });
+    } else if (group === 'priority') {
+      if (w.priority !== to) void this.store.updateWorkstream(w.id, { priority: to as Priority });
+    } else if (group === 'ownerTeamId') {
+      if (to && w.ownerTeamId !== to) void this.store.updateWorkstream(w.id, { ownerTeamId: to });
+    } else if (group === 'accountableUserId') {
+      const id = to || null;
+      if ((w.accountableUserId ?? null) !== id) void this.store.updateWorkstream(w.id, { accountableUserId: id });
+    }
   }
 
   protected async saveView(): Promise<void> {

@@ -155,7 +155,7 @@ export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medi
 export const ROLE_META: Record<Role, { label: string; rank: number; description: string }> = {
   viewer: { label: 'Viewer', rank: 0, description: 'Read only' },
   member: { label: 'Member', rank: 1, description: 'Create and update work' },
-  admin: { label: 'Admin', rank: 2, description: 'Manage teams, repositories, agents and members' },
+  admin: { label: 'Admin', rank: 2, description: 'Manage teams, projects, agents and members' },
   owner: { label: 'Owner', rank: 3, description: 'Everything, including deleting the workspace' },
 };
 export const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];

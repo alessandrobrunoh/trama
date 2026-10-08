@@ -54,7 +54,7 @@ export class CreateWorkstreamDto {
   @IsOptional() @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => CriterionDto) acceptanceCriteria?: CriterionDto[];
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsArray() @IsString({ each: true }) labels?: string[];
-  @IsOptional() @IsIn(['draft', 'canceled']) statusOverride?: 'draft' | 'canceled';
+  @IsOptional() @IsIn(STATUSES) statusOverride?: WorkstreamStatus;
   @IsOptional() @IsISO8601() targetDate?: string;
 }
 
@@ -71,7 +71,7 @@ class UpdateWorkstreamDto {
   @OptionalNotNull() @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => CriterionDto) acceptanceCriteria?: CriterionDto[];
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) labels?: string[];
-  @Clearable() @IsIn(['draft', 'canceled']) statusOverride?: 'draft' | 'canceled' | null;
+  @Clearable() @IsIn(STATUSES) statusOverride?: WorkstreamStatus | null;
   @Clearable() @IsISO8601() targetDate?: string | null;
 }
 

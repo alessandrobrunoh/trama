@@ -72,7 +72,7 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 ### Workstreams — `/workstreams`
 - `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
 - `GET /:idOrKey`
-- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|canceled, targetDate? }`
+- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, targetDate? }`
   - `deltaThreadUrl` is required: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream.
   - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
   - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.

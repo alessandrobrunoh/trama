@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideEllipsis, LucideExternalLink, LucidePackage, LucidePlus, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
@@ -61,6 +62,7 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
   selector: 'app-ws-artifacts-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    RouterLink,
     HlmButtonImports,
     HlmDialogImports,
     HlmDropdownMenuImports,
@@ -122,8 +124,10 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
               }
             </span>
             <span class="text-muted-foreground flex items-center gap-2 text-xs max-sm:pl-[26px]">
-              @if (repoName(a); as r) {
-                <span class="inline-flex items-center gap-1 max-lg:hidden"><app-provider-icon [provider]="repoProvider(a)" [size]="12" />{{ r }}</span>
+              @if (repoOf(a); as repo) {
+                <a class="inline-flex items-center gap-1 hover:underline max-lg:hidden" [routerLink]="['/', slug(), 'projects', repo.id]">
+                  <app-provider-icon [provider]="repo.provider" [size]="12" />{{ repo.fullName }}
+                </a>
               }
               <span class="max-sm:hidden">{{ a.updatedAt | relativeTime }}</span>
               @if (a.authorRef) {
@@ -281,11 +285,10 @@ export class WsArtifactsTab {
     return KIND_STATES[k];
   }
 
-  protected repoName(a: Artifact): string | undefined {
-    return this.store.getRepository(a.repositoryId)?.fullName;
-  }
-  protected repoProvider(a: Artifact) {
-    return this.store.getRepository(a.repositoryId)?.provider ?? 'github';
+  protected readonly slug = computed(() => this.store.slug() ?? '');
+
+  protected repoOf(a: Artifact) {
+    return this.store.getRepository(a.repositoryId);
   }
 
   protected openAttach(): void {

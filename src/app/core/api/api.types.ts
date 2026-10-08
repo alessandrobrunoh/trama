@@ -29,6 +29,7 @@ import type {
   ViewLayout,
   Workspace,
   Workstream,
+  WorkstreamStatus,
 } from '../contracts/domain';
 
 // ───── auth ─────
@@ -133,7 +134,7 @@ export interface CreateWorkstreamInput {
   priority?: Priority;
   labels?: string[];
   targetDate?: ISODate;
-  statusOverride?: 'draft' | 'canceled';
+  statusOverride?: WorkstreamStatus;
 }
 export interface UpdateWorkstreamInput {
   title?: string;
@@ -150,7 +151,7 @@ export interface UpdateWorkstreamInput {
   priority?: Priority;
   labels?: string[];
   targetDate?: ISODate | null;
-  statusOverride?: 'draft' | 'canceled' | null;
+  statusOverride?: WorkstreamStatus | null;
 }
 export interface CriterionInput {
   text: string;

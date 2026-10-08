@@ -50,8 +50,8 @@ import { priorityOptions, repoOptions, teamOptions, userOptions } from './ws-mod
           }
         </hlm-date-picker>
       </app-property-row>
-      <app-property-row label="Repositories">
-        <app-picker variant="field" label="Repositories" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
+      <app-property-row label="Projects">
+        <app-picker variant="field" label="Projects" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
       </app-property-row>
       <app-property-row label="Labels">
         <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1 py-1">

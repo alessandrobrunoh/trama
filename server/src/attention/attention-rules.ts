@@ -24,7 +24,7 @@ export interface AWorkstream {
   acceptanceCriteria: { state: string }[];
   status: WorkstreamStatus;
   derivedStatus: WorkstreamStatus;
-  statusOverride?: 'draft' | 'canceled' | null;
+  statusOverride?: WorkstreamStatus | null;
   targetDate?: Date | null;
   updatedAt: Date;
 }

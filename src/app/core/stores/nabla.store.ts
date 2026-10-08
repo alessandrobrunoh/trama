@@ -1057,7 +1057,7 @@ export class NablaStore {
   }
 
   async createRepository(input: CreateRepositoryInput): Promise<Repository | undefined> {
-    return this.write('add repository', (s) => this.api.repositories.create(s, input), {
+    return this.write('add project', (s) => this.api.repositories.create(s, input), {
       onResult: (r) => this.upsert(this._repositories, r),
     });
   }
@@ -1066,7 +1066,7 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.patch(this._repositories, id, patch);
-    return this.write('update repository', (s) => this.api.repositories.update(s, id, patch), {
+    return this.write('update project', (s) => this.api.repositories.update(s, id, patch), {
       tx,
       onResult: (r) => this.upsert(this._repositories, r),
     }).then((r) => !!r);
@@ -1076,7 +1076,7 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._repositories, id);
-    return this.ok('remove repository', (s) => this.api.repositories.remove(s, id), { tx });
+    return this.ok('remove project', (s) => this.api.repositories.remove(s, id), { tx });
   }
 
   // ─────────────────────────── admin: members, agents, tokens, integrations ───────────────────────────
