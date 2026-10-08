@@ -33,6 +33,7 @@ import type {
   IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
+  MilestoneEntity,
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
@@ -40,6 +41,9 @@ import type {
   WorkspaceEntity,
   WorkstreamEntity,
 } from '../entities/index.js';
+
+const STARTED: ReadonlySet<string> = new Set(['in_progress', 'in_review']);
+const FINISHED: ReadonlySet<string> = new Set(['done', 'canceled']);
 
 export const HOUR = 3600_000;
 export const DAY = 24 * HOUR;
@@ -54,6 +58,7 @@ export interface SeedData {
   teams: Rows<TeamEntity>;
   repositories: Rows<RepositoryEntity>;
   workstreams: Rows<WorkstreamEntity>;
+  milestones: Rows<MilestoneEntity>;
   inputRequests: Rows<InputRequestEntity>;
   issues: Rows<IssueEntity>;
   artifacts: Rows<ArtifactEntity>;
@@ -107,7 +112,7 @@ export class SeedBuilder {
   ) {
     this.workspaceId = workspaceId;
     this.data = {
-      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], workstreams: [],
+      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], workstreams: [], milestones: [],
       inputRequests: [], issues: [], artifacts: [], decisions: [], dependencies: [], comments: [],
       events: [], views: [], integrations: [], counters: {},
     };
@@ -167,6 +172,8 @@ export class SeedBuilder {
     /** status progression, oldest first; last = current derived status */
     path: WorkstreamStatus[];
     override?: 'draft' | 'canceled';
+    /** days ago the work started (timeline start) */
+    start?: number;
     target?: number;
     created: number;
     shipped?: number;
@@ -199,6 +206,7 @@ export class SeedBuilder {
       status: o.override ?? current,
       derivedStatus: current,
       statusOverride: o.override ?? null,
+      startDate: o.start !== undefined ? this.at(o.start) : null,
       targetDate: o.target !== undefined ? this.at(-o.target) : null,
       createdById: o.createdBy,
       createdAt,
@@ -341,6 +349,17 @@ export class SeedBuilder {
     this.event(this.at(daysAgo), user(by), 'decision.superseded', { type: 'decision', id: decisionId }, d.originWorkstreamId ?? null, { key: d.key, title: d.title, supersededBy: byKey });
   }
 
+  /** Milestone of a workstream; `target` = days from now (negative = past). */
+  milestone(workstreamId: string, o: { name: string; description?: string; target?: number; sort: number; created: number }): string {
+    const id = uid('ms');
+    this.data.milestones.push({
+      id, workspaceId: this.workspaceId, workstreamId, name: o.name, description: o.description ?? null,
+      targetDate: o.target !== undefined ? this.at(-o.target) : null, sortOrder: o.sort, createdAt: this.at(o.created), updatedAt: this.at(o.created),
+    });
+    this.event(this.at(o.created), SYSTEM, 'milestone.created', { type: 'milestone', id }, workstreamId, { name: o.name });
+    return id;
+  }
+
   issue(o: {
     kind: IssueKind;
     number: number;
@@ -354,6 +373,8 @@ export class SeedBuilder {
     priority?: Priority;
     status: IssueStatus;
     workstreams?: string[];
+    milestones?: string[];
+    estimate?: number;
     duplicateOf?: string;
     url?: string;
     created: number;
@@ -367,7 +388,10 @@ export class SeedBuilder {
     this.data.issues.push({
       id, workspaceId: this.workspaceId, key, number: o.number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', status: o.status,
-      workstreamIds: o.workstreams ?? [], duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
+      workstreamIds: o.workstreams ?? [], milestoneIds: o.milestones ?? [], aliases: [], estimate: o.estimate ?? null,
+      startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
+      completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
+      duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
       createdAt: this.at(o.created), updatedAt: this.at(o.moved ?? o.created),
     });
     const subj: SubjectRef = { type: 'issue', id };

@@ -57,7 +57,7 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 
 ## Workspace snapshot
 
-`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, workstreams, executions, inputRequests, issues, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
+`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, workstreams, milestones, executions, inputRequests, issues, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
 
 ## Domain routes (all under `/w/:slug`)
 
@@ -72,28 +72,39 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 ### Workstreams — `/workstreams`
 - `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
 - `GET /:idOrKey`
-- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, targetDate? }`
+- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, startDate?, targetDate? }`
   - `deltaThreadUrl` is required: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream.
   - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
   - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.
 - `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. `deltaThreadUrl` can be replaced but not cleared. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
-- `DELETE /:idOrKey` (cascades input requests, artifacts, dependencies, comments; unlinks issues/decisions).
+- `DELETE /:idOrKey` (cascades input requests, artifacts, milestones, dependencies, comments; unlinks issues/decisions and drops the deleted milestones from issues).
 - Criteria (each returns the updated workstream): `POST /:idOrKey/criteria { text, state? }`, `PATCH /:idOrKey/criteria/:criterionId { text?, state? }`, `DELETE /:idOrKey/criteria/:criterionId`. States: `pending|in_progress|met`.
 - `status` / `derivedStatus` / `shippedAt` are written by the status engine (see *Derived workstream status* below); `status = statusOverride ?? derivedStatus`.
+
+### Milestones — `/milestones`
+Linear-style milestones inside a workstream (flat resource, like artifacts). `Milestone { id: ms_…, workspaceId, workstreamId, name, description?, targetDate?, sortOrder, createdAt, updatedAt }`; also in the snapshot (`milestones`, ordered by `sortOrder`).
+- `GET ?workstreamId` (ordered by workstream, `sortOrder`), `GET /:id`
+- `POST { workstreamId, name, description?, targetDate?, sortOrder? }` → `sortOrder` defaults to last (max + 1).
+- `PATCH /:id { name?, description?, targetDate?, sortOrder? }` (`null` clears `description` / `targetDate`).
+- `POST /reorder { workstreamId, ids: [...] }` → re-numbers `sortOrder` to 0..n-1 following `ids` (milestones not listed follow, in their current order); `400` for ids that are not milestones of that workstream. Returns the ordered list.
+- `DELETE /:id` (`204`; removes the id from `Issue.milestoneIds`, deletes its comments). Milestones are deleted with their workstream.
+- Events: `milestone.created|updated|deleted` (subject `milestone`, `workstreamId` set; `data.name`, `data.fields`). Live (SSE) events use entity `milestone`.
+- Issue rule: an issue is in at most one milestone per workstream and only in milestones of workstreams in its `workstreamIds` (`PATCH /issues/:idOrKey { milestoneIds }` → `400` otherwise). Removing a workstream from `workstreamIds` drops that workstream's milestone from the issue.
 
 ### Input requests — `/input-requests`
 `GET ?state&workstreamId&assigneeUserId`, `GET /:id`, `POST { question, workstreamId, options?, assigneeUserId? }` (`requestedBy` = caller), `PATCH` (open only), `POST /:id/answer { answer }`, `POST /:id/dismiss` (`409` if not open), `DELETE`.
 
 ### Issues — `/issues`
 Demand items (bugs, requests, incidents, tasks). Status is a tracker workflow, separate from workstream status. Keys stay per kind: `BUG-n|FEAT-n|INC-n|DEBT-n|FB-n|IDEA-n|SEC-n`.
-- `GET ?kind&status&teamId&assigneeId&workstreamId&q`, `GET /:idOrKey` (`BUG-142` or id)
-- `POST { kind, title, body?, source?, reporterName?, assigneeId?, teamId?, priority?, status?: backlog|todo|in_progress|in_review|done|canceled, externalUrl? }` → status defaults to `backlog`.
-- `PATCH /:idOrKey { title?, body?, reporterName?, assigneeId?, teamId?, priority?, status?, externalUrl?, workstreamIds?, duplicateOfId? }` — `duplicateOfId` (id or key, or `null`) marks the issue as a duplicate and sets status `canceled`; an issue cannot duplicate itself. `null` clears an optional field.
+- `GET ?kind&status&teamId&assigneeId&workstreamId&milestoneId&q`, `GET /:idOrKey` (`BUG-142`, an **alias** — an old key from before a kind change, case-insensitive — or id; the response carries the current `key`)
+- `POST { kind, title, body?, source?, reporterName?, assigneeId?, teamId?, priority?, status?: backlog|todo|in_progress|in_review|done|canceled, externalUrl?, estimate? }` → status defaults to `backlog`.
+- `PATCH /:idOrKey { title?, kind?, estimate?, body?, reporterName?, assigneeId?, teamId?, priority?, status?, externalUrl?, workstreamIds?, milestoneIds?, duplicateOfId? }` — `duplicateOfId` (id or key, or `null`) marks the issue as a duplicate and sets status `canceled`; an issue cannot duplicate itself. `null` clears an optional field. `estimate` is a non-negative number (story points, ≤ 1000), `null` clears it; `issue.updated.data.fields` includes `estimate`. **`kind` re-keys the issue**: it takes the next number of the new kind (`BUG-148` → `FEAT-35`), the old key is appended to `aliases` (lookups by old keys keep working), and an `issue.rekeyed` event (`data: { from, to, fromKind, toKind }`) is recorded. Sending the current kind is a no-op.
+- Time facts (server-set, read-only): `startedAt` = first time the status enters `in_progress`/`in_review` (kept if moved back); `completedAt` = set when the status becomes `done`/`canceled`, cleared on reopen. Also applied by `POST` (initial status) and `/link`.
 - `POST /:idOrKey/link { workstreamIds?, createWorkstream?: { title, ownerTeamId, deltaThreadUrl, objective?, … same as workstream create }, status? }` — attaches existing and/or a newly created workstream (created atomically). `backlog`/`todo` move to `in_progress` unless `status` is set. A duplicate issue cannot be linked. At least one of `workstreamIds` / `createWorkstream` is required.
 - `DELETE /:idOrKey`
 
 ### Artifacts — `/artifacts`
-`GET ?workstreamId&executionId&repositoryId&kind&state`, `POST { workstreamId, kind, title, executionId?, repositoryId?, provider?, url?, externalId?, state?, ci?, review?, hasConflicts?, environment? }`, `PATCH` (same fields), `DELETE`. Defaults: PR/MR → `open`, ci `pending`, review `none`, no conflicts; provider `github`/`gitlab` by kind; document/design/release → `published`, commit → `merged`, build/deployment → `pending`. `review.requested` is recorded when review becomes `requested`.
+`GET ?workstreamId&executionId&repositoryId&kind&state`, `POST { workstreamId, kind, title, executionId?, repositoryId?, provider?, url?, externalId?, state?, ci?, review?, hasConflicts?, environment? }`, `PATCH` (same fields), `DELETE`. Defaults: PR/MR → `open`, ci `pending`, review `none`, no conflicts; provider `github`/`gitlab` by kind; document/design/release → `published`, build/deployment → `pending`. Kinds: pull_request, merge_request, document, design, image, file, build, test_report, deployment, release (`commit` and `branch` were removed; PRs cover them). `review.requested` is recorded when review becomes `requested`.
 
 ### Decisions — `/decisions`
 `GET ?status&workstreamId&tag&q`, `GET /:idOrKey` (`ADR-21`), `POST { title, statement, rationale?, status?: proposed|accepted|rejected, originWorkstreamId?, originExecutionId?, relatedWorkstreamIds?, tags? }` (key `ADR-n` per workspace; `accepted`/`rejected` at creation need a person), `PATCH` (content only), `POST /:idOrKey/accept` and `/reject` (people only; `409` unless `proposed`), `POST /:idOrKey/supersede { byId }` (id or key; `409` on cycles or when the replacement is itself superseded/rejected), `DELETE`.
@@ -164,7 +175,7 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 
 ## Events (activity log + live updates)
 
-- `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `issue.created|status_changed|linked|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
+- `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `issue.created|status_changed|rekeyed|linked|updated|deleted`, `milestone.created|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
 - `GET /events/stream` — **Server-Sent Events**, one `LiveEvent` JSON per message (`{ type: created|updated|deleted|attention, entity, id, clientId?, at }`), plus a named `ping` event every 25 s. `clientId` echoes the `X-Client-Id` header of the request that caused the change, so a tab can ignore its own echoes. Use `new EventSource(url, { withCredentials: true })` (cookie auth; EventSource cannot send headers).
 
 ## Dev utilities
@@ -231,6 +242,19 @@ Idempotency: `X-GitHub-Delivery` / `X-Gitlab-Event-UUID` ids are stored in `webh
 
 ### Not implemented yet (documented TODOs)
 - `POST /integrations/:id/sync` (history backfill: open + recently closed PRs/MRs, reviews, mergeability, deployments, releases). Until it exists, only events received after the webhook is set up are reflected.
-- GitHub `pull_request_review`, `push` (commit and branch artifacts), `deployment_status`, `release`; GitLab `push`, `deployment`, `release`.
+- GitHub `pull_request_review`, `deployment_status`, `release`; GitLab `push`, `deployment`, `release`.
 - Delta: connection type only (no session discovery; `sessionUrl` links on executions work as before).
 - CI is derived from the single event received, not re-aggregated across all check suites of a commit.
+
+## Permission policy, team roles and token scopes
+
+- **Workspace settings** — `Workspace.settings` (always fully resolved in responses): `permissions` (minimum role per capability), `defaultTeamId?`, `estimateScale` (`fibonacci|linear|tshirt|none`), `weekStart`, `timeZone` (IANA or `auto`), `iconColor?`, `iconInitial?`. `PATCH /w/:slug/settings` (admin; `permissions` needs an owner; `null` clears `defaultTeamId`, `iconColor`, `iconInitial`). `permissions` is partial: send only the capabilities you change, each set to `member|admin|owner`.
+- **Capabilities** (defaults = historical behaviour): `createWorkstreams` member, `deleteWorkstreams` member, `createIssues` member, `deleteIssues` member, `acceptDecisions` member (accept/reject/supersede, always a person), `manageSharedViews` member (publish a view to the workspace), `createTeams` admin, `manageTeams` admin (edit/delete a team; a team lead may always edit their own team), `manageRepositories` admin, `inviteMembers` admin (a role above the inviter's own cannot be granted), `manageAgents` admin (agents and agent tokens), `manageTokens` member (personal tokens), `manageIntegrations` admin (integrations and outgoing webhooks). Enforced by `@Can(capability)` in `AccessGuard`; members/roles changes, workspace rename and delete keep their fixed roles.
+- **Team roles** — `Team.leadIds` (subset of `memberIds`) and `Team.editPolicy` (`workspace` | `members`). With `members`, creating/updating/deleting the team's workstreams (`ownerTeamId`) and issues (`teamId`) — including moving work into the team — needs a team member/lead, or a workspace admin+. Agents count through their owner (`ownerUserId`). Enforced by `@EditsTeamWork` in `AccessGuard` (`PermissionsService`).
+- **Token scopes** — `ApiToken.scope`: `read` (GET only, effective role viewer), `write` (default; effective role capped at member, so no admin routes), `admin` (full role of the acting user; only admins can mint one, never for agents). `POST /w/:slug/tokens { name, scope?, agentId?, expiresAt? }`.
+
+## Outgoing webhooks (custom integrations) — `/w/:slug/outgoing-webhooks` (`manageIntegrations`)
+
+`OutgoingWebhook { id, name, url, events[], enabled, createdAt, lastDeliveryAt?, lastStatus? }`. `events`: event types (`issue.created`), entity wildcards (`issue.*`) or `*`. `GET`, `GET /:id`, `POST { name, url, events, enabled? }` → `{ webhook, secret }` (the `whsec_…` secret is shown once), `PATCH /:id`, `DELETE /:id`, `POST /:id/rotate-secret` → `{ webhook, secret }`, `POST /:id/test` → sends a `ping` now and answers the delivery result, `GET /:id/deliveries?limit` → last deliveries (newest first; the latest 50 are kept).
+
+Every `DomainEvent` (see *Events*) is delivered asynchronously (per webhook in order, 5 s timeout, one retry after ~2 s on a network error, 429 or 5xx): `POST url` with `Content-Type: application/json`, headers `X-Nabla-Event`, `X-Nabla-Delivery` (= event id), `X-Nabla-Signature: sha256=<hex HMAC-SHA256 of the raw body with the secret>`, body `{ id, event, workspaceId, at, actor, subject, workstreamId?, data }`. URLs must be http(s) without credentials; in production internal hosts (localhost, private IP ranges) are rejected unless `NABLA_ALLOW_PRIVATE_WEBHOOKS=true` (hostnames are not resolved: use an egress proxy for real SSRF protection). At most 20 webhooks per workspace. Limits: delivery is in-process (no durable queue), events emitted inside a transaction that later rolls back are still delivered.

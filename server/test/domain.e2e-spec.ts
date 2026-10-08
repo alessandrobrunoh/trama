@@ -171,7 +171,7 @@ describe('domain', () => {
     const off = bus.onTouched((e) => void touched.push(`${e.reason}`));
     const ws = (await c.post(`${base()}/workstreams`, { title: 'Hooked', ownerTeamId: web.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201)).body;
     await c.post(`${base()}/input-requests`, { workstreamId: ws.id, question: 'q?' }).expect(201);
-    await c.post(`${base()}/artifacts`, { workstreamId: ws.id, kind: 'branch', title: 'b' }).expect(201);
+    await c.post(`${base()}/artifacts`, { workstreamId: ws.id, kind: 'document', title: 'b' }).expect(201);
     await c.post(`${base()}/decisions`, { title: 'd', statement: 's', originWorkstreamId: ws.id }).expect(201);
     off();
     expect(touched).toEqual(

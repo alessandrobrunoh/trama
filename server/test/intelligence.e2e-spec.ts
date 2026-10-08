@@ -47,7 +47,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       await c.post(`${base()}/workstreams/${w.key}/criteria`, { text: 'Sessions survive' }).expect(201);
       expect((await ws(w.key)).status).toBe('planned');
 
-      await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'branch', title: 'auth-42/rotation' }).expect(201);
+      await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'build', title: 'auth-42 build' }).expect(201);
       expect((await ws(w.key)).status).toBe('working');
 
       const pr = (await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'pull_request', title: 'PR', externalId: '#1' }).expect(201)).body;

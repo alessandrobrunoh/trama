@@ -21,6 +21,7 @@
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "db:up": "docker compose up -d --wait",
     "db:down": "docker compose down",
+    "db:mock-estimates": "tsc -p tsconfig.scripts.json && node dist-scripts/scripts/mock-estimates.js",
     "migration:generate": "npm run build && typeorm migration:generate -d dist/database/data-source.js",
     "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
     "migration:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js"

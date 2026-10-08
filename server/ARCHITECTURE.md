@@ -12,7 +12,7 @@ src/
   auth/                           AuthService (users, sessions), TokensService, AuthController, request-context.ts (decorators)
   workspaces/                     AccessGuard (global), WorkspacesService + controllers (workspace, members, agents, tokens)
   events/                         EventsService (record + SSE), WorkstreamBus, EventsController (list + stream), request-store
-  teams repositories workstreams executions input-requests issues artifacts decisions dependencies comments views
+  teams repositories workstreams milestones executions input-requests issues artifacts decisions dependencies comments views
   snapshot/ health/
   status/ attention/ graph/ search/ agent-context/   (backend-intelligence)
 ```
@@ -75,7 +75,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Numbering
 
-`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `ws:<teamId>` (workstream numbers per owner team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Changing a workstream's owner team keeps its key.
+`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `ws:<teamId>` (workstream numbers per owner team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Changing a workstream's owner team keeps its key. Changing an issue's `kind` takes the next number of the new kind and keeps the old key in `aliases` (lookups match aliases).
 
 ## Database
 
@@ -128,3 +128,7 @@ webhooks/      controller (@Public), service (verify -> dedupe -> parse -> apply
 **Status engine flow** (`status/`): a domain service persists a change and `await bus.touch(workspaceId, workstreamId, reason)` → `StatusService.onTouched` loads the workstream's executions, open input requests, artifacts, proposed decisions that originate from it and the incoming dependencies (with the sources' current status/state) → pure `deriveStatus()` (`derive-status.ts`, PLAN.md §2, returns `{ status, derivedStatus, rule }`) → if `derivedStatus`/`status` changed, update the row (+ `shippedAt` the first time), record `workstream.status_changed` (system actor) → re-derive dependents (workstreams with edges *from* this workstream or its executions; cascades while statuses change, cycle-safe) → publish a `LiveEvent` of type `attention`. `onApplicationBootstrap` re-derives all workstreams; `SeedService.reset()` touches every seeded workstream through the bus (an additive hook). `blockers()` in `derive-status.ts` is shared with attention.
 
 **Attention** (`attention/`): `attention-rules.ts` is a pure function (`computeAttention(data)`) from workspace rows to items with an *audience* (user ids); `AttentionService` loads the rows, adds event-log `since` timestamps (one SQL), filters by audience and merges per-user `attention_state`. Nothing is stored for items themselves. **Graph / search / agent-context** are read-only services over the same tables (raw ILIKE SQL for search).
+
+## Access control, token scopes and outgoing webhooks
+
+`@Can(capability)` (auth/request-context.ts) makes `AccessGuard` take the minimum role from `workspace.resolved().permissions` instead of a hard-coded `@Roles`. Token scopes cap the effective role in the guard (`capRole`), so every `ctx.role` check downstream already respects them; `ctx.memberRole` is the uncapped role. `@EditsTeamWork('workstream'|'issue')` calls `PermissionsService.enforceTeamScope` (team `editPolicy`). Migration `1791820000000-AccessWebhooks`. `src/outgoing-webhooks`: `EventsService.recorded$` (emits every non-backdated DomainEvent after persisting) feeds `OutgoingWebhooksService`, which delivers through the injectable `HttpClient` (tests override it) and logs to `outgoing_webhook_deliveries`.

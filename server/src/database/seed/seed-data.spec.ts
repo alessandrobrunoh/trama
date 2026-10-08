@@ -39,4 +39,22 @@ describe('demo seed', () => {
     const now = Date.parse('2026-10-07T12:00:00Z');
     for (const e of data.events) expect((e.at as Date).getTime()).toBeLessThanOrEqual(now);
   });
+
+  it('includes deterministic mock estimate history', () => {
+    const now = Date.parse('2026-10-07T12:00:00Z');
+    const done = data.issues.filter((i) => i.status === 'done' && i.estimate != null && i.startedAt && i.completedAt);
+    expect(done.length).toBeGreaterThanOrEqual(35);
+    for (const i of data.issues) {
+      if (i.startedAt && i.completedAt) expect(i.startedAt.getTime()).toBeLessThanOrEqual(i.completedAt.getTime());
+      expect(i.createdAt!.getTime()).toBeLessThanOrEqual(now);
+    }
+    const mockIds = new Set(data.issues.filter((i) => i.id!.startsWith('in_mock_')).map((i) => i.id));
+    expect(mockIds.size).toBeGreaterThanOrEqual(40);
+    const linked = data.events.filter((e) => e.type === 'issue.linked' && mockIds.has(e.subject!.id));
+    expect(linked.length).toBeGreaterThan(20);
+    const again = createSeed(now, 'hash');
+    const shape = (d: typeof data) => d.issues.filter((i) => i.id!.startsWith('in_mock_')).map((i) => [i.key, i.estimate, i.completedAt?.getTime()]);
+    expect(shape(again)).toEqual(shape(data));
+    expect(createSeed(now, 'hash', { mockHistory: false }).issues.some((i) => i.id!.startsWith('in_mock_'))).toBe(false);
+  });
 });

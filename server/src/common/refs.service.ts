@@ -7,6 +7,7 @@ import {
   InputRequestEntity,
   IssueEntity,
   MembershipEntity,
+  MilestoneEntity,
   RepositoryEntity,
   TeamEntity,
   WorkstreamEntity,
@@ -76,6 +77,10 @@ export class RefsService {
       case 'decision': {
         const r = await db.getRepository(DecisionEntity).findOne({ where });
         return { exists: !!r, workstreamId: r?.originWorkstreamId ?? undefined };
+      }
+      case 'milestone': {
+        const r = await db.getRepository(MilestoneEntity).findOne({ where, select: { id: true, workstreamId: true } });
+        return { exists: !!r, workstreamId: r?.workstreamId };
       }
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };

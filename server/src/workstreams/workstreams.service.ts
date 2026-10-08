@@ -36,6 +36,7 @@ export interface WorkstreamInput {
   priority?: Priority;
   labels?: string[];
   statusOverride?: WorkstreamStatus | null;
+  startDate?: string | null;
   targetDate?: string | null;
 }
 
@@ -144,6 +145,7 @@ export class WorkstreamsService {
           derivedStatus: derived,
           statusOverride: input.statusOverride ?? null,
           status: input.statusOverride ?? derived,
+          startDate: (toDate(input.startDate) as Date | null | undefined) ?? null,
           targetDate: (toDate(input.targetDate) as Date | null | undefined) ?? null,
           createdById: actor.id ?? 'system',
         }),
@@ -196,6 +198,8 @@ export class WorkstreamsService {
     if (patch.acceptanceCriteria !== undefined) set('acceptanceCriteria', criteria(patch.acceptanceCriteria));
     if (patch.priority !== undefined) set('priority', patch.priority);
     if (patch.labels !== undefined) set('labels', unique(patch.labels));
+    if (patch.startDate !== undefined)
+      set('startDate', (toDate(patch.startDate) as Date | null) ?? null);
     if (patch.targetDate !== undefined)
       set('targetDate', (toDate(patch.targetDate) as Date | null) ?? null);
     if (patch.statusOverride !== undefined) {
@@ -228,6 +232,15 @@ export class WorkstreamsService {
         )
       ).map((r) => r.id);
       ids.push(ws.id);
+      const milestoneIds = (await m.query<{ id: string }[]>(`SELECT "id" FROM "milestones" WHERE "workstreamId" = $1`, [ws.id])).map((r) => r.id);
+      if (milestoneIds.length) {
+        // milestones cascade with the workstream; drop their ids from issues and their comments
+        await m.query(
+          `UPDATE "issues" SET "milestoneIds" = COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements_text("milestoneIds") x WHERE x <> ALL($2)), '[]'::jsonb) WHERE "workspaceId" = $1 AND "milestoneIds" ?| $2`,
+          [workspaceId, milestoneIds],
+        );
+        ids.push(...milestoneIds);
+      }
       await m.query(`DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`, [workspaceId, ids]);
       await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`, [workspaceId, ids]);
       await m.query(

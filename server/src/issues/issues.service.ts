@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, type Repository } from 'typeorm';
+import { DataSource, In, type Repository } from 'typeorm';
 import {
   ISSUE_KEY_PREFIX,
   type ActorRef,
@@ -12,13 +12,16 @@ import {
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
-import { IssueEntity } from '../database/entities/index.js';
+import { IssueEntity, MilestoneEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { WorkstreamsService, type WorkstreamInput } from '../workstreams/workstreams.service.js';
 
 export interface IssueInput {
   title?: string;
+  /** Changing it re-keys the issue and keeps the old key as an alias. */
+  kind?: IssueKind;
+  estimate?: number | null;
   body?: string | null;
   source?: IssueSource;
   reporterName?: string | null;
@@ -28,6 +31,7 @@ export interface IssueInput {
   status?: IssueStatus;
   externalUrl?: string | null;
   workstreamIds?: string[];
+  milestoneIds?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
 }
@@ -41,6 +45,19 @@ export interface LinkIssueInput {
 
 const KEY_RE = /^[A-Za-z]+-\d+$/;
 const SCHEDULED: ReadonlySet<IssueStatus> = new Set(['backlog', 'todo']);
+const STARTED: ReadonlySet<IssueStatus> = new Set(['in_progress', 'in_review']);
+const FINISHED: ReadonlySet<IssueStatus> = new Set(['done', 'canceled']);
+
+/**
+ * Time-tracking facts follow the status: `startedAt` is set the first time the issue enters
+ * in_progress / in_review (and kept afterwards); `completedAt` is set when it becomes done or
+ * canceled and cleared when it is reopened.
+ */
+export function applyStatusFacts(row: Pick<IssueEntity, 'startedAt' | 'completedAt'>, to: IssueStatus, now = new Date()) {
+  if (STARTED.has(to) && !row.startedAt) row.startedAt = now;
+  if (FINISHED.has(to)) row.completedAt ??= now;
+  else row.completedAt = null;
+}
 
 @Injectable()
 export class IssuesService {
@@ -54,29 +71,61 @@ export class IssuesService {
     @InjectRepository(IssueEntity) private readonly repo: Repository<IssueEntity>,
   ) {}
 
-  list(workspaceId: string, f: { kind?: IssueKind; status?: IssueStatus; teamId?: string; assigneeId?: string; workstreamId?: string; q?: string } = {}) {
+  list(workspaceId: string, f: { kind?: IssueKind; status?: IssueStatus; teamId?: string; assigneeId?: string; workstreamId?: string; milestoneId?: string; q?: string } = {}) {
     const qb = this.repo.createQueryBuilder('i').where('i.workspaceId = :workspaceId', { workspaceId }).orderBy('i.createdAt', 'DESC');
     if (f.kind) qb.andWhere('i.kind = :k', { k: f.kind });
     if (f.status) qb.andWhere('i.status = :s', { s: f.status });
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
     if (f.workstreamId) qb.andWhere('i.workstreamIds @> :w::jsonb', { w: JSON.stringify([f.workstreamId]) });
-    if (f.q) qb.andWhere('(i.title ILIKE :q OR i.key ILIKE :q)', { q: `%${f.q}%` });
+    if (f.milestoneId) qb.andWhere('i.milestoneIds @> :m::jsonb', { m: JSON.stringify([f.milestoneId]) });
+    if (f.q) qb.andWhere('(i.title ILIKE :q OR i.key ILIKE :q OR i.aliases::text ILIKE :q)', { q: `%${f.q}%` });
     return qb.getMany();
   }
 
-  /** `idOrKey`: id (`in_…`) or key (`BUG-142`). */
+  /** `idOrKey`: id (`in_…`), key (`BUG-142`) or an alias (an old key from before a kind change). */
   async get(workspaceId: string, idOrKey: string) {
-    const row = await this.repo.findOneBy(
-      KEY_RE.test(idOrKey) ? { workspaceId, key: idOrKey.toUpperCase() } : { workspaceId, id: idOrKey },
-    );
+    let row: IssueEntity | null;
+    if (KEY_RE.test(idOrKey)) {
+      const key = idOrKey.toUpperCase();
+      row =
+        (await this.repo.findOneBy({ workspaceId, key })) ??
+        (await this.repo
+          .createQueryBuilder('i')
+          .where('i.workspaceId = :workspaceId', { workspaceId })
+          .andWhere('i.aliases @> :a::jsonb', { a: JSON.stringify([key]) })
+          .getOne());
+    } else {
+      row = await this.repo.findOneBy({ workspaceId, id: idOrKey });
+    }
     if (!row) throw notFound('Issue', idOrKey);
     return row;
+  }
+
+  /**
+   * Milestones must exist, belong to a workstream the issue is linked to, and an issue may be in
+   * at most one milestone per workstream.
+   */
+  private async assertMilestones(workspaceId: string, milestoneIds: readonly string[], workstreamIds: readonly string[]) {
+    if (!milestoneIds.length) return;
+    const rows = await this.ds.getRepository(MilestoneEntity).findBy({ workspaceId, id: In(milestoneIds) });
+    if (rows.length !== milestoneIds.length)
+      throw new BadRequestException(`Unknown milestone in: ${milestoneIds.join(', ')}`);
+    const seen = new Set<string>();
+    for (const m of rows) {
+      if (!workstreamIds.includes(m.workstreamId))
+        throw new BadRequestException(`Milestone "${m.name}" belongs to a workstream this issue is not linked to`);
+      if (seen.has(m.workstreamId)) throw new BadRequestException('An issue can be in at most one milestone per workstream');
+      seen.add(m.workstreamId);
+    }
   }
 
   async create(workspaceId: string, actor: ActorRef, input: IssueInput & { kind: IssueKind; title: string }) {
     await this.refs.teams(workspaceId, [input.teamId].filter((x): x is string => !!x));
     await this.refs.users(workspaceId, [input.assigneeId]);
+    const status = input.status ?? 'backlog';
+    const facts: Pick<IssueEntity, 'startedAt' | 'completedAt'> = { startedAt: null, completedAt: null };
+    applyStatusFacts(facts, status);
     const row = await this.ds.transaction(async (m) => {
       const number = await this.counters.next(m, workspaceId, `issue:${input.kind}`);
       return m.save(
@@ -94,7 +143,10 @@ export class IssuesService {
           assigneeId: input.assigneeId ?? null,
           teamId: input.teamId ?? null,
           priority: input.priority ?? 'none',
-          status: input.status ?? 'backlog',
+          status,
+          estimate: input.estimate ?? null,
+          startedAt: facts.startedAt,
+          completedAt: facts.completedAt,
           externalUrl: input.externalUrl ?? null,
         }),
       );
@@ -116,6 +168,8 @@ export class IssuesService {
     await this.refs.workstreams(workspaceId, patch.workstreamIds);
     const before = new Set(row.workstreamIds);
     const from = row.status;
+    const fromKey = row.key;
+    const fromKind = row.kind;
 
     let duplicateOfId = row.duplicateOfId;
     if (patch.duplicateOfId !== undefined) {
@@ -133,7 +187,23 @@ export class IssuesService {
       }
     }
 
+    const nextWorkstreamIds = patch.workstreamIds !== undefined ? unique(patch.workstreamIds) : row.workstreamIds;
+    let nextMilestoneIds = patch.milestoneIds !== undefined ? unique(patch.milestoneIds) : row.milestoneIds;
+    if (patch.milestoneIds !== undefined) {
+      await this.assertMilestones(workspaceId, nextMilestoneIds, nextWorkstreamIds);
+    } else if (patch.workstreamIds !== undefined && row.milestoneIds.length) {
+      // Unlinking a workstream drops that workstream's milestone.
+      const kept = new Set(
+        (await this.ds.getRepository(MilestoneEntity).findBy({ workspaceId, id: In(row.milestoneIds) }))
+          .filter((m) => nextWorkstreamIds.includes(m.workstreamId))
+          .map((m) => m.id),
+      );
+      nextMilestoneIds = row.milestoneIds.filter((id) => kept.has(id));
+    }
+    row.milestoneIds = nextMilestoneIds;
+
     if (patch.title !== undefined) row.title = patch.title.trim();
+    if (patch.estimate !== undefined) row.estimate = patch.estimate;
     if (patch.body !== undefined) row.body = patch.body;
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
@@ -141,12 +211,34 @@ export class IssuesService {
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
     if (patch.workstreamIds !== undefined) row.workstreamIds = unique(patch.workstreamIds);
-    if (patch.status !== undefined) row.status = patch.status;
+    if (patch.status !== undefined) {
+      row.status = patch.status;
+      if (row.status !== from) applyStatusFacts(row, row.status);
+    }
     row.duplicateOfId = duplicateOfId;
     row.updatedAt = new Date();
-    await this.repo.save(row);
+    const rekey = patch.kind !== undefined && patch.kind !== fromKind;
+    await this.ds.transaction(async (m) => {
+      if (rekey) {
+        // The key prefix follows the kind: take the next number of the new kind, keep the old key as an alias.
+        const number = await this.counters.next(m, workspaceId, `issue:${patch.kind}`);
+        row.aliases = unique([...row.aliases, fromKey]);
+        row.kind = patch.kind!;
+        row.number = number;
+        row.key = `${ISSUE_KEY_PREFIX[row.kind]}-${number}`;
+      }
+      await m.save(row);
+    });
 
-    const fields = Object.keys(patch).filter((k) => k !== 'status');
+    const fields = Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined).filter((k) => k !== 'status' && k !== 'kind');
+    if (rekey)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.rekeyed',
+        subject: { type: 'issue', id: row.id },
+        data: { key: row.key, from: fromKey, to: row.key, fromKind, toKind: row.kind },
+      });
     if (fields.length)
       await this.events.record({
         workspaceId,
@@ -195,6 +287,7 @@ export class IssuesService {
       }
       row.workstreamIds = ids;
       row.status = input.status ?? (SCHEDULED.has(row.status) ? 'in_progress' : row.status);
+      if (row.status !== from) applyStatusFacts(row, row.status);
       row.updatedAt = new Date();
       await m.save(row);
     });

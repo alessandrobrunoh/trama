@@ -36,6 +36,10 @@ export class EventsService {
   /** All live events of all workspaces; filter by `workspaceId`. */
   readonly stream$ = this.bus.asObservable();
 
+  private readonly recorded = new Subject<DomainEventEntity>();
+  /** Every DomainEvent right after it was persisted (not backdated seed events). Used by outgoing webhooks. */
+  readonly recorded$ = this.recorded.asObservable();
+
   constructor(
     @InjectRepository(DomainEventEntity)
     private readonly repo: Repository<DomainEventEntity>,
@@ -70,6 +74,7 @@ export class EventsService {
       data: input.data ?? {},
     });
     await repo.save(row);
+    if (!input.at) this.recorded.next(row);
     if (live) this.publish(input.workspaceId, live);
     return row;
   }

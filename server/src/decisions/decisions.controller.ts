@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
-import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { DecisionsService } from './decisions.service.js';
@@ -64,18 +64,21 @@ export class DecisionsController {
   }
 
   @Post(':idOrKey/accept')
+  @Can('acceptDecisions')
   @HttpCode(200)
   accept(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
     return this.service.accept(ctx.workspace.id, actor, idOrKey);
   }
 
   @Post(':idOrKey/reject')
+  @Can('acceptDecisions')
   @HttpCode(200)
   reject(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
     return this.service.reject(ctx.workspace.id, actor, idOrKey);
   }
 
   @Post(':idOrKey/supersede')
+  @Can('acceptDecisions')
   @HttpCode(200)
   supersede(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: SupersedeDto) {
     return this.service.supersede(ctx.workspace.id, actor, idOrKey, dto.byId);

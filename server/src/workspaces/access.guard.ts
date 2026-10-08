@@ -12,21 +12,30 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { AuthService, SESSION_COOKIE } from '../auth/auth.service.js';
 import {
+  CAPABILITY_KEY,
   IS_PUBLIC_KEY,
   REQUIRE_USER_KEY,
+  TEAM_SCOPE_KEY,
   ROLES_KEY,
   hasRole,
   type AppRequest,
   type AuthInfo,
 } from '../auth/request-context.js';
 import { TokensService } from '../auth/tokens.service.js';
-import type { Role } from '../contracts/domain.js';
+import type { Capability, Role, TokenScope } from '../contracts/domain.js';
+import { PermissionsService } from './permissions.service.js';
 import {
   AgentEntity,
   MembershipEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
+
+/** Effective role of a token: read -> viewer, write -> member (never above the member's own role). */
+export function capRole(role: Role, scope: TokenScope | undefined): Role {
+  const cap: Role | undefined = scope === 'read' ? 'viewer' : scope === 'write' ? 'member' : undefined;
+  return cap && !hasRole(cap, role) ? cap : role;
+}
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
@@ -52,8 +61,13 @@ function hasBody(req: AppRequest): boolean {
  *     or the httpOnly `nabla_session` cookie. → 401 otherwise. Sets `req.auth`.
  *  3. CSRF for cookie sessions: mutating requests need `X-Requested-With` or `X-Client-Id`
  *     (forces a CORS preflight, so only allow-listed origins can send them); bodies must be JSON.
- *  4. For routes with a `:slug` param: resolves the workspace + the caller's role → `req.ctx`.
+ *  4. API token scopes: `read` tokens can only call safe (GET) routes; the effective role of a
+ *     `read` token is capped at viewer and of a `write` token at member, so neither can reach
+ *     workspace-admin routes. `admin` tokens keep the full role of the user they act as.
+ *  5. For routes with a `:slug` param: resolves the workspace + the caller's role → `req.ctx`.
  *     Non-members get 404 (existence is not leaked), too-low role gets 403.
+ *     The minimum role is `@Can(capability)` (workspace permission settings), else `@Roles(min)`,
+ *     else viewer for reads / member for writes.
  *     Agent tokens get role `member` in the workspace the token belongs to.
  */
 @Injectable()
@@ -66,6 +80,7 @@ export class AccessGuard implements CanActivate {
     @InjectRepository(MembershipEntity) private readonly memberships: Repository<MembershipEntity>,
     @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
     @InjectRepository(AgentEntity) private readonly agents: Repository<AgentEntity>,
+    private readonly permissions: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -91,19 +106,31 @@ export class AccessGuard implements CanActivate {
         throw new ForbiddenException('Missing X-Requested-With or X-Client-Id header');
     }
 
+    if (auth.token?.scope === 'read' && mutating)
+      throw new ForbiddenException('This API token has the "read" scope and can only call GET routes');
+
     if (this.reflector.getAllAndOverride<boolean>(REQUIRE_USER_KEY, targets) && !auth.user)
       throw new ForbiddenException('This endpoint requires a user, not an agent token');
 
     const slug = (req.params as Record<string, string | undefined>).slug;
     if (slug) {
-      const min =
-        this.reflector.getAllAndOverride<Role | undefined>(ROLES_KEY, targets) ??
-        (mutating ? 'member' : 'viewer');
       const workspace = await this.workspaces.findOneBy({ slug });
-      const role = workspace ? await this.roleIn(auth, workspace.id) : null;
-      if (!workspace || !role) throw new NotFoundException(`Workspace "${slug}" not found`);
-      if (!hasRole(role, min)) throw new ForbiddenException(`Requires role ${min} or higher`);
-      req.ctx = { workspace, actor: auth.actor, userId: auth.user?.id, role };
+      const memberRole = workspace ? await this.roleIn(auth, workspace.id) : null;
+      if (!workspace || !memberRole) throw new NotFoundException(`Workspace "${slug}" not found`);
+      const capability = this.reflector.getAllAndOverride<Capability | undefined>(CAPABILITY_KEY, targets);
+      const min: Role = capability
+        ? workspace.resolved().permissions[capability]
+        : (this.reflector.getAllAndOverride<Role | undefined>(ROLES_KEY, targets) ?? (mutating ? 'member' : 'viewer'));
+      const scope = auth.token?.scope;
+      const role = capRole(memberRole, scope);
+      if (!hasRole(role, min)) {
+        if (scope && hasRole(memberRole, min))
+          throw new ForbiddenException(`This route needs role ${min}: use an admin-scoped token (this one is "${scope}")`);
+        throw new ForbiddenException(`Requires role ${min} or higher`);
+      }
+      req.ctx = { workspace, actor: auth.actor, userId: auth.user?.id, role, memberRole, tokenScope: scope };
+      const teamScope = this.reflector.getAllAndOverride<'workstream' | 'issue' | undefined>(TEAM_SCOPE_KEY, targets);
+      if (teamScope) await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }
     return true;
   }

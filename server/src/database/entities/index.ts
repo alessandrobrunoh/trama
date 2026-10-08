@@ -25,11 +25,15 @@ import type {
   Role,
   SavedView,
   SubjectRef,
+  TeamEditPolicy,
+  TokenScope,
   ViewEntity,
   ViewFilter,
   ViewLayout,
+  WorkspaceSettings,
   WorkstreamStatus,
 } from '../../contracts/domain.js';
+import { resolveWorkspaceSettings } from '../../contracts/domain.js';
 import { Wire } from './wire.js';
 
 export { Wire };
@@ -77,7 +81,18 @@ export class WorkspaceEntity extends Wire {
   @Index('UQ_workspaces_slug', { unique: true })
   @Column({ type: 'varchar' })
   slug: string;
+  /** Stored partially (only what was customized); `toJSON` and `resolved()` fill in the defaults. */
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) settings: Partial<WorkspaceSettings>;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  /** Settings with defaults applied. */
+  resolved(): WorkspaceSettings {
+    return resolveWorkspaceSettings(this.settings);
+  }
+
+  override toJSON(): Record<string, unknown> {
+    return { ...super.toJSON(), settings: this.resolved() };
+  }
 }
 
 @Entity('memberships')
@@ -128,6 +143,8 @@ export class TeamEntity extends Wire {
   @Column({ type: 'varchar', default: '#6b7280' }) color: string;
   @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) memberIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) leadIds: string[];
+  @Column({ type: 'varchar', default: 'workspace' }) editPolicy: TeamEditPolicy;
 }
 
 @Entity('repositories')
@@ -187,11 +204,33 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'varchar', default: 'draft' })
   derivedStatus: WorkstreamStatus;
   @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
+  @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
   @Column({ type: 'varchar' }) createdById: string;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) shippedAt: Date | null;
+}
+
+@Entity('milestones')
+@Index('IDX_milestones_workspace', ['workspaceId'])
+@Index('IDX_milestones_workstream', ['workstreamId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => WorkstreamEntity, ['workstreamId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class MilestoneEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) workstreamId: string;
+  @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'text', nullable: true }) description: string | null;
+  @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
+  @Column({ type: 'double precision', default: 0 }) sortOrder: number;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
 }
 
 @Entity('input_requests')
@@ -250,6 +289,11 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) workstreamIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) milestoneIds: string[];
+  @Column({ type: 'double precision', nullable: true }) estimate: number | null;
+  @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) aliases: string[];
   @Column({ type: 'varchar', nullable: true }) duplicateOfId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
@@ -420,6 +464,7 @@ export class ApiTokenEntity extends Wire {
   @Column({ type: 'varchar' }) prefix: string;
   @Column({ type: 'varchar' }) tokenHash: string;
   @Column({ type: 'jsonb' }) actor: ActorRef;
+  @Column({ type: 'varchar', default: 'write' }) scope: TokenScope;
   @Column({ type: 'varchar', nullable: true }) createdByUserId: string | null;
   @Column({ type: 'timestamptz', nullable: true }) lastUsedAt: Date | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
@@ -497,6 +542,48 @@ export class IntegrationConnectionEntity extends Wire {
   }
 }
 
+/** Custom integration: signed JSON POSTs to `url` for matching domain events. `secret` is encrypted and only shown once. */
+@Entity('outgoing_webhooks')
+@Index('IDX_outgoing_webhooks_workspace', ['workspaceId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class OutgoingWebhookEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'varchar' }) url: string;
+  /** Encrypted signing secret (SecretsService, AAD = `<id>:outgoing`). */
+  @Column({ type: 'text' }) secret: string;
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) events: string[];
+  @Column({ type: 'boolean', default: true }) enabled: boolean;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) lastDeliveryAt: Date | null;
+  @Column({ type: 'integer', nullable: true }) lastStatus: number | null;
+
+  protected override hidden() {
+    return ['secret'];
+  }
+}
+
+/** One attempt to deliver an event to an outgoing webhook. Pruned to the latest ~50 per webhook. */
+@Entity('outgoing_webhook_deliveries')
+@Index('IDX_outgoing_deliveries_webhook_at', ['webhookId', 'at'])
+@ForeignKey(() => OutgoingWebhookEntity, ['webhookId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class OutgoingWebhookDeliveryEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) webhookId: string;
+  @Column({ type: 'varchar' }) event: string;
+  @Column({ type: 'integer', default: 0 }) status: number;
+  @Column({ type: 'boolean', default: false }) ok: boolean;
+  @Column({ type: 'integer', default: 0 }) durationMs: number;
+  @Column({ type: 'text', nullable: true }) error: string | null;
+  @Column({ type: 'integer', default: 1 }) attempt: number;
+  @Column({ type: 'timestamptz', default: NOW }) at: Date;
+}
+
 export const ENTITIES = [
   UserEntity,
   SessionEntity,
@@ -506,6 +593,7 @@ export const ENTITIES = [
   TeamEntity,
   RepositoryEntity,
   WorkstreamEntity,
+  MilestoneEntity,
   InputRequestEntity,
   IssueEntity,
   ArtifactEntity,
@@ -518,4 +606,6 @@ export const ENTITIES = [
   AttentionStateEntity,
   WorkspaceCounterEntity,
   IntegrationConnectionEntity,
+  OutgoingWebhookEntity,
+  OutgoingWebhookDeliveryEntity,
 ];

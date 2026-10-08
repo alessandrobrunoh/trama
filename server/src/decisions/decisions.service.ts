@@ -117,7 +117,7 @@ export class DecisionsService {
     if (patch.tags !== undefined) row.tags = unique(patch.tags);
     row.updatedAt = new Date();
     await this.repo.save(row);
-    await this.record(row, actor, 'decision.updated', { fields: Object.keys(patch) });
+    await this.record(row, actor, 'decision.updated', { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) });
     await this.bus.touchMany(workspaceId, [...before, ...this.touched(row)], 'decision.updated');
     return row;
   }

@@ -26,9 +26,9 @@ describe('deriveStatus', () => {
     expect(status({ workstream: { acceptanceCriteria: [{ state: 'pending' }] } })).toMatchObject({ status: 'planned', rule: 8 });
   });
 
-  it('7 working: a criterion in progress, or a branch/commit/build', () => {
+  it('7 working: a criterion in progress, or a build/test report', () => {
     expect(status({ workstream: { acceptanceCriteria: [{ state: 'in_progress' }] } })).toMatchObject({ status: 'working', rule: 7 });
-    expect(status({ artifacts: [{ kind: 'branch', state: 'open' }] })).toMatchObject({ status: 'working', rule: 7 });
+    expect(status({ artifacts: [{ kind: 'build', state: 'running' }] })).toMatchObject({ status: 'working', rule: 7 });
     expect(status({ artifacts: [{ kind: 'document', state: 'published' }] }).status).toBe('draft');
   });
 

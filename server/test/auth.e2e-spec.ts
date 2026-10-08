@@ -66,7 +66,8 @@ describe('auth', () => {
     const ws = (await client.post('/api/workspaces', { name: 'Tokens Inc' }).expect(201)).body;
     const slug = ws.slug;
 
-    const created = (await client.post(`/api/w/${slug}/tokens`, { name: 'my laptop' }).expect(201)).body;
+    const created = (await client.post(`/api/w/${slug}/tokens`, { name: 'my laptop', scope: 'admin' }).expect(201)).body;
+    expect(created.token.scope).toBe('admin');
     expect(created.secret).toMatch(/^nbl_/);
     expect(created.token.prefix).toBe(`${created.secret.slice(0, 8)}…`);
     expect(created.token.tokenHash).toBeUndefined();

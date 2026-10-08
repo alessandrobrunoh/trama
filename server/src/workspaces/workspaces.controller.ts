@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -13,6 +14,7 @@ import {
   IsEmail,
   IsIn,
   IsISO8601,
+  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -21,14 +23,17 @@ import {
 } from 'class-validator';
 import {
   Auth,
+  Can,
   Ctx,
   RequireUser,
   Roles,
+  canDo,
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import { TokensService } from '../auth/tokens.service.js';
-import type { ExecutionProvider, Role } from '../contracts/domain.js';
+import { ESTIMATE_SCALES, WEEK_STARTS } from '../contracts/domain.js';
+import type { EstimateScale, ExecutionProvider, Role, TokenScope, WeekStart } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { toDate } from '../common/util.js';
 import { WorkspacesService } from './workspaces.service.js';
@@ -44,6 +49,17 @@ class CreateWorkspaceDto {
 class UpdateWorkspaceDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(80) name?: string;
   @OptionalNotNull() @IsString() @MaxLength(40) slug?: string;
+}
+
+/** Everything optional; `null` clears `defaultTeamId` / `iconColor` / `iconInitial`. `permissions` is owner-only. */
+class UpdateSettingsDto {
+  @OptionalNotNull() @IsObject() permissions?: Record<string, string>;
+  @Clearable() @IsString() defaultTeamId?: string | null;
+  @OptionalNotNull() @IsIn(ESTIMATE_SCALES) estimateScale?: EstimateScale;
+  @OptionalNotNull() @IsIn(WEEK_STARTS) weekStart?: WeekStart;
+  @OptionalNotNull() @IsString() @MaxLength(64) timeZone?: string;
+  @Clearable() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'iconColor must be #rrggbb' }) iconColor?: string | null;
+  @Clearable() @IsString() @MaxLength(2) iconInitial?: string | null;
 }
 
 class AddMemberDto {
@@ -69,8 +85,12 @@ class UpdateAgentDto {
   @Clearable() @IsString() ownerUserId?: string | null;
 }
 
+const TOKEN_SCOPE_VALUES: TokenScope[] = ['read', 'write', 'admin'];
+
 class CreateTokenDto {
   @IsString() @MinLength(1) @MaxLength(80) name: string;
+  /** Default `write`. `admin` needs an admin caller and a user token. */
+  @IsOptional() @IsIn(TOKEN_SCOPE_VALUES) scope?: TokenScope;
   /** Omit to create a token that acts as you; set to create an agent token (admin). */
   @IsOptional() @IsString() @Matches(/^ag_/) agentId?: string;
   @IsOptional() @IsISO8601() expiresAt?: string;
@@ -109,6 +129,13 @@ export class WorkspaceController {
     return Object.assign(await this.service.update(ctx.workspace, dto), { role: ctx.role });
   }
 
+  /** Workspace customization (default team, estimate scale, icon, week start, time zone, permission policy). */
+  @Patch('settings')
+  @Roles('admin')
+  async updateSettings(@Ctx() ctx: WorkspaceContext, @Body() dto: UpdateSettingsDto) {
+    return Object.assign(await this.service.updateSettings(ctx, dto), { role: ctx.role });
+  }
+
   @Delete()
   @Roles('owner')
   @HttpCode(204)
@@ -127,7 +154,7 @@ export class MembersController {
   }
 
   @Post()
-  @Roles('admin')
+  @Can('inviteMembers')
   add(@Ctx() ctx: WorkspaceContext, @Body() dto: AddMemberDto) {
     return this.service.addMember(ctx.workspace.id, ctx.role, dto);
   }
@@ -157,7 +184,7 @@ export class AgentsController {
   }
 
   @Post()
-  @Roles('admin')
+  @Can('manageAgents')
   create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateAgentDto) {
     return this.service.createAgent(ctx.workspace.id, dto);
   }
@@ -168,13 +195,13 @@ export class AgentsController {
   }
 
   @Patch(':id')
-  @Roles('admin')
+  @Can('manageAgents')
   update(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: UpdateAgentDto) {
     return this.service.updateAgent(ctx.workspace.id, id, dto);
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Can('manageAgents')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
     return this.service.removeAgent(ctx.workspace.id, id);
@@ -197,11 +224,15 @@ export class TokensController {
   /** Returns `{ token, secret }`; the secret is shown only this once. */
   @Post()
   @RequireUser()
-  @Roles('member')
+  @Can('manageTokens')
   async create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateTokenDto) {
+    const scope: TokenScope = dto.scope ?? 'write';
+    if (scope === 'admin' && ctx.role !== 'admin' && ctx.role !== 'owner')
+      throw new ForbiddenException('Only admins can create admin-scoped tokens');
     let actor = ctx.actor;
     if (dto.agentId) {
-      if (ctx.role !== 'admin' && ctx.role !== 'owner') throw new ForbiddenException('Only admins can create agent tokens');
+      if (!canDo(ctx, 'manageAgents')) throw new ForbiddenException('You are not allowed to create agent tokens');
+      if (scope === 'admin') throw new BadRequestException('Agents act with the member role: use the read or write scope');
       const agent = await this.service.getAgent(ctx.workspace.id, dto.agentId);
       actor = { type: 'agent', id: agent.id };
     }
@@ -209,6 +240,7 @@ export class TokensController {
       workspaceId: ctx.workspace.id,
       name: dto.name,
       actor,
+      scope,
       createdByUserId: ctx.userId,
       expiresAt: toDate(dto.expiresAt) as Date | undefined,
     });

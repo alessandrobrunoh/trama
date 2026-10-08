@@ -61,7 +61,7 @@ export class RepositoriesService {
     if (patch.defaultBranch !== undefined) row.defaultBranch = patch.defaultBranch;
     if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
     await this.repo.save(row);
-    await this.events.record({ workspaceId, actor, type: 'repository.updated', subject: { type: 'repository', id }, data: { fields: Object.keys(patch) } });
+    await this.events.record({ workspaceId, actor, type: 'repository.updated', subject: { type: 'repository', id }, data: { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) } });
     return row;
   }
 

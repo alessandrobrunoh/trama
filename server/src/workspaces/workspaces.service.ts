@@ -7,8 +7,9 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service.js';
-import { hasRole } from '../auth/request-context.js';
-import type { Role } from '../contracts/domain.js';
+import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
+import { CAPABILITIES, CAPABILITY_ROLES } from '../contracts/domain.js';
+import type { Capability, PermissionMap, Role, WorkspaceSettings } from '../contracts/domain.js';
 import {
   AgentEntity,
   ApiTokenEntity,
@@ -91,6 +92,67 @@ export class WorkspacesService {
     return this.workspaces.save(ws);
   }
 
+  /** Partial update of the customization settings. Changing `permissions` is reserved to owners. */
+  async updateSettings(
+    ctx: WorkspaceContext,
+    patch: {
+      permissions?: Record<string, string>;
+      defaultTeamId?: string | null;
+      estimateScale?: WorkspaceSettings['estimateScale'];
+      weekStart?: WorkspaceSettings['weekStart'];
+      timeZone?: string;
+      iconColor?: string | null;
+      iconInitial?: string | null;
+    },
+  ) {
+    const ws = ctx.workspace;
+    const next: Partial<WorkspaceSettings> = { ...ws.settings };
+    if (patch.permissions !== undefined) {
+      if (!hasRole(ctx.role, 'owner')) throw new ForbiddenException('Only an owner can change roles and permissions');
+      const perms: Partial<PermissionMap> = { ...(next.permissions ?? {}) };
+      for (const [cap, role] of Object.entries(patch.permissions)) {
+        if (!CAPABILITIES.includes(cap as Capability)) throw new BadRequestException(`Unknown capability "${cap}"`);
+        if (!CAPABILITY_ROLES.includes(role as Role))
+          throw new BadRequestException(`"${role}" is not a valid minimum role for ${cap} (use ${CAPABILITY_ROLES.join(', ')})`);
+        perms[cap as Capability] = role as Role;
+      }
+      next.permissions = perms as PermissionMap;
+    }
+    if (patch.defaultTeamId !== undefined) {
+      if (patch.defaultTeamId === null) delete next.defaultTeamId;
+      else {
+        if (!(await this.ds.getRepository(TeamEntity).existsBy({ id: patch.defaultTeamId, workspaceId: ws.id })))
+          throw new BadRequestException('defaultTeamId must be a team of this workspace');
+        next.defaultTeamId = patch.defaultTeamId;
+      }
+    }
+    if (patch.estimateScale !== undefined) next.estimateScale = patch.estimateScale;
+    if (patch.weekStart !== undefined) next.weekStart = patch.weekStart;
+    if (patch.timeZone !== undefined) {
+      if (patch.timeZone !== 'auto') {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: patch.timeZone });
+        } catch {
+          throw new BadRequestException(`"${patch.timeZone}" is not a valid IANA time zone`);
+        }
+      }
+      next.timeZone = patch.timeZone;
+    }
+    if (patch.iconColor !== undefined) {
+      if (patch.iconColor === null) delete next.iconColor;
+      else next.iconColor = patch.iconColor.toLowerCase();
+    }
+    if (patch.iconInitial !== undefined) {
+      const initial = patch.iconInitial?.trim();
+      if (!initial) delete next.iconInitial;
+      else next.iconInitial = initial.toUpperCase();
+    }
+    ws.settings = next;
+    const saved = await this.workspaces.save(ws);
+    this.events.publish(ws.id, { type: 'updated', entity: 'workspace', id: ws.id });
+    return saved;
+  }
+
   async remove(ws: WorkspaceEntity): Promise<void> {
     await this.workspaces.delete({ id: ws.id });
   }
@@ -147,13 +209,18 @@ export class WorkspacesService {
       const teams = await tx.findBy(TeamEntity, { workspaceId });
       for (const t of teams)
         if (t.memberIds.includes(m.userId))
-          await tx.update(TeamEntity, { id: t.id }, { memberIds: t.memberIds.filter((u) => u !== m.userId) });
+          await tx.update(
+            TeamEntity,
+            { id: t.id },
+            { memberIds: t.memberIds.filter((u) => u !== m.userId), leadIds: t.leadIds.filter((u) => u !== m.userId) },
+          );
     });
     this.events.publish(workspaceId, { type: 'deleted', entity: 'membership', id });
   }
 
   private assertCanGrant(callerRole: Role, target: Role) {
     if (target === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can grant owner');
+    if (!hasRole(callerRole, target)) throw new ForbiddenException(`You cannot grant a role above your own (${callerRole})`);
   }
 
   private async assertNotLastOwner(workspaceId: string, m: MembershipEntity) {

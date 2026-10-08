@@ -1,3 +1,4 @@
+import { addMockHistoryToSeed } from '../mock-history.js';
 import { SeedBuilder, SYSTEM, agent, team, user, type SeedData } from './builder.js';
 
 export const DEMO_EMAIL = 'demo@nabla.dev';
@@ -9,7 +10,7 @@ export const DEMO_PASSWORD = 'nabla-demo';
  * ~6 weeks of event history, all relative to `now`. Stored `status` values follow PLAN.md §2
  * so the UI is right before the status engine runs.
  */
-export function createSeed(now: number, passwordHash: string): SeedData {
+export function createSeed(now: number, passwordHash: string, opts: { mockHistory?: boolean } = {}): SeedData {
   const b = new SeedBuilder(now);
   const ws = b.workspaceId;
   b.data.workspace = { id: ws, name: 'Acme', slug: 'acme', createdAt: b.at(60) };
@@ -66,7 +67,7 @@ export function createSeed(now: number, passwordHash: string): SeedData {
       ['Integration tests pass', 'in_progress'],
       ['Metrics are available', 'pending'],
     ],
-    path: ['draft', 'planned', 'working', 'needs_input'], target: 6, created: 21, createdBy: maya,
+    path: ['draft', 'planned', 'working', 'needs_input'], start: 20, target: 6, created: 21, createdBy: maya,
   });
   const a42e1 = b.execution(auth42, {
     title: 'Investigate the current authentication flow', description: 'Map every login/refresh/logout path and where tokens are validated.', team: AUTH, repos: [rAuth, rApi],
@@ -104,7 +105,6 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   b.input(auth42, { execution: a42e2, question: 'Should replay of a rotated token revoke the whole token family?', options: ['Revoke the token only', 'Revoke the whole family'], by: agent(delta), assignee: maya, created: 14, answer: { text: 'Revoke the whole family and force a re-login.', by: maya, daysAgo: 13 } });
   b.artifact(auth42, { kind: 'pull_request', provider: 'github', title: 'Implement refresh token rotation', execution: a42e2b, repo: rAuth, externalId: '#182', url: 'https://github.com/acme/auth-service/pull/182', state: 'merged', ci: 'passing', review: 'approved', by: agent(claude), created: 11, updated: 8 });
   b.artifact(auth42, { kind: 'pull_request', provider: 'github', title: 'Update web refresh handling', execution: a42e3, repo: rWeb, externalId: '#187', url: 'https://github.com/acme/web/pull/187', state: 'open', ci: 'passing', review: 'requested', by: user(priya), created: 3, updated: 1 });
-  b.artifact(auth42, { kind: 'commit', provider: 'github', title: 'feat(auth): rotate refresh tokens on use', execution: a42e2b, repo: rAuth, externalId: 'a91f3c2', state: 'merged', ci: 'passing', by: agent(claude), created: 8 });
   b.artifact(auth42, { kind: 'document', provider: 'docs', title: 'Refresh token rotation strategy', externalId: 'ADR-21', url: 'https://docs.acme.dev/adr/021', state: 'published', by: agent(delta), created: 12 });
   b.artifact(auth42, { kind: 'test_report', provider: 'ci', title: 'Auth integration suite #1182', repo: rAuth, externalId: 'run-1182', state: 'failed', by: SYSTEM, created: 2 });
   b.criterionEvents(auth42, 'AUTH-42', [
@@ -193,7 +193,6 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   b.dependency('workstream', inf27, 'workstream', plat7, plat7, 29);
   b.artifact(plat7, { kind: 'pull_request', provider: 'github', title: 'Payment intent service', execution: p7e1, repo: rPay, externalId: '#455', url: 'https://github.com/acme/payments/pull/455', state: 'draft', ci: 'pending', review: 'none', by: agent(codex), created: 12 });
   b.artifact(plat7, { kind: 'document', provider: 'docs', title: 'Checkout rewrite RFC', url: 'https://docs.acme.dev/rfc/checkout-rewrite', state: 'published', by: user(ale), created: 29 });
-  b.artifact(plat7, { kind: 'branch', provider: 'github', title: 'plat-7/payment-intents', repo: rPay, externalId: 'plat-7/payment-intents', state: 'open', by: agent(codex), created: 25 });
   b.comment({ type: 'workstream', id: plat7 }, plat7, user(ale), 'Weekly sync: Payments and Identity are on track, Infra load tests start once the intent API is deployed to staging.', 5);
 
   // ═══════════════════════════ PAY-22 — blocked (dependency on AUTH-42) ═══════════════════════════
@@ -241,8 +240,6 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   b.execution(api58, { title: 'Load test limits', team: API, repos: [rApi], performers: [agent(delta)], provider: 'delta', state: 'queued', created: 4 });
   b.execution(api58, { title: 'Document limits for API consumers', team: API, performers: [user(jonas)], provider: 'human', state: 'queued', created: 4 });
   b.input(api58, { execution: a58e1, question: 'Should limits be per API key or per IP?', options: ['Per API key', 'Per IP', 'Both'], by: agent(claude), assignee: jonas, created: 6, answer: { text: 'Per API key, with a coarse per-IP backstop.', by: jonas, daysAgo: 5 } });
-  b.artifact(api58, { kind: 'branch', provider: 'github', title: 'api-58/rate-limit', repo: rApi, externalId: 'api-58/rate-limit', state: 'open', by: agent(claude), created: 6 });
-  b.artifact(api58, { kind: 'commit', provider: 'github', title: 'feat(api): token bucket rate limiter', execution: a58e1, repo: rApi, externalId: 'e03b7d1', state: 'merged', ci: 'passing', by: agent(claude), created: 2 });
 
   // ═══════════════════════════ API-57 — blocked (merge conflict) ═══════════════════════════
   const api57 = b.workstream({
@@ -313,10 +310,14 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   adr(22, 'Audit log retention: 400 days hot, 7 years cold', 'Keep audit logs queryable for 400 days, then archive to cold storage for 7 years.', 'Covers SOC 2 and the longest regulatory retention requirement we know of.', ['compliance', 'security'], { by: agent(claude), created: 3, origin: sec11, related: [sec11], status: 'proposed' });
   adr(23, 'Hash refresh tokens at rest with HMAC-SHA256', 'Refresh tokens are stored as HMAC-SHA256 digests keyed with a server secret, never in plaintext.', 'A database leak must not expose usable refresh tokens.', ['auth', 'security'], { by: agent(claude), created: 2, origin: auth42, related: [auth42], status: 'proposed' });
 
+  // ───────── milestones
+  const ms42Replay = b.milestone(auth42, { name: 'Replay detection', description: 'Shared replay detection across both refresh paths.', target: -2, sort: 0, created: 20 });
+  const ms42Rollout = b.milestone(auth42, { name: 'Rollout and metrics', description: 'Gradual rollout with rotation metrics in place.', target: 6, sort: 1, created: 20 });
+
   // ───────── issues
-  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], created: 24, moved: 21, movedBy: maya });
-  b.issue({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', status: 'in_progress', workstreams: [auth42], created: 27, moved: 21, movedBy: maya });
-  b.issue({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], created: 8, moved: 7, movedBy: maya });
+  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, created: 24, moved: 21, movedBy: maya });
+  b.issue({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 3, created: 27, moved: 21, movedBy: maya });
+  b.issue({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Rollout], estimate: 8, created: 8, moved: 7, movedBy: maya });
   b.issue({ kind: 'bug', number: 150, title: 'Checkout button misaligned on Safari 17', source: 'github', team: WEB, priority: 'medium', status: 'in_progress', workstreams: [web81], created: 16, moved: 15, movedBy: priya, url: 'https://github.com/acme/web/issues/1150' });
   b.issue({ kind: 'bug', number: 151, title: 'Coupon field loses focus on mobile', source: 'github', team: WEB, priority: 'low', status: 'backlog', created: 1, url: 'https://github.com/acme/web/issues/1161' });
   b.issue({ kind: 'bug', number: 148, title: 'Webhook retries sometimes deliver duplicate events', source: 'email', reporterName: 'Customer: Globex', team: API, priority: 'high', status: 'in_progress', workstreams: [api57], created: 15, moved: 14, movedBy: jonas });
@@ -344,6 +345,9 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   b.view(maya, 'Needs a decision', 'decision', { filters: [{ field: 'status', op: 'is', value: 'proposed' }], layout: 'list', shared: true, created: 20 });
   b.view(maya, 'Backlog issues', 'issue', { filters: [{ field: 'status', op: 'is', value: 'backlog' }], sort: { field: 'createdAt', direction: 'desc' }, layout: 'list', shared: true, created: 18 });
   b.view(ale, 'Agents at work', 'execution', { filters: [{ field: 'state', op: 'in', value: ['running', 'needs_input'] }, { field: 'provider', op: 'not_in', value: ['human'] }], groupBy: 'provider', layout: 'board', shared: false, created: 10 });
+
+  // ───────── ~12 weeks of finished/running/canceled issues with estimates (statistics → Estimates & time)
+  if (opts.mockHistory !== false) addMockHistoryToSeed(b.data, now);
 
   return b.data;
 }

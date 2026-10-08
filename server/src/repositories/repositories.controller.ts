@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { IsArray, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
-import { Actor, Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, GitProvider } from '../contracts/domain.js';
 import { OptionalNotNull } from '../common/validation.js';
 import { RepositoriesService } from './repositories.service.js';
@@ -35,19 +35,19 @@ export class RepositoriesController {
   }
 
   @Post()
-  @Roles('admin')
+  @Can('manageRepositories')
   create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateRepositoryDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
 
   @Patch(':id')
-  @Roles('admin')
+  @Can('manageRepositories')
   update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('id') id: string, @Body() dto: UpdateRepositoryDto) {
     return this.service.update(ctx.workspace.id, actor, id, dto);
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Can('manageRepositories')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('id') id: string) {
     return this.service.remove(ctx.workspace.id, actor, id);

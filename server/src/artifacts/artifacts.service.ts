@@ -34,8 +34,6 @@ export interface ArtifactInput {
 const DEFAULT_STATE: Record<ArtifactKind, ArtifactState> = {
   pull_request: 'open',
   merge_request: 'open',
-  commit: 'merged',
-  branch: 'open',
   document: 'published',
   design: 'published',
   image: 'published',

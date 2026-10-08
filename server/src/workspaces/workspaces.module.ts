@@ -5,11 +5,15 @@ import { AuthModule } from '../auth/auth.module.js';
 import {
   AgentEntity,
   ApiTokenEntity,
+  IssueEntity,
   MembershipEntity,
+  TeamEntity,
   UserEntity,
   WorkspaceEntity,
+  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { AccessGuard } from './access.guard.js';
+import { PermissionsService } from './permissions.service.js';
 import {
   AgentsController,
   MembersController,
@@ -29,6 +33,9 @@ import { WorkspacesService } from './workspaces.service.js';
       UserEntity,
       AgentEntity,
       ApiTokenEntity,
+      TeamEntity,
+      WorkstreamEntity,
+      IssueEntity,
     ]),
   ],
   controllers: [
@@ -40,8 +47,9 @@ import { WorkspacesService } from './workspaces.service.js';
   ],
   providers: [
     WorkspacesService,
+    PermissionsService,
     { provide: APP_GUARD, useClass: AccessGuard },
   ],
-  exports: [WorkspacesService],
+  exports: [WorkspacesService, PermissionsService],
 })
 export class WorkspacesModule {}
