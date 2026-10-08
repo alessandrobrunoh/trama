@@ -4,7 +4,7 @@ import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, Priority, ProjectStatus } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
-import { ProjectEntity } from '../database/entities/index.js';
+import { ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
 export interface ProjectInput {
@@ -103,7 +103,16 @@ export class ProjectsService {
       row.completedAt = CLOSED.includes(patch.status) ? (row.completedAt ?? new Date()) : null;
     }
     row.updatedAt = new Date();
-    await this.repo.save(row);
+    await this.ds.transaction(async (m) => {
+      await m.save(row);
+      if (patch.repositoryIds === undefined) return;
+      // Its workstreams may only use the project's repositories: drop the ones that left.
+      const streams = await m.getRepository(WorkstreamEntity).findBy({ workspaceId, projectId: id });
+      for (const w of streams) {
+        const kept = w.repositoryIds.filter((r) => row.repositoryIds.includes(r));
+        if (kept.length !== w.repositoryIds.length) await m.update(WorkstreamEntity, { id: w.id }, { repositoryIds: kept });
+      }
+    });
     await this.events.record({
       workspaceId,
       actor,

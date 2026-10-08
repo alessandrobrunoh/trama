@@ -321,6 +321,9 @@ export class NablaStore {
   readonly workstreamsByParticipatingTeam = computed(() =>
     groupBy(this._workstreams(), (w) => w.participatingTeamIds),
   );
+  readonly workstreamsByProject = computed(() =>
+    groupBy(this._workstreams(), (w) => w.projectId),
+  );
   readonly workstreamsByRepository = computed(() =>
     groupBy(this._workstreams(), (w) => w.repositoryIds),
   );

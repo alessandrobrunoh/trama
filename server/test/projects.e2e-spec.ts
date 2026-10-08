@@ -54,4 +54,36 @@ describe('projects', () => {
     const types = ((await c.get(`${base()}/events`).expect(200)).body as { type: string }[]).map((e) => e.type);
     expect(types).toEqual(expect.arrayContaining(['project.created', 'project.updated', 'project.status_changed', 'project.deleted']));
   });
+  it('workstreams of a project only use its repositories', async () => {
+    const other = (await c.post(`${base()}/repositories`, { provider: 'github', fullName: 'acme/web' }).expect(201)).body;
+    const p = (await c.post(`${base()}/projects`, { name: 'Scoped', repositoryIds: [repo.id] }).expect(201)).body;
+    const mk = (extra: object) =>
+      c.post(`${base()}/workstreams`, { title: 'WS', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e', ...extra });
+
+    // inherits the project's repositories when it names none
+    const inherited = (await mk({ projectId: p.id }).expect(201)).body;
+    expect(inherited.projectId).toBe(p.id);
+    expect(inherited.repositoryIds).toEqual([repo.id]);
+
+    await mk({ projectId: 'pj_missing' }).expect(400);
+    await mk({ projectId: p.id, repositoryIds: [other.id] }).expect(400);
+
+    // a loose workstream can join a project only when its repositories fit
+    const loose = (await mk({ repositoryIds: [other.id] }).expect(201)).body;
+    expect(loose.projectId).toBeUndefined();
+    await c.patch(`${base()}/workstreams/${loose.id}`, { projectId: p.id }).expect(400);
+    await c.patch(`${base()}/workstreams/${loose.id}`, { repositoryIds: [repo.id], projectId: p.id }).expect(200);
+    await c.patch(`${base()}/workstreams/${loose.id}`, { repositoryIds: [other.id] }).expect(400);
+    expect((await c.get(`${base()}/workstreams?projectId=${p.id}`).expect(200)).body).toHaveLength(2);
+
+    // dropping a repository from the project drops it from its workstreams
+    await c.patch(`${base()}/projects/${p.id}`, { repositoryIds: [] }).expect(200);
+    expect((await c.get(`${base()}/workstreams/${inherited.id}`).expect(200)).body.repositoryIds).toEqual([]);
+
+    // detaching and deleting
+    const detached = (await c.patch(`${base()}/workstreams/${loose.id}`, { projectId: null }).expect(200)).body;
+    expect(detached.projectId).toBeUndefined();
+    await c.delete(`${base()}/projects/${p.id}`).expect(204);
+    expect((await c.get(`${base()}/workstreams/${inherited.id}`).expect(200)).body.projectId).toBeUndefined();
+  });
 });

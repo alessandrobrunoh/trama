@@ -320,6 +320,9 @@ export interface Workstream {
   ownerTeamId: ID;
   participatingTeamIds: ID[];
   accountableUserId?: ID;
+  /** The project this workstream carries out (at most one). */
+  projectId?: ID;
+  /** Always a subset of the project's `repositoryIds` when `projectId` is set. */
   repositoryIds: ID[];
   acceptanceCriteria: AcceptanceCriterion[];
   priority: Priority;

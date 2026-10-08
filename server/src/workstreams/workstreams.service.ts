@@ -32,6 +32,7 @@ export interface WorkstreamInput {
   ownerTeamId?: string;
   participatingTeamIds?: string[];
   accountableUserId?: string | null;
+  projectId?: string | null;
   repositoryIds?: string[];
   acceptanceCriteria?: CriterionInput[];
   priority?: Priority;
@@ -47,6 +48,7 @@ export interface WorkstreamFilter {
   teamId?: string;
   accountableUserId?: string;
   priority?: Priority;
+  projectId?: string;
   repositoryId?: string;
   label?: string;
   q?: string;
@@ -93,6 +95,7 @@ export class WorkstreamsService {
     if (f.accountableUserId)
       qb.andWhere('w.accountableUserId = :au', { au: f.accountableUserId });
     if (f.priority) qb.andWhere('w.priority = :p', { p: f.priority });
+    if (f.projectId) qb.andWhere('w.projectId = :pid', { pid: f.projectId });
     if (f.repositoryId)
       qb.andWhere('w.repositoryIds @> :rid::jsonb', {
         rid: JSON.stringify([f.repositoryId]),
@@ -141,6 +144,12 @@ export class WorkstreamsService {
     ]);
     await this.refs.users(workspaceId, [input.accountableUserId]);
     await this.refs.repositories(workspaceId, input.repositoryIds);
+    // A workstream of a project works in the project's repositories: inherit them unless it names some.
+    let repositoryIds = unique(input.repositoryIds);
+    if (input.projectId) {
+      const project = await this.refs.projectRepositories(workspaceId, input.projectId, repositoryIds);
+      if (input.repositoryIds === undefined) repositoryIds = [...project.repositoryIds];
+    }
     const suppliedDeltaThreadUrl =
       typeof input.deltaThreadUrl === 'string'
         ? input.deltaThreadUrl.trim()
@@ -181,7 +190,8 @@ export class WorkstreamsService {
             (t) => t !== team.id,
           ),
           accountableUserId: input.accountableUserId ?? null,
-          repositoryIds: unique(input.repositoryIds),
+          projectId: input.projectId ?? null,
+          repositoryIds,
           acceptanceCriteria,
           priority: input.priority ?? 'none',
           labels: unique(input.labels),
@@ -228,6 +238,9 @@ export class WorkstreamsService {
     await this.refs.teams(workspaceId, patch.participatingTeamIds);
     await this.refs.users(workspaceId, [patch.accountableUserId]);
     await this.refs.repositories(workspaceId, patch.repositoryIds);
+    const projectId = patch.projectId !== undefined ? patch.projectId : ws.projectId;
+    if (projectId && (patch.projectId !== undefined || patch.repositoryIds !== undefined))
+      await this.refs.projectRepositories(workspaceId, projectId, patch.repositoryIds ?? ws.repositoryIds);
     const changed: string[] = [];
     const set = <K extends keyof WorkstreamEntity>(
       k: K,
@@ -254,6 +267,7 @@ export class WorkstreamsService {
       );
     if (patch.accountableUserId !== undefined)
       set('accountableUserId', patch.accountableUserId);
+    if (patch.projectId !== undefined) set('projectId', patch.projectId);
     if (patch.repositoryIds !== undefined)
       set('repositoryIds', unique(patch.repositoryIds));
     if (patch.acceptanceCriteria !== undefined)

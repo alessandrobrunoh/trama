@@ -242,6 +242,8 @@ export class ProjectEntity extends Wire {
   onDelete: 'CASCADE',
 })
 @ForeignKey(() => TeamEntity, ['ownerTeamId'], ['id'], { onDelete: 'RESTRICT' })
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
+@Index('IDX_workstreams_project', ['projectId'])
 @ForeignKey(() => UserEntity, ['accountableUserId'], ['id'], {
   onDelete: 'SET NULL',
 })
@@ -259,6 +261,7 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'jsonb', default: EMPTY_ARRAY })
   participatingTeamIds: string[];
   @Column({ type: 'varchar', nullable: true }) accountableUserId: string | null;
+  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) repositoryIds: string[];
   @Column({ type: 'jsonb', default: EMPTY_ARRAY })
   acceptanceCriteria: AcceptanceCriterion[];

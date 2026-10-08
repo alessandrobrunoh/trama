@@ -45,6 +45,21 @@ export class RefsService {
     return this.assertAll(ProjectEntity, workspaceId, ids, 'project');
   }
 
+  /**
+   * A workstream of a project may only use the project's repositories: 400 listing the offenders.
+   * Resolves the project (and 400s when it does not exist) so callers can inherit its repositories.
+   */
+  async projectRepositories(workspaceId: string, projectId: string, repositoryIds: readonly string[]) {
+    const project = await this.ds.getRepository(ProjectEntity).findOneBy({ id: projectId, workspaceId });
+    if (!project) throw new BadRequestException(`Unknown project in: ${projectId}`);
+    const outside = [...new Set(repositoryIds)].filter((r) => !project.repositoryIds.includes(r));
+    if (outside.length)
+      throw new BadRequestException(
+        `Repositories not part of project "${project.name}": ${outside.join(', ')}. Add them to the project first.`,
+      );
+    return project;
+  }
+
   workstreams(workspaceId: string, ids?: readonly string[] | null) {
     return this.assertAll(WorkstreamEntity, workspaceId, ids, 'workstream');
   }

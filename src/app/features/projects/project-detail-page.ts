@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { LucideBox, LucideDynamicIcon, LucideEllipsis, LucideTrash2 } from '@lucide/angular';
+import { LucideBox, LucideDynamicIcon, LucideEllipsis, LucideHexagon, LucidePlus, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { NablaStore, UiStore, type DomainEvent, type Priority, type ProjectStatus } from '../../core';
@@ -8,6 +8,8 @@ import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
+import { WorkstreamRow } from '../workstreams/workstream-items';
+import { buildSummary } from '../workstreams/ws-model';
 import { ProviderIcon } from '../../shared/provider-icon';
 import { EventLine } from '../overview/event-line';
 import { CommentThread } from '../workstreams/comments';
@@ -40,6 +42,7 @@ const ACTIVITY_CAP = 20;
     Picker,
     WsDatePicker,
     EventLine,
+    WorkstreamRow,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -93,6 +96,29 @@ const ACTIVITY_CAP = 20;
               [canEdit]="canManage()"
               (save)="update({ description: $event.trim() || null })"
             />
+          </section>
+
+          <section class="min-w-0">
+            <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
+              Workstreams <span class="text-muted-foreground font-normal tabular-nums">{{ workstreams().length }}</span>
+              @if (canCreateWorkstream()) {
+                <button hlmBtn variant="ghost" size="xs" class="text-muted-foreground ml-auto h-6 gap-1 px-2 text-xs font-normal" (click)="newWorkstream()">
+                  <svg [lucideIcon]="plus" [size]="12"></svg>New workstream
+                </button>
+              }
+            </h2>
+            @if (workstreams().length) {
+              <div class="-mx-4 border-t sm:-mx-6">
+                @for (s of workstreams(); track s.ws.id) {
+                  <app-workstream-row [summary]="s" />
+                }
+              </div>
+            } @else {
+              <div class="text-muted-foreground flex items-center gap-2 rounded-md border border-dashed px-3 py-4 text-[13px]">
+                <svg [lucideIcon]="hexagon" [size]="15" [strokeWidth]="1.5"></svg>
+                No workstream carries out this project yet.
+              </div>
+            }
           </section>
 
           <section>
@@ -199,6 +225,8 @@ export class ProjectDetailPage {
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
+  protected readonly plus = LucidePlus;
+  protected readonly hexagon = LucideHexagon;
   protected readonly statuses = projectStatusOptions();
   protected readonly priorities = priorityOptions();
   protected readonly activityCap = ACTIVITY_CAP;
@@ -218,6 +246,11 @@ export class ProjectDetailPage {
   protected readonly repos = computed(() =>
     (this.project()?.repositoryIds ?? []).map((id) => this.store.getRepository(id)).filter((r) => !!r),
   );
+  protected readonly canCreateWorkstream = computed(() => this.store.allowed('createWorkstreams'));
+  protected readonly workstreams = computed(() => {
+    const id = this.project()?.id;
+    return id ? (this.store.workstreamsByProject().get(id) ?? []).map((ws) => buildSummary(this.store, ws)) : [];
+  });
   protected readonly activity = computed(() => {
     const id = this.project()?.id;
     return id ? ([...(this.store.eventsBySubject().get(`project:${id}`) ?? [])] as DomainEvent[]).sort((a, b) => (a.at < b.at ? 1 : -1)) : [];
@@ -234,6 +267,11 @@ export class ProjectDetailPage {
   protected update(patch: Parameters<NablaStore['updateProject']>[1]): void {
     const p = this.project();
     if (p) void this.store.updateProject(p.id, patch);
+  }
+
+  protected newWorkstream(): void {
+    const id = this.project()?.id;
+    if (id) this.ui.openCreate('workstream', { projectId: id });
   }
 
   protected setStatus(v: string | undefined): void {

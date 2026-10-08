@@ -123,7 +123,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
  *   issue:      status, priority, teamId (or ownerTeamId), kind, assigneeId, workstreamIds[], title, body
  *               → workstreamIds are linked right after create (keeping the chosen status).
  *   workstream: status (sent as statusOverride unless 'planned' = derivable), title, description,
- *               ownerTeamId, repositoryIds[], issueIds[], priority, accountableUserId, deltaThreadUrl
+ *               ownerTeamId, projectId, repositoryIds[], issueIds[], priority, accountableUserId, deltaThreadUrl
  *               → issueIds are linked to the new workstream right after create.
  *   decision:   workstreamId (origin), title, statement, rationale, tags (string[] or "a, b")
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
@@ -420,6 +420,17 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     clearLabel="Nobody yet"
                     (valueChange)="accountableId.set($event[0] ?? '')"
                   />
+                  @if (projectOptions().length) {
+                    <app-picker
+                      variant="pill"
+                      label="Project"
+                      [options]="projectOptions()"
+                      [value]="opt(projectId())"
+                      [clearable]="true"
+                      clearLabel="No project"
+                      (valueChange)="onProject($event[0])"
+                    />
+                  }
                   @if (repoOptions().length) {
                     <app-picker
                       variant="pill"
@@ -731,6 +742,7 @@ export class CreateDialog {
   protected readonly accountableId = signal('');
   protected readonly targetDate = signal<Date | undefined>(undefined);
   protected readonly repositoryIds = signal<string[]>([]);
+  protected readonly projectId = signal('');
   protected readonly issueIds = signal<string[]>([]);
   // decision
   protected readonly workstreamId = signal('');
@@ -797,10 +809,19 @@ export class CreateDialog {
       .users()
       .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
   );
-  protected readonly repoOptions = computed<PickOption[]>(() =>
-    this.store
+  /** The repositories offered: the chosen project's own, or all of them. */
+  protected readonly repoOptions = computed<PickOption[]>(() => {
+    const project = this.store.getProject(this.projectId());
+    return this.store
       .repositories()
-      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider })),
+      .filter((r) => !project || project.repositoryIds.includes(r.id))
+      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
+  });
+  protected readonly projectOptions = computed<PickOption[]>(() =>
+    this.store
+      .projects()
+      .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
+      .map((p) => ({ value: p.id, label: p.name, kind: 'plain' })),
   );
   /** Open workstreams first (hexagon glyphs). */
   protected readonly workstreamOptions = computed<PickOption[]>(() => {
@@ -900,6 +921,7 @@ export class CreateDialog {
       this.store.userById().has(asStr(d['accountableUserId'])) ? asStr(d['accountableUserId']) : '',
     );
     this.targetDate.set(undefined);
+    this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
     this.repositoryIds.set(
       asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
     );
@@ -993,6 +1015,15 @@ export class CreateDialog {
 
   protected onClosed(): void {
     if (this.ui.modal() === 'create') this.ui.closeModal();
+  }
+
+  /** Picking a project narrows the repositories to its own (all of them when none were chosen yet). */
+  protected onProject(id: string | undefined): void {
+    this.projectId.set(id ?? '');
+    const project = this.store.getProject(id);
+    if (!project) return;
+    const own = this.repositoryIds().filter((r) => project.repositoryIds.includes(r));
+    this.repositoryIds.set(own.length ? own : [...project.repositoryIds]);
   }
 
   protected onTeamName(v: string): void {
@@ -1131,6 +1162,7 @@ export class CreateDialog {
             ownerTeamId: this.ownerTeamId(),
             priority: this.priority() as Priority,
             accountableUserId: this.accountableId() || undefined,
+            projectId: this.projectId() || undefined,
             repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
             targetDate: this.targetDate()?.toISOString(),
             statusOverride: asDraft ? 'draft' : (this.wsStatus() as WorkstreamStatus) || undefined,

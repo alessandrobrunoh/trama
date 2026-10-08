@@ -195,6 +195,8 @@ export interface CreateWorkstreamInput {
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID;
+  /** Repositories default to the project's when omitted; otherwise they must be a subset of them. */
+  projectId?: ID;
   repositoryIds?: ID[];
   acceptanceCriteria?: { text: string; state?: CriterionState }[];
   priority?: Priority;
@@ -212,6 +214,7 @@ export interface UpdateWorkstreamInput {
   ownerTeamId?: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID | null;
+  projectId?: ID | null;
   repositoryIds?: ID[];
   /** Replace the whole checklist (prefer the criterion methods for single edits). */
   acceptanceCriteria?: { id?: ID; text: string; state?: CriterionState }[];
