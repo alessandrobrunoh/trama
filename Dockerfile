@@ -20,6 +20,8 @@ RUN npx ng build --configuration production \
       -exec gzip -9 -k {} +
 
 FROM nginxinc/nginx-unprivileged:1.27-alpine AS runtime
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="trama-web" org.opencontainers.image.version="${VERSION}" org.opencontainers.image.source="https://github.com/alessandrobrunoh/trama"
 COPY docker/nginx/default.conf /etc/nginx/conf.d/default.conf
 COPY docker/nginx/security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /app/dist/delta/browser /usr/share/nginx/html

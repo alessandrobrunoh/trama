@@ -1,0 +1,5 @@
+# Allow-list for `docker build -f mcp/Dockerfile .` (context = repo root).
+*
+!mcp/Cargo.toml
+!mcp/Cargo.lock
+!mcp/src

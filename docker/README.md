@@ -3,13 +3,17 @@
 | Image | Source | Base | Size | Serves |
 |---|---|---|---|---|
 | `ghcr.io/alessandrobrunoh/trama-web` | `Dockerfile` (repo root) | nginx-unprivileged (alpine) | ~55 MB | the Angular app, port 8080 |
-| `ghcr.io/alessandrobrunoh/trama` | `server/Dockerfile` | node:22-bookworm-slim | ~270 MB | the API, port 3000 |
+| `ghcr.io/alessandrobrunoh/trama-server` | `server/Dockerfile` | node:22-bookworm-slim | ~270 MB | the API, port 3000 |
 | `ghcr.io/alessandrobrunoh/trama-mcp` | `mcp/Dockerfile` | distroless/cc (nonroot) | ~40 MB | the MCP server, port 8080 |
+
+All images are built with the **repository root as the build context**, each with its own
+`<Dockerfile>.dockerignore` allow-list (this is also how the deploy pipeline calls them):
 
 ```bash
 docker build -t ghcr.io/alessandrobrunoh/trama-web:latest .
-docker build -t ghcr.io/alessandrobrunoh/trama:latest server
-docker build -t ghcr.io/alessandrobrunoh/trama-mcp:latest mcp
+docker build -f server/Dockerfile -t ghcr.io/alessandrobrunoh/trama-server:latest .
+docker build -f mcp/Dockerfile -t ghcr.io/alessandrobrunoh/trama-mcp:latest .
+# optional: --build-arg VERSION=1.2.3 sets the org.opencontainers.image.version label
 ```
 
 Production stack: `server/docker-compose.yml` (web, app, mcp, postgres) behind Traefik. Routing on
@@ -29,7 +33,7 @@ Production stack: `server/docker-compose.yml` (web, app, mcp, postgres) behind T
 
 ## Notes
 - The optional Grok Build CLI (see `server/AI.md`) is not in the API image; extend it with
-  `FROM ghcr.io/alessandrobrunoh/trama` and `npm install -g @xai-official/grok` if you need it.
+  `FROM ghcr.io/alessandrobrunoh/trama-server` and `npm install -g @xai-official/grok` if you need it.
 - The Angular initial-bundle budget was raised to 1.75 MB (warning) / 2 MB (error): the app is now at ~1.6 MB raw
   (~265 kB gzipped), mostly the icon library (`@lucide/angular`, ~620 kB raw). Trimming it is a follow-up.
 - Images are not published by any workflow yet; build and push them by hand or add a CI job.
