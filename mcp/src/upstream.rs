@@ -1,4 +1,4 @@
-//! HTTP client for the Nabla REST API. The caller's API key is forwarded as a bearer token and
+//! HTTP client for the Trama REST API. The caller's API key is forwarded as a bearer token and
 //! never stored (the introspection cache is keyed by its sha256) or logged.
 
 use std::collections::{HashMap, HashSet};
@@ -50,9 +50,9 @@ impl Upstream {
     pub fn new(base: &str, timeout: Duration, max_output: usize) -> Result<Self, reqwest::Error> {
         let client = reqwest::Client::builder()
             .timeout(timeout)
-            // The key must only ever go to NABLA_API_URL, never to a redirect target.
+            // The key must only ever go to TRAMA_API_URL, never to a redirect target.
             .redirect(reqwest::redirect::Policy::none())
-            .user_agent(concat!("nabla-mcp/", env!("CARGO_PKG_VERSION")))
+            .user_agent(concat!("trama-mcp/", env!("CARGO_PKG_VERSION")))
             .build()?;
         Ok(Self { client, base: base.trim_end_matches('/').to_string(), max_output, cache: Mutex::default() })
     }
@@ -69,7 +69,7 @@ impl Upstream {
             .client
             .get(format!("{}/auth/token", self.base))
             .bearer_auth(api_key)
-            .header("X-Client-Id", "nabla-mcp")
+            .header("X-Client-Id", "trama-mcp")
             .send()
             .await
             .map_err(|e| AuthError::Unavailable(describe_transport(&e)))?;
@@ -102,7 +102,7 @@ impl Upstream {
             Method::Delete => self.client.delete(&url),
         }
         .bearer_auth(api_key)
-        .header("X-Client-Id", "nabla-mcp")
+        .header("X-Client-Id", "trama-mcp")
         .header("Accept", "application/json, text/markdown;q=0.9");
         if !call.query.is_empty() {
             req = req.query(&call.query);
@@ -112,7 +112,7 @@ impl Upstream {
         }
         let res = match req.send().await {
             Ok(r) => r,
-            Err(e) => return ToolOutput { text: format!("Could not reach the Nabla API: {}", describe_transport(&e)), is_error: true },
+            Err(e) => return ToolOutput { text: format!("Could not reach the Trama API: {}", describe_transport(&e)), is_error: true },
         };
         let status = res.status();
         let text = match res.text().await {

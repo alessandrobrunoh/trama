@@ -10,7 +10,7 @@ use crate::upstream::{ToolOutput, Upstream, Whoami};
 const SUPPORTED: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 const WHOAMI: &str = "whoami";
 
-const INSTRUCTIONS: &str = "Nabla (coordination for human + AI engineering teams). The API key you connected with is bound to one workspace, so no workspace argument is needed. \
+const INSTRUCTIONS: &str = "Trama (coordination for human + AI engineering teams). The API key you connected with is bound to one workspace, so no workspace argument is needed. \
 Items can be addressed by id (iss_…, wk_…) or by key (BUG-142, AUTH-42, ADR-21, team key AUTH). \
 Tools you are not permitted to use are hidden; writes are limited by per-key caps (HTTP 429 means stop and report, never retry in a loop). \
 In update_* tools, null clears an optional field. Start with `whoami` if unsure what this key can do.";
@@ -82,7 +82,7 @@ impl Server {
                     json!({
                         "protocolVersion": version,
                         "capabilities": { "tools": { "listChanged": false } },
-                        "serverInfo": { "name": "nabla-mcp", "title": "Nabla", "version": env!("CARGO_PKG_VERSION") },
+                        "serverInfo": { "name": "trama-mcp", "title": "Trama", "version": env!("CARGO_PKG_VERSION") },
                         "instructions": format!("{INSTRUCTIONS} Workspace: {}.", who.workspace_name),
                     }),
                 )

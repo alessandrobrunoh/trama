@@ -44,7 +44,7 @@ export class CodeBlock {
 type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'env' | 'read' | 'write' | 'context';
 
 /**
- * Copy-paste examples for connecting an MCP client (the nabla-mcp server) or calling the Nabla REST
+ * Copy-paste examples for connecting an MCP client (the trama-mcp server) or calling the Trama REST
  * API directly with a token. Every route shown exists (see server/API.md).
  */
 @Component({
@@ -107,7 +107,7 @@ export class ConnectSnippets {
   protected readonly current = computed<{ label: string; hint: string }>(() => {
     switch (this.tab()) {
       case 'mcp-cli':
-        return { label: 'Claude Code command', hint: 'Adds the Nabla MCP server to Claude Code. The key decides which tools the model sees: tools it may not use are hidden.' };
+        return { label: 'Claude Code command', hint: 'Adds the Trama MCP server to Claude Code. The key decides which tools the model sees: tools it may not use are hidden.' };
       case 'mcp-json':
         return { label: 'MCP config', hint: 'For clients that take a Streamable HTTP server with headers (Cursor, Windsurf, VS Code…). Same key, same permissions.' };
       case 'mcp-docker':
@@ -131,13 +131,13 @@ export class ConnectSnippets {
     const slug = this.slug();
     switch (this.tab()) {
       case 'mcp-cli':
-        return `claude mcp add --transport http nabla ${this.mcpUrl} \\\n  --header "Authorization: Bearer ${this.secret()}"`;
+        return `claude mcp add --transport http trama ${this.mcpUrl} \\\n  --header "Authorization: Bearer ${this.secret()}"`;
       case 'mcp-json':
-        return JSON.stringify({ mcpServers: { nabla: { url: this.mcpUrl, headers: { Authorization: `Bearer ${this.secret()}` } } } }, null, 2);
+        return JSON.stringify({ mcpServers: { trama: { url: this.mcpUrl, headers: { Authorization: `Bearer ${this.secret()}` } } } }, null, 2);
       case 'mcp-docker':
-        return [`docker run --rm -p 8080:8080 \\`, `  -e NABLA_API_URL=${url} \\`, `  ghcr.io/alessandrobrunoh/trama-mcp:latest`].join('\n');
+        return [`docker run --rm -p 8080:8080 \\`, `  -e TRAMA_API_URL=${url} \\`, `  ghcr.io/alessandrobrunoh/trama-mcp:latest`].join('\n');
       case 'env':
-        return [`NABLA_API_URL=${url}`, `NABLA_WORKSPACE=${slug}`, `NABLA_TOKEN=${this.secret()}`].join('\n');
+        return [`TRAMA_API_URL=${url}`, `TRAMA_WORKSPACE=${slug}`, `TRAMA_TOKEN=${this.secret()}`].join('\n');
       case 'read':
         return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/workstreams"`;
       case 'write':

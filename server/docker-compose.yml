@@ -35,7 +35,7 @@ services:
     container_name: trama-mcp
     restart: unless-stopped
     environment:
-      NABLA_API_URL: http://app:3000/api
+      TRAMA_API_URL: http://app:3000/api
       MCP_BIND: 0.0.0.0:8080
     networks:
       - default

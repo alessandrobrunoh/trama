@@ -42,7 +42,7 @@ reports configuration presence, not a successful upstream connection.
 
 ## Assistant tools (MCP)
 
-Set `MCP_URL` to the Nabla MCP server (`mcp/`, Docker service `mcp`, e.g. `http://mcp:8080/mcp`). For each
+Set `MCP_URL` to the Trama MCP server (`mcp/`, Docker service `mcp`, e.g. `http://mcp:8080/mcp`). For each
 chat reply the API mints a temporary `custom` API token that acts as the user (their workspace role still
 applies), gives the model the tools that token allows, and deletes the token when the reply is done.
 

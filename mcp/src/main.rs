@@ -1,4 +1,4 @@
-//! Nabla MCP server: exposes the Nabla REST API as MCP tools, authenticated by a per-client
+//! Trama MCP server: exposes the Trama REST API as MCP tools, authenticated by a per-client
 //! API key (Settings → API tokens). Streamable HTTP (stateless) by default, `--stdio` for local use.
 
 mod catalog;
@@ -38,9 +38,9 @@ fn env(name: &str) -> Option<String> {
 
 impl Config {
     fn from_env() -> Result<Self, String> {
-        let api_url = env("NABLA_API_URL").unwrap_or_else(|| "http://localhost:3000/api".into());
+        let api_url = env("TRAMA_API_URL").unwrap_or_else(|| "http://localhost:3000/api".into());
         if !(api_url.starts_with("http://") || api_url.starts_with("https://")) {
-            return Err("NABLA_API_URL must start with http:// or https://".into());
+            return Err("TRAMA_API_URL must start with http:// or https://".into());
         }
         let bind = env("MCP_BIND").unwrap_or_else(|| "0.0.0.0:8080".into()).parse().map_err(|e| format!("MCP_BIND: {e}"))?;
         let number = |name: &str, default: u64| -> Result<u64, String> {
@@ -64,7 +64,7 @@ struct App {
 fn unauthorized(message: &str) -> Response {
     (
         StatusCode::UNAUTHORIZED,
-        [(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer realm=\"nabla-mcp\""))],
+        [(header::WWW_AUTHENTICATE, HeaderValue::from_static("Bearer realm=\"trama-mcp\""))],
         Json(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32001, "message": message } })),
     )
         .into_response()
@@ -85,14 +85,14 @@ async fn mcp_post(State(app): State<Arc<App>>, headers: HeaderMap, body: Bytes) 
         }
     }
     let Some(key) = bearer(&headers) else {
-        return unauthorized("Missing API key: send 'Authorization: Bearer nbl_…' (create one in Nabla → Settings → API tokens)");
+        return unauthorized("Missing API key: send 'Authorization: Bearer nbl_…' (create one in Trama → Settings → API tokens)");
     };
     let who = match app.server.upstream.whoami(key).await {
         Ok(w) => w,
         Err(AuthError::Unauthorized) => return unauthorized("Invalid, revoked or expired API key"),
         Err(AuthError::Unavailable(m)) => {
             tracing::warn!("upstream unavailable: {m}");
-            return (StatusCode::BAD_GATEWAY, format!("Nabla API unavailable: {m}")).into_response();
+            return (StatusCode::BAD_GATEWAY, format!("Trama API unavailable: {m}")).into_response();
         }
     };
     let message: Value = match serde_json::from_slice(&body) {
@@ -147,11 +147,11 @@ async fn run_http(app: Arc<App>, bind: SocketAddr) -> Result<(), String> {
     axum::serve(listener, router).with_graceful_shutdown(shutdown_signal()).await.map_err(|e| e.to_string())
 }
 
-/// Newline-delimited JSON-RPC on stdin/stdout, authenticated by `NABLA_API_KEY`.
+/// Newline-delimited JSON-RPC on stdin/stdout, authenticated by `TRAMA_API_KEY`.
 async fn run_stdio(app: Arc<App>) -> Result<(), String> {
-    let key = env("NABLA_API_KEY").ok_or("--stdio needs NABLA_API_KEY")?;
+    let key = env("TRAMA_API_KEY").ok_or("--stdio needs TRAMA_API_KEY")?;
     if !key.starts_with("nbl_") {
-        return Err("NABLA_API_KEY must start with nbl_".into());
+        return Err("TRAMA_API_KEY must start with nbl_".into());
     }
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     let mut stdout = tokio::io::stdout();
@@ -166,7 +166,7 @@ async fn run_stdio(app: Arc<App>) -> Result<(), String> {
                 Err(e) => msg.get("id").map(|id| {
                     let text = match e {
                         AuthError::Unauthorized => "Invalid, revoked or expired API key".to_string(),
-                        AuthError::Unavailable(m) => format!("Nabla API unavailable: {m}"),
+                        AuthError::Unavailable(m) => format!("Trama API unavailable: {m}"),
                     };
                     json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32001, "message": text } })
                 }),
@@ -186,7 +186,7 @@ async fn main() {
     // Logs go to stderr so stdout stays clean for the stdio transport.
     tracing_subscriber::fmt().with_writer(std::io::stderr).with_env_filter(tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into())).init();
     if let Err(e) = start().await {
-        eprintln!("nabla-mcp: {e}");
+        eprintln!("trama-mcp: {e}");
         std::process::exit(1);
     }
 }
@@ -195,7 +195,7 @@ async fn start() -> Result<(), String> {
     let cfg = Config::from_env()?;
     let upstream = Upstream::new(&cfg.api_url, cfg.timeout, cfg.max_output).map_err(|e| e.to_string())?;
     let server = Server::new(upstream)?;
-    tracing::info!(tools = server.tool_count(), api = %cfg.api_url, "nabla-mcp {}", env!("CARGO_PKG_VERSION"));
+    tracing::info!(tools = server.tool_count(), api = %cfg.api_url, "trama-mcp {}", env!("CARGO_PKG_VERSION"));
     let app = Arc::new(App { server, allowed_origins: cfg.allowed_origins });
     if std::env::args().any(|a| a == "--stdio") { run_stdio(app).await } else { run_http(app, cfg.bind).await }
 }
