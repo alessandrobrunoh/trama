@@ -1,0 +1,6 @@
+# Development override: publishes Postgres on localhost:5434 (5432/5433 belong to other projects).
+# Used by `npm run db:up` / `db:down`; never part of the production deploy.
+services:
+  postgres:
+    ports:
+      - '127.0.0.1:5434:5432'
