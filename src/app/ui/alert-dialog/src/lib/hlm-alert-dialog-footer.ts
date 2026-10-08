@@ -9,7 +9,7 @@ export class HlmAlertDialogFooter {
   constructor() {
     classes(
       () =>
-        'bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4 flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end',
+        'bg-muted/50 -mx-4 -mb-4 rounded-b-xl border-t p-4 max-sm:pb-[calc(1rem+env(safe-area-inset-bottom))] flex flex-col-reverse gap-2 group-data-[size=sm]/alert-dialog-content:grid group-data-[size=sm]/alert-dialog-content:grid-cols-2 sm:flex-row sm:justify-end',
     );
   }
 }

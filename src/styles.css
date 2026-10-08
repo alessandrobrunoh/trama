@@ -583,6 +583,94 @@
   background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 
+/* ───────────────────── Dialogs as bottom sheets on phones ─────────────────────
+   Every hlm-dialog / hlm-alert-dialog (below `sm`) docks to the bottom edge, full width, with a
+   grab handle (hlm-dialog-content.ts swipes it away). The command palette opts out via
+   data-variant="palette". The CDK wrapper centres with inline styles, hence the !important. */
+.sheet-handle {
+  display: none;
+}
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sheet-out {
+  from {
+    transform: translateY(var(--sheet-drag, 0px));
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+@media (max-width: 639.98px) {
+  .cdk-global-overlay-wrapper:has(
+      hlm-dialog-content:not([data-variant='palette']),
+      hlm-alert-dialog-content
+    ) {
+    align-items: flex-end !important;
+    justify-content: stretch !important;
+  }
+  .cdk-overlay-pane:has(hlm-dialog-content:not([data-variant='palette']), hlm-alert-dialog-content) {
+    width: 100%;
+    max-width: 100%;
+  }
+  hlm-dialog-content:not([data-variant='palette']),
+  hlm-alert-dialog-content {
+    position: relative;
+    margin: 0;
+    width: 100%;
+    max-width: none;
+    max-height: min(92dvh, 100%);
+    border-radius: 1.25rem 1.25rem 0 0;
+    border: 0;
+    border-top: 1px solid var(--border);
+    box-shadow: 0 -12px 48px rgb(0 0 0 / 0.35);
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    grid-template-columns: minmax(0, 1fr);
+    transform: translateY(var(--sheet-drag, 0px));
+    overscroll-behavior: contain;
+    animation: none;
+  }
+  hlm-dialog-content:not([data-variant='palette'])[data-state='open'],
+  hlm-alert-dialog-content[data-state='open'] {
+    animation: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  hlm-dialog-content:not([data-variant='palette'])[data-state='closed'],
+  hlm-alert-dialog-content[data-state='closed'] {
+    animation: sheet-out 200ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  }
+  /* The footer already pads for the safe area; avoid doubling it on dialogs that have one. */
+  hlm-dialog-content:not([data-variant='palette']):has(> [data-slot='dialog-footer']),
+  hlm-dialog-content:not([data-variant='palette']):has(form > [data-slot='dialog-footer']),
+  hlm-alert-dialog-content:has(> [data-slot='alert-dialog-footer']) {
+    padding-bottom: 0;
+  }
+  hlm-dialog-content:not([data-variant='palette']) > .sheet-handle {
+    position: absolute;
+    top: 0;
+    left: 25%;
+    z-index: 1;
+    display: block;
+    width: 50%;
+    height: 1.25rem;
+    cursor: grab;
+    touch-action: none;
+  }
+  hlm-dialog-content:not([data-variant='palette']) > .sheet-handle::after {
+    content: '';
+    position: absolute;
+    top: 0.4375rem;
+    left: 50%;
+    width: 2.25rem;
+    height: 0.25rem;
+    border-radius: 9999px;
+    background: var(--muted-foreground);
+    opacity: 0.4;
+    transform: translateX(-50%);
+  }
+}
+
 /* Shortcut chips on primary surfaces (e.g. "New issue C"): a lighter shade of the accent
    instead of the muted keycap, so the chip reads as part of the button. */
 .bg-primary [data-slot='kbd'] {
