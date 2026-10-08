@@ -6,6 +6,7 @@ import {
   LucideArrowDownWideNarrow,
   LucideArrowUpNarrowWide,
   LucideCheck,
+  LucideBox,
   LucideCircleUserRound,
   LucideColumns3,
   LucideCopy,
@@ -53,8 +54,9 @@ import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
+import { ProjectGlyph } from '../projects/project-glyph';
 import { Picker, type PickOption } from '../workstreams/picker';
-import { priorityOptions, teamOptions, userOptions } from '../workstreams/ws-model';
+import { priorityOptions, projectFilterOptions, teamOptions, userOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
 import { IssueCard, IssueRow } from './issue-items';
 import {
@@ -69,6 +71,7 @@ import {
   groupUniverse,
   issueKindOptions,
   issueStatusOptions,
+  milestoneFilterOptions,
   readDisplay,
   workstreamPickOptions,
   writeDisplay,
@@ -105,6 +108,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     IssueRow,
     IssueCard,
     IssueOptionGlyph,
+    ProjectGlyph,
     Kanban,
     KanbanItemDirective,
     KanbanLabelDirective,
@@ -134,6 +138,12 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         <app-picker variant="chip" label="Assignee" [multiple]="true" [options]="assigneeFilter()" [value]="fv('assigneeId')" (valueChange)="setF('assigneeId', $event)" />
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
         <app-picker variant="chip" label="Workstream" [multiple]="true" [options]="wsFilter()" [value]="fv('workstreamIds')" (valueChange)="setF('workstreamIds', $event)" />
+        @if (projectFilter().length > 1) {
+          <app-picker variant="chip" label="Project" [multiple]="true" [icon]="projectIcon" [options]="projectFilter()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
+        }
+        @if (milestoneFilter().length) {
+          <app-picker variant="chip" label="Milestone" [multiple]="true" [options]="milestoneFilter()" [value]="fv('milestoneIds')" (valueChange)="setF('milestoneIds', $event)" />
+        }
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -309,6 +319,13 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                 <app-actor-avatar [actor]="{ type: 'user', id: key }" [size]="16" />
               } @else {
                 <svg [lucideIcon]="noUser" [size]="16" [strokeWidth]="1.5" class="text-muted-foreground"></svg>
+              }
+            }
+            @case ('projectId') {
+              @if (store.getProject(key); as p) {
+                <app-project-glyph [project]="p" [size]="14" />
+              } @else {
+                <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground"></svg>
               }
             }
             @case ('workstreamIds') {
@@ -531,6 +548,8 @@ export class IssueBoard {
   readonly status = input<string>();
   /** Query `?team=`. */
   readonly team = input<string>();
+  /** Query `?project=<projectId>` (links from a project). */
+  readonly project = input<string>();
   readonly emptyTitle = input('No issues yet');
   readonly emptyDescription = input(
     'Issues are demand: the bugs, requests and incidents people report. When you decide to act, add them to a workstream: the outcome that resolves them.',
@@ -551,6 +570,10 @@ export class IssueBoard {
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly assigneeFilter = computed<PickOption[]>(() => [{ value: '', label: 'Unassigned' }, ...userOptions(this.store)]);
   protected readonly wsFilter = computed<PickOption[]>(() => [{ value: '', label: 'No workstream' }, ...workstreamPickOptions(this.store)]);
+  protected readonly projectFilter = computed(() => projectFilterOptions(this.store));
+  protected readonly milestoneFilter = computed(() => milestoneFilterOptions(this.store));
+  /** An issue counts under its own project and the projects of its workstreams. */
+  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById() }));
   protected readonly groups = GROUPS;
   protected readonly sorts = SORTS;
   protected readonly props = PROPS;
@@ -578,6 +601,7 @@ export class IssueBoard {
   protected readonly displayIcon = LucideSlidersHorizontal;
   protected readonly noUser = LucideCircleUserRound;
   protected readonly hexIcon = LucideHexagon;
+  protected readonly projectIcon = LucideBox;
   protected readonly teamIcon = LucideUsers;
   protected readonly copyIcon = LucideCopy;
   protected readonly branchIcon = LucideGitBranch;
@@ -629,7 +653,7 @@ export class IssueBoard {
         sort: { field: d.sortField, direction: d.sortDir },
         groupBy: group === 'none' ? null : group,
       },
-      {},
+      this.queryCtx(),
       include,
     );
   });
@@ -682,8 +706,10 @@ export class IssueBoard {
     effect(() => {
       const status = this.status();
       const team = this.team();
+      const project = this.project();
       this.filters.update((f) => {
         let next = setFilter(f, 'teamId', 'in', team ? [team] : []);
+        if (project) next = setFilter(next, 'projectId', 'in', [project]);
         if (status && (ISSUE_STATUSES as readonly string[]).includes(status)) next = setFilter(next, 'status', 'in', [status]);
         return next;
       });
@@ -763,6 +789,9 @@ export class IssueBoard {
         break;
       case 'assigneeId':
         if (key) defaults['assigneeId'] = key;
+        break;
+      case 'projectId':
+        if (key) defaults['projectId'] = key;
         break;
     }
     this.ui.openCreate('issue', defaults);

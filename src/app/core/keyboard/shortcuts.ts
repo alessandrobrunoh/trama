@@ -10,7 +10,6 @@ export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = 
   n: { segment: 'notifications', label: 'Notifications' },
   i: { segment: 'issues', label: 'Issues' },
   w: { segment: 'workstreams', label: 'Workstreams' },
-  l: { segment: 'timeline', label: 'Timeline' },
   d: { segment: 'decisions', label: 'Decisions' },
   p: { segment: 'projects', label: 'Projects' },
   r: { segment: 'repositories', label: 'Repositories' },

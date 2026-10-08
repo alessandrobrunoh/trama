@@ -16,6 +16,7 @@ import { NablaStore, UiStore, WORKSTREAM_STATUS_META, type Priority, type Workst
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
+import { ProjectChip } from '../../shared/project-chip';
 import { StatusIcon } from '../../shared/status';
 import { NextMilestoneChip } from '../milestones/milestone-chips';
 import { Picker } from './picker';
@@ -32,6 +33,7 @@ export interface WsRowProps {
   criteria: boolean;
   prs: boolean;
   teams: boolean;
+  project: boolean;
   accountable: boolean;
   targetDate: boolean;
   labels: boolean;
@@ -44,6 +46,7 @@ export const DEFAULT_ROW_PROPS: WsRowProps = {
   criteria: true,
   prs: true,
   teams: true,
+  project: true,
   accountable: true,
   targetDate: true,
   labels: false,
@@ -56,6 +59,7 @@ export const ROW_PROP_LABELS: { key: keyof WsRowProps; label: string }[] = [
   { key: 'criteria', label: 'Criteria' },
   { key: 'prs', label: 'Pull requests' },
   { key: 'teams', label: 'Teams' },
+  { key: 'project', label: 'Project' },
   { key: 'accountable', label: 'Accountable' },
   { key: 'targetDate', label: 'Target date' },
   { key: 'labels', label: 'Labels' },
@@ -230,6 +234,7 @@ abstract class WsItemBase {
     TargetDate,
     WsDatePicker,
     NextMilestoneChip,
+    ProjectChip,
     WsMenu,
   ],
   host: { class: 'block' },
@@ -307,6 +312,9 @@ abstract class WsItemBase {
         }
       </span>
 
+      @if (p.project && w.projectId) {
+        <app-project-chip class="shrink-0 max-lg:hidden" [projectId]="w.projectId" />
+      }
       @if (p.prs) {
         <span class="hidden w-[9.5rem] shrink-0 items-center justify-end gap-1 xl:flex">
           @for (a of s.openPrs.slice(0, 2); track a.id) {
@@ -397,6 +405,7 @@ export class WorkstreamRow extends WsItemBase {
     TargetDate,
     WsDatePicker,
     NextMilestoneChip,
+    ProjectChip,
     WsMenu,
   ],
   host: { class: 'block' },
@@ -462,6 +471,9 @@ export class WorkstreamRow extends WsItemBase {
         <app-issue-progress [compact]="true" [done]="s.issuesDone" [active]="s.issuesActive" [total]="s.issuesTotal" />
         <app-criteria-count [met]="s.criteriaMet" [total]="s.criteriaTotal" />
         <app-next-milestone [workstreamId]="w.id" />
+        @if (w.projectId) {
+          <app-project-chip [projectId]="w.projectId" />
+        }
         <span class="ml-auto flex items-center gap-2">
           <app-ws-date-picker #datePicker label="Target date" triggerClass="h-6 px-1" align="end" [disabled]="!canEdit()" [value]="w.targetDate" (dateChange)="setDate($event)">
             @if (w.targetDate) {

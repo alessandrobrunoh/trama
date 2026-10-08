@@ -5,6 +5,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { format } from 'date-fns';
 import { NablaStore, UiStore } from '../../core';
 import { Kbd } from '../../shared/kbd';
+import { timelineViewLink } from '../views/view-model';
 import { OverviewModel } from './overview-model';
 
 /** "Good morning, Ada", today's date with a one-sentence status, and the three quick actions. */
@@ -33,7 +34,7 @@ import { OverviewModel } from './overview-model';
           <svg [lucideIcon]="plus" [size]="14"></svg> New workstream
         </button>
       }
-      <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', m.slug(), 'timeline']">
+      <a hlmBtn size="sm" variant="ghost" [routerLink]="timelineLink()">
         <svg [lucideIcon]="timeline" [size]="14"></svg> Open timeline
       </a>
     </div>
@@ -45,6 +46,7 @@ export class OverviewGreeting {
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
   protected readonly timeline = LucideChartGantt;
+  protected readonly timelineLink = computed(() => timelineViewLink(this.store));
   protected readonly today = format(new Date(), 'EEEE, MMMM d');
 
   protected readonly greeting = computed(() => {

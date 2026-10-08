@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucideKanban, LucideLayers, LucideList, LucideLock, LucidePlus, LucideUsers } from '@lucide/angular';
+import { LucideChartGantt, LucideDynamicIcon, LucideKanban, LucideLayers, LucideList, LucideLock, LucidePlus, LucideUsers } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { NablaStore, UiStore, type SavedView } from '../../core';
@@ -41,7 +41,7 @@ interface ViewSection {
       <app-empty-state
         [icon]="layers"
         title="No saved views"
-        description="A view is a saved filter over issues, workstreams or decisions, shown as a list or a board. Private views stay yours; shared ones show up for everyone."
+        description="A view is a saved filter over issues, workstreams, projects or decisions, shown as a list, a board or (for workstreams and projects) a timeline. Private views stay yours; shared ones show up for everyone."
       >
         @if (canEdit()) {
           <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New view</button>
@@ -65,7 +65,7 @@ interface ViewSection {
               <svg
                 [lucideIcon]="entityIcon(v)"
                 [size]="14"
-                [class]="v.entity === 'workstream' ? 'text-entity-workstream' : v.entity === 'decision' ? 'text-entity-decision' : 'text-entity-issue'"
+                [class]="v.entity === 'workstream' ? 'text-entity-workstream' : v.entity === 'decision' ? 'text-entity-decision' : v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
                 class="shrink-0"
               ></svg>
               <span class="min-w-0 shrink truncate text-sm">{{ v.name }}</span>
@@ -73,10 +73,10 @@ interface ViewSection {
               <span class="flex-1 md:hidden"></span>
               <span class="text-meta w-20 shrink-0 max-sm:hidden">{{ entityLabel(v) }}</span>
               <svg
-                [lucideIcon]="v.layout === 'board' ? boardIcon : listIcon"
+                [lucideIcon]="layoutIcon(v)"
                 [size]="13"
                 class="text-muted-foreground shrink-0"
-                [hlmTooltip]="v.layout === 'board' ? 'Board' : 'List'"
+                [hlmTooltip]="layoutLabel(v)"
                 position="bottom"
               ></svg>
               <svg
@@ -104,6 +104,7 @@ export class ViewListPage {
   protected readonly layers = LucideLayers;
   protected readonly listIcon = LucideList;
   protected readonly boardIcon = LucideKanban;
+  protected readonly timelineIcon = LucideChartGantt;
   protected readonly usersIcon = LucideUsers;
   protected readonly lockIcon = LucideLock;
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
@@ -125,6 +126,12 @@ export class ViewListPage {
     return n === 1 ? '1 saved view' : `${n} saved views`;
   });
 
+  protected layoutIcon(v: SavedView) {
+    return v.layout === 'board' ? this.boardIcon : v.layout === 'timeline' ? this.timelineIcon : this.listIcon;
+  }
+  protected layoutLabel(v: SavedView): string {
+    return v.layout === 'board' ? 'Board' : v.layout === 'timeline' ? 'Timeline' : 'List';
+  }
   protected entityIcon(v: SavedView) {
     return ENTITY_ICON[v.entity];
   }

@@ -4,9 +4,10 @@ import { ChangeDetectionStrategy, Component, Directive, computed, inject, input,
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, shortDate, fullDate, type Issue } from '../../core';
+import { NablaStore, fullDate, issueProjectIds, shortDate, type Issue } from '../../core';
 import { EntityChip } from '../../shared/entity-chip';
 import { Estimate } from '../../shared/estimate';
+import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue } from './issue-model';
@@ -35,7 +36,7 @@ abstract class IssueItemBase {
   protected readonly quiet = computed(() => isClosedIssue(this.issue()));
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
-    return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
+    return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
   });
   protected readonly team = computed(() => {
     const id = this.issue().teamId;
@@ -46,6 +47,12 @@ abstract class IssueItemBase {
   protected readonly wsMore = computed(() => {
     const rest = this.wsIds().slice(2);
     return rest.length ? { n: rest.length, keys: rest.map((id) => this.store.getWorkstream(id)?.key ?? '').join(', ') } : null;
+  });
+  /** Projects of the issue: its own, then those of its workstreams (same meaning as the project filter). */
+  protected readonly projectIds = computed(() => issueProjectIds(this.issue(), this.store.workstreamById()));
+  protected readonly projectMore = computed(() => {
+    const rest = this.projectIds().slice(1);
+    return rest.length ? { n: rest.length, names: rest.map((id) => this.store.getProject(id)?.name ?? '').join(', ') } : null;
   });
   /** Shown when the issue is estimated and the workspace still uses estimates (or the value is kept anyway). */
   protected readonly hasEstimate = computed(() => this.issue().estimate !== undefined && this.issue().estimate !== null);
@@ -72,7 +79,7 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, EntityChip, Estimate],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -135,6 +142,14 @@ abstract class IssueItemBase {
           }
         </span>
       }
+      @if (s.project && projectIds().length) {
+        <span class="relative flex min-w-0 shrink-0 items-center gap-1 max-lg:hidden">
+          <app-project-chip [projectId]="projectIds()[0]" />
+          @if (projectMore(); as m) {
+            <span class="text-muted-foreground border-border-strong rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.names">+{{ m.n }}</span>
+          }
+        </span>
+      }
       @if (s.team && team(); as t) {
         <span class="text-muted-foreground w-12 shrink-0 truncate text-right font-mono text-[11px] max-md:hidden">{{ t.key }}</span>
       }
@@ -160,7 +175,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, EntityChip, Estimate],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -215,6 +230,12 @@ export class IssueRow extends IssueItemBase {
           }
           @if (wsMore(); as m) {
             <span class="text-muted-foreground border-border-strong relative rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.keys">+{{ m.n }}</span>
+          }
+        }
+        @if (s.project && projectIds().length) {
+          <app-project-chip [projectId]="projectIds()[0]" />
+          @if (projectMore(); as m) {
+            <span class="text-muted-foreground border-border-strong relative rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.names">+{{ m.n }}</span>
           }
         }
         @if (hasEstimate()) {

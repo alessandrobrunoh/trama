@@ -46,6 +46,7 @@ import { oneOf, readJson, writeJson } from '../../core/stores/storage';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
+import { ProjectGlyph } from '../projects/project-glyph';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -60,7 +61,7 @@ import {
   buildSummary,
   labelOptions,
   priorityOptions,
-  projectOptions,
+  projectFilterOptions,
   repoOptions,
   statusOptions,
   teamOptions,
@@ -71,18 +72,19 @@ import {
 import { DEFAULT_ROW_PROPS, ROW_PROP_LABELS, WorkstreamCard, WorkstreamRow, type WsRowProps } from './workstream-items';
 
 type Layout = 'list' | 'board';
-type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'none';
+type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
 type SortField = 'updatedAt' | 'priority' | 'targetDate' | 'createdAt' | 'title' | 'status';
 
 const DISPLAY_KEY = 'nabla.workstreams.display.v2';
 const LEGACY_LAYOUT_KEY = 'nabla.workstreams.layout';
-const GROUPS: GroupField[] = ['status', 'ownerTeamId', 'priority', 'accountableUserId', 'none'];
+const GROUPS: GroupField[] = ['status', 'ownerTeamId', 'priority', 'accountableUserId', 'projectId', 'none'];
 const SORTS: SortField[] = ['updatedAt', 'priority', 'targetDate', 'createdAt', 'title', 'status'];
 const GROUP_OPTIONS: PickOption[] = [
   { value: 'status', label: 'Status' },
   { value: 'ownerTeamId', label: 'Owner team' },
   { value: 'priority', label: 'Priority' },
   { value: 'accountableUserId', label: 'Accountable' },
+  { value: 'projectId', label: 'Project' },
   { value: 'none', label: 'No grouping' },
 ];
 const SORT_OPTIONS: PickOption[] = [
@@ -156,6 +158,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     StatusIcon,
     PriorityIcon,
     ActorAvatar,
+    ProjectGlyph,
     WorkstreamRow,
     WorkstreamCard,
     Kanban,
@@ -282,7 +285,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
         }
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Accountable" [multiple]="true" [options]="users()" [value]="fv('accountableUserId')" (valueChange)="setF('accountableUserId', $event)" />
-        @if (projects().length) {
+        @if (projects().length > 1) {
           <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
         }
         <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
@@ -338,7 +341,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       <app-kanban
         [columns]="columns()"
         [layout]="display().layout"
-        [disabled]="!canEdit()"
+        [disabled]="!canEdit() || effectiveGroup() === 'projectId'"
         prefix="workstreams"
         [track]="trackSummary"
         (moved)="move($event.item, $event.to)"
@@ -374,6 +377,14 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
                 <span class="font-medium">{{ store.getUser(key)?.name }}</span>
               } @else {
                 <span class="font-medium">Unassigned</span>
+              }
+            }
+            @case ('projectId') {
+              @if (store.getProject(key); as p) {
+                <app-project-glyph [project]="p" [size]="14" />
+                <span class="font-medium">{{ p.name }}</span>
+              } @else {
+                <span class="font-medium">No project</span>
               }
             }
             @default {
@@ -434,7 +445,7 @@ export class WorkstreamListPage {
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repos = computed(() => repoOptions(this.store));
-  protected readonly projects = computed(() => projectOptions(this.store));
+  protected readonly projects = computed(() => projectFilterOptions(this.store));
   protected readonly labels = computed(() => labelOptions(this.store));
 
   protected readonly plus = LucidePlus;
@@ -510,8 +521,9 @@ export class WorkstreamListPage {
     if (group === 'status') {
       const order = (k: string) => WORKSTREAM_STATUS_FLOW.indexOf(k as WorkstreamStatus);
       out = [...groups].sort((a, b) => order(a.key) - order(b.key));
-    } else if (group === 'ownerTeamId' || group === 'accountableUserId') {
-      const name = (k: string) => (group === 'ownerTeamId' ? this.store.getTeam(k)?.name : this.store.getUser(k)?.name) ?? '￿';
+    } else if (group === 'ownerTeamId' || group === 'accountableUserId' || group === 'projectId') {
+      const name = (k: string) =>
+        (group === 'ownerTeamId' ? this.store.getTeam(k)?.name : group === 'projectId' ? this.store.getProject(k)?.name : this.store.getUser(k)?.name) ?? '￿';
       out = [...groups].sort((a, b) => (a.key === '' ? 1 : b.key === '' ? -1 : name(a.key).localeCompare(name(b.key))));
     }
     const sums = this.summaries();
