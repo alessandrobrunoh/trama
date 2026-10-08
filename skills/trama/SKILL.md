@@ -19,13 +19,21 @@ Trama coordinates teams of humans and coding agents. It keeps the issue tracker 
 
 Issues are *demand*. A workstream groups the issues that share a root cause and is the unit you execute. Grouping is by **outcome, not convenience**: five bugs with one cause belong together; ten unrelated bugs do not.
 
+## One parent thread, one workstream
+
+If you are the parent agent of a Delta thread, that thread has one workstream. Link every issue you were asked to do in this thread to that workstream. A subagent works an issue; it is not a workstream and it is not a new issue when the issue already exists. Do not attach the same parent thread to several workstreams.
+
+"Group by outcome, not convenience" applies when you triage a backlog. It does not apply when a person has already told you to carry these issues in this thread. That request is the grouping. Do not split it, and do not ask again.
+
+People may say "workspace" for that thread. In Trama the object is still one workstream. Do not create extra Trama workspaces.
+
 A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. To understand a whole project in one read, call `get_project_context` (markdown "mega context"); to report on it, post a project update (see `trama-report-progress`).
 
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.
 
 ## Ground rules
 
-1. **Start with `whoami`.** It tells you which workspace and role you act as and which tools your token allows. Tools your key cannot use are hidden; do not look for workarounds.
+1. **Start with `whoami`.** It tells you which workspace and role you act as and which tools your token allows. If several keys are connected it returns one entry per workspace; `list_accounts` lists them. Tools your key cannot use are hidden; do not look for workarounds.
 2. **Read before you write.** To work on a workstream call `get_workstream_context` (a markdown briefing); for a project call `get_project_context`. Use targeted `list_*` / `get_*` / `search` tools. Avoid `get_snapshot`: it is huge and only works for user tokens.
 3. **Never set a workstream's status yourself.** Status is *derived* from facts (see `trama-report-progress`). `statusOverride` exists for people pinning a board column; leave it alone unless the user explicitly asks.
 4. **Facts, not guesses.** Do not invent progress, percentages or completion. Report what exists: criteria met, PR state, CI result.
@@ -33,10 +41,15 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 6. **Ask, don't stall.** If a human must choose or unblock something, open an input request instead of guessing or stopping silently.
 7. **Respect limits.** Tokens have per-minute and per-day caps (default 600 requests/min, 60 writes/min, 2000 writes/day). On HTTP 429 **stop and tell the user**; never retry in a loop.
 8. **Be economical with writes.** Batch your thinking, then write once. Do not create duplicates: `search` first.
-9. **Ids and keys.** Tools accept either (`idOrKey`). Old issue keys keep resolving after a re-key. Dates are ISO strings.
+9. **Ids and keys.** Tools accept either (`idOrKey`). Old issue keys keep resolving after a re-key. Dates are ISO strings. A key like `BUG-142` is unique only inside one workspace, so with several workspaces connected always keep the `workspace` stamp that came back with the row.
+10. **One key, one workspace.** A token never spans workspaces. With a single key, omit `workspace`. With several keys, every tool takes an optional `workspace` (a slug, or several separated by commas):
+    - **Reads** (`list_*`, `get_*`, `search`, `get_*_context`): omit `workspace` to cover every connected workspace. Each result is stamped with the workspace it came from. A workspace that fails is reported, not fatal, as long as another answered.
+    - **Writes** (`create_*`, `update_*`, `delete_*`, link, answer, accept): pass exactly one `workspace`. Omitting it is refused, so a write can never land in every workspace at once.
+    - One key is unchanged: no `workspace` argument and no `list_accounts` tool.
 
 ## Which skill next
 
+- Starting, continuing, or closing work → `trama-workflow` (it decides whether a workstream exists, then hands off)
 - Picking up work on a workstream → `trama-start-work`
 - Reporting progress, PRs, CI → `trama-report-progress`
 - Blocked, or a choice needs recording → `trama-ask-and-decide`
@@ -44,6 +57,6 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 
 ## Tool map
 
-`workspace/whoami` · `search` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
+`workspace/whoami` · `list_accounts` (only when several keys are connected) · `search` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
 
 `api_request` is an escape hatch for workspace routes with no dedicated tool. Prefer the dedicated tools; it only takes plain workspace-relative paths.

@@ -14,7 +14,7 @@ const WHOAMI_TTL: Duration = Duration::from_secs(30);
 const CACHE_MAX: usize = 1000;
 
 /// What `GET /auth/token` says about the key.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Whoami {
     pub slug: String,
     pub workspace_name: String,
@@ -54,7 +54,12 @@ impl Upstream {
             .redirect(reqwest::redirect::Policy::none())
             .user_agent(concat!("trama-mcp/", env!("CARGO_PKG_VERSION")))
             .build()?;
-        Ok(Self { client, base: base.trim_end_matches('/').to_string(), max_output, cache: Mutex::default() })
+        Ok(Self {
+            client,
+            base: base.trim_end_matches('/').to_string(),
+            max_output,
+            cache: Mutex::default(),
+        })
     }
 
     /// Resolves a key to its workspace and permissions (cached for 30 s).
@@ -76,11 +81,24 @@ impl Upstream {
         match res.status().as_u16() {
             200 => {}
             401 => return Err(AuthError::Unauthorized),
-            429 => return Err(AuthError::Unavailable("the API key hit its request cap; retry in a minute".into())),
-            s => return Err(AuthError::Unavailable(format!("the API answered HTTP {s} to key introspection"))),
+            429 => {
+                return Err(AuthError::Unavailable(
+                    "the API key hit its request cap; retry in a minute".into(),
+                ));
+            }
+            s => {
+                return Err(AuthError::Unavailable(format!(
+                    "the API answered HTTP {s} to key introspection"
+                )));
+            }
         }
-        let raw: Value = res.json().await.map_err(|_| AuthError::Unavailable("the API sent an invalid introspection reply".into()))?;
-        let who = Arc::new(parse_whoami(raw).ok_or_else(|| AuthError::Unavailable("unexpected introspection reply".into()))?);
+        let raw: Value = res.json().await.map_err(|_| {
+            AuthError::Unavailable("the API sent an invalid introspection reply".into())
+        })?;
+        let who = Arc::new(
+            parse_whoami(raw)
+                .ok_or_else(|| AuthError::Unavailable("unexpected introspection reply".into()))?,
+        );
         let mut cache = self.cache.lock().unwrap();
         if cache.len() >= CACHE_MAX {
             cache.retain(|_, (at, _)| at.elapsed() < WHOAMI_TTL);
@@ -94,7 +112,12 @@ impl Upstream {
 
     /// Executes a resolved call inside the key's workspace and renders it as tool output.
     pub async fn call(&self, api_key: &str, slug: &str, call: &Call) -> ToolOutput {
-        let url = format!("{}/w/{}{}", self.base, crate::catalog::encode_segment(slug), call.path);
+        let url = format!(
+            "{}/w/{}{}",
+            self.base,
+            crate::catalog::encode_segment(slug),
+            call.path
+        );
         let mut req = match call.method {
             Method::Get => self.client.get(&url),
             Method::Post => self.client.post(&url),
@@ -112,30 +135,60 @@ impl Upstream {
         }
         let res = match req.send().await {
             Ok(r) => r,
-            Err(e) => return ToolOutput { text: format!("Could not reach the Trama API: {}", describe_transport(&e)), is_error: true },
+            Err(e) => {
+                return ToolOutput {
+                    text: format!("Could not reach the Trama API: {}", describe_transport(&e)),
+                    is_error: true,
+                };
+            }
         };
         let status = res.status();
         let text = match res.text().await {
             Ok(t) => t,
-            Err(e) => return ToolOutput { text: format!("Could not read the API reply: {}", describe_transport(&e)), is_error: true },
+            Err(e) => {
+                return ToolOutput {
+                    text: format!("Could not read the API reply: {}", describe_transport(&e)),
+                    is_error: true,
+                };
+            }
         };
         if status.is_success() {
-            let text = if status.as_u16() == 204 || text.is_empty() { "OK (no content)".to_string() } else { truncate(text, self.max_output) };
-            return ToolOutput { text, is_error: false };
+            let text = if status.as_u16() == 204 || text.is_empty() {
+                "OK (no content)".to_string()
+            } else {
+                truncate(text, self.max_output)
+            };
+            return ToolOutput {
+                text,
+                is_error: false,
+            };
         }
         let mut message = api_error_message(&text);
         if status.as_u16() == 429 {
             message.push_str(" (usage cap of this API key: wait before retrying; do not loop)");
         }
-        ToolOutput { text: format!("HTTP {}: {message}", status.as_u16()), is_error: true }
+        ToolOutput {
+            text: format!("HTTP {}: {message}", status.as_u16()),
+            is_error: true,
+        }
     }
 }
 
 fn parse_whoami(raw: Value) -> Option<Whoami> {
     let slug = raw.pointer("/workspace/slug")?.as_str()?.to_string();
     let workspace_name = raw.pointer("/workspace/name")?.as_str()?.to_string();
-    let permissions = raw.get("permissions")?.as_array()?.iter().filter_map(|p| p.as_str().map(str::to_string)).collect();
-    Some(Whoami { slug, workspace_name, permissions, raw })
+    let permissions = raw
+        .get("permissions")?
+        .as_array()?
+        .iter()
+        .filter_map(|p| p.as_str().map(str::to_string))
+        .collect();
+    Some(Whoami {
+        slug,
+        workspace_name,
+        permissions,
+        raw,
+    })
 }
 
 fn describe_transport(e: &reqwest::Error) -> String {
@@ -151,11 +204,18 @@ fn describe_transport(e: &reqwest::Error) -> String {
 /// Nest errors look like `{ statusCode, message: string | string[], error }`.
 fn api_error_message(body: &str) -> String {
     let parsed: Option<Value> = serde_json::from_str(body).ok();
-    let message = parsed.as_ref().and_then(|v| v.get("message")).map(|m| match m {
-        Value::String(s) => s.clone(),
-        Value::Array(a) => a.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("; "),
-        other => other.to_string(),
-    });
+    let message = parsed
+        .as_ref()
+        .and_then(|v| v.get("message"))
+        .map(|m| match m {
+            Value::String(s) => s.clone(),
+            Value::Array(a) => a
+                .iter()
+                .filter_map(Value::as_str)
+                .collect::<Vec<_>>()
+                .join("; "),
+            other => other.to_string(),
+        });
     truncate(message.unwrap_or_else(|| body.trim().to_string()), 2000)
 }
 
@@ -169,7 +229,9 @@ fn truncate(mut text: String, max: usize) -> String {
     }
     let total = text.len();
     text.truncate(cut);
-    text.push_str(&format!("\n… [truncated: showing {cut} of {total} bytes; narrow the query with filters]"));
+    text.push_str(&format!(
+        "\n… [truncated: showing {cut} of {total} bytes; narrow the query with filters]"
+    ));
     text
 }
 
@@ -180,8 +242,16 @@ mod tests {
 
     #[test]
     fn formats_nest_errors() {
-        assert_eq!(api_error_message(r#"{"statusCode":400,"message":["a is required","b must be x"],"error":"Bad Request"}"#), "a is required; b must be x");
-        assert_eq!(api_error_message(r#"{"statusCode":403,"message":"nope"}"#), "nope");
+        assert_eq!(
+            api_error_message(
+                r#"{"statusCode":400,"message":["a is required","b must be x"],"error":"Bad Request"}"#
+            ),
+            "a is required; b must be x"
+        );
+        assert_eq!(
+            api_error_message(r#"{"statusCode":403,"message":"nope"}"#),
+            "nope"
+        );
         assert_eq!(api_error_message("gateway down"), "gateway down");
     }
 

@@ -46,7 +46,7 @@ trama whoami         # workspace, role, permissions and caps of the key
 trama doctor         # if anything fails: config, connectivity, key
 ```
 
-A Trama API key is bound to **one workspace**; `login` saves it in a *profile*. Three ways in:
+A Trama API key is bound to **one workspace**; `login` saves it in a *profile*. To cover more than one workspace, add the keys to an *account* (`trama account add`) and read with `--account`, `--workspace` or `--all-workspaces`. Three ways in:
 
 | | Command | Notes |
 |---|---|---|
@@ -69,6 +69,33 @@ Plain `http://` is refused except for localhost (the key travels in every reques
 Profiles live in `~/.config/trama/config.json` (`%APPDATA%\trama` on Windows; `TRAMA_CONFIG_DIR` to move it),
 written `0600`. Manage them with `trama profile list|use|show|remove`, `--profile <name>` per command, and
 `trama logout [--revoke] [--all]` (`--revoke` also deletes the key on the server).
+
+### Several workspaces
+
+A key still belongs to exactly one workspace. An **account** is the name that groups the keys you add,
+so one command can read all of them:
+
+```bash
+# keys you already created, one per line
+printf '%s\n' "$KEY_ACME" "$KEY_BETA" | trama account add --with-token --api-url https://trama.example.com --name work
+
+# or sign in once and mint a key in every workspace the account belongs to
+trama account add --email you@acme.com --name work                 # add --workspace acme,beta to limit it
+
+trama account list
+trama issue list --account work            # one row per issue, each stamped with its workspace
+trama issue list --all-workspaces         # every saved profile
+trama issue list --workspace acme,beta
+trama issue get BUG-142 --workspace acme   # a single workspace, by slug
+```
+
+Reads (`list`, `get`, `search`, the markdown briefings) run once per matching profile and merge the
+results; each row gains `workspace` and `profile`, so a key that exists in two workspaces stays
+distinguishable. A workspace that fails is reported and skipped. Writes stay on exactly one workspace:
+a create or update with more than one match is refused, so nothing is ever created twice. `trama mcp`
+uses the same selection (`trama mcp --account work`), and the hosted MCP server accepts several keys in
+one header (`Authorization: Bearer nbl_one,nbl_two`). `TRAMA_API_KEY` is still a single key and wins
+over every selection.
 
 ## Use
 

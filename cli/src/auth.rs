@@ -14,7 +14,9 @@ use serde_json::{Value, json};
 
 use crate::Ctx;
 use crate::catalog::Method;
-use crate::config::{self, Config, Creds, Profile, check_token_format, check_transport, normalize_api_url, redact};
+use crate::config::{
+    self, Config, Creds, Profile, check_token_format, check_transport, normalize_api_url, redact,
+};
 use crate::error::{CliError, Kind, Result};
 use crate::http::{Api, Request, cookie_value};
 use crate::output;
@@ -32,19 +34,32 @@ pub struct Identity {
 
 impl Identity {
     pub fn permissions(&self) -> Vec<String> {
-        let set: BTreeSet<String> = self.raw.get("permissions").and_then(Value::as_array).into_iter().flatten().filter_map(|p| p.as_str().map(str::to_string)).collect();
+        let set: BTreeSet<String> = self
+            .raw
+            .get("permissions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p.as_str().map(str::to_string))
+            .collect();
         set.into_iter().collect()
     }
 
     pub fn token_id(&self) -> Option<String> {
-        self.raw.pointer("/token/id").and_then(Value::as_str).map(str::to_string)
+        self.raw
+            .pointer("/token/id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
     }
 
     /// The introspection reply with the permission list sorted and anything hash-like removed.
     pub fn summary(&self, api_url: &str, profile: Option<&str>) -> Value {
         let mut token = self.raw.get("token").cloned().unwrap_or(Value::Null);
         if let Some(map) = token.as_object_mut() {
-            map.retain(|k, _| !k.to_ascii_lowercase().contains("hash") && !k.to_ascii_lowercase().contains("secret"));
+            map.retain(|k, _| {
+                !k.to_ascii_lowercase().contains("hash")
+                    && !k.to_ascii_lowercase().contains("secret")
+            });
         }
         json!({
             "api": api_url,
@@ -58,13 +73,23 @@ impl Identity {
 }
 
 pub async fn introspect(api: &Api, token: &str) -> Result<Identity> {
-    let reply = api.send(&Request::get("/auth/token").token(token)).await?.into_result()?;
+    let reply = api
+        .send(&Request::get("/auth/token").token(token))
+        .await?
+        .into_result()?;
     let raw = reply.json()?;
     let slug = raw.pointer("/workspace/slug").and_then(Value::as_str);
     let name = raw.pointer("/workspace/name").and_then(Value::as_str);
     match (slug, name) {
-        (Some(slug), Some(name)) => Ok(Identity { slug: slug.to_string(), name: name.to_string(), raw: raw.clone() }),
-        _ => Err(CliError::new(Kind::Internal, "unexpected reply from /auth/token: is this a Trama API URL?")),
+        (Some(slug), Some(name)) => Ok(Identity {
+            slug: slug.to_string(),
+            name: name.to_string(),
+            raw: raw.clone(),
+        }),
+        _ => Err(CliError::new(
+            Kind::Internal,
+            "unexpected reply from /auth/token: is this a Trama API URL?",
+        )),
     }
 }
 
@@ -92,13 +117,26 @@ enum Method3 {
 
 pub async fn login(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let existing = Config::load()?;
-    let profile_name = ctx.ov.profile.clone().or_else(|| config::env("TRAMA_PROFILE")).or_else(|| existing.default_name()).unwrap_or_else(|| config::DEFAULT_PROFILE.to_string());
+    let profile_name = ctx
+        .ov
+        .profile
+        .clone()
+        .or_else(|| config::env("TRAMA_PROFILE"))
+        .or_else(|| existing.default_name())
+        .unwrap_or_else(|| config::DEFAULT_PROFILE.to_string());
     let previous_url = existing.profiles.get(&profile_name).map(|p| p.url.clone());
 
-    let url_raw = match ctx.ov.api_url.clone().or_else(|| config::env("TRAMA_API_URL")) {
+    let url_raw = match ctx
+        .ov
+        .api_url
+        .clone()
+        .or_else(|| config::env("TRAMA_API_URL"))
+    {
         Some(u) => u,
         None => {
-            let default = previous_url.clone().unwrap_or_else(|| config::DEFAULT_API_URL.to_string());
+            let default = previous_url
+                .clone()
+                .unwrap_or_else(|| config::DEFAULT_API_URL.to_string());
             util::prompt("Trama URL (site or API)", Some(&default))?
         }
     };
@@ -160,15 +198,31 @@ pub async fn login(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let mut cfg = existing;
     cfg.profiles.insert(
         profile_name.clone(),
-        Profile { url: url.clone(), token: token.clone(), workspace: identity.slug.clone(), workspace_name: identity.name.clone(), saved_at: util::now_iso() },
+        Profile {
+            url: url.clone(),
+            token: token.clone(),
+            workspace: identity.slug.clone(),
+            workspace_name: identity.name.clone(),
+            saved_at: util::now_iso(),
+            account: String::new(),
+        },
     );
     cfg.current = Some(profile_name.clone());
     cfg.save()?;
 
     let human = ctx.fmt.tty && ctx.fmt.mode == output::Mode::Auto;
     if human {
-        eprintln!("Signed in to {} ({}) · profile '{profile_name}' · {} permissions", identity.name, identity.slug, identity.permissions().len());
-        eprintln!("Key {} saved in {}", redact(&token), config::config_path().display());
+        eprintln!(
+            "Signed in to {} ({}) · profile '{profile_name}' · {} permissions",
+            identity.name,
+            identity.slug,
+            identity.permissions().len()
+        );
+        eprintln!(
+            "Key {} saved in {}",
+            redact(&token),
+            config::config_path().display()
+        );
         return Ok(());
     }
     let mut summary = identity.summary(&url, Some(&profile_name));
@@ -198,15 +252,36 @@ async fn mint_with_password(api: &Api, m: &ArgMatches) -> Result<String> {
     }
 
     let body = json!({ "email": email, "password": password });
-    let login = api.send(&Request { method: Method::Post, path: "/auth/login", query: &[], body: Some(&body), token: None, accept: crate::http::ACCEPT_JSON, cookie: None }).await?;
+    let login = api
+        .send(&Request {
+            method: Method::Post,
+            path: "/auth/login",
+            query: &[],
+            body: Some(&body),
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: None,
+        })
+        .await?;
     if login.status == 401 {
         return Err(CliError::auth("wrong email or password").status(401));
     }
     let login = login.into_result()?;
-    let cookie = cookie_value(&login.headers, SESSION_COOKIE).ok_or_else(|| CliError::internal("the API did not start a session"))?;
+    let cookie = cookie_value(&login.headers, SESSION_COOKIE)
+        .ok_or_else(|| CliError::internal("the API did not start a session"))?;
     let result = mint_in_session(api, m, &login.json()?, &cookie).await;
     // Always close the session, whatever happened.
-    let _ = api.send(&Request { method: Method::Post, path: "/auth/logout", query: &[], body: None, token: None, accept: crate::http::ACCEPT_JSON, cookie: Some(&cookie) }).await;
+    let _ = api
+        .send(&Request {
+            method: Method::Post,
+            path: "/auth/logout",
+            query: &[],
+            body: None,
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: Some(&cookie),
+        })
+        .await;
     result
 }
 
@@ -216,16 +291,28 @@ async fn mint_in_session(api: &Api, m: &ArgMatches, login: &Value, cookie: &str)
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|w| Some((w.get("slug")?.as_str()?.to_string(), w.get("name").and_then(Value::as_str).unwrap_or("").to_string())))
+        .filter_map(|w| {
+            Some((
+                w.get("slug")?.as_str()?.to_string(),
+                w.get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+            ))
+        })
         .collect();
     if workspaces.is_empty() {
-        return Err(CliError::usage("this account is not a member of any workspace").hint("Create or join one in the web app first."));
+        return Err(
+            CliError::usage("this account is not a member of any workspace")
+                .hint("Create or join one in the web app first."),
+        );
     }
     let slug = match m.get_one::<String>("workspace") {
         Some(s) if workspaces.iter().any(|(slug, _)| slug == s) => s.clone(),
         Some(s) => {
             let known: Vec<&str> = workspaces.iter().map(|(s, _)| s.as_str()).collect();
-            return Err(CliError::usage(format!("you are not a member of '{s}'")).hint(format!("Your workspaces: {}", known.join(", "))));
+            return Err(CliError::usage(format!("you are not a member of '{s}'"))
+                .hint(format!("Your workspaces: {}", known.join(", "))));
         }
         None if workspaces.len() == 1 => workspaces[0].0.clone(),
         None if util::interactive() => {
@@ -234,19 +321,34 @@ async fn mint_in_session(api: &Api, m: &ArgMatches, login: &Value, cookie: &str)
                 eprintln!("  {}) {name} ({slug})", i + 1);
             }
             let pick = util::prompt("Choose", Some("1"))?;
-            let index: usize = pick.parse().ok().filter(|n| (1..=workspaces.len()).contains(n)).ok_or_else(|| CliError::usage(format!("'{pick}' is not a valid choice")))?;
+            let index: usize = pick
+                .parse()
+                .ok()
+                .filter(|n| (1..=workspaces.len()).contains(n))
+                .ok_or_else(|| CliError::usage(format!("'{pick}' is not a valid choice")))?;
             workspaces[index - 1].0.clone()
         }
         None => {
             let known: Vec<&str> = workspaces.iter().map(|(s, _)| s.as_str()).collect();
-            return Err(CliError::usage("this account has several workspaces: pick one with --workspace").hint(format!("Your workspaces: {}", known.join(", "))));
+            return Err(CliError::usage(
+                "this account has several workspaces: pick one with --workspace",
+            )
+            .hint(format!("Your workspaces: {}", known.join(", "))));
         }
     };
 
     let mut body = json!({ "name": m.get_one::<String>("token-name").cloned().unwrap_or_else(|| format!("trama-cli@{}", util::hostname())) });
-    let name_len = body["name"].as_str().map(|s| s.chars().count()).unwrap_or(0);
+    let name_len = body["name"]
+        .as_str()
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
     if name_len > 80 {
-        let short: String = body["name"].as_str().unwrap_or("").chars().take(80).collect();
+        let short: String = body["name"]
+            .as_str()
+            .unwrap_or("")
+            .chars()
+            .take(80)
+            .collect();
         body["name"] = json!(short);
     }
     if let Some(perms) = m.get_many::<String>("permissions") {
@@ -261,8 +363,24 @@ async fn mint_in_session(api: &Api, m: &ArgMatches, login: &Value, cookie: &str)
         body["expiresAt"] = json!(util::iso(util::now_secs() + secs));
     }
     let path = format!("/w/{}/tokens", crate::catalog::encode_segment(&slug));
-    let reply = api.send(&Request { method: Method::Post, path: &path, query: &[], body: Some(&body), token: None, accept: crate::http::ACCEPT_JSON, cookie: Some(cookie) }).await?.into_result()?;
-    let secret = reply.json()?.get("secret").and_then(Value::as_str).map(str::to_string).ok_or_else(|| CliError::internal("the API did not return the token secret"))?;
+    let reply = api
+        .send(&Request {
+            method: Method::Post,
+            path: &path,
+            query: &[],
+            body: Some(&body),
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: Some(cookie),
+        })
+        .await?
+        .into_result()?;
+    let secret = reply
+        .json()?
+        .get("secret")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| CliError::internal("the API did not return the token secret"))?;
     check_token_format(&secret)?;
     Ok(secret)
 }
@@ -274,13 +392,18 @@ pub async fn whoami(ctx: &Ctx) -> Result<()> {
     if !creds.from_env {
         refresh_profile(&creds, &identity);
     }
-    output::print(&identity.summary(&creds.url, creds.profile.as_deref()), &ctx.fmt);
+    output::print(
+        &identity.summary(&creds.url, creds.profile.as_deref()),
+        &ctx.fmt,
+    );
     Ok(())
 }
 
 /// Keeps the saved workspace slug/name current (best effort: a read-only config is not an error here).
 fn refresh_profile(creds: &Creds, identity: &Identity) {
-    let (Some(name), Ok(mut cfg)) = (creds.profile.as_ref(), Config::load()) else { return };
+    let (Some(name), Ok(mut cfg)) = (creds.profile.as_ref(), Config::load()) else {
+        return;
+    };
     if let Some(p) = cfg.profiles.get_mut(name)
         && (p.workspace != identity.slug || p.workspace_name != identity.name)
     {
@@ -295,7 +418,13 @@ pub async fn logout(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let names: Vec<String> = if m.get_flag("all") {
         cfg.profiles.keys().cloned().collect()
     } else {
-        let name = ctx.ov.profile.clone().or_else(|| config::env("TRAMA_PROFILE")).or_else(|| cfg.default_name()).ok_or_else(|| CliError::usage("no profile to sign out of"))?;
+        let name = ctx
+            .ov
+            .profile
+            .clone()
+            .or_else(|| config::env("TRAMA_PROFILE"))
+            .or_else(|| cfg.default_name())
+            .ok_or_else(|| CliError::usage("no profile to sign out of"))?;
         if !cfg.profiles.contains_key(&name) {
             return Err(CliError::usage(format!("no profile named '{name}'")));
         }
@@ -304,62 +433,93 @@ pub async fn logout(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let mut revoked: Vec<String> = vec![];
     let mut warnings: Vec<String> = vec![];
     for name in &names {
-        let Some(profile) = cfg.profiles.remove(name) else { continue };
+        let Some(profile) = cfg.profiles.remove(name) else {
+            continue;
+        };
         if m.get_flag("revoke") {
             match revoke(&profile, ctx).await {
                 Ok(()) => revoked.push(name.clone()),
-                Err(e) => warnings.push(format!("could not revoke the key of '{name}': {}", e.message)),
+                Err(e) => warnings.push(format!(
+                    "could not revoke the key of '{name}': {}",
+                    e.message
+                )),
             }
         }
     }
-    if cfg.current.as_ref().is_some_and(|c| !cfg.profiles.contains_key(c)) {
+    if cfg
+        .current
+        .as_ref()
+        .is_some_and(|c| !cfg.profiles.contains_key(c))
+    {
         cfg.current = cfg.default_name();
     }
     cfg.save()?;
     for w in &warnings {
         eprintln!("warning: {w}");
     }
-    output::print(&json!({ "loggedOut": names, "revoked": revoked, "warnings": warnings }), &ctx.fmt);
+    output::print(
+        &json!({ "loggedOut": names, "revoked": revoked, "warnings": warnings }),
+        &ctx.fmt,
+    );
     Ok(())
 }
 
 async fn revoke(profile: &Profile, ctx: &Ctx) -> Result<()> {
     let api = Api::new(&profile.url, ctx.timeout)?;
     let identity = introspect(&api, &profile.token).await?;
-    let id = identity.token_id().ok_or_else(|| CliError::internal("the API did not say which token this is"))?;
-    let path = format!("/w/{}/tokens/{}", crate::catalog::encode_segment(&identity.slug), crate::catalog::encode_segment(&id));
-    api.send(&Request { method: Method::Delete, path: &path, query: &[], body: None, token: Some(&profile.token), accept: crate::http::ACCEPT_JSON, cookie: None }).await?.into_result()?;
+    let id = identity
+        .token_id()
+        .ok_or_else(|| CliError::internal("the API did not say which token this is"))?;
+    let path = format!(
+        "/w/{}/tokens/{}",
+        crate::catalog::encode_segment(&identity.slug),
+        crate::catalog::encode_segment(&id)
+    );
+    api.send(&Request {
+        method: Method::Delete,
+        path: &path,
+        query: &[],
+        body: None,
+        token: Some(&profile.token),
+        accept: crate::http::ACCEPT_JSON,
+        cookie: None,
+    })
+    .await?
+    .into_result()?;
     Ok(())
 }
 
 pub fn profile(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let mut cfg = Config::load()?;
-    let current = ctx.ov.profile.clone().or_else(|| config::env("TRAMA_PROFILE")).or_else(|| cfg.default_name());
-    let row = |name: &str, p: &Profile| {
-        json!({
-            "name": name,
-            "current": current.as_deref() == Some(name),
-            "url": p.url,
-            "workspace": p.workspace,
-            "workspaceName": p.workspace_name,
-            "token": redact(&p.token),
-            "savedAt": p.saved_at,
-        })
-    };
+    let current = ctx
+        .ov
+        .profile
+        .clone()
+        .or_else(|| config::env("TRAMA_PROFILE"))
+        .or_else(|| cfg.default_name());
+    let row = |name: &str, p: &Profile| profile_row(name, p, current.as_deref());
     match m.subcommand() {
         Some(("list", _)) | None => {
             let rows: Vec<Value> = cfg.profiles.iter().map(|(n, p)| row(n, p)).collect();
             output::print(&Value::Array(rows), &ctx.fmt);
         }
         Some(("show", sm)) => {
-            let name = sm.get_one::<String>("name").cloned().or_else(|| current.clone()).ok_or_else(CliError::not_logged_in)?;
-            let p = cfg.profiles.get(&name).ok_or_else(|| CliError::usage(format!("no profile named '{name}'")))?;
+            let name = sm
+                .get_one::<String>("name")
+                .cloned()
+                .or_else(|| current.clone())
+                .ok_or_else(CliError::not_logged_in)?;
+            let p = cfg
+                .profiles
+                .get(&name)
+                .ok_or_else(|| CliError::usage(format!("no profile named '{name}'")))?;
             output::print(&row(&name, p), &ctx.fmt);
         }
         Some(("use", sm)) => {
             let name = sm.get_one::<String>("name").expect("required").clone();
             if !cfg.profiles.contains_key(&name) {
-                return Err(CliError::usage(format!("no profile named '{name}'")).hint("`trama profile list` shows the saved ones."));
+                return Err(CliError::usage(format!("no profile named '{name}'"))
+                    .hint("`trama profile list` shows the saved ones."));
             }
             cfg.current = Some(name.clone());
             cfg.save()?;
@@ -376,8 +536,367 @@ pub fn profile(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             cfg.save()?;
             output::print(&json!({ "removed": name }), &ctx.fmt);
         }
-        Some((other, _)) => return Err(CliError::usage(format!("unknown profile command '{other}'"))),
+        Some((other, _)) => {
+            return Err(CliError::usage(format!(
+                "unknown profile command '{other}'"
+            )));
+        }
     }
+    Ok(())
+}
+
+fn profile_row(name: &str, p: &Profile, current: Option<&str>) -> Value {
+    let mut row = json!({
+        "name": name,
+        "current": current == Some(name),
+        "url": p.url,
+        "workspace": p.workspace,
+        "workspaceName": p.workspace_name,
+        "token": redact(&p.token),
+        "savedAt": p.saved_at,
+    });
+    if !p.account.is_empty() {
+        row["account"] = json!(p.account);
+    }
+    row
+}
+
+/// `trama account`: add one or many tokens (or sign in and mint one key per workspace), then list or remove them.
+///
+/// A token is still bound to exactly one workspace. An *account* is just the name that groups the
+/// profiles `add` created, so `trama issue list --account work` can read all of them at once.
+pub async fn account(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
+    match m.subcommand() {
+        Some(("add", sm)) => account_add(sm, ctx).await,
+        Some(("list", _)) | None => account_list(ctx),
+        Some(("remove", sm)) => account_remove(sm, ctx),
+        Some((other, _)) => Err(CliError::usage(format!(
+            "unknown account command '{other}'"
+        ))),
+    }
+}
+
+pub fn account_list(ctx: &Ctx) -> Result<()> {
+    let cfg = Config::load()?;
+    let current = cfg.default_name();
+    let mut names: Vec<String> = cfg
+        .profiles
+        .values()
+        .map(|p| p.account.clone())
+        .filter(|a| !a.is_empty())
+        .collect();
+    names.sort();
+    names.dedup();
+    let rows: Vec<Value> = names
+        .into_iter()
+        .map(|name| {
+            let profiles: Vec<Value> = cfg.profiles.iter().filter(|(_, p)| p.account == name).map(|(n, p)| profile_row(n, p, current.as_deref())).collect();
+            json!({ "name": name, "profiles": profiles.len(), "workspaces": profiles.iter().filter_map(|p| p.get("workspace")).collect::<Vec<_>>() })
+        })
+        .collect();
+    output::print(&Value::Array(rows), &ctx.fmt);
+    Ok(())
+}
+
+async fn account_add(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
+    let label = m
+        .get_one::<String>("name")
+        .cloned()
+        .or_else(|| config::env("TRAMA_ACCOUNT"));
+    let url_raw = ctx
+        .ov
+        .api_url
+        .clone()
+        .or_else(|| config::env("TRAMA_API_URL"))
+        .or_else(|| {
+            Config::load().ok().and_then(|c| {
+                c.default_name()
+                    .and_then(|n| c.profiles.get(&n).map(|p| p.url.clone()))
+            })
+        });
+    let url_raw = match url_raw {
+        Some(u) => u,
+        None if util::interactive() => {
+            util::prompt("Trama URL (site or API)", Some(config::DEFAULT_API_URL))?
+        }
+        None => {
+            return Err(CliError::usage("no API URL").hint("Pass --api-url, or set TRAMA_API_URL."));
+        }
+    };
+    let url = normalize_api_url(&url_raw)?;
+    check_transport(&url)?;
+    let api = Api::new(&url, ctx.timeout)?;
+
+    let tokens = if m.get_flag("with-token")
+        || config::env("TRAMA_API_KEY").is_some()
+            && !util::interactive()
+            && m.get_one::<String>("email").is_none()
+    {
+        pasted_tokens(m.get_flag("with-token"))?
+    } else if m.get_one::<String>("email").is_some()
+        || util::interactive() && !m.get_flag("with-token")
+    {
+        mint_many(&api, m).await?
+    } else {
+        return Err(CliError::usage("nothing to add").hint("Pipe keys, one per line: `trama account add --with-token --api-url <url> --name work`, or use --email."));
+    };
+    if tokens.is_empty() {
+        return Err(CliError::usage("no token was given"));
+    }
+
+    let account = label.unwrap_or_else(|| "account".to_string());
+    let mut cfg = Config::load()?;
+    let mut added: Vec<Value> = vec![];
+    let mut skipped: Vec<Value> = vec![];
+    for token in tokens {
+        check_token_format(&token)?;
+        if let Some((name, existing)) = cfg
+            .profiles
+            .iter()
+            .find(|(_, p)| p.token == token && p.url == url)
+        {
+            skipped.push(json!({ "profile": name, "workspace": existing.workspace, "reason": "already saved" }));
+            continue;
+        }
+        let identity = introspect(&api, &token).await?;
+        let name = cfg.unique_name(&identity.slug);
+        cfg.profiles.insert(
+            name.clone(),
+            Profile {
+                url: url.clone(),
+                token: token.clone(),
+                workspace: identity.slug.clone(),
+                workspace_name: identity.name.clone(),
+                saved_at: util::now_iso(),
+                account: account.clone(),
+            },
+        );
+        if cfg.current.is_none() {
+            cfg.current = Some(name.clone());
+        }
+        added.push(json!({ "profile": name, "workspace": identity.slug, "workspaceName": identity.name, "permissions": identity.permissions().len() }));
+    }
+    cfg.save()?;
+    let human = ctx.fmt.tty && ctx.fmt.mode == output::Mode::Auto;
+    if human {
+        for row in &added {
+            eprintln!(
+                "Added {} ({}) to account '{account}' as profile '{}'",
+                row["workspaceName"].as_str().unwrap_or(""),
+                row["workspace"].as_str().unwrap_or(""),
+                row["profile"].as_str().unwrap_or("")
+            );
+        }
+        if added.is_empty() {
+            eprintln!("Nothing new: every token was already saved.");
+        }
+        eprintln!("Read all of them at once with `trama issue list --account {account}`.");
+        return Ok(());
+    }
+    output::print(
+        &json!({ "account": account, "added": added, "skipped": skipped }),
+        &ctx.fmt,
+    );
+    Ok(())
+}
+
+/// One token per non-empty line of stdin, or the single `TRAMA_API_KEY`.
+fn pasted_tokens(from_stdin: bool) -> Result<Vec<String>> {
+    let text = if from_stdin {
+        util::read_stdin()?
+    } else {
+        config::env("TRAMA_API_KEY").unwrap_or_default()
+    };
+    let tokens: Vec<String> = text
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_string)
+        .collect();
+    for token in &tokens {
+        check_token_format(token)?;
+    }
+    Ok(tokens)
+}
+
+/// Email + password once, then one machine token per workspace the account belongs to.
+async fn mint_many(api: &Api, m: &ArgMatches) -> Result<Vec<String>> {
+    let email = match m.get_one::<String>("email") {
+        Some(e) => e.clone(),
+        None => util::prompt("Email", None)?,
+    };
+    let password = if m.get_flag("password-stdin") {
+        first_line(&util::read_stdin()?)
+    } else if let Some(p) = config::env("TRAMA_PASSWORD") {
+        p
+    } else {
+        util::prompt_secret("Password")?
+    };
+    if password.is_empty() {
+        return Err(CliError::usage("the password is empty"));
+    }
+    let body = json!({ "email": email, "password": password });
+    let login = api
+        .send(&Request {
+            method: Method::Post,
+            path: "/auth/login",
+            query: &[],
+            body: Some(&body),
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: None,
+        })
+        .await?;
+    if login.status == 401 {
+        return Err(CliError::auth("wrong email or password").status(401));
+    }
+    let login = login.into_result()?;
+    let cookie = cookie_value(&login.headers, SESSION_COOKIE)
+        .ok_or_else(|| CliError::internal("the API did not start a session"))?;
+    let wanted = m
+        .get_many::<String>("workspace")
+        .map(|v| v.cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    let result = mint_all(api, m, &login.json()?, &cookie, &wanted).await;
+    let _ = api
+        .send(&Request {
+            method: Method::Post,
+            path: "/auth/logout",
+            query: &[],
+            body: None,
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: Some(&cookie),
+        })
+        .await;
+    result
+}
+
+async fn mint_all(
+    api: &Api,
+    m: &ArgMatches,
+    login: &Value,
+    cookie: &str,
+    wanted: &[String],
+) -> Result<Vec<String>> {
+    let workspaces: Vec<(String, String)> = login
+        .get("workspaces")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|w| {
+            Some((
+                w.get("slug")?.as_str()?.to_string(),
+                w.get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_string(),
+            ))
+        })
+        .collect();
+    if workspaces.is_empty() {
+        return Err(
+            CliError::usage("this account is not a member of any workspace")
+                .hint("Create or join one in the web app first."),
+        );
+    }
+    let chosen: Vec<(String, String)> = if wanted.is_empty() {
+        workspaces.clone()
+    } else {
+        let mut out = vec![];
+        for slug in wanted {
+            match workspaces.iter().find(|(s, _)| s == slug) {
+                Some(w) => out.push(w.clone()),
+                None => {
+                    let known: Vec<&str> = workspaces.iter().map(|(s, _)| s.as_str()).collect();
+                    return Err(CliError::usage(format!("you are not a member of '{slug}'"))
+                        .hint(format!("Your workspaces: {}", known.join(", "))));
+                }
+            }
+        }
+        out
+    };
+    let mut tokens = vec![];
+    for (slug, _) in &chosen {
+        tokens.push(mint_one(api, m, cookie, slug).await?);
+    }
+    Ok(tokens)
+}
+
+/// One machine token in `slug`, inside a session that is already open.
+async fn mint_one(api: &Api, m: &ArgMatches, cookie: &str, slug: &str) -> Result<String> {
+    let mut body = json!({ "name": m.get_one::<String>("token-name").cloned().unwrap_or_else(|| format!("trama-cli@{}-{slug}", util::hostname())) });
+    let name_len = body["name"]
+        .as_str()
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
+    if name_len > 80 {
+        let short: String = body["name"]
+            .as_str()
+            .unwrap_or("")
+            .chars()
+            .take(80)
+            .collect();
+        body["name"] = json!(short);
+    }
+    if let Some(perms) = m.get_many::<String>("permissions") {
+        body["permissions"] = json!(perms.cloned().collect::<Vec<_>>());
+        body["scope"] = json!("custom");
+    } else if let Some(scope) = m.get_one::<String>("scope") {
+        body["scope"] = json!(scope);
+    }
+    if let Some(expires) = m.get_one::<String>("expires-in")
+        && let Some(secs) = util::parse_duration(expires)?
+    {
+        body["expiresAt"] = json!(util::iso(util::now_secs() + secs));
+    }
+    let path = format!("/w/{}/tokens", crate::catalog::encode_segment(slug));
+    let reply = api
+        .send(&Request {
+            method: Method::Post,
+            path: &path,
+            query: &[],
+            body: Some(&body),
+            token: None,
+            accept: crate::http::ACCEPT_JSON,
+            cookie: Some(cookie),
+        })
+        .await?
+        .into_result()?;
+    let secret = reply
+        .json()?
+        .get("secret")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .ok_or_else(|| CliError::internal("the API did not return the token secret"))?;
+    check_token_format(&secret)?;
+    Ok(secret)
+}
+
+fn account_remove(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
+    let name = m.get_one::<String>("name").expect("required").clone();
+    let mut cfg = Config::load()?;
+    let gone: Vec<String> = cfg
+        .profiles
+        .iter()
+        .filter(|(_, p)| p.account == name)
+        .map(|(n, _)| n.clone())
+        .collect();
+    if gone.is_empty() {
+        return Err(CliError::usage(format!("no account named '{name}'")).hint("`trama account list` shows the saved ones. Removing an account forgets its keys on this machine; it does not revoke them."));
+    }
+    for profile in &gone {
+        cfg.profiles.remove(profile);
+    }
+    if cfg
+        .current
+        .as_ref()
+        .is_some_and(|c| !cfg.profiles.contains_key(c))
+    {
+        cfg.current = cfg.default_name();
+    }
+    cfg.save()?;
+    output::print(&json!({ "removed": name, "profiles": gone }), &ctx.fmt);
     Ok(())
 }
 
@@ -406,7 +925,13 @@ mod tests {
 
     #[test]
     fn origin_drops_the_api_suffix() {
-        assert_eq!(origin_of("https://trama.example.com/api"), "https://trama.example.com");
-        assert_eq!(origin_of("http://localhost:3000/api"), "http://localhost:3000");
+        assert_eq!(
+            origin_of("https://trama.example.com/api"),
+            "https://trama.example.com"
+        );
+        assert_eq!(
+            origin_of("http://localhost:3000/api"),
+            "http://localhost:3000"
+        );
     }
 }

@@ -38,6 +38,16 @@ Streamable HTTP, stateless (`POST /mcp` only, JSON replies, no sessions). `--std
 stdin/stdout for local clients, with the key in `TRAMA_API_KEY`. The [`trama` CLI](../cli/README.md) embeds this protocol layer too:
 `trama mcp` serves it over stdio using the CLI's saved login (`claude mcp add trama -- trama mcp`). `GET /healthz` is unauthenticated.
 
+### Several workspaces
+
+Each key is still bound to one workspace. To cover more than one, connect several keys:
+
+- HTTP: `Authorization: Bearer nbl_one,nbl_two` (or the extras in `X-Trama-Api-Keys` when the client allows only one Authorization header).
+- `--stdio`: `TRAMA_API_KEYS=nbl_one,nbl_two` alongside `TRAMA_API_KEY`.
+- `trama mcp`: every saved profile, narrowed with the same `--account`, `--workspace`, `--profile` or `--all-workspaces` flags as the CLI.
+
+With more than one key every tool gains an optional `workspace` argument and a `list_accounts` tool lists the connected workspaces. Omit `workspace` on a read and the call runs in every connected workspace, each result stamped with the workspace it came from. A write needs exactly one: without `workspace` it is refused, so it can never land in every workspace at once. A single key is unchanged: no `workspace` argument, no `list_accounts`.
+
 ## Tools
 
 `src/tools.json` is the catalog: one entry per route with its permission and a compact parameter spec (see

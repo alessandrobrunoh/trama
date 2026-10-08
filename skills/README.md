@@ -7,6 +7,7 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 | Skill | Use it when |
 |---|---|
 | [`trama`](trama/SKILL.md) | Always first: concepts, ground rules, tool map |
+| [`trama-workflow`](trama-workflow/SKILL.md) | The work cycle: search, reuse or create the workstream, then hand off |
 | [`trama-start-work`](trama-start-work/SKILL.md) | Picking up a workstream or issue |
 | [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording criteria, PRs, CI, issue status |
 | [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Blocked, or a choice should be recorded |
@@ -29,10 +30,13 @@ Connect the MCP server too (the skills assume its tools exist):
 ```bash
 claude mcp add --transport http trama https://<your-trama-host>/mcp \
   --header "Authorization: Bearer nbl_…"
+# several workspaces, one key each: Bearer nbl_one,nbl_two
 ```
 
 Create the key in Trama under Settings → API tokens. Give agents the narrowest permissions that do the job
-(see `trama-report-progress` for what it writes), and keep the default usage caps.
+(see `trama-report-progress` for what it writes), and keep the default usage caps. One key is bound to one
+workspace. To cover more, connect several keys (comma-separated bearer, or `trama mcp` after `trama account add`).
+Reads then span every connected workspace; writes still need exactly one (`workspace` on MCP, `--workspace` on the CLI).
 
 ## Keeping them accurate
 

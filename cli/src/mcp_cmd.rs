@@ -11,18 +11,71 @@ use crate::Ctx;
 use crate::config;
 use crate::error::{CliError, Result};
 use crate::output;
-use crate::protocol::Server;
+use crate::protocol::{Account, Server};
 use crate::upstream::{AuthError, Upstream};
 
 const MAX_OUTPUT_BYTES: usize = 200_000;
 
 pub async fn serve(ctx: &Ctx) -> Result<()> {
-    let creds = config::resolve(&ctx.ov)?;
-    let upstream = Upstream::new(&creds.url, ctx.timeout, MAX_OUTPUT_BYTES).map_err(|e| CliError::internal(e.to_string()))?;
+    // `TRAMA_API_KEY` is one key and wins, exactly as it does for every other command. Otherwise the
+    // server speaks for every saved profile the flags select, so an agent can read across workspaces.
+    let creds = if config::env("TRAMA_API_KEY").is_some() {
+        vec![config::resolve(&ctx.ov)?]
+    } else {
+        config::resolve_all_saved(&ctx.ov)?
+    };
+    let url = creds
+        .first()
+        .map(|c| c.url.clone())
+        .ok_or_else(CliError::not_logged_in)?;
+    if creds.iter().any(|c| c.url != url) {
+        let urls: Vec<&str> = {
+            let mut u: Vec<&str> = creds.iter().map(|c| c.url.as_str()).collect();
+            u.sort();
+            u.dedup();
+            u
+        };
+        return Err(CliError::usage(format!(
+            "the saved profiles point at different APIs ({}); one MCP server can only talk to one",
+            urls.join(", ")
+        ))
+        .hint(
+            "Pass `--api-url`, or `--account` / `--profile` to keep only the profiles of one API.",
+        ));
+    }
+    let upstream = Upstream::new(&url, ctx.timeout, MAX_OUTPUT_BYTES)
+        .map_err(|e| CliError::internal(e.to_string()))?;
     let server = Server::new(upstream).map_err(CliError::internal)?;
-    eprintln!("trama mcp: {} tools, API {}", server.tool_count(), creds.url);
+    let mut accounts = Vec::new();
+    for cred in &creds {
+        let who = server
+            .upstream
+            .whoami(&cred.token)
+            .await
+            .map_err(|e| match e {
+                AuthError::Unauthorized => CliError::auth(format!(
+                    "the key of profile '{}' is invalid, revoked or expired",
+                    cred.profile.as_deref().unwrap_or("?")
+                )),
+                AuthError::Unavailable(m) => {
+                    CliError::network(format!("Trama API unavailable: {m}"))
+                }
+            })?;
+        accounts.push(Account {
+            key: cred.token.clone(),
+            profile: cred.profile.clone().unwrap_or_default(),
+            who: (*who).clone(),
+        });
+    }
+    let slugs: Vec<&str> = accounts.iter().map(|a| a.who.slug.as_str()).collect();
+    eprintln!(
+        "trama mcp: {} tools, {} workspace(s) ({}), API {}",
+        server.tool_count(),
+        accounts.len(),
+        slugs.join(", "),
+        url
+    );
 
-    let key = creds.token;
     let mut lines = BufReader::new(tokio::io::stdin()).lines();
     let mut stdout = tokio::io::stdout();
     while let Some(line) = lines.next_line().await? {
@@ -30,17 +83,10 @@ pub async fn serve(ctx: &Ctx) -> Result<()> {
             continue;
         }
         let reply = match serde_json::from_str::<Value>(&line) {
-            Err(_) => Some(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "Parse error" } })),
-            Ok(msg) => match server.upstream.whoami(&key).await {
-                Ok(who) => server.handle(&key, &who, msg).await,
-                Err(e) => msg.get("id").map(|id| {
-                    let text = match e {
-                        AuthError::Unauthorized => "Invalid, revoked or expired API key (run `trama login`)".to_string(),
-                        AuthError::Unavailable(m) => format!("Trama API unavailable: {m}"),
-                    };
-                    json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32001, "message": text } })
-                }),
-            },
+            Err(_) => Some(
+                json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "Parse error" } }),
+            ),
+            Ok(msg) => server.handle(&accounts, msg).await,
         };
         if let Some(r) = reply {
             stdout.write_all(r.to_string().as_bytes()).await?;
@@ -64,7 +110,7 @@ pub fn snippet(client: &str, transport: &str, api_url: &str) -> String {
     if transport == "http" {
         let url = mcp_url(api_url);
         return match client {
-            "claude" => format!("claude mcp add --transport http trama {url} \\\n  --header \"Authorization: Bearer nbl_YOUR_TOKEN\""),
+            "claude" => format!("claude mcp add --transport http trama {url} \\\n  --header \"Authorization: Bearer nbl_YOUR_TOKEN\"\n# several workspaces: --header \"Authorization: Bearer nbl_ONE,nbl_TWO\""),
             "cursor" | "json" => serde_json::to_string_pretty(&json!({ "mcpServers": { "trama": { "url": url, "headers": { "Authorization": "Bearer nbl_YOUR_TOKEN" } } } })).unwrap_or_default(),
             "vscode" => serde_json::to_string_pretty(&json!({ "servers": { "trama": { "type": "http", "url": url, "headers": { "Authorization": "Bearer nbl_YOUR_TOKEN" } } } })).unwrap_or_default(),
             _ => format!("[mcp_servers.trama]\nurl = \"{url}\"\nhttp_headers = {{ Authorization = \"Bearer nbl_YOUR_TOKEN\" }}"),
@@ -81,10 +127,16 @@ pub fn snippet(client: &str, transport: &str, api_url: &str) -> String {
 pub fn config_snippet(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     let client = m.get_one::<String>("client").expect("has default");
     let transport = m.get_one::<String>("transport").expect("has default");
-    let url = config::resolve(&ctx.ov).map(|c| c.url).ok().or_else(|| config::env("TRAMA_API_URL")).unwrap_or_else(|| config::DEFAULT_API_URL.to_string());
+    let url = config::resolve(&ctx.ov)
+        .map(|c| c.url)
+        .ok()
+        .or_else(|| config::env("TRAMA_API_URL"))
+        .unwrap_or_else(|| config::DEFAULT_API_URL.to_string());
     output::emit(&snippet(client, transport, &url));
     if transport == "stdio" {
-        eprintln!("(`trama mcp` uses your saved login; run `trama login` first. For CI set TRAMA_API_KEY and TRAMA_API_URL instead.)");
+        eprintln!(
+            "(`trama mcp` uses your saved login; run `trama login` first. For CI set TRAMA_API_KEY and TRAMA_API_URL instead.)"
+        );
     } else {
         eprintln!("(Create the token in Settings → API tokens and replace nbl_YOUR_TOKEN.)");
     }
@@ -97,14 +149,25 @@ mod tests {
 
     #[test]
     fn derives_the_mcp_url() {
-        assert_eq!(mcp_url("https://trama.example.com/api"), "https://trama.example.com/mcp");
-        assert_eq!(mcp_url("http://localhost:3000/api"), "http://localhost:3000/mcp");
+        assert_eq!(
+            mcp_url("https://trama.example.com/api"),
+            "https://trama.example.com/mcp"
+        );
+        assert_eq!(
+            mcp_url("http://localhost:3000/api"),
+            "http://localhost:3000/mcp"
+        );
     }
 
     #[test]
     fn snippets_cover_every_client() {
-        assert_eq!(snippet("claude", "stdio", "https://x/api"), "claude mcp add trama -- trama mcp");
-        assert!(snippet("claude", "http", "https://x/api").contains("--transport http trama https://x/mcp"));
+        assert_eq!(
+            snippet("claude", "stdio", "https://x/api"),
+            "claude mcp add trama -- trama mcp"
+        );
+        let http = snippet("claude", "http", "https://x/api");
+        assert!(http.contains("--transport http trama https://x/mcp"));
+        assert!(http.contains("nbl_ONE,nbl_TWO"));
         let v: Value = serde_json::from_str(&snippet("cursor", "stdio", "")).unwrap();
         assert_eq!(v["mcpServers"]["trama"]["args"][0], "mcp");
         let v: Value = serde_json::from_str(&snippet("vscode", "http", "https://x/api")).unwrap();

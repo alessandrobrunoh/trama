@@ -43,6 +43,30 @@ pub fn definitions() -> Vec<Command> {
             .arg(flag("all", "Sign out of every profile"))
             .arg(flag("revoke", "Also revoke the API key on the server")),
         Command::new("whoami").about("Workspace, actor, permissions and caps of the current key"),
+        Command::new("account")
+            .about("Add several tokens or workspaces and read across all of them")
+            .long_about(
+                "An account groups one profile per workspace, so a read can cover more than the current one.\n\n\
+                 Add keys you already have (one per line):\n  printf '%s\\n' \"$KEY_ACME\" \"$KEY_BETA\" | trama account add --with-token --api-url https://trama.example.com --name work\n\n\
+                 Or sign in once and mint a key in every workspace the account belongs to:\n  trama account add --email you@acme.com --name work --workspace acme,beta\n\n\
+                 Then: trama issue list --account work",
+            )
+            .subcommand_required(false)
+            .subcommand(
+                Command::new("add")
+                    .about("Save one or more workspace keys under an account name")
+                    .arg(flag("with-token", "Read API tokens from stdin, one per line"))
+                    .arg(Arg::new("name").long("name").value_name("NAME").help("Account name that groups the new profiles (default: account)"))
+                    .arg(Arg::new("email").long("email").value_name("EMAIL").help("Sign in and create a token in every workspace of this account"))
+                    .arg(flag("password-stdin", "With --email: read the password from stdin (or set TRAMA_PASSWORD)"))
+                    .arg(Arg::new("workspace").long("workspace").value_name("SLUG").value_delimiter(',').action(ArgAction::Append).help("With --email: only these workspaces (default: all of them)"))
+                    .arg(Arg::new("scope").long("scope").value_name("SCOPE").value_parser(["read", "write", "admin", "custom"]).help("With --email: token scope (server default: write)"))
+                    .arg(Arg::new("permissions").long("permissions").value_name("RESOURCE:ACTION").value_delimiter(',').action(ArgAction::Append).help("With --email: custom token with exactly these permissions"))
+                    .arg(Arg::new("expires-in").long("expires-in").value_name("DURATION").help("With --email: token lifetime, e.g. 90d (default: never)"))
+                    .arg(Arg::new("token-name").long("token-name").value_name("NAME").help("With --email: name shown in Settings → API tokens")),
+            )
+            .subcommand(Command::new("list").visible_alias("ls").about("Saved accounts and the workspaces in each"))
+            .subcommand(Command::new("remove").visible_alias("rm").about("Forget an account and its profiles on this machine").arg(Arg::new("name").required(true))),
         Command::new("profile")
             .about("List and switch saved profiles")
             .subcommand_required(false)
@@ -78,7 +102,7 @@ pub fn definitions() -> Vec<Command> {
             .after_help("Example:\n  trama completion zsh > ~/.zfunc/_trama"),
         Command::new("mcp")
             .about("Run as an MCP server over stdio (uses your saved login), or print client config")
-            .long_about("`trama mcp` speaks the Model Context Protocol on stdin/stdout with the same tools as the hosted MCP server, authenticated by your saved profile. Add it to a client as: command `trama`, args `mcp`.")
+            .long_about("`trama mcp` speaks the Model Context Protocol on stdin/stdout with the same tools as the hosted MCP server, authenticated by your saved profiles. With several profiles (or TRAMA_API_KEYS) every tool takes an optional `workspace` argument and reads run across all of them when it is omitted. Add it to a client as: command `trama`, args `mcp`.")
             .subcommand(
                 Command::new("config")
                     .about("Print the snippet that connects an MCP client")
@@ -101,18 +125,40 @@ pub fn definitions() -> Vec<Command> {
 }
 
 fn skill_target_args(cmd: Command) -> Command {
-    cmd.arg(Arg::new("target").long("target").value_parser(["claude", "agents"]).default_value("claude").help("claude → .claude/skills, agents → .agents/skills"))
-        .arg(Arg::new("scope").long("scope").value_parser(["user", "project"]).default_value("user").help("user → your home directory, project → the current directory"))
-        .arg(Arg::new("dir").long("dir").value_name("DIR").help("Skills directory to use instead (the skill goes in DIR/trama-cli/)"))
+    cmd.arg(
+        Arg::new("target")
+            .long("target")
+            .value_parser(["claude", "agents"])
+            .default_value("claude")
+            .help("claude → .claude/skills, agents → .agents/skills"),
+    )
+    .arg(
+        Arg::new("scope")
+            .long("scope")
+            .value_parser(["user", "project"])
+            .default_value("user")
+            .help("user → your home directory, project → the current directory"),
+    )
+    .arg(
+        Arg::new("dir")
+            .long("dir")
+            .value_name("DIR")
+            .help("Skills directory to use instead (the skill goes in DIR/trama-cli/)"),
+    )
 }
 
 pub async fn api(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
-    let method = m.get_one::<String>("method").expect("required").to_ascii_uppercase();
+    let method = m
+        .get_one::<String>("method")
+        .expect("required")
+        .to_ascii_uppercase();
     let path = m.get_one::<String>("path").expect("required");
     let mut args = json!({ "method": method, "path": path });
     let mut query = serde_json::Map::new();
     for kv in m.get_many::<String>("query").into_iter().flatten() {
-        let (k, v) = kv.split_once('=').ok_or_else(|| CliError::usage(format!("--query expects KEY=VALUE, got '{kv}'")))?;
+        let (k, v) = kv
+            .split_once('=')
+            .ok_or_else(|| CliError::usage(format!("--query expects KEY=VALUE, got '{kv}'")))?;
         query.insert(k.to_string(), Value::String(v.to_string()));
     }
     if !query.is_empty() {
@@ -121,13 +167,18 @@ pub async fn api(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     if let Some(raw) = m.get_one::<String>("data") {
         args["body"] = cmdtree::parse_json_arg(raw, "--data")?;
     }
-    let call = generic::build_call(&args).map_err(|e| CliError::usage(e).hint("Put query parameters in -Q key=value, not in PATH."))?;
+    let call = generic::build_call(&args).map_err(|e| {
+        CliError::usage(e).hint("Put query parameters in -Q key=value, not in PATH.")
+    })?;
     exec::run(&format!("api {method} {path}"), &call, ACCEPT_JSON, ctx).await
 }
 
 fn param_json(entry: &Entry, p: &crate::catalog::Param) -> Value {
     let (location, flag) = match p.loc {
-        Loc::Path => ("path", format!("<{}>", kebab(&p.name).to_uppercase().replace('-', "_"))),
+        Loc::Path => (
+            "path",
+            format!("<{}>", kebab(&p.name).to_uppercase().replace('-', "_")),
+        ),
         Loc::Query => ("query", format!("--{}", kebab(&p.name))),
         Loc::Body => ("body", format!("--{}", kebab(&p.name))),
     };
@@ -136,7 +187,13 @@ fn param_json(entry: &Entry, p: &crate::catalog::Param) -> Value {
         v["choices"] = json!(p.choices);
     }
     if p.loc == Loc::Path {
-        v["position"] = json!(entry.positionals.iter().position(|n| n == &p.name).map(|i| i + 1));
+        v["position"] = json!(
+            entry
+                .positionals
+                .iter()
+                .position(|n| n == &p.name)
+                .map(|i| i + 1)
+        );
     }
     v
 }
@@ -148,10 +205,15 @@ pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
     {
         let mut groups: Vec<&str> = reg.entries.iter().map(|e| e.group.as_str()).collect();
         groups.dedup();
-        return Err(CliError::usage(format!("no resource named '{g}'")).hint(format!("Resources: {}", groups.join(", "))));
+        return Err(CliError::usage(format!("no resource named '{g}'"))
+            .hint(format!("Resources: {}", groups.join(", "))));
     }
     let detail = m.get_flag("detail");
-    let mut entries: Vec<&Entry> = reg.entries.iter().filter(|e| group.is_none_or(|g| &e.group == g)).collect();
+    let mut entries: Vec<&Entry> = reg
+        .entries
+        .iter()
+        .filter(|e| group.is_none_or(|g| &e.group == g))
+        .collect();
     entries.sort_by_key(|e| e.command_name());
     let rows: Vec<Value> = entries
         .into_iter()
@@ -169,15 +231,31 @@ pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
 }
 
 pub fn schema(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
-    let words: Vec<&str> = m.get_many::<String>("command").expect("required").map(String::as_str).collect();
+    let words: Vec<&str> = m
+        .get_many::<String>("command")
+        .expect("required")
+        .map(String::as_str)
+        .collect();
     let entry = match words.as_slice() {
-        [one] => reg.entries.iter().find(|e| e.tool.name == *one).or_else(|| reg.find(one, None)),
+        [one] => reg
+            .entries
+            .iter()
+            .find(|e| e.tool.name == *one)
+            .or_else(|| reg.find(one, None)),
         [group, verb] => reg.find(group, Some(verb)),
         _ => None,
     };
     let Some(e) = entry else {
         let hint = match words.first().filter(|g| reg.is_group(g)) {
-            Some(g) => format!("`{g}` has: {}", reg.entries.iter().filter(|e| &e.group == g).filter_map(|e| e.verb.as_deref()).collect::<Vec<_>>().join(", ")),
+            Some(g) => format!(
+                "`{g}` has: {}",
+                reg.entries
+                    .iter()
+                    .filter(|e| &e.group == g)
+                    .filter_map(|e| e.verb.as_deref())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
             None => "`trama commands` lists every command.".to_string(),
         };
         return Err(CliError::usage(format!("no command '{}'", words.join(" "))).hint(hint));
@@ -200,7 +278,9 @@ pub fn schema(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
 }
 
 pub fn completion(m: &ArgMatches, cli: &mut Command) {
-    let shell = *m.get_one::<clap_complete::Shell>("shell").expect("required");
+    let shell = *m
+        .get_one::<clap_complete::Shell>("shell")
+        .expect("required");
     clap_complete::generate(shell, cli, "trama", &mut std::io::stdout());
 }
 
@@ -212,7 +292,13 @@ pub fn config_cmd(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             let profiles: Vec<Value> = cfg
                 .profiles
                 .iter()
-                .map(|(n, p)| json!({ "name": n, "url": p.url, "workspace": p.workspace, "token": redact(&p.token), "savedAt": p.saved_at }))
+                .map(|(n, p)| {
+                    let mut row = json!({ "name": n, "url": p.url, "workspace": p.workspace, "token": redact(&p.token), "savedAt": p.saved_at });
+                    if !p.account.is_empty() {
+                        row["account"] = json!(p.account);
+                    }
+                    row
+                })
                 .collect();
             let env_set = |name: &str| config::env(name).is_some();
             output::print(
@@ -225,6 +311,9 @@ pub fn config_cmd(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
                         "TRAMA_API_URL": config::env("TRAMA_API_URL"),
                         "TRAMA_WORKSPACE": config::env("TRAMA_WORKSPACE"),
                         "TRAMA_PROFILE": config::env("TRAMA_PROFILE"),
+                        "TRAMA_ACCOUNTS": config::env("TRAMA_ACCOUNTS"),
+                        "TRAMA_WORKSPACES": config::env("TRAMA_WORKSPACES"),
+                        "TRAMA_API_KEYS": env_set("TRAMA_API_KEYS").then_some("set"),
                         "TRAMA_CONFIG_DIR": config::env("TRAMA_CONFIG_DIR"),
                     },
                 }),
@@ -244,13 +333,35 @@ pub async fn doctor(ctx: &Ctx) -> Result<()> {
     let mut report = Report::default();
     report.record("version", Ok(format!("trama {VERSION} ({TARGET})")));
     let path = config::config_path();
-    report.record("config", Ok(format!("{} ({})", path.display(), if path.exists() { "found" } else { "not created yet" })));
+    report.record(
+        "config",
+        Ok(format!(
+            "{} ({})",
+            path.display(),
+            if path.exists() {
+                "found"
+            } else {
+                "not created yet"
+            }
+        )),
+    );
 
     match config::resolve(&ctx.ov) {
         Err(e) => report.record("credentials", Err(e)),
         Ok(creds) => {
-            let source = if creds.from_env { "TRAMA_API_KEY".to_string() } else { format!("profile '{}'", creds.profile.clone().unwrap_or_default()) };
-            report.record("credentials", Ok(format!("{source} → {} ({})", creds.url, redact(&creds.token))));
+            let source = if creds.from_env {
+                "TRAMA_API_KEY".to_string()
+            } else {
+                format!("profile '{}'", creds.profile.clone().unwrap_or_default())
+            };
+            report.record(
+                "credentials",
+                Ok(format!(
+                    "{source} → {} ({})",
+                    creds.url,
+                    redact(&creds.token)
+                )),
+            );
             match Api::new(&creds.url, ctx.timeout) {
                 Err(e) => report.record("api", Err(e)),
                 Ok(api) => {
@@ -260,7 +371,9 @@ pub async fn doctor(ctx: &Ctx) -> Result<()> {
                     report.record(
                         "api",
                         match health {
-                            Ok(r) if (200..300).contains(&r.status) => Ok(format!("{} answered {} in {ms} ms", api.base(), r.status)),
+                            Ok(r) if (200..300).contains(&r.status) => {
+                                Ok(format!("{} answered {} in {ms} ms", api.base(), r.status))
+                            }
                             Ok(r) => Err(CliError::from_http(r.status, &r.body)),
                             Err(e) => Err(e),
                         },
@@ -269,8 +382,18 @@ pub async fn doctor(ctx: &Ctx) -> Result<()> {
                         report.record(
                             "token",
                             auth::introspect(&api, &creds.token).await.map(|id| {
-                                let expires = id.raw.pointer("/token/expiresAt").and_then(Value::as_str).map(|e| format!(", expires {e}")).unwrap_or_default();
-                                format!("workspace {} ({}), {} permissions{expires}", id.name, id.slug, id.permissions().len())
+                                let expires = id
+                                    .raw
+                                    .pointer("/token/expiresAt")
+                                    .and_then(Value::as_str)
+                                    .map(|e| format!(", expires {e}"))
+                                    .unwrap_or_default();
+                                format!(
+                                    "workspace {} ({}), {} permissions{expires}",
+                                    id.name,
+                                    id.slug,
+                                    id.permissions().len()
+                                )
                             }),
                         );
                     }
@@ -291,9 +414,12 @@ struct Report {
 impl Report {
     fn record(&mut self, name: &str, result: Result<String>) {
         match result {
-            Ok(detail) => self.checks.push(json!({ "check": name, "ok": true, "detail": detail })),
+            Ok(detail) => self
+                .checks
+                .push(json!({ "check": name, "ok": true, "detail": detail })),
             Err(e) => {
-                self.checks.push(json!({ "check": name, "ok": false, "detail": e.message }));
+                self.checks
+                    .push(json!({ "check": name, "ok": false, "detail": e.message }));
                 self.first_error.get_or_insert(e);
             }
         }
