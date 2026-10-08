@@ -57,3 +57,4 @@ Thumbs.db
 .claude/
 .agents/plans/
 mcp/target/
+server/dist-fe1/
