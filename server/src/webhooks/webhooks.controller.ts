@@ -1,19 +1,20 @@
 import { Controller, HttpCode, Param, Post, Req, Res } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import type { GitProvider } from '../contracts/domain.js';
 import { Public } from '../auth/request-context.js';
 import type { RawBodyRequest } from './raw-body.js';
 import { WebhooksService } from './webhooks.service.js';
 
 /**
  * Provider webhooks. Public (no session/token): authenticity is the HMAC signature
- * (GitHub) or secret token (GitLab) of the connection, checked in the service.
+ * (GitHub, Bitbucket) or secret token (GitLab) of the connection, checked in the service.
  */
 @Public()
 @Controller('webhooks')
 export class WebhooksController {
   constructor(private readonly service: WebhooksService) {}
 
-  private async run(provider: 'github' | 'gitlab', connectionId: string, req: Request, res: Response) {
+  private async run(provider: GitProvider, connectionId: string, req: Request, res: Response) {
     const result = await this.service.handle({
       provider,
       connectionId,
@@ -34,5 +35,11 @@ export class WebhooksController {
   @HttpCode(200)
   gitlab(@Param('connectionId') id: string, @Req() req: Request, @Res() res: Response) {
     return this.run('gitlab', id, req, res);
+  }
+
+  @Post('bitbucket/:connectionId')
+  @HttpCode(200)
+  bitbucket(@Param('connectionId') id: string, @Req() req: Request, @Res() res: Response) {
+    return this.run('bitbucket', id, req, res);
   }
 }

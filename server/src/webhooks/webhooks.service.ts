@@ -6,8 +6,8 @@ import { IntegrationConnectionEntity, RepositoryEntity } from '../database/entit
 import { ArtifactLinkerService } from '../integrations/artifact-linker.service.js';
 import { WebhookDeliveryEntity } from '../integrations/entities.js';
 import { SecretsService } from '../integrations/secrets.service.js';
-import { PayloadError, parseGithubEvent, parseGitlabEvent, type ParsedEvent } from './events.js';
-import { verifyGithubSignature, verifyGitlabToken } from './signatures.js';
+import { PayloadError, parseBitbucketEvent, parseGithubEvent, parseGitlabEvent, type ParsedEvent } from './events.js';
+import { verifyBitbucketSignature, verifyGithubSignature, verifyGitlabToken } from './signatures.js';
 
 export interface WebhookResult {
   /** HTTP status to answer with: 200 handled / duplicate, 202 accepted but nothing to do. */
@@ -23,6 +23,13 @@ export interface WebhookInput {
   /** lower-cased request headers */
   headers: Record<string, string | string[] | undefined>;
 }
+
+/** Header carrying a per-delivery id, used to ignore redeliveries. */
+const DELIVERY_HEADER: Record<GitProvider, string> = {
+  github: 'x-github-delivery',
+  gitlab: 'x-gitlab-event-uuid',
+  bitbucket: 'x-request-uuid',
+};
 
 const header = (h: WebhookInput['headers'], name: string): string | undefined => {
   const v = h[name];
@@ -52,13 +59,10 @@ export class WebhooksService {
       this.logger.error(`Cannot decrypt the webhook secret of ${conn.id} (TRAMA_ENCRYPTION_KEY changed?)`);
       throw new UnauthorizedException('Webhook secret unavailable');
     }
-    const valid =
-      input.provider === 'github'
-        ? !!input.rawBody && verifyGithubSignature(secret, input.rawBody, header(input.headers, 'x-hub-signature-256'))
-        : verifyGitlabToken(secret, header(input.headers, 'x-gitlab-token'));
+    const valid = this.verify(input, secret);
     if (!valid) throw new UnauthorizedException('Invalid webhook signature');
 
-    const deliveryId = header(input.headers, input.provider === 'github' ? 'x-github-delivery' : 'x-gitlab-event-uuid');
+    const deliveryId = header(input.headers, DELIVERY_HEADER[input.provider]);
     if (deliveryId && !(await this.claimDelivery(conn.id, deliveryId))) return { httpStatus: 200, body: { status: 'duplicate' } };
 
     try {
@@ -82,7 +86,24 @@ export class WebhooksService {
       if (!event) throw new PayloadError('missing X-GitHub-Event header');
       return parseGithubEvent(event, input.payload);
     }
+    if (input.provider === 'bitbucket') {
+      const event = header(input.headers, 'x-event-key');
+      if (!event) throw new PayloadError('missing X-Event-Key header');
+      return parseBitbucketEvent(event, input.payload);
+    }
     return parseGitlabEvent(input.payload);
+  }
+
+  /** Each host proves authenticity differently: an HMAC of the raw body (GitHub, Bitbucket) or the secret itself (GitLab). */
+  private verify(input: WebhookInput, secret: string): boolean {
+    switch (input.provider) {
+      case 'github':
+        return !!input.rawBody && verifyGithubSignature(secret, input.rawBody, header(input.headers, 'x-hub-signature-256'));
+      case 'bitbucket':
+        return !!input.rawBody && verifyBitbucketSignature(secret, input.rawBody, header(input.headers, 'x-hub-signature'));
+      case 'gitlab':
+        return verifyGitlabToken(secret, header(input.headers, 'x-gitlab-token'));
+    }
   }
 
   private async apply(conn: IntegrationConnectionEntity, parsed: ParsedEvent): Promise<WebhookResult> {

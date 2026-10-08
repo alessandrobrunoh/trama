@@ -175,3 +175,75 @@ export function parseGitlabEvent(payload: unknown): ParsedEvent {
       return { kind: 'ignored', reason: `event "${kind}" is not handled` };
   }
 }
+
+// ───────────────────────────── Bitbucket Cloud ─────────────────────────────
+
+export function bitbucketCi(state: unknown): CiState {
+  if (state === 'SUCCESSFUL') return 'passing';
+  if (state === 'FAILED') return 'failing';
+  return 'pending'; // INPROGRESS, STOPPED
+}
+
+const BB_PR_EVENTS = new Set([
+  'created', 'updated', 'approved', 'unapproved', 'fulfilled', 'rejected', 'changes_request_created', 'changes_request_removed',
+]);
+
+function bitbucketRepo(r: Obj): RepoMeta {
+  const links = r.links && typeof r.links === 'object' ? ((r.links as Obj).html as Obj | undefined) : undefined;
+  const main = r.mainbranch && typeof r.mainbranch === 'object' ? (r.mainbranch as Obj) : undefined;
+  return { fullName: str(r.full_name, 'repository.full_name'), url: optStr(links?.href), defaultBranch: optStr(main?.name) };
+}
+
+/** `eventKey` is the `X-Event-Key` header (`pullrequest:created`, `repo:commit_status_updated`, …). */
+export function parseBitbucketEvent(eventKey: string, payload: unknown): ParsedEvent {
+  if (eventKey === 'diagnostics:ping') return { kind: 'ping' };
+  const p = obj(payload, 'payload');
+  if (eventKey.startsWith('pullrequest:')) {
+    const action = eventKey.slice('pullrequest:'.length);
+    if (!BB_PR_EVENTS.has(action)) return { kind: 'ignored', reason: `event "${eventKey}" is not handled` };
+    const pr = obj(p.pullrequest, 'pullrequest');
+    const source = obj(pr.source, 'pullrequest.source');
+    const branch = source.branch && typeof source.branch === 'object' ? optStr((source.branch as Obj).name) : undefined;
+    const commit = source.commit && typeof source.commit === 'object' ? optStr((source.commit as Obj).hash) : undefined;
+    const html = pr.links && typeof pr.links === 'object' ? ((pr.links as Obj).html as Obj | undefined) : undefined;
+    const reviewers = arr(pr.reviewers).length;
+    const state: ArtifactState =
+      pr.state === 'MERGED' ? 'merged' : pr.state === 'DECLINED' || pr.state === 'SUPERSEDED' ? 'closed' : pr.draft === true ? 'draft' : 'open';
+    const title = str(pr.title, 'pullrequest.title');
+    const candidate: ArtifactCandidate = {
+      kind: 'pull_request',
+      provider: 'bitbucket',
+      externalId: `#${num(pr.id, 'pullrequest.id')}`,
+      title,
+      url: optStr(html?.href),
+      state,
+      headSha: commit,
+      headBranch: branch,
+      texts: [title, optStr(pr.description) ?? ''],
+      branchTexts: [branch ?? ''],
+    };
+    if (action === 'approved') candidate.review = 'approved';
+    else if (action === 'unapproved') {
+      candidate.review = reviewers > 0 ? 'requested' : 'none';
+      candidate.reviewOnlyFrom = ['approved'];
+    } else if (action === 'changes_request_created') candidate.review = 'changes_requested';
+    else if (action === 'changes_request_removed') {
+      candidate.review = reviewers > 0 ? 'requested' : 'none';
+      candidate.reviewOnlyFrom = ['changes_requested'];
+    } else if (action === 'created' && reviewers > 0) {
+      candidate.review = 'requested';
+      candidate.reviewOnlyFrom = ['none'];
+    }
+    return { kind: 'pr', repo: bitbucketRepo(obj(p.repository, 'repository')), candidate };
+  }
+  if (eventKey === 'repo:commit_status_created' || eventKey === 'repo:commit_status_updated') {
+    const status = obj(p.commit_status, 'commit_status');
+    const commit = obj(status.commit, 'commit_status.commit');
+    return {
+      kind: 'ci',
+      repo: bitbucketRepo(obj(p.repository, 'repository')),
+      patch: { sha: str(commit.hash, 'commit_status.commit.hash'), ci: bitbucketCi(status.state) },
+    };
+  }
+  return { kind: 'ignored', reason: `event "${eventKey}" is not handled` };
+}

@@ -13,7 +13,7 @@ import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { ArtifactsService } from './artifacts.service.js';
 
 const KINDS: ArtifactKind[] = ['pull_request', 'merge_request', 'document', 'design', 'image', 'file', 'build', 'test_report', 'deployment', 'release'];
-const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'delta', 'figma', 'docs', 'ci', 'other'];
+const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'bitbucket', 'delta', 'figma', 'docs', 'ci', 'other'];
 const STATES: ArtifactState[] = ['draft', 'open', 'merged', 'closed', 'pending', 'running', 'succeeded', 'failed', 'healthy', 'degraded', 'published'];
 const CI: CiState[] = ['pending', 'passing', 'failing'];
 const REVIEW: ReviewState[] = ['none', 'requested', 'approved', 'changes_requested'];

@@ -32,15 +32,17 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import type {
-  GitProvider,
-  IssueKind,
-  IssueStatus,
-  Priority,
-  ViewEntity,
-  ViewFilter,
-  ViewLayout,
-  WorkstreamStatus,
+import {
+  GIT_PROVIDERS,
+  GIT_PROVIDER_META,
+  type GitProvider,
+  type IssueKind,
+  type IssueStatus,
+  type Priority,
+  type ViewEntity,
+  type ViewFilter,
+  type ViewLayout,
+  type WorkstreamStatus,
 } from '../../core/contracts/domain';
 import {
   ISSUE_KIND_META,
@@ -742,10 +744,7 @@ export class CreateDialog {
     { value: 'proposed', label: 'Proposed', kind: 'status' },
     { value: 'accepted', label: 'Accepted', kind: 'status' },
   ];
-  protected readonly gitProviderOptions: Option[] = [
-    { value: 'github', label: 'GitHub' },
-    { value: 'gitlab', label: 'GitLab' },
-  ];
+  protected readonly gitProviderOptions: Option[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label }));
   protected readonly viewEntityOptions: Option[] = [
     { value: 'workstream', label: 'Workstreams' },
     { value: 'issue', label: 'Issues' },

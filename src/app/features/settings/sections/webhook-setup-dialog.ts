@@ -3,6 +3,7 @@ import { LucideDynamicIcon, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import type { WebhookSetup } from '../../../core/api/api.types';
+import { GIT_PROVIDER_META, type GitProvider } from '../../../core/contracts/domain';
 import { SECTION_KIT } from './section-kit';
 
 const STEPS: Record<string, { where: string; steps: string[] }> = {
@@ -22,6 +23,15 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Paste the URL below.',
       'Paste the secret into “Secret token”.',
       'Tick the triggers listed below and keep SSL verification on.',
+      'Link the repositories here: events for unlinked repositories are ignored.',
+    ],
+  },
+  bitbucket: {
+    where: 'Bitbucket → repository Settings → Webhooks → Add webhook (or Workspace settings → Webhooks)',
+    steps: [
+      'Give it a title and paste the URL below.',
+      'Tick “Use a secret” and paste the secret.',
+      'Under Triggers choose “Choose from a full list of triggers” and tick the ones listed below: Pull request created, updated, approved, approval removed, merged and declined; and Repository → Build status created and updated.',
       'Link the repositories here: events for unlinked repositories are ignored.',
     ],
   },
@@ -66,7 +76,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
                 <code class="font-mono text-xs">{{ s.contentType }}</code>
               </div>
               <div class="grid content-start gap-1.5">
-                <span class="text-muted-foreground text-xs font-medium">{{ provider() === 'gitlab' ? 'Triggers' : 'Events' }}</span>
+                <span class="text-muted-foreground text-xs font-medium">{{ provider() === 'github' ? 'Events' : 'Triggers' }}</span>
                 <div class="flex flex-wrap gap-1">
                   @for (e of s.events; track e) {
                     <code class="bg-muted rounded px-1.5 py-0.5 font-mono text-[11px]">{{ e }}</code>
@@ -104,5 +114,5 @@ export class WebhookSetupDialog {
 
   protected readonly warn = LucideTriangleAlert;
   protected readonly guide = computed(() => STEPS[this.provider()] ?? null);
-  protected readonly providerLabel = computed(() => (this.provider() === 'gitlab' ? 'GitLab' : 'GitHub'));
+  protected readonly providerLabel = computed(() => GIT_PROVIDER_META[this.provider() as GitProvider]?.label ?? 'your git host');
 }

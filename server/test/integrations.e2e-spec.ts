@@ -6,7 +6,7 @@ import { AppModule } from '../src/app.module.js';
 import { configureApp } from '../src/configure-app.js';
 import { HttpClient, type HttpRequest, type HttpResponse } from '../src/integrations/http-client.js';
 import { signGithub } from '../src/webhooks/signatures.js';
-import { ghCheckRun, ghCheckSuite, ghPullRequest, ghRepo, ghStatus, glMergeRequest, glPipeline, glProject } from '../src/webhooks/fixtures.js';
+import { bbCommitStatus, bbPullRequest, bbRepo, ghCheckRun, ghCheckSuite, ghPullRequest, ghRepo, ghStatus, glMergeRequest, glPipeline, glProject } from '../src/webhooks/fixtures.js';
 import { Client, uniq } from './app.js';
 
 /** Provider API stub: no test touches the network. */
@@ -17,7 +17,8 @@ class MockHttp extends HttpClient {
     const ok = (json: unknown, headers: Record<string, string> = {}): Promise<HttpResponse> => Promise.resolve({ status: 200, headers, json });
     const fail = (status: number, message: string, headers: Record<string, string> = {}): Promise<HttpResponse> =>
       Promise.resolve({ status, headers, json: { message } });
-    const auth = req.headers?.Authorization ?? req.headers?.['PRIVATE-TOKEN'] ?? '';
+    const raw = req.headers?.Authorization ?? req.headers?.['PRIVATE-TOKEN'] ?? '';
+    const auth = raw.startsWith('Basic ') ? Buffer.from(raw.slice(6), 'base64').toString() : raw;
     const { host, pathname } = new URL(req.url);
     if (!auth.includes('good')) return fail(401, 'Bad credentials');
     if (auth.includes('limited')) return fail(403, 'rate limit', { 'x-ratelimit-remaining': '0', 'x-ratelimit-reset': '4102444800' });
@@ -33,6 +34,11 @@ class MockHttp extends HttpClient {
     if (host === 'gitlab.example.com' || host === 'gitlab.com') {
       if (pathname === '/api/v4/user') return ok({ username: 'gl-bot' });
       if (pathname === '/api/v4/projects') return ok([glProject], { 'x-next-page': '' });
+    }
+    if (host === 'api.bitbucket.org') {
+      if (pathname === '/2.0/user') return ok({ nickname: 'bb-bot' });
+      if (pathname === '/2.0/user/permissions/repositories') return ok({ values: [{ permission: 'admin', repository: bbRepo }], next: 'https://api.bitbucket.org/2.0/next' });
+      if (pathname === '/2.0/repositories/acme-bb/payments') return ok(bbRepo);
     }
     return fail(404, 'Not Found');
   }
@@ -65,7 +71,7 @@ describe('integrations: connections, repository linking and webhooks', () => {
   }
 
   const base = (slug: string) => `/api/w/${slug}/integrations`;
-  async function connect(owner: Client, slug: string, provider: 'github' | 'gitlab', extra: object = {}) {
+  async function connect(owner: Client, slug: string, provider: 'github' | 'gitlab' | 'bitbucket', extra: object = {}) {
     const res = await owner.post(base(slug), { provider, token: 'good-token', ...extra }).expect(201);
     return res.body as { connection: { id: string }; webhook: { url: string; secret: string } };
   }
@@ -364,6 +370,80 @@ describe('integrations: connections, repository linking and webhooks', () => {
       await send({ object_kind: 'push', project: glProject }).expect(202);
       await send({ object_kind: 'merge_request', project: glProject }).expect(400);
       await send({}).expect(400);
+    });
+  });
+
+  // ───────────────────────── Bitbucket ─────────────────────────
+
+  describe('Bitbucket', () => {
+    async function bitbucketSetup() {
+      const s = await setup();
+      const c = await connect(s.owner, s.slug, 'bitbucket');
+      await s.owner.post(`/api/w/${s.slug}/repositories`, { provider: 'bitbucket', fullName: 'acme-bb/payments' }).expect(201);
+      const send = (event: string, payload: unknown, opts: { secret?: string | null; uuid?: string } = {}) => {
+        const raw = JSON.stringify(payload);
+        const req = request(server)
+          .post(`/api/webhooks/bitbucket/${c.connection.id}`)
+          .set('Content-Type', 'application/json')
+          .set('X-Event-Key', event)
+          .set('X-Request-UUID', opts.uuid ?? uniq('u'));
+        if (opts.secret !== null) req.set('X-Hub-Signature', signGithub(opts.secret ?? c.webhook.secret, raw));
+        return req.send(raw);
+      };
+      const pr = (attrs: Record<string, unknown> = {}) => bbPullRequest({ title: `${s.key}: Retry failed charges`, ...attrs });
+      return { ...s, c, send, pr };
+    }
+
+    it('connects with an access token or an email:token pair, and refuses a base URL', async () => {
+      const { owner, slug } = await setup();
+      const created = await owner.post(base(slug), { provider: 'bitbucket', token: 'good-token' }).expect(201);
+      expect(created.body.connection).toMatchObject({ provider: 'bitbucket', account: 'bb-bot', status: 'connected', webhookConfigured: true });
+      expect(created.body.webhook).toMatchObject({ url: expect.stringMatching(/\/api\/webhooks\/bitbucket\//), events: expect.arrayContaining(['pullrequest:created']) });
+      expect(http.calls.some((c) => c.url === 'https://api.bitbucket.org/2.0/user' && c.headers?.Authorization === 'Bearer good-token')).toBe(true);
+
+      await owner.post(base(slug), { provider: 'bitbucket', token: 'someone@acme.dev:good-api-token' }).expect(409); // same account
+      expect(http.calls.some((c) => c.headers?.Authorization === `Basic ${Buffer.from('someone@acme.dev:good-api-token').toString('base64')}`)).toBe(true);
+      await owner.post(base(slug), { provider: 'bitbucket', token: 'bad' }).expect(400);
+      await owner.post(base(slug), { provider: 'bitbucket', token: 'good-token', baseUrl: 'https://bitbucket.example.com' }).expect(400);
+    });
+
+    it('lists and links repositories', async () => {
+      const { owner, slug } = await setup();
+      const c = await connect(owner, slug, 'bitbucket');
+      const remote = (await owner.get(`${base(slug)}/${c.connection.id}/remote-repositories`).expect(200)).body;
+      expect(remote).toMatchObject({ hasMore: true, items: [{ fullName: 'acme-bb/payments', url: 'https://bitbucket.org/acme-bb/payments', defaultBranch: 'main', private: true, linked: false }] });
+      const linked = (await owner.post(`${base(slug)}/${c.connection.id}/link-repository`, { fullName: 'acme-bb/payments' }).expect(201)).body;
+      expect(linked).toMatchObject({ provider: 'bitbucket', fullName: 'acme-bb/payments', url: 'https://bitbucket.org/acme-bb/payments' });
+    });
+
+    it('rejects a missing/wrong signature', async () => {
+      const { send, pr } = await bitbucketSetup();
+      await send('pullrequest:created', pr(), { secret: null }).expect(401);
+      await send('pullrequest:created', pr(), { secret: 'whsec_nope' }).expect(401);
+    });
+
+    it('PR created -> artifact linked by key; approved; merged; build status updates ci; dedupes by request uuid', async () => {
+      const { owner, slug, key, workstream, send, pr } = await bitbucketSetup();
+      const res = await send('pullrequest:created', pr()).expect(200);
+      expect(res.body).toMatchObject({ status: 'processed', artifactsCreated: 1, workstreams: [key] });
+      expect((await artifacts(owner, slug, `?workstreamId=${workstream.id}`))[0]).toMatchObject({ kind: 'pull_request', provider: 'bitbucket', externalId: '#21', state: 'open' });
+      const state = async () => (await artifacts(owner, slug))[0];
+
+      await send('pullrequest:approved', pr()).expect(200);
+      expect((await state()).review).toBe('approved');
+      const uuid = uniq('same');
+      await send('repo:commit_status_updated', bbCommitStatus('FAILED'), { uuid }).expect(200);
+      expect((await state()).ci).toBe('failing');
+      await send('repo:commit_status_updated', bbCommitStatus('SUCCESSFUL'), { uuid }).expect(200).expect((r) => expect(r.body.status).toBe('duplicate'));
+      expect((await state()).ci).toBe('failing');
+      await send('repo:commit_status_updated', bbCommitStatus('SUCCESSFUL')).expect(200);
+      expect((await state()).ci).toBe('passing');
+      await send('pullrequest:fulfilled', pr({ state: 'MERGED' })).expect(200);
+      expect((await state()).state).toBe('merged');
+
+      await send('diagnostics:ping', {}).expect(200).expect((r) => expect(r.body.status).toBe('pong'));
+      await send('repo:push', {}).expect(202);
+      await send('pullrequest:created', {}).expect(400);
     });
   });
 });

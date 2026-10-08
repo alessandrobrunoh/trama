@@ -21,6 +21,7 @@ const LABEL: Record<string, string> = {
   other: 'Other',
   github: 'GitHub',
   gitlab: 'GitLab',
+  bitbucket: 'Bitbucket',
   figma: 'Figma',
   docs: 'Docs',
   ci: 'CI',
@@ -70,6 +71,16 @@ export function providerLabel(provider: AnyProvider): string {
         <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 24 24" fill="none" aria-hidden="true">
           <path
             d="M12 21.5 2.6 14.4 5 5.2l2.7 6.3h8.6L19 5.2l2.4 9.2z"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linejoin="round"
+          />
+        </svg>
+      }
+      @case ('bitbucket') {
+        <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path
+            d="M3.5 4.5h17l-2.2 14.4a1 1 0 0 1-1 .85H6.7a1 1 0 0 1-1-.85zM8.4 14h7.2l.9-5.5H7.5z"
             stroke="currentColor"
             stroke-width="1.8"
             stroke-linejoin="round"

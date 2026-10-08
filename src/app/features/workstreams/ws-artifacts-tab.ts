@@ -40,7 +40,7 @@ const KIND_STATES: Record<ArtifactKind, ArtifactState[]> = {
   deployment: ['pending', 'running', 'healthy', 'degraded', 'failed'],
   release: ['draft', 'published'],
 };
-const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'delta', 'figma', 'docs', 'ci', 'other'];
+const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'bitbucket', 'delta', 'figma', 'docs', 'ci', 'other'];
 const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
   pull_request: 'github',
   merge_request: 'gitlab',

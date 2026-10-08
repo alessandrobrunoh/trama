@@ -405,7 +405,7 @@ export interface CreateIntegrationInput {
   provider: GitProvider | 'delta';
   /** PAT / app credential / Delta token. Stored server-side, never returned. */
   token: string;
-  /** GitHub Enterprise / self-hosted GitLab / Delta base URL. */
+  /** GitHub Enterprise / self-hosted GitLab / Delta base URL (Bitbucket Cloud has none). */
   baseUrl?: string;
 }
 /** `PATCH /integrations/:id` — re-validates against the provider and refreshes account/status. */

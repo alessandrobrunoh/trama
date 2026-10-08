@@ -13,7 +13,7 @@ import { teamOptions } from '../workstreams/ws-model';
 import { RemoteRepoBrowser } from './remote-repo-browser';
 
 /**
- * "Import from GitHub / GitLab": pick a connection, optionally the teams for new projects, then link
+ * "Import from a git host": pick a connection, optionally the teams for new projects, then link
  * repositories the token can see. Falls back to the manual "New project" form.
  *   <app-import-repositories-dialog [open]="importOpen()" (closed)="importOpen.set(false)" />
  */
@@ -26,7 +26,7 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="flex max-h-[85svh] flex-col gap-4 sm:max-w-xl">
         <hlm-dialog-header>
           <h2 hlmDialogTitle>Import projects</h2>
-          <p hlmDialogDescription>Link repositories from a connected GitHub or GitLab account. Pull requests and CI then flow in through the webhook.</p>
+          <p hlmDialogDescription>Link repositories from a connected GitHub, GitLab or Bitbucket account. Pull requests and CI then flow in through the webhook.</p>
         </hlm-dialog-header>
 
         @if (connections().length) {
@@ -69,10 +69,10 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
               <svg [lucideIcon]="plug" [size]="18" [strokeWidth]="1.5"></svg>
             </span>
             <div>
-              <p class="text-[13px] font-medium">No GitHub or GitLab connection</p>
+              <p class="text-[13px] font-medium">No git host connected</p>
               <p class="text-muted-foreground mt-1 text-xs">Connect an account with a token to browse and import its repositories.</p>
             </div>
-            <a hlmBtn size="sm" [routerLink]="['/', slug(), 'settings', 'integrations']" (click)="closed.emit()">Connect GitHub or GitLab</a>
+            <a hlmBtn size="sm" [routerLink]="['/', slug(), 'settings', 'integrations']" (click)="closed.emit()">Connect a git host</a>
           </div>
         }
 
@@ -107,7 +107,7 @@ export class ImportRepositoriesDialog {
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly connections = computed(() =>
-    this.store.integrations().filter((c) => c.provider === 'github' || c.provider === 'gitlab'),
+    this.store.integrations().filter((c) => c.provider !== 'delta'),
   );
 
   constructor() {

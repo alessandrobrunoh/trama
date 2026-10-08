@@ -1,4 +1,4 @@
-import { ISSUE_KEY_PREFIX, isDeltaThreadUrl } from '../../contracts/domain.js';
+import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX, isDeltaThreadUrl } from '../../contracts/domain.js';
 import type {
   AcceptanceCriterion,
   ActorRef,
@@ -150,7 +150,7 @@ export class SeedBuilder {
 
   repo(provider: GitProvider, fullName: string, teamIds: string[]) {
     const id = uid('rp');
-    const host = provider === 'github' ? 'github.com' : 'gitlab.com';
+    const host = GIT_PROVIDER_META[provider].host;
     this.data.repositories.push({
       id, workspaceId: this.workspaceId, provider, fullName, url: `https://${host}/${fullName}`, defaultBranch: 'main', teamIds, createdAt: this.at(58),
     });

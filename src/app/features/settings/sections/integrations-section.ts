@@ -48,6 +48,14 @@ const PROVIDER_INFO: Record<ConnProvider, { label: string; blurb: string; base: 
     baseHint: 'Only for self-hosted GitLab. Leave empty for gitlab.com.',
     scopes: 'Personal or project access token with read_api.',
   },
+  bitbucket: {
+    label: 'Bitbucket',
+    blurb: 'Pull requests and build statuses (Cloud)',
+    base: '',
+    baseHint: '',
+    scopes:
+      'An Atlassian API token as email:token (scopes read:user, read:repository and read:pullrequest), or a repository or workspace access token.',
+  },
   delta: {
     label: 'Delta',
     blurb: 'Agent threads and sessions',
@@ -57,9 +65,31 @@ const PROVIDER_INFO: Record<ConnProvider, { label: string; blurb: string; base: 
   },
 };
 
+/**
+ * What can be connected. A choice is a provider, optionally preset to a self-hosted instance
+ * (GitHub Enterprise Server, self-hosted GitLab), where the base URL becomes required.
+ */
+interface Choice {
+  id: string;
+  provider: ConnProvider;
+  label: string;
+  blurb: string;
+  /** The connection must point at your own instance. */
+  selfHosted?: boolean;
+}
+
+const CHOICES: Choice[] = [
+  { id: 'github', provider: 'github', label: 'GitHub', blurb: PROVIDER_INFO.github.blurb },
+  { id: 'github-enterprise', provider: 'github', label: 'GitHub Enterprise', blurb: 'Self-hosted GitHub Enterprise Server', selfHosted: true },
+  { id: 'gitlab', provider: 'gitlab', label: 'GitLab', blurb: PROVIDER_INFO.gitlab.blurb },
+  { id: 'gitlab-self-hosted', provider: 'gitlab', label: 'GitLab Self-Hosted', blurb: 'Your own GitLab instance', selfHosted: true },
+  { id: 'bitbucket', provider: 'bitbucket', label: 'Bitbucket', blurb: PROVIDER_INFO.bitbucket.blurb },
+  { id: 'delta', provider: 'delta', label: 'Delta', blurb: PROVIDER_INFO.delta.blurb },
+];
+
 type Row = IntegrationDetail & { detailed: boolean };
 
-/** GitHub / GitLab / Delta connections: connect, re-validate, webhook setup, linked repositories. */
+/** GitHub / GitLab / Bitbucket / Delta connections: connect, re-validate, webhook setup, linked repositories. */
 @Component({
   selector: 'app-integrations-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -82,7 +112,7 @@ type Row = IntegrationDetail & { detailed: boolean };
     <div>
       <app-section-header
         title="Integrations"
-        description="Connect GitHub, GitLab or Delta so pull requests and CI show up on workstreams automatically, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
+        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on workstreams automatically, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
       >
         @if (canAdmin() && !connecting()) {
           <button actions hlmBtn size="sm" (click)="openConnect()">
@@ -99,20 +129,20 @@ type Row = IntegrationDetail & { detailed: boolean };
         <app-settings-group title="New connection" class="mb-8">
           <form (submit)="connect($event)">
             <div class="grid grid-cols-1 gap-2 p-4 sm:grid-cols-3" role="radiogroup" aria-label="Provider">
-              @for (p of providers; track p) {
+              @for (p of choices; track p.id) {
                 <button
                   type="button"
                   role="radio"
-                  [attr.aria-checked]="provider() === p"
+                  [attr.aria-checked]="choice().id === p.id"
                   class="hover:bg-accent flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors"
-                  [class.border-primary]="provider() === p"
-                  [class.bg-selected]="provider() === p"
-                  (click)="provider.set(p)"
+                  [class.border-primary]="choice().id === p.id"
+                  [class.bg-selected]="choice().id === p.id"
+                  (click)="choose(p)"
                 >
-                  <app-provider-icon [provider]="p" [size]="18" />
+                  <app-provider-icon [provider]="p.provider" [size]="18" />
                   <span class="min-w-0">
-                    <span class="block text-[13px] font-medium">{{ info[p].label }}</span>
-                    <span class="text-muted-foreground block truncate text-xs">{{ info[p].blurb }}</span>
+                    <span class="block text-[13px] font-medium">{{ p.label }}</span>
+                    <span class="text-muted-foreground block truncate text-xs">{{ p.blurb }}</span>
                   </span>
                 </button>
               }
@@ -125,7 +155,7 @@ type Row = IntegrationDetail & { detailed: boolean };
                   [type]="showToken() ? 'text' : 'password'"
                   autocomplete="off"
                   spellcheck="false"
-                  [placeholder]="provider() === 'gitlab' ? 'glpat-…' : provider() === 'github' ? 'github_pat_… or ghp_…' : 'Token'"
+                  [placeholder]="tokenPlaceholder()"
                   [value]="token()"
                   (input)="token.set($any($event.target).value)"
                   aria-label="Access token"
@@ -135,16 +165,18 @@ type Row = IntegrationDetail & { detailed: boolean };
                 </button>
               </div>
             </app-settings-row>
-            <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" [description]="info[provider()].baseHint" wide>
+            @if (provider() !== 'bitbucket') {
+              <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" [description]="baseHint()" wide>
               <input hlmInput class="h-8 w-full font-mono text-xs" type="url" [placeholder]="info[provider()].base" [value]="baseUrl()" (input)="baseUrl.set($any($event.target).value)" aria-label="Base URL" />
             </app-settings-row>
+            }
             <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
               <button hlmBtn type="button" variant="ghost" size="sm" (click)="closeConnect()">Cancel</button>
               <button hlmBtn type="submit" size="sm" [disabled]="!canConnect() || busy()">
                 @if (busy()) {
                   <hlm-spinner class="size-3.5" />
                 }
-                {{ busy() ? 'Checking token…' : 'Connect ' + info[provider()].label }}
+                {{ busy() ? 'Checking token…' : 'Connect ' + choice().label }}
               </button>
             </div>
           </form>
@@ -158,7 +190,7 @@ type Row = IntegrationDetail & { detailed: boolean };
           </span>
           <div>
             <p class="text-[13px] font-medium">Nothing connected yet</p>
-            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub or GitLab to import projects and see pull requests and CI on your workstreams.</p>
+            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import projects and see pull requests and CI on your workstreams.</p>
           </div>
           @if (canAdmin()) {
             <button hlmBtn size="sm" (click)="openConnect()"><svg [lucideIcon]="plus" [size]="14"></svg> Connect</button>
@@ -218,9 +250,11 @@ type Row = IntegrationDetail & { detailed: boolean };
                 <app-settings-row label="New token" description="Checked against the provider before it replaces the old one." wide>
                   <input hlmInput type="password" autocomplete="off" class="h-8 w-full font-mono text-xs" placeholder="Leave empty to keep the current token" [value]="editToken()" (input)="editToken.set($any($event.target).value)" aria-label="New token" />
                 </app-settings-row>
-                <app-settings-row [label]="c.provider === 'delta' ? 'Delta URL' : 'Base URL'" [description]="info[c.provider].baseHint" wide>
+                @if (c.provider !== 'bitbucket') {
+                  <app-settings-row [label]="c.provider === 'delta' ? 'Delta URL' : 'Base URL'" [description]="info[c.provider].baseHint" wide>
                   <input hlmInput type="url" class="h-8 w-full font-mono text-xs" [placeholder]="info[c.provider].base" [value]="editBase()" (input)="editBase.set($any($event.target).value)" aria-label="Base URL" />
                 </app-settings-row>
+                }
                 <div class="flex items-center justify-end gap-2 px-4 py-2">
                   <button hlmBtn type="button" variant="ghost" size="sm" (click)="editing.set(null)">Cancel</button>
                   <button hlmBtn type="submit" size="sm" [disabled]="busy() || (c.provider === 'delta' && !editBase().trim())">Save and re-validate</button>
@@ -306,7 +340,7 @@ export class IntegrationsSection {
   private readonly notify = inject(Notifier);
 
   protected readonly info = PROVIDER_INFO;
-  protected readonly providers: ConnProvider[] = ['github', 'gitlab', 'delta'];
+  protected readonly choices = CHOICES;
   protected readonly plus = LucidePlus;
   protected readonly plug = LucidePlug;
   protected readonly more = LucideEllipsis;
@@ -325,12 +359,34 @@ export class IntegrationsSection {
 
   // connect form
   protected readonly connecting = signal(false);
-  protected readonly provider = signal<ConnProvider>('github');
+  protected readonly choice = signal<Choice>(CHOICES[0]);
+  protected readonly provider = computed(() => this.choice().provider);
   protected readonly token = signal('');
   protected readonly baseUrl = signal('');
   protected readonly showToken = signal(false);
   protected readonly busy = signal(false);
-  protected readonly canConnect = computed(() => !!this.token().trim() && (this.provider() !== 'delta' || !!this.baseUrl().trim()));
+  protected readonly baseRequired = computed(() => this.provider() === 'delta' || !!this.choice().selfHosted);
+  protected readonly canConnect = computed(() => !!this.token().trim() && (!this.baseRequired() || !!this.baseUrl().trim()));
+  protected readonly baseHint = computed(() =>
+    this.baseRequired() ? `Required: the address of your ${this.choice().label.replace(/ Self-Hosted$/, '')} instance.` : PROVIDER_INFO[this.provider()].baseHint,
+  );
+  protected readonly tokenPlaceholder = computed(() => {
+    switch (this.provider()) {
+      case 'gitlab':
+        return 'glpat-…';
+      case 'github':
+        return 'github_pat_… or ghp_…';
+      case 'bitbucket':
+        return 'email:api-token or an access token';
+      default:
+        return 'Token';
+    }
+  });
+
+  protected choose(c: Choice): void {
+    this.choice.set(c);
+    this.baseUrl.set('');
+  }
 
   // per-connection UI
   protected readonly editing = signal<string | null>(null);
