@@ -268,6 +268,7 @@ export class AssistantOverlay {
 
   protected expand(): void {
     this.ai.open.set(false);
+    this.ai.handoverToPage = true;
     void this.router.navigate(['/', this.ai.slug(), 'assistant']);
   }
 }

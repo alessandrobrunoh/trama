@@ -46,6 +46,8 @@ export class AssistantStore {
   private revision = 0;
   private grokPoll?: ReturnType<typeof setTimeout>;
   readonly open = signal(false);
+  /** Set when the popup expands into the full page, so the page keeps that chat instead of starting a new one. */
+  handoverToPage = false;
   readonly expanded = signal(false);
   /** Chats shown as chips in the dock (opened this session, newest last). Closing one removes its chip, not the chat. */
   readonly dock = signal<string[]>([]);

@@ -106,7 +106,8 @@ export function timeAgo(time: number): string {
       }
       <form
         (submit)="send($event)"
-        class="border-input dark:bg-secondary focus-within:border-ring focus-within:ring-ring/50 rounded-md border p-2 transition-colors focus-within:ring-2"
+        class="border-input dark:bg-secondary focus-within:border-ring focus-within:ring-ring/50 border p-2 transition-colors focus-within:ring-2"
+        [class]="page() ? 'bg-card rounded-xl p-3 shadow-xs' : 'rounded-md'"
       >
         <textarea
           #composer
@@ -114,7 +115,8 @@ export function timeAgo(time: number): string {
           aria-describedby="assistant-context-hint"
           [rows]="page() ? 3 : 2"
           maxlength="8000"
-          class="placeholder:text-muted-foreground w-full resize-none bg-transparent px-1 text-sm outline-none"
+          class="placeholder:text-muted-foreground w-full resize-none bg-transparent px-1 outline-none"
+          [class]="page() ? 'text-[15px]' : 'text-sm'"
           placeholder="Ask Trama…"
           name="message"
           [ngModel]="ai.draft()"
@@ -123,19 +125,23 @@ export function timeAgo(time: number): string {
           (keydown)="onComposerKey($event)"
         ></textarea>
         <div class="flex items-center justify-between gap-2">
-          <button
-            type="button"
-            class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs"
-            [class.text-foreground]="ai.shareContext()"
-            [attr.aria-pressed]="ai.shareContext()"
-            [attr.aria-label]="'Include ' + ai.context().label + ' in this chat'"
-            (click)="ai.shareContext.set(!ai.shareContext())"
-          >
-            <svg [lucideIcon]="contextIcon" [size]="13" class="shrink-0"></svg>
-            <span class="truncate" [class.line-through]="!ai.shareContext()">{{
-              ai.context().label
-            }}</span>
-          </button>
+          @if (page()) {
+            <span></span>
+          } @else {
+            <button
+              type="button"
+              class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs"
+              [class.text-foreground]="ai.shareContext()"
+              [attr.aria-pressed]="ai.shareContext()"
+              [attr.aria-label]="'Include ' + ai.context().label + ' in this chat'"
+              (click)="ai.shareContext.set(!ai.shareContext())"
+            >
+              <svg [lucideIcon]="contextIcon" [size]="13" class="shrink-0"></svg>
+              <span class="truncate" [class.line-through]="!ai.shareContext()">{{
+                ai.context().label
+              }}</span>
+            </button>
+          }
           @if (ai.busy()) {
             <button
               hlmBtn
@@ -162,7 +168,36 @@ export function timeAgo(time: number): string {
           }
         </div>
       </form>
-      <p id="assistant-context-hint" class="text-muted-foreground mt-2 text-center text-[11px]">
+      @if (page() && !ai.messages().length && ai.chats().length) {
+        <ul class="mt-4" aria-label="Recent chats">
+          @for (chat of ai.chats(); track chat.id) {
+            <li>
+              <button
+                type="button"
+                class="hover:bg-accent/60 flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-2 text-left text-[13px]"
+                (click)="ai.openChat(chat.id)"
+              >
+                @if (chat.unread) {
+                  <span
+                    class="bg-primary size-1.5 shrink-0 rounded-full"
+                    role="img"
+                    aria-label="Unread"
+                  ></span>
+                }
+                <span
+                  class="min-w-0 flex-1 truncate"
+                  [class]="chat.unread ? 'text-foreground' : 'text-foreground/80'"
+                  >{{ chat.title }}</span
+                >
+                <span class="text-muted-foreground shrink-0 text-xs">{{
+                  ago(chat.updatedAt)
+                }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+      <p id="assistant-context-hint" class="text-muted-foreground mt-3 text-center text-[11px]">
         {{
           ai.shareContext()
             ? ai.context().kind === 'page'
@@ -172,25 +207,6 @@ export function timeAgo(time: number): string {
         }}
         AI can make mistakes. Review suggestions before using them.
       </p>
-
-      @if (page() && !ai.messages().length && ai.chats().length) {
-        <ul class="mt-6 divide-y" aria-label="Recent chats">
-          @for (chat of ai.chats(); track chat.id) {
-            <li class="group/chat flex items-center">
-              <button
-                type="button"
-                class="hover:bg-accent/60 flex min-w-0 flex-1 items-center justify-between gap-4 rounded-md px-2 py-2 text-left text-sm"
-                (click)="ai.openChat(chat.id)"
-              >
-                <span class="truncate">{{ chat.title }}</span>
-                <span class="text-muted-foreground shrink-0 text-xs">{{
-                  ago(chat.updatedAt)
-                }}</span>
-              </button>
-            </li>
-          }
-        </ul>
-      }
     </div>
     @if (page() && !ai.messages().length) {
       <div class="flex-[1.5]" aria-hidden="true"></div>

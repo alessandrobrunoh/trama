@@ -11,6 +11,11 @@ import { AssistantChat } from './assistant-chat';
   imports: [LucideDynamicIcon, HlmButtonImports, AssistantChat],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
+    @if (!ai.active()) {
+      <div class="flex h-12 shrink-0 items-center border-b px-4">
+        <h1 class="text-sm font-medium">New chat</h1>
+      </div>
+    }
     @if (ai.active(); as chat) {
       <div class="flex h-12 shrink-0 items-center gap-2 border-b px-4">
         <h1 class="min-w-0 flex-1 truncate text-sm font-medium">{{ chat.title }}</h1>
@@ -38,6 +43,10 @@ export class AssistantPage {
   protected readonly deleteIcon = LucideTrash2;
 
   constructor() {
+    // The page opens on a fresh chat (with the history underneath) unless the popup handed one over
+    // or a reply is still on its way.
+    if (!this.ai.handoverToPage && !this.ai.busy()) this.ai.newChat();
+    this.ai.handoverToPage = false;
     effect(() => {
       if (this.chat()) queueMicrotask(() => this.chat()?.focusComposer());
     });
