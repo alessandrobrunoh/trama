@@ -60,6 +60,7 @@ import {
   buildSummary,
   labelOptions,
   priorityOptions,
+  projectOptions,
   repoOptions,
   statusOptions,
   teamOptions,
@@ -281,6 +282,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
         }
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Accountable" [multiple]="true" [options]="users()" [value]="fv('accountableUserId')" (valueChange)="setF('accountableUserId', $event)" />
+        @if (projects().length) {
+          <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
+        }
         <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
         @if (labels().length) {
           <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
@@ -430,6 +434,7 @@ export class WorkstreamListPage {
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repos = computed(() => repoOptions(this.store));
+  protected readonly projects = computed(() => projectOptions(this.store));
   protected readonly labels = computed(() => labelOptions(this.store));
 
   protected readonly plus = LucidePlus;

@@ -37,7 +37,7 @@ export interface FieldDef {
   /** Fixed value set for enums (in display order). */
   values?: readonly string[];
   /** For `id` / `multi-id` fields: the NablaStore collection the ids come from. */
-  refersTo?: 'team' | 'user' | 'repository' | 'workstream' | 'actor';
+  refersTo?: 'team' | 'user' | 'repository' | 'project' | 'workstream' | 'actor';
   sortable: boolean;
   groupable: boolean;
 }
@@ -54,6 +54,7 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
     { field: 'accountableUserId', label: 'Accountable', kind: 'id', refersTo: 'user', sortable: true, groupable: true },
     { field: 'priority', label: 'Priority', kind: 'enum', values: keysByOrder(PRIORITY_META), sortable: true, groupable: true },
     { field: 'labels', label: 'Labels', kind: 'tags', sortable: false, groupable: false },
+    { field: 'projectId', label: 'Project', kind: 'id', refersTo: 'project', sortable: false, groupable: true },
     { field: 'repositoryIds', label: 'Repositories', kind: 'multi-id', refersTo: 'repository', sortable: false, groupable: false },
     { field: 'targetDate', label: 'Target date', kind: 'date', sortable: true, groupable: false },
     { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
