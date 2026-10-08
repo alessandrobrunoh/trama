@@ -155,7 +155,7 @@ Demand items (bugs, requests, incidents, tasks). Status is a tracker workflow, s
 `GET ?subjectType&subjectId`, `POST { subject: { type, id }, body }` (subject must exist in the workspace; types: workstream, execution, issue, artifact, decision, input_request, repository, team), `PATCH /:id { body }` (author only), `DELETE /:id` (author or admin).
 
 ### Views — `/views`
-`GET` (shared + your private), `GET /:id`, `POST { name, entity: workstream|issue|execution|decision, filters?, sort?, groupBy?, layout?: list|board|graph, shared? }`, `PATCH`, `DELETE`. Only the owner (or an admin, for shared views) can change a view; other people's private views are `404`.
+`GET` (shared + your private), `GET /:id`, `POST { name, entity: workstream|issue|decision|project, filters?, sort?, groupBy?, layout?: list|board|graph|timeline, shared? }` (`timeline` only for workstream and project views; filter fields are the client's field registry, e.g. `projectId` on an issue matches the issue's own project or the project of any workstream it is linked to), `PATCH`, `DELETE`. Only the owner (or an admin, for shared views) can change a view; other people's private views are `404`.
 
 ### Attention — `/attention` (human attention: agent tokens get `403`)
 `GET /attention?scope=mine|all&state=open|snoozed|dismissed|active` → `AttentionItem[]` for the caller (PLAN.md §3). `scope=all` (admin+, else `403`) returns every item of the workspace. `state=active` = open + snoozed. Without `state` dismissed/snoozed items are included with their `state` (the snapshot's `attention` is this unfiltered list). Sorted by severity (high → low), then `since` ascending (longest waiting first).
@@ -219,7 +219,7 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 
 ## Dev utilities
 
-`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 5 saved views and ~300 events over the last 6 weeks.
+`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
 
 ## Configuration
 

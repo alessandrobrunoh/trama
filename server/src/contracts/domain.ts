@@ -262,7 +262,13 @@ export interface Project {
   /** Longer description (markdown). */
   description?: string;
   color: string;
+  /** Lucide icon name (kebab-case, e.g. `rocket`) or a single emoji. Absent = the default project glyph. */
+  icon?: string;
   status: ProjectStatus;
+  /** Health from the latest project update; absent until the first update is posted. */
+  health?: ProjectHealth;
+  /** When the latest update was posted (drives "updated 3d ago" and update reminders). */
+  lastUpdateAt?: ISODate;
   priority: Priority;
   leadId?: ID;
   /** Teams involved. */
@@ -276,6 +282,95 @@ export interface Project {
   /** Set when the status becomes completed or canceled; cleared on reopen. */
   completedAt?: ISODate;
 }
+
+/** Linear-style project health, set by whoever posts a project update. */
+export type ProjectHealth = 'on_track' | 'at_risk' | 'off_track';
+export const PROJECT_HEALTHS: ProjectHealth[] = ['on_track', 'at_risk', 'off_track'];
+
+/**
+ * A status post on a project (Linear "Project update"): a health value plus a markdown write-up, newest first
+ * in the project's Updates feed. Discussed through comments (`SubjectRef` type `project_update`).
+ * The newest update drives `Project.health` and `Project.lastUpdateAt`; deleting it falls back to the previous one.
+ */
+export interface ProjectUpdate {
+  /** `pu_…` */
+  id: ID;
+  workspaceId: ID;
+  projectId: ID;
+  health: ProjectHealth;
+  /** Markdown body. */
+  body: string;
+  author: ActorRef;
+  /** True when the update was drafted by the AI assistant and posted from that draft (informational). */
+  aiDrafted?: boolean;
+  createdAt: ISODate;
+  /** Set once the body or health was edited after posting. */
+  editedAt?: ISODate;
+}
+
+/** An artifact reached from a project, with the chain that links it back to where it was attached. */
+export interface ProjectContextArtifact {
+  artifact: Artifact;
+  /**
+   * Chain from the project down to the artifact's owner, e.g. [project, workstream, issue] for a PR attached to
+   * an issue that is part of a workstream of the project. A one-element chain means it is attached to the project itself.
+   */
+  path: SubjectRef[];
+}
+
+/**
+ * GET /w/:slug/projects/:id/context — the whole tree under a project in one response ("mega context"):
+ * Project → workstreams → issues → artifacts (+ the project's own artifacts, issues and updates).
+ * Every item is reachable from the project and carries the ids needed to trace it back.
+ */
+export interface ProjectContext {
+  project: Project;
+  milestones: Milestone[];
+  updates: ProjectUpdate[];
+  workstreams: Workstream[];
+  /** Issues with `projectId` = project OR linked to one of its workstreams. */
+  issues: Issue[];
+  artifacts: ProjectContextArtifact[];
+  decisions: Decision[];
+  inputRequests: InputRequest[];
+}
+
+// ── AI suggestions for a project (POST /w/:slug/projects/:id/ai/:kind) ──
+
+export type ProjectAiKind = 'update_draft' | 'summary' | 'issues' | 'risks';
+export const PROJECT_AI_KINDS: ProjectAiKind[] = ['update_draft', 'summary', 'issues', 'risks'];
+
+export interface ProjectAiUpdateDraft {
+  kind: 'update_draft';
+  health: ProjectHealth;
+  body: string;
+}
+export interface ProjectAiSummary {
+  kind: 'summary';
+  summary: string;
+  description: string;
+}
+export interface ProjectAiIssueSuggestion {
+  issueId: ID;
+  reason: string;
+}
+export interface ProjectAiIssues {
+  kind: 'issues';
+  suggestions: ProjectAiIssueSuggestion[];
+}
+export interface ProjectAiRisk {
+  title: string;
+  detail: string;
+  severity: AttentionSeverity;
+  issueId?: ID;
+  workstreamId?: ID;
+}
+export interface ProjectAiRisks {
+  kind: 'risks';
+  health: ProjectHealth;
+  risks: ProjectAiRisk[];
+}
+export type ProjectAiResult = ProjectAiUpdateDraft | ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
 
 // ───────────────────────────── Workstreams ─────────────────────────────
 
@@ -454,6 +549,7 @@ export type ArtifactKind =
   | 'pull_request'
   | 'merge_request'
   | 'document'
+  | 'link'
   | 'design'
   | 'image'
   | 'file'
@@ -480,10 +576,21 @@ export type ArtifactState =
 export type CiState = 'pending' | 'passing' | 'failing';
 export type ReviewState = 'none' | 'requested' | 'approved' | 'changes_requested';
 
+/**
+ * Something the work produced or points to: a PR, a build, a document, a link.
+ * Attached to at least one owner: a project, a workstream and/or an issue. A project sees the artifacts of
+ * its own, of its workstreams and of the issues under it (see `ProjectContext`); an issue that belongs to a
+ * workstream of a project makes its artifacts part of that project (a tree: project → workstream/issue → artifact).
+ */
 export interface Artifact {
   id: ID;
-  workstreamId: ID;
+  /** Owner. At least one of `projectId` / `workstreamId` / `issueId` is always set. */
+  workstreamId?: ID;
+  projectId?: ID;
+  issueId?: ID;
   repositoryId?: ID;
+  /** Short note on what it is / why it is attached (markdown allowed). */
+  description?: string;
   kind: ArtifactKind;
   provider: ArtifactProvider;
   title: string;
@@ -557,6 +664,7 @@ export type SubjectType =
   | 'repository'
   | 'team'
   | 'project'
+  | 'project_update'
   | 'milestone';
 
 export interface SubjectRef {
@@ -632,8 +740,9 @@ export interface AttentionItem {
 
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
-export type ViewEntity = 'workstream' | 'issue' | 'decision';
-export type ViewLayout = 'list' | 'board' | 'graph';
+export type ViewEntity = 'workstream' | 'issue' | 'decision' | 'project';
+/** `timeline` (Gantt) is a layout of a saved view, offered for workstream and project views. */
+export type ViewLayout = 'list' | 'board' | 'graph' | 'timeline';
 
 export interface ViewFilter {
   field: string;
@@ -954,6 +1063,7 @@ export interface WebhookDeliveryLog {
 /** Event types a webhook can subscribe to, grouped by entity (for pickers). */
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
   { entity: 'project', label: 'Projects', events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'] },
+  { entity: 'project_update', label: 'Project updates', events: ['project_update.created', 'project_update.updated', 'project_update.deleted'] },
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },

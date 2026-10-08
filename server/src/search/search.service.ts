@@ -56,8 +56,8 @@ const SPECS: Spec[] = [
   },
   {
     type: 'artifact',
-    from: `"artifacts" x JOIN "workstreams" w ON w."id" = x."workstreamId"`,
-    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", x."url" AS body`,
+    from: `"artifacts" x LEFT JOIN "workstreams" w ON w."id" = x."workstreamId"`,
+    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", COALESCE(x."url", x."description") AS body`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
     rank: 4,
   },

@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, Priority, ProjectStatus } from '../contracts/domain.js';
@@ -6,12 +6,15 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
 import { ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { isProjectIcon } from './project-icon.js';
 
 export interface ProjectInput {
   name?: string;
   summary?: string | null;
   description?: string | null;
   color?: string;
+  /** Lucide icon name (kebab-case) or an emoji; null clears it. */
+  icon?: string | null;
   status?: ProjectStatus;
   priority?: Priority;
   leadId?: string | null;
@@ -70,6 +73,7 @@ export class ProjectsService {
         summary: input.summary?.trim() || null,
         description: input.description ?? null,
         color: input.color ?? '#6b7280',
+        icon: input.icon ?? null,
         status,
         priority: input.priority ?? 'none',
         leadId: input.leadId ?? null,
@@ -92,6 +96,7 @@ export class ProjectsService {
     if (patch.summary !== undefined) row.summary = patch.summary?.trim() || null;
     if (patch.description !== undefined) row.description = patch.description;
     if (patch.color !== undefined) row.color = patch.color;
+    if (patch.icon !== undefined) row.icon = patch.icon;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.leadId !== undefined) row.leadId = patch.leadId;
     if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
@@ -130,7 +135,13 @@ export class ProjectsService {
     const milestoneIds = (
       await this.ds.query<{ id: string }[]>(`SELECT "id" FROM "milestones" WHERE "projectId" = $1`, [id])
     ).map((r) => r.id);
+    const updateIds = (
+      await this.ds.query<{ id: string }[]>(`SELECT "id" FROM "project_updates" WHERE "projectId" = $1`, [id])
+    ).map((r) => r.id);
     await this.ds.transaction(async (m) => {
+      // project updates cascade with the project: drop their comments
+      if (updateIds.length)
+        await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`, [workspaceId, updateIds]);
       if (milestoneIds.length) {
         // milestones cascade with the project: drop their ids from issues, and their comments
         await m.query(
@@ -145,6 +156,8 @@ export class ProjectsService {
   }
 
   private async validate(workspaceId: string, input: ProjectInput) {
+    if (input.icon != null && !isProjectIcon(input.icon))
+      throw new BadRequestException('icon must be a lucide icon name (kebab-case) or a single emoji');
     await this.refs.teams(workspaceId, input.teamIds);
     await this.refs.repositories(workspaceId, input.repositoryIds);
     await this.refs.users(workspaceId, [input.leadId]);

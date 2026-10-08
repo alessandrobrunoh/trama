@@ -24,6 +24,7 @@ import type {
   NotificationChannels,
   NotificationKind,
   Priority,
+  ProjectHealth,
   ProjectStatus,
   ReviewState,
   Role,
@@ -219,7 +220,12 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) summary: string | null;
   @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'varchar', default: '#6b7280' }) color: string;
+  /** Lucide icon name (kebab-case) or an emoji; null = default glyph. */
+  @Column({ type: 'varchar', nullable: true }) icon: string | null;
   @Column({ type: 'varchar', default: 'backlog' }) status: ProjectStatus;
+  /** Health of the latest project update (denormalized; see ProjectUpdatesService). */
+  @Column({ type: 'varchar', nullable: true }) health: ProjectHealth | null;
+  @Column({ type: 'timestamptz', nullable: true }) lastUpdateAt: Date | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', nullable: true }) leadId: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) teamIds: string[];
@@ -229,6 +235,26 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
+}
+
+@Entity('project_updates')
+@Index('IDX_project_updates_project', ['projectId', 'createdAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class ProjectUpdateEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) projectId: string;
+  @Column({ type: 'varchar' }) health: ProjectHealth;
+  @Column({ type: 'text' }) body: string;
+  @Column({ type: 'jsonb' }) author: ActorRef;
+  @Column({ type: 'boolean', default: false }) aiDrafted: boolean;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) editedAt: Date | null;
 }
 
 // ───────────────────────────── workstreams ─────────────────────────────
@@ -375,21 +401,31 @@ export class IssueEntity extends Wire {
 @Entity('artifacts')
 @Index('IDX_artifacts_workspace', ['workspaceId'])
 @Index('IDX_artifacts_workstream', ['workstreamId'])
+@Index('IDX_artifacts_project', ['projectId'])
+@Index('IDX_artifacts_issue', ['issueId'])
 @Index('IDX_artifacts_external', ['workspaceId', 'repositoryId', 'externalId'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
+// Owners are detached with SET NULL; a trigger (see the ArtifactOwners migration) deletes an artifact whose
+// last owner goes away, and a CHECK keeps at least one owner set.
 @ForeignKey(() => WorkstreamEntity, ['workstreamId'], ['id'], {
-  onDelete: 'CASCADE',
+  onDelete: 'SET NULL',
 })
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
+@ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => RepositoryEntity, ['repositoryId'], ['id'], {
   onDelete: 'SET NULL',
 })
 export class ArtifactEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) workstreamId: string;
+  /** Owners: at least one of workstreamId / projectId / issueId is set. */
+  @Column({ type: 'varchar', nullable: true }) workstreamId: string | null;
+  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
+  @Column({ type: 'varchar', nullable: true }) issueId: string | null;
   @Column({ type: 'varchar', nullable: true }) repositoryId: string | null;
+  @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'varchar' }) kind: ArtifactKind;
   @Column({ type: 'varchar', default: 'other' }) provider: ArtifactProvider;
   @Column({ type: 'varchar' }) title: string;
@@ -730,6 +766,7 @@ export const ENTITIES = [
   TeamEntity,
   RepositoryEntity,
   ProjectEntity,
+  ProjectUpdateEntity,
   WorkstreamEntity,
   MilestoneEntity,
   InputRequestEntity,

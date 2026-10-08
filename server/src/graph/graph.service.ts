@@ -104,16 +104,17 @@ export class GraphService {
     const includedIds = new Set(included.map((w) => w.id));
     for (const w of included) addWorkstream(w);
     for (const a of artifacts) {
-      if (!includedIds.has(a.workstreamId)) continue;
+      const owner = a.workstreamId;
+      if (!owner || !includedIds.has(owner)) continue;
       node({
         id: a.id,
         type: 'artifact',
         label: a.externalId ? `${a.title} (${a.externalId})` : a.title,
         state: a.state,
-        parentId: a.workstreamId,
+        parentId: owner,
         data: {
           kind: a.kind,
-          workstreamId: a.workstreamId,
+          workstreamId: owner,
           url: a.url ?? undefined,
           externalId: a.externalId ?? undefined,
           ci: a.ci ?? undefined,
@@ -122,7 +123,7 @@ export class GraphService {
           environment: a.environment ?? undefined,
         },
       });
-      edge('contains', a.workstreamId, a.id);
+      edge('contains', owner, a.id);
     }
 
     for (const d of deps) {
