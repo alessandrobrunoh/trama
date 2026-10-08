@@ -99,8 +99,7 @@ export class RefsService {
         return { exists: !!r, workstreamId: r?.originWorkstreamId ?? undefined };
       }
       case 'milestone': {
-        const r = await db.getRepository(MilestoneEntity).findOne({ where, select: { id: true, workstreamId: true } });
-        return { exists: !!r, workstreamId: r?.workstreamId };
+        return { exists: await db.getRepository(MilestoneEntity).existsBy(where) };
       }
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };

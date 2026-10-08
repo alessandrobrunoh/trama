@@ -380,13 +380,13 @@ export class ApiClient {
   };
 
   readonly milestones = {
-    list: (slug: string, workstreamId?: ID) => this.get<Milestone[]>(`${this.w(slug)}/milestones`, { workstreamId }),
+    list: (slug: string, projectId?: ID) => this.get<Milestone[]>(`${this.w(slug)}/milestones`, { projectId }),
     create: (slug: string, input: CreateMilestoneInput) => this.post<Milestone>(`${this.w(slug)}/milestones`, input),
     update: (slug: string, id: ID, input: UpdateMilestoneInput) =>
       this.patch<Milestone>(`${this.w(slug)}/milestones/${id}`, input),
-    /** Re-numbers sortOrder 0..n-1 following `ids`; returns the ordered milestones of the workstream. */
-    reorder: (slug: string, workstreamId: ID, ids: ID[]) =>
-      this.post<Milestone[]>(`${this.w(slug)}/milestones/reorder`, { workstreamId, ids }),
+    /** Re-numbers sortOrder 0..n-1 following `ids`; returns the ordered milestones of the project. */
+    reorder: (slug: string, projectId: ID, ids: ID[]) =>
+      this.post<Milestone[]>(`${this.w(slug)}/milestones/reorder`, { projectId, ids }),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/milestones/${id}`),
   };
 

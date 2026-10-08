@@ -302,11 +302,33 @@ export class NablaStore {
   readonly issuesByWorkstream = computed(() =>
     groupBy(this._issues(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
   );
-  /** Milestones of a workstream (by workstream id), ordered by `sortOrder`. */
-  readonly milestonesByWorkstream = computed(() => {
-    const map = groupBy(this._milestones(), (m) => m.workstreamId);
+  /** Milestones of a project (by project id), ordered by `sortOrder`. */
+  readonly milestonesByProject = computed(() => {
+    const map = groupBy(this._milestones(), (m) => m.projectId);
     for (const list of map.values()) list.sort(bySortOrder);
     return map;
+  });
+  /** The milestones a workstream shares through its project (by workstream id). Workstreams without a project have none. */
+  readonly milestonesByWorkstream = computed(() => {
+    const byProject = this.milestonesByProject();
+    const map = new Map<string, Milestone[]>();
+    for (const w of this._workstreams()) {
+      const list = w.projectId ? byProject.get(w.projectId) : undefined;
+      if (list?.length) map.set(w.id, list);
+    }
+    return map;
+  });
+  /** Issues linked to any workstream of a project (by project id). */
+  readonly issuesByProject = computed(() => {
+    const projectOf = new Map(this._workstreams().map((w) => [w.id, w.projectId]));
+    return groupBy(this._issues(), (i) => {
+      const ids = new Set<string>();
+      for (const w of i.workstreamIds) {
+        const p = projectOf.get(w);
+        if (p) ids.add(p);
+      }
+      return ids.size ? [...ids] : undefined;
+    });
   });
   /** Issues in a milestone (by milestone id). */
   readonly issuesByMilestone = computed(() =>
@@ -818,7 +840,6 @@ export class NablaStore {
     const tx = this.tx();
     tx.remove(this._workstreams, ws.id);
     for (const a of this._artifacts().filter((x) => x.workstreamId === ws.id)) tx.remove(this._artifacts, a.id);
-    this.dropMilestones(tx, this._milestones().filter((m) => m.workstreamId === ws.id).map((m) => m.id));
     for (const r of this._inputRequests().filter((x) => x.workstreamId === ws.id)) tx.remove(this._inputRequests, r.id);
     return this.ok('delete workstream', (s) => this.api.workstreams.remove(s, ws.id), { tx });
   }
@@ -963,10 +984,12 @@ export class NablaStore {
     const { kind: _kind, ...local } = patch;
     const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
     if (patch.workstreamIds && patch.milestoneIds === undefined) {
-      const linked = new Set(patch.workstreamIds);
+      const projects = new Set(
+        patch.workstreamIds.map((w) => this.workstreamById().get(w)?.projectId).filter((p): p is string => !!p),
+      );
       optimistic['milestoneIds'] = (current.milestoneIds ?? []).filter((m) => {
         const ms = this._milestones().find((x) => x.id === m);
-        return !!ms && linked.has(ms.workstreamId);
+        return !!ms && projects.has(ms.projectId);
       });
     }
     const tx = this.tx();
@@ -1038,11 +1061,11 @@ export class NablaStore {
   }
 
   /**
-   * Put the milestones of a workstream in this order (`ids`; unlisted ones follow). Optimistic;
+   * Put the milestones of a project in this order (`ids`; unlisted ones follow). Optimistic;
    * the server re-numbers `sortOrder` to 0..n-1.
    */
-  async reorderMilestones(workstreamId: ID, ids: readonly ID[]): Promise<boolean> {
-    const current = this.milestonesByWorkstream().get(workstreamId) ?? [];
+  async reorderMilestones(projectId: ID, ids: readonly ID[]): Promise<boolean> {
+    const current = this.milestonesByProject().get(projectId) ?? [];
     const known = new Set(current.map((m) => m.id));
     const order = [...new Set(ids)].filter((id) => known.has(id));
     for (const m of current) if (!order.includes(m.id)) order.push(m.id);
@@ -1050,7 +1073,7 @@ export class NablaStore {
     order.forEach((id, i) => {
       if (this.milestoneById().get(id)?.sortOrder !== i) tx.patch(this._milestones, id, { sortOrder: i });
     });
-    return this.write('reorder milestones', (s) => this.api.milestones.reorder(s, workstreamId, order), {
+    return this.write('reorder milestones', (s) => this.api.milestones.reorder(s, projectId, order), {
       tx,
       onResult: (list) => {
         for (const m of list) this.upsert(this._milestones, m);
@@ -1308,6 +1331,9 @@ export class NablaStore {
     if (!this.projectById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._projects, id);
+    // its milestones go with it, and its workstreams are detached
+    this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
+    for (const w of this._workstreams().filter((x) => x.projectId === id)) tx.patch(this._workstreams, w.id, { projectId: undefined });
     return this.ok('delete project', (s) => this.api.projects.remove(s, id), { tx });
   }
 

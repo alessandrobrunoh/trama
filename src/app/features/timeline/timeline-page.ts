@@ -613,11 +613,17 @@ export class TimelinePage {
   }
 
   protected async addMilestone(ws: Workstream, day: number): Promise<void> {
-    const n = (this.store.milestonesByWorkstream().get(ws.id)?.length ?? 0) + 1;
-    const ms = await this.msActions.create(ws.id, `Milestone ${n}`, isoOfDay(day));
+    // Milestones belong to the workstream's project.
+    const project = this.store.getProject(ws.projectId);
+    if (!project) {
+      this.notify.info(`${ws.key} is not in a project`, { description: 'Milestones belong to a project. Add the workstream to one first.' });
+      return;
+    }
+    const n = (this.store.milestonesByProject().get(project.id)?.length ?? 0) + 1;
+    const ms = await this.msActions.create(project.id, `Milestone ${n}`, isoOfDay(day));
     if (ms) {
       this.panelId.set(ws.id);
-      this.notify.success(`Milestone added to ${ws.key}`, { description: `On ${dayLabel(day)}. Rename it in the details panel.` });
+      this.notify.success(`Milestone added to ${project.name}`, { description: `On ${dayLabel(day)}. Rename it from the project page.` });
     }
   }
 

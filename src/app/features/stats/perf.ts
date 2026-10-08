@@ -683,9 +683,9 @@ export type MilestoneState = 'done' | 'overdue' | 'at_risk' | 'on_track' | 'no_d
 export interface MilestoneRow {
   id: string;
   name: string;
-  workstreamId: string;
-  workstreamKey: string;
-  workstreamTitle: string;
+  projectId: string;
+  projectName: string;
+  workstreamIds: string[];
   target?: number;
   total: number;
   done: number;
@@ -709,7 +709,7 @@ export function milestoneRows(data: WorkData, now: number): MilestoneRow[] {
   const byId = new Map(data.issues.map((i) => [i.id, i] as const));
   const byWs = new Map<string, WorkRec[]>();
   for (const i of data.issues) for (const w of i.workstreamIds) byWs.set(w, [...(byWs.get(w) ?? []), i]);
-  return data.milestones.map((m) => milestoneRow(m, m.issueIds.flatMap((id) => byId.get(id) ?? []), wsRate(byWs.get(m.workstreamId) ?? [], now), now));
+  return data.milestones.map((m) => milestoneRow(m, m.issueIds.flatMap((id) => byId.get(id) ?? []), wsRate([...new Map(m.workstreamIds.flatMap((w) => byWs.get(w) ?? []).map((i) => [i.id, i] as const)).values()], now), now));
 }
 
 function milestoneRow(m: MilestoneRec, issues: readonly WorkRec[], rate: number, now: number): MilestoneRow {
@@ -722,7 +722,7 @@ function milestoneRow(m: MilestoneRec, issues: readonly WorkRec[], rate: number,
   const pct = total ? Math.round((doneSize / total) * 100) : 0;
   const remaining = live.length - done.length;
   const projected = remaining > 0 && rate > 0 ? now + (remaining / rate) * DAY : undefined;
-  const base = { id: m.id, name: m.name, workstreamId: m.workstreamId, workstreamKey: m.workstreamKey, workstreamTitle: m.workstreamTitle, target: m.target, total, done: doneSize, pct, basis, projected };
+  const base = { id: m.id, name: m.name, projectId: m.projectId, projectName: m.projectName, workstreamIds: m.workstreamIds, target: m.target, total, done: doneSize, pct, basis, projected };
   if (!live.length) return { ...base, state: 'empty', detail: 'No issues in this milestone yet.' };
   if (remaining === 0) return { ...base, state: 'done', detail: 'All issues are done.' };
   const rateText = rate > 0 ? `${+(rate * 7).toFixed(1)} issues/week lately` : 'nothing completed in the workstream recently';

@@ -342,16 +342,16 @@ export interface Workstream {
   shippedAt?: ISODate;
 }
 
-/** Linear-style milestone inside a workstream. An issue is in at most one milestone per workstream. */
+/** Linear-style milestone inside a project. An issue is in at most one milestone per project. */
 export interface Milestone {
   /** `ms_…` */
   id: ID;
   workspaceId: ID;
-  workstreamId: ID;
+  projectId: ID;
   name: string;
   description?: string;
   targetDate?: ISODate;
-  /** Ascending order inside the workstream (reorder by PATCHing it). */
+  /** Ascending order inside the project (reorder by PATCHing it). */
   sortOrder: number;
   createdAt: ISODate;
   updatedAt: ISODate;
@@ -423,8 +423,8 @@ export interface Issue {
   /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
   workstreamIds: ID[];
   /**
-   * Milestones this issue is in: at most one per workstream, and only milestones of workstreams in
-   * `workstreamIds`. Unlinking a workstream drops its milestone.
+   * Milestones this issue is in: at most one per project, and only milestones of the projects of the
+   * workstreams in `workstreamIds`. Unlinking the last workstream of a project drops its milestone.
    */
   milestoneIds: ID[];
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */

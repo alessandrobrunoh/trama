@@ -127,7 +127,20 @@ export class ProjectsService {
 
   async remove(workspaceId: string, actor: ActorRef, id: string) {
     const row = await this.get(workspaceId, id);
-    await this.ds.transaction((m) => m.delete(ProjectEntity, { id }));
+    const milestoneIds = (
+      await this.ds.query<{ id: string }[]>(`SELECT "id" FROM "milestones" WHERE "projectId" = $1`, [id])
+    ).map((r) => r.id);
+    await this.ds.transaction(async (m) => {
+      if (milestoneIds.length) {
+        // milestones cascade with the project: drop their ids from issues, and their comments
+        await m.query(
+          `UPDATE "issues" SET "milestoneIds" = COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements_text("milestoneIds") x WHERE x <> ALL($2)), '[]'::jsonb) WHERE "workspaceId" = $1 AND "milestoneIds" ?| $2`,
+          [workspaceId, milestoneIds],
+        );
+        await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`, [workspaceId, milestoneIds]);
+      }
+      await m.delete(ProjectEntity, { id });
+    });
     await this.events.record({ workspaceId, actor, type: 'project.deleted', subject: { type: 'project', id }, data: { name: row.name } });
   }
 

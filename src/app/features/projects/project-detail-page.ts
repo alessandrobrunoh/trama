@@ -11,6 +11,7 @@ import { PropertyRow } from '../../shared/property-row';
 import { WorkstreamRow } from '../workstreams/workstream-items';
 import { buildSummary } from '../workstreams/ws-model';
 import { ProviderIcon } from '../../shared/provider-icon';
+import { ProjectMilestones } from '../milestones/project-milestones';
 import { EventLine } from '../overview/event-line';
 import { CommentThread } from '../workstreams/comments';
 import { EditableMarkdown, InlineText } from '../workstreams/inline-edit';
@@ -43,6 +44,7 @@ const ACTIVITY_CAP = 20;
     WsDatePicker,
     EventLine,
     WorkstreamRow,
+    ProjectMilestones,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -97,6 +99,8 @@ const ACTIVITY_CAP = 20;
               (save)="update({ description: $event.trim() || null })"
             />
           </section>
+
+          <app-project-milestones [project]="p" />
 
           <section class="min-w-0">
             <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
@@ -253,7 +257,11 @@ export class ProjectDetailPage {
   });
   protected readonly activity = computed(() => {
     const id = this.project()?.id;
-    return id ? ([...(this.store.eventsBySubject().get(`project:${id}`) ?? [])] as DomainEvent[]).sort((a, b) => (a.at < b.at ? 1 : -1)) : [];
+    if (!id) return [] as DomainEvent[];
+    const own = this.store.eventsBySubject().get(`project:${id}`) ?? [];
+    // milestone events carry the project in their data
+    const milestones = this.store.events().filter((e) => e.subject.type === 'milestone' && e.data?.['projectId'] === id);
+    return [...own, ...milestones].sort((a, b) => (a.at < b.at ? 1 : -1));
   });
   protected readonly shownActivity = computed(() =>
     this.allActivity() ? this.activity() : this.activity().slice(0, ACTIVITY_CAP),

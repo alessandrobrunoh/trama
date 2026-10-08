@@ -13,7 +13,7 @@ import { ProviderIcon } from '../../shared/provider-icon';
 import { StatusIcon } from '../../shared/status';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProgressChart } from '../milestones/progress-chart';
-import { WsMilestones } from '../milestones/ws-milestones';
+import { WsProjectMilestones } from '../milestones/ws-project-milestones';
 import { Picker } from '../workstreams/picker';
 import { WsActions } from '../workstreams/ws-actions';
 import { issueCounts, statusOptions, userOptions } from '../workstreams/ws-model';
@@ -36,7 +36,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
     IssueProgress,
     WsDatePicker,
     ProgressChart,
-    WsMilestones,
+    WsProjectMilestones,
   ],
   host: { class: 'flex min-h-0 flex-col' },
   template: `
@@ -85,7 +85,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
           <h3 class="mb-2 text-sm font-semibold">Progress</h3>
           <app-progress-chart [ws]="w" [height]="170" />
         </section>
-        <app-ws-milestones [ws]="w" [showChart]="false" />
+        <app-ws-project-milestones [ws]="w" />
       </div>
     </div>
     <footer class="border-t px-4 py-2.5">

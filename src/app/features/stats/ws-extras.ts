@@ -58,7 +58,7 @@ const STATE_META: Record<MilestoneState, { label: string; cls: string; order: nu
           <thead>
             <tr class="text-muted-foreground">
               <th class="px-2 py-1.5 text-start font-medium">Milestone</th>
-              <th class="px-2 py-1.5 text-start font-medium">Workstream</th>
+              <th class="px-2 py-1.5 text-start font-medium">Project</th>
               <th class="px-2 py-1.5 text-start font-medium">Target</th>
               <th class="px-2 py-1.5 text-start font-medium">Progress</th>
               <th class="px-2 py-1.5 text-start font-medium">Projected</th>
@@ -70,7 +70,7 @@ const STATE_META: Record<MilestoneState, { label: string; cls: string; order: nu
               <tr class="hover:bg-hover border-border/60 border-t" [attr.title]="m.detail">
                 <td class="max-w-48 truncate px-2 py-1.5 font-medium">{{ m.name }}</td>
                 <td class="px-2 py-1.5">
-                  <a class="text-muted-foreground hover:text-foreground font-mono text-[11px] hover:underline" [routerLink]="['/', slug(), 'workstreams', m.workstreamKey]">{{ m.workstreamKey }}</a>
+                  <a class="text-muted-foreground hover:text-foreground font-mono text-[11px] hover:underline" [routerLink]="['/', slug(), 'projects', m.projectId]">{{ m.projectName }}</a>
                 </td>
                 <td class="px-2 py-1.5 tabular-nums">{{ m.target ? fmt(m.target) : '—' }}</td>
                 <td class="px-2 py-1.5">
@@ -123,7 +123,7 @@ export class WsExtras {
   protected readonly rows = computed<MilestoneRow[]>(() => {
     const ids = this.wsIds();
     return milestoneRows(this.data(), this.now())
-      .filter((m) => !ids || ids.has(m.workstreamId))
+      .filter((m) => !ids || m.workstreamIds.some((w) => ids.has(w)))
       .sort((a, b) => STATE_META[a.state].order - STATE_META[b.state].order || (a.target ?? Infinity) - (b.target ?? Infinity));
   });
 

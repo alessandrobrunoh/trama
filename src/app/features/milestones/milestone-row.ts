@@ -1,4 +1,4 @@
-// One milestone in a workstream: diamond · name · "61% of ◬ 7" · target date · ⋯. Click expands the
+// One milestone in a project: diamond · name · "61% of ◬ 7" · target date · ⋯. Click expands the
 // description, the milestone's own progress chart and its issues (assign / remove inline).
 import { CdkDragHandle } from '@angular/cdk/drag-drop';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
@@ -22,7 +22,7 @@ import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, isOverdue, shortDate, type Milestone, type Workstream } from '../../core';
+import { NablaStore, isOverdue, shortDate, type Milestone, type Project } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { Estimate } from '../../shared/estimate';
 import { KeyChip } from '../../shared/key-chip';
@@ -140,7 +140,7 @@ import { ProgressChart } from './progress-chart';
           (save)="actions.setDescription(m, $event)"
         />
         @if (s.issues > 0) {
-          <app-progress-chart [ws]="ws()" [milestone]="m" [height]="160" [compact]="true" />
+          <app-progress-chart [project]="project()" [milestone]="m" [height]="160" [compact]="true" />
         }
         <div>
           <div class="mb-1 flex items-center gap-2">
@@ -150,7 +150,7 @@ import { ProgressChart } from './progress-chart';
                 class="ml-auto"
                 variant="bare"
                 label="Add issues to milestone"
-                searchPlaceholder="Search workstream issues…"
+                searchPlaceholder="Search project issues…"
                 triggerClass="text-muted-foreground hover:text-foreground h-6 gap-1 px-1.5 text-xs"
                 align="end"
                 [options]="addOptions()"
@@ -239,8 +239,10 @@ export class MilestoneRow {
   protected readonly actions = inject(MilestoneActions);
 
   readonly ms = input.required<Milestone>();
-  readonly ws = input.required<Workstream>();
-  /** Position among the workstream's milestones (for move up / down). */
+  readonly project = input.required<Project>();
+  /** Show without any editing (the workstream page lists its project's milestones this way). */
+  readonly readonly = input(false);
+  /** Position among the project's milestones (for move up / down). */
   readonly index = input(0);
   readonly count = input(1);
 
@@ -264,7 +266,7 @@ export class MilestoneRow {
   protected readonly fmtNum = fmtNum;
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly canEdit = computed(() => this.store.canEditTeamWork(this.ws().ownerTeamId));
+  protected readonly canEdit = computed(() => !this.readonly() && this.store.allowed('manageProjects'));
   protected readonly stats = computed(() => this.info.stats().get(this.ms().id)!);
   protected readonly state = computed(() => this.info.states().get(this.ms().id) ?? 'idle');
   protected readonly label = computed(() => progressLabel(this.stats()));
@@ -277,7 +279,7 @@ export class MilestoneRow {
       ? `${s.doneIssues} of ${s.issues} issues done${s.points ? ` · ◬ ${fmtNum(s.completed)} of ${fmtNum(s.scope)} points` : ''}`
       : 'No issues in this milestone';
   });
-  protected readonly addable = computed(() => (this.store.issuesByWorkstream().get(this.ws().id) ?? []).filter((i) => i.status !== 'canceled' && !i.milestoneIds?.includes(this.ms().id)));
+  protected readonly addable = computed(() => (this.store.issuesByProject().get(this.project().id) ?? []).filter((i) => i.status !== 'canceled' && !i.milestoneIds?.includes(this.ms().id)));
   protected readonly addOptions = computed(() => issueOptions(this.addable()));
 
   constructor() {
@@ -316,11 +318,11 @@ export class MilestoneRow {
 
   protected addIssue(id: string | undefined): void {
     const issue = id ? this.store.getIssue(id) : undefined;
-    if (issue) this.actions.assign(issue, this.ws().id, this.ms().id);
+    if (issue) this.actions.assign(issue, this.project().id, this.ms().id);
   }
 
   protected removeIssue(id: string): void {
     const issue = this.store.getIssue(id);
-    if (issue) this.actions.assign(issue, this.ws().id, null);
+    if (issue) this.actions.assign(issue, this.project().id, null);
   }
 }

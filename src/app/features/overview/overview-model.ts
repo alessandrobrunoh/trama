@@ -238,13 +238,16 @@ export class OverviewModel {
   readonly upcomingAll = computed<UpcomingItem[]>(() => {
     const today = startOfDay(Date.now());
     const activeIds = new Map(this.rows().map((r) => [r.ws.id, r] as const));
+    // A milestone is shown against an in-flight workstream of its project (the first one).
+    const rowByProject = new Map<string, (typeof this.rows extends () => (infer R)[] ? R : never)>();
+    for (const r of activeIds.values()) if (r.ws.projectId && !rowByProject.has(r.ws.projectId)) rowByProject.set(r.ws.projectId, r);
     const stats = this.ms.stats();
     const states = this.ms.states();
     const items: UpcomingItem[] = [];
     const days = (iso: string): number => differenceInCalendarDays(parseISO(iso), today);
 
     for (const m of this.store.milestones() as readonly Milestone[]) {
-      const row = activeIds.get(m.workstreamId);
+      const row = rowByProject.get(m.projectId);
       const st = stats.get(m.id);
       if (!row || !st || st.complete || !m.targetDate) continue;
       const d = days(m.targetDate);

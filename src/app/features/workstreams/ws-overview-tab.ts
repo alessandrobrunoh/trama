@@ -10,7 +10,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { Clipboard, NablaStore, Notifier, isDeltaThreadUrl, type Workstream } from '../../core';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { WsSideCards } from '../milestones/ws-side-cards';
-import { WsMilestones } from '../milestones/ws-milestones';
+import { WsProjectMilestones } from '../milestones/ws-project-milestones';
 import { CommentThread } from './comments';
 import { CriteriaList } from './criteria-list';
 import { EditableMarkdown } from './inline-edit';
@@ -36,7 +36,7 @@ import { WsProperties } from './ws-properties';
     WsDependencies,
     WsInputRequests,
     WsIssuesSection,
-    WsMilestones,
+    WsProjectMilestones,
     WsSideCards,
     WsProperties,
     RelativeTimePipe,
@@ -66,7 +66,7 @@ import { WsProperties } from './ws-properties';
           <app-criteria-list [ws]="ws()" />
         </section>
 
-        <app-ws-milestones [ws]="ws()" [showChart]="false" />
+        <app-ws-project-milestones [ws]="ws()" />
 
         <app-ws-issues-section [ws]="ws()" />
 

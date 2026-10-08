@@ -9,6 +9,7 @@ import {
   LucideDynamicIcon,
   LucideFlag,
   LucideBox,
+  LucideDiamond,
   LucideFolderGit2,
   LucideGitPullRequest,
   LucideInbox,
@@ -283,6 +284,17 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
         text: str(d['fullName']) ?? store.getRepository(e.subject.id)?.fullName,
         link: e.type !== 'repository.deleted' ? ['/', slug, 'repositories', e.subject.id] : undefined,
       };
+    case 'milestone.created':
+    case 'milestone.updated':
+    case 'milestone.deleted': {
+      const projectId = str(d['projectId']);
+      return {
+        icon: LucideDiamond,
+        verb: `${e.type.split('.')[1]} milestone`,
+        text: str(d['name']) ?? store.getMilestone(e.subject.id)?.name,
+        link: projectId && store.getProject(projectId) ? ['/', slug, 'projects', projectId] : undefined,
+      };
+    }
     case 'project.created':
     case 'project.updated':
     case 'project.status_changed':

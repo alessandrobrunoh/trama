@@ -272,7 +272,7 @@ export interface UpdateIssueInput {
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
-  /** At most one per linked workstream; only milestones of linked workstreams. */
+  /** At most one per project; only milestones of the projects of the linked workstreams. */
   milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
@@ -287,11 +287,11 @@ export interface LinkIssueInput {
 
 // ───── milestones ─────
 export interface CreateMilestoneInput {
-  workstreamId: ID;
+  projectId: ID;
   name: string;
   description?: string;
   targetDate?: ISODate;
-  /** Defaults to last in the workstream. */
+  /** Defaults to last in the project. */
   sortOrder?: number;
 }
 export interface UpdateMilestoneInput {

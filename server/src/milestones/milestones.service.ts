@@ -3,11 +3,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef } from '../contracts/domain.js';
 import { notFound, toDate, uid } from '../common/util.js';
-import { MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { MilestoneEntity, ProjectEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
 export interface MilestoneInput {
-  workstreamId?: string;
+  projectId?: string;
   name?: string;
   description?: string | null;
   targetDate?: string | null;
@@ -22,14 +22,14 @@ export class MilestonesService {
     @InjectRepository(MilestoneEntity) private readonly repo: Repository<MilestoneEntity>,
   ) {}
 
-  list(workspaceId: string, f: { workstreamId?: string } = {}) {
+  list(workspaceId: string, f: { projectId?: string } = {}) {
     const qb = this.repo
       .createQueryBuilder('m')
       .where('m.workspaceId = :workspaceId', { workspaceId })
-      .orderBy('m.workstreamId', 'ASC')
+      .orderBy('m.projectId', 'ASC')
       .addOrderBy('m.sortOrder', 'ASC')
       .addOrderBy('m.createdAt', 'ASC');
-    if (f.workstreamId) qb.andWhere('m.workstreamId = :w', { w: f.workstreamId });
+    if (f.projectId) qb.andWhere('m.projectId = :w', { w: f.projectId });
     return qb.getMany();
   }
 
@@ -39,15 +39,15 @@ export class MilestonesService {
     return row;
   }
 
-  async create(workspaceId: string, actor: ActorRef, input: MilestoneInput & { workstreamId: string; name: string }) {
-    if (!(await this.ds.getRepository(WorkstreamEntity).existsBy({ id: input.workstreamId, workspaceId })))
-      throw new BadRequestException(`Unknown workstream "${input.workstreamId}"`);
+  async create(workspaceId: string, actor: ActorRef, input: MilestoneInput & { projectId: string; name: string }) {
+    if (!(await this.ds.getRepository(ProjectEntity).existsBy({ id: input.projectId, workspaceId })))
+      throw new BadRequestException(`Unknown project "${input.projectId}"`);
     let sortOrder = input.sortOrder;
     if (sortOrder === undefined) {
       const { max } = (await this.repo
         .createQueryBuilder('m')
         .select('MAX(m.sortOrder)', 'max')
-        .where('m.workspaceId = :workspaceId AND m.workstreamId = :w', { workspaceId, w: input.workstreamId })
+        .where('m.workspaceId = :workspaceId AND m.projectId = :w', { workspaceId, w: input.projectId })
         .getRawOne<{ max: number | null }>()) ?? { max: null };
       sortOrder = max === null || max === undefined ? 0 : Number(max) + 1;
     }
@@ -55,7 +55,7 @@ export class MilestonesService {
       this.repo.create({
         id: uid('ms'),
         workspaceId,
-        workstreamId: input.workstreamId,
+        projectId: input.projectId,
         name: input.name.trim(),
         description: input.description?.trim() || null,
         targetDate: (toDate(input.targetDate) as Date | null | undefined) ?? null,
@@ -67,13 +67,12 @@ export class MilestonesService {
       actor,
       type: 'milestone.created',
       subject: { type: 'milestone', id: row.id },
-      workstreamId: row.workstreamId,
-      data: { name: row.name },
+      data: { name: row.name, projectId: row.projectId },
     });
     return row;
   }
 
-  async update(workspaceId: string, actor: ActorRef, id: string, patch: Omit<MilestoneInput, 'workstreamId'>) {
+  async update(workspaceId: string, actor: ActorRef, id: string, patch: Omit<MilestoneInput, 'projectId'>) {
     const row = await this.get(workspaceId, id);
     const fields: string[] = [];
     const set = <K extends keyof MilestoneEntity>(k: K, v: MilestoneEntity[K]) => {
@@ -94,18 +93,17 @@ export class MilestonesService {
       actor,
       type: 'milestone.updated',
       subject: { type: 'milestone', id },
-      workstreamId: row.workstreamId,
-      data: { name: row.name, fields },
+      data: { name: row.name, projectId: row.projectId, fields },
     });
     return row;
   }
 
-  /** Assigns sortOrder 0..n-1 following `ids` (all milestones of the workstream, in the new order). */
-  async reorder(workspaceId: string, actor: ActorRef, workstreamId: string, ids: string[]) {
-    const rows = await this.repo.findBy({ workspaceId, workstreamId });
+  /** Assigns sortOrder 0..n-1 following `ids` (all milestones of the project, in the new order). */
+  async reorder(workspaceId: string, actor: ActorRef, projectId: string, ids: string[]) {
+    const rows = await this.repo.findBy({ workspaceId, projectId });
     const byId = new Map(rows.map((r) => [r.id, r]));
     if (new Set(ids).size !== ids.length || ids.some((id) => !byId.has(id)))
-      throw new BadRequestException('ids must be distinct milestones of the workstream');
+      throw new BadRequestException('ids must be distinct milestones of the project');
     // Milestones not listed keep their relative order after the listed ones.
     const rest = rows.filter((r) => !ids.includes(r.id)).sort((a, b) => a.sortOrder - b.sortOrder);
     const ordered = [...ids.map((id) => byId.get(id)!), ...rest];
@@ -124,10 +122,9 @@ export class MilestonesService {
         actor,
         type: 'milestone.updated',
         subject: { type: 'milestone', id: r.id },
-        workstreamId,
-        data: { name: r.name, fields: ['sortOrder'] },
+        data: { name: r.name, projectId, fields: ['sortOrder'] },
       });
-    return this.list(workspaceId, { workstreamId });
+    return this.list(workspaceId, { projectId });
   }
 
   async remove(workspaceId: string, actor: ActorRef, id: string) {
@@ -147,8 +144,7 @@ export class MilestonesService {
       actor,
       type: 'milestone.deleted',
       subject: { type: 'milestone', id },
-      workstreamId: row.workstreamId,
-      data: { name: row.name },
+      data: { name: row.name, projectId: row.projectId },
     });
     // issues that were in the milestone changed too: let other tabs refetch them
     for (const r of affected.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id: r.id });

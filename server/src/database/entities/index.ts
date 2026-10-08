@@ -281,17 +281,17 @@ export class WorkstreamEntity extends Wire {
 
 @Entity('milestones')
 @Index('IDX_milestones_workspace', ['workspaceId'])
-@Index('IDX_milestones_workstream', ['workstreamId'])
+@Index('IDX_milestones_project', ['projectId'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
-@ForeignKey(() => WorkstreamEntity, ['workstreamId'], ['id'], {
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
   onDelete: 'CASCADE',
 })
 export class MilestoneEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) workstreamId: string;
+  @Column({ type: 'varchar' }) projectId: string;
   @Column({ type: 'varchar' }) name: string;
   @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;

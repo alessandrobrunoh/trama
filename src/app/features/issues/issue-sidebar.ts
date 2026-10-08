@@ -96,7 +96,7 @@ export class IssueSideWorkstreams {
       const counted = (byWs.get(id) ?? []).filter((i) => i.status !== 'canceled');
       const ms = (issue.milestoneIds ?? []).flatMap((mid) => {
         const m = this.store.getMilestone(mid);
-        if (!m || m.workstreamId !== id) return [];
+        if (!m || !ws.projectId || m.projectId !== ws.projectId) return [];
         return [{ id: m.id, n: this.milestones.ordinal(m), name: m.name, fraction: stats.get(m.id)?.fraction ?? 0, state: states.get(m.id) ?? 'idle' }];
       });
       return [{ ws, total: counted.length, done: counted.filter((i) => i.status === 'done').length, milestones: ms }];

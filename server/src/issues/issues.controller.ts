@@ -105,7 +105,7 @@ class UpdateIssueDto {
   @IsArray()
   @IsString({ each: true })
   workstreamIds?: string[];
-  /** At most one milestone per linked workstream. */
+  /** At most one milestone per project of the linked workstreams. */
   @OptionalNotNull()
   @IsArray()
   @IsString({ each: true })

@@ -53,9 +53,19 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   const S = (h: string) => `https://delta.dev/t/${h}`;
 
+  // ───────── projects (planning level; workstreams below carry them out)
+  const pAuth = b.project({
+    name: 'Auth hardening', summary: 'Safer sessions and key management across api, web and auth-service.',
+    color: '#8b5cf6', status: 'in_progress', priority: 'high', lead: maya, teams: [AUTH, SEC], start: 25, target: 20, created: 26, createdBy: maya,
+  });
+  const pCheckout = b.project({
+    name: 'Checkout v2', summary: 'A faster, server-driven checkout that matches the new brand.',
+    color: '#f59e0b', status: 'in_progress', priority: 'high', lead: priya, teams: [WEB, PAY, PLAT], start: 40, target: 30, created: 41, createdBy: priya,
+  });
+
   // ═══════════════════════════ AUTH-42 — needs_input ═══════════════════════════
   const auth42 = b.workstream({
-    key: 'AUTH-42',
+    key: 'AUTH-42', project: pAuth,
     title: 'Improve refresh token rotation',
     objective: 'Users remain authenticated while refresh tokens rotate safely.',
     context:
@@ -118,7 +128,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   // ═══════════════════════════ WEB-81 — in_review ═══════════════════════════
   const web81 = b.workstream({
-    key: 'WEB-81', title: 'Checkout redesign', objective: 'A faster, accessible checkout that matches the new brand and keeps conversion tracking intact.',
+    key: 'WEB-81', project: pCheckout, title: 'Checkout redesign', objective: 'A faster, accessible checkout that matches the new brand and keeps conversion tracking intact.',
     context: 'Checkout is the highest-drop-off flow. Design delivered v3 in Figma; engineering to ship behind the existing feature flag.',
     owner: WEB, participating: [PAY], accountable: ale, repos: [rWeb], priority: 'high', labels: ['checkout', 'design'],
     criteria: [['Matches the approved Figma spec', 'met'], ['Lighthouse accessibility score >= 95', 'in_progress'], ['Conversion analytics events keep parity', 'pending']],
@@ -152,7 +162,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   // ═══════════════════════════ AUTH-39 — shipped (deployment healthy) ═══════════════════════════
   const auth39 = b.workstream({
-    key: 'AUTH-39', title: 'Rotate JWT signing keys', objective: 'Signing keys rotate automatically every 90 days with zero downtime.',
+    key: 'AUTH-39', project: pAuth, title: 'Rotate JWT signing keys', objective: 'Signing keys rotate automatically every 90 days with zero downtime.',
     owner: AUTH, participating: [INF], accountable: maya, repos: [rAuth], priority: 'medium', labels: ['auth', 'security'],
     criteria: [['JWKS endpoint serves current and previous keys', 'met'], ['Rotation runs from a scheduled job', 'met'], ['Runbook published', 'met']],
     path: ['draft', 'planned', 'working', 'in_review', 'ready_to_land', 'shipped'], created: 28, shipped: 0.12, createdBy: maya,
@@ -177,7 +187,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   // ═══════════════════════════ PLAT-7 — Checkout rewrite (multi-team, working) ═══════════════════════════
   const plat7 = b.workstream({
-    key: 'PLAT-7', title: 'Checkout rewrite', objective: 'Replace the legacy checkout with a server-driven flow owned jointly by Payments, Identity, Web and Infra.',
+    key: 'PLAT-7', project: pCheckout, title: 'Checkout rewrite', objective: 'Replace the legacy checkout with a server-driven flow owned jointly by Payments, Identity, Web and Infra.',
     context: 'The legacy checkout duplicates pricing logic in three places and cannot support 3DS2 or saved methods. One workstream coordinates all four teams.',
     owner: PLAT, participating: [PAY, AUTH, WEB, INF], accountable: maya, repos: [rApi, rWeb, rPay, rAuth], priority: 'urgent', labels: ['checkout', 'multi-team'],
     criteria: [['Server-side cart and pricing is the single source of truth', 'in_progress'], ['3DS2 challenge flow supported', 'in_progress'], ['Load test passes at 3x Black Friday traffic', 'pending'], ['Legacy checkout removed', 'pending']],
@@ -197,7 +207,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   // ═══════════════════════════ PAY-22 — blocked (dependency on AUTH-42) ═══════════════════════════
   const pay22 = b.workstream({
-    key: 'PAY-22', title: 'Saved payment methods migration', objective: 'Migrate stored cards to network tokens without re-entering details.',
+    key: 'PAY-22', project: pCheckout, title: 'Saved payment methods migration', objective: 'Migrate stored cards to network tokens without re-entering details.',
     owner: PAY, participating: [AUTH], accountable: jonas, repos: [rPay], priority: 'high', labels: ['payments'],
     criteria: [['All stored cards migrated to network tokens', 'pending'], ['No customer re-authentication required', 'pending']],
     path: ['draft', 'planned', 'blocked'], created: 12, createdBy: jonas,
@@ -310,9 +320,10 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   adr(22, 'Audit log retention: 400 days hot, 7 years cold', 'Keep audit logs queryable for 400 days, then archive to cold storage for 7 years.', 'Covers SOC 2 and the longest regulatory retention requirement we know of.', ['compliance', 'security'], { by: agent(claude), created: 3, origin: sec11, related: [sec11], status: 'proposed' });
   adr(23, 'Hash refresh tokens at rest with HMAC-SHA256', 'Refresh tokens are stored as HMAC-SHA256 digests keyed with a server secret, never in plaintext.', 'A database leak must not expose usable refresh tokens.', ['auth', 'security'], { by: agent(claude), created: 2, origin: auth42, related: [auth42], status: 'proposed' });
 
-  // ───────── milestones
-  const ms42Replay = b.milestone(auth42, { name: 'Replay detection', description: 'Shared replay detection across both refresh paths.', target: -2, sort: 0, created: 20 });
-  const ms42Rollout = b.milestone(auth42, { name: 'Rollout and metrics', description: 'Gradual rollout with rotation metrics in place.', target: 6, sort: 1, created: 20 });
+  // ───────── milestones (of the projects)
+  b.syncProjectRepos();
+  const ms42Replay = b.milestone(pAuth, { name: 'Replay detection', description: 'Shared replay detection across both refresh paths.', target: -2, sort: 0, created: 20 });
+  const ms42Rollout = b.milestone(pAuth, { name: 'Rollout and metrics', description: 'Gradual rollout with rotation metrics in place.', target: 6, sort: 1, created: 20 });
 
   // ───────── issues
   const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, created: 24, moved: 21, movedBy: maya });

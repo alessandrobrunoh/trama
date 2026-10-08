@@ -282,13 +282,13 @@ export class WsIssuesSection {
   });
   protected readonly milestones = computed(() => this.store.milestonesByWorkstream().get(this.ws().id) ?? []);
   protected readonly hasMilestones = computed(() => this.milestones().length > 0);
-  protected readonly milestoneOpts = computed(() => this.msActions.options(this.ws().id));
+  protected readonly milestoneOpts = computed(() => (this.ws().projectId ? this.msActions.options(this.ws().projectId!) : []));
   protected readonly groupByMilestone = signal(false);
   protected readonly grouped = computed(() => this.groupByMilestone() && this.hasMilestones());
   protected readonly groups = computed<{ key: string; ms: Milestone | null; issues: Issue[] }[]>(() => {
     const list = this.issues();
     const out = this.milestones().map((m) => ({ key: m.id, ms: m as Milestone | null, issues: list.filter((i) => i.milestoneIds?.includes(m.id)) }));
-    const rest = list.filter((i) => !this.msActions.milestoneOf(i, this.ws().id));
+    const rest = list.filter((i) => !this.milestoneOf(i));
     if (rest.length) out.push({ key: 'none', ms: null, issues: rest });
     return out;
   });
@@ -324,7 +324,8 @@ export class WsIssuesSection {
   }
 
   protected milestoneOf(i: Issue): Milestone | undefined {
-    return this.msActions.milestoneOf(i, this.ws().id);
+    const projectId = this.ws().projectId;
+    return projectId ? this.msActions.milestoneOf(i, projectId) : undefined;
   }
 
   protected milestoneValue(i: Issue): string[] {
@@ -333,7 +334,8 @@ export class WsIssuesSection {
   }
 
   protected setMilestone(i: Issue, id: string | undefined): void {
-    this.msActions.assign(i, this.ws().id, id ?? null);
+    const projectId = this.ws().projectId;
+    if (projectId) this.msActions.assign(i, projectId, id ?? null);
   }
 
   protected shortDay(iso: string): string {
