@@ -82,7 +82,7 @@ export class InputRequestsService {
       type: 'input.updated',
       subject: { type: 'input_request', id },
       workstreamId: row.workstreamId,
-      data: { fields: Object.keys(patch) },
+      data: { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) },
     });
     await this.bus.touch(workspaceId, row.workstreamId, 'input.updated');
     return row;

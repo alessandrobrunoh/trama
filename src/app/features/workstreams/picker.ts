@@ -14,9 +14,10 @@ import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import type { ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
+import { EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { ProviderIcon, type AnyProvider } from '../../shared/provider-icon';
-import { StatusIcon, type AnyStatus } from '../../shared/status';
+import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import type { Priority } from '../../core';
 
 export type PickKind =
@@ -29,7 +30,8 @@ export type PickKind =
   | 'actor'
   | 'provider'
   | 'repo'
-  | 'label';
+  | 'label'
+  | 'estimate';
 
 export interface PickOption {
   value: string;
@@ -41,8 +43,14 @@ export interface PickOption {
   search?: string;
   /** Status glyph when it differs from `value` (kind `status`). */
   status?: string;
+  /** Glyph family for `status` options (workstreams = hexagons, issues = circles). */
+  statusEntity?: StatusEntity;
   /** Git provider for `repo` options. */
   provider?: string;
+  /** Single key that picks this option while the list is open and not searchable ("3", "m"). */
+  quickKey?: string;
+  /** 0..1 position on the estimate scale (kind `estimate`); omitted/0 = empty glyph. */
+  fraction?: number;
 }
 
 /** "user:usr_1" → ActorRef. */
@@ -58,6 +66,9 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
  *  - `field` : borderless row button for property panels
  *  - `input` : bordered full-width control for forms
  *  - `ghost` : compact ghost button (summary text only)
+ *  - `bare`  : the projected content IS the trigger (inline row editors: a status glyph, an avatar…)
+ *
+ * `open()` / `close()` open the list programmatically (keyboard shortcuts).
  */
 @Component({
   selector: 'app-picker',
@@ -71,12 +82,25 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     PriorityIcon,
     ActorAvatar,
     ProviderIcon,
+    EstimateGlyph,
     NgTemplateOutlet,
   ],
   host: { class: 'inline-block min-w-0 max-w-full' },
   template: `
-    <hlm-popover align="start" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
+    <hlm-popover [align]="align()" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
       @switch (variant()) {
+        @case ('bare') {
+          <button
+            hlmPopoverTrigger
+            type="button"
+            class="focus-visible:ring-ring hover:bg-accent inline-flex min-w-0 max-w-full items-center rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
+            [class]="triggerClass()"
+            [disabled]="disabled()"
+            [attr.aria-label]="label()"
+          >
+            <ng-content />
+          </button>
+        }
         @case ('chip') {
           <button
             hlmBtn
@@ -185,16 +209,19 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
       }
 
       <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-60 p-0 sm:w-64">
-        <hlm-command class="h-auto max-h-[22rem] rounded-lg">
+        <hlm-command class="h-auto max-h-[22rem] rounded-lg" (keydown)="onQuickKey($event)">
           @if (searchable()) {
             <hlm-command-input [placeholder]="searchPlaceholder() ?? 'Search ' + label().toLowerCase() + '…'" />
           }
           <div *hlmCommandEmptyState hlmCommandEmpty>No matches.</div>
           <hlm-command-list class="max-h-64">
             <hlm-command-group>
-              @if (clearable() && selected().length > 0) {
+              @if (clearable() && (clearAlways() || selected().length > 0)) {
                 <button hlmCommandItem value="__clear" (selected)="clear()">
-                  <span class="text-muted-foreground">{{ clearLabel() }}</span>
+                  <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ clearLabel() }}</span>
+                  @if (clearAlways() && selected().length === 0) {
+                    <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
+                  }
                 </button>
               }
               @for (o of options(); track o.value) {
@@ -226,7 +253,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     <ng-template #glyph let-o>
       @switch (o.kind ?? 'plain') {
         @case ('status') {
-          <app-status-icon [status]="asStatus(o.status ?? o.value)" />
+          <app-status-icon [status]="asStatus(o.status ?? o.value)" [entity]="o.statusEntity ?? 'auto'" />
         }
         @case ('priority') {
           <app-priority-icon [priority]="asPriority(o.value)" />
@@ -252,6 +279,9 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
         @case ('label') {
           <span class="bg-muted-foreground/50 size-2 shrink-0 rounded-full"></span>
         }
+        @case ('estimate') {
+          <app-estimate-glyph class="text-muted-foreground" [fraction]="o.fraction ?? 0" [size]="14" />
+        }
       }
     </ng-template>
   `,
@@ -261,12 +291,17 @@ export class Picker {
   /** Selected values. */
   readonly value = input<readonly string[]>([]);
   readonly multiple = input(false);
-  readonly variant = input<'chip' | 'field' | 'input' | 'ghost'>('input');
+  readonly variant = input<'chip' | 'field' | 'input' | 'ghost' | 'bare'>('input');
+  /** Extra classes for the `bare` trigger button. */
+  readonly triggerClass = input('');
+  readonly align = input<'start' | 'center' | 'end'>('start');
   readonly label = input('Select');
   readonly placeholder = input('None');
   readonly searchPlaceholder = input<string>();
   readonly searchable = input(true);
   readonly clearable = input(false);
+  /** Keep the clear row ("No estimate") at the top even when nothing is selected, checked when empty. */
+  readonly clearAlways = input(false);
   readonly clearLabel = input('Clear');
   readonly disabled = input(false);
   readonly icon = input<LucideIcon | null>(null);
@@ -290,6 +325,25 @@ export class Picker {
     return s.length <= 2 ? s.map((x) => x.label).join(', ') : `${s.length} selected`;
   });
   private readonly selectedSet = computed(() => new Set(this.value()));
+
+  /** Open the option list (e.g. from a keyboard shortcut). */
+  open(): void {
+    if (!this.disabled()) this.state.set('open');
+  }
+
+  close(): void {
+    this.state.set('closed');
+  }
+
+  /** Option shortcuts (`quickKey`) in lists without a search box. */
+  protected onQuickKey(e: KeyboardEvent): void {
+    if (this.searchable() || e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+    const k = e.key.toLowerCase();
+    const hit = this.options().find((o) => o.quickKey === k);
+    if (!hit) return;
+    e.preventDefault();
+    this.pick(hit);
+  }
 
   protected isSelected(v: string): boolean {
     return this.selectedSet().has(v);

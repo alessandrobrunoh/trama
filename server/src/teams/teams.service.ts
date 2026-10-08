@@ -1,7 +1,7 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
-import type { ActorRef } from '../contracts/domain.js';
+import type { ActorRef, TeamEditPolicy } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
 import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
@@ -13,6 +13,8 @@ export interface TeamInput {
   color?: string;
   description?: string | null;
   memberIds?: string[];
+  leadIds?: string[];
+  editPolicy?: TeamEditPolicy;
 }
 
 const KEY_RE = /^[A-Z][A-Z0-9]{1,7}$/;
@@ -42,6 +44,9 @@ export class TeamsService {
 
   async create(workspaceId: string, actor: ActorRef, input: TeamInput & { name: string; key: string }) {
     await this.refs.users(workspaceId, input.memberIds);
+    const memberIds = unique(input.memberIds);
+    const leadIds = unique(input.leadIds);
+    if (leadIds.some((id) => !memberIds.includes(id))) throw new BadRequestException('leadIds must be members of the team');
     if (await this.repo.existsBy({ workspaceId, key: input.key }))
       throw new ConflictException(`Team key "${input.key}" is already used`);
     const team = await this.repo.save(
@@ -52,7 +57,9 @@ export class TeamsService {
         key: input.key,
         color: input.color ?? '#6b7280',
         description: input.description ?? null,
-        memberIds: unique(input.memberIds),
+        memberIds,
+        leadIds,
+        editPolicy: input.editPolicy ?? 'workspace',
       }),
     );
     await this.events.record({ workspaceId, actor, type: 'team.created', subject: { type: 'team', id: team.id }, data: { key: team.key } });
@@ -66,8 +73,16 @@ export class TeamsService {
     if (patch.color !== undefined) team.color = patch.color;
     if (patch.description !== undefined) team.description = patch.description;
     if (patch.memberIds !== undefined) team.memberIds = unique(patch.memberIds);
+    if (patch.leadIds !== undefined) {
+      const leads = unique(patch.leadIds);
+      if (leads.some((id) => !team.memberIds.includes(id))) throw new BadRequestException('leadIds must be members of the team');
+      team.leadIds = leads;
+    } else if (patch.memberIds !== undefined) {
+      team.leadIds = team.leadIds.filter((id) => team.memberIds.includes(id));
+    }
+    if (patch.editPolicy !== undefined) team.editPolicy = patch.editPolicy;
     await this.repo.save(team);
-    await this.events.record({ workspaceId, actor, type: 'team.updated', subject: { type: 'team', id: team.id }, data: { fields: Object.keys(patch) } });
+    await this.events.record({ workspaceId, actor, type: 'team.updated', subject: { type: 'team', id: team.id }, data: { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) } });
     return team;
   }
 

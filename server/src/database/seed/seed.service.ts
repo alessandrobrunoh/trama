@@ -13,6 +13,7 @@ import {
   IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
+  MilestoneEntity,
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
@@ -44,7 +45,7 @@ export class SeedService implements OnApplicationBootstrap {
   /** Wipes every table and re-inserts the demo workspace (dates relative to now). */
   async reset(): Promise<void> {
     const passwordHash = await argon2.hash(DEMO_PASSWORD);
-    const data = createSeed(Date.now(), passwordHash);
+    const data = createSeed(Date.now(), passwordHash, { mockHistory: process.env.SEED_MOCK_HISTORY !== 'false' });
     await this.ds.transaction(async (m) => {
       const tables = ENTITIES.map((e) => `"${this.ds.getMetadata(e).tableName}"`);
       await m.query(`TRUNCATE ${tables.join(', ')} CASCADE`);
@@ -55,6 +56,7 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, TeamEntity, data.teams);
       await insert(m, RepositoryEntity, data.repositories);
       await insert(m, WorkstreamEntity, data.workstreams);
+      await insert(m, MilestoneEntity, data.milestones);
       await insert(m, InputRequestEntity, data.inputRequests);
       await insert(m, IssueEntity, data.issues);
       await insert(m, ArtifactEntity, data.artifacts);

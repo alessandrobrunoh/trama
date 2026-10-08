@@ -103,6 +103,7 @@ api.workstreams.graph(slug,idOrKey) -> GraphResponse
 api.executions.list|get|create|update|remove|progress(slug,id,{note,state?})|complete(slug,id,note?)
 api.inputRequests.list|create|answer(slug,id,answer)|dismiss(slug,id)
 api.issues.list|get|create|update|remove|link(slug,idOrKey,{workstreamIds?,createWorkstream?,status?})
+api.milestones.list(slug,workstreamId?)|create({workstreamId,name,description?,targetDate?,sortOrder?})|update(id,{name?,description?,targetDate?,sortOrder?})|reorder(slug,workstreamId,ids)|remove(id)
 api.artifacts.list|create|update|remove          api.decisions.list|get|create|update|remove|accept(slug,id)|reject(slug,id)|supersede(slug,id,byId)
 api.dependencies.list|create({fromType,fromId,toType,toId})|remove
 api.comments.list(slug,{type,id}?)|create({subject,body})|update(slug,id,body)|remove
@@ -149,12 +150,12 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 
 **Meta signals**: `workspace`, `me` (User), `myRole`.
 
-**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `workstreams`, `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
+**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `workstreams`, `milestones` (by workstream then `sortOrder`), `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
 
 **Lookup computeds** (Maps; use `.get(...)` after calling the signal: `store.teamById().get(id)`):
 - by id: `userById`, `agentById`, `teamById`, `repositoryById`, `workstreamById`, `executionById`, `inputRequestById`, `issueById`, `artifactById`, `decisionById`, `viewById`, `integrationById`
 - by key (UPPER-CASE keys): `workstreamByKey` (AUTH-42), `issueByKey` (BUG-142), `decisionByKey` (ADR-7), `teamByKey` (AUTH); `membershipByUserId`
-- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `decisionsByWorkstream` (origin or related), `issuesByWorkstream`, `issuesByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
+- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `decisionsByWorkstream` (origin or related), `issuesByWorkstream`, `issuesByMilestone`, `milestonesByWorkstream` (workstream id -> milestones by `sortOrder`), `issuesByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
 - lists: `members` (`{membership,user}[]`), `openInputRequests`, `myTeams`, `myTeamIds`, `myWorkstreams` (I am accountable), `actors` (`ResolvedActor[]`: all users+agents+teams, for pickers)
 - attention: `openAttention` (state open, severity then newest), `snoozedAttention`, `attentionByKind` (Map<AttentionKind, AttentionItem[]>), `attentionCounts` (`Record<AttentionKind, number>`, zeros included), `attentionCount` (total open; sidebar badge), `highAttentionCount`, `backlogIssues`, `backlogIssueCount`
 
@@ -195,7 +196,14 @@ answerInput(id: ID, answer: string): Promise<boolean>        // also clears its 
 dismissInput(id: ID): Promise<boolean>
 // issues
 createIssue(input: CreateIssueInput): Promise<Issue | undefined>
-updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean>
+updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean>   // patch: estimate (null clears), milestoneIds, kind (waits for server: re-keys)
+changeIssueKind(id: ID, kind: IssueKind): Promise<Issue | undefined>   // resolves the issue with its new key; old key stays in issue.aliases
+// milestones
+createMilestone(input: CreateMilestoneInput): Promise<Milestone | undefined>
+updateMilestone(id: ID, patch: UpdateMilestoneInput): Promise<boolean>
+deleteMilestone(id: ID): Promise<boolean>              // also strips it from issues.milestoneIds
+reorderMilestones(workstreamId: ID, ids: readonly ID[]): Promise<boolean>
+getMilestone(id): Milestone | undefined   // milestoneById map; getIssue(ref) also matches aliases
 deleteIssue(id: ID): Promise<boolean>
 linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined>   // {workstreamIds?, createWorkstream?, status?}
 // artifacts, decisions, dependencies
@@ -227,7 +235,7 @@ createRepository / updateRepository(id, patch) / deleteRepository(id)
 addMember({email, role}) / updateMemberRole(membershipId, role) / removeMember(membershipId)
 createAgent({name, provider, description?, ownerUserId?}) / updateAgent(id, patch) / deleteAgent(id)
 loadTokens(): Promise<void>   createToken({name, agentId?, expiresAt?}): Promise<{token, secret} | undefined>   deleteToken(id)   // secret is shown once
-createIntegration({provider, account?, baseUrl?, token?, webhookSecret?}) / deleteIntegration(id) / syncIntegration(id)
+createIntegration({provider, token, baseUrl?}) → {connection, webhook?} / updateIntegration(id, {token?, baseUrl?}) / rotateWebhookSecret(id) / deleteIntegration(id) / loadIntegrationDetails() + integrationDetails() / remoteRepositories(id, page?) / linkRepository(id, {fullName, teamIds?}) / unlinkRepository(id, repositoryId)
 ```
 Workspace-level admin (rename, delete) is on SessionStore (`updateWorkspace`, `deleteWorkspace`).
 

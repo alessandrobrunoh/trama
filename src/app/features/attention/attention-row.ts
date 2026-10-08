@@ -17,6 +17,7 @@ import {
   LucideCheck,
   LucideClock,
   LucideDynamicIcon,
+  LucideArrowRight,
   LucideExternalLink,
   LucideEllipsis,
   LucideMessageSquareReply,
@@ -28,10 +29,10 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { toast } from '@spartan-ng/brain/sonner';
-import { NablaStore, shortDate, type AttentionItem } from '../../core';
-import { Kbd, KeyChip } from '../../shared';
+import { ATTENTION_KIND_META, NablaStore, Notifier, shortDate, type AttentionItem } from '../../core';
+import { ActorAvatar, EntityChip, Kbd, RelativeTimePipe, type EntityChipType } from '../../shared';
 import { AgoPipe } from '../overview/ago';
-import { ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
+import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
 import { snoozePresets, type SnoozePreset } from './snooze';
 
 /**
@@ -49,8 +50,10 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     HlmTextareaImports,
     HlmTooltip,
     Kbd,
-    KeyChip,
+    EntityChip,
+    ActorAvatar,
     AgoPipe,
+    RelativeTimePipe,
   ],
   host: {
     class: 'group/row relative block border-b outline-none',
@@ -69,7 +72,9 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     <div
       class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 px-4 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-6"
     >
-      <svg [lucideIcon]="kind().icon" [size]="16" [strokeWidth]="1.75" class="mt-0.5" [class]="kind().color"></svg>
+      <span class="mt-0.5 inline-flex cursor-help" [hlmTooltip]="kindLabel() + ': ' + help()" position="right" tabindex="-1">
+        <svg [lucideIcon]="kind().icon" [size]="16" [strokeWidth]="1.75" [class]="kind().color"></svg>
+      </span>
 
       <div class="min-w-0">
         <div class="flex min-w-0 items-baseline gap-2">
@@ -89,6 +94,10 @@ import { snoozePresets, type SnoozePreset } from './snooze';
 
         @if (mode() === 'open') {
           @if (item().kind === 'input_requested' && request(); as ir) {
+            <p class="text-meta mt-1 flex items-center gap-1.5">
+              <app-actor-avatar [actor]="ir.requestedBy" [size]="14" />
+              Asked by {{ requesterName() }} · {{ ir.createdAt | relativeTime }}
+            </p>
             @if (!answering()) {
               <div class="mt-2 flex flex-wrap items-center gap-1.5">
                 @for (o of ir.options ?? []; track o) {
@@ -100,6 +109,17 @@ import { snoozePresets, type SnoozePreset } from './snooze';
                   <svg [lucideIcon]="reply" [size]="14"></svg>
                   {{ (ir.options?.length ?? 0) > 0 ? 'Other answer' : 'Answer' }}
                   <app-kbd keys="a" class="max-sm:hidden" />
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="sm"
+                  class="text-muted-foreground max-sm:h-9"
+                  hlmTooltip="Close the question without answering (for everyone)"
+                  position="bottom"
+                  (click)="dismissQuestion()"
+                >
+                  Dismiss question
                 </button>
               </div>
             } @else {
@@ -146,21 +166,29 @@ import { snoozePresets, type SnoozePreset } from './snooze';
       <div
         class="col-span-full flex items-center gap-2 max-sm:ps-7 sm:col-span-1 sm:justify-end"
       >
-        @if (wsKey(); as k) {
-          <a
-            [routerLink]="['/', slug(), 'workstreams', k]"
-            class="hover:bg-accent -m-1 rounded p-1 max-sm:me-auto"
-            tabindex="-1"
-          >
-            <app-key-chip [value]="k" />
-          </a>
+        @if (subjectChip(); as c) {
+          <app-entity-chip [type]="c.type" [ref]="c.ref" compact class="max-sm:me-auto" />
         }
-        <span class="text-meta w-9 text-end tabular-nums max-sm:w-auto" [class.max-sm:me-auto]="!wsKey()">{{ item().since | ago }}</span>
+        <span class="text-meta w-9 text-end tabular-nums max-sm:w-auto" [class.max-sm:me-auto]="!subjectChip()">{{ item().since | ago }}</span>
 
         @if (mode() === 'open') {
           <div
             class="flex items-center gap-0.5 sm:opacity-0 sm:transition-opacity sm:group-hover/row:opacity-100 sm:group-focus-within/row:opacity-100 sm:group-data-[focused]/row:opacity-100"
           >
+            <a
+              hlmBtn
+              variant="ghost"
+              size="icon-sm"
+              class="max-sm:size-9"
+              [routerLink]="primaryLink().commands"
+              [queryParams]="primaryLink().query"
+              tabindex="-1"
+              hlmTooltip="Open (Enter)"
+              position="bottom"
+              aria-label="Open"
+            >
+              <svg [lucideIcon]="openIcon" [size]="14"></svg>
+            </a>
             @if (artifactUrl(); as url) {
               <a
                 hlmBtn
@@ -184,7 +212,7 @@ import { snoozePresets, type SnoozePreset } from './snooze';
               class="max-sm:size-9"
               [hlmDropdownMenuTrigger]="snoozeMenu"
               align="end"
-              hlmTooltip="Snooze (S)"
+              hlmTooltip="Snooze (H)"
               position="bottom"
               aria-label="Snooze"
             >
@@ -239,7 +267,10 @@ import { snoozePresets, type SnoozePreset } from './snooze';
           }
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
-        <button hlmDropdownMenuItem (triggered)="pickDate.emit()">Pick a date…</button>
+        <button hlmDropdownMenuItem (triggered)="pickDate.emit()">
+          Pick a date…
+          <hlm-dropdown-menu-shortcut><app-kbd keys="h" /></hlm-dropdown-menu-shortcut>
+        </button>
       </hlm-dropdown-menu>
     </ng-template>
 
@@ -250,6 +281,9 @@ import { snoozePresets, type SnoozePreset } from './snooze';
         }
         @if (artifactUrl(); as url) {
           <button hlmDropdownMenuItem (triggered)="openExternal(url)">Open pull request</button>
+        }
+        @if (request()?.state === 'open') {
+          <button hlmDropdownMenuItem (triggered)="dismissQuestion()">Dismiss question for everyone</button>
         }
         <hlm-dropdown-menu-separator />
         <button hlmDropdownMenuItem (triggered)="dismiss.emit()">
@@ -286,8 +320,20 @@ export class AttentionRow {
   protected readonly more = LucideEllipsis;
   protected readonly undo = LucideRotateCcw;
   protected readonly reply = LucideMessageSquareReply;
+  protected readonly openIcon = LucideArrowRight;
+  private readonly notifier = inject(Notifier);
 
   protected readonly kind = computed(() => ATTENTION_KIND_VIEW[this.item().kind]);
+  protected readonly kindLabel = computed(() => ATTENTION_KIND_META[this.item().kind].label);
+  protected readonly help = computed(() => ATTENTION_KIND_HELP[this.item().kind]);
+  /** The entity the item is about, as a compact chip (decision > issue > workstream). */
+  protected readonly subjectChip = computed<{ type: EntityChipType; ref: string } | null>(() => {
+    const it = this.item();
+    if (it.decisionId && this.store.decisionById().has(it.decisionId)) return { type: 'decision', ref: it.decisionId };
+    if (it.issueId && this.store.issueById().has(it.issueId)) return { type: 'issue', ref: it.issueId };
+    if (it.workstreamId && this.store.workstreamById().has(it.workstreamId)) return { type: 'workstream', ref: it.workstreamId };
+    return null;
+  });
   protected readonly severityBar = computed(() => (this.mode() === 'open' ? SEVERITY_VIEW[this.item().severity].bar : 'bg-transparent'));
   protected readonly ws = computed(() => {
     const id = this.item().workstreamId;
@@ -361,6 +407,15 @@ export class AttentionRow {
   protected cancelAnswer(ev?: Event): void {
     ev?.stopPropagation();
     this.answering.set(false);
+  }
+
+  /** Close the input request itself (for everyone), not just this attention item. */
+  protected async dismissQuestion(): Promise<void> {
+    const r = this.request();
+    if (!r) return;
+    if (await this.store.dismissInput(r.id)) {
+      this.notifier.success('Question dismissed', { description: r.question });
+    }
   }
 
   protected async accept(): Promise<void> {

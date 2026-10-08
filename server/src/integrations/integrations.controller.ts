@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query, Req
 import type { Request, Response } from 'express';
 import { Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { Actor, Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { IntegrationsService, type ConnectionProvider } from './integrations.service.js';
@@ -30,7 +30,7 @@ class LinkRepositoryDto {
 
 /** Connections to GitHub / GitLab / Delta. Admin and above only; secrets are never returned. */
 @Controller('w/:slug/integrations')
-@Roles('admin')
+@Can('manageIntegrations')
 export class IntegrationsController {
   constructor(private readonly service: IntegrationsService) {}
 

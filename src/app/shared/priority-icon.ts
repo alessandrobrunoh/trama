@@ -11,10 +11,10 @@ const LABEL: Record<Priority, string> = {
 const BARS: Record<Priority, number> = { urgent: 3, high: 3, medium: 2, low: 1, none: 0 };
 const COLOR: Record<Priority, string> = {
   urgent: 'text-priority-urgent',
-  high: 'text-priority-high',
-  medium: 'text-priority-medium',
-  low: 'text-priority-low',
-  none: 'text-priority-none',
+  high: 'text-foreground/75',
+  medium: 'text-foreground/75',
+  low: 'text-foreground/75',
+  none: 'text-muted-foreground',
 };
 
 /**
@@ -37,6 +37,12 @@ const COLOR: Record<Priority, string> = {
         <rect x="7.25" y="4" width="1.5" height="5.5" rx="0.75" fill="var(--background)" />
         <rect x="7.25" y="10.75" width="1.5" height="1.5" rx="0.75" fill="var(--background)" />
       </svg>
+    } @else if (priority() === 'none') {
+      <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
+        @for (i of [0, 1, 2]; track i) {
+          <rect [attr.x]="2 + i * 4.5" y="7.25" width="3" height="1.5" rx="0.75" fill="currentColor" opacity="0.6" />
+        }
+      </svg>
     } @else {
       <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true">
         @for (i of [0, 1, 2]; track i) {
@@ -47,7 +53,7 @@ const COLOR: Record<Priority, string> = {
             [attr.height]="4 + i * 3"
             rx="0.8"
             fill="currentColor"
-            [attr.opacity]="i < bars() ? 1 : 0.22"
+            [attr.opacity]="i < bars() ? 1 : 0.25"
           />
         }
       </svg>

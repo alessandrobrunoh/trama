@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
+import { canDo, hasRole, type WorkspaceContext } from '../auth/request-context.js';
 import type { SavedView, ViewEntity, ViewFilter, ViewLayout } from '../contracts/domain.js';
 import { notFound, uid } from '../common/util.js';
 import { SavedViewEntity } from '../database/entities/index.js';
@@ -41,6 +41,7 @@ export class ViewsService {
 
   async create(ctx: WorkspaceContext, input: ViewInput & { name: string; entity: ViewEntity }) {
     if (!ctx.userId) throw new ForbiddenException('Agents cannot own saved views');
+    if (input.shared) this.assertCanShare(ctx);
     const row = await this.repo.save(
       this.repo.create({
         id: uid('vw'),
@@ -59,6 +60,10 @@ export class ViewsService {
     return row;
   }
 
+  private assertCanShare(ctx: WorkspaceContext) {
+    if (!canDo(ctx, 'manageSharedViews')) throw new ForbiddenException('You are not allowed to share views with the workspace');
+  }
+
   private assertCanEdit(ctx: WorkspaceContext, row: SavedViewEntity) {
     if (row.ownerId !== ctx.userId && !(row.shared && hasRole(ctx.role, 'admin')))
       throw new ForbiddenException('Only the owner (or an admin, for shared views) can change a view');
@@ -67,6 +72,7 @@ export class ViewsService {
   async update(ctx: WorkspaceContext, id: string, patch: ViewInput) {
     const row = await this.get(ctx, id);
     this.assertCanEdit(ctx, row);
+    if (patch.shared === true && !row.shared) this.assertCanShare(ctx);
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.entity !== undefined) row.entity = patch.entity;
     if (patch.filters !== undefined) row.filters = patch.filters;

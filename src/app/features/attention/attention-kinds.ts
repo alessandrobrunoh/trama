@@ -35,6 +35,21 @@ export const ATTENTION_KIND_VIEW: Record<AttentionKind, KindView> = {
   triage: { icon: LucideInbox, color: 'text-status-working' },
 };
 
+/** One-sentence explanation of why an item of each kind is in My Attention (tooltips). */
+export const ATTENTION_KIND_HELP: Record<AttentionKind, string> = {
+  input_requested: 'Someone (often an agent) asked a question on a workstream and is waiting for a human answer.',
+  needs_decision: 'A decision was proposed and needs to be accepted or rejected.',
+  review_requested: 'A pull or merge request is waiting for your review.',
+  ci_failed: 'Checks are failing on an open pull request of a workstream you are involved in.',
+  blocked: 'A workstream you are accountable for is blocked and cannot move on its own.',
+  conflict: 'A pull request has merge conflicts that need resolving.',
+  ready_to_land: 'Approved and green: a pull request can be merged.',
+  ready_to_ship: 'Every acceptance criterion is met; the workstream can be marked shipped.',
+  deadline: 'A target date is close or has passed.',
+  dependency: 'Your workstream waits on another workstream that has not shipped yet.',
+  triage: 'A new issue for one of your teams sits in the backlog and needs triage.',
+};
+
 export interface AttentionSection {
   id: string;
   title: string;

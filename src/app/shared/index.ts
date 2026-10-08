@@ -12,3 +12,5 @@ export * from './pipes';
 export * from './markdown';
 export * from './artifact';
 export * from './issue';
+export * from './entity-chip';
+export * from './estimate';

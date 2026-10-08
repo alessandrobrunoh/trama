@@ -31,8 +31,6 @@ import { ARTIFACT_GROUPS } from './ws-model';
 const KIND_STATES: Record<ArtifactKind, ArtifactState[]> = {
   pull_request: ['draft', 'open', 'merged', 'closed'],
   merge_request: ['draft', 'open', 'merged', 'closed'],
-  commit: ['merged', 'open', 'closed'],
-  branch: ['open', 'merged', 'closed'],
   document: ['draft', 'published'],
   design: ['draft', 'published'],
   image: ['draft', 'published'],
@@ -46,8 +44,6 @@ const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'delta', 'figma', 'do
 const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
   pull_request: 'github',
   merge_request: 'gitlab',
-  commit: 'github',
-  branch: 'github',
   document: 'docs',
   design: 'figma',
   image: 'other',
@@ -95,7 +91,7 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
           {{ g.title }} <span class="text-muted-foreground font-normal tabular-nums">{{ g.items.length }}</span>
         </h2>
         @for (a of g.items; track a.id) {
-          <div class="hover:bg-muted/40 group flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 sm:px-6">
+          <div class="hover:bg-hover group flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 sm:px-6">
             <span class="flex min-w-0 flex-1 items-center gap-2.5 max-sm:basis-full">
               <app-artifact-icon [kind]="a.kind" [state]="a.state" [size]="16" />
               @if (a.externalId) {

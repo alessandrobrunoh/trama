@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, effect, inject, untracked } from '@
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
 import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
+import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
 import { UiStore } from '../core/stores/ui.store';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
@@ -48,11 +49,11 @@ import { TopBar } from './top-bar';
       class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-1.5 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >Skip to content</a
     >
-    <div hlmSidebarWrapper class="h-svh min-h-0 overflow-hidden">
-      <hlm-sidebar collapsible="offcanvas" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
+    <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden">
+      <hlm-sidebar collapsible="offcanvas" variant="inset" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
         <app-sidebar />
       </hlm-sidebar>
-      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden">
+      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
         <app-top-bar />
         <div id="main-content" tabindex="-1" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
@@ -60,15 +61,38 @@ import { TopBar } from './top-bar';
       </main>
     </div>
 
-    <app-command-palette />
-    <app-shortcuts-dialog />
+    @if (ui.pendingG()) {
+      <!-- G-chord hint: shows where the second key goes -->
+      <div
+        class="bg-popover text-popover-foreground animate-in fade-in-0 slide-in-from-bottom-1 fixed bottom-4 left-1/2 z-50 -translate-x-1/2 rounded-lg p-2 shadow-md duration-100 max-md:hidden"
+        role="status"
+      >
+        <div class="text-muted-foreground px-1 pb-1.5 text-[11px] font-medium">Go to…</div>
+        <div class="grid grid-cols-3 gap-x-4 gap-y-1">
+          @for (r of goRoutes; track r[0]) {
+            <span class="flex items-center gap-2 px-1 text-xs">
+              <kbd class="border-border-strong bg-muted text-muted-foreground flex size-5 items-center justify-center rounded border font-mono text-[11px]">{{ r[0].toUpperCase() }}</kbd>
+              {{ r[1].label }}
+            </span>
+          }
+        </div>
+      </div>
+    }
+
+    <!-- Global overlays are heavy (create composer, palette, search) and only needed once the user acts:
+         load them after first paint instead of in the initial bundle. -->
+    @defer (on idle) {
+      <app-command-palette />
+      <app-shortcuts-dialog />
+      <app-create-dialog />
+      <app-search-dialog />
+    }
     <app-confirm-dialog />
-    <app-create-dialog />
-    <app-search-dialog />
   `,
 })
 export class AppShell {
-  private readonly ui = inject(UiStore);
+  protected readonly ui = inject(UiStore);
+  protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */
   private readonly keyboard = inject(KeyboardShortcuts);

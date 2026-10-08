@@ -1,7 +1,9 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
-import { IsArray, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { Actor, Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
-import type { ActorRef } from '../contracts/domain.js';
+import { ForbiddenException } from '@nestjs/common';
+import { IsArray, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Actor, Can, Ctx, canDo, type WorkspaceContext } from '../auth/request-context.js';
+import type { ActorRef, TeamEditPolicy } from '../contracts/domain.js';
+import { PermissionsService } from '../workspaces/permissions.service.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { TeamsService } from './teams.service.js';
 
@@ -12,6 +14,9 @@ class CreateTeamDto {
   @IsOptional() @IsString() @MaxLength(32) color?: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) memberIds?: string[];
+  /** Must be a subset of `memberIds`. */
+  @IsOptional() @IsArray() @IsString({ each: true }) leadIds?: string[];
+  @IsOptional() @IsIn(['workspace', 'members']) editPolicy?: TeamEditPolicy;
 }
 
 class UpdateTeamDto {
@@ -19,11 +24,23 @@ class UpdateTeamDto {
   @OptionalNotNull() @IsString() @MaxLength(32) color?: string;
   @Clearable() @IsString() @MaxLength(500) description?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) memberIds?: string[];
+  @OptionalNotNull() @IsArray() @IsString({ each: true }) leadIds?: string[];
+  @OptionalNotNull() @IsIn(['workspace', 'members']) editPolicy?: TeamEditPolicy;
 }
 
 @Controller('w/:slug/teams')
 export class TeamsController {
-  constructor(private readonly service: TeamsService) {}
+  constructor(
+    private readonly service: TeamsService,
+    private readonly permissions: PermissionsService,
+  ) {}
+
+  /** `manageTeams` capability, or being a lead of this very team. */
+  private async assertCanManage(ctx: WorkspaceContext, idOrKey: string, leadMay: boolean): Promise<void> {
+    if (canDo(ctx, 'manageTeams')) return;
+    if (leadMay && (await this.permissions.isLead(ctx, await this.service.get(ctx.workspace.id, idOrKey)))) return;
+    throw new ForbiddenException('Requires the manageTeams permission (or being a lead of this team)');
+  }
 
   @Get()
   list(@Ctx() ctx: WorkspaceContext) {
@@ -36,21 +53,21 @@ export class TeamsController {
   }
 
   @Post()
-  @Roles('admin')
+  @Can('createTeams')
   create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateTeamDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
 
   @Patch(':idOrKey')
-  @Roles('admin')
-  update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: UpdateTeamDto) {
+  async update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: UpdateTeamDto) {
+    await this.assertCanManage(ctx, idOrKey, true);
     return this.service.update(ctx.workspace.id, actor, idOrKey, dto);
   }
 
   @Delete(':idOrKey')
-  @Roles('admin')
   @HttpCode(204)
-  remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
+  async remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
+    await this.assertCanManage(ctx, idOrKey, false);
     return this.service.remove(ctx.workspace.id, actor, idOrKey);
   }
 }

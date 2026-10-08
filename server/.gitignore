@@ -3,3 +3,4 @@ dist/
 coverage/
 .env
 *.tsbuildinfo
+dist-scripts/

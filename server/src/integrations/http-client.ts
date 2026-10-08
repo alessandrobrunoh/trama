@@ -5,6 +5,8 @@ export interface HttpRequest {
   url: string;
   headers?: Record<string, string>;
   body?: unknown;
+  /** Exact bytes to send (already serialized); wins over `body`. Needed when the body is signed. */
+  rawBody?: string;
   timeoutMs?: number;
 }
 
@@ -27,8 +29,8 @@ export class FetchHttpClient extends HttpClient {
   async request(req: HttpRequest): Promise<HttpResponse> {
     const res = await fetch(req.url, {
       method: req.method ?? 'GET',
-      headers: { ...(req.body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...req.headers },
-      body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
+      headers: { ...(req.body !== undefined || req.rawBody !== undefined ? { 'Content-Type': 'application/json' } : {}), ...req.headers },
+      body: req.rawBody ?? (req.body !== undefined ? JSON.stringify(req.body) : undefined),
       signal: AbortSignal.timeout(req.timeoutMs ?? 15_000),
       redirect: 'error',
     });

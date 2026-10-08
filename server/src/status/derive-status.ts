@@ -97,7 +97,7 @@ function deriveWithoutOverride(input: StatusInput): { status: WorkstreamStatus; 
 
   const active =
     input.workstream.acceptanceCriteria.some((c) => c.state === 'in_progress') ||
-    artifacts.some((a) => a.kind === 'branch' || a.kind === 'commit' || a.kind === 'build' || a.kind === 'test_report');
+    artifacts.some((a) => a.kind === 'build' || a.kind === 'test_report');
   if (active) return { status: 'working', rule: 7 };
 
   if (input.workstream.acceptanceCriteria.length > 0) return { status: 'planned', rule: 8 };

@@ -15,12 +15,14 @@ import { HealthController } from './health/health.controller.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { IssuesModule } from './issues/issues.module.js';
+import { MilestonesModule } from './milestones/milestones.module.js';
 import { RepositoriesModule } from './repositories/repositories.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
 import { StatusModule } from './status/status.module.js';
 import { TeamsModule } from './teams/teams.module.js';
 import { ViewsModule } from './views/views.module.js';
+import { OutgoingWebhooksModule } from './outgoing-webhooks/outgoing-webhooks.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
 import { WorkstreamsModule } from './workstreams/workstreams.module.js';
@@ -37,6 +39,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     WorkstreamsModule,
     InputRequestsModule,
     IssuesModule,
+    MilestonesModule,
     ArtifactsModule,
     DecisionsModule,
     DependenciesModule,
@@ -50,6 +53,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     SnapshotModule,
     IntegrationsModule,
     WebhooksModule,
+    OutgoingWebhooksModule,
   ],
   controllers: [HealthController],
 })

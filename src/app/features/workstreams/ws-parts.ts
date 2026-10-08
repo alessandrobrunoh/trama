@@ -1,13 +1,17 @@
 // Small presentational pieces shared by list rows, board cards and the detail screens.
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import {
   LucideCalendar,
   LucideCheck,
   LucideDynamicIcon,
   LucideEye,
+  LucideListChecks,
   LucideTriangleAlert,
   LucideX,
 } from '@lucide/angular';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCalendar } from '@spartan-ng/helm/calendar';
+import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { NablaStore, isOverdue, shortDate, type Artifact, type Workstream } from '../../core';
 import { ActorAvatar, AvatarStack } from '../../shared/actor-avatar';
@@ -134,10 +138,8 @@ export class TeamDots {
     '[class.text-muted-foreground]': '!overdue()',
   },
   template: `
-    @if (date(); as d) {
+    @if (date()) {
       <svg [lucideIcon]="cal" [size]="12"></svg>{{ label() }}
-    } @else {
-      <span class="text-muted-foreground/50">—</span>
     }
   `,
 })
@@ -147,4 +149,155 @@ export class TargetDate {
   protected readonly cal = LucideCalendar;
   protected readonly overdue = computed(() => !this.done() && isOverdue(this.date()));
   protected readonly label = computed(() => shortDate(this.date()));
+}
+
+/**
+ * Issue progress of a workstream: a ring (issues are circles) + "done/total".
+ * Deliberately different from the acceptance-criteria count (a checklist icon).
+ */
+@Component({
+  selector: 'app-issue-progress',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTooltip],
+  host: { class: 'inline-flex items-center' },
+  template: `
+    <span class="inline-flex items-center gap-1.5 text-xs whitespace-nowrap tabular-nums" [hlmTooltip]="tip()" position="bottom">
+      @if (total() > 0) {
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" stroke="var(--border-strong)" stroke-width="2" />
+          @if (active() > 0) {
+            <circle cx="8" cy="8" r="6" stroke="var(--status-working)" stroke-opacity="0.45" stroke-width="2"
+              [attr.stroke-dasharray]="arc(done() + active()) + ' 40'" transform="rotate(-90 8 8)" />
+          }
+          @if (done() > 0) {
+            <circle cx="8" cy="8" r="6" stroke="var(--status-shipped)" stroke-width="2" stroke-linecap="round"
+              [attr.stroke-dasharray]="arc(done()) + ' 40'" transform="rotate(-90 8 8)" />
+          }
+        </svg>
+        <span [class.text-muted-foreground]="done() < total()">{{ done() }}/{{ total() }}</span>
+        @if (!compact()) {
+          <span class="text-muted-foreground">issues</span>
+        }
+      } @else if (!compact()) {
+        <span class="text-muted-foreground/60">No issues</span>
+      }
+    </span>
+  `,
+})
+export class IssueProgress {
+  readonly done = input(0);
+  readonly active = input(0);
+  readonly total = input(0);
+  /** Hide the "issues" word. */
+  readonly compact = input(false);
+  private readonly circumference = 2 * Math.PI * 6;
+  protected arc(n: number): string {
+    return ((Math.min(n, this.total()) / Math.max(1, this.total())) * this.circumference).toFixed(2);
+  }
+  protected readonly tip = computed(() =>
+    this.total()
+      ? `${this.done()} of ${this.total()} linked issues done${this.active() ? `, ${this.active()} in progress` : ''}`
+      : 'No issues linked yet',
+  );
+}
+
+/** Compact acceptance-criteria count: checklist icon + met/total. */
+@Component({
+  selector: 'app-criteria-count',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTooltip, LucideDynamicIcon],
+  host: { class: 'inline-flex items-center' },
+  template: `
+    @if (total() > 0) {
+      <span
+        class="inline-flex items-center gap-1 text-xs whitespace-nowrap tabular-nums"
+        [class.text-muted-foreground]="met() < total()"
+        [class.text-status-shipped]="met() === total()"
+        [hlmTooltip]="met() + ' of ' + total() + ' acceptance criteria met'"
+        position="bottom"
+      >
+        <svg [lucideIcon]="icon" [size]="13"></svg>{{ met() }}/{{ total() }}
+      </span>
+    }
+  `,
+})
+export class CriteriaCount {
+  readonly met = input(0);
+  readonly total = input(0);
+  protected readonly icon = LucideListChecks;
+}
+
+/**
+ * Target-date editor: the projected content is the trigger; the popover offers quick presets,
+ * a calendar and "Clear". Emits a local calendar day (or null).
+ */
+@Component({
+  selector: 'app-ws-date-picker',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmPopoverImports, HlmCalendar, HlmButtonImports],
+  host: { class: 'inline-flex min-w-0' },
+  template: `
+    <hlm-popover [align]="align()" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
+      <button
+        hlmPopoverTrigger
+        type="button"
+        class="focus-visible:ring-ring hover:bg-accent inline-flex min-w-0 items-center rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
+        [class]="triggerClass()"
+        [disabled]="disabled()"
+        [attr.aria-label]="label()"
+      >
+        <ng-content />
+      </button>
+      <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-fit gap-0 p-0">
+        <div class="grid grid-cols-2 gap-0.5 border-b p-1">
+          @for (p of presets; track p.label) {
+            <button hlmBtn variant="ghost" size="xs" class="justify-start font-normal" (click)="pick(p.at())">{{ p.label }}</button>
+          }
+        </div>
+        <hlm-calendar class="border-0" [date]="date()" [weekStartsOn]="store.weekStartsOn()" (dateChange)="pick($event)" />
+        @if (value()) {
+          <div class="border-t p-1">
+            <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground w-full" (click)="pick(null)">Clear date</button>
+          </div>
+        }
+      </hlm-popover-content>
+    </hlm-popover>
+  `,
+})
+export class WsDatePicker {
+  protected readonly store = inject(NablaStore);
+  /** Current ISO date (or undefined). */
+  readonly value = input<string | undefined>();
+  readonly disabled = input(false);
+  readonly label = input('Target date');
+  readonly triggerClass = input('');
+  readonly align = input<'start' | 'center' | 'end'>('start');
+  readonly dateChange = output<Date | null>();
+
+  protected readonly state = signal<'open' | 'closed'>('closed');
+  protected readonly date = computed(() => {
+    const v = this.value();
+    return v ? new Date(v) : undefined;
+  });
+  protected readonly presets: { label: string; at: () => Date }[] = [
+    { label: 'Today', at: () => plusDays(0) },
+    { label: 'Tomorrow', at: () => plusDays(1) },
+    { label: 'Next week', at: () => plusDays(7) },
+    { label: 'In 2 weeks', at: () => plusDays(14) },
+  ];
+
+  open(): void {
+    if (!this.disabled()) this.state.set('open');
+  }
+
+  protected pick(d: Date | null | undefined): void {
+    this.state.set('closed');
+    this.dateChange.emit(d ?? null);
+  }
+}
+
+function plusDays(n: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d;
 }

@@ -1,11 +1,12 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideArrowUpRight, LucideDynamicIcon } from '@lucide/angular';
+import { LucideArrowUpRight, LucideDynamicIcon, LucidePlus, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import {
   ARTIFACT_KIND_META,
   NablaStore,
+  Notifier,
   type Artifact,
   type Workstream,
 } from '../../core';
@@ -17,6 +18,8 @@ import { ProviderIcon } from '../../shared/provider-icon';
 import { PropertyRow } from '../../shared/property-row';
 import { ShortDatePipe } from '../../shared/pipes';
 import { StatusBadge, StatusIcon, type AnyStatus } from '../../shared/status';
+import { Picker } from '../workstreams/picker';
+import { workstreamOptions } from '../workstreams/ws-model';
 import type { GraphNode } from './graph-model';
 
 /** A neighbour in the dependency list of the detail panel. */
@@ -25,6 +28,7 @@ export interface DetailLink {
   label: string;
   status?: AnyStatus;
   mono?: boolean;
+  blocking?: boolean;
 }
 
 /** Body of the graph's side sheet: details + links for one node. */
@@ -49,6 +53,7 @@ export interface DetailLink {
     ShortDatePipe,
     StatusBadge,
     StatusIcon,
+    Picker,
   ],
   template: `
     @let n = node();
@@ -57,9 +62,9 @@ export interface DetailLink {
         @let w = ws();
         <div class="flex flex-col gap-3">
           <div class="flex min-w-0 items-center gap-2">
-            <app-status-icon [status]="w.status" [size]="16" />
+            <app-status-icon entity="workstream" [status]="w.status" [size]="16" />
             <app-key-chip [value]="w.key" />
-            <app-status-badge [status]="w.status" />
+            <app-status-badge entity="workstream" [status]="w.status" />
           </div>
           <h3 class="text-base leading-snug font-medium">{{ w.title }}</h3>
           @if (w.objective) {
@@ -160,6 +165,9 @@ export interface DetailLink {
     @if (blockedBy().length) {
       <div class="mt-5">
         <div class="text-muted-foreground mb-1 text-xs font-medium">Waiting on</div>
+        @if (hasBlockingDependency()) {
+          <p class="text-blocked mb-1.5 text-xs">This workstream is blocked until the listed workstreams ship.</p>
+        }
         <div class="flex flex-col">
           @for (l of blockedBy(); track l.id) {
             <ng-container *ngTemplateOutlet="linkRow; context: { $implicit: l }" />
@@ -178,20 +186,60 @@ export interface DetailLink {
       </div>
     }
 
+    @if (node().kind === 'workstream' && canEdit()) {
+      <div class="mt-5 flex flex-wrap items-center gap-1.5 border-t pt-3">
+        <span class="text-muted-foreground mr-1 text-xs">Add dependency</span>
+        <app-picker
+          variant="bare"
+          label="Waits on…"
+          searchPlaceholder="Search workstreams…"
+          triggerClass="h-7 gap-1 border border-border-strong px-2 text-xs"
+          [options]="candidates()"
+          [value]="[]"
+          (valueChange)="addDep('waits', $event[0])"
+        >
+          <svg [lucideIcon]="plusIcon" [size]="12"></svg>Waits on
+        </app-picker>
+        <app-picker
+          variant="bare"
+          label="Blocks…"
+          searchPlaceholder="Search workstreams…"
+          triggerClass="h-7 gap-1 border border-border-strong px-2 text-xs"
+          [options]="candidates()"
+          [value]="[]"
+          (valueChange)="addDep('blocks', $event[0])"
+        >
+          <svg [lucideIcon]="plusIcon" [size]="12"></svg>Blocks
+        </app-picker>
+      </div>
+    }
+
     <ng-template #linkRow let-l>
-      <button
-        hlmBtn
-        type="button"
-        variant="ghost"
-        size="sm"
-        class="h-8 justify-start gap-2 px-1.5 font-normal"
-        (click)="focusNode.emit(l.id)"
-      >
-        @if (l.status) {
-          <app-status-icon [status]="l.status" />
+      <div class="group/dep flex items-center">
+        <button
+          hlmBtn
+          type="button"
+          variant="ghost"
+          size="sm"
+          class="h-8 min-w-0 flex-1 justify-start gap-2 px-1.5 font-normal"
+          (click)="focusNode.emit(l.id)"
+        >
+          @if (l.status) {
+            <app-status-icon entity="workstream" [status]="l.status" />
+          }
+          <span class="truncate" [class.font-mono]="l.mono" [class.text-xs]="l.mono">{{ l.label }}</span>
+          @if (l.status === 'shipped') {
+            <span class="text-muted-foreground ml-auto shrink-0 text-[10px]">Shipped</span>
+          } @else if (l.blocking) {
+            <span class="text-blocked ml-auto shrink-0 text-[10px] font-medium">Blocking</span>
+          }
+        </button>
+        @if (canEdit() && depId(l.id); as dep) {
+          <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground opacity-0 group-hover/dep:opacity-100 focus-visible:opacity-100" aria-label="Remove dependency" (click)="removeDep(dep)">
+            <svg [lucideIcon]="xIcon" [size]="12"></svg>
+          </button>
         }
-        <span class="truncate" [class.font-mono]="l.mono" [class.text-xs]="l.mono">{{ l.label }}</span>
-      </button>
+      </div>
     </ng-template>
   `,
 })
@@ -202,7 +250,48 @@ export class GraphNodeDetail {
   readonly blocks = input<readonly DetailLink[]>([]);
   readonly focusNode = output<string>();
 
+  protected hasBlockingDependency(): boolean {
+    return this.blockedBy().some((dependency) => dependency.blocking);
+  }
+
+  private readonly notify = inject(Notifier);
   protected readonly arrow = LucideArrowUpRight;
+  protected readonly plusIcon = LucidePlus;
+  protected readonly xIcon = LucideX;
+  protected readonly canEdit = computed(() => this.store.can('member'));
+  /** Workstreams that can become a dependency of this node. */
+  protected readonly candidates = computed(() => {
+    const n = this.node();
+    if (n.kind !== 'workstream') return [];
+    const linked = new Set<string>([n.id]);
+    for (const d of this.store.dependencies()) {
+      if (d.fromId === n.id) linked.add(d.toId);
+      if (d.toId === n.id) linked.add(d.fromId);
+    }
+    return workstreamOptions(this.store.workstreams().filter((w) => !linked.has(w.id) && w.status !== 'canceled'));
+  });
+
+  /** The dependency between this node and `otherId`, either direction. */
+  protected depId(otherId: string): string | undefined {
+    const id = this.node().id;
+    return this.store.dependencies().find((d) => (d.fromId === id && d.toId === otherId) || (d.fromId === otherId && d.toId === id))?.id;
+  }
+
+  protected async addDep(kind: 'waits' | 'blocks', otherId: string | undefined): Promise<void> {
+    if (!otherId) return;
+    const me = this.node().id;
+    const [fromId, toId] = kind === 'waits' ? [otherId, me] : [me, otherId];
+    const dep = await this.store.addDependency({ fromType: 'workstream', fromId, toType: 'workstream', toId });
+    if (dep) this.notify.success('Dependency added', { action: { label: 'Undo', run: () => void this.store.removeDependency(dep.id) } });
+  }
+
+  protected removeDep(id: string): void {
+    const d = this.store.dependencies().find((x) => x.id === id);
+    if (!d) return;
+    void this.store.removeDependency(id);
+    const { fromType, fromId, toType, toId } = d;
+    this.notify.success('Dependency removed', { action: { label: 'Undo', run: () => void this.store.addDependency({ fromType, fromId, toType, toId }) } });
+  }
   protected readonly slug = this.store.slug;
 
   protected readonly ws = computed(() => this.node().entity as Workstream);

@@ -21,7 +21,7 @@ import {
   MinLength,
   ValidateNested,
 } from 'class-validator';
-import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, EditsTeamWork, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, CriterionState, Priority, WorkstreamStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { WorkstreamsService } from './workstreams.service.js';
@@ -55,6 +55,7 @@ export class CreateWorkstreamDto {
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsArray() @IsString({ each: true }) labels?: string[];
   @IsOptional() @IsIn(STATUSES) statusOverride?: WorkstreamStatus;
+  @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() targetDate?: string;
 }
 
@@ -72,6 +73,7 @@ class UpdateWorkstreamDto {
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) labels?: string[];
   @Clearable() @IsIn(STATUSES) statusOverride?: WorkstreamStatus | null;
+  @Clearable() @IsISO8601() startDate?: string | null;
   @Clearable() @IsISO8601() targetDate?: string | null;
 }
 
@@ -88,6 +90,7 @@ class ListWorkstreamsQuery {
 }
 
 @Controller('w/:slug/workstreams')
+@EditsTeamWork('workstream')
 export class WorkstreamsController {
   constructor(private readonly service: WorkstreamsService) {}
 
@@ -102,6 +105,7 @@ export class WorkstreamsController {
   }
 
   @Post()
+  @Can('createWorkstreams')
   create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateWorkstreamDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
@@ -112,6 +116,7 @@ export class WorkstreamsController {
   }
 
   @Delete(':idOrKey')
+  @Can('deleteWorkstreams')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
     return this.service.remove(ctx.workspace.id, actor, idOrKey);

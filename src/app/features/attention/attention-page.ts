@@ -25,7 +25,7 @@ import {
   usePageShortcuts,
   type AttentionItem,
 } from '../../core';
-import { EmptyState, PageHeader } from '../../shared';
+import { EmptyState, Kbd, PageHeader } from '../../shared';
 import { ATTENTION_SECTIONS } from './attention-kinds';
 import { AttentionRow } from './attention-row';
 import { morningOf, snoozePresets } from './snooze';
@@ -35,7 +35,8 @@ type Tab = 'open' | 'archived';
 
 /**
  * My Attention: "where is my attention actually required?" Grouped by kind in a fixed order,
- * severity-sorted, with inline actions. Keyboard: J/K move, Enter open, E dismiss, S snooze, A answer.
+ * severity-sorted, with inline actions. Keyboard: J/K move, Enter open, E dismiss, H snooze, A answer,
+ * Shift+E dismiss the question itself (input requests).
  */
 @Component({
   selector: 'app-attention-page',
@@ -50,6 +51,7 @@ type Tab = 'open' | 'archived';
     HlmToggleGroupImports,
     PageHeader,
     EmptyState,
+    Kbd,
     AttentionRow,
   ],
   host: { class: 'flex min-h-full flex-col' },
@@ -123,6 +125,16 @@ type Tab = 'open' | 'archived';
           </div>
         </app-empty-state>
       }
+      @if (sections().length) {
+        <p class="text-meta hidden flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex sm:px-6">
+          <span class="flex items-center gap-1"><app-kbd keys="j" /><app-kbd keys="k" /> move</span>
+          <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
+          <span class="flex items-center gap-1"><app-kbd keys="a" /> answer</span>
+          <span class="flex items-center gap-1"><app-kbd keys="e" /> dismiss</span>
+          <span class="flex items-center gap-1"><app-kbd keys="h" /> snooze</span>
+          <span class="flex items-center gap-1"><app-kbd keys="shift+e" /> dismiss question</span>
+        </p>
+      }
     } @else {
       @for (it of archived(); track it.id) {
         <app-attention-row
@@ -162,6 +174,7 @@ type Tab = 'open' | 'archived';
           <hlm-calendar
             [date]="pickedDate()"
             [min]="minDate()"
+            [weekStartsOn]="store.weekStartsOn()"
             (dateChange)="pickedDate.set($event ?? null)"
           />
         </div>
@@ -234,6 +247,13 @@ export class AttentionPage {
     return id ? this.flat().find((a) => a.id === id) : undefined;
   });
 
+  private readonly focusedQuestion = computed(() => {
+    const it = this.focusedItem();
+    const id = it?.kind === 'input_requested' ? it.inputRequestId : undefined;
+    const r = id ? this.store.inputRequestById().get(id) : undefined;
+    return r?.state === 'open' ? r : undefined;
+  });
+
   protected readonly description = computed(() => {
     const open = this.open();
     if (!open.length) return this.scope() === 'all' ? 'Nothing open across the workspace' : 'All clear';
@@ -257,10 +277,22 @@ export class AttentionPage {
         run: () => this.dismiss(this.focusedItem()!),
       },
       {
-        keys: 's',
+        keys: 'h',
         label: 'Snooze item…',
         when: () => this.tab() === 'open' && !!this.focusedItem(),
         run: () => this.openSnooze(this.focusedItem()!),
+      },
+      {
+        keys: 's',
+        label: 'Snooze item… (alias of H)',
+        when: () => this.tab() === 'open' && !!this.focusedItem(),
+        run: () => this.openSnooze(this.focusedItem()!),
+      },
+      {
+        keys: 'shift+e',
+        label: 'Dismiss the question for everyone',
+        when: () => this.tab() === 'open' && !!this.focusedQuestion(),
+        run: () => this.dismissQuestion(this.focusedItem()!),
       },
       {
         keys: 'a',
@@ -349,6 +381,15 @@ export class AttentionPage {
           description: item.title,
           action: { label: 'Undo', onClick: () => void this.store.restoreAttention(item.id) },
         });
+    });
+  }
+
+  protected dismissQuestion(item: AttentionItem): void {
+    const r = this.focusedQuestion();
+    if (!r) return;
+    this.advanceFocus(item.id);
+    void this.store.dismissInput(r.id).then((ok) => {
+      if (ok) toast('Question dismissed', { description: r.question });
     });
   }
 

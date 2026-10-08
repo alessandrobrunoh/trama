@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, MoreThan, Or, type Repository } from 'typeorm';
-import type { ActorRef } from '../contracts/domain.js';
+import type { ActorRef, TokenScope } from '../contracts/domain.js';
 import { ApiTokenEntity } from '../database/entities/index.js';
 import { sha256 } from '../common/crypto.js';
 import { uid } from '../common/util.js';
@@ -21,6 +21,7 @@ export class TokensService {
     workspaceId: string;
     name: string;
     actor: ActorRef;
+    scope?: TokenScope;
     createdByUserId?: string;
     expiresAt?: Date | null;
   }): Promise<{ token: ApiTokenEntity; secret: string }> {
@@ -33,6 +34,7 @@ export class TokensService {
         prefix: `${secret.slice(0, 8)}…`,
         tokenHash: sha256(secret),
         actor: input.actor,
+        scope: input.scope ?? 'write',
         createdByUserId: input.createdByUserId ?? null,
         expiresAt: input.expiresAt ?? null,
       }),

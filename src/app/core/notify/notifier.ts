@@ -10,6 +10,8 @@ export interface NoticeOptions {
   description?: string;
   /** Auto-dismiss in ms (sink-specific default when omitted). */
   duration?: number;
+  /** One inline action button, e.g. `{ label: 'Undo', run: () => restore() }`. */
+  action?: { label: string; run: () => void };
 }
 
 export type NoticeSink = (kind: NoticeKind, title: string, options?: NoticeOptions) => void;
@@ -37,5 +39,25 @@ export class Notifier {
 
   info(title: string, options?: NoticeOptions): void {
     this.sink('info', title, options);
+  }
+}
+
+/**
+ * Copy text to the clipboard and confirm with a toast.
+ *   inject(Clipboard).copy(location.href, 'Link copied')
+ */
+@Injectable({ providedIn: 'root' })
+export class Clipboard {
+  constructor(private readonly notifier: Notifier) {}
+
+  async copy(text: string, title = 'Copied to clipboard'): Promise<boolean> {
+    try {
+      await navigator.clipboard.writeText(text);
+      this.notifier.success(title, { description: text.length > 80 ? text.slice(0, 77) + '…' : text, duration: 2000 });
+      return true;
+    } catch {
+      this.notifier.error('Could not copy to clipboard');
+      return false;
+    }
   }
 }

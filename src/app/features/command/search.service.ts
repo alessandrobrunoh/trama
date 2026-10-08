@@ -72,11 +72,11 @@ export class SearchService {
   private readonly store = inject(NablaStore);
 
   /** Rejects on network / server errors; callers fall back to {@link local}. */
-  async remote(q: string, limit = 24): Promise<SearchHit[]> {
+  async remote(q: string, limit = 24, types?: readonly HitType[]): Promise<SearchHit[]> {
     const slug = this.store.slug();
     if (!slug) return [];
     const res = await this.api.request<unknown>('GET', `/w/${encodeURIComponent(slug)}/search`, {
-      params: { q, limit },
+      params: { q, limit, types: types?.length ? types.join(',') : undefined },
     });
     const out: SearchHit[] = [];
     if (Array.isArray(res)) {
@@ -107,18 +107,19 @@ export class SearchService {
   }
 
   /** Instant fuzzy search over everything already in the snapshot. */
-  local(q: string, perType = 6): SearchHit[] {
+  local(q: string, perType = 6, only?: HitType): SearchHit[] {
     const s = this.store;
     const wsKey = (id: string) => s.workstreamById().get(id)?.key;
     const scored: { hit: SearchHit; score: number }[] = [];
     const push = (hit: SearchHit, text: string, extra = '') => {
+      if (only && hit.type !== only) return;
       const score = Math.max(fuzzyScore(text, q), extra ? fuzzyScore(extra, q) * 0.5 : 0);
       if (score > 0) scored.push({ hit, score });
     };
     for (const w of s.workstreams()) push({ type: 'workstream', id: w.id, key: w.key, title: w.title }, `${w.key} ${w.title}`, w.objective);
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
-      for (const a of s.artifacts())
+    for (const a of s.artifacts())
       push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId, workstreamKey: wsKey(a.workstreamId) }, a.title, a.externalId ?? '');
     for (const r of s.repositories()) push({ type: 'repository', id: r.id, title: r.fullName }, r.fullName);
     for (const t of s.teams()) push({ type: 'team', id: t.id, key: t.key, title: t.name }, `${t.key} ${t.name}`);

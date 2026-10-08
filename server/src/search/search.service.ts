@@ -37,7 +37,7 @@ const SPECS: Spec[] = [
     type: 'issue',
     from: `"issues" x`,
     select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
-    fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
+    fields: [['x."key"', 'key'], ['x."aliases"::text', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
     rank: 2,
   },
   {

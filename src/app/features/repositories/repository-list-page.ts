@@ -1,15 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucideFolderGit2, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
+import { LucideDownload, LucideDynamicIcon, LucideFolderGit2, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore, UiStore, type GitProvider, type Repository } from '../../core';
+import { NablaStore, UiStore } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { ProviderIcon, providerLabel } from '../../shared/provider-icon';
+import { ProviderIcon } from '../../shared/provider-icon';
+import { RelativeTimePipe } from '../../shared/pipes';
+import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
+import { ImportRepositoriesDialog } from './import-repositories-dialog';
 import { teamOptions } from '../workstreams/ws-model';
 
 const PROVIDERS: PickOption[] = [
@@ -31,11 +34,18 @@ const PROVIDERS: PickOption[] = [
     EmptyState,
     ProviderIcon,
     TopBarActions,
+    StatusIcon,
+    RelativeTimePipe,
+    ImportRepositoriesDialog,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (canAdmin()) {
+        <button hlmBtn variant="outline" size="sm" (click)="importOpen.set(true)">
+          <svg [lucideIcon]="download" [size]="14"></svg>
+          <span class="max-sm:hidden">Import</span>
+        </button>
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
           <span class="max-sm:hidden">New project</span>
@@ -70,9 +80,10 @@ const PROVIDERS: PickOption[] = [
     </div>
 
     @if (total() === 0) {
-      <app-empty-state [icon]="folder" title="No projects yet" description="A project is a GitHub or GitLab repository a workstream can land in. Nabla keeps the link, not the git history.">
+      <app-empty-state [icon]="folder" title="No projects yet" description="A project is a GitHub or GitLab repository a workstream can land in. Import them from a connected account, or add one by hand.">
         @if (canAdmin()) {
-          <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New project</button>
+          <button hlmBtn size="sm" (click)="importOpen.set(true)"><svg [lucideIcon]="download" [size]="14"></svg>Import from GitHub or GitLab</button>
+          <button hlmBtn size="sm" variant="outline" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>Add manually</button>
         }
       </app-empty-state>
     } @else if (shown().length === 0) {
@@ -81,27 +92,54 @@ const PROVIDERS: PickOption[] = [
       </app-empty-state>
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
-        @for (r of shown(); track r.id) {
+        <div class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex">
+          <span class="flex-1">Repository</span>
+          <span class="w-28">Branch</span>
+          <span class="w-36">Teams</span>
+          <span class="w-24 text-right">Workstreams</span>
+          <span class="w-24 text-right">Activity</span>
+        </div>
+        @for (row of rows(); track row.repo.id) {
+          @let r = row.repo;
           <a
             [routerLink]="['/', slug(), 'projects', r.id]"
             [attr.data-row-id]="r.id"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 outline-none sm:px-6 md:min-h-9 md:flex-nowrap"
+            role="listitem"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 outline-none sm:px-6 md:min-h-10 md:flex-nowrap"
             [class.bg-muted]="ui.focusedRowId() === r.id"
           >
             <span class="flex min-w-0 flex-1 items-center gap-2.5">
               <app-provider-icon [provider]="r.provider" [size]="15" />
-              <span class="min-w-0 truncate font-mono text-sm">{{ r.fullName }}</span>
+              <span class="min-w-0 truncate font-mono text-[13px]">
+                <span class="text-muted-foreground">{{ row.owner }}/</span><span class="text-foreground font-medium">{{ row.name }}</span>
+              </span>
             </span>
-            <span class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:pl-[26px]">
-              <span class="hidden sm:inline">{{ providerName(r.provider) }}</span>
-              <span class="font-mono">{{ r.defaultBranch }}</span>
-              <span class="max-w-48 truncate">{{ teamNames(r) }}</span>
-              <span class="tabular-nums">{{ workstreamCount(r.id) }} workstreams</span>
+            <span class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:pl-[26px] md:contents">
+              <span class="w-28 truncate font-mono">{{ r.defaultBranch }}</span>
+              <span class="flex w-36 min-w-0 items-center gap-1.5">
+                @for (t of row.teams; track t.id) {
+                  <span class="flex min-w-0 items-center gap-1" [title]="t.name">
+                    <span class="size-2 shrink-0 rounded-full" [style.background]="t.color"></span>
+                    @if (row.teams.length === 1) {
+                      <span class="truncate">{{ t.name }}</span>
+                    } @else {
+                      <span class="font-mono text-[11px]">{{ t.key }}</span>
+                    }
+                  </span>
+                } @empty {
+                  <span class="opacity-60">No team</span>
+                }
+              </span>
+              <span class="flex w-24 items-center justify-end gap-1.5 tabular-nums">
+                <app-status-icon status="working" entity="workstream" [size]="12" />{{ row.active }}<span class="opacity-60">/ {{ row.total }}</span>
+              </span>
+              <span class="w-24 text-right tabular-nums">{{ row.lastActivity ? (row.lastActivity | relativeTime) : '—' }}</span>
             </span>
           </a>
         }
       </div>
     }
+    <app-import-repositories-dialog [open]="importOpen()" (closed)="importOpen.set(false)" />
   `,
 })
 export class RepositoryListPage {
@@ -115,6 +153,8 @@ export class RepositoryListPage {
   protected readonly searchIcon = LucideSearch;
   protected readonly xIcon = LucideX;
   protected readonly folder = LucideFolderGit2;
+  protected readonly download = LucideDownload;
+  protected readonly importOpen = signal(false);
   protected readonly providers = PROVIDERS;
 
   protected readonly search = signal('');
@@ -122,7 +162,7 @@ export class RepositoryListPage {
   protected readonly teamFilter = signal<string[]>([]);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
-  protected readonly canAdmin = computed(() => this.store.can('admin'));
+  protected readonly canAdmin = computed(() => this.store.allowed('manageRepositories'));
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly total = computed(() => this.store.repositories().length);
   protected readonly hasFilters = computed(
@@ -146,27 +186,34 @@ export class RepositoryListPage {
       .sort((a, b) => a.fullName.localeCompare(b.fullName));
   });
 
+  protected readonly rows = computed(() => {
+    const teams = this.store.teamById();
+    const wsBy = this.store.workstreamsByRepository();
+    const arBy = this.store.artifactsByRepository();
+    return this.shown().map((repo) => {
+      const ws = wsBy.get(repo.id) ?? [];
+      const slash = repo.fullName.lastIndexOf('/');
+      let last = '';
+      for (const a of arBy.get(repo.id) ?? []) if (a.updatedAt > last) last = a.updatedAt;
+      for (const w of ws) if (w.updatedAt > last) last = w.updatedAt;
+      return {
+        repo,
+        owner: slash > 0 ? repo.fullName.slice(0, slash) : '',
+        name: slash > 0 ? repo.fullName.slice(slash + 1) : repo.fullName,
+        teams: repo.teamIds.map((id) => teams.get(id)).filter((t) => !!t),
+        total: ws.length,
+        active: ws.filter((w) => w.status !== 'shipped' && w.status !== 'canceled' && w.status !== 'draft').length,
+        lastActivity: last || null,
+      };
+    });
+  });
+
   protected readonly description = computed(() => {
     const n = this.total();
     const visible = this.shown().length;
     const noun = n === 1 ? 'project' : 'projects';
     return this.hasFilters() ? `${visible} of ${n} ${noun}` : `${n} ${noun}`;
   });
-
-  protected providerName(provider: GitProvider): string {
-    return providerLabel(provider);
-  }
-
-  protected teamNames(repo: Repository): string {
-    const names = repo.teamIds
-      .map((id) => this.store.teamById().get(id)?.name)
-      .filter((n): n is string => !!n);
-    return names.length ? names.join(', ') : 'No team';
-  }
-
-  protected workstreamCount(id: string): number {
-    return this.store.workstreamsByRepository().get(id)?.length ?? 0;
-  }
 
   protected create(): void {
     this.ui.openCreate('repository');

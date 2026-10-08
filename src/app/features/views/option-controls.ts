@@ -6,7 +6,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import type { ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
-import { StatusIcon, type AnyStatus } from '../../shared/status';
+import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 
 /** One selectable entry for `app-option-menu` / `app-entity-picker`. */
 export interface PickOption {
@@ -17,6 +17,8 @@ export interface PickOption {
   /** Leading colour dot (a CSS colour, e.g. a team colour). */
   color?: string;
   status?: AnyStatus;
+  /** Glyph family for `status` (issues = circles, workstreams = hexagons). */
+  statusEntity?: StatusEntity;
   actor?: ActorRef;
   /** Render the label in the mono face (keys). */
   mono?: boolean;
@@ -32,7 +34,7 @@ export interface PickOption {
     @if (o.actor) {
       <app-actor-avatar [actor]="o.actor" [size]="16" />
     } @else if (o.status) {
-      <app-status-icon [status]="o.status" [size]="14" />
+      <app-status-icon [status]="o.status" [entity]="o.statusEntity ?? 'auto'" [size]="14" />
     } @else if (o.color) {
       <span class="size-2.5 shrink-0 rounded-[3px]" [style.background]="o.color"></span>
     }
@@ -54,6 +56,20 @@ export class OptionLeading {
   imports: [HlmButtonImports, HlmDropdownMenuImports, LucideDynamicIcon, OptionLeading],
   host: { class: 'inline-flex' },
   template: `
+    @if (variant() === 'segment') {
+      <!-- value segment of a Linear-style filter chip: no border, the chip draws it -->
+      <button
+        type="button"
+        class="hover:bg-accent aria-expanded:bg-accent flex h-full max-w-full items-center gap-1.5 px-2 text-xs font-medium outline-none"
+        [hlmDropdownMenuTrigger]="menu"
+        [attr.aria-label]="label()"
+      >
+        @if (leadingOption(); as lo) {
+          <app-option-leading [option]="lo" />
+        }
+        <span class="max-w-48 truncate">{{ summary() || 'any' }}</span>
+      </button>
+    } @else {
     <button
       hlmBtn
       variant="outline"
@@ -74,6 +90,7 @@ export class OptionLeading {
       }
       <svg [lucideIcon]="chevron" [size]="12" class="text-muted-foreground"></svg>
     </button>
+    }
     <ng-template #menu>
       <hlm-dropdown-menu class="max-h-80 w-60 overflow-y-auto">
         @if (!multi() && allowClear()) {
@@ -115,10 +132,17 @@ export class OptionMenu {
   readonly allowClear = input(true);
   readonly anyLabel = input('Any');
   readonly icon = input<LucideIcon>();
+  /** `segment`: borderless trigger for use inside a filter chip. */
+  readonly variant = input<'outline' | 'segment'>('outline');
 
   protected readonly chevron = LucideChevronDown;
   protected readonly x = LucideX;
 
+  /** Glyph of the single selected option (segment variant). */
+  protected readonly leadingOption = computed(() => {
+    const sel = this.selected();
+    return sel.length === 1 ? this.options().find((o) => o.value === sel[0]) : undefined;
+  });
   protected readonly summary = computed(() => {
     const sel = this.selected();
     if (!sel.length) return '';

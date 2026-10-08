@@ -1,7 +1,7 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
-import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
+import { IsArray, IsIn, IsNumber, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import { Actor, Can, Ctx, EditsTeamWork, canDo, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, IssueKind, IssueSource, IssueStatus, Priority } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { CreateWorkstreamDto, PRIORITIES } from '../workstreams/workstreams.controller.js';
@@ -22,10 +22,15 @@ class CreateIssueDto {
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
+  @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
 }
 
 class UpdateIssueDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
+  /** Changing the kind re-keys the issue (BUG-148 → FEAT-35); the old key stays valid as an alias. */
+  @OptionalNotNull() @IsIn(KINDS) kind?: IssueKind;
+  /** Story points: non-negative number, `null` clears. */
+  @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;
@@ -34,6 +39,8 @@ class UpdateIssueDto {
   @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) workstreamIds?: string[];
+  /** At most one milestone per linked workstream. */
+  @OptionalNotNull() @IsArray() @IsString({ each: true }) milestoneIds?: string[];
   /** Id or key of the issue this duplicates. `null` clears it. */
   @Clearable() @IsString() duplicateOfId?: string | null;
 }
@@ -50,10 +57,12 @@ class ListIssueQuery {
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() workstreamId?: string;
+  @IsOptional() @IsString() milestoneId?: string;
   @IsOptional() @IsString() q?: string;
 }
 
 @Controller('w/:slug/issues')
+@EditsTeamWork('issue')
 export class IssuesController {
   constructor(private readonly service: IssuesService) {}
 
@@ -68,6 +77,7 @@ export class IssuesController {
   }
 
   @Post()
+  @Can('createIssues')
   create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateIssueDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
@@ -81,10 +91,12 @@ export class IssuesController {
   @Post(':idOrKey/link')
   @HttpCode(200)
   link(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: LinkIssueDto) {
+    if (dto.createWorkstream && !canDo(ctx, 'createWorkstreams')) throw new ForbiddenException('You are not allowed to create workstreams');
     return this.service.link(ctx.workspace.id, actor, idOrKey, dto);
   }
 
   @Delete(':idOrKey')
+  @Can('deleteIssues')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string) {
     return this.service.remove(ctx.workspace.id, actor, idOrKey);

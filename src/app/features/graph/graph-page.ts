@@ -28,6 +28,11 @@ import { buildExecutionGraph, graphStats } from './graph-model';
         <hlm-switch size="sm" [(checked)]="hideShipped" /> Hide shipped
       </label>
     </div>
+    @if (stats().workstreams && !stats().dependencies) {
+      <p class="text-muted-foreground border-b px-4 py-2 text-xs sm:px-6" role="status">
+        No dependencies in this view. Select a workstream and add a dependency from its details to show what blocks the work.
+      </p>
+    }
     <div class="min-h-0 flex-1">
       <app-execution-graph [graph]="graph()" />
     </div>

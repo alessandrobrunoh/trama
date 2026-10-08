@@ -9,7 +9,7 @@ import { ThemeService } from './core/theme';
   imports: [RouterOutlet, HlmToasterImports],
   template: `
     <router-outlet />
-    <hlm-toaster position="bottom-right" />
+    <hlm-toaster position="bottom-right" [theme]="theme.resolved()" />
   `,
 })
 export class App {

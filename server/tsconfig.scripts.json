@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist-scripts",
+    "rootDir": ".",
+    "declaration": false,
+    "sourceMap": false,
+    "incremental": true,
+    "tsBuildInfoFile": "./dist-scripts/.tsbuildinfo",
+    "types": ["node"]
+  },
+  "include": ["src", "scripts"],
+  "exclude": ["node_modules", "test", "dist", "dist-scripts", "**/*spec.ts"]
+}
