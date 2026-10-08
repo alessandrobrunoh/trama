@@ -37,7 +37,7 @@ const PAGE = 30;
         <ol class="flex flex-col">
           @for (e of d.entries; track e.id) {
             @if (e.kind === 'comment') {
-              <li class="bg-card my-1.5 rounded-lg border p-3"><app-comment-item [comment]="e.comment" /></li>
+              <li class="my-1.5"><app-comment-item [comment]="e.comment" /></li>
             } @else {
               <li
                 class="flex items-start gap-2.5 rounded-md px-1.5 py-1.5"

@@ -389,21 +389,19 @@ function describe(ev: DomainEvent): EventView | null {
 
 type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: EventView } | { kind: 'comment'; id: string; at: string; c: Comment };
 
-/** Activity events and comments, oldest first, with the composer at the bottom. */
+/** Activity events and comments, newest first, with the composer on top. */
 @Component({
   selector: 'app-issue-activity',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ActorAvatar, LucideDynamicIcon, StatusIcon, EntityChip, RelativeTimePipe, CommentItem, CommentComposer, HlmTooltip],
   host: { class: 'block' },
   template: `
-    <div class="mb-3 flex items-center gap-2">
-      <h2 class="text-sm font-semibold">Activity</h2>
-      @if (hiddenCount() > 0) {
-        <button type="button" class="text-muted-foreground hover:text-foreground ml-auto text-xs" (click)="all.set(true)">
-          Show {{ hiddenCount() }} older {{ hiddenCount() === 1 ? 'event' : 'events' }}
-        </button>
-      }
-    </div>
+    <h2 class="mb-3 text-sm font-semibold">Activity</h2>
+    @if (canEdit()) {
+      <div class="mb-4">
+        <app-comment-composer #composer placeholder="Leave a comment…" (submitted)="send($event, composer)" />
+      </div>
+    }
     <ol class="relative flex flex-col gap-3">
       @for (f of visible(); track f.id) {
         @if (f.kind === 'event') {
@@ -434,7 +432,7 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
             </span>
           </li>
         } @else {
-          <li class="border-border bg-card rounded-lg border px-3 py-2.5">
+          <li>
             <app-comment-item [comment]="f.c" />
           </li>
         }
@@ -442,10 +440,10 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
         <li class="text-muted-foreground text-sm">No activity yet.</li>
       }
     </ol>
-    @if (canEdit()) {
-      <div class="mt-4">
-        <app-comment-composer #composer placeholder="Leave a comment…" (submitted)="send($event, composer)" />
-      </div>
+    @if (hiddenCount() > 0) {
+      <button type="button" class="text-muted-foreground hover:text-foreground mt-3 text-xs" (click)="all.set(true)">
+        Show {{ hiddenCount() }} older {{ hiddenCount() === 1 ? 'event' : 'events' }}
+      </button>
     }
   `,
 })
@@ -477,7 +475,9 @@ export class IssueActivity {
   protected readonly visible = computed(() => {
     let n = 0;
     const cut = this.cutoff();
-    return this.feed().filter((f) => f.kind === 'comment' || n++ >= cut);
+    return this.feed()
+      .filter((f) => f.kind === 'comment' || n++ >= cut)
+      .reverse();
   });
 
   protected statusLabel(s: IssueStatus): string {

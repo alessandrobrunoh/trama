@@ -81,24 +81,30 @@ export class EntityRefs {
     return null;
   }
 
-  /** Markdown text → text and `ref` nodes. Rebuilt when the loaded projects change. */
+  /** Markdown text → text, `ref` and `mention` nodes. Rebuilt when projects, members or agents change. */
   readonly linker = computed<TextLinker>(() => {
     const names = this.store
       .repositories()
       .map((r) => r.fullName)
       .filter((n) => n.length >= 3)
       .map(escapeRegExp);
-    const pattern = new RegExp(
-      names.length ? `${KEY_PATTERN}|(?<![\\w/.-])(?:${names.join('|')})(?![\\w/.-])` : KEY_PATTERN,
-      'g',
-    );
+    const people = [...this.store.users().map((u) => u.name), ...this.store.agents().map((a) => a.name)]
+      .filter((n) => n.trim())
+      .sort((a, b) => b.length - a.length)
+      .map(escapeRegExp);
+    const parts = [`#?${KEY_PATTERN}`];
+    if (names.length) parts.push(`(?<![\\w/.-])(?:${names.join('|')})(?![\\w/.-])`);
+    if (people.length) parts.push(`(?<![\\w@])@(?:${people.join('|')})(?!\\w)`);
+    const pattern = new RegExp(parts.join('|'), 'g');
     return (text) => {
       const out: ReturnType<TextLinker> = [];
       let last = 0;
       for (const m of text.matchAll(pattern)) {
-        if (!this.resolve(m[0])) continue;
+        const mention = m[0].startsWith('@');
+        const token = m[0].replace(/^#/, '');
+        if (!mention && !this.resolve(token)) continue;
         if (m.index > last) out.push({ t: 'text', v: text.slice(last, m.index) });
-        out.push({ t: 'ref', v: m[0] });
+        out.push(mention ? { t: 'mention', v: m[0] } : { t: 'ref', v: token });
         last = m.index + m[0].length;
       }
       if (last < text.length) out.push({ t: 'text', v: text.slice(last) });

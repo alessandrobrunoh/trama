@@ -73,6 +73,16 @@ const MOTION_LABELS: Record<MotionMode, string> = {
             (valueChange)="setSendKey($event)"
           />
         </app-settings-row>
+        <app-settings-row
+          label="Convert emoji shortcodes"
+          description="Typing :skull: in a comment turns it into 💀."
+        >
+          <hlm-switch
+            [checked]="prefs.emojiShortcodes()"
+            (checkedChange)="prefs.emojiShortcodes.set($event)"
+            aria-label="Convert emoji shortcodes"
+          />
+        </app-settings-row>
       </app-settings-group>
     </div>
 

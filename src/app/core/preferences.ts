@@ -47,6 +47,7 @@ interface Persisted {
   pointerCursors: boolean;
   underlineLinks: boolean;
   motion: MotionMode;
+  emojiShortcodes: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -64,6 +65,10 @@ export class Preferences {
     typeof this.saved?.underlineLinks === 'boolean' ? this.saved.underlineLinks : false,
   );
   readonly motion = signal<MotionMode>(oneOf(this.saved?.motion, MOTION_MODES, 'system'));
+  /** Typing `:skull:` in a comment turns it into 💀. */
+  readonly emojiShortcodes = signal<boolean>(
+    typeof this.saved?.emojiShortcodes === 'boolean' ? this.saved.emojiShortcodes : false,
+  );
 
   /** True when comments are posted with plain Enter (Shift+Enter inserts a new line). */
   sendsOnEnter(): boolean {
@@ -85,6 +90,7 @@ export class Preferences {
         pointerCursors: this.pointerCursors(),
         underlineLinks: this.underlineLinks(),
         motion: this.motion(),
+        emojiShortcodes: this.emojiShortcodes(),
       } satisfies Persisted);
     });
   }
@@ -97,5 +103,6 @@ export class Preferences {
     this.pointerCursors.set(true);
     this.underlineLinks.set(false);
     this.motion.set('system');
+    this.emojiShortcodes.set(false);
   }
 }
