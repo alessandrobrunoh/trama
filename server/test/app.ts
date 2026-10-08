@@ -35,6 +35,11 @@ export class Client {
     return { client: new Client(server, cookie), email, user: res.body.user };
   }
 
+  /** Raw `Cookie` header this client sends. */
+  get cookieHeader(): string {
+    return this.cookie;
+  }
+
   private with(r: request.Test): request.Test {
     return r.set('Cookie', this.cookie).set('X-Client-Id', 'test-client');
   }

@@ -2,8 +2,9 @@
 //
 // - Base URL `/api` (API_BASE_URL); cookie session; `X-Client-Id` on writes (apiInterceptor).
 // - Every call rejects with `ApiError`. Side effects of failures (done once, here):
-//     401 (except on /auth/*)  -> `sessionExpired` fires; SessionStore clears the session and
-//                                  redirects to /login?next=...
+//     401 (except login, signup, logout) -> `sessionExpired` fires; SessionStore clears the session
+//                                  and redirects to /login?next=... A rejected /auth/me is a dead
+//                                  session. Wrong-password and logout 401s are not.
 //     403                       -> toast "You don't have permission" (the ApiError is still thrown)
 // - Pass `{ quiet: true }` as the last argument of a method that supports it to skip the 403 toast.
 import { HttpClient, HttpParams } from '@angular/common/http';
@@ -129,7 +130,7 @@ export class ApiClient {
   private readonly notifier = inject(Notifier);
   readonly baseUrl = inject(API_BASE_URL).replace(/\/$/, '');
 
-  /** Emits when the server rejects the session (401 on a non-auth endpoint). */
+  /** Emits when the server rejects the session (401, other than login, signup or logout). */
   readonly sessionExpired = new Subject<void>();
 
   // ───────────────────────── core ─────────────────────────
@@ -156,7 +157,9 @@ export class ApiClient {
       )) as T;
     } catch (e) {
       const err = ApiError.from(e);
-      if (err.status === 401 && !path.startsWith('/auth/')) this.sessionExpired.next();
+      if (err.status === 401 && path !== '/auth/login' && path !== '/auth/signup' && path !== '/auth/logout') {
+        this.sessionExpired.next();
+      }
       else if (err.status === 403 && !init.quiet) this.notifier.error("You don't have permission");
       throw err;
     }

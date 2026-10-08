@@ -93,6 +93,33 @@
   overscroll-behavior: contain;
 }
 
+.mobile-menu__workspaces {
+  margin-bottom: 0.375rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-menu__label {
+  margin: 0.25rem 0.875rem 0.125rem;
+  color: var(--muted-foreground);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.mobile-menu__mark {
+  display: grid;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  flex: none;
+  place-items: center;
+  border-radius: 0.375rem;
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .mobile-menu__link {
   display: flex;
   min-height: 3.25rem;

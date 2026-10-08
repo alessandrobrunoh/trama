@@ -74,9 +74,18 @@ export class AuthService {
   async authenticateSession(raw: string): Promise<{ user: UserEntity; sessionId: string } | null> {
     const id = hashSession(raw);
     const session = await this.sessions.findOneBy({ id });
-    if (!session || session.expiresAt.getTime() < Date.now()) return null;
+    if (!session) return null;
+    const expires = session.expiresAt?.getTime();
+    if (expires === undefined || Number.isNaN(expires) || expires <= Date.now()) {
+      await this.sessions.delete({ id });
+      return null;
+    }
     const user = await this.users.findOneBy({ id: session.userId });
-    return user ? { user, sessionId: id } : null;
+    if (!user) {
+      await this.sessions.delete({ id });
+      return null;
+    }
+    return { user, sessionId: id };
   }
 
   async destroySession(sessionId: string): Promise<void> {

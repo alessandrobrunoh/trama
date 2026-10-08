@@ -86,7 +86,7 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
 
 Errors: every call rejects with `ApiError { status, message, code?, details?, isUnauthorized/isForbidden/isNotFound/isConflict/isValidation/isNetwork }` (`status 0` = unreachable).
-- 401 on a non-`/auth/` call: `api.sessionExpired` emits; SessionStore clears the session and redirects to `/login?next=<url>` (toast "Your session expired").
+- 401 other than `POST /auth/login`, `POST /auth/signup` or `POST /auth/logout`: `api.sessionExpired` emits; SessionStore clears the session and redirects to `/login?next=<url>` (toast "Your session expired"). A 401 from `GET /auth/me` is a dead session too. Wrong-password and logout 401s do not.
 - 403: toast "You don't have permission" (pass `{ quiet: true }` to the few methods that take `RequestOptions` to suppress; core stores never double-toast it) and the ApiError is still thrown.
 
 Surface (`slug` = workspace slug; `idOrKey` = id or key like `AUTH-42`; everything returns the contract types):

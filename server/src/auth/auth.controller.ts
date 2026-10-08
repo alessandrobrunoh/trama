@@ -35,14 +35,22 @@ class LoginDto {
   @IsString() @MinLength(1) @MaxLength(200) password: string;
 }
 
-export function setSessionCookie(res: Response, raw: string): void {
-  res.cookie(SESSION_COOKIE, raw, {
+/** Flags shared by set and clear. A clear that omits these leaves the browser holding the old cookie. */
+function sessionCookieFlags() {
+  return {
     httpOnly: true,
-    sameSite: 'lax',
+    sameSite: 'lax' as const,
     secure: process.env.NODE_ENV === 'production',
     path: '/',
-    maxAge: SESSION_TTL_MS,
-  });
+  };
+}
+
+export function setSessionCookie(res: Response, raw: string): void {
+  res.cookie(SESSION_COOKIE, raw, { ...sessionCookieFlags(), maxAge: SESSION_TTL_MS });
+}
+
+export function clearSessionCookie(res: Response): void {
+  res.clearCookie(SESSION_COOKIE, sessionCookieFlags());
 }
 
 @Controller('auth')
@@ -76,7 +84,7 @@ export class AuthController {
   @RequireUser()
   async logout(@Auth() auth: AuthInfo, @Res({ passthrough: true }) res: Response): Promise<void> {
     if (auth.sessionId) await this.auth.destroySession(auth.sessionId);
-    res.clearCookie(SESSION_COOKIE, { path: '/' });
+    clearSessionCookie(res);
   }
 
   @Get('me')

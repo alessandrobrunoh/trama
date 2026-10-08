@@ -25,7 +25,7 @@ Two ways, accepted on every route except the public ones (`/health`, `/auth/sign
 |---|---|---|
 | `POST /auth/signup` | `{ name, email, password (≥ 8) }` | `201 { user, workspaces: [] }` + cookie. `409` if the email exists. |
 | `POST /auth/login` | `{ email, password }` | `200 { user, workspaces }` + cookie. `401` on bad credentials. |
-| `POST /auth/logout` | – | `204`, clears the session. |
+| `POST /auth/logout` | – | `204`, deletes the session and clears the cookie with the same path, `SameSite` and `Secure` flags used to set it. |
 | `GET /auth/me` | – | `{ user, workspaces }`. `workspaces` = `Array<Workspace & { role }>`. Agent tokens get `403`. |
 | `GET /health` | – | `{ status: 'ok', db: 'up' }` or `503`. |
 

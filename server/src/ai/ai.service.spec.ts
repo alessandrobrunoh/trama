@@ -69,7 +69,7 @@ describe('assistant tool loop', () => {
   });
 
   it('caps changes per reply at 10 and stops spending on writes', async () => {
-    const many = Array.from({ length: 14 }, (_, i) => call('create_issue', { n: i }, `c${i}`));
+    const many = Array.from({ length: 14 }, (_, i) => call('create_issue', { kind: 'bug', title: `n${i}` }, `c${i}`));
     const { service, tools, seen } = setup([
       { content: '', toolCalls: many },
       { content: 'Stopped.', toolCalls: [] },

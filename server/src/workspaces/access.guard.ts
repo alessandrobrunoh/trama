@@ -161,6 +161,8 @@ export class AccessGuard implements CanActivate {
       const m = /^Bearer\s+(\S+)$/i.exec(header);
       if (!m) return null;
       const token = await this.tokens.authenticate(m[1]);
+      // A presented bearer token that is missing, revoked or expired is not a session.
+      // Do not fall through to the cookie: the caller asked to act as that token.
       if (!token) return null;
       if (token.actor.type === 'user') {
         const user = await this.users.findOneBy({ id: token.actor.id });
