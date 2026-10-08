@@ -1,7 +1,8 @@
 # Trama production stack: web (static Angular), app (API), mcp (MCP server) and a dedicated Postgres.
 # Public URL: https://trama.alessandrobrunoh.it, routed by Traefik (external network `proxy`):
 #   /api -> app, /mcp -> mcp, everything else -> web.
-# Needs server/.env.production (copy .env.production.example and fill it in).
+# The API reads its environment from ../.env (the repository root: where deploy tools such as Komodo write the
+# stack's environment) and then server/.env.production (copy .env.production.example and fill it in; it wins).
 # Postgres is NOT published on the host here: the API reaches it as postgres:5432 on the compose network.
 # For development, docker-compose.dev.yml publishes it on localhost:5434 (npm run db:up).
 name: delta
@@ -42,9 +43,13 @@ services:
     init: true
     read_only: true
     tmpfs: [/tmp]
-    # Optional so `npm run db:up` / `db:down` work in development; in production the API refuses to boot
-    # without TRAMA_ENCRYPTION_KEY and a DATABASE_URL, so a missing file shows up immediately.
+    # Both files are optional so `npm run db:up` / `db:down` work in development; in production the API refuses
+    # to boot without TRAMA_ENCRYPTION_KEY and a DATABASE_URL, so missing variables show up immediately.
+    # Note: `--env-file` on the docker compose command only fills ${VARS} in this file; it does not reach the
+    # container. That is why the deploy's .env is listed here explicitly (paths are relative to this file).
     env_file:
+      - path: ../.env
+        required: false
       - path: .env.production
         required: false
     environment:

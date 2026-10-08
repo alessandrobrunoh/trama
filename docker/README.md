@@ -19,7 +19,10 @@ docker build -f mcp/Dockerfile -t ghcr.io/alessandrobrunoh/trama-mcp:latest .
 Production stack: `server/docker-compose.yml` (web, app, mcp, postgres) behind Traefik. Routing on
 `trama.alessandrobrunoh.it`: `/api` → app, `/mcp` → mcp, everything else → web. Copy
 `server/.env.production.example` to `server/.env.production` and fill in the `CHANGE_ME` values, then
-`docker compose -f server/docker-compose.yml up -d`.
+`docker compose -f server/docker-compose.yml up -d`. With a deploy tool (Komodo, Portainer…) you can instead define the
+same variables in the stack's environment: the tool writes them to `.env` in the repository root, which the `app` service
+also reads (`server/.env.production`, if present, overrides it). The API will not start in production without at least
+`DATABASE_URL` (host `postgres`, password `delta` unless you changed `POSTGRES_PASSWORD`) and `TRAMA_ENCRYPTION_KEY`.
 `npm run db:up` (development) starts only Postgres, published on `localhost:5434` by `server/docker-compose.dev.yml`.
 In production Postgres has **no** host port: only the API (same compose network) can reach it.
 
