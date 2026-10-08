@@ -156,7 +156,7 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
             <li>Actions show up in Trama with {{ a.name }}’s name and an agent badge.</li>
           </ol>
           <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
-          <p class="text-muted-foreground text-xs leading-snug">Trama does not expose an MCP server yet, so agents talk to the REST API with this token.</p>
+          <p class="text-muted-foreground text-xs leading-snug">Agents connect through the Trama MCP server or the REST API with this token.</p>
         </div>
       </app-settings-group>
 

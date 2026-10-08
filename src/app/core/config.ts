@@ -11,3 +11,9 @@ export const API_BASE_URL = new InjectionToken<string>('API_BASE_URL', {
   providedIn: 'root',
   factory: () => environment.apiBaseUrl,
 });
+
+/** Absolute URL of the MCP server (Streamable HTTP), shown in Settings → API tokens. */
+export const MCP_URL = new InjectionToken<string>('MCP_URL', {
+  providedIn: 'root',
+  factory: () => (typeof location !== 'undefined' ? location.origin : '') + environment.mcpPath,
+});

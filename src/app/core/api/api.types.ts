@@ -14,6 +14,8 @@ import type {
   PermissionMap,
   TeamEditPolicy,
   TokenScope,
+  ApiPermission,
+  TokenLimits,
   WeekStart,
   OutgoingWebhook,
   DependencyNodeType,
@@ -95,6 +97,10 @@ export interface CreateTokenInput {
   name: string;
   /** Default `write`. `admin` needs an admin caller and cannot be used for agents. */
   scope?: TokenScope;
+  /** Explicit resource × action grants; implies `scope: 'custom'`. */
+  permissions?: ApiPermission[];
+  /** Request / write caps; omitted values use the defaults. */
+  limits?: Partial<TokenLimits>;
   /** Omit: the token acts as you. Set (admin only): the token acts as this agent. */
   agentId?: ID;
   expiresAt?: ISODate;

@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { LucideCheck, LucideCopy, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { API_BASE_URL } from '../../../core/config';
+import { API_BASE_URL, MCP_URL } from '../../../core/config';
 import type { TokenScope } from '../../../core/contracts/domain';
 import { Clipboard } from '../../../core/notify/notifier';
 import { NablaStore } from '../../../core/stores/nabla.store';
@@ -41,12 +41,11 @@ export class CodeBlock {
   }
 }
 
-type Tab = 'env' | 'read' | 'write' | 'context';
+type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'env' | 'read' | 'write' | 'context';
 
 /**
- * Copy-paste examples for calling the Nabla REST API with a token. Every route shown exists
- * (see server/API.md). Nabla has no MCP endpoint yet, so there is no MCP snippet: agents use these
- * HTTP calls (or the agent-context markdown below) until one is added.
+ * Copy-paste examples for connecting an MCP client (the nabla-mcp server) or calling the Nabla REST
+ * API directly with a token. Every route shown exists (see server/API.md).
  */
 @Component({
   selector: 'app-connect-snippets',
@@ -82,11 +81,12 @@ type Tab = 'env' | 'read' | 'write' | 'context';
 export class ConnectSnippets {
   private readonly store = inject(NablaStore);
   private readonly base = inject(API_BASE_URL).replace(/\/$/, '');
+  private readonly mcpUrl = inject(MCP_URL);
 
   /** The plaintext secret (just created), or null to show a placeholder. */
   readonly token = input<string | null>(null);
   readonly scope = input<TokenScope>('write');
-  protected readonly tab = signal<Tab>('env');
+  protected readonly tab = signal<Tab>('mcp-cli');
 
   /** Absolute API base: the SPA proxies/serves `/api` from its own origin. */
   protected readonly apiUrl = computed(() => (this.base.startsWith('/') && typeof location !== 'undefined' ? location.origin + this.base : this.base));
@@ -95,6 +95,9 @@ export class ConnectSnippets {
   private readonly exampleKey = computed(() => this.store.workstreams()[0]?.key ?? 'AUTH-42');
 
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [
+    { id: 'mcp-cli', label: 'MCP · Claude Code' },
+    { id: 'mcp-json', label: 'MCP · JSON config' },
+    { id: 'mcp-docker', label: 'MCP · Docker' },
     { id: 'env', label: 'Environment' },
     { id: 'read', label: 'Read (curl)' },
     ...(this.scope() === 'read' ? [] : [{ id: 'write' as Tab, label: 'Write (curl)' }]),
@@ -103,6 +106,12 @@ export class ConnectSnippets {
 
   protected readonly current = computed<{ label: string; hint: string }>(() => {
     switch (this.tab()) {
+      case 'mcp-cli':
+        return { label: 'Claude Code command', hint: 'Adds the Nabla MCP server to Claude Code. The key decides which tools the model sees: tools it may not use are hidden.' };
+      case 'mcp-json':
+        return { label: 'MCP config', hint: 'For clients that take a Streamable HTTP server with headers (Cursor, Windsurf, VS Code…). Same key, same permissions.' };
+      case 'mcp-docker':
+        return { label: 'docker command', hint: 'Run your own MCP server next to the API. Clients then connect to http://localhost:8080/mcp with the same Authorization header.' };
       case 'env':
         return { label: 'Environment', hint: 'Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
       case 'read':
@@ -121,6 +130,12 @@ export class ConnectSnippets {
     const url = this.apiUrl();
     const slug = this.slug();
     switch (this.tab()) {
+      case 'mcp-cli':
+        return `claude mcp add --transport http nabla ${this.mcpUrl} \\\n  --header "Authorization: Bearer ${this.secret()}"`;
+      case 'mcp-json':
+        return JSON.stringify({ mcpServers: { nabla: { url: this.mcpUrl, headers: { Authorization: `Bearer ${this.secret()}` } } } }, null, 2);
+      case 'mcp-docker':
+        return [`docker run --rm -p 8080:8080 \\`, `  -e NABLA_API_URL=${url} \\`, `  ghcr.io/alessandrobrunoh/trama-mcp:latest`].join('\n');
       case 'env':
         return [`NABLA_API_URL=${url}`, `NABLA_WORKSPACE=${slug}`, `NABLA_TOKEN=${this.secret()}`].join('\n');
       case 'read':
