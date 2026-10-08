@@ -61,7 +61,29 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <div hlmSidebarHeader class="gap-1 px-2 pt-2.5 pb-1">
+    <div class="border-sidebar-border flex items-center gap-2 border-b px-5 py-4 md:hidden">
+      <button
+        type="button"
+        class="hover:bg-sidebar-accent flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-start"
+        [hlmDropdownMenuTrigger]="userMenu"
+        align="start"
+        aria-label="Account menu"
+      >
+        <app-actor-avatar [actor]="meRef()" [size]="36" />
+        <span class="min-w-0 flex-1 truncate text-base font-medium">{{ session.user()?.name ?? 'Account' }}</span>
+        <svg [lucideIcon]="chevrons" [size]="17" class="text-muted-foreground shrink-0"></svg>
+      </button>
+      <button
+        type="button"
+        class="hover:bg-sidebar-accent flex size-10 shrink-0 items-center justify-center rounded-full"
+        aria-label="Settings"
+        (click)="go(['/', slug(), 'settings', 'profile'])"
+      >
+        <svg [lucideIcon]="settings" [size]="19"></svg>
+      </button>
+    </div>
+
+    <div hlmSidebarHeader class="gap-1 px-2 pt-2.5 pb-1 max-md:hidden">
       <div class="flex items-center gap-0.5">
         <!-- workspace switcher -->
         <button
@@ -113,7 +135,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
       </ul>
 
       <!-- Workspace -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-2">
         <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('workspace')" [attr.aria-expanded]="!ui.isFolded('workspace')">
           Workspace
           <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('workspace')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
@@ -128,7 +150,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
       </div>
 
       <!-- Teams -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('teams')" [attr.aria-expanded]="!ui.isFolded('teams')">
             Your teams
@@ -207,7 +229,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
       </div>
 
       <!-- Views -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('views')" [attr.aria-expanded]="!ui.isFolded('views')">
             Views
@@ -260,10 +282,23 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
           </ul>
         }
       </div>
+
+      <div class="mt-4 border-t border-sidebar-border pt-2 md:hidden">
+        <button
+          type="button"
+          hlmSidebarMenuButton
+          class="max-md:!h-12 max-md:!rounded-xl max-md:!px-4 max-md:!text-[15px]"
+          (click)="ui.openCommandPalette()"
+          closeMobileSidebarOnClick
+        >
+          <svg [lucideIcon]="search" [size]="17" class="text-muted-foreground"></svg>
+          <span>Search</span>
+        </button>
+      </div>
     </div>
 
     <!-- footer: user menu + help -->
-    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
       <button
         type="button"
         class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"

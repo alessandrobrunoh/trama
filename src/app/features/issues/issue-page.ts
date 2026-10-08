@@ -43,7 +43,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       @if (store.allowed('createIssues')) {
         <button hlmBtn size="sm" hlmTooltip="Report a bug, request or incident" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New issue</span>
+          <span>New issue</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }

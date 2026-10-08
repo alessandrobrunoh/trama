@@ -1,6 +1,5 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input } from '@angular/core';
-import { HlmSheetImports } from '@spartan-ng/helm/sheet';
 import { classes, hlm } from '@spartan-ng/helm/utils';
 import type { ClassValue } from 'clsx';
 import { HlmSidebarService, type SidebarVariant } from './hlm-sidebar.service';
@@ -8,7 +7,7 @@ import { injectHlmSidebarConfig } from './hlm-sidebar.token';
 
 @Component({
   selector: 'hlm-sidebar',
-  imports: [NgTemplateOutlet, HlmSheetImports],
+  imports: [NgTemplateOutlet],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     '[attr.data-slot]': '_dataSlot()',
@@ -25,28 +24,7 @@ import { injectHlmSidebarConfig } from './hlm-sidebar.token';
     @if (collapsible() === 'none') {
       <ng-container *ngTemplateOutlet="contentContainer"></ng-container>
     } @else if (_sidebarService.isMobile()) {
-      <hlm-sheet
-        [side]="side()"
-        [state]="_sidebarService.openMobile() ? 'open' : 'closed'"
-        (stateChanged)="_sidebarService.setOpenMobile($event === 'open')"
-      >
-        <hlm-sheet-content
-          *hlmSheetPortal="let ctx"
-          data-slot="sidebar"
-          data-sidebar="sidebar"
-          data-mobile="true"
-          class="bg-sidebar text-sidebar-foreground h-svh w-(--sidebar-width) p-0 [&>button]:hidden"
-          [style.--sidebar-width]="sidebarWidthMobile()"
-        >
-          <hlm-sheet-header class="sr-only">
-            <h2 hlmSheetTitle>{{ srOnlySheetTitle() }}</h2>
-            <p hlmSheetDescription>{{ srOnlySheetDescription() }}</p>
-          </hlm-sheet-header>
-          <div class="flex h-full w-full flex-col">
-            <ng-container *ngTemplateOutlet="contentContainer" />
-          </div>
-        </hlm-sheet-content>
-      </hlm-sheet>
+      <ng-container />
     } @else {
       <!-- Sidebar gap on desktop -->
       <div data-slot="sidebar-gap" [class]="_sidebarGapComputedClass()"></div>
@@ -72,6 +50,7 @@ export class HlmSidebar {
   public readonly sidebarWidthMobile = input<string>(this._config.sidebarWidthMobile);
 
   public readonly side = input<'left' | 'right'>('left');
+  public readonly mobileSide = input<'left' | 'right' | 'top' | 'bottom'>('left');
   public readonly variant = input<SidebarVariant>(this._sidebarService.variant());
   public readonly collapsible = input<'offcanvas' | 'icon' | 'none'>('offcanvas');
 

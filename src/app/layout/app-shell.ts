@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
 import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
@@ -17,7 +17,7 @@ import { MobileNav } from './mobile-nav';
 /**
  * Router parent for `/:workspaceSlug/...`.
  *   desktop: [sidebar | top bar + scrolling content]   (⌘B collapses the sidebar)
- *   mobile (≤768px): the same sidebar becomes a left sheet, opened from the top bar trigger
+ *   mobile (≤768px): the same sidebar becomes a bottom navigation sheet, opened from the mobile bar
  * Global overlays (command palette, shortcuts, destructive confirm) are mounted once here and driven
  * by `UiStore.modal`. The create dialog (features/create) and `/` search (features/command) are mounted here too.
  */
@@ -54,12 +54,12 @@ import { MobileNav } from './mobile-nav';
       >Skip to content</a
     >
     <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden">
-      <hlm-sidebar collapsible="offcanvas" variant="inset" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
+      <hlm-sidebar collapsible="offcanvas" variant="inset" mobileSide="bottom" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
         <app-sidebar />
       </hlm-sidebar>
       <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
         <app-top-bar />
-        <div id="main-content" tabindex="-1" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
+        <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
         </div>
         <app-mobile-nav />
@@ -106,11 +106,5 @@ export class AppShell {
   constructor() {
     // UiStore (persisted, driven by keyboard shortcuts) → Spartan sidebar state.
     effect(() => this.sidebar.setOpen(!this.ui.sidebarCollapsed()));
-    effect(() => this.sidebar.setOpenMobile(this.ui.mobileSidebarOpen()));
-    // Spartan → UiStore (sheet closed by overlay click / Esc / link tap).
-    effect(() => {
-      const open = this.sidebar.openMobile();
-      untracked(() => this.ui.setMobileSidebar(open));
-    });
   }
 }

@@ -97,7 +97,7 @@ interface WsItem {
       @if (canEdit()) {
         <button hlmBtn size="sm" variant="outline" (click)="newIssue()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New issue</span>
+          <span>New issue</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }

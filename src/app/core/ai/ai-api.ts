@@ -23,11 +23,32 @@ export interface AiDraft {
   kind: 'issue' | 'workstream' | 'decision';
   title: string;
   description: string;
+  issueOptions?: AiIssueDraftOptions;
+}
+export interface AiIssueDraftOptions {
+  kinds: string[];
+  priorities: string[];
+  estimates: number[];
+  teams: { id: string; label: string }[];
+  assignees: { id: string; label: string }[];
+  workstreams: { id: string; key: string; title: string; objective: string }[];
+  similar: { key: string; title: string; kind: string; priority: string; estimate: number | null; cycleDays: number | null }[];
+}
+export type AiIssueDraftSuggestion =
+  | { field: 'priority'; value: string; why: string }
+  | { field: 'kind'; value: string; why: string }
+  | { field: 'estimate'; value: number; why: string }
+  | { field: 'teamId'; value: string; label: string; why: string }
+  | { field: 'assigneeId'; value: string; label: string; why: string }
+  | { field: 'workstreamId'; value: string; label: string; why: string };
+export interface AiIssueDraftTriage {
+  suggestions: AiIssueDraftSuggestion[];
 }
 export interface AiSuggestion {
   title: string;
   description: string;
   questions: string[];
+  triage?: AiIssueDraftTriage;
 }
 export interface ChatMessage {
   role: 'user' | 'assistant';

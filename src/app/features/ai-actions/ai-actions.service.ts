@@ -149,6 +149,7 @@ export class AiActions {
   private checkedAt = 0;
   private knownSlug: string | null = null;
   private checking: Promise<void> | null = null;
+  private checkingSlug: string | null = null;
   /** True when a provider is configured or a SuperGrok account is connected. Cached per workspace. */
   readonly available = this._available.asReadonly();
   /** The status answered at least once for this workspace (so "unavailable" is a fact, not a guess). */
@@ -190,8 +191,9 @@ export class AiActions {
   refresh(): Promise<void> {
     const slug = this.store.slug();
     if (!slug) return Promise.resolve();
-    if (this.checking) return this.checking;
+    if (this.checking && this.checkingSlug === slug) return this.checking;
     this.checkedAt = Date.now();
+    this.checkingSlug = slug;
     this.checking = this.api
       .status(slug)
       .then((s) => {
@@ -206,7 +208,7 @@ export class AiActions {
         }
       })
       .finally(() => {
-        this.checking = null;
+        if (this.checkingSlug === slug) this.checking = null;
       });
     return this.checking;
   }

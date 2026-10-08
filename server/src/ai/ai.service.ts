@@ -27,13 +27,20 @@ export class AiService {
   async suggest(userId: string, dto: SuggestionDto, signal: AbortSignal) {
     if (!(dto.title.trim() || dto.description.trim()))
       throw new BadRequestException('Write a title or description first.');
+    const issueOptions = dto.kind === 'issue' ? dto.issueOptions : undefined;
+    const triageInstruction = issueOptions
+      ? ` Also suggest issue triage properties from the supplied choices only. Use similar finished issues to calibrate estimates. Never infer an assignee or team without evidence; return null when uncertain. Return triage with priority, kind, estimate, team, assignee, and up to 3 workstreams. Each non-null field is {value: the exact allowed value or id, why: one short evidence-based sentence}; workstreams is an array of {id, why}. Do not suggest status or labels.`
+      : '';
+    const triageSchema = issueOptions
+      ? ', triage: {priority: {value: allowed priority, why: string} | null, kind: {value: allowed kind, why: string} | null, estimate: {value: allowed estimate, why: string} | null, team: {value: allowed team id, why: string} | null, assignee: {value: allowed assignee id, why: string} | null, workstreams: [{id: allowed workstream id, why: string}]}'
+      : '';
     const text = await this.provider.complete(
       [
         {
           role: 'system',
-          content: `${INSTRUCTIONS} Improve the supplied draft without inventing information. Return only a JSON object with title (nonempty string, at most 300 characters), description (string, at most 12000 characters), and questions (at most 3 short strings about missing information). Preserve existing facts and links. Do not put questions inside the description.`,
+          content: `${INSTRUCTIONS} Improve the supplied draft without inventing information.${triageInstruction} Return only a JSON object with title (nonempty string, at most 300 characters), description (string, at most 12000 characters), questions (at most 3 short strings about missing information)${triageSchema}. Preserve existing facts and links. Do not put questions inside the description.`,
         },
-        { role: 'user', content: JSON.stringify(dto) },
+        { role: 'user', content: JSON.stringify({ kind: dto.kind, title: dto.title, description: dto.description, issueOptions }) },
       ],
       signal,
       userId,
@@ -69,7 +76,54 @@ export class AiService {
         'The AI returned a suggestion in an unexpected format. Try again.',
       );
     }
-    return { title: title.trim(), description, questions };
+    const triage = issueOptions ? this.parseDraftTriage(result?.['triage'], issueOptions) : undefined;
+    return { title: title.trim(), description, questions, ...(triage ? { triage } : {}) };
+  }
+
+  private parseDraftTriage(value: unknown, options: NonNullable<SuggestionDto['issueOptions']>) {
+    const raw = record(value);
+    if (!raw) return { suggestions: [] };
+    const suggestions: { field: string; value: string | number; label?: string; why: string }[] = [];
+    const addChoice = (field: string, key: string, choices: readonly string[]) => {
+      const candidate = record(raw[key]);
+      const picked = candidate?.['value'];
+      if (typeof picked !== 'string' || !choices.includes(picked)) return;
+      suggestions.push({ field, value: picked, why: this.draftWhy(candidate?.['why']) });
+    };
+    addChoice('priority', 'priority', options.priorities);
+    addChoice('kind', 'kind', options.kinds);
+
+    const estimate = record(raw['estimate']);
+    const estimateValue = estimate?.['value'];
+    if (typeof estimateValue === 'number' && options.estimates.includes(estimateValue)) {
+      suggestions.push({ field: 'estimate', value: estimateValue, why: this.draftWhy(estimate?.['why']) });
+    }
+    const addNamedChoice = (field: 'teamId' | 'assigneeId', key: 'team' | 'assignee', choices: readonly { id: string; label: string }[]) => {
+      const candidate = record(raw[key]);
+      const picked = candidate?.['value'];
+      const choice = typeof picked === 'string' ? choices.find((item) => item.id === picked) : undefined;
+      if (choice) suggestions.push({ field, value: choice.id, label: choice.label, why: this.draftWhy(candidate?.['why']) });
+    };
+    addNamedChoice('teamId', 'team', options.teams);
+    addNamedChoice('assigneeId', 'assignee', options.assignees);
+
+    if (Array.isArray(raw['workstreams'])) {
+      const seen = new Set<string>();
+      for (const entry of raw['workstreams']) {
+        const candidate = record(entry);
+        const picked = candidate?.['id'];
+        const choice = typeof picked === 'string' ? options.workstreams.find((item) => item.id === picked) : undefined;
+        if (!choice || seen.has(choice.id)) continue;
+        seen.add(choice.id);
+        suggestions.push({ field: 'workstreamId', value: choice.id, label: `${choice.key} · ${choice.title}`, why: this.draftWhy(candidate?.['why']) });
+        if (seen.size >= 3) break;
+      }
+    }
+    return { suggestions };
+  }
+
+  private draftWhy(value: unknown): string {
+    return typeof value === 'string' ? value.trim().slice(0, 180) : '';
   }
 
   async chat(

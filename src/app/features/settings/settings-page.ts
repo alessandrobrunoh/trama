@@ -102,7 +102,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
           <div class="text-muted-foreground hidden px-2 pb-1 text-xs font-medium md:block" [class.md:pt-5]="!first">{{ g.title }}</div>
           @for (s of g.sections; track s.id) {
             <a
-              class="hover:bg-accent text-muted-foreground hover:text-foreground flex h-7 shrink-0 items-center gap-2 rounded-md px-2 text-[13px] whitespace-nowrap transition-colors"
+              class="hover:bg-accent text-muted-foreground hover:text-foreground flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm whitespace-nowrap transition-colors md:h-7 md:px-2 md:text-[13px]"
               [class.bg-accent]="sectionId() === s.id"
               [class.text-foreground]="sectionId() === s.id"
               [class.font-medium]="sectionId() === s.id"

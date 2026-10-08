@@ -14,7 +14,7 @@ import { RelativeTimePipe } from '../../shared/pipes';
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTextareaImports, HlmButtonImports, Kbd, ActorAvatar],
-  host: { class: 'flex gap-2.5' },
+  host: { class: 'flex min-w-0 gap-2.5' },
   template: `
     <app-actor-avatar [actor]="{ type: 'user', id: store.me()?.id }" [size]="24" class="mt-1" />
     <div class="min-w-0 flex-1">
@@ -63,7 +63,7 @@ export class CommentComposer {
   selector: 'app-comment-item',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [ActorAvatar, Markdown, RelativeTimePipe, HlmButtonImports, HlmTextareaImports, LucideDynamicIcon, HlmTooltip],
-  host: { class: 'flex gap-2.5' },
+  host: { class: 'flex min-w-0 gap-2.5' },
   template: `
     <app-actor-avatar [actor]="comment().author" [size]="24" class="mt-0.5" />
     <div class="min-w-0 flex-1">
@@ -143,7 +143,7 @@ export class CommentItem {
   selector: 'app-comment-thread',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CommentItem, CommentComposer],
-  host: { class: 'block' },
+  host: { class: 'block min-w-0' },
   template: `
     <div class="flex flex-col gap-4">
       @for (c of comments(); track c.id) {

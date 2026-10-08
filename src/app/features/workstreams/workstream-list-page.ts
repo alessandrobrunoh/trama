@@ -170,7 +170,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       @if (canCreate()) {
         <button hlmBtn size="sm" (click)="create()" hlmTooltip="New workstream" position="bottom">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New workstream</span>
+          <span>New workstream</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }

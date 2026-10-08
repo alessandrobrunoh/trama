@@ -20,7 +20,7 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
       'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 md:rounded-t-lg',
   },
   template: `
-    <button hlmSidebarTrigger class="-ml-1 size-9 md:size-7" srOnlyText="Toggle sidebar (⌘B)"></button>
+    <button hlmSidebarTrigger class="-ml-1 hidden size-7 md:inline-flex" srOnlyText="Toggle sidebar (⌘B)"></button>
 
     <nav aria-label="Breadcrumb" class="flex min-w-0 flex-1 items-center gap-1.5">
       @if (sectionIcon(); as icon) {
@@ -63,7 +63,7 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
       </span>
     }
 
-    <div class="flex shrink-0 items-center gap-1.5 empty:hidden">
+    <div class="top-bar__actions flex shrink-0 items-center gap-1.5 empty:hidden">
       @if (chrome.actions(); as tpl) {
         <ng-container *ngTemplateOutlet="tpl" />
       }

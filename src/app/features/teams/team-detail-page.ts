@@ -53,12 +53,12 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
       <ng-template appTopBarActions>
         @if (canNewIssue()) {
           <button hlmBtn variant="outline" size="sm" (click)="newIssue()">
-            <svg [lucideIcon]="plus" [size]="14"></svg><span class="max-sm:hidden">Issue</span>
+            <svg [lucideIcon]="plus" [size]="14"></svg><span>Issue</span>
           </button>
         }
         @if (canNewWorkstream()) {
           <button hlmBtn size="sm" (click)="newWorkstream()">
-            <svg [lucideIcon]="plus" [size]="14"></svg><span class="max-sm:hidden">Workstream</span>
+            <svg [lucideIcon]="plus" [size]="14"></svg><span>Workstream</span>
           </button>
         }
         <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="Team actions">

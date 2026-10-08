@@ -60,6 +60,7 @@ import { issueEstimateOptions } from '../issues/issue-model';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
 import { DraftSuggestions } from '../ai/draft-suggestions';
+import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 
 type ComposerKind = 'issue' | 'workstream' | 'decision';
 
@@ -221,7 +222,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
               ></textarea>
               @if (composer(); as composerKind) {
                 <app-draft-suggestions [kind]="composerKind.kind" [title]="title()" [description]="text()" [disabled]="busy()"
-                  (titleAccepted)="title.set($event)" (descriptionAccepted)="text.set($event)" (settingsRequested)="ui.closeModal()" />
+                  (titleAccepted)="title.set($event)" (descriptionAccepted)="text.set($event)" (triageAccepted)="applyIssueSuggestion($event)" (settingsRequested)="ui.closeModal()" />
               }
               @if (err('statement'); as e) {
                 <p class="text-destructive text-xs" role="alert">{{ e }}</p>
@@ -697,6 +698,29 @@ export class CreateDialog {
 
   private focusTitle(): void {
     setTimeout(() => this.titleEl()?.nativeElement.focus());
+  }
+
+  protected applyIssueSuggestion(suggestion: AiIssueDraftSuggestion): void {
+    switch (suggestion.field) {
+      case 'priority':
+        this.priority.set(suggestion.value);
+        break;
+      case 'kind':
+        this.issueKind.set(suggestion.value);
+        break;
+      case 'estimate':
+        this.issueEstimate.set(String(suggestion.value));
+        break;
+      case 'teamId':
+        this.teamId.set(suggestion.value);
+        break;
+      case 'assigneeId':
+        this.assigneeId.set(suggestion.value);
+        break;
+      case 'workstreamId':
+        this.workstreamIds.update((ids) => ids.includes(suggestion.value) ? ids : [...ids, suggestion.value]);
+        break;
+    }
   }
 
   protected async submit(ev: Event): Promise<void> {
