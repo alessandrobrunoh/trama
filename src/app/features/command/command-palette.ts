@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { UiStore } from '../../core/stores/ui.store';
-import { CommandPanel } from './command-panel';
+import { COMMAND_DIALOG_CLASS, CommandPanel } from './command-panel';
 
 /** ⌘K palette: navigation, actions and global search. Mounted once in AppShell. */
 @Component({
@@ -14,7 +14,7 @@ import { CommandPanel } from './command-panel';
       description="Search for a screen, an action or any workstream, issue or decision."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
-      dialogContentClass="w-[calc(100%-1rem)] max-w-none sm:w-[44rem] top-[10%] sm:top-[14%] translate-y-0 rounded-xl"
+      [dialogContentClass]="dialogClass"
     >
       @if (open()) {
         <app-command-panel mode="palette" />
@@ -24,6 +24,7 @@ import { CommandPanel } from './command-panel';
 })
 export class CommandPalette {
   private readonly ui = inject(UiStore);
+  protected readonly dialogClass = COMMAND_DIALOG_CLASS;
   protected readonly open = computed(() => this.ui.modal() === 'command');
 
   protected onState(s: string): void {

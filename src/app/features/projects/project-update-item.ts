@@ -1,4 +1,4 @@
-// One post of the Updates feed: author, health, markdown body, edit / delete menu, comment thread.
+// One project update: health is the headline, the body is the post, comments sit apart under it.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import {
   LucideChevronDown,
@@ -46,38 +46,47 @@ import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
     ProjectHealthPicker,
   ],
   host: {
-    class: 'flex min-w-0 gap-2.5 rounded-lg border p-3',
+    class: 'block min-w-0 border-b py-8 first:pt-2 last:border-b-0',
     '[attr.data-update-id]': 'update().id',
   },
   template: `
     @let u = update();
-    <app-actor-avatar [actor]="u.author" [size]="24" class="mt-0.5" />
-    <div class="min-w-0 flex-1">
-      <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-        <span class="text-foreground truncate text-sm font-medium">{{
-          store.actorName(u.author)
-        }}</span>
-        @if (u.author.type === 'agent') {
-          <span class="text-primary bg-primary/10 rounded px-1 text-[10px] font-medium uppercase"
-            >agent</span
+    <article>
+      <header class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          @if (editing()) {
+            <app-project-health-picker label="Update health" [(value)]="draftHealth" />
+          } @else {
+            <app-project-health [health]="u.health" />
+          }
+          <p
+            class="text-muted-foreground mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm"
           >
-        }
-        <app-project-health [health]="editing() ? draftHealth() : u.health" [compact]="true" />
-        <span class="text-muted-foreground" [hlmTooltip]="posted()">{{
-          u.createdAt | relativeTime
-        }}</span>
-        @if (u.editedAt) {
-          <span class="text-muted-foreground" [hlmTooltip]="'Edited ' + edited()">· edited</span>
-        }
-        @if (u.aiDrafted) {
-          <span class="text-muted-foreground">· drafted with AI</span>
-        }
+            <app-actor-avatar [actor]="u.author" [size]="20" />
+            <span class="text-foreground font-medium">{{ store.actorName(u.author) }}</span>
+            @if (u.author.type === 'agent') {
+              <span
+                class="text-primary bg-primary/10 rounded px-1 text-[10px] font-medium uppercase"
+                >agent</span
+              >
+            }
+            <time [attr.datetime]="u.createdAt" [hlmTooltip]="posted()">{{
+              u.createdAt | relativeTime
+            }}</time>
+            @if (u.editedAt) {
+              <span [hlmTooltip]="'Edited ' + edited()">edited</span>
+            }
+            @if (u.aiDrafted) {
+              <span>drafted with AI</span>
+            }
+          </p>
+        </div>
         @if (canEdit() && !editing()) {
           <button
             hlmBtn
             variant="ghost"
             size="icon-xs"
-            class="text-muted-foreground ml-auto"
+            class="text-muted-foreground shrink-0"
             [hlmDropdownMenuTrigger]="menu"
             aria-label="Update actions"
           >
@@ -94,11 +103,10 @@ import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
             </hlm-dropdown-menu>
           </ng-template>
         }
-      </div>
+      </header>
 
       @if (editing()) {
-        <div class="mt-2 flex flex-col gap-2">
-          <app-project-health-picker label="Update health" [(value)]="draftHealth" />
+        <div class="mt-4 flex flex-col gap-2">
           <app-comment-input
             label="Edit update"
             [autofocus]="true"
@@ -121,10 +129,10 @@ import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
           </div>
         </div>
       } @else {
-        <app-markdown [source]="u.body" [link]="refs.linker()" class="mt-1.5 block" />
+        <app-markdown [source]="u.body" [link]="refs.linker()" class="mt-4 block" />
       }
 
-      <div class="mt-2">
+      <div class="mt-4">
         <button
           hlmBtn
           variant="ghost"
@@ -151,11 +159,11 @@ import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
         </button>
       </div>
       @if (open()) {
-        <div class="mt-2 border-t pt-3">
+        <div class="border-border mt-3 border-l pl-4">
           <app-comment-thread [subject]="{ type: 'project_update', id: u.id }" />
         </div>
       }
-    </div>
+    </article>
   `,
 })
 export class ProjectUpdateItem {

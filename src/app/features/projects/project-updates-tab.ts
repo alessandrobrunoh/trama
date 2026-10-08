@@ -13,7 +13,7 @@ import { canPostUpdate } from './project-model';
   selector: 'app-project-updates-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, HlmSkeleton, EmptyState, ProjectUpdateComposer, ProjectUpdateItem],
-  host: { class: 'mx-auto flex w-full max-w-3xl min-w-0 flex-col gap-4 px-4 py-5 sm:px-6' },
+  host: { class: 'mx-auto flex w-full max-w-2xl min-w-0 flex-col gap-10 px-4 py-8 sm:px-6' },
   template: `
     @let p = project();
     @if (canPost()) {
@@ -29,9 +29,9 @@ import { canPostUpdate } from './project-model';
         <button hlmBtn size="sm" variant="outline" (click)="reload()">Retry</button>
       </app-empty-state>
     } @else if ((state() === 'loading' || state() === 'idle') && updates().length === 0) {
-      <div class="flex flex-col gap-3" aria-busy="true" aria-label="Loading updates">
-        <div hlmSkeleton class="h-28"></div>
-        <div hlmSkeleton class="h-20"></div>
+      <div class="flex flex-col gap-8" aria-busy="true" aria-label="Loading updates">
+        <div hlmSkeleton class="h-36"></div>
+        <div hlmSkeleton class="h-24"></div>
       </div>
     } @else if (updates().length === 0) {
       <app-empty-state
@@ -44,7 +44,7 @@ import { canPostUpdate } from './project-model';
         "
       />
     } @else {
-      <div class="flex flex-col gap-3" role="feed" aria-label="Project updates">
+      <div role="feed" aria-label="Project updates">
         @for (u of updates(); track u.id) {
           <app-project-update-item [update]="u" [project]="p" />
         }
