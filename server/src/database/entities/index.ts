@@ -21,6 +21,8 @@ import type {
   IssueKind,
   IssueSource,
   IssueStatus,
+  NotificationChannels,
+  NotificationKind,
   Priority,
   ReviewState,
   Role,
@@ -57,10 +59,12 @@ export class UserEntity extends Wire {
   email: string;
   @Column({ type: 'varchar' }) passwordHash: string;
   @Column({ type: 'integer', default: 0 }) avatarHue: number;
+  /** Per notification kind and channel; missing entries use the defaults (see resolveNotificationSettings). */
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) notificationSettings: Partial<Record<string, Partial<NotificationChannels>>>;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   protected override hidden() {
-    return ['passwordHash'];
+    return ['passwordHash', 'notificationSettings'];
   }
 }
 
@@ -510,6 +514,29 @@ export class ApiTokenEntity extends Wire {
   }
 }
 
+/** A message for one person about something that happened in a workspace. */
+@Entity('notifications')
+@Index('IDX_notifications_user', ['userId', 'workspaceId', 'createdAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class NotificationEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'varchar' }) kind: NotificationKind;
+  @Column({ type: 'varchar' }) title: string;
+  @Column({ type: 'text', nullable: true }) body: string | null;
+  @Column({ type: 'jsonb' }) actor: ActorRef;
+  @Column({ type: 'jsonb' }) subject: SubjectRef;
+  @Column({ type: 'varchar' }) link: string;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) readAt: Date | null;
+
+  protected override hidden() {
+    return ['userId'];
+  }
+}
+
 /** A person's pinned entity (unique per user, workspace, type and subject). */
 @Entity('favorites')
 @Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], { unique: true })
@@ -644,6 +671,7 @@ export const ENTITIES = [
   MembershipEntity,
   InviteEntity,
   FavoriteEntity,
+  NotificationEntity,
   AgentEntity,
   TeamEntity,
   RepositoryEntity,

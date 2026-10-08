@@ -235,6 +235,7 @@ export class IssuesService {
         kind: row.kind,
         title: row.title,
         status: row.status,
+        assigneeId: row.assigneeId,
       },
     });
     return row;
@@ -247,6 +248,7 @@ export class IssuesService {
     patch: IssueInput,
   ) {
     const row = await this.get(workspaceId, idOrKey);
+    const previousAssigneeId = row.assigneeId;
     await this.refs.teams(
       workspaceId,
       [patch.teamId].filter((x): x is string => !!x),
@@ -364,7 +366,13 @@ export class IssuesService {
         actor,
         type: 'issue.updated',
         subject: { type: 'issue', id: row.id },
-        data: { key: row.key, fields },
+        data: {
+          key: row.key,
+          fields,
+          ...(row.assigneeId !== previousAssigneeId
+            ? { assignee: { from: previousAssigneeId, to: row.assigneeId } }
+            : {}),
+        },
       });
     if (patch.status !== undefined && patch.status !== from)
       await this.events.record({

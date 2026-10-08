@@ -43,6 +43,71 @@ export interface Membership {
   createdAt: ISODate;
 }
 
+// ───────────────────────────── Notifications ─────────────────────────────
+
+/** Why a notification was sent. Each kind can be switched on or off per person and channel. */
+export const NOTIFICATION_KINDS = [
+  'assigned',
+  'input_requested',
+  'decision_proposed',
+  'review_requested',
+  'ci_failed',
+  'comment',
+  'workstream_update',
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const NOTIFICATION_KIND_META: Record<NotificationKind, { label: string; description: string }> = {
+  assigned: { label: 'Assigned to me', description: 'An issue is assigned to you.' },
+  input_requested: { label: 'Questions for me', description: 'Someone, or an agent, asks you a question on a workstream.' },
+  decision_proposed: { label: 'Decisions to review', description: 'A decision is proposed on a workstream you are accountable for.' },
+  review_requested: { label: 'Review requested', description: 'A pull request on a workstream you are accountable for needs a review.' },
+  ci_failed: { label: 'Failing checks', description: 'CI fails on a workstream you are accountable for.' },
+  comment: { label: 'Comments', description: 'New comments on issues you are assigned or reported, and on workstreams you are accountable for.' },
+  workstream_update: { label: 'Workstream updates', description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.' },
+};
+
+export type NotificationChannel = 'inApp' | 'email';
+export type NotificationChannels = Record<NotificationChannel, boolean>;
+/** Per kind and channel. Missing entries use the defaults (in-app on, email off). */
+export type NotificationSettings = Record<NotificationKind, NotificationChannels>;
+
+export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = { inApp: true, email: false };
+
+/** Fills the gaps of a stored (partial) settings object with the defaults. */
+export function resolveNotificationSettings(raw?: Partial<Record<string, Partial<NotificationChannels>>> | null): NotificationSettings {
+  const out = {} as NotificationSettings;
+  for (const kind of NOTIFICATION_KINDS) out[kind] = { ...DEFAULT_NOTIFICATION_CHANNELS, ...(raw?.[kind] ?? {}) };
+  return out;
+}
+
+/** A message for one person, created from something that happened in a workspace. */
+export interface Notification {
+  /** `ntf_…` */
+  id: ID;
+  workspaceId: ID;
+  kind: NotificationKind;
+  title: string;
+  /** A short excerpt (a comment, a question), when there is one. */
+  body?: string;
+  /** Who caused it. */
+  actor: ActorRef;
+  /** The record it is about. */
+  subject: SubjectRef;
+  /** Where it leads, relative to the workspace, e.g. `issues/BUG-142`. */
+  link: string;
+  createdAt: ISODate;
+  /** Absent while unread. */
+  readAt?: ISODate;
+}
+
+/** Response of GET /w/:slug/notifications. */
+export interface NotificationList {
+  items: Notification[];
+  /** Unread in this workspace, whatever the page size. */
+  unread: number;
+}
+
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
 export const FAVORITE_TYPES = ['issue', 'workstream', 'decision', 'team', 'repository', 'view'] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
@@ -868,7 +933,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'notification' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;

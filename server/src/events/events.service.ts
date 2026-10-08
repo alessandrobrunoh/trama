@@ -28,6 +28,8 @@ export interface RecordEventInput {
 export interface PublishedEvent {
   workspaceId: string;
   event: LiveEvent;
+  /** When set, only this person's streams receive the event (private things, like notifications). */
+  userId?: string;
 }
 
 @Injectable()
@@ -80,9 +82,10 @@ export class EventsService {
   }
 
   /** Broadcast a LiveEvent to SSE subscribers of the workspace (clientId added automatically). */
-  publish(workspaceId: string, event: Pick<LiveEvent, 'type' | 'entity' | 'id'>): void {
+  publish(workspaceId: string, event: Pick<LiveEvent, 'type' | 'entity' | 'id'>, userId?: string): void {
     this.bus.next({
       workspaceId,
+      userId,
       event: {
         ...event,
         clientId: requestStore.getStore()?.clientId,
