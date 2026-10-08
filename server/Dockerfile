@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
-# Trama API (NestJS). Build context: ./server
-#   docker build -t ghcr.io/alessandrobrunoh/trama:latest server
+# Trama API (NestJS). Build context: the repository root (the Dockerfile lives in server/):
+#   docker build -f server/Dockerfile -t ghcr.io/alessandrobrunoh/trama:latest .
 
 FROM node:22-bookworm-slim AS base
 WORKDIR /app
@@ -8,28 +8,30 @@ ENV NPM_CONFIG_UPDATE_NOTIFIER=false NPM_CONFIG_FUND=false NPM_CONFIG_AUDIT=fals
 
 # All dependencies (build tools included): re-run only when the lockfile changes.
 FROM base AS deps
-COPY package.json package-lock.json ./
+COPY server/package.json server/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci
 
 FROM deps AS build
-COPY nest-cli.json tsconfig.json tsconfig.build.json ./
-COPY src ./src
+COPY server/nest-cli.json server/tsconfig.json server/tsconfig.build.json ./
+COPY server/src ./src
 RUN npm run build
 
 # Production dependencies only (argon2 ships a prebuilt binary for glibc, so no compiler is needed).
 FROM base AS prod-deps
-COPY package.json package-lock.json ./
+COPY server/package.json server/package-lock.json ./
 RUN --mount=type=cache,target=/root/.npm npm ci --omit=dev \
  # runtime never reads source maps, type declarations or docs
  && find node_modules -type f \( -name '*.map' -o -name '*.d.ts' -o -name '*.d.mts' -o -name '*.d.cts' \
       -o -iname 'readme*' -o -iname 'changelog*' -o -iname 'history.md' \) -delete
 
 FROM node:22-bookworm-slim AS runtime
+ARG VERSION=dev
+LABEL org.opencontainers.image.title="trama" org.opencontainers.image.version="${VERSION}" org.opencontainers.image.source="https://github.com/alessandrobrunoh/trama"
 ENV NODE_ENV=production PORT=3000 NODE_OPTIONS=--max-old-space-size=512
 WORKDIR /app
 COPY --from=prod-deps --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/dist ./dist
-COPY --chown=node:node package.json ./
+COPY --chown=node:node server/package.json ./
 USER node
 EXPOSE 3000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=3 \

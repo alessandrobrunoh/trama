@@ -1,0 +1,10 @@
+# Allow-list for `docker build -f server/Dockerfile .` (context = repo root): only what the build needs
+# reaches the daemon (faster, no secrets, better layer caching).
+*
+!server/package.json
+!server/package-lock.json
+!server/nest-cli.json
+!server/tsconfig.json
+!server/tsconfig.build.json
+!server/src
+server/src/**/*.spec.ts

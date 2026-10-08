@@ -1,9 +1,0 @@
-# Allow-list: only what the build needs reaches the daemon (faster, no secrets, better layer caching).
-*
-!package.json
-!package-lock.json
-!nest-cli.json
-!tsconfig.json
-!tsconfig.build.json
-!src
-src/**/*.spec.ts

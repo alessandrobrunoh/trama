@@ -33,10 +33,10 @@ services:
 
   app:
     <<: *hardened
-    image: ghcr.io/alessandrobrunoh/trama:latest
+    image: ghcr.io/alessandrobrunoh/trama-server:latest
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: server/Dockerfile
     container_name: trama.alessandrobrunoh.it
     init: true
     read_only: true
@@ -70,7 +70,8 @@ services:
     <<: *hardened
     image: ghcr.io/alessandrobrunoh/trama-mcp:latest
     build:
-      context: ../mcp
+      context: ..
+      dockerfile: mcp/Dockerfile
     container_name: trama-mcp
     read_only: true
     environment:
