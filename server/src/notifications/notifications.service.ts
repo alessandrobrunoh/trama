@@ -24,6 +24,7 @@ import {
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { PushService } from './push.service.js';
 import { planNotifications, type NotificationDraft, type RuleContext } from './notification-rules.js';
 
 const DEDUPE_WINDOW_MS = 60_000;
@@ -37,6 +38,7 @@ export class NotificationsService implements OnModuleInit {
     private readonly ds: DataSource,
     private readonly events: EventsService,
     private readonly mail: MailService,
+    private readonly push: PushService,
   ) {}
 
   onModuleInit(): void {
@@ -173,6 +175,19 @@ export class NotificationsService implements OnModuleInit {
         this.events.publish(workspace.id, { type: 'created', entity: 'notification', id: row.id }, user.id);
         void repo.delete({ userId: user.id, readAt: LessThan(new Date(Date.now() - KEEP_READ_FOR_MS)) });
       }
+    }
+
+    if (channels.push && this.push.enabled) {
+      await this.push
+        .send(user.id, {
+          title: draft.title,
+          body: draft.body?.slice(0, 200),
+          path: `/${workspace.slug}/${draft.link}`,
+          tag: `${draft.kind}:${draft.subject.id}`,
+        })
+        .catch((e: unknown) =>
+          this.log.warn(`Could not push "${draft.title}": ${e instanceof Error ? e.message : String(e)}`),
+        );
     }
 
     if (channels.email && this.mail.enabled) {

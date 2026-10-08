@@ -68,12 +68,15 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, { label: string; d
   workstream_update: { label: 'Workstream updates', description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.' },
 };
 
-export type NotificationChannel = 'inApp' | 'email';
+export type NotificationChannel = 'inApp' | 'email' | 'push';
 export type NotificationChannels = Record<NotificationChannel, boolean>;
-/** Per kind and channel. Missing entries use the defaults (in-app on, email off). */
+/**
+ * Per kind and channel. Missing entries use the defaults (in-app on, email off, push on: a push only
+ * reaches the devices where the person turned notifications on).
+ */
 export type NotificationSettings = Record<NotificationKind, NotificationChannels>;
 
-export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = { inApp: true, email: false };
+export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = { inApp: true, email: false, push: true };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
 export function resolveNotificationSettings(raw?: Partial<Record<string, Partial<NotificationChannels>>> | null): NotificationSettings {

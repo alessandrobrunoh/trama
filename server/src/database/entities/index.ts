@@ -571,6 +571,25 @@ export class NotificationEntity extends Wire {
   }
 }
 
+/** A browser/device a person turned push notifications on for (Web Push subscription). */
+@Entity('push_subscriptions')
+@Index('UQ_push_subscriptions_endpoint', ['endpoint'], { unique: true })
+@Index('IDX_push_subscriptions_user', ['userId'])
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class PushSubscriptionEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'text' }) endpoint: string;
+  @Column({ type: 'varchar' }) p256dh: string;
+  @Column({ type: 'varchar' }) auth: string;
+  @Column({ type: 'varchar', nullable: true }) userAgent: string | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['userId', 'p256dh', 'auth'];
+  }
+}
+
 /** A person's pinned entity (unique per user, workspace, type and subject). */
 @Entity('favorites')
 @Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], { unique: true })
@@ -706,6 +725,7 @@ export const ENTITIES = [
   InviteEntity,
   FavoriteEntity,
   NotificationEntity,
+  PushSubscriptionEntity,
   AgentEntity,
   TeamEntity,
   RepositoryEntity,
