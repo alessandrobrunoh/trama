@@ -34,6 +34,10 @@ import type {
   Milestone,
   OutgoingWebhook,
   Project,
+  ProjectAiKind,
+  ProjectAiResult,
+  ProjectContext,
+  ProjectUpdate,
   Repository,
   Role,
   SavedView,
@@ -67,7 +71,9 @@ import type {
   LinkRepositoryInput,
   RemoteRepositoryPage,
   UpdateIntegrationInput,
+  CreateOwnedArtifactInput,
   CreateProjectInput,
+  CreateProjectUpdateInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -90,6 +96,7 @@ import type {
   UpdateIssueInput,
   UpdateMemberInput,
   UpdateProjectInput,
+  UpdateProjectUpdateInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -306,6 +313,37 @@ export class ApiClient {
     create: (slug: string, input: CreateProjectInput) => this.post<Project>(`${this.w(slug)}/projects`, input),
     update: (slug: string, id: ID, input: UpdateProjectInput) => this.patch<Project>(`${this.w(slug)}/projects/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/projects/${id}`),
+    /** Status posts, newest first. */
+    updates: {
+      list: (slug: string, projectId: ID) => this.get<ProjectUpdate[]>(`${this.w(slug)}/projects/${projectId}/updates`),
+      get: (slug: string, projectId: ID, id: ID) =>
+        this.get<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
+      create: (slug: string, projectId: ID, input: CreateProjectUpdateInput) =>
+        this.post<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates`, input),
+      update: (slug: string, projectId: ID, id: ID, input: UpdateProjectUpdateInput) =>
+        this.patch<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`, input),
+      remove: (slug: string, projectId: ID, id: ID) =>
+        this.del(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
+    },
+    /** The whole tree under a project in one response (workstreams, issues, artifacts with paths, updates...). */
+    context: (slug: string, projectId: ID) =>
+      this.get<ProjectContext>(`${this.w(slug)}/projects/${projectId}/context`),
+    /** The same context rendered as markdown (for agents / copy). */
+    contextMarkdown: (slug: string, projectId: ID) =>
+      this.request<string>('GET', `${this.w(slug)}/projects/${projectId}/context.md`, {
+        text: true,
+        accept: 'text/markdown',
+      }),
+    /** AI suggestion; the `kind` of the result matches the requested one. */
+    ai: (slug: string, projectId: ID, kind: ProjectAiKind) =>
+      this.post<ProjectAiResult>(`${this.w(slug)}/projects/${projectId}/ai/${kind}`),
+    /** Artifacts attached to the project itself (use `context` for the whole tree). */
+    artifacts: {
+      list: (slug: string, projectId: ID) =>
+        this.get<Artifact[]>(`${this.w(slug)}/projects/${projectId}/artifacts`),
+      create: (slug: string, projectId: ID, input: CreateOwnedArtifactInput) =>
+        this.post<Artifact>(`${this.w(slug)}/projects/${projectId}/artifacts`, input),
+    },
   };
 
   readonly repositories = {
@@ -387,6 +425,12 @@ export class ApiClient {
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
+    artifacts: {
+      list: (slug: string, idOrKey: string) =>
+        this.get<Artifact[]>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/artifacts`),
+      create: (slug: string, idOrKey: string, input: CreateOwnedArtifactInput) =>
+        this.post<Artifact>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/artifacts`, input),
+    },
   };
 
   readonly milestones = {

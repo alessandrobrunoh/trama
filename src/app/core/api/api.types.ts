@@ -29,6 +29,7 @@ import type {
   IntegrationConnection,
   IssueStatus,
   Priority,
+  ProjectHealth,
   ProjectStatus,
   ReviewState,
   Role,
@@ -162,6 +163,8 @@ export interface CreateProjectInput {
   summary?: string;
   description?: string;
   color?: string;
+  /** Lucide icon name (kebab-case) or a single emoji. */
+  icon?: string;
   status?: ProjectStatus;
   priority?: Priority;
   leadId?: ID;
@@ -175,6 +178,8 @@ export interface UpdateProjectInput {
   summary?: string | null;
   description?: string | null;
   color?: string;
+  /** Lucide icon name (kebab-case) or a single emoji. `null` resets to the default glyph. */
+  icon?: string | null;
   status?: ProjectStatus;
   priority?: Priority;
   leadId?: ID | null;
@@ -182,6 +187,21 @@ export interface UpdateProjectInput {
   repositoryIds?: ID[];
   startDate?: ISODate | null;
   targetDate?: ISODate | null;
+}
+
+// ───── project updates ─────
+/** `POST /projects/:projectId/updates`. The newest update drives `Project.health` / `lastUpdateAt`. */
+export interface CreateProjectUpdateInput {
+  health: ProjectHealth;
+  /** Markdown. */
+  body: string;
+  /** True when the body came from `aiProject(id, 'update_draft')`. */
+  aiDrafted?: boolean;
+}
+/** `PATCH /projects/:projectId/updates/:id`. Sets `editedAt` on the update. */
+export interface UpdateProjectUpdateInput {
+  health?: ProjectHealth;
+  body?: string;
 }
 
 // ───── workstreams ─────
@@ -306,23 +326,33 @@ export interface UpdateMilestoneInput {
 }
 
 // ───── artifacts ─────
-export interface CreateArtifactInput {
-  workstreamId: ID;
+/** Fields shared by every artifact creation route; the owner comes from the route or from `CreateArtifactInput`. */
+export interface CreateArtifactFields {
   repositoryId?: ID;
   kind: ArtifactKind;
   provider?: ArtifactProvider;
   title: string;
   url?: string;
   externalId?: string;
+  /** Short note on what it is / why it is attached (markdown allowed). */
+  description?: string;
   state?: ArtifactState;
   ci?: CiState;
   review?: ReviewState;
   hasConflicts?: boolean;
   environment?: string;
 }
+/** `POST /artifacts`: attach to a workstream (the original route). */
+export interface CreateArtifactInput extends CreateArtifactFields {
+  workstreamId: ID;
+}
+/** `POST /projects/:id/artifacts` and `POST /issues/:idOrKey/artifacts`: the owner is in the path. */
+export type CreateOwnedArtifactInput = CreateArtifactFields;
 export interface UpdateArtifactInput {
   repositoryId?: ID | null;
   title?: string;
+  /** Markdown note; null clears it. */
+  description?: string | null;
   url?: string | null;
   externalId?: string | null;
   state?: ArtifactState;

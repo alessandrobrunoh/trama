@@ -380,8 +380,9 @@ export class RepositoryDetailPage {
     });
   }
 
-  protected workstreamKey(id: string): string {
-    return this.store.workstreamById().get(id)?.key ?? id;
+  /** Key of the workstream an artifact belongs to; empty for artifacts attached to a project or issue only. */
+  protected workstreamKey(id: string | undefined): string {
+    return id ? (this.store.workstreamById().get(id)?.key ?? id) : '';
   }
 
   protected copy(text: string, title: string): void {

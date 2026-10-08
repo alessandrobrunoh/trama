@@ -11,7 +11,10 @@ import type {
   IssueKind,
   IssueStatus,
   Priority,
+  ProjectHealth,
+  ProjectStatus,
   Role,
+  ViewLayout,
   WorkstreamStatus,
 } from './contracts/domain';
 
@@ -55,6 +58,31 @@ export const WORKSTREAM_STATUS_FLOW: WorkstreamStatus[] = [
   'shipped',
   'canceled',
 ];
+
+export const PROJECT_STATUS_META: Record<ProjectStatus, Meta> = {
+  backlog: { label: 'Backlog', tone: 'muted', order: 0 },
+  planned: { label: 'Planned', tone: 'neutral', order: 1 },
+  in_progress: { label: 'In progress', tone: 'info', order: 2 },
+  paused: { label: 'Paused', tone: 'warning', order: 3 },
+  completed: { label: 'Completed', tone: 'success', order: 4 },
+  canceled: { label: 'Canceled', tone: 'muted', order: 5 },
+};
+
+/** Project health (set by whoever posts a project update). */
+export const PROJECT_HEALTH_META: Record<ProjectHealth, Meta> = {
+  on_track: { label: 'On track', tone: 'success', order: 0 },
+  at_risk: { label: 'At risk', tone: 'warning', order: 1 },
+  off_track: { label: 'Off track', tone: 'danger', order: 2 },
+};
+
+/** Layouts a saved view can use, in picker order. */
+export const VIEW_LAYOUT_META: Record<ViewLayout, { label: string; order: number }> = {
+  list: { label: 'List', order: 0 },
+  board: { label: 'Board', order: 1 },
+  graph: { label: 'Graph', order: 2 },
+  timeline: { label: 'Timeline', order: 3 },
+};
+export const VIEW_LAYOUTS = sortedKeys(VIEW_LAYOUT_META);
 
 export const PRIORITY_META: Record<Priority, Meta> = {
   urgent: { label: 'Urgent', tone: 'danger', order: 0 },
@@ -109,6 +137,7 @@ export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: nu
   design: { label: 'Design', order: 7 },
   image: { label: 'Image', order: 8 },
   file: { label: 'File', order: 9 },
+  link: { label: 'Link', order: 10 },
 };
 export const ARTIFACT_KINDS = sortedKeys(ARTIFACT_KIND_META);
 
