@@ -19,6 +19,7 @@ import {
   WorkstreamsService,
   type WorkstreamInput,
 } from '../workstreams/workstreams.service.js';
+import { LabelsService } from '../workspaces/labels.service.js';
 
 export interface IssueInput {
   title?: string;
@@ -37,6 +38,7 @@ export interface IssueInput {
   externalUrl?: string | null;
   workstreamIds?: string[];
   milestoneIds?: string[];
+  labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
 }
@@ -85,6 +87,7 @@ export class IssuesService {
     private readonly events: EventsService,
     private readonly bus: WorkstreamBus,
     private readonly workstreams: WorkstreamsService,
+    private readonly labels: LabelsService,
     @InjectRepository(IssueEntity)
     private readonly repo: Repository<IssueEntity>,
   ) {}
@@ -249,6 +252,7 @@ export class IssuesService {
           startedAt: facts.startedAt,
           completedAt: facts.completedAt,
           externalUrl: input.externalUrl ?? null,
+          labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
         }),
       );
     });
@@ -355,6 +359,7 @@ export class IssuesService {
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
     if (patch.workstreamIds !== undefined)
       row.workstreamIds = unique(patch.workstreamIds);
+    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels)) ?? [];
     if (patch.status !== undefined) {
       row.status = patch.status;
       if (row.status !== from) applyStatusFacts(row, row.status);

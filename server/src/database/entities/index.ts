@@ -202,6 +202,7 @@ export class RepositoryEntity extends Wire {
   @Column({ type: 'varchar' }) url: string;
   @Column({ type: 'varchar', default: 'main' }) defaultBranch: string;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) teamIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 }
 
@@ -230,6 +231,7 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) leadId: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) teamIds: string[];
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) repositoryIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];
   @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
@@ -389,6 +391,7 @@ export class IssueEntity extends Wire {
   @Column({ type: 'double precision', nullable: true }) estimate: number | null;
   @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) aliases: string[];
   @Column({ type: 'varchar', nullable: true }) duplicateOfId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;

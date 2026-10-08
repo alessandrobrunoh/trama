@@ -101,7 +101,9 @@ import type {
   UpdateTeamInput,
   UpdateViewInput,
   UpdateWorkspaceInput,
+  CreateLabelInput,
   CreateWebhookInput,
+  UpdateLabelInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -203,6 +205,9 @@ export class ApiClient {
     /** Customization + permission policy. Admin; changing `permissions` needs an owner. */
     updateSettings: (slug: string, input: UpdateWorkspaceSettingsInput) =>
       this.patch<Workspace>(`${this.w(slug)}/settings`, input),
+    createLabel: (slug: string, input: CreateLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels`, input),
+    updateLabel: (slug: string, id: ID, input: UpdateLabelInput) => this.patch<Workspace>(`${this.w(slug)}/labels/${id}`, input),
+    deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
     /** Owner only. */
     remove: (slug: string) => this.del(this.w(slug)),
     snapshot: (slug: string) => this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`),

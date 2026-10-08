@@ -262,11 +262,11 @@ export const repoOptionsIn = (store: NablaStore, projectId?: string | null): Pic
   return project ? all.filter((o) => project.repositoryIds.includes(o.value)) : all;
 };
 
-export const labelOptions = (store: NablaStore): PickOption[] => {
-  const set = new Set<string>();
-  for (const w of store.workstreams()) for (const l of w.labels) set.add(l);
-  return [...set].sort().map((l) => ({ value: l, label: l, kind: 'label' }));
-};
+export const labelOptions = (store: NablaStore): PickOption[] =>
+  store.settings().labels.map((label) => ({ value: label.id, label: label.name, kind: 'label' as const, color: label.color }));
+
+export const labelName = (store: NablaStore, id: string): string =>
+  store.settings().labels.find((label) => label.id === id)?.name ?? id;
 
 /** Users + agents + teams as performer options (`type:id` values). */
 export const performerOptions = (store: NablaStore): PickOption[] => [

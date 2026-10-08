@@ -27,7 +27,7 @@ import { repositoryStats } from '../stats/stats-model';
 import { CommentThread } from '../workstreams/comments';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { buildSummary, teamOptions } from '../workstreams/ws-model';
+import { buildSummary, labelOptions, teamOptions } from '../workstreams/ws-model';
 import { WorkstreamRow } from '../workstreams/workstream-items';
 
 const ACTIVITY_CAP = 20;
@@ -232,6 +232,18 @@ const ARTIFACT_CAP = 12;
               </button>
             }
           </app-property-row>
+          <app-property-row label="Labels">
+            <app-picker
+              variant="field"
+              label="Labels"
+              placeholder="None"
+              [multiple]="true"
+              [disabled]="!canAdmin()"
+              [options]="labels()"
+              [value]="r.labels"
+              (valueChange)="saveLabels($event)"
+            />
+          </app-property-row>
           <app-property-row label="Teams">
             <app-picker
               variant="field"
@@ -308,6 +320,7 @@ export class RepositoryDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canAdmin = computed(() => this.store.allowed('manageRepositories'));
   protected readonly teams = computed(() => teamOptions(this.store));
+  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly repo = computed(() => this.store.getRepository(this.id()));
   protected readonly providerName = computed(() => {
     const r = this.repo();
@@ -401,6 +414,14 @@ export class RepositoryDetailPage {
     const next = value.trim();
     if (!repo || !next || next === repo.url) return;
     void this.store.updateRepository(repo.id, { url: next });
+  }
+
+  protected saveLabels(ids: string[]): void {
+    const repo = this.repo();
+    if (!repo) return;
+    const same = ids.length === repo.labels.length && ids.every((id, i) => id === repo.labels[i]);
+    if (same) return;
+    void this.store.updateRepository(repo.id, { labels: ids });
   }
 
   protected saveTeams(ids: string[]): void {

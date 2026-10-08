@@ -23,7 +23,7 @@ import { Picker } from './picker';
 import { WsActions } from './ws-actions';
 import { WsMenu } from './ws-menu';
 import { CriteriaCount, IssueProgress, PrChip, TargetDate, TeamDots, WsDatePicker } from './ws-parts';
-import { priorityOptions, statusOptions, userOptions, type WsSummary } from './ws-model';
+import { labelName, priorityOptions, statusOptions, userOptions, type WsSummary } from './ws-model';
 
 /** Which properties a row shows (display options of the list). */
 export interface WsRowProps {
@@ -141,6 +141,14 @@ abstract class WsItemBase {
   protected readonly userIcon = LucideUserRound;
   protected readonly checkIcon = LucideCheck;
   protected readonly calIcon = LucideCalendar;
+
+  protected labelName(id: string): string {
+    return labelName(this.store, id);
+  }
+
+  protected labelColor(id: string): string {
+    return this.store.settings().labels.find((label) => label.id === id)?.color ?? 'var(--color-muted-foreground)';
+  }
 
   protected readonly statusPicker = viewChild<Picker>('statusPicker');
   protected readonly priorityPicker = viewChild<Picker>('priorityPicker');
@@ -307,7 +315,7 @@ abstract class WsItemBase {
         <app-next-milestone class="max-lg:hidden" [workstreamId]="w.id" />
         @if (p.labels) {
           @for (l of w.labels.slice(0, 3); track l) {
-            <span class="border-border-strong text-muted-foreground hidden h-5 shrink-0 items-center rounded-full border px-1.5 text-[11px] lg:inline-flex">{{ l }}</span>
+            <span class="border-border-strong text-muted-foreground hidden h-5 shrink-0 items-center gap-1 rounded-full border px-1.5 text-[11px] lg:inline-flex"><span class="size-1.5 rounded-full" [style.background]="labelColor(l)"></span>{{ labelName(l) }}</span>
           }
         }
       </span>

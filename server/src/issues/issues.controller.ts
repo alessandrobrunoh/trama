@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   IsArray,
   IsBoolean,
   IsIn,
@@ -87,6 +88,8 @@ class CreateIssueDto {
   @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
+  /** Workspace label ids. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
 }
 
 class UpdateIssueDto {
@@ -115,6 +118,8 @@ class UpdateIssueDto {
   milestoneIds?: string[];
   /** Id or key of the issue this duplicates. `null` clears it. */
   @Clearable() @IsString() duplicateOfId?: string | null;
+  /** Workspace label ids. Replaces the whole list. */
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
 }
 
 class LinkIssueDto {

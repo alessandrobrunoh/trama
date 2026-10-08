@@ -1,4 +1,5 @@
-import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX, isDeltaThreadUrl } from '../../contracts/domain.js';
+import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX, adoptFreeTextLabels, isDeltaThreadUrl } from '../../contracts/domain.js';
+import type { WorkspaceSettings } from '../../contracts/domain.js';
 import type {
   AcceptanceCriterion,
   ActorRef,
@@ -185,6 +186,19 @@ export class SeedBuilder {
     });
     this.event(createdAt, user(o.createdBy), 'project.created', { type: 'project', id }, null, { name: o.name });
     return id;
+  }
+
+  /** Replace free-text workstream labels with catalog ids and store that catalog on the workspace. */
+  adoptLabels() {
+    const { catalog, groups } = adoptFreeTextLabels(
+      undefined,
+      this.data.workstreams.map((row) => (row.labels ?? []) as string[]),
+    );
+    groups.forEach((ids, i) => {
+      this.data.workstreams[i].labels = ids;
+    });
+    const settings = (this.data.workspace.settings ?? {}) as Partial<WorkspaceSettings>;
+    this.data.workspace.settings = { ...settings, labels: catalog };
   }
 
   /** A workstream of a project may only use the project's repositories: give each project the union of its workstreams'. */

@@ -1,9 +1,5 @@
 // Properties sidebar of a workstream: every row is an inline popover editor.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { LucideDynamicIcon, LucidePlus, LucideX } from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { NablaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
@@ -13,25 +9,13 @@ import { isoFromDate } from '../milestones/milestone-actions';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
-import { contributors, issueCounts, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
+import { contributors, issueCounts, labelOptions, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
 
 @Component({
   selector: 'app-ws-properties',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    PropertyRow,
-    Picker,
-    HlmButtonImports,
-    HlmInputImports,
-    HlmTooltip,
-    ActorLabel,
-    FullDatePipe,
-    IssueProgress,
-    WsDatePicker,
-    HlmPopoverImports,
-    LucideDynamicIcon,
-  ],
+  imports: [PropertyRow, Picker, HlmTooltip, ActorLabel, FullDatePipe, IssueProgress, WsDatePicker],
   host: { class: 'block' },
   template: `
     @let w = ws();
@@ -116,36 +100,7 @@ import { IssueProgress, WsDatePicker } from './ws-parts';
         </span>
       </app-property-row>
       <app-property-row label="Labels">
-        <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1 py-1">
-          @for (l of w.labels; track l) {
-            <span class="bg-muted text-foreground inline-flex h-5 items-center gap-0.5 rounded-md px-1.5 text-xs">
-              {{ l }}
-              @if (canEdit()) {
-                <button type="button" class="text-muted-foreground hover:text-foreground -mr-0.5 rounded" [attr.aria-label]="'Remove label ' + l" (click)="removeLabel(l)">
-                  <svg [lucideIcon]="xIcon" [size]="11"></svg>
-                </button>
-              }
-            </span>
-          }
-          @if (canEdit()) {
-            <hlm-popover align="start" sideOffset="4" [state]="labelState()" (stateChanged)="labelState.set($event)">
-              <button hlmBtn hlmPopoverTrigger variant="ghost" size="xs" class="text-muted-foreground h-5 px-1.5 text-xs font-normal" aria-label="Add label">
-                <svg [lucideIcon]="plusIcon" [size]="12"></svg>{{ w.labels.length ? '' : 'Add label' }}
-              </button>
-              <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-56 gap-1.5 p-2">
-                <input hlmInput class="h-8" placeholder="Label name, Enter to add" aria-label="New label" [value]="labelDraft()" (input)="labelDraft.set($any($event.target).value)" (keydown.enter)="addLabel()" />
-                @if (suggestions().length) {
-                  <div class="text-muted-foreground text-[11px]">Existing labels</div>
-                  <div class="flex flex-wrap gap-1">
-                    @for (s of suggestions(); track s) {
-                      <button type="button" class="bg-muted hover:bg-accent rounded-md px-1.5 py-0.5 text-xs" (click)="addLabel(s)">{{ s }}</button>
-                    }
-                  </div>
-                }
-              </hlm-popover-content>
-            </hlm-popover>
-          }
-        </div>
+        <app-picker variant="field" label="Labels" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="labelChoices()" [value]="w.labels" (valueChange)="update({ labels: $event })" />
       </app-property-row>
     </div>
 
@@ -204,22 +159,12 @@ export class WsProperties {
   protected readonly repos = computed(() => repoOptionsIn(this.store, this.ws().projectId));
   protected readonly projects = computed(() => projectOptions(this.store, this.ws().projectId));
   protected readonly priorities = priorityOptions();
+  protected readonly labelChoices = computed(() => labelOptions(this.store));
   protected readonly participantOptions = computed(() => this.teams().filter((t) => t.value !== this.ws().ownerTeamId));
-  protected readonly xIcon = LucideX;
-  protected readonly plusIcon = LucidePlus;
-  protected readonly labelState = signal<'open' | 'closed'>('closed');
-  protected readonly labelDraft = signal('');
 
   protected readonly overdue = computed(
     () => isOverdue(this.ws().targetDate) && this.ws().status !== 'shipped' && this.ws().status !== 'canceled',
   );
-  protected readonly suggestions = computed(() => {
-    const have = new Set(this.ws().labels);
-    const all = new Set<string>();
-    for (const w of this.store.workstreams()) for (const l of w.labels) if (!have.has(l)) all.add(l);
-    return [...all].sort().slice(0, 12);
-  });
-
   protected update(patch: Parameters<NablaStore['updateWorkstream']>[1]): void {
     void this.store.updateWorkstream(this.ws().id, patch);
   }
@@ -251,16 +196,5 @@ export class WsProperties {
 
   protected setStatus(v: string | undefined): void {
     this.actions.setStatus([this.ws()], (v as WorkstreamStatus | undefined) ?? null);
-  }
-
-  protected addLabel(value?: string): void {
-    const l = (value ?? this.labelDraft()).trim();
-    if (!l) return;
-    this.labelDraft.set('');
-    if (!this.ws().labels.includes(l)) this.update({ labels: [...this.ws().labels, l] });
-  }
-
-  protected removeLabel(l: string): void {
-    this.update({ labels: this.ws().labels.filter((x) => x !== l) });
   }
 }

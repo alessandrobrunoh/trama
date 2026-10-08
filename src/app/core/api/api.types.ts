@@ -82,6 +82,14 @@ export interface UpdateWorkspaceSettingsInput {
   iconInitial?: string | null;
   deltaThreads?: boolean;
 }
+export interface CreateLabelInput {
+  name: string;
+  color?: string;
+}
+export interface UpdateLabelInput {
+  name?: string;
+  color?: string;
+}
 export interface CreateInviteInput {
   email: string;
   role: Role;
@@ -150,11 +158,15 @@ export interface CreateRepositoryInput {
   url?: string;
   defaultBranch?: string;
   teamIds?: ID[];
+  /** Workspace label ids. */
+  labels?: ID[];
 }
 export interface UpdateRepositoryInput {
   url?: string;
   defaultBranch?: string;
   teamIds?: ID[];
+  /** Workspace label ids. Replaces the whole list. */
+  labels?: ID[];
 }
 
 // ───── projects ─────
@@ -170,6 +182,8 @@ export interface CreateProjectInput {
   leadId?: ID;
   teamIds?: ID[];
   repositoryIds?: ID[];
+  /** Workspace label ids. */
+  labels?: ID[];
   startDate?: ISODate;
   targetDate?: ISODate;
 }
@@ -185,6 +199,8 @@ export interface UpdateProjectInput {
   leadId?: ID | null;
   teamIds?: ID[];
   repositoryIds?: ID[];
+  /** Workspace label ids. Replaces the whole list. */
+  labels?: ID[];
   startDate?: ISODate | null;
   targetDate?: ISODate | null;
 }
@@ -279,6 +295,8 @@ export interface CreateIssueInput {
   status?: IssueStatus;
   externalUrl?: string;
   estimate?: number;
+  /** Workspace label ids. */
+  labels?: ID[];
 }
 export interface UpdateIssueInput {
   title?: string;
@@ -300,6 +318,8 @@ export interface UpdateIssueInput {
   milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
+  /** Workspace label ids. Replaces the whole list. */
+  labels?: ID[];
 }
 export interface LinkIssueInput {
   workstreamIds?: ID[];

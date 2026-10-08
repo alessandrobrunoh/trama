@@ -17,6 +17,7 @@ import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
 import { TeamEntity, WorkspaceEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
+import { LabelsService } from '../workspaces/labels.service.js';
 
 export interface CriterionInput {
   id?: string;
@@ -73,6 +74,7 @@ export class WorkstreamsService {
     private readonly counters: CountersService,
     private readonly events: EventsService,
     private readonly bus: WorkstreamBus,
+    private readonly labels: LabelsService,
     @InjectRepository(WorkstreamEntity)
     private readonly repo: Repository<WorkstreamEntity>,
   ) {}
@@ -195,7 +197,7 @@ export class WorkstreamsService {
           repositoryIds,
           acceptanceCriteria,
           priority: input.priority ?? 'none',
-          labels: unique(input.labels),
+          labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
           derivedStatus: derived,
           statusOverride: input.statusOverride ?? null,
           status: input.statusOverride ?? derived,
@@ -274,7 +276,7 @@ export class WorkstreamsService {
     if (patch.acceptanceCriteria !== undefined)
       set('acceptanceCriteria', criteria(patch.acceptanceCriteria));
     if (patch.priority !== undefined) set('priority', patch.priority);
-    if (patch.labels !== undefined) set('labels', unique(patch.labels));
+    if (patch.labels !== undefined) set('labels', (await this.labels.assign(workspaceId, patch.labels)) ?? []);
     if (patch.startDate !== undefined)
       set('startDate', (toDate(patch.startDate) as Date | null) ?? null);
     if (patch.targetDate !== undefined)

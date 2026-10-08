@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
-import { IsArray, IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import { PROJECT_STATUSES, type ActorRef, type Priority, type ProjectStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
@@ -20,6 +20,8 @@ class CreateProjectDto {
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) repositoryIds?: string[];
+  /** Workspace label ids. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() targetDate?: string;
 }
@@ -35,6 +37,8 @@ class UpdateProjectDto {
   @Clearable() @IsString() leadId?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) teamIds?: string[];
   @OptionalNotNull() @IsArray() @IsString({ each: true }) repositoryIds?: string[];
+  /** Workspace label ids. Replaces the whole list. */
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @Clearable() @IsISO8601() startDate?: string | null;
   @Clearable() @IsISO8601() targetDate?: string | null;
 }

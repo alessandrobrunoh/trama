@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
-import { IsArray, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import { GIT_PROVIDERS, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { OptionalNotNull } from '../common/validation.js';
@@ -12,12 +12,16 @@ class CreateRepositoryDto {
   @IsOptional() @IsString() @MaxLength(300) url?: string;
   @IsOptional() @IsString() @MaxLength(100) defaultBranch?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
+  /** Workspace label ids. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
 }
 
 class UpdateRepositoryDto {
   @OptionalNotNull() @IsString() @MaxLength(300) url?: string;
   @OptionalNotNull() @IsString() @MaxLength(100) defaultBranch?: string;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) teamIds?: string[];
+  /** Workspace label ids. Replaces the whole list. */
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
 }
 
 @Controller('w/:slug/repositories')

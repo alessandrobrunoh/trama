@@ -36,7 +36,9 @@ import type {
   CreateTeamInput,
   CreateTokenInput,
   CreatedToken,
+  CreateLabelInput,
   CreateWebhookInput,
+  UpdateLabelInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -1808,6 +1810,31 @@ export class NablaStore {
         this._workspace.update((cur) => (cur ? { ...cur, settings: ws.settings } : cur));
         setDisplayTimeZone(this.timeZone());
       },
+    }).then((r) => !!r);
+  }
+
+  private applyWorkspace(ws: { settings: Workspace['settings'] }): void {
+    this._workspace.update((cur) => (cur ? { ...cur, settings: ws.settings } : cur));
+  }
+
+  /** Add a custom workspace label (admin). */
+  async createLabel(input: CreateLabelInput): Promise<boolean> {
+    return this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Rename or recolor a workspace label (admin). Templates can only be recolored. */
+  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
+    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Remove a custom label and every assignment of it (admin). */
+  async deleteLabel(id: ID): Promise<boolean> {
+    return this.write('remove label', (s) => this.api.workspaces.deleteLabel(s, id), {
+      onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
 

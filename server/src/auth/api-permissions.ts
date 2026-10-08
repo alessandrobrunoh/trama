@@ -4,7 +4,7 @@ import type { ApiAction, ApiPermission, ApiResource } from '../contracts/domain.
 const KNOWN = new Set<string>(API_PERMISSIONS);
 
 /** Routes under `/w/:slug/<segment>` whose segment is not the resource name. */
-const SEGMENT_RESOURCE: Record<string, ApiResource> = { settings: 'workspace' };
+const SEGMENT_RESOURCE: Record<string, ApiResource> = { settings: 'workspace', labels: 'workspace' };
 
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> = {

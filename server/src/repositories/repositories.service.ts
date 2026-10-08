@@ -6,6 +6,7 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
 import { ProjectEntity, RepositoryEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { LabelsService } from '../workspaces/labels.service.js';
 
 export interface RepositoryInput {
   provider?: GitProvider;
@@ -13,6 +14,7 @@ export interface RepositoryInput {
   url?: string;
   defaultBranch?: string;
   teamIds?: string[];
+  labels?: string[];
 }
 
 @Injectable()
@@ -21,6 +23,7 @@ export class RepositoriesService {
     private readonly ds: DataSource,
     private readonly refs: RefsService,
     private readonly events: EventsService,
+    private readonly labels: LabelsService,
     @InjectRepository(RepositoryEntity) private readonly repo: Repository<RepositoryEntity>,
   ) {}
 
@@ -48,6 +51,7 @@ export class RepositoriesService {
         url: input.url ?? `https://${host}/${input.fullName}`,
         defaultBranch: input.defaultBranch ?? 'main',
         teamIds: unique(input.teamIds),
+        labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
       }),
     );
     await this.events.record({ workspaceId, actor, type: 'repository.created', subject: { type: 'repository', id: row.id }, data: { fullName: row.fullName } });
@@ -60,6 +64,7 @@ export class RepositoriesService {
     if (patch.url !== undefined) row.url = patch.url;
     if (patch.defaultBranch !== undefined) row.defaultBranch = patch.defaultBranch;
     if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
+    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels)) ?? [];
     await this.repo.save(row);
     await this.events.record({ workspaceId, actor, type: 'repository.updated', subject: { type: 'repository', id }, data: { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) } });
     return row;

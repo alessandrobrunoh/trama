@@ -90,7 +90,8 @@ export class CreateWorkstreamDto {
   @Type(() => CriterionDto)
   acceptanceCriteria?: CriterionDto[];
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
-  @IsOptional() @IsArray() @IsString({ each: true }) labels?: string[];
+  /** Workspace label ids. */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @IsOptional() @IsIn(STATUSES) statusOverride?: WorkstreamStatus;
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() targetDate?: string;
@@ -124,7 +125,8 @@ class UpdateWorkstreamDto {
   @Type(() => CriterionDto)
   acceptanceCriteria?: CriterionDto[];
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
-  @OptionalNotNull() @IsArray() @IsString({ each: true }) labels?: string[];
+  /** Workspace label ids. Replaces the whole list. */
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @Clearable() @IsIn(STATUSES) statusOverride?: WorkstreamStatus | null;
   @Clearable() @IsISO8601() startDate?: string | null;
   @Clearable() @IsISO8601() targetDate?: string | null;
