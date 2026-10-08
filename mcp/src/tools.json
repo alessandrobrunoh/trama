@@ -640,6 +640,7 @@
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "priority": "query string Comma-separated: urgent,high,medium,low,none (e.g. 'high,urgent' = important)",
    "open": "query boolean true = only issues still in play (backlog, todo, in_progress, in_review)",
+   "limit": "query integer Newest first, at most this many (1-500)",
    "teamId": "query string Team",
    "assigneeId": "query string Assignee",
    "workstreamId": "query string Workstream",

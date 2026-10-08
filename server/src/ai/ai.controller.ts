@@ -12,6 +12,7 @@ import {
   ForbiddenException,
   Get,
   HttpCode,
+  HttpException,
   Delete,
   Post,
   Res,
@@ -20,6 +21,7 @@ import type { Response } from 'express';
 import { AiConfig } from './ai.config.js';
 import { ChatDto, SuggestionDto } from './ai.dto.js';
 import { AiService } from './ai.service.js';
+import type { ChatSink } from './activity.js';
 import { AiProvider } from './ai-provider.js';
 import { GrokBuildService } from './grok-build.service.js';
 
@@ -40,7 +42,10 @@ export class AiController {
     return {
       suggestions: this.config.status(),
       supergrok: await this.grok.status(userId),
-      assistantTools: { enabled: this.ai.toolsEnabled() && (await this.provider.supportsTools(userId)) },
+      assistantTools: {
+        enabled:
+          this.ai.toolsEnabled() && (await this.provider.supportsTools(userId)),
+      },
       chatgpt: {
         status: 'unavailable' as const,
         reason:
@@ -83,6 +88,67 @@ export class AiController {
     return this.request(auth, response, (signal) =>
       this.ai.chat(this.sessionUser(auth), ctx, dto, signal),
     );
+  }
+
+  /**
+   * Same as `chat`, but streams what happens as server-sent events: `working`, `step`, `text`,
+   * `reset`, then `done` (the final `{ content, activity }`) or `error`.
+   */
+  @Post('chat/stream')
+  @HttpCode(200)
+  async chatStream(
+    @Auth() auth: AuthInfo,
+    @Ctx() ctx: WorkspaceContext,
+    @Body() dto: ChatDto,
+    @Res() response: Response,
+  ) {
+    const userId = this.sessionUser(auth);
+    const controller = new AbortController();
+    const close = () => controller.abort();
+    response.once('close', close);
+    try {
+      await this.ai.run(userId, async () => {
+        response.status(200).set({
+          'Content-Type': 'text/event-stream; charset=utf-8',
+          'Cache-Control': 'no-store, no-transform',
+          'X-Accel-Buffering': 'no',
+        });
+        response.flushHeaders();
+        const send = (event: string, data: unknown) => {
+          if (!response.writableEnded)
+            response.write(
+              `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`,
+            );
+        };
+        const heartbeat = setInterval(() => {
+          if (!response.writableEnded) response.write(': ping\n\n');
+        }, 15_000);
+        const sink: ChatSink = {
+          step: (index, step) => send('step', { index, step }),
+          working: (label) => send('working', { label }),
+          text: (delta) => send('text', { delta }),
+          textReset: () => send('reset', {}),
+        };
+        try {
+          send(
+            'done',
+            await this.ai.chat(userId, ctx, dto, controller.signal, sink),
+          );
+        } catch (error) {
+          send('error', {
+            message:
+              error instanceof HttpException
+                ? error.message
+                : 'The assistant could not finish this reply.',
+          });
+        } finally {
+          clearInterval(heartbeat);
+          response.end();
+        }
+      });
+    } finally {
+      response.off('close', close);
+    }
   }
 
   private sessionUser(auth: AuthInfo): string {

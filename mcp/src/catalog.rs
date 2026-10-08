@@ -292,8 +292,12 @@ impl Tool {
                 continue;
             };
             let clearing = value.is_null() && self.method == Method::Patch && p.loc == Loc::Body && !p.required;
-            // Models often send null for "not set"; outside of an explicit PATCH clear that means omitted.
-            if value.is_null() && !clearing && !p.required {
+            // Models often send null or "" for "not set"; outside of an explicit PATCH clear that means omitted.
+            // (An empty string in a PATCH body is a real value, e.g. blanking a description.)
+            let blank = value.as_str().is_some_and(|v| v.trim().is_empty())
+                && (p.loc == Loc::Query || self.method != Method::Patch);
+            let unset = value.is_null() || blank;
+            if unset && !clearing && !p.required && p.loc != Loc::Path {
                 continue;
             }
             if !clearing && !type_ok(p, value) {
@@ -378,7 +382,7 @@ mod tests {
         assert!(t.build_call(&json!({ "kind": "bug", "title": null })).is_err());
         let call = t.build_call(&json!({ "kind": "bug", "title": "x", "body": null, "assigneeId": null })).unwrap();
         assert_eq!(call.body, Some(json!({ "kind": "bug", "title": "x" })));
-        let call = tool("list_issues").build_call(&json!({ "kind": null, "q": "a" })).unwrap();
+        let call = tool("list_issues").build_call(&json!({ "kind": null, "status": "", "q": "a" })).unwrap();
         assert_eq!(call.query, vec![("q".into(), "a".into())]);
         assert!(tool("get_issue").build_call(&json!({ "idOrKey": "" })).is_err());
     }

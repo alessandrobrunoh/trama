@@ -15,6 +15,7 @@ import {
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsNumber,
   IsOptional,
   IsString,
@@ -141,6 +142,8 @@ class ListIssueQuery {
   @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
   @IsBoolean()
   open?: boolean;
+  /** Newest first; at most this many (1-500). */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
 }
 
 @Controller('w/:slug/issues')

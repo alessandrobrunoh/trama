@@ -100,6 +100,7 @@ export class IssuesService {
       priority?: Priority[];
       /** Only issues still in play: backlog, todo, in progress, in review. */
       open?: boolean;
+      limit?: number;
     } = {},
   ) {
     const qb = this.repo
@@ -125,6 +126,7 @@ export class IssuesService {
         '(i.title ILIKE :q OR i.key ILIKE :q OR i.aliases::text ILIKE :q)',
         { q: `%${f.q}%` },
       );
+    if (f.limit) qb.take(f.limit);
     return qb.getMany();
   }
 

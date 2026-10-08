@@ -30,6 +30,8 @@ describe('issue list filters: priority and open', () => {
     expect(await titles('?open=true')).toEqual(['high open', 'low open', 'urgent open']);
     expect(await titles('?open=false&priority=low')).toEqual(['low open']);
     expect(await titles('')).toHaveLength(5);
+    expect(await titles('?limit=2')).toHaveLength(2);
+    await owner.client.get(`${w}?limit=0`).expect(400);
     await owner.client.get(`${w}?priority=bogus`).expect(400);
     await owner.client.get(`${w}?open=maybe`).expect(400);
   });
