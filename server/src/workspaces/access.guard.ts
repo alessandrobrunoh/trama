@@ -12,6 +12,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { AuthService, SESSION_COOKIE } from '../auth/auth.service.js';
 import {
+  ALLOW_CUSTOM_TOKEN_KEY,
   CAPABILITY_KEY,
   IS_PUBLIC_KEY,
   REQUIRE_USER_KEY,
@@ -21,6 +22,7 @@ import {
   type AppRequest,
   type AuthInfo,
 } from '../auth/request-context.js';
+import { requiredPermission } from '../auth/api-permissions.js';
 import { TokensService } from '../auth/tokens.service.js';
 import type { Capability, Role, TokenScope } from '../contracts/domain.js';
 import { PermissionsService } from './permissions.service.js';
@@ -106,6 +108,11 @@ export class AccessGuard implements CanActivate {
         throw new ForbiddenException('Missing X-Requested-With or X-Client-Id header');
     }
 
+    if (auth.token) {
+      await this.tokens.enforceLimits(auth.token, mutating);
+      if (auth.token.scope === 'custom') this.enforceCustomPermission(req, targets, mutating);
+    }
+
     if (auth.token?.scope === 'read' && mutating)
       throw new ForbiddenException('This API token has the "read" scope and can only call GET routes');
 
@@ -133,6 +140,19 @@ export class AccessGuard implements CanActivate {
       if (teamScope) await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }
     return true;
+  }
+
+  /** `custom` tokens: the route's `<resource>:<action>` must be in the token's explicit list. */
+  private enforceCustomPermission(req: AppRequest, targets: Parameters<Reflector['getAllAndOverride']>[1], mutating: boolean): void {
+    const token = req.auth!.token!;
+    const path = (req.route as { path?: string } | undefined)?.path ?? '';
+    const needed = requiredPermission(req.method, path);
+    if (!needed) {
+      if (this.reflector.getAllAndOverride<boolean>(ALLOW_CUSTOM_TOKEN_KEY, targets) && !mutating) return;
+      throw new ForbiddenException('This route is not available to custom API tokens');
+    }
+    if (!token.permissions?.includes(needed))
+      throw new ForbiddenException(`This API token lacks the "${needed}" permission`);
   }
 
   private async authenticate(req: AppRequest): Promise<AuthInfo | null> {

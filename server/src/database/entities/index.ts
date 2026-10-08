@@ -27,6 +27,8 @@ import type {
   SubjectRef,
   TeamEditPolicy,
   TokenScope,
+  ApiPermission,
+  TokenLimits,
   ViewEntity,
   ViewFilter,
   ViewLayout,
@@ -465,6 +467,9 @@ export class ApiTokenEntity extends Wire {
   @Column({ type: 'varchar' }) tokenHash: string;
   @Column({ type: 'jsonb' }) actor: ActorRef;
   @Column({ type: 'varchar', default: 'write' }) scope: TokenScope;
+  /** Explicit permission list; only set when `scope = 'custom'`. */
+  @Column({ type: 'jsonb', nullable: true }) permissions: ApiPermission[] | null;
+  @Column({ type: 'jsonb' }) limits: TokenLimits;
   @Column({ type: 'varchar', nullable: true }) createdByUserId: string | null;
   @Column({ type: 'timestamptz', nullable: true }) lastUsedAt: Date | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;

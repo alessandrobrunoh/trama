@@ -11,16 +11,23 @@ import {
   Post,
 } from '@nestjs/common';
 import {
+  IsArray,
   IsEmail,
   IsIn,
   IsISO8601,
+  IsInt,
   IsObject,
   IsOptional,
   IsString,
   Matches,
+  Max,
   MaxLength,
+  Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { normalizePermissions } from '../auth/api-permissions.js';
 import {
   Auth,
   Can,
@@ -32,7 +39,7 @@ import {
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import { TokensService } from '../auth/tokens.service.js';
-import { ESTIMATE_SCALES, WEEK_STARTS } from '../contracts/domain.js';
+import { ESTIMATE_SCALES, MAX_TOKEN_LIMITS, WEEK_STARTS } from '../contracts/domain.js';
 import type { EstimateScale, ExecutionProvider, Role, TokenScope, WeekStart } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { toDate } from '../common/util.js';
@@ -85,12 +92,22 @@ class UpdateAgentDto {
   @Clearable() @IsString() ownerUserId?: string | null;
 }
 
-const TOKEN_SCOPE_VALUES: TokenScope[] = ['read', 'write', 'admin'];
+const TOKEN_SCOPE_VALUES: TokenScope[] = ['read', 'write', 'admin', 'custom'];
+
+class TokenLimitsDto {
+  @IsOptional() @IsInt() @Min(1) @Max(MAX_TOKEN_LIMITS.requestsPerMinute) requestsPerMinute?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(MAX_TOKEN_LIMITS.writesPerMinute) writesPerMinute?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(MAX_TOKEN_LIMITS.writesPerDay) writesPerDay?: number;
+}
 
 class CreateTokenDto {
   @IsString() @MinLength(1) @MaxLength(80) name: string;
   /** Default `write`. `admin` needs an admin caller and a user token. */
   @IsOptional() @IsIn(TOKEN_SCOPE_VALUES) scope?: TokenScope;
+  /** `<resource>:<action>` list; implies `scope: 'custom'` (see API_RESOURCES). */
+  @IsOptional() @IsArray() @IsString({ each: true }) @MaxLength(60, { each: true }) permissions?: string[];
+  /** Request / write budget; omitted values use the defaults. */
+  @IsOptional() @ValidateNested() @Type(() => TokenLimitsDto) limits?: TokenLimitsDto;
   /** Omit to create a token that acts as you; set to create an agent token (admin). */
   @IsOptional() @IsString() @Matches(/^ag_/) agentId?: string;
   @IsOptional() @IsISO8601() expiresAt?: string;
@@ -225,8 +242,17 @@ export class TokensController {
   @Post()
   @RequireUser()
   @Can('manageTokens')
-  async create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateTokenDto) {
-    const scope: TokenScope = dto.scope ?? 'write';
+  async create(@Ctx() ctx: WorkspaceContext, @Auth() auth: AuthInfo, @Body() dto: CreateTokenDto) {
+    const scope: TokenScope = dto.scope ?? (dto.permissions ? 'custom' : 'write');
+    const permissions = scope === 'custom' ? normalizePermissions(dto.permissions ?? []) : undefined;
+    if (scope === 'custom' && !permissions?.length) throw new BadRequestException('A custom token needs at least one valid permission');
+    if (scope !== 'custom' && dto.permissions) throw new BadRequestException('permissions can only be set on custom tokens');
+    // A custom token can only mint custom tokens that are a subset of itself (no escalation).
+    if (auth.token?.scope === 'custom') {
+      const own = new Set(auth.token.permissions ?? []);
+      if (scope !== 'custom' || permissions!.some((p) => !own.has(p)))
+        throw new ForbiddenException('A custom token can only create custom tokens with a subset of its own permissions');
+    }
     if (scope === 'admin' && ctx.role !== 'admin' && ctx.role !== 'owner')
       throw new ForbiddenException('Only admins can create admin-scoped tokens');
     let actor = ctx.actor;
@@ -241,6 +267,8 @@ export class TokensController {
       name: dto.name,
       actor,
       scope,
+      permissions,
+      limits: dto.limits,
       createdByUserId: ctx.userId,
       expiresAt: toDate(dto.expiresAt) as Date | undefined,
     });

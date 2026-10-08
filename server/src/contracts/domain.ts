@@ -489,6 +489,10 @@ export interface ApiToken {
   actor: ActorRef;
   /** What the token may do: read = GET only, write = everyday work (member role), admin = everything the actor's role allows. */
   scope: TokenScope;
+  /** Granted permissions; present only for `custom` tokens. */
+  permissions?: ApiPermission[];
+  /** Request / write budget (defaults apply when not customized). */
+  limits: TokenLimits;
   lastUsedAt?: ISODate;
   createdAt: ISODate;
   expiresAt?: ISODate;
@@ -520,12 +524,87 @@ export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; descrip
   members: { label: 'Team members only', description: 'Only people on this team (and workspace admins) can edit its workstreams and issues.' },
 };
 
-export type TokenScope = 'read' | 'write' | 'admin';
+export type TokenScope = 'read' | 'write' | 'admin' | 'custom';
 export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: string }> = {
   read: { label: 'Read', description: 'Read-only: GET requests. Good for dashboards and reporting.' },
   write: { label: 'Write', description: 'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.' },
   admin: { label: 'Admin', description: 'Everything the acting user\'s role allows, including members, integrations and settings. Only admins can create one.' },
+  custom: { label: 'Custom', description: 'Only the listed permissions (resource × action), always within the acting user\'s role.' },
 };
+
+/**
+ * Fine-grained API permissions (`<resource>:<action>`), used by `custom` tokens. The required
+ * permission of a request is derived from its route: `/w/:slug/<resource>/…` plus the HTTP method
+ * (GET → read, POST/PUT/PATCH → write, DELETE → delete), with a few named exceptions
+ * (`decisions:accept`). A route whose resource is not listed here is denied to custom tokens.
+ */
+export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
+export type ApiResource =
+  | 'workspace' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
+  | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
+export type ApiPermission = `${ApiResource}:${ApiAction}`;
+
+export interface ApiResourceMeta {
+  label: string;
+  group: 'Work' | 'Insight' | 'Organization' | 'Access & automation';
+  actions: readonly ApiAction[];
+}
+
+const RWD = ['read', 'write', 'delete'] as const;
+export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
+  workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
+  issues: { label: 'Issues', group: 'Work', actions: RWD },
+  decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
+  milestones: { label: 'Milestones', group: 'Work', actions: RWD },
+  comments: { label: 'Comments', group: 'Work', actions: RWD },
+  artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
+  dependencies: { label: 'Dependencies', group: 'Work', actions: RWD },
+  'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
+  views: { label: 'Views', group: 'Work', actions: RWD },
+  attention: { label: 'Attention', group: 'Work', actions: ['read', 'write'] },
+  search: { label: 'Search', group: 'Insight', actions: ['read'] },
+  graph: { label: 'Graph', group: 'Insight', actions: ['read'] },
+  events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
+  snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
+  teams: { label: 'Teams', group: 'Organization', actions: RWD },
+  repositories: { label: 'Repositories', group: 'Organization', actions: RWD },
+  workspace: { label: 'Workspace & settings', group: 'Organization', actions: RWD },
+  members: { label: 'Members', group: 'Access & automation', actions: RWD },
+  agents: { label: 'Agents', group: 'Access & automation', actions: RWD },
+  tokens: { label: 'API tokens', group: 'Access & automation', actions: RWD },
+  integrations: { label: 'Integrations', group: 'Access & automation', actions: RWD },
+  'outgoing-webhooks': { label: 'Outgoing webhooks', group: 'Access & automation', actions: RWD },
+};
+
+export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOURCES) as ApiResource[]).flatMap((r) =>
+  API_RESOURCES[r].actions.map((a) => `${r}:${a}` as ApiPermission),
+);
+
+/** Every `*:read` permission. */
+const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
+const WORK: ApiResource[] = ['workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+
+/** Starting points offered in Settings; the final selection is always an explicit permission list. */
+export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
+  'read-only': { label: 'Read-only', description: 'Read every resource. Nothing can be changed.', permissions: READ_ALL },
+  contributor: {
+    label: 'Contributor',
+    description: 'Read everything and create/update work items. No deletes, no members, tokens or integrations.',
+    permissions: [...READ_ALL, ...WORK.filter((r) => r !== 'attention').map((r) => `${r}:write` as ApiPermission), 'attention:write'],
+  },
+  everything: { label: 'Everything', description: 'All permissions. The acting user\'s role still applies.', permissions: API_PERMISSIONS },
+};
+
+/** Request budget of an API token (enforced server-side; sessions are not limited). */
+export interface TokenLimits {
+  requestsPerMinute: number;
+  writesPerMinute: number;
+  writesPerDay: number;
+}
+export const DEFAULT_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 600, writesPerMinute: 60, writesPerDay: 2000 };
+/** Upper bounds a token can be configured with. */
+export const MAX_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 6000, writesPerMinute: 600, writesPerDay: 20000 };
 
 /** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
 export type Capability =

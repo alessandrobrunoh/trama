@@ -58,6 +58,7 @@ export const ROLES_KEY = 'nabla:roles';
 export const REQUIRE_USER_KEY = 'nabla:require-user';
 export const CAPABILITY_KEY = 'nabla:capability';
 export const TEAM_SCOPE_KEY = 'nabla:team-scope';
+export const ALLOW_CUSTOM_TOKEN_KEY = 'nabla:allow-custom-token';
 
 /** Skip authentication (login, signup, health, webhooks…). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -79,6 +80,9 @@ export const Can = (capability: Capability) => SetMetadata(CAPABILITY_KEY, capab
  * the team's `editPolicy` is enforced by PolicyGuard on top of the workspace role.
  */
 export const EditsTeamWork = (kind: 'workstream' | 'issue') => SetMetadata(TEAM_SCOPE_KEY, kind);
+
+/** A non-workspace route that `custom` (fine-grained) tokens may call, e.g. `GET /auth/token`. */
+export const AllowCustomToken = () => SetMetadata(ALLOW_CUSTOM_TOKEN_KEY, true);
 
 /** Reject agent tokens: the route needs a human principal (a user). */
 export const RequireUser = () => SetMetadata(REQUIRE_USER_KEY, true);
