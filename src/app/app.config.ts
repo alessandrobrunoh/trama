@@ -39,7 +39,11 @@ export const appConfig: ApplicationConfig = {
     // `<hlm-toaster />` (HlmToasterImports from ui/sonner) must be mounted once in the root template.
     provideAppInitializer(() => {
       inject(Notifier).use((kind, title, options) => {
-        toast[kind](title, { description: options?.description, duration: options?.duration });
+        toast[kind](title, {
+          description: options?.description,
+          duration: options?.duration,
+          action: options?.action ? { label: options.action.label, onClick: options.action.run } : undefined,
+        });
       });
     }),
     // Instantiate LiveSync (SSE) up front; it connects whenever a workspace is loaded.

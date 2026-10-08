@@ -119,7 +119,7 @@ export class HlmToaster {
       ...options,
       classes: {
         ...options?.classes,
-        toast: hlm('rounded-2xl!', options?.classes?.toast),
+        toast: hlm('rounded-lg! shadow-md! border-border-strong! text-[13px]!', options?.classes?.toast),
       },
     };
   });

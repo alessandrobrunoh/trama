@@ -7,8 +7,6 @@ import {
   LucideFlaskConical,
   LucideImage,
   LucidePaperclip,
-  LucideGitBranch,
-  LucideGitCommitHorizontal,
   LucideGitMerge,
   LucideGitPullRequest,
   LucideGitPullRequestDraft,
@@ -24,8 +22,6 @@ import { StatusBadge } from './status';
 const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
   pull_request: LucideGitPullRequest,
   merge_request: LucideGitMerge,
-  commit: LucideGitCommitHorizontal,
-  branch: LucideGitBranch,
   document: LucideFileText,
   design: LucidePalette,
   image: LucideImage,
@@ -36,7 +32,7 @@ const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
   release: LucideRocket,
 };
 
-/** Kind glyph for an artifact (PR, MR, branch, deployment…), tinted by its state. */
+/** Kind glyph for an artifact (PR, MR, deployment…), tinted by its state. */
 @Component({
   selector: 'app-artifact-icon',
   changeDetection: ChangeDetectionStrategy.OnPush,

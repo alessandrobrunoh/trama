@@ -10,6 +10,6 @@ import { classes } from '@spartan-ng/helm/utils';
 })
 export class HlmCommandGroupLabel {
   constructor() {
-    classes(() => 'inline-block');
+    classes(() => 'block');
   }
 }
