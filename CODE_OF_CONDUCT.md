@@ -2,11 +2,11 @@
 
 ## Our commitment
 
-Nabla is an open-source project built through technical discussion, experimentation, and collaboration.
+Trama is a source-available project built through technical discussion, experimentation, and collaboration.
 
 We want participation in the project to be welcoming, constructive, and safe for contributors regardless of experience level, background, identity, or role.
 
-Everyone participating in Nabla is expected to treat others with respect.
+Everyone participating in Trama is expected to treat others with respect.
 
 ## Expected behavior
 
@@ -46,7 +46,7 @@ Examples of unacceptable behavior include:
 
 ## Technical disagreement
 
-Nabla is an experimental project. Architecture and product decisions will change.
+Trama is an experimental project. Architecture and product decisions will change.
 
 Contributors are encouraged to challenge ideas.
 
@@ -101,7 +101,7 @@ This Code of Conduct applies to project spaces including:
 - code reviews;
 - community chat spaces operated by the project;
 - project events;
-- other public spaces where someone is representing Nabla.
+- other public spaces where someone is representing Trama.
 
 ## Enforcement principles
 
@@ -139,10 +139,10 @@ Moderation should not be used to punish someone merely for:
 
 ## Changes
 
-This Code of Conduct may evolve as the Nabla community grows.
+This Code of Conduct may evolve as the Trama community grows.
 
 Material changes should be documented in the repository history.
 
 ---
 
-By participating in Nabla, you agree to follow this Code of Conduct and help keep the project focused on respectful, productive collaboration.
+By participating in Trama, you agree to follow this Code of Conduct and help keep the project focused on respectful, productive collaboration.

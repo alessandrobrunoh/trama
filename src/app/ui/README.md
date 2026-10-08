@@ -1,4 +1,4 @@
-# Nabla UI kit (Spartan UI + Tailwind v4)
+# Trama UI kit (Spartan UI + Tailwind v4)
 
 Everything here is the contract for feature screens. Read it before writing a template.
 

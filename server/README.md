@@ -1,6 +1,6 @@
-# Nabla API (NestJS + PostgreSQL)
+# Trama API (NestJS + PostgreSQL)
 
-Backend for Nabla, coordination for human + AI engineering teams. Routes: [API.md](./API.md). Internals and extension points: [ARCHITECTURE.md](./ARCHITECTURE.md).
+Backend for Trama, coordination for human + AI engineering teams. Routes: [API.md](./API.md). Internals and extension points: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ```bash
 npm install

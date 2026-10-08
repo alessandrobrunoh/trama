@@ -19,7 +19,7 @@ import { RouterLink } from '@angular/router';
           class="hidden h-6 w-auto dark:block"
         />
         <p class="text-muted-foreground mt-3 max-w-xs leading-relaxed">
-          The open-source coordination layer for teams of humans and coding agents.
+          The source-available coordination layer for teams of humans and coding agents.
         </p>
       </div>
       <nav class="flex flex-col gap-2" aria-label="Product">
@@ -48,7 +48,7 @@ import { RouterLink } from '@angular/router';
     </div>
     <div class="border-border/60 border-t">
       <p class="text-muted-foreground mx-auto max-w-6xl px-4 py-5 text-xs sm:px-6">
-        © {{ year }} Trama · Open source under AGPL-3.0
+        © {{ year }} Trama · Source-available under PolyForm Shield 1.0.0
       </p>
     </div>
   `,

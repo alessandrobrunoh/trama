@@ -1,8 +1,8 @@
-# Nabla Vision
+# Trama Vision
 
 > **Issues describe problems. Workstreams organize outcomes. Shared workspaces preserve implementation context. Artifacts show what was delivered.**
 
-Nabla is an open-source coordination layer for software teams working with humans and coding agents.
+Trama is a source-available coordination layer for software teams working with humans and coding agents.
 
 It keeps the familiar Issue model that software teams already understand, but introduces a new organizational unit — the **Workstream** — to represent how modern engineering work actually happens.
 
@@ -14,7 +14,7 @@ A bug report may describe one symptom. A customer request may describe one need.
 
 That coordinated effort is a **Workstream**.
 
-Nabla exists to connect those layers without forcing teams to abandon the Issue-based workflows they already use.
+Trama exists to connect those layers without forcing teams to abandon the Issue-based workflows they already use.
 
 ---
 
@@ -55,13 +55,13 @@ The Issue remains useful.
 
 The mistake is assuming that an Issue must represent **the problem, the execution, the collaboration, and the outcome at the same time**.
 
-Nabla separates those concerns.
+Trama separates those concerns.
 
 ---
 
 # 2. Core thesis
 
-The core thesis of Nabla is:
+The core thesis of Trama is:
 
 > **Issues are excellent units of demand. They are not always the best units of execution.**
 
@@ -88,7 +88,7 @@ Outcome
 "What did we actually deliver?"
 ```
 
-Nabla is not trying to eliminate Issues.
+Trama is not trying to eliminate Issues.
 
 It adds a missing layer between Issue tracking and modern collaborative execution.
 
@@ -96,7 +96,7 @@ It adds a missing layer between Issue tracking and modern collaborative executio
 
 # 3. Issues remain first-class
 
-Issues are not legacy objects in Nabla.
+Issues are not legacy objects in Trama.
 
 They remain the familiar way to represent individual problems, requests, tasks, incidents, technical debt, improvements, security findings, and customer feedback.
 
@@ -131,7 +131,7 @@ createdAt
 updatedAt
 ```
 
-A team should be able to use Nabla almost like a traditional issue tracker if that is all it needs.
+A team should be able to use Trama almost like a traditional issue tracker if that is all it needs.
 
 That compatibility is intentional.
 
@@ -208,7 +208,7 @@ This keeps Workstreams meaningful for the rest of the team.
 
 # 6. A Workstream is not a Delta Thread
 
-Nabla is designed around workflows enabled by collaborative environments such as Delta, but a Workstream is not equivalent to a Delta Thread.
+Trama is designed around workflows enabled by collaborative environments such as Delta, but a Workstream is not equivalent to a Delta Thread.
 
 The relationship is:
 
@@ -231,7 +231,7 @@ A Workstream may have:
 - another execution environment instead;
 - a mixture of human and agent work.
 
-Therefore Nabla should never encode:
+Therefore Trama should never encode:
 
 ```text
 Workstream == Delta Thread
@@ -261,9 +261,9 @@ That may include:
 - bookmarks;
 - intermediate implementation history.
 
-Nabla should link to that workspace.
+Trama should link to that workspace.
 
-Nabla should not mirror it.
+Trama should not mirror it.
 
 Example:
 
@@ -353,17 +353,17 @@ Developer B
 
 The second developer can inspect the same working history and continue from it.
 
-Nabla's role is to make that shared context discoverable from the organizational layer.
+Trama's role is to make that shared context discoverable from the organizational layer.
 
 It should not become another place where developers must rewrite that context manually.
 
 ---
 
-# 9. Nabla should not duplicate Delta
+# 9. Trama should not duplicate Delta
 
 This is a hard product boundary.
 
-Nabla should not attempt to reproduce:
+Trama should not attempt to reproduce:
 
 - Delta turns;
 - full agent transcripts;
@@ -386,7 +386,7 @@ Open in Delta
 not:
 
 ```text
-Open the copied Delta history inside Nabla
+Open the copied Delta history inside Trama
 ```
 
 Duplicating execution history would create:
@@ -398,23 +398,23 @@ Duplicating execution history would create:
 - fragile integrations;
 - unnecessary maintenance.
 
-Nabla exists above that layer.
+Trama exists above that layer.
 
 ---
 
 # 10. The duplication test
 
-Every new Nabla feature should be evaluated with one question:
+Every new Trama feature should be evaluated with one question:
 
-> **Would the developer feel like they already did this somewhere else and now have to document it again in Nabla?**
+> **Would the developer feel like they already did this somewhere else and now have to document it again in Trama?**
 
 If yes, the feature is probably wrong.
 
 Bad examples:
 
 ```text
-"Mark an implementation checkpoint in Nabla"
-"Copy this Delta bookmark into Nabla"
+"Mark an implementation checkpoint in Trama"
+"Copy this Delta bookmark into Trama"
 "Summarize what the agent just did"
 "List which files were modified"
 "Update completion percentage"
@@ -425,13 +425,13 @@ Those are forms of bookkeeping, not durable coordination.
 
 A central product principle is:
 
-> **If using Nabla feels like “I already did this in Delta, now I need to document it again”, the workflow is wrong.**
+> **If using Trama feels like “I already did this in Delta, now I need to document it again”, the workflow is wrong.**
 
 ---
 
-# 11. What belongs in Nabla
+# 11. What belongs in Trama
 
-Nabla should contain information whose value extends beyond the implementation session.
+Trama should contain information whose value extends beyond the implementation session.
 
 Examples:
 
@@ -456,7 +456,7 @@ The key question is:
 
 > Will someone who never opens the Delta Thread still need this information?
 
-If yes, it probably belongs in Nabla.
+If yes, it probably belongs in Trama.
 
 ---
 
@@ -491,7 +491,7 @@ If yes, it probably belongs in Delta.
 
 Decisions are the main exception.
 
-Important decisions should be elevated into Nabla when they become durable organizational knowledge.
+Important decisions should be elevated into Trama when they become durable organizational knowledge.
 
 Example:
 
@@ -516,7 +516,7 @@ Therefore:
 
 ```text
 Discussion → Delta
-Durable decision → Nabla
+Durable decision → Trama
 ```
 
 Not every coding choice deserves a Decision.
@@ -566,7 +566,7 @@ v2.4.0
 
 Artifacts connect intent to delivered change.
 
-Nabla should automate artifact discovery where reliable integrations exist.
+Trama should automate artifact discovery where reliable integrations exist.
 
 ---
 
@@ -643,13 +643,13 @@ It does **not** mean:
 
 > Delta is currently generating code.
 
-That distinction keeps Nabla truthful.
+That distinction keeps Trama truthful.
 
 ---
 
 # 17. Manual first, automation second
 
-Nabla should prefer truthful manual state over fake automation.
+Trama should prefer truthful manual state over fake automation.
 
 Early versions can use:
 
@@ -673,7 +673,7 @@ merged
 deployment succeeded
 ```
 
-Over time, Nabla may suggest state changes:
+Over time, Trama may suggest state changes:
 
 ```text
 All linked PRs are merged.
@@ -686,7 +686,7 @@ Suggestions are often safer than invisible automation.
 
 # 18. No fake progress
 
-Nabla should not invent software progress percentages.
+Trama should not invent software progress percentages.
 
 Avoid:
 
@@ -711,7 +711,7 @@ CI passing
 Review pending
 ```
 
-Nabla should communicate facts, not simulated certainty.
+Trama should communicate facts, not simulated certainty.
 
 ---
 
@@ -743,7 +743,7 @@ Security
 Web
 ```
 
-Nabla should distinguish:
+Trama should distinguish:
 
 - Issue assignment;
 - Workstream accountability;
@@ -867,7 +867,7 @@ An Issue answers:
 
 # 24. Shared workspaces are references, not mirrors
 
-Nabla should model shared workspaces generically.
+Trama should model shared workspaces generically.
 
 Conceptually:
 
@@ -892,19 +892,19 @@ Future providers should be possible without redesigning the Workstream model.
 
 # 25. Delta-first, not Delta-dependent
 
-Delta is the primary workflow Nabla is currently designed around.
+Delta is the primary workflow Trama is currently designed around.
 
 This is intentional.
 
-Nabla should take advantage of Delta's shared thread model and persistent implementation context.
+Trama should take advantage of Delta's shared thread model and persistent implementation context.
 
 But:
 
 ```text
-Nabla core != Delta API wrapper
+Trama core != Delta API wrapper
 ```
 
-Nabla should still make sense when:
+Trama should still make sense when:
 
 - a team uses another execution environment;
 - some Workstreams are human-only;
@@ -988,7 +988,7 @@ Inside Delta, the team may:
 - review proposed changes;
 - continue the work from another developer's machine.
 
-Nabla does not need to understand every internal step.
+Trama does not need to understand every internal step.
 
 As outputs appear:
 
@@ -1020,7 +1020,7 @@ and the relevant Issues can be resolved.
 
 # 27. Workstream page
 
-The Workstream should become the central Nabla view for coordinated work.
+The Workstream should become the central Trama view for coordinated work.
 
 Conceptually:
 
@@ -1229,7 +1229,7 @@ Web
 Mobile
 ```
 
-Nabla should not require copying the Workstream into four team-specific objects.
+Trama should not require copying the Workstream into four team-specific objects.
 
 Each team should simply be able to see the Workstreams in which it participates.
 
@@ -1248,11 +1248,11 @@ auth-service
 infra
 ```
 
-Nabla should allow linking repositories to Projects and Workstreams.
+Trama should allow linking repositories to Projects and Workstreams.
 
 Detailed repository state remains owned by Git and the execution environment.
 
-Nabla should not become a Git client.
+Trama should not become a Git client.
 
 ---
 
@@ -1260,7 +1260,7 @@ Nabla should not become a Git client.
 
 Git integrations provide reliable automation.
 
-Nabla should progressively support:
+Trama should progressively support:
 
 - repository connections;
 - Pull Request discovery;
@@ -1286,7 +1286,7 @@ PR descriptions
 commit messages
 ```
 
-Nabla can use these signals to suggest associations.
+Trama can use these signals to suggest associations.
 
 Example:
 
@@ -1297,13 +1297,13 @@ Detected PR #201
 Attach to AUTH-12?
 ```
 
-When confidence is uncertain, Nabla should suggest rather than silently guess.
+When confidence is uncertain, Trama should suggest rather than silently guess.
 
 ---
 
 # 34. External Issue trackers
 
-Long term, Issues do not necessarily have to originate inside Nabla.
+Long term, Issues do not necessarily have to originate inside Trama.
 
 A Workstream could organize Issues from:
 
@@ -1312,7 +1312,7 @@ GitHub Issues
 GitLab Issues
 Linear
 Jira
-Nabla
+Trama
 ```
 
 Example:
@@ -1323,20 +1323,20 @@ JIRA AUTH-191 ─┼── AUTH-12 Workstream
 GitHub #882 ───┘
 ```
 
-This is strategically important because an organization could adopt Nabla without replacing its existing tracker on day one.
+This is strategically important because an organization could adopt Trama without replacing its existing tracker on day one.
 
 A realistic path is:
 
 ```text
 Existing tracker
       +
-    Nabla
+    Trama
 ```
 
 before:
 
 ```text
-Nabla as the primary Issue tracker
+Trama as the primary Issue tracker
 ```
 
 This is a long-term direction, not a V1 requirement.
@@ -1345,7 +1345,7 @@ This is a long-term direction, not a V1 requirement.
 
 # 35. Compatibility with existing workflows
 
-Nabla must support gradual adoption.
+Trama must support gradual adoption.
 
 Simple:
 
@@ -1377,7 +1377,7 @@ Traditional trackers have:
 My Issues
 ```
 
-Nabla may evolve toward:
+Trama may evolve toward:
 
 ```text
 My Issues
@@ -1387,7 +1387,7 @@ Reviews waiting on me
 Decisions waiting on me
 ```
 
-However, Nabla should not build a complex attention engine before it has reliable signals.
+However, Trama should not build a complex attention engine before it has reliable signals.
 
 The early product should remain explicit and predictable.
 
@@ -1455,7 +1455,7 @@ Agent switched branch
 
 Those belong in the execution environment.
 
-Nabla's activity feed should remain useful rather than noisy.
+Trama's activity feed should remain useful rather than noisy.
 
 ---
 
@@ -1472,7 +1472,7 @@ PR #204 was approved
 AUTH-12 moved to Review
 ```
 
-Not useful in Nabla:
+Not useful in Trama:
 
 ```text
 Agent edited a file
@@ -1491,7 +1491,7 @@ The execution environment already owns that detail.
 
 The Issue workflow remains useful and widely understood.
 
-Nabla extends it instead of replacing it.
+Trama extends it instead of replacing it.
 
 ## Separate demand from coordinated execution
 
@@ -1505,11 +1505,11 @@ Workstreams represent coherent outcomes, not arbitrary ticket batches.
 
 Modern implementation context may live in a collaborative workspace.
 
-Nabla should make that workspace discoverable.
+Trama should make that workspace discoverable.
 
 ## Do not duplicate execution tools
 
-Nabla should not become a worse version of Delta, GitHub, GitLab, or an IDE.
+Trama should not become a worse version of Delta, GitHub, GitLab, or an IDE.
 
 ## Minimize bookkeeping
 
@@ -1537,17 +1537,17 @@ The Workstream model should still work for human-only teams.
 
 ## Be agent-native without being agent-dependent
 
-Agents are first-class participants, but Nabla should not collapse if one provider changes or disappears.
+Agents are first-class participants, but Trama should not collapse if one provider changes or disappears.
 
 ## Stay self-hostable
 
-Teams should be able to run Nabla on infrastructure they control.
+Teams should be able to run Trama on infrastructure they control.
 
 ---
 
-# 41. What Nabla is not
+# 41. What Trama is not
 
-Nabla is not:
+Trama is not:
 
 - a replacement for Delta;
 - another coding-agent chat UI;
@@ -1561,7 +1561,7 @@ Nabla is not:
 - a Linear clone with an AI button;
 - a mandatory replacement for Jira, Linear, GitHub Issues, or GitLab Issues.
 
-Nabla is the layer that connects organizational intent to shared implementation context and delivered artifacts.
+Trama is the layer that connects organizational intent to shared implementation context and delivered artifacts.
 
 ---
 
@@ -1569,7 +1569,7 @@ Nabla is the layer that connects organizational intent to shared implementation 
 
 ## Do not model every Delta concept
 
-Nabla does not need domain equivalents for:
+Trama does not need domain equivalents for:
 
 ```text
 Turn
@@ -1582,7 +1582,7 @@ Worktree internals
 
 ## Do not require double documentation
 
-Users should not summarize in Nabla what already exists naturally in Delta.
+Users should not summarize in Trama what already exists naturally in Delta.
 
 ## Do not force Workstreams everywhere
 
@@ -1594,7 +1594,7 @@ Grouping unrelated tickets destroys the model.
 
 ## Do not hide uncertainty
 
-If Nabla cannot know something, it should not pretend it can.
+If Trama cannot know something, it should not pretend it can.
 
 ## Do not optimize dashboards before workflow
 
@@ -1710,7 +1710,7 @@ Artifacts may optionally be related to specific Issues as well as the Workstream
 
 # 45. UX principles
 
-Nabla should feel:
+Trama should feel:
 
 - fast;
 - compact;
@@ -1823,7 +1823,7 @@ repository metadata
 Potentially:
 
 ```text
-Nabla → execution workspace
+Trama → execution workspace
 
 objective
 linked Issues
@@ -1836,12 +1836,12 @@ repository context
 Only when reliably supported:
 
 ```text
-execution workspace → Nabla
+execution workspace → Trama
 
 meaningful state signals
 ```
 
-Nabla should not rely on undocumented behavior or scraping for core functionality.
+Trama should not rely on undocumented behavior or scraping for core functionality.
 
 ---
 
@@ -1858,7 +1858,7 @@ AUTH-12 appears in PR title
 GitHub webhook
         │
         ▼
-Nabla detects PR #201
+Trama detects PR #201
         │
         ▼
 Suggest attachment to AUTH-12
@@ -1882,12 +1882,12 @@ These should enrich the Workstream without pretending to represent the entire im
 
 # 50. Source-of-truth boundaries
 
-Nabla should have explicit ownership boundaries.
+Trama should have explicit ownership boundaries.
 
-## Nabla owns
+## Trama owns
 
 ```text
-Issues created in Nabla
+Issues created in Trama
 Workstreams
 organizational ownership
 Workstream state
@@ -1925,19 +1925,19 @@ release state
 environment state
 ```
 
-Nabla connects these sources without pretending to own all of them.
+Trama connects these sources without pretending to own all of them.
 
 ---
 
 # 51. Adoption strategy
 
-Nabla should be adoptable incrementally.
+Trama should be adoptable incrementally.
 
 A realistic path:
 
 ```text
 Step 1
-Use Nabla for Workstreams.
+Use Trama for Workstreams.
 
 Step 2
 Link Issues from the existing tracker.
@@ -1949,7 +1949,7 @@ Step 4
 Connect GitHub/GitLab.
 
 Step 5
-Optionally move Issue management into Nabla.
+Optionally move Issue management into Trama.
 ```
 
 The product should deliver value before requiring a company-wide migration.
@@ -1963,11 +1963,11 @@ Self-hosting is a primary requirement.
 The long-term minimal stack should remain close to:
 
 ```text
-Nabla
+Trama
 PostgreSQL
 ```
 
-Nabla should not require an infrastructure zoo for a small team.
+Trama should not require an infrastructure zoo for a small team.
 
 Avoid introducing systems such as:
 
@@ -1987,7 +1987,7 @@ Architecture should favor simplicity, maintainability, and understandable operat
 
 # 53. Security
 
-Nabla may handle:
+Trama may handle:
 
 - private repository metadata;
 - OAuth credentials;
@@ -2010,13 +2010,13 @@ Security is part of the core architecture.
 
 ---
 
-# 54. Open-source philosophy
+# 54. Source-available philosophy
 
-Nabla should be genuinely useful when self-hosted.
+Trama should be genuinely useful when self-hosted.
 
-The open-source edition should not intentionally cripple the core Workstream workflow.
+The self-hosted edition should not intentionally cripple the core Workstream workflow.
 
-Future hosted or commercial offerings may provide convenience, operations, support, or enterprise capabilities, but the central product model should remain valuable in the open project.
+Future hosted or commercial offerings may provide convenience, operations, support, or enterprise capabilities, but the central product model should remain valuable in the public project.
 
 The project should encourage:
 
@@ -2031,7 +2031,7 @@ The project should encourage:
 
 # 55. What success looks like
 
-Nabla succeeds if a developer can open a Workstream and quickly understand:
+Trama succeeds if a developer can open a Workstream and quickly understand:
 
 ```text
 What are we trying to achieve?
@@ -2074,7 +2074,7 @@ with minimal handoff cost.
 
 # 56. What failure looks like
 
-Nabla fails if developers experience it as:
+Trama fails if developers experience it as:
 
 > another place I need to update.
 
@@ -2082,7 +2082,7 @@ It also fails if:
 
 - Workstreams become arbitrary folders;
 - the domain model becomes too complex for normal teams;
-- Nabla copies everything from Delta;
+- Trama copies everything from Delta;
 - familiar Issue workflows become unnecessarily difficult;
 - users cannot identify the source of truth;
 - every action requires manual metadata;
@@ -2105,11 +2105,11 @@ If yes, prefer linking or integration over manual duplication.
 
 ### Does this help explain an outcome?
 
-If yes, it may belong in Nabla.
+If yes, it may belong in Trama.
 
 ### Will another developer need it without opening Delta?
 
-If yes, Nabla may be the right home.
+If yes, Trama may be the right home.
 
 ### Is the state observable and reliable?
 
@@ -2127,7 +2127,7 @@ If not, the trade-off should be intentional.
 
 # 58. Product language
 
-Nabla should use terminology consistently.
+Trama should use terminology consistently.
 
 ## Issue
 
@@ -2192,7 +2192,7 @@ Projects remain optional for smaller efforts.
 
 # 60. Near-term product direction
 
-The first meaningful version of Nabla should prove the Workstream model.
+The first meaningful version of Trama should prove the Workstream model.
 
 The core workflow is:
 
@@ -2210,7 +2210,7 @@ Complete Workstream
 
 If this is useful in real team usage, the core thesis is validated.
 
-Only then should Nabla aggressively expand into deeper automation, analytics, or additional execution providers.
+Only then should Trama aggressively expand into deeper automation, analytics, or additional execution providers.
 
 ---
 
@@ -2233,7 +2233,7 @@ These should not distract from proving the core workflow:
 
 # 62. Long-term opportunity
 
-If Workstreams prove useful, Nabla can become a coordination layer across the modern software toolchain.
+If Workstreams prove useful, Trama can become a coordination layer across the modern software toolchain.
 
 ```text
              Issues
@@ -2259,13 +2259,13 @@ If Workstreams prove useful, Nabla can become a coordination layer across the mo
           Deployment
 ```
 
-Nabla should not replace every tool in this diagram.
+Trama should not replace every tool in this diagram.
 
 It connects them around the outcome the team is pursuing.
 
 ---
 
-# 63. The Nabla test
+# 63. The Trama test
 
 A healthy Workstream should let a new team member answer, within seconds:
 
@@ -2287,7 +2287,7 @@ What remains organizationally unfinished?
 
 If the Workstream cannot answer those questions, it is missing important context.
 
-If answering them requires copying the entire Delta Thread into Nabla, Nabla is storing too much.
+If answering them requires copying the entire Delta Thread into Trama, Trama is storing too much.
 
 The product must maintain that balance.
 
@@ -2339,10 +2339,10 @@ Shared agent workspaces remain useful.
 
 What is missing is the layer that explains how those things relate to the outcome the team is actually trying to achieve.
 
-That layer is Nabla.
+That layer is Trama.
 
 ---
 
 # In one sentence
 
-**Nabla connects the Issues a team needs to solve with the shared workspace where humans and agents solve them together, while preserving the decisions and artifacts that explain what was ultimately delivered.**
+**Trama connects the Issues a team needs to solve with the shared workspace where humans and agents solve them together, while preserving the decisions and artifacts that explain what was ultimately delivered.**

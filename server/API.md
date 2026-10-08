@@ -1,4 +1,4 @@
-# Nabla API
+# Trama API
 
 REST + SSE backend (NestJS 12, TypeORM, Postgres 17). Everything lives under the `/api` prefix. Entity shapes are defined in
 [`contracts/domain.ts`](../contracts/domain.ts) (synced to `src/contracts/domain.ts`); this file documents routes, auth and behaviour.
@@ -231,7 +231,7 @@ Connections to GitHub, GitLab (including GitHub Enterprise / self-hosted GitLab)
 
 ### Required token scopes
 - **GitHub**: a fine-grained token with *Metadata: read* and *Pull requests: read* (and *Webhooks: read/write* if you want to create the webhook through the API) on the linked repositories, or a classic PAT with `repo` (or `public_repo`). The token is used for "current user" and repository discovery.
-- **GitLab**: a personal/project access token with `read_api` (use `api` if you want Nabla to manage hooks later).
+- **GitLab**: a personal/project access token with `read_api` (use `api` if you want Trama to manage hooks later).
 
 ### Webhook setup (shown in Settings → Integrations)
 **GitHub** — repository (or organization) *Settings → Webhooks → Add webhook*:

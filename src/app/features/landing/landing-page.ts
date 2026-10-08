@@ -51,7 +51,7 @@ import { SiteHeader } from './site-header';
           class="border-border bg-card/70 text-muted-foreground hover:text-foreground mx-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors"
         >
           <span class="bg-primary size-1.5 rounded-full"></span>
-          Introducing Trama · open source, built for humans and coding agents
+          Introducing Trama · source-available, built for humans and coding agents
           <svg [lucideIcon]="arrowIcon" [size]="12"></svg>
         </a>
         <h1
@@ -432,18 +432,18 @@ import { SiteHeader } from './site-header';
         </div>
       </section>
 
-      <!-- Open source -->
+      <!-- Source-available -->
       <section class="mx-auto max-w-6xl px-4 py-20 sm:px-6">
         <div class="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
           <div>
-            <p class="text-primary text-[13px] font-medium">Open source</p>
+            <p class="text-primary text-[13px] font-medium">Source-available</p>
             <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
               Your work, on your infrastructure.
             </h2>
             <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-              Trama is AGPL-3.0 and self-hostable. A web app, an API and PostgreSQL: no
-              infrastructure zoo, no feature held hostage. The open-source edition is the real
-              product.
+              Trama is source-available under PolyForm Shield and self-hostable. A web app, an API
+              and PostgreSQL: no infrastructure zoo, no feature held hostage. The self-hosted
+              edition is the real product.
             </p>
           </div>
           <dl
@@ -620,7 +620,7 @@ export class LandingPage {
   ];
 
   protected readonly facts = [
-    { label: 'License', value: 'AGPL-3.0' },
+    { label: 'License', value: 'PolyForm Shield' },
     { label: 'Database', value: 'PostgreSQL' },
     { label: 'Agent protocol', value: 'MCP + REST' },
     { label: 'Vendor lock-in', value: 'None' },
