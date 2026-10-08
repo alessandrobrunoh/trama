@@ -638,6 +638,8 @@
   "params": {
    "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
+   "priority": "query string Comma-separated: urgent,high,medium,low,none (e.g. 'high,urgent' = important)",
+   "open": "query boolean true = only issues still in play (backlog, todo, in_progress, in_review)",
    "teamId": "query string Team",
    "assigneeId": "query string Assignee",
    "workstreamId": "query string Workstream",

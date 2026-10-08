@@ -10,9 +10,10 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
+  IsBoolean,
   IsIn,
   IsNumber,
   IsOptional,
@@ -129,6 +130,17 @@ class ListIssueQuery {
   @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() milestoneId?: string;
   @IsOptional() @IsString() q?: string;
+  /** Comma-separated priorities, e.g. `high,urgent`. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.split(',').map((p) => p.trim()).filter(Boolean) : value))
+  @IsArray()
+  @IsIn(PRIORITIES, { each: true })
+  priority?: Priority[];
+  /** `true`: only issues still being worked on (backlog, todo, in progress, in review). */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  open?: boolean;
 }
 
 @Controller('w/:slug/issues')

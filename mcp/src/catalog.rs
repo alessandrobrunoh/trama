@@ -292,6 +292,10 @@ impl Tool {
                 continue;
             };
             let clearing = value.is_null() && self.method == Method::Patch && p.loc == Loc::Body && !p.required;
+            // Models often send null for "not set"; outside of an explicit PATCH clear that means omitted.
+            if value.is_null() && !clearing && !p.required {
+                continue;
+            }
             if !clearing && !type_ok(p, value) {
                 let expected = if p.choices.is_empty() { p.ty.clone() } else { format!("one of {}", p.choices.join("|")) };
                 return Err(format!("argument '{}' must be {expected}", p.name));
@@ -370,8 +374,12 @@ mod tests {
         assert!(t.build_call(&json!({ "kind": "nope", "title": "x" })).unwrap_err().contains("one of"));
         assert!(t.build_call(&json!({ "kind": "bug", "title": "x", "wat": 1 })).unwrap_err().contains("unknown argument"));
         assert!(t.build_call(&json!({ "kind": "bug", "title": 5 })).unwrap_err().contains("title"));
-        // null is only a "clear" on optional PATCH body fields
-        assert!(t.build_call(&json!({ "kind": "bug", "title": "x", "body": null })).is_err());
+        // null on a required field is an error; on an optional non-PATCH field it means "not set"
+        assert!(t.build_call(&json!({ "kind": "bug", "title": null })).is_err());
+        let call = t.build_call(&json!({ "kind": "bug", "title": "x", "body": null, "assigneeId": null })).unwrap();
+        assert_eq!(call.body, Some(json!({ "kind": "bug", "title": "x" })));
+        let call = tool("list_issues").build_call(&json!({ "kind": null, "q": "a" })).unwrap();
+        assert_eq!(call.query, vec![("q".into(), "a".into())]);
         assert!(tool("get_issue").build_call(&json!({ "idOrKey": "" })).is_err());
     }
 

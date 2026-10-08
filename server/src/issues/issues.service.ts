@@ -97,6 +97,9 @@ export class IssuesService {
       workstreamId?: string;
       milestoneId?: string;
       q?: string;
+      priority?: Priority[];
+      /** Only issues still in play: backlog, todo, in progress, in review. */
+      open?: boolean;
     } = {},
   ) {
     const qb = this.repo
@@ -105,6 +108,8 @@ export class IssuesService {
       .orderBy('i.createdAt', 'DESC');
     if (f.kind) qb.andWhere('i.kind = :k', { k: f.kind });
     if (f.status) qb.andWhere('i.status = :s', { s: f.status });
+    if (f.priority?.length) qb.andWhere('i.priority IN (:...pr)', { pr: f.priority });
+    if (f.open) qb.andWhere("i.status IN ('backlog', 'todo', 'in_progress', 'in_review')");
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
     if (f.workstreamId)
