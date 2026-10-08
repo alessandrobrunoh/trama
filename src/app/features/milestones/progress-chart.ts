@@ -1,5 +1,5 @@
 // Progress (burn-up) chart for a workstream or a single milestone, like Linear's project graph:
-// Scope (grey), Started (amber) and Completed (indigo, filled) from the start date to today, a
+// Scope (grey), Started (amber) and Completed (accent, filled) from the start date to today, a
 // projection cone to the target date (current pace vs. required pace), a red hatched band when the
 // target date has passed, milestone diamonds on the x-axis and completions per period at the bottom.
 // Reusable: `<app-progress-chart [ws]="ws" />` or `<app-progress-chart [ws]="ws" [milestone]="ms" />`.

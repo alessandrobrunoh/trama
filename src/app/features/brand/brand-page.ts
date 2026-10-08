@@ -141,7 +141,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
       <section class="mt-20" aria-labelledby="colours">
         <h2 id="colours" class="text-2xl font-semibold tracking-[-0.02em]">Colours</h2>
         <p class="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-relaxed">
-          Trama is mostly ink and paper, with one indigo accent. Workstream violet and decision
+          Trama is mostly ink and paper, with one terracotta accent. Workstream violet and decision
           amber identify the two concepts that make Trama different. Click a swatch to copy its hex
           value.
         </p>
@@ -273,7 +273,7 @@ export class BrandPage {
   protected readonly colors = [
     { name: 'Ink', hex: '#08090B', role: 'Logo on light backgrounds' },
     { name: 'Paper', hex: '#FFFFFF', role: 'Logo on dark backgrounds' },
-    { name: 'Trama Indigo', hex: '#5E6AD2', role: 'Primary accent, links and actions' },
+    { name: 'Terracotta', hex: '#B5583A', role: 'Primary accent, links and actions' },
     { name: 'Night', hex: '#0E0F11', role: 'Dark surfaces' },
     { name: 'Graphite', hex: '#1B1C1F', role: 'Body text on light' },
     { name: 'Mist', hex: '#F4F4F6', role: 'Light surfaces and sidebar' },
@@ -298,7 +298,7 @@ export class BrandPage {
     },
     {
       label: 'Add effects',
-      style: 'filter: drop-shadow(4px 6px 2px rgb(94 106 210 / 0.8)) blur(0.6px)',
+      style: 'filter: drop-shadow(4px 6px 2px rgb(181 88 58 / 0.8)) blur(0.6px)',
     },
   ];
 }

@@ -253,7 +253,7 @@
 /* ───────────────────────── Tokens ─────────────────────────
    Light is :root, dark is :root.dark (class set by ThemeService).
    Linear-like: the app chrome (sidebar) is the darkest/most recessed surface and the page
-   sits on an inset panel. Neutral greys + ONE indigo accent. Status tones are muted and keep
+   sits on an inset panel. Neutral greys + ONE terracotta accent. Status tones are muted and keep
    the same meaning in both modes. Use the semantic Tailwind colors (bg-background,
    text-muted-foreground, text-status-working, …) — never raw hex / palette colors in feature code.
 
@@ -272,7 +272,7 @@
   --card-foreground: #1b1c1f;
   --popover: #ffffff;
   --popover-foreground: #1b1c1f;
-  --primary: #5e6ad2;
+  --primary: #b5583a;
   --primary-foreground: #ffffff;
   --secondary: #f3f3f5;
   --secondary-foreground: #26272b;
@@ -284,25 +284,25 @@
   --border: #e8e8ec;
   --border-strong: #dcdce1;
   --input: #dddde2;
-  --ring: #5e6ad2;
+  --ring: #b5583a;
   /* Faint row hover / selected fills */
   --hover: rgb(18 19 24 / 0.035);
   --selected: color-mix(in oklab, var(--primary) 8%, transparent);
 
-  --chart-1: #5e6ad2;
+  --chart-1: #b5583a;
   --chart-2: #2d9d8f;
   --chart-3: #d19a2a;
   --chart-4: #8a63d2;
-  --chart-5: #d9573f;
+  --chart-5: #5e6ad2;
 
   --sidebar: #f4f4f6;
   --sidebar-foreground: #3a3b40;
-  --sidebar-primary: #5e6ad2;
+  --sidebar-primary: #b5583a;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e8e8ec;
   --sidebar-accent-foreground: #1b1c1f;
   --sidebar-border: #e3e3e8;
-  --sidebar-ring: #5e6ad2;
+  --sidebar-ring: #b5583a;
 
   --entity-workstream: #7c5cc4;
   --entity-decision: #b7791f;
@@ -333,7 +333,7 @@
   --card-foreground: #e9eaee;
   --popover: #17181b;
   --popover-foreground: #e9eaee;
-  --primary: #6e79d6;
+  --primary: #c8643f;
   --primary-foreground: #ffffff;
   --secondary: #18191c;
   --secondary-foreground: #e9eaee;
@@ -345,24 +345,24 @@
   --border: #1e1f23;
   --border-strong: #2a2b30;
   --input: #2a2b30;
-  --ring: #6e79d6;
+  --ring: #c8643f;
   --hover: rgb(255 255 255 / 0.03);
   --selected: color-mix(in oklab, var(--primary) 12%, transparent);
 
-  --chart-1: #6e79d6;
+  --chart-1: #c8643f;
   --chart-2: #46b8a8;
   --chart-3: #e0b04a;
   --chart-4: #a389e6;
-  --chart-5: #ee7a63;
+  --chart-5: #6e79d6;
 
   --sidebar: #08090a;
   --sidebar-foreground: #c9cbd1;
-  --sidebar-primary: #6e79d6;
+  --sidebar-primary: #c8643f;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #17181b;
   --sidebar-accent-foreground: #f4f5f7;
   --sidebar-border: #17181b;
-  --sidebar-ring: #6e79d6;
+  --sidebar-ring: #c8643f;
 
   --entity-workstream: #a38bea;
   --entity-decision: #e0b04a;
@@ -581,4 +581,12 @@
 }
 .cdk-drop-list-receiving {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* Shortcut chips on primary surfaces (e.g. "New issue C"): a lighter shade of the accent
+   instead of the muted keycap, so the chip reads as part of the button. */
+.bg-primary [data-slot='kbd'] {
+  border-color: color-mix(in oklab, var(--primary), white 30%);
+  background: color-mix(in oklab, var(--primary), white 12%);
+  color: var(--primary-foreground);
 }
