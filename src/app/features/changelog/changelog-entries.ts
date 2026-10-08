@@ -12,6 +12,33 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: '2026-10-08',
+    title: 'Projects, separate from repositories',
+    summary: 'Plan outcomes as projects, carry them out with workstreams, and keep repositories in their own section.',
+    changes: [
+      {
+        kind: 'new',
+        text: 'Projects: planned outcomes with a status, lead, teams, target dates and the repositories they touch.',
+      },
+      {
+        kind: 'new',
+        text: 'Milestones now belong to projects. Workstream pages show their project’s milestones read-only; workstreams that already had milestones moved into a project of their own.',
+      },
+      {
+        kind: 'new',
+        text: 'A workstream can carry out a project and works in its repositories, inherited unless you pick a subset.',
+      },
+      {
+        kind: 'new',
+        text: 'Projects in search, favorites, workstream filters, saved views and the MCP tools for agents.',
+      },
+      {
+        kind: 'improved',
+        text: 'Repositories are back in their own section at /repositories; old /projects links to repositories keep working.',
+      },
+    ],
+  },
+  {
+    date: '2026-10-08',
     title: 'A public home for Trama',
     summary: 'Trama now has a landing page, a blog, a public roadmap and this changelog.',
     changes: [
