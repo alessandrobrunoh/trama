@@ -62,7 +62,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
     <form (submit)="savePrefs($event)">
       <app-settings-group title="Preferences" description="How this workspace looks and counts. Stored on the server, so everyone sees the same.">
-        <app-settings-row label="Icon" description="Shown in the sidebar and workspace switcher." >
+        <app-settings-row label="Icon" description="Shown in the sidebar and workspace switcher. Its colour is also the accent colour of the whole workspace." >
           <div class="flex flex-wrap items-center justify-end gap-2">
             <span
               class="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold"

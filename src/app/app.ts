@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmToasterImports } from '@spartan-ng/helm/sonner';
 import { Preferences } from './core/preferences';
-import { ThemeService } from './core/theme';
+import { AccentService, ThemeService } from './core/theme';
 
 @Component({
   selector: 'app-root',
@@ -18,4 +18,6 @@ export class App {
   protected readonly theme = inject(ThemeService);
   // Instantiate early so font size, cursors, links and motion preferences are applied.
   protected readonly preferences = inject(Preferences);
+  // Instantiate early so the workspace colour becomes the accent colour.
+  protected readonly accent = inject(AccentService);
 }
