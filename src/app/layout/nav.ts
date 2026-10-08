@@ -7,6 +7,7 @@ import {
   LucideFolderGit2,
   LucideHexagon,
   LucideLayoutDashboard,
+  LucideMessageSquare,
   LucideNetwork,
   LucideScale,
   LucideUserRoundCheck,
@@ -41,6 +42,13 @@ export const PERSONAL_NAV: NavItem[] = [
     icon: LucideUserRoundCheck,
     keys: 'g m',
     hint: 'Issues assigned to you and workstreams you are accountable for',
+  },
+  {
+    segment: 'assistant',
+    label: 'Assistant',
+    icon: LucideMessageSquare,
+    keys: '',
+    hint: 'Chat with Trama about your work',
   },
 ];
 
@@ -79,6 +87,7 @@ export const SECTION_LABELS: Record<string, string> = {
   stats: 'Statistics',
   attention: 'My Attention',
   'my-work': 'My Work',
+  assistant: 'Assistant',
   issues: 'Issues',
   workstreams: 'Workstreams',
   timeline: 'Timeline',

@@ -6,6 +6,27 @@ import { SessionStore } from '../session/session.store';
 import { NablaStore } from '../stores/nabla.store';
 import { AiApi, type AiStatus, type ChatContext, type ChatMessage } from './ai-api';
 
+/** One saved conversation. Kept in this browser only, per user and workspace. */
+export interface AssistantChat {
+  id: string;
+  title: string;
+  messages: ChatMessage[];
+  updatedAt: number;
+}
+
+const MAX_CHATS = 30;
+const MAX_MESSAGES = 100;
+
+function isMessage(value: unknown): value is ChatMessage {
+  const m = value as ChatMessage | null;
+  return !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string';
+}
+
+function titleFrom(content: string): string {
+  const line = content.replace(/\s+/g, ' ').trim();
+  return line.length > 60 ? `${line.slice(0, 57)}…` : line;
+}
+
 @Injectable({ providedIn: 'root' })
 export class AssistantStore {
   private readonly api = inject(AiApi);
@@ -24,15 +45,25 @@ export class AssistantStore {
   private grokPoll?: ReturnType<typeof setTimeout>;
   readonly open = signal(false);
   readonly expanded = signal(false);
+  /** Chats shown as chips in the dock (opened this session, newest last). Closing one removes its chip, not the chat. */
+  readonly dock = signal<string[]>([]);
   readonly status = signal<AiStatus | null>(null);
   readonly statusError = signal('');
   readonly loadingStatus = signal(false);
-  readonly messages = signal<ChatMessage[]>([]);
+  /** Saved chats, newest first. */
+  readonly chats = signal<AssistantChat[]>([]);
+  /** Open chat; null is a fresh chat that is saved on its first message. */
+  readonly activeId = signal<string | null>(null);
+  readonly active = computed(() => this.chats().find((c) => c.id === this.activeId()) ?? null);
+  readonly messages = computed(() => this.active()?.messages ?? []);
   readonly draft = signal('');
   readonly busy = signal(false);
   readonly error = signal('');
   readonly shareContext = signal(true);
   readonly slug = this.store.slug;
+  readonly onAssistantPage = computed(
+    () => this.url().split(/[?#]/)[0].split('/')[2] === 'assistant',
+  );
   readonly context = computed<ChatContext>(() => {
     const parts =
       this.router.parseUrl(this.url()).root.children['primary']?.segments.map((s) => s.path) ?? [];
@@ -68,7 +99,8 @@ export class AssistantStore {
     };
   });
   readonly ready = computed(
-    () => this.status()?.suggestions.configured === true || this.status()?.supergrok.connected === true,
+    () =>
+      this.status()?.suggestions.configured === true || this.status()?.supergrok.connected === true,
   );
 
   constructor() {
@@ -78,7 +110,9 @@ export class AssistantStore {
       untracked(() => {
         this.revision++;
         this.newChat();
+        this.loadChats(user, slug);
         this.open.set(false);
+        this.dock.set([]);
         this.status.set(null);
         this.statusError.set('');
         this.loadingStatus.set(false);
@@ -145,17 +179,43 @@ export class AssistantStore {
 
   newChat(): void {
     this.stop();
-    this.messages.set([]);
+    this.activeId.set(null);
     this.draft.set('');
     this.error.set('');
   }
 
+  openChat(id: string): void {
+    if (!this.chats().some((c) => c.id === id)) return;
+    this.stop();
+    this.activeId.set(id);
+    this.pin(id);
+    this.draft.set('');
+    this.error.set('');
+  }
+
+  deleteChat(id: string): void {
+    if (this.activeId() === id) this.newChat();
+    this.unpin(id);
+    this.chats.update((items) => items.filter((c) => c.id !== id));
+    this.saveChats();
+  }
+
+  /** Removes a chat's chip from the dock; the chat stays in the history. */
+  unpin(id: string): void {
+    this.dock.update((ids) => ids.filter((x) => x !== id));
+  }
+
+  private pin(id: string): void {
+    this.dock.update((ids) => [...ids.filter((x) => x !== id), id].slice(-2));
+  }
+
   stop(): void {
-    if (this.busy()) {
+    const id = this.activeId();
+    if (this.busy() && id) {
       const pending = this.messages().at(-1);
       if (pending?.role === 'user') {
         this.draft.set(pending.content);
-        this.messages.update((items) => items.slice(0, -1));
+        this.removeLastMessage(id);
       }
     }
     this.controller?.abort();
@@ -173,6 +233,7 @@ export class AssistantStore {
     }
     const controller = new AbortController();
     this.controller = controller;
+    const chatId = this.activeId() ?? crypto.randomUUID();
     const messages: ChatMessage[] = [...this.messages(), { role: 'user', content }];
     const history: ChatMessage[] = [];
     let size = 0;
@@ -181,7 +242,9 @@ export class AssistantStore {
       history.unshift(message);
       size += message.content.length;
     }
-    this.messages.set(messages);
+    this.writeChat(chatId, messages);
+    this.activeId.set(chatId);
+    this.pin(chatId);
     this.draft.set('');
     this.error.set('');
     this.busy.set(true);
@@ -193,13 +256,10 @@ export class AssistantStore {
         controller.signal,
       );
       if (this.controller === controller)
-        this.messages.update((items) => [
-          ...items.slice(-99),
-          { role: 'assistant', content: result.content },
-        ]);
+        this.writeChat(chatId, [...messages, { role: 'assistant', content: result.content }]);
     } catch (error) {
       if (this.controller === controller && !controller.signal.aborted) {
-        this.messages.update((items) => items.slice(0, -1));
+        this.removeLastMessage(chatId);
         this.draft.set(content);
         this.error.set(error instanceof Error ? error.message : 'Could not send your message.');
       }
@@ -208,6 +268,75 @@ export class AssistantStore {
         this.controller = undefined;
         this.busy.set(false);
       }
+    }
+  }
+
+  /** Replaces a chat's messages (creating it if new) and moves it to the top of the list. */
+  private writeChat(id: string, messages: ChatMessage[]): void {
+    const kept = messages.slice(-MAX_MESSAGES);
+    this.chats.update((items) => {
+      const current = items.find((c) => c.id === id);
+      const title = current?.title || titleFrom(kept.find((m) => m.role === 'user')?.content ?? '');
+      const chat: AssistantChat = {
+        id,
+        title: title || 'New chat',
+        messages: kept,
+        updatedAt: Date.now(),
+      };
+      return [chat, ...items.filter((c) => c.id !== id)].slice(0, MAX_CHATS);
+    });
+    this.saveChats();
+  }
+
+  /** Drops the last message; an emptied chat is removed so it does not linger in the history. */
+  private removeLastMessage(id: string): void {
+    const chat = this.chats().find((c) => c.id === id);
+    if (!chat) return;
+    const messages = chat.messages.slice(0, -1);
+    if (!messages.length) {
+      this.chats.update((items) => items.filter((c) => c.id !== id));
+      if (this.activeId() === id) this.activeId.set(null);
+      this.saveChats();
+    } else {
+      this.chats.update((items) => items.map((c) => (c.id === id ? { ...c, messages } : c)));
+      this.saveChats();
+    }
+  }
+
+  private storageKey: string | null = null;
+
+  private loadChats(user: string | undefined, slug: string | null | undefined): void {
+    this.storageKey = user && slug ? `trama.assistant.chats.${user}.${slug}` : null;
+    let chats: AssistantChat[] = [];
+    if (this.storageKey) {
+      try {
+        const parsed: unknown = JSON.parse(localStorage.getItem(this.storageKey) ?? '[]');
+        if (Array.isArray(parsed))
+          chats = parsed
+            .filter(
+              (c): c is AssistantChat =>
+                !!c &&
+                typeof c.id === 'string' &&
+                typeof c.title === 'string' &&
+                typeof c.updatedAt === 'number' &&
+                Array.isArray(c.messages) &&
+                c.messages.length > 0 &&
+                c.messages.every(isMessage),
+            )
+            .slice(0, MAX_CHATS);
+      } catch {
+        chats = [];
+      }
+    }
+    this.chats.set(chats);
+  }
+
+  private saveChats(): void {
+    if (!this.storageKey) return;
+    try {
+      localStorage.setItem(this.storageKey, JSON.stringify(this.chats()));
+    } catch {
+      // Storage can be full or blocked; the chat still works for this session.
     }
   }
 }

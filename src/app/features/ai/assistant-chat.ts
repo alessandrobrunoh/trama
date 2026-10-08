@@ -1,0 +1,249 @@
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  effect,
+  inject,
+  input,
+  output,
+  viewChild,
+} from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
+import { LucideArrowUp, LucideDynamicIcon, LucideFileText, LucideSquare } from '@lucide/angular';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { AssistantStore } from '../../core/ai/assistant.store';
+
+/** Compact relative time: now, 5m, 3h, 2d, 4mo. */
+export function timeAgo(time: number): string {
+  const minutes = Math.max(0, Math.round((Date.now() - time) / 60000));
+  if (minutes < 1) return 'now';
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours}h`;
+  const days = Math.round(hours / 24);
+  return days < 30 ? `${days}d` : `${Math.round(days / 30)}mo`;
+}
+
+/**
+ * Conversation + composer shared by the floating popup and the full-page assistant.
+ * `page` centres the composer on an empty chat and lists recent chats beneath it.
+ */
+@Component({
+  selector: 'app-assistant-chat',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports],
+  host: { class: 'flex min-h-0 flex-1 flex-col' },
+  template: `
+    @if (ai.messages().length || !page()) {
+      <div
+        #conversation
+        class="min-h-0 flex-1 overflow-y-auto"
+        role="log"
+        aria-label="Conversation"
+        aria-live="polite"
+        aria-relevant="additions text"
+      >
+        <div class="mx-auto w-full space-y-5 px-4 py-4" [class.max-w-3xl]="page()">
+          @if (!ai.messages().length) {
+            <div class="flex min-h-40 flex-col justify-center gap-2 py-4">
+              <h3 class="text-sm font-medium">A little help with your work</h3>
+              <p class="text-muted-foreground text-sm leading-relaxed">
+                Ask a question, improve a draft, or summarize the item you have open.
+              </p>
+              @if (ai.ready()) {
+                <div class="mt-2 flex flex-col gap-2">
+                  @for (prompt of prompts; track prompt) {
+                    <button
+                      type="button"
+                      class="hover:bg-accent rounded-md border px-3 py-2 text-left text-xs"
+                      (click)="ai.draft.set(prompt); focusComposer()"
+                    >
+                      {{ prompt }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          }
+          @for (message of ai.messages(); track $index) {
+            <article [class]="message.role === 'user' ? 'bg-muted ml-8 rounded-md p-3' : 'pr-2'">
+              <div class="text-muted-foreground mb-1 text-[11px] font-medium">
+                {{ message.role === 'user' ? 'You' : 'Trama' }}
+              </div>
+              <p class="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                {{ message.content }}
+              </p>
+            </article>
+          }
+          @if (ai.busy()) {
+            <p class="text-muted-foreground text-xs" role="status">Thinking…</p>
+          }
+        </div>
+      </div>
+    } @else {
+      <div class="min-h-0 flex-1" aria-hidden="true"></div>
+    }
+
+    <div class="mx-auto w-full px-3 pb-3" [class.max-w-3xl]="page()">
+      @if (ai.error() || ai.statusError()) {
+        <p class="text-destructive mb-2 text-xs" role="alert">
+          {{ ai.error() || ai.statusError() }}
+        </p>
+      }
+      @if (ai.loadingStatus()) {
+        <p class="text-muted-foreground mb-2 text-xs" role="status">Checking AI connection…</p>
+      } @else if (!ai.ready()) {
+        <p class="text-muted-foreground mb-2 text-xs">
+          AI is not available yet.
+          <a
+            [routerLink]="['/', ai.slug(), 'settings', 'ai']"
+            class="underline"
+            (click)="navigated.emit()"
+            >Open AI settings</a
+          >
+        </p>
+      }
+      <form
+        (submit)="send($event)"
+        class="border-input dark:bg-secondary focus-within:border-ring focus-within:ring-ring/50 rounded-md border p-2 transition-colors focus-within:ring-2"
+      >
+        <textarea
+          #composer
+          aria-label="Message Trama assistant"
+          aria-describedby="assistant-context-hint"
+          [rows]="page() ? 3 : 2"
+          maxlength="8000"
+          class="placeholder:text-muted-foreground w-full resize-none bg-transparent px-1 text-sm outline-none"
+          placeholder="Ask Trama…"
+          name="message"
+          [ngModel]="ai.draft()"
+          (ngModelChange)="ai.draft.set($event)"
+          [disabled]="!ai.ready() || ai.busy()"
+          (keydown)="onComposerKey($event)"
+        ></textarea>
+        <div class="flex items-center justify-between gap-2">
+          <button
+            type="button"
+            class="text-muted-foreground hover:bg-accent hover:text-foreground inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs"
+            [class.text-foreground]="ai.shareContext()"
+            [attr.aria-pressed]="ai.shareContext()"
+            [attr.aria-label]="'Include ' + ai.context().label + ' in this chat'"
+            (click)="ai.shareContext.set(!ai.shareContext())"
+          >
+            <svg [lucideIcon]="contextIcon" [size]="13" class="shrink-0"></svg>
+            <span class="truncate" [class.line-through]="!ai.shareContext()">{{
+              ai.context().label
+            }}</span>
+          </button>
+          @if (ai.busy()) {
+            <button
+              hlmBtn
+              type="button"
+              size="icon"
+              variant="outline"
+              class="size-7"
+              aria-label="Stop response"
+              (click)="ai.stop()"
+            >
+              <svg [lucideIcon]="stopIcon" [size]="12"></svg>
+            </button>
+          } @else {
+            <button
+              hlmBtn
+              type="submit"
+              size="icon"
+              class="size-7"
+              aria-label="Send message"
+              [disabled]="!ai.ready() || !ai.draft().trim()"
+            >
+              <svg [lucideIcon]="sendIcon" [size]="14"></svg>
+            </button>
+          }
+        </div>
+      </form>
+      <p id="assistant-context-hint" class="text-muted-foreground mt-2 text-center text-[11px]">
+        {{
+          ai.shareContext()
+            ? ai.context().kind === 'page'
+              ? 'Shares the page name and your open issues (titles only).'
+              : 'Shares this item’s details with the AI provider.'
+            : 'No current page data will be added.'
+        }}
+        AI can make mistakes. Review suggestions before using them.
+      </p>
+
+      @if (page() && !ai.messages().length && ai.chats().length) {
+        <ul class="mt-6 divide-y" aria-label="Recent chats">
+          @for (chat of ai.chats(); track chat.id) {
+            <li class="group/chat flex items-center">
+              <button
+                type="button"
+                class="hover:bg-accent/60 flex min-w-0 flex-1 items-center justify-between gap-4 rounded-md px-2 py-2 text-left text-sm"
+                (click)="ai.openChat(chat.id)"
+              >
+                <span class="truncate">{{ chat.title }}</span>
+                <span class="text-muted-foreground shrink-0 text-xs">{{
+                  ago(chat.updatedAt)
+                }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </div>
+    @if (page() && !ai.messages().length) {
+      <div class="flex-[1.5]" aria-hidden="true"></div>
+    }
+  `,
+  styles: `
+    @media (pointer: coarse) {
+      button {
+        min-height: 36px;
+        min-width: 36px;
+      }
+    }
+  `,
+})
+export class AssistantChat {
+  protected readonly ai = inject(AssistantStore);
+  readonly page = input(false);
+  readonly navigated = output<void>();
+  private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
+  private readonly conversation = viewChild<ElementRef<HTMLElement>>('conversation');
+  protected readonly contextIcon = LucideFileText;
+  protected readonly sendIcon = LucideArrowUp;
+  protected readonly stopIcon = LucideSquare;
+  protected readonly prompts = [
+    'Summarize this item',
+    'What information is missing?',
+    'Help me write a clearer description',
+  ];
+
+  constructor() {
+    effect(() => {
+      this.ai.messages();
+      this.ai.busy();
+      const element = this.conversation()?.nativeElement;
+      if (element)
+        queueMicrotask(() => {
+          element.scrollTop = element.scrollHeight;
+        });
+    });
+  }
+
+  focusComposer(): void {
+    this.composer()?.nativeElement.focus();
+  }
+
+  protected send(event: Event): void {
+    event.preventDefault();
+    void this.ai.send();
+  }
+
+  protected onComposerKey(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) this.send(event);
+  }
+
+  protected readonly ago = timeAgo;
+}

@@ -2,248 +2,186 @@ import {
   ChangeDetectionStrategy,
   Component,
   DestroyRef,
-  ElementRef,
+  computed,
   effect,
+  signal,
   inject,
   viewChild,
 } from '@angular/core';
 import { DOCUMENT } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
-  LucideArrowUp,
   LucideDynamicIcon,
+  LucideHistory,
   LucideMaximize2,
   LucideMessageSquare,
-  LucideMinimize2,
-  LucidePlus,
-  LucideSquare,
+  LucideMinus,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../core/ai/assistant.store';
+import { AssistantChat, timeAgo } from './assistant-chat';
 
+/**
+ * Floating assistant: a popup anchored to a thin dock at the bottom right. The dock lists the
+ * latest chats, so a conversation can be resumed in one click; the full list lives on the
+ * assistant page.
+ */
 @Component({
   selector: 'app-assistant-overlay',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports],
+  imports: [RouterLink, LucideDynamicIcon, HlmButtonImports, AssistantChat],
   template: `
-    @if (ai.open()) {
+    @if (ai.open() && !ai.onAssistantPage()) {
       <section
         id="nabla-assistant"
         role="dialog"
         aria-modal="false"
         aria-labelledby="assistant-title"
-        class="assistant-panel bg-popover text-popover-foreground fixed z-40 flex flex-col overflow-hidden rounded-xl border shadow-xl"
-        [class.expanded]="ai.expanded()"
-        (keydown.escape)="close($event)"
+        class="assistant-panel bg-popover text-popover-foreground fixed z-40 flex flex-col overflow-hidden rounded-lg border shadow-lg"
+        (keydown.escape)="minimize($event)"
       >
-        <header class="flex h-12 shrink-0 items-center gap-2 border-b px-3">
-          <svg [lucideIcon]="chatIcon" [size]="16" class="text-muted-foreground"></svg>
-          <h2 id="assistant-title" class="flex-1 text-sm font-medium">Trama assistant</h2>
+        <header class="flex h-12 shrink-0 items-center gap-1 border-b px-3">
+          <h2 id="assistant-title" class="min-w-0 flex-1 truncate text-sm font-medium">
+            {{ ai.active()?.title ?? 'New chat' }}
+          </h2>
           <button
             hlmBtn
             variant="ghost"
             size="icon"
-            class="size-7"
-            aria-label="New chat"
-            title="New chat"
-            (click)="ai.newChat(); focusComposer()"
+            class="text-muted-foreground size-7"
+            aria-label="Minimize chat"
+            title="Minimize"
+            (click)="minimize()"
           >
-            <svg [lucideIcon]="plusIcon" [size]="15"></svg>
+            <svg [lucideIcon]="minimizeIcon" [size]="14"></svg>
           </button>
           <button
             hlmBtn
             variant="ghost"
             size="icon"
-            class="size-7"
-            [attr.aria-label]="ai.expanded() ? 'Shrink chat' : 'Expand chat'"
-            [attr.aria-pressed]="ai.expanded()"
-            (click)="ai.expanded.set(!ai.expanded())"
+            class="text-muted-foreground size-7"
+            aria-label="Open full page"
+            title="Open full page"
+            (click)="expand()"
           >
-            <svg [lucideIcon]="ai.expanded() ? shrinkIcon : expandIcon" [size]="15"></svg>
+            <svg [lucideIcon]="expandIcon" [size]="14"></svg>
           </button>
           <button
             hlmBtn
             variant="ghost"
             size="icon"
-            class="size-7"
+            class="text-muted-foreground size-7"
             aria-label="Close chat"
-            (click)="close()"
+            title="Close"
+            (click)="closeChat()"
           >
-            <svg [lucideIcon]="closeIcon" [size]="16"></svg>
+            <svg [lucideIcon]="closeIcon" [size]="15"></svg>
           </button>
         </header>
-
-        <div
-          #conversation
-          class="min-h-0 flex-1 space-y-5 overflow-y-auto p-4"
-          role="log"
-          aria-label="Conversation"
-          aria-live="polite"
-          aria-relevant="additions text"
-        >
-          @if (!ai.messages().length) {
-            <div class="flex min-h-48 flex-col justify-center gap-3 py-6">
-              <h3 class="text-base font-medium">A little help with your work</h3>
-              <p class="text-muted-foreground text-sm leading-relaxed">
-                Ask a question, improve a draft, or summarize the item you have open.
-              </p>
-              @if (ai.ready()) {
-                @for (prompt of prompts; track prompt) {
-                  <button
-                    type="button"
-                    class="hover:bg-accent rounded-lg border px-3 py-2 text-left text-xs"
-                    (click)="ai.draft.set(prompt); focusComposer()"
-                  >
-                    {{ prompt }}
-                  </button>
-                }
-              }
-            </div>
-          }
-          @for (message of ai.messages(); track $index) {
-            <article [class]="message.role === 'user' ? 'bg-muted ml-5 rounded-xl p-3' : 'pr-2'">
-              <div class="text-muted-foreground mb-1 text-[11px] font-medium">
-                {{ message.role === 'user' ? 'You' : 'Trama' }}
-              </div>
-              <p class="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                {{ message.content }}
-              </p>
-            </article>
-          }
-          @if (ai.busy()) {
-            <p class="text-muted-foreground text-xs" role="status">Thinking…</p>
-          }
-        </div>
-
-        <div class="space-y-2 border-t p-3">
-          @if (ai.error() || ai.statusError()) {
-            <p class="text-destructive text-xs" role="alert">
-              {{ ai.error() || ai.statusError() }}
-            </p>
-          }
-          @if (ai.loadingStatus()) {
-            <p class="text-muted-foreground text-xs" role="status">Checking AI connection…</p>
-          } @else if (!ai.ready()) {
-            <p class="text-muted-foreground text-xs">
-              AI is not available yet.
-              <a
-                [routerLink]="['/', ai.slug(), 'settings', 'ai']"
-                class="underline"
-                (click)="close()"
-                >Open AI settings</a
-              >
-            </p>
-          }
-          <label
-            for="assistant-share-context"
-            class="text-muted-foreground flex items-center gap-2 text-xs"
-          >
-            <input
-              id="assistant-share-context"
-              type="checkbox"
-              [ngModel]="ai.shareContext()"
-              (ngModelChange)="ai.shareContext.set($event)"
-            />
-            <span class="truncate">Include {{ ai.context().label }}</span>
-          </label>
-          <p id="assistant-context-hint" class="text-muted-foreground text-[11px]">
-            {{
-              ai.shareContext()
-                ? ai.context().kind === 'page'
-                  ? 'Shares the page name only.'
-                  : 'Shares this item’s details with the AI provider.'
-                : 'No current page data will be added.'
-            }}
-            Earlier messages remain in this chat.
-          </p>
-          <form (submit)="send($event)" class="bg-muted/50 rounded-lg border p-2">
-            <textarea
-              #composer
-              aria-label="Message Trama assistant"
-              aria-describedby="assistant-context-hint"
-              rows="3"
-              maxlength="8000"
-              class="placeholder:text-muted-foreground w-full resize-none bg-transparent text-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring"
-              placeholder="Ask Trama…"
-              name="message"
-              [ngModel]="ai.draft()"
-              (ngModelChange)="ai.draft.set($event)"
-              [disabled]="!ai.ready() || ai.busy()"
-              (keydown)="onComposerKey($event)"
-            ></textarea>
-            <div class="flex items-center justify-between gap-2">
-              <span class="text-muted-foreground truncate text-[11px]">{{
-                ai.status()?.suggestions?.model ?? 'AI not configured'
-              }}</span>
-              @if (ai.busy()) {
-                <button
-                  hlmBtn
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  class="size-7 rounded-full"
-                  aria-label="Stop response"
-                  (click)="ai.stop()"
-                >
-                  <svg [lucideIcon]="stopIcon" [size]="12"></svg>
-                </button>
-              } @else {
-                <button
-                  hlmBtn
-                  type="submit"
-                  size="icon"
-                  class="size-7 rounded-full"
-                  aria-label="Send message"
-                  [disabled]="!ai.ready() || !ai.draft().trim()"
-                >
-                  <svg [lucideIcon]="sendIcon" [size]="14"></svg>
-                </button>
-              }
-            </div>
-          </form>
-          <p class="text-muted-foreground text-center text-[10px]">
-            AI can make mistakes. Review suggestions before using them.
-          </p>
-        </div>
+        <app-assistant-chat (navigated)="minimize()" />
       </section>
     }
-    <button
-      #launcher
-      hlmBtn
-      variant="outline"
-      id="desktop-assistant-launcher"
-      class="bg-popover fixed right-5 bottom-4 z-40 h-8 gap-2 rounded-full shadow-md max-md:hidden"
-      aria-controls="nabla-assistant"
-      [attr.aria-expanded]="ai.open()"
-      (click)="toggle()"
-    >
-      <svg [lucideIcon]="chatIcon" [size]="14"></svg> Assistant
-    </button>
+
+    @if (!ai.onAssistantPage()) {
+      <div
+        class="bg-popover text-muted-foreground fixed right-4 bottom-4 z-30 flex h-8 items-center gap-0.5 rounded-md border px-1 text-xs shadow-md max-md:hidden"
+      >
+        @for (chat of dockChats(); track chat.id) {
+          <button
+            type="button"
+            class="hover:bg-accent hover:text-foreground h-6 max-w-44 truncate rounded px-2"
+            [class.bg-accent]="ai.open() && ai.activeId() === chat.id"
+            [class.text-foreground]="ai.open() && ai.activeId() === chat.id"
+            [attr.aria-label]="'Open chat: ' + chat.title"
+            (click)="resume(chat.id)"
+          >
+            <span class="truncate">{{ chat.title }}</span>
+          </button>
+        }
+        <button
+          #launcher
+          type="button"
+          id="desktop-assistant-launcher"
+          class="hover:bg-accent text-foreground inline-flex h-6 items-center gap-1.5 rounded px-2"
+          [class.bg-accent]="ai.open() && !activeInDock()"
+          aria-controls="nabla-assistant"
+          [attr.aria-expanded]="ai.open()"
+          (click)="toggle()"
+        >
+          <svg [lucideIcon]="chatIcon" [size]="14"></svg> Assistant
+        </button>
+        <button
+          type="button"
+          class="hover:bg-accent hover:text-foreground inline-flex size-6 items-center justify-center rounded"
+          [class.bg-accent]="historyOpen()"
+          aria-label="Chat history"
+          title="Chat history"
+          aria-haspopup="true"
+          [attr.aria-expanded]="historyOpen()"
+          (click)="historyOpen.set(!historyOpen())"
+        >
+          <svg [lucideIcon]="historyIcon" [size]="14"></svg>
+        </button>
+      </div>
+
+      @if (historyOpen()) {
+        <div class="fixed inset-0 z-40" aria-hidden="true" (click)="historyOpen.set(false)"></div>
+        <div
+          role="menu"
+          aria-label="Chat history"
+          class="bg-popover text-popover-foreground fixed right-4 bottom-16 z-50 w-96 max-w-[calc(100vw-2rem)] rounded-lg border p-1 shadow-md"
+          (keydown.escape)="historyOpen.set(false)"
+        >
+          <div class="text-muted-foreground px-3 py-2 text-xs">Chat history</div>
+          @for (chat of ai.chats(); track chat.id) {
+            <button
+              type="button"
+              role="menuitem"
+              class="hover:bg-accent flex w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm"
+              (click)="openFromHistory(chat.id)"
+            >
+              <span
+                class="size-1.5 shrink-0 rounded-full"
+                [class.bg-primary]="ai.activeId() === chat.id"
+                aria-hidden="true"
+              ></span>
+              <span class="min-w-0 flex-1 truncate">{{ chat.title }}</span>
+              <span class="text-muted-foreground shrink-0 text-xs">{{ ago(chat.updatedAt) }}</span>
+            </button>
+          } @empty {
+            <p class="text-muted-foreground px-3 py-3 text-sm">No chats yet.</p>
+          }
+          <a
+            [routerLink]="['/', ai.slug(), 'assistant']"
+            class="text-muted-foreground hover:bg-accent hover:text-foreground mt-1 block rounded-md border-t px-3 py-2 text-xs"
+            (click)="historyOpen.set(false); ai.open.set(false)"
+            >Open full page</a
+          >
+        </div>
+      }
+    }
   `,
   styles: `
     .assistant-panel {
       right: 1rem;
-      bottom: 3.75rem;
-      width: min(440px, calc(100vw - 2rem));
-      height: min(640px, calc(100dvh - 5rem));
-    }
-    .assistant-panel.expanded {
-      width: min(760px, calc(100vw - 2rem));
-      height: calc(100dvh - 5rem);
+      bottom: 4rem;
+      width: min(400px, calc(100vw - 2rem));
+      height: min(600px, calc(100dvh - 5rem));
     }
     @media (pointer: coarse) {
-      button {
+      button,
+      a {
         min-height: 36px;
         min-width: 36px;
       }
     }
-    @media (max-width: 600px) {
+    @media (max-width: 767px) {
       .assistant-panel {
         right: 0.5rem;
+        bottom: 4.5rem;
         width: calc(100vw - 1rem);
-        height: calc(100dvh - 5rem);
+        height: calc(100dvh - 7rem);
       }
     }
   `,
@@ -251,43 +189,56 @@ import { AssistantStore } from '../../core/ai/assistant.store';
 export class AssistantOverlay {
   protected readonly ai = inject(AssistantStore);
   private readonly document = inject(DOCUMENT);
-  private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
-  private readonly launcher = viewChild<ElementRef<HTMLButtonElement>>('launcher');
-  private readonly conversation = viewChild<ElementRef<HTMLElement>>('conversation');
+  private readonly router = inject(Router);
+  private readonly launcher = viewChild<{ nativeElement: HTMLButtonElement }>('launcher');
+  private readonly chat = viewChild(AssistantChat);
   protected readonly chatIcon = LucideMessageSquare;
-  protected readonly plusIcon = LucidePlus;
+  protected readonly historyIcon = LucideHistory;
+  protected readonly minimizeIcon = LucideMinus;
   protected readonly expandIcon = LucideMaximize2;
-  protected readonly shrinkIcon = LucideMinimize2;
   protected readonly closeIcon = LucideX;
-  protected readonly sendIcon = LucideArrowUp;
-  protected readonly stopIcon = LucideSquare;
-  protected readonly prompts = [
-    'Summarize this item',
-    'What information is missing?',
-    'Help me write a clearer description',
-  ];
+  protected readonly historyOpen = signal(false);
+  protected readonly ago = timeAgo;
+  protected readonly dockChats = computed(() => {
+    const chats = this.ai.chats();
+    return this.ai
+      .dock()
+      .map((id) => chats.find((c) => c.id === id))
+      .filter((c) => !!c);
+  });
+  protected readonly activeInDock = computed(() =>
+    this.dockChats().some((c) => c.id === this.ai.activeId()),
+  );
 
   constructor() {
     inject(DestroyRef).onDestroy(() => this.ai.stop());
     effect(() => {
-      this.ai.messages();
-      this.ai.busy();
-      const element = this.conversation()?.nativeElement;
-      if (element)
-        queueMicrotask(() => {
-          element.scrollTop = element.scrollHeight;
-        });
-    });
-    effect(() => {
-      if (this.ai.open() && this.composer()) queueMicrotask(() => this.focusComposer());
+      if (this.ai.open() && this.chat()) queueMicrotask(() => this.chat()?.focusComposer());
     });
   }
 
   protected toggle(): void {
-    if (this.ai.open()) this.close();
+    if (this.ai.open()) this.minimize();
     else this.ai.open.set(true);
   }
-  protected close(event?: Event): void {
+
+  protected openFromHistory(id: string): void {
+    this.historyOpen.set(false);
+    this.ai.openChat(id);
+    this.ai.open.set(true);
+  }
+
+  protected resume(id: string): void {
+    if (this.ai.open() && this.ai.activeId() === id) {
+      this.minimize();
+      return;
+    }
+    this.ai.openChat(id);
+    this.ai.open.set(true);
+  }
+
+  /** Hides the popup; the chat stays selected and in the dock. */
+  protected minimize(event?: Event): void {
     event?.stopPropagation();
     this.ai.open.set(false);
     const mobileLauncher = this.document.getElementById('mobile-assistant-launcher');
@@ -297,14 +248,18 @@ export class AssistantOverlay {
       this.launcher()?.nativeElement.focus();
     }
   }
-  protected focusComposer(): void {
-    this.composer()?.nativeElement.focus();
+
+  /** Closes the popup and removes the chat's chip; the chat stays in the history. */
+  protected closeChat(): void {
+    const id = this.ai.activeId();
+    this.ai.newChat();
+    if (id) this.ai.unpin(id);
+    this.ai.open.set(false);
+    this.historyOpen.set(false);
   }
-  protected send(event: Event): void {
-    event.preventDefault();
-    void this.ai.send();
-  }
-  protected onComposerKey(event: KeyboardEvent): void {
-    if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) this.send(event);
+
+  protected expand(): void {
+    this.ai.open.set(false);
+    void this.router.navigate(['/', this.ai.slug(), 'assistant']);
   }
 }

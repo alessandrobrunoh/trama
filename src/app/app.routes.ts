@@ -53,6 +53,12 @@ export const routes: Routes = [
         loadComponent: () => import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
       {
+        path: 'assistant',
+        title: 'Assistant · Trama',
+        loadComponent: () =>
+          import('./features/ai/assistant-page').then((m) => m.AssistantPage),
+      },
+      {
         path: 'stats',
         title: 'Statistics · Trama',
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
