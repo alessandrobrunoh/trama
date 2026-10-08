@@ -1,0 +1,13 @@
+# Allow-list for the web image (the API and MCP server have their own contexts).
+*
+!package.json
+!package-lock.json
+!angular.json
+!tsconfig.json
+!tsconfig.app.json
+!ngsw-config.json
+!.postcssrc.json
+!public
+!src
+!docker
+src/**/*.spec.ts
