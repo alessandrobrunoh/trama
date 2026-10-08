@@ -50,13 +50,14 @@ import {
   LucideWorkflow,
   type LucideIcon,
 } from '@lucide/angular';
-import { BrnCommand } from '@spartan-ng/brain/command';
+import { BrnCommand, BrnCommandInput } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import type { ArtifactKind, IssueStatus, WorkstreamStatus } from '../../core/contracts/domain';
 import { ISSUE_STATUSES, ISSUE_STATUS_META, WORKSTREAM_STATUSES, WORKSTREAM_STATUS_META } from '../../core/meta';
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
+import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
@@ -186,7 +187,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
 @Component({
   selector: 'app-command-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmCommandImports, LucideDynamicIcon, NgTemplateOutlet, StatusIcon, ArtifactIcon, ActorAvatar, ProviderIcon, Kbd],
+  imports: [HlmCommandImports, LucideDynamicIcon, NgTemplateOutlet, StatusIcon, ArtifactIcon, ActorAvatar, ProviderIcon, Kbd, BrnCommandInput],
   host: { class: 'block', '(keydown)': 'onKeydown($event)' },
   template: `
     <ng-template #glyph let-h>
@@ -214,9 +215,30 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
     </ng-template>
 
     <hlm-command class="h-[min(34rem,76svh)]" [filter]="filter" [(search)]="query">
-      <hlm-command-input [placeholder]="placeholder()" />
+      <div class="flex shrink-0 items-center gap-3 px-4 pt-3.5 pb-2.5">
+        <input
+          brnCommandInput
+          data-slot="command-input"
+          class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-hidden"
+          [placeholder]="placeholder()"
+          [attr.aria-label]="placeholder()"
+          (keydown.meta.enter)="askAssistant($event)"
+          (keydown.control.enter)="askAssistant($event)"
+        />
+        @if (canAsk()) {
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-2 text-[13px] max-sm:hidden"
+            (mousedown)="$event.preventDefault()"
+            (click)="askAssistant()"
+          >
+            Ask Trama <app-kbd keys="mod+enter" />
+          </button>
+        }
+      </div>
 
-      <div class="scrollbar-none flex shrink-0 items-center gap-1 overflow-x-auto px-2 pt-2 pb-1" role="tablist" aria-label="Search scope">
+      @if (showScopes()) {
+      <div class="scrollbar-none flex shrink-0 items-center gap-1 overflow-x-auto px-3 pb-1.5" role="tablist" aria-label="Search scope">
         @if (page() === 'status' && context(); as ctx) {
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1 rounded-md border px-2 text-xs" (click)="backToRoot()">
             <span class="font-mono">{{ ctx.key }}</span>
@@ -237,6 +259,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
           }
         }
       </div>
+      }
 
       <div *hlmCommandEmptyState hlmCommandEmpty>
         @if (loading()) {
@@ -248,7 +271,9 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
         }
       </div>
 
-      <hlm-command-list class="max-h-none flex-1">
+      <hlm-command-list
+        class="max-h-none flex-1 px-1 pb-1 [&_[data-slot=command-group-label]]:px-3 [&_[data-slot=command-group-label]]:pt-3 [&_[data-slot=command-group-label]]:pb-1.5 [&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-item]]:gap-3 [&_[data-slot=command-item]]:px-3 [&_[data-slot=command-item]]:text-sm"
+      >
         @if (page() === 'status') {
           <hlm-command-group>
             <hlm-command-group-label>Status</hlm-command-group-label>
@@ -287,9 +312,6 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
               <hlm-command-group-label>
                 <span class="flex items-center justify-between">
                   <span>{{ g.label }}</span>
-                  @if (g.id !== 'recent') {
-                    <span class="tabular-nums opacity-70">{{ g.items.length }}</span>
-                  }
                 </span>
               </hlm-command-group-label>
               @for (h of g.items; track h.type + h.id) {
@@ -320,7 +342,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
                   <svg [lucideIcon]="c.icon" [size]="14" class="text-muted-foreground shrink-0"></svg>
                   <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
                   @if (c.keys) {
-                    <hlm-command-shortcut><app-kbd [keys]="c.keys" /></hlm-command-shortcut>
+                    <hlm-command-shortcut><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)" /></hlm-command-shortcut>
                   }
                 </button>
               }
@@ -332,7 +354,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
                   <svg [lucideIcon]="c.icon" [size]="14" class="text-muted-foreground shrink-0"></svg>
                   <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
                   @if (c.keys) {
-                    <hlm-command-shortcut><app-kbd [keys]="c.keys" /></hlm-command-shortcut>
+                    <hlm-command-shortcut><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)" /></hlm-command-shortcut>
                   }
                 </button>
               }
@@ -375,6 +397,7 @@ export class CommandPanel {
   private readonly recents = inject(RecentItems);
   private readonly clipboard = inject(Clipboard);
   private readonly ai = inject(AiActions);
+  private readonly assistant = inject(AssistantStore);
   private readonly branches = inject(BranchNames);
   private readonly document = inject(DOCUMENT);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -402,6 +425,13 @@ export class CommandPanel {
     return this.mode() === 'palette' ? 'Type a command or search…' : 'Search workstreams, issues, decisions…';
   });
   protected readonly isSearching = computed(() => this.query().trim().length > 0);
+  /** The scope chips stay out of the way until you search or narrow the scope (the `/` dialog always shows them). */
+  protected readonly showScopes = computed(
+    () => this.mode() === 'search' || this.page() !== 'root' || this.isSearching() || this.scope() !== 'all',
+  );
+  protected readonly canAsk = computed(
+    () => this.mode() === 'palette' && this.page() === 'root' && this.assistant.ready(),
+  );
 
   // ─────────────────────────── results ───────────────────────────
 
@@ -746,6 +776,23 @@ export class CommandPanel {
   protected setScope(s: Scope): void {
     this.scope.set(s);
     this.focusInput();
+  }
+
+  /** "a then b" keys are a chord, "mod+k" is one combination. */
+  protected isChord(keys: string): boolean {
+    return /\s/.test(keys) && !keys.includes('+');
+  }
+
+  /** Opens the assistant with what you typed as the draft (nothing is sent until you press send). */
+  protected askAssistant(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+    if (!this.canAsk()) return;
+    const text = this.query().trim();
+    if (!this.assistant.busy()) this.assistant.newChat();
+    if (text) this.assistant.draft.set(text);
+    this.assistant.open.set(true);
+    this.ui.closeModal();
   }
 
   protected onKeydown(e: KeyboardEvent): void {
