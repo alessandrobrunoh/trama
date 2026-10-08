@@ -52,6 +52,7 @@ import {
   LucideUsers,
   LucideWorkflow,
   type LucideIcon,
+  LucideBox,
 } from '@lucide/angular';
 import { BrnCommand, BrnCommandInput } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
@@ -117,12 +118,13 @@ interface Visual {
 }
 
 /** Palette scopes (chips). `all` mixes everything plus Go to / Actions. */
-type Scope = 'all' | 'issue' | 'workstream' | 'decision' | 'repository' | 'person' | 'team';
+type Scope = 'all' | 'issue' | 'workstream' | 'project' | 'decision' | 'repository' | 'person' | 'team';
 
 const SCOPES: { id: Scope; label: string; placeholder: string }[] = [
   { id: 'all', label: 'All', placeholder: '' },
   { id: 'issue', label: 'Issues', placeholder: 'Search issues…' },
   { id: 'workstream', label: 'Workstreams', placeholder: 'Search workstreams…' },
+  { id: 'project', label: 'Projects', placeholder: 'Search projects…' },
   { id: 'decision', label: 'Decisions', placeholder: 'Search decisions…' },
   { id: 'repository', label: 'Repositories', placeholder: 'Search repositories…' },
   { id: 'person', label: 'People', placeholder: 'Search people…' },
@@ -138,6 +140,8 @@ const PREFIXES: Record<string, Scope> = {
   ws: 'workstream',
   workstream: 'workstream',
   workstreams: 'workstream',
+  project: 'project',
+  projects: 'project',
   decision: 'decision',
   decisions: 'decision',
   adr: 'decision',
@@ -151,6 +155,7 @@ const PREFIXES: Record<string, Scope> = {
 
 const HIT_ICON: Record<ItemType, LucideIcon> = {
   workstream: LucideWorkflow,
+  project: LucideBox,
   decision: LucideScale,
   issue: LucideInbox,
   artifact: LucideGitPullRequest,
@@ -481,6 +486,8 @@ export class CommandPanel {
           .sort(byUpdated)
           .slice(0, 50)
           .map((w) => ({ type: 'workstream', id: w.id, key: w.key, title: w.title }));
+      case 'project':
+        return [...s.projects()].sort((a, b) => a.name.localeCompare(b.name)).map((p) => ({ type: 'project', id: p.id, title: p.name, subtitle: p.summary }));
       case 'decision':
         return [...s.decisions()]
           .sort(byUpdated)

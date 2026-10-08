@@ -109,7 +109,7 @@ export interface NotificationList {
 }
 
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
-export const FAVORITE_TYPES = ['issue', 'workstream', 'decision', 'team', 'repository', 'view'] as const;
+export const FAVORITE_TYPES = ['issue', 'workstream', 'project', 'decision', 'team', 'repository', 'view'] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
 /** Most favorites one person can keep in a workspace. */
 export const MAX_FAVORITES = 100;
@@ -120,7 +120,7 @@ export interface Favorite {
   id: ID;
   workspaceId: ID;
   type: FavoriteType;
-  /** Id (not key) of the issue, workstream, decision, team, repository or view. */
+  /** Id (not key) of the issue, workstream, project, decision, team, repository or view. */
   subjectId: ID;
   createdAt: ISODate;
 }

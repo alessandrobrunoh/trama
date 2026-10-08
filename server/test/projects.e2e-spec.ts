@@ -86,4 +86,19 @@ describe('projects', () => {
     await c.delete(`${base()}/projects/${p.id}`).expect(204);
     expect((await c.get(`${base()}/workstreams/${inherited.id}`).expect(200)).body.projectId).toBeUndefined();
   });
+  it('projects are searchable, favoritable and commentable', async () => {
+    const p = (await c.post(`${base()}/projects`, { name: 'Zebra rollout', summary: 'Quagga migration' }).expect(201)).body;
+
+    const byName = (await c.get(`${base()}/search?q=zebra`).expect(200)).body.results as { type: string; id: string; title: string }[];
+    expect(byName.find((r) => r.id === p.id)).toMatchObject({ type: 'project', title: 'Zebra rollout' });
+    const bySummary = (await c.get(`${base()}/search?q=quagga&types=project`).expect(200)).body.results as { id: string }[];
+    expect(bySummary.map((r) => r.id)).toEqual([p.id]);
+
+    const fav = (await c.post(`${base()}/favorites`, { type: 'project', subjectId: p.id }).expect(201)).body;
+    expect(fav).toMatchObject({ type: 'project', subjectId: p.id });
+    await c.post(`${base()}/favorites`, { type: 'project', subjectId: 'pj_missing' }).expect(404);
+
+    await c.post(`${base()}/comments`, { subject: { type: 'project', id: p.id }, body: 'Looks good' }).expect(201);
+    expect((await c.get(`${base()}/comments?subjectType=project&subjectId=${p.id}`).expect(200)).body).toHaveLength(1);
+  });
 });

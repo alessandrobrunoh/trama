@@ -16,7 +16,13 @@ import {
   LucideLock,
   LucideScale,
   LucideUsers,
+  LucideBookOpen,
   LucideCircleHelp,
+  LucideExternalLink,
+  LucideKeyboard,
+  LucideKeyRound,
+  LucideMap,
+  LucidePlug,
   LucideDynamicIcon,
   LucideLogOut,
   LucideMonitor,
@@ -44,6 +50,7 @@ import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
+import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
 /**
@@ -100,13 +107,8 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
           align="start"
           aria-label="Switch workspace"
         >
-          <span
-            class="bg-primary text-primary-foreground flex size-5 shrink-0 items-center justify-center rounded-[5px] text-[11px] font-semibold"
-            [style.background]="wsColor()"
-            [style.color]="wsColor() ? '#fff' : null"
-            aria-hidden="true"
-            >{{ wsInitial() }}</span
-          >
+          <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 shrink-0 dark:hidden" />
+          <img src="/icons/trama-symbol-white.svg" alt="" class="hidden size-5 shrink-0 dark:block" />
           <span class="min-w-0 truncate text-[13px] font-semibold">{{ wsName() }}</span>
           <svg [lucideIcon]="chevronDown" [size]="13" class="text-muted-foreground shrink-0"></svg>
         </button>
@@ -168,6 +170,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
                       @case ('team') {
                         <span class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white" [style.background]="e.color" aria-hidden="true">{{ e.label.slice(0, 1) }}</span>
                       }
+                      @case ('project') { <svg [lucideIcon]="projectIcon" [size]="14" class="shrink-0" [style.color]="e.color"></svg> }
                       @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
                       @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
                     }
@@ -368,10 +371,10 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
       <button
         type="button"
         class="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
-        hlmTooltip="Keyboard shortcuts  ?"
-        position="top"
-        aria-label="Keyboard shortcuts"
-        (click)="ui.openModal('shortcuts')"
+        [hlmDropdownMenuTrigger]="helpMenu"
+        align="start"
+        side="top"
+        aria-label="Help"
       >
         <svg [lucideIcon]="help" [size]="15"></svg>
       </button>
@@ -486,6 +489,63 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
               <span class="flex-1">New team</span>
             </button>
           }
+        </hlm-dropdown-menu-group>
+      </hlm-dropdown-menu>
+    </ng-template>
+
+    <ng-template #helpMenu>
+      <hlm-dropdown-menu class="w-64">
+        <hlm-dropdown-menu-group>
+          <button hlmDropdownMenuItem (triggered)="ui.openModal('shortcuts')">
+            <svg [lucideIcon]="keyboardIcon" [size]="14"></svg>
+            Keyboard shortcuts
+            <hlm-dropdown-menu-shortcut><app-kbd keys="?" /></hlm-dropdown-menu-shortcut>
+          </button>
+          <button hlmDropdownMenuItem (triggered)="ui.openCommandPalette()">
+            <svg [lucideIcon]="search" [size]="14"></svg>
+            Command palette
+            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+k" /></hlm-dropdown-menu-shortcut>
+          </button>
+          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'tokens'])">
+            <svg [lucideIcon]="keyIcon" [size]="14"></svg>
+            API tokens &amp; MCP
+          </button>
+          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'integrations'])">
+            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
+            Integrations
+          </button>
+          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'profile'])">
+            <svg [lucideIcon]="settings" [size]="14"></svg>
+            Settings
+            <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
+          </button>
+        </hlm-dropdown-menu-group>
+        <hlm-dropdown-menu-separator />
+        <hlm-dropdown-menu-group>
+          <button hlmDropdownMenuItem (triggered)="openPublic('/roadmap')">
+            <svg [lucideIcon]="mapIcon" [size]="14"></svg>
+            Roadmap
+            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
+          </button>
+          <button hlmDropdownMenuItem (triggered)="openPublic('/blog')">
+            <svg [lucideIcon]="bookIcon" [size]="14"></svg>
+            Blog
+            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
+          </button>
+        </hlm-dropdown-menu-group>
+        <hlm-dropdown-menu-separator />
+        <hlm-dropdown-menu-label>What's new</hlm-dropdown-menu-label>
+        <hlm-dropdown-menu-group>
+          @for (e of latestChanges; track e.title) {
+            <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
+              <span class="min-w-0 flex-1 truncate">{{ e.title }}</span>
+              <span class="text-muted-foreground shrink-0 text-xs">{{ e.date.slice(5) }}</span>
+            </button>
+          }
+          <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
+            <span class="flex-1">Full changelog</span>
+            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground"></svg>
+          </button>
         </hlm-dropdown-menu-group>
       </hlm-dropdown-menu>
     </ng-template>
@@ -629,6 +689,13 @@ export class AppSidebar {
   protected readonly settings = LucideSettings;
   protected readonly user = LucideUserRound;
   protected readonly help = LucideCircleHelp;
+  protected readonly keyboardIcon = LucideKeyboard;
+  protected readonly keyIcon = LucideKeyRound;
+  protected readonly plugIcon = LucidePlug;
+  protected readonly mapIcon = LucideMap;
+  protected readonly bookIcon = LucideBookOpen;
+  protected readonly externalIcon = LucideExternalLink;
+  protected readonly latestChanges = CHANGELOG.slice(0, 3);
   protected readonly logout = LucideLogOut;
   protected readonly themes: { mode: ThemeMode; label: string; icon: LucideIcon }[] = [
     { mode: 'light', label: 'Light', icon: LucideSun },
@@ -640,8 +707,6 @@ export class AppSidebar {
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
-  protected readonly wsInitial = computed(() => this.store.settings().iconInitial || this.wsName().slice(0, 1).toUpperCase());
-  protected readonly wsColor = computed(() => this.store.settings().iconColor ?? null);
   protected readonly canAdmin = computed(() => this.store.allowed('createTeams'));
   protected readonly meRef = computed(() => {
     const u = this.session.user();
@@ -660,6 +725,10 @@ export class AppSidebar {
     if (kind === 'issues') return this.store.backlogIssueCount();
     if (kind === 'notifications') return this.notifications.unread();
     return 0;
+  }
+
+  protected openPublic(path: string): void {
+    window.open(path, '_blank', 'noopener');
   }
 
   protected go(commands: string[]): void {

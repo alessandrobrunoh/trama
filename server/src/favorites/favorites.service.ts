@@ -6,6 +6,7 @@ import {
   DecisionEntity,
   FavoriteEntity,
   IssueEntity,
+  ProjectEntity,
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
@@ -16,6 +17,7 @@ import { EventsService } from '../events/events.service.js';
 const TABLES: Record<FavoriteType, EntityTarget<{ id: string; workspaceId: string }>> = {
   issue: IssueEntity,
   workstream: WorkstreamEntity,
+  project: ProjectEntity,
   decision: DecisionEntity,
   team: TeamEntity,
   repository: RepositoryEntity,

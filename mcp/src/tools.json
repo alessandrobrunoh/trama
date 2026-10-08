@@ -31,10 +31,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across workstreams, issues, decisions, artifacts, repositories and teams.",
+  "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, repositories and teams.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: workstream,issue,decision,execution,artifact,repository,team",
+   "types": "query string Comma-separated: workstream,project,issue,decision,execution,artifact,repository,team",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -1030,7 +1030,7 @@
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team) Subject type",
+   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team|project) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -1041,7 +1041,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team, id}",
+   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team|project, id}",
    "body": "body string! Comment (markdown)"
   }
  },

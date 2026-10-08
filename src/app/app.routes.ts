@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
 import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/session/guards';
 
@@ -184,6 +185,15 @@ export const routes: Routes = [
       {
         path: 'projects/:id',
         title: 'Project · Trama',
+        // Repositories used to live under /projects: send old links (`rp_…` ids) to /repositories.
+        canActivate: [
+          (route: ActivatedRouteSnapshot) => {
+            const id = route.paramMap.get('id') ?? '';
+            return id.startsWith('rp_')
+              ? inject(Router).createUrlTree(['/', route.paramMap.get('workspaceSlug') ?? '', 'repositories', id])
+              : true;
+          },
+        ],
         loadComponent: () =>
           import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
       },
