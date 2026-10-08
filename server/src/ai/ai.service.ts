@@ -6,8 +6,16 @@ import {
 } from '@nestjs/common';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import { AiProvider, record, type AiTurnMessage } from './ai-provider.js';
-import { AssistantToolsService, type McpSession } from './assistant-tools.service.js';
-import { ActivityLog, type Activity } from './activity.js';
+import {
+  AssistantToolsService,
+  type McpSession,
+} from './assistant-tools.service.js';
+import {
+  ActivityLog,
+  describeToolRunning,
+  type Activity,
+  type ChatSink,
+} from './activity.js';
 import { AiContextService } from './ai-context.service.js';
 import type { ChatDto, SuggestionDto } from './ai.dto.js';
 
@@ -15,7 +23,10 @@ import type { ChatDto, SuggestionDto } from './ai.dto.js';
 const MAX_STEPS = 12;
 const MAX_TOOL_CALLS = 20;
 const MAX_WRITES_PER_REPLY = 10;
-const MAX_WRITES_PER_DAY = Math.max(1, Number(process.env.AI_ASSISTANT_MAX_WRITES_PER_DAY) || 200);
+const MAX_WRITES_PER_DAY = Math.max(
+  1,
+  Number(process.env.AI_ASSISTANT_MAX_WRITES_PER_DAY) || 200,
+);
 const REPLY_DEADLINE_MS = 120_000;
 
 const TOOL_INSTRUCTIONS =
@@ -31,7 +42,10 @@ export class AiService {
     string,
     { count: number; expiresAt: number }
   >();
-  private readonly writesToday = new Map<string, { count: number; day: string }>();
+  private readonly writesToday = new Map<
+    string,
+    { count: number; day: string }
+  >();
 
   constructor(
     private readonly provider: AiProvider,
@@ -59,7 +73,15 @@ export class AiService {
           role: 'system',
           content: `${INSTRUCTIONS} Improve the supplied draft without inventing information.${triageInstruction} Return only a JSON object with title (nonempty string, at most 300 characters), description (string, at most 12000 characters), questions (at most 3 short strings about missing information)${triageSchema}. Preserve existing facts and links. Do not put questions inside the description.`,
         },
-        { role: 'user', content: JSON.stringify({ kind: dto.kind, title: dto.title, description: dto.description, issueOptions }) },
+        {
+          role: 'user',
+          content: JSON.stringify({
+            kind: dto.kind,
+            title: dto.title,
+            description: dto.description,
+            issueOptions,
+          }),
+        },
       ],
       signal,
       userId,
@@ -95,33 +117,76 @@ export class AiService {
         'The AI returned a suggestion in an unexpected format. Try again.',
       );
     }
-    const triage = issueOptions ? this.parseDraftTriage(result?.['triage'], issueOptions) : undefined;
-    return { title: title.trim(), description, questions, ...(triage ? { triage } : {}) };
+    const triage = issueOptions
+      ? this.parseDraftTriage(result?.['triage'], issueOptions)
+      : undefined;
+    return {
+      title: title.trim(),
+      description,
+      questions,
+      ...(triage ? { triage } : {}),
+    };
   }
 
-  private parseDraftTriage(value: unknown, options: NonNullable<SuggestionDto['issueOptions']>) {
+  private parseDraftTriage(
+    value: unknown,
+    options: NonNullable<SuggestionDto['issueOptions']>,
+  ) {
     const raw = record(value);
     if (!raw) return { suggestions: [] };
-    const suggestions: { field: string; value: string | number; label?: string; why: string }[] = [];
-    const addChoice = (field: string, key: string, choices: readonly string[]) => {
+    const suggestions: {
+      field: string;
+      value: string | number;
+      label?: string;
+      why: string;
+    }[] = [];
+    const addChoice = (
+      field: string,
+      key: string,
+      choices: readonly string[],
+    ) => {
       const candidate = record(raw[key]);
       const picked = candidate?.['value'];
       if (typeof picked !== 'string' || !choices.includes(picked)) return;
-      suggestions.push({ field, value: picked, why: this.draftWhy(candidate?.['why']) });
+      suggestions.push({
+        field,
+        value: picked,
+        why: this.draftWhy(candidate?.['why']),
+      });
     };
     addChoice('priority', 'priority', options.priorities);
     addChoice('kind', 'kind', options.kinds);
 
     const estimate = record(raw['estimate']);
     const estimateValue = estimate?.['value'];
-    if (typeof estimateValue === 'number' && options.estimates.includes(estimateValue)) {
-      suggestions.push({ field: 'estimate', value: estimateValue, why: this.draftWhy(estimate?.['why']) });
+    if (
+      typeof estimateValue === 'number' &&
+      options.estimates.includes(estimateValue)
+    ) {
+      suggestions.push({
+        field: 'estimate',
+        value: estimateValue,
+        why: this.draftWhy(estimate?.['why']),
+      });
     }
-    const addNamedChoice = (field: 'teamId' | 'assigneeId', key: 'team' | 'assignee', choices: readonly { id: string; label: string }[]) => {
+    const addNamedChoice = (
+      field: 'teamId' | 'assigneeId',
+      key: 'team' | 'assignee',
+      choices: readonly { id: string; label: string }[],
+    ) => {
       const candidate = record(raw[key]);
       const picked = candidate?.['value'];
-      const choice = typeof picked === 'string' ? choices.find((item) => item.id === picked) : undefined;
-      if (choice) suggestions.push({ field, value: choice.id, label: choice.label, why: this.draftWhy(candidate?.['why']) });
+      const choice =
+        typeof picked === 'string'
+          ? choices.find((item) => item.id === picked)
+          : undefined;
+      if (choice)
+        suggestions.push({
+          field,
+          value: choice.id,
+          label: choice.label,
+          why: this.draftWhy(candidate?.['why']),
+        });
     };
     addNamedChoice('teamId', 'team', options.teams);
     addNamedChoice('assigneeId', 'assignee', options.assignees);
@@ -131,10 +196,18 @@ export class AiService {
       for (const entry of raw['workstreams']) {
         const candidate = record(entry);
         const picked = candidate?.['id'];
-        const choice = typeof picked === 'string' ? options.workstreams.find((item) => item.id === picked) : undefined;
+        const choice =
+          typeof picked === 'string'
+            ? options.workstreams.find((item) => item.id === picked)
+            : undefined;
         if (!choice || seen.has(choice.id)) continue;
         seen.add(choice.id);
-        suggestions.push({ field: 'workstreamId', value: choice.id, label: `${choice.key} · ${choice.title}`, why: this.draftWhy(candidate?.['why']) });
+        suggestions.push({
+          field: 'workstreamId',
+          value: choice.id,
+          label: `${choice.key} · ${choice.title}`,
+          why: this.draftWhy(candidate?.['why']),
+        });
         if (seen.size >= 3) break;
       }
     }
@@ -150,6 +223,7 @@ export class AiService {
     ctx: WorkspaceContext,
     dto: ChatDto,
     signal: AbortSignal,
+    sink?: ChatSink,
   ): Promise<{ content: string; activity?: Activity }> {
     if (
       dto.messages.at(-1)?.role !== 'user' ||
@@ -160,9 +234,12 @@ export class AiService {
         'Send a nonempty message with a shorter conversation history.',
       );
     }
-    const withTools = this.assistantTools.enabled() && (await this.provider.supportsTools(userId));
+    const withTools =
+      this.assistantTools.enabled() &&
+      (await this.provider.supportsTools(userId));
     const context = await this.context.resolve(ctx, dto.context, withTools);
-    if (withTools) return this.chatWithTools(userId, ctx, dto, context, signal);
+    if (withTools)
+      return this.chatWithTools(userId, ctx, dto, context, signal, sink);
     const content = await this.provider.complete(
       [
         { role: 'system', content: INSTRUCTIONS },
@@ -196,74 +273,119 @@ export class AiService {
     dto: ChatDto,
     pageContext: string,
     outer: AbortSignal,
+    sink?: ChatSink,
   ): Promise<{ content: string; activity?: Activity }> {
-    const signal = AbortSignal.any([outer, AbortSignal.timeout(REPLY_DEADLINE_MS)]);
-    return this.assistantTools.withSession(userId, ctx, signal, async (mcp: McpSession) => {
-      const messages: AiTurnMessage[] = [
-        { role: 'system', content: TOOL_INSTRUCTIONS },
-        { role: 'user', content: `Page data (reference only):\n${pageContext}` },
-        ...dto.messages,
-      ];
-      const readOnly = new Set(mcp.tools.filter((t) => t.readOnly).map((t) => t.name));
-      const known = new Set(mcp.tools.map((t) => t.name));
-      const log = new ActivityLog();
-      let calls = 0;
-      let writes = 0;
-
-      const run = async (name: string, rawArgs: string): Promise<string> => {
-        if (!known.has(name)) return `Unknown tool "${name}".`;
-        let args: unknown;
-        try {
-          args = rawArgs.trim() ? JSON.parse(rawArgs) : {};
-        } catch {
-          return 'Invalid arguments: not valid JSON.';
-        }
-        const parsed = record(args);
-        if (!parsed) return 'Invalid arguments: expected a JSON object.';
-        if (++calls > MAX_TOOL_CALLS) return `Tool call limit reached (${MAX_TOOL_CALLS} per reply). Summarize and ask the user how to continue.`;
-        const isWrite = !readOnly.has(name);
-        if (isWrite) {
-          if (writes >= MAX_WRITES_PER_REPLY) return `Change limit reached (${MAX_WRITES_PER_REPLY} per reply). Tell the user what is left and ask whether to continue.`;
-          if (!this.spendWrite(userId)) return `The daily limit of ${MAX_WRITES_PER_DAY} assistant changes is used up. Tell the user to continue tomorrow or make the changes manually.`;
-          writes++;
-        }
-        try {
-          const result = await mcp.call(name, parsed, signal);
-          log.tool(name, isWrite, !result.isError, result.isError ? result.text : undefined);
-          return result.isError ? `Error: ${result.text}` : result.text;
-        } catch (error) {
-          log.tool(name, isWrite, false, 'the tool could not be reached');
-          if (signal.aborted) throw error;
-          return 'Error: the tool could not be reached.';
-        }
-      };
-
-      for (let step = 0; step < MAX_STEPS; step++) {
-        const turn = await this.provider.completeWithTools(messages, mcp.tools, signal, userId);
-        if (!turn.toolCalls.length) return { content: turn.content, activity: log.result() };
-        log.note(turn.content);
-        messages.push({ role: 'assistant', content: turn.content || null, toolCalls: turn.toolCalls });
-        for (const call of turn.toolCalls) {
-          messages.push({ role: 'tool', toolCallId: call.id, content: await run(call.name, call.arguments) });
-        }
-      }
-      // Out of steps: one last turn without tools, with the whole transcript so the summary is grounded.
-      const closing = await this.provider.completeWithTools(
-        [
-          ...messages,
+    const signal = AbortSignal.any([
+      outer,
+      AbortSignal.timeout(REPLY_DEADLINE_MS),
+    ]);
+    return this.assistantTools.withSession(
+      userId,
+      ctx,
+      signal,
+      async (mcp: McpSession) => {
+        const messages: AiTurnMessage[] = [
+          { role: 'system', content: TOOL_INSTRUCTIONS },
           {
-            role: 'system',
-            content:
-              'The tool budget for this reply is used up. Answer the user now in their language, using only what the tool results above show. Say plainly what you found or changed and what is still open. Do not invent placeholders.',
+            role: 'user',
+            content: `Page data (reference only):\n${pageContext}`,
           },
-        ],
-        [],
-        signal,
-        userId,
-      );
-      const summary = closing.content || 'I ran out of steps before finishing. Please ask again, or narrow the request.';
-      return { content: summary, activity: log.result() };
-    });
+          ...dto.messages,
+        ];
+        const readOnly = new Set(
+          mcp.tools.filter((t) => t.readOnly).map((t) => t.name),
+        );
+        const known = new Set(mcp.tools.map((t) => t.name));
+        const log = new ActivityLog(
+          sink && ((index, step) => sink.step(index, step)),
+        );
+        const onText = sink && ((delta: string) => sink.text(delta));
+        let calls = 0;
+        let writes = 0;
+
+        const run = async (name: string, rawArgs: string): Promise<string> => {
+          if (!known.has(name)) return `Unknown tool "${name}".`;
+          let args: unknown;
+          try {
+            args = rawArgs.trim() ? JSON.parse(rawArgs) : {};
+          } catch {
+            return 'Invalid arguments: not valid JSON.';
+          }
+          const parsed = record(args);
+          if (!parsed) return 'Invalid arguments: expected a JSON object.';
+          if (++calls > MAX_TOOL_CALLS)
+            return `Tool call limit reached (${MAX_TOOL_CALLS} per reply). Summarize and ask the user how to continue.`;
+          const isWrite = !readOnly.has(name);
+          sink?.working(describeToolRunning(name));
+          if (isWrite) {
+            if (writes >= MAX_WRITES_PER_REPLY)
+              return `Change limit reached (${MAX_WRITES_PER_REPLY} per reply). Tell the user what is left and ask whether to continue.`;
+            if (!this.spendWrite(userId))
+              return `The daily limit of ${MAX_WRITES_PER_DAY} assistant changes is used up. Tell the user to continue tomorrow or make the changes manually.`;
+            writes++;
+          }
+          try {
+            const result = await mcp.call(name, parsed, signal);
+            log.tool(
+              name,
+              isWrite,
+              !result.isError,
+              result.isError ? result.text : undefined,
+            );
+            return result.isError ? `Error: ${result.text}` : result.text;
+          } catch (error) {
+            log.tool(name, isWrite, false, 'the tool could not be reached');
+            if (signal.aborted) throw error;
+            return 'Error: the tool could not be reached.';
+          }
+        };
+
+        for (let step = 0; step < MAX_STEPS; step++) {
+          const turn = await this.provider.completeWithTools(
+            messages,
+            mcp.tools,
+            signal,
+            userId,
+            onText,
+          );
+          if (!turn.toolCalls.length)
+            return { content: turn.content, activity: log.result() };
+          log.note(turn.content);
+          sink?.textReset();
+          messages.push({
+            role: 'assistant',
+            content: turn.content || null,
+            toolCalls: turn.toolCalls,
+          });
+          for (const call of turn.toolCalls) {
+            messages.push({
+              role: 'tool',
+              toolCallId: call.id,
+              content: await run(call.name, call.arguments),
+            });
+          }
+        }
+        // Out of steps: one last turn without tools, with the whole transcript so the summary is grounded.
+        const closing = await this.provider.completeWithTools(
+          [
+            ...messages,
+            {
+              role: 'system',
+              content:
+                'The tool budget for this reply is used up. Answer the user now in their language, using only what the tool results above show. Say plainly what you found or changed and what is still open. Do not invent placeholders.',
+            },
+          ],
+          [],
+          signal,
+          userId,
+          onText,
+        );
+        const summary =
+          closing.content ||
+          'I ran out of steps before finishing. Please ask again, or narrow the request.';
+        return { content: summary, activity: log.result() };
+      },
+    );
   }
 
   async run<T>(userId: string, action: () => Promise<T>): Promise<T> {
