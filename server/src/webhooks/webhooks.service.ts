@@ -49,7 +49,7 @@ export class WebhooksService {
     try {
       secret = this.secrets.decrypt(conn.webhookSecret, `${conn.id}:webhook`);
     } catch {
-      this.logger.error(`Cannot decrypt the webhook secret of ${conn.id} (NABLA_ENCRYPTION_KEY changed?)`);
+      this.logger.error(`Cannot decrypt the webhook secret of ${conn.id} (TRAMA_ENCRYPTION_KEY changed?)`);
       throw new UnauthorizedException('Webhook secret unavailable');
     }
     const valid =
