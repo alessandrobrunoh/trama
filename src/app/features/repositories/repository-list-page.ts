@@ -48,7 +48,7 @@ const PROVIDERS: PickOption[] = [
         </button>
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New project</span>
+          <span>New project</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
@@ -61,7 +61,7 @@ const PROVIDERS: PickOption[] = [
         <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
         <input
           hlmInput
-          class="h-7 w-full pl-8 text-xs"
+          class="h-10 w-full pl-9 text-sm"
           placeholder="Search projects…"
           aria-label="Search projects"
           [value]="search()"
@@ -105,18 +105,18 @@ const PROVIDERS: PickOption[] = [
             [routerLink]="['/', slug(), 'projects', r.id]"
             [attr.data-row-id]="r.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 outline-none sm:px-6 md:min-h-10 md:flex-nowrap"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
             [class.bg-muted]="ui.focusedRowId() === r.id"
           >
             <span class="flex min-w-0 flex-1 items-center gap-2.5">
-              <app-provider-icon [provider]="r.provider" [size]="15" />
-              <span class="min-w-0 truncate font-mono text-[13px]">
+              <app-provider-icon [provider]="r.provider" [size]="18" />
+              <span class="min-w-0 truncate font-mono text-sm">
                 <span class="text-muted-foreground">{{ row.owner }}/</span><span class="text-foreground font-medium">{{ row.name }}</span>
               </span>
             </span>
-            <span class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:pl-[26px] md:contents">
-              <span class="w-28 truncate font-mono">{{ r.defaultBranch }}</span>
-              <span class="flex w-36 min-w-0 items-center gap-1.5">
+            <span class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[30px] max-md:text-[13px] md:contents">
+              <span class="w-28 truncate font-mono max-md:w-auto">{{ r.defaultBranch }}</span>
+              <span class="flex w-36 min-w-0 items-center gap-1.5 max-md:w-auto">
                 @for (t of row.teams; track t.id) {
                   <span class="flex min-w-0 items-center gap-1" [title]="t.name">
                     <span class="size-2 shrink-0 rounded-full" [style.background]="t.color"></span>
@@ -130,10 +130,10 @@ const PROVIDERS: PickOption[] = [
                   <span class="opacity-60">No team</span>
                 }
               </span>
-              <span class="flex w-24 items-center justify-end gap-1.5 tabular-nums">
+              <span class="flex w-24 items-center justify-end gap-1.5 tabular-nums max-md:w-auto max-md:justify-start">
                 <app-status-icon status="working" entity="workstream" [size]="12" />{{ row.active }}<span class="opacity-60">/ {{ row.total }}</span>
               </span>
-              <span class="w-24 text-right tabular-nums">{{ row.lastActivity ? (row.lastActivity | relativeTime) : '—' }}</span>
+              <span class="w-24 text-right tabular-nums max-md:hidden">{{ row.lastActivity ? (row.lastActivity | relativeTime) : '—' }}</span>
             </span>
           </a>
         }

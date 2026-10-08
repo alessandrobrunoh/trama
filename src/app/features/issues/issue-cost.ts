@@ -16,8 +16,10 @@ export interface IssueCost {
   /** Present when the issue has an estimate. */
   compare?: {
     estimate: number;
-    /** Finished issues with this estimate (not counting this one). */
+    /** Finished issues in the selected comparison group (not counting this one). */
     n: number;
+    /** True when the comparison uses this assignee's history. */
+    personalized: boolean;
     /** Median cycle time of those; undefined below REF_MIN. */
     typicalMs?: number;
     ratio?: number;
@@ -41,6 +43,19 @@ export function finishedCycles(all: readonly Issue[], estimate: number, exceptId
     if (a !== undefined && b !== undefined && b >= a) out.push((b - a) / DAY);
   }
   return out;
+}
+
+/** Prefer the assignee's estimate history once it has enough samples; otherwise use workspace history. */
+export function estimateCycles(all: readonly Issue[], estimate: number, assigneeId?: string, exceptId?: string) {
+  const workspace = finishedCycles(all, estimate, exceptId);
+  const personal = assigneeId
+    ? all
+        .filter((issue) => issue.assigneeId === assigneeId)
+        .flatMap((issue) => finishedCycles([issue], estimate, exceptId))
+    : [];
+  return personal.length >= REF_MIN
+    ? { cycles: personal, personalized: true }
+    : { cycles: workspace, personalized: false };
 }
 
 export function verdictFor(ratio: number, finished: boolean): CostVerdict {
@@ -67,7 +82,7 @@ export function issueCost(issue: Issue, all: readonly Issue[], now: number): Iss
 
   const cost: IssueCost = { state, cycleMs, running };
   if (issue.estimate !== undefined && issue.estimate !== null) {
-    const days = finishedCycles(all, issue.estimate, issue.id);
+    const { cycles: days, personalized } = estimateCycles(all, issue.estimate, issue.assigneeId, issue.id);
     const d = dist(days);
     const typicalMs = d && d.n >= REF_MIN ? d.median * DAY : undefined;
     let ratio: number | undefined;
@@ -77,7 +92,7 @@ export function issueCost(issue: Issue, all: readonly Issue[], now: number): Iss
       ratio = cycleMs / typicalMs;
       verdict = verdictFor(ratio, state === 'done');
     }
-    cost.compare = { estimate: issue.estimate, n: days.length, typicalMs, ratio, verdict };
+    cost.compare = { estimate: issue.estimate, n: days.length, personalized, typicalMs, ratio, verdict };
   }
   return cost;
 }

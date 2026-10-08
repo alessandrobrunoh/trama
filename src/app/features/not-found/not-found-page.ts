@@ -22,7 +22,7 @@ import { Kbd } from '../../shared/kbd';
       ></div>
       <a routerLink="/" class="absolute top-3 left-4 flex items-center gap-2 text-[13px] font-semibold tracking-tight sm:left-6">
         <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-[5px] text-[13px] leading-none" aria-hidden="true">∇</span>
-        Nabla
+        Trama
       </a>
     }
     <div class="mx-auto flex min-h-full max-w-md flex-col items-center justify-center px-6 py-20 text-center" [class.min-h-svh]="!inShell()">
@@ -90,7 +90,7 @@ export class NotFoundPage {
   });
 
   protected readonly heading = computed(() => {
-    if (this.serverError()) return 'Cannot reach Nabla';
+    if (this.serverError()) return 'Cannot reach Trama';
     if (this.workspace()) return 'Workspace not found';
     return 'Page not found';
   });

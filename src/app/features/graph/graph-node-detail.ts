@@ -94,7 +94,7 @@ export interface DetailLink {
           <app-property-row label="Criteria">
             <span>{{ criteriaMet() }} of {{ w.acceptanceCriteria.length }} met</span>
           </app-property-row>
-          @if (w.deltaThreadUrl) {
+          @if (w.deltaThreadUrl && deltaEnabled()) {
             <app-property-row label="Delta">
               <a class="truncate text-xs hover:underline" [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer">Thread</a>
             </app-property-row>
@@ -245,6 +245,7 @@ export interface DetailLink {
 })
 export class GraphNodeDetail {
   private readonly store = inject(NablaStore);
+  protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   readonly node = input.required<GraphNode>();
   readonly blockedBy = input<readonly DetailLink[]>([]);
   readonly blocks = input<readonly DetailLink[]>([]);

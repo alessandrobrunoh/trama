@@ -15,11 +15,14 @@ import type {
   DecisionStatus,
   DependencyNodeType,
   ExecutionProvider,
+  FavoriteType,
   GitProvider,
   InputRequestState,
   IssueKind,
   IssueSource,
   IssueStatus,
+  NotificationChannels,
+  NotificationKind,
   Priority,
   ReviewState,
   Role,
@@ -27,6 +30,8 @@ import type {
   SubjectRef,
   TeamEditPolicy,
   TokenScope,
+  ApiPermission,
+  TokenLimits,
   ViewEntity,
   ViewFilter,
   ViewLayout,
@@ -54,10 +59,12 @@ export class UserEntity extends Wire {
   email: string;
   @Column({ type: 'varchar' }) passwordHash: string;
   @Column({ type: 'integer', default: 0 }) avatarHue: number;
+  /** Per notification kind and channel; missing entries use the defaults (see resolveNotificationSettings). */
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) notificationSettings: Partial<Record<string, Partial<NotificationChannels>>>;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   protected override hidden() {
-    return ['passwordHash'];
+    return ['passwordHash', 'notificationSettings'];
   }
 }
 
@@ -111,6 +118,35 @@ export class MembershipEntity extends Wire {
   userId: string;
   @Column({ type: 'varchar' }) role: Role;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+}
+
+/** Pending (or finished) invitation by email. Only the sha256 of the secret link token is stored. */
+@Entity('invites')
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['invitedByUserId'], ['id'], { onDelete: 'SET NULL' })
+export class InviteEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Index('IDX_invites_workspace')
+  @Column({ type: 'varchar' })
+  workspaceId: string;
+  /** Lower-cased. */
+  @Index('IDX_invites_email')
+  @Column({ type: 'varchar' })
+  email: string;
+  @Column({ type: 'varchar' }) role: Role;
+  @Index('UQ_invites_token', { unique: true })
+  @Column({ type: 'varchar' })
+  tokenHash: string;
+  @Column({ type: 'varchar', nullable: true }) invitedByUserId: string | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz' }) expiresAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) emailedAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) acceptedAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) revokedAt: Date | null;
+
+  protected override hidden() {
+    return ['tokenHash', 'acceptedAt', 'revokedAt'];
+  }
 }
 
 @Entity('agents')
@@ -465,6 +501,9 @@ export class ApiTokenEntity extends Wire {
   @Column({ type: 'varchar' }) tokenHash: string;
   @Column({ type: 'jsonb' }) actor: ActorRef;
   @Column({ type: 'varchar', default: 'write' }) scope: TokenScope;
+  /** Explicit permission list; only set when `scope = 'custom'`. */
+  @Column({ type: 'jsonb', nullable: true }) permissions: ApiPermission[] | null;
+  @Column({ type: 'jsonb' }) limits: TokenLimits;
   @Column({ type: 'varchar', nullable: true }) createdByUserId: string | null;
   @Column({ type: 'timestamptz', nullable: true }) lastUsedAt: Date | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
@@ -472,6 +511,47 @@ export class ApiTokenEntity extends Wire {
 
   protected override hidden() {
     return ['tokenHash', 'createdByUserId'];
+  }
+}
+
+/** A message for one person about something that happened in a workspace. */
+@Entity('notifications')
+@Index('IDX_notifications_user', ['userId', 'workspaceId', 'createdAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class NotificationEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'varchar' }) kind: NotificationKind;
+  @Column({ type: 'varchar' }) title: string;
+  @Column({ type: 'text', nullable: true }) body: string | null;
+  @Column({ type: 'jsonb' }) actor: ActorRef;
+  @Column({ type: 'jsonb' }) subject: SubjectRef;
+  @Column({ type: 'varchar' }) link: string;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) readAt: Date | null;
+
+  protected override hidden() {
+    return ['userId'];
+  }
+}
+
+/** A person's pinned entity (unique per user, workspace, type and subject). */
+@Entity('favorites')
+@Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], { unique: true })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class FavoriteEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'varchar' }) type: FavoriteType;
+  @Column({ type: 'varchar' }) subjectId: string;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['userId'];
   }
 }
 
@@ -589,6 +669,9 @@ export const ENTITIES = [
   SessionEntity,
   WorkspaceEntity,
   MembershipEntity,
+  InviteEntity,
+  FavoriteEntity,
+  NotificationEntity,
   AgentEntity,
   TeamEntity,
   RepositoryEntity,

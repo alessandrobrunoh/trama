@@ -19,18 +19,28 @@ import type {
   Decision,
   Dependency,
   DomainEvent,
+  Favorite,
+  FavoriteType,
   ID,
   InputRequest,
+  NotificationKind,
+  NotificationChannels,
+  NotificationList,
+  NotificationSettings,
+  InviteLink,
+  InvitePreview,
   Issue,
   Membership,
   Milestone,
   OutgoingWebhook,
   Repository,
+  Role,
   SavedView,
   Team,
   User,
   WebhookDeliveryLog,
   Workspace,
+  WorkspaceInvite,
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
@@ -45,6 +55,7 @@ import type {
   CreateDecisionInput,
   CreateDependencyInput,
   CreateInputRequestInput,
+  CreateInviteInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
   UpdateInputRequestInput,
@@ -194,6 +205,53 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+  };
+
+  /** Invitations by email (admins). `create` and `resend` return the secret link once. */
+  readonly invites = {
+    list: (slug: string) => this.get<WorkspaceInvite[]>(`${this.w(slug)}/invites`),
+    create: (slug: string, input: CreateInviteInput) =>
+      this.post<InviteLink>(`${this.w(slug)}/invites`, input),
+    resend: (slug: string, id: ID) => this.post<InviteLink>(`${this.w(slug)}/invites/${id}/resend`),
+    revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
+  };
+
+  /** The signed-in user's notifications in a workspace, and their settings (the same in every workspace). */
+  readonly notifications = {
+    list: (slug: string, opts: { limit?: number; unread?: boolean } = {}) =>
+      this.get<NotificationList>(
+        `${this.w(slug)}/notifications`,
+        { ...(opts.limit ? { limit: opts.limit } : {}), ...(opts.unread ? { unread: true } : {}) },
+        { quiet: true },
+      ),
+    /** Without `ids`, marks everything in the workspace as read. */
+    markRead: (slug: string, ids?: ID[]) =>
+      this.post<{ unread: number }>(`${this.w(slug)}/notifications/read`, ids ? { ids } : {}, { quiet: true }),
+    settings: () =>
+      this.get<{ settings: NotificationSettings; emailAvailable: boolean }>('/me/notification-settings'),
+    updateSettings: (settings: Partial<Record<NotificationKind, Partial<NotificationChannels>>>) =>
+      this.patch<{ settings: NotificationSettings; emailAvailable: boolean }>('/me/notification-settings', { settings }),
+  };
+
+  /** The signed-in user's favorites in a workspace (private to them). `remove` is idempotent. */
+  readonly favorites = {
+    list: (slug: string) => this.get<Favorite[]>(`${this.w(slug)}/favorites`, undefined, { quiet: true }),
+    add: (slug: string, type: FavoriteType, subjectId: ID) =>
+      this.post<Favorite>(`${this.w(slug)}/favorites`, { type, subjectId }),
+    remove: (slug: string, type: FavoriteType, subjectId: ID) =>
+      this.del(`${this.w(slug)}/favorites/${type}/${encodeURIComponent(subjectId)}`),
+  };
+
+  /** The page behind an invitation link: `preview` is public, `accept` needs a signed-in user. */
+  readonly inviteLinks = {
+    preview: (token: string) =>
+      this.get<InvitePreview>(`/invites/${encodeURIComponent(token)}`, undefined, { quiet: true }),
+    accept: (token: string) =>
+      this.post<{ workspace: { slug: string; name: string }; role: Role }>(
+        `/invites/${encodeURIComponent(token)}/accept`,
+        undefined,
+        { quiet: true },
+      ),
   };
 
   readonly agents = {

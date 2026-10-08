@@ -97,76 +97,118 @@ interface WsItem {
       @if (canEdit()) {
         <button hlmBtn size="sm" variant="outline" (click)="newIssue()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New issue</span>
+          <span>New issue</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
     </ng-template>
 
     <app-page-header title="My Work" [description]="description()">
-      <div class="flex flex-wrap items-end justify-between gap-x-4 border-b px-4 sm:px-6">
-        <hlm-tabs [tab]="tab()" (tabActivated)="setTab($event)">
-          <hlm-tabs-list variant="line" class="-mb-px h-10 p-0" aria-label="My work">
-            @for (t of tabs; track t; let n = $index) {
-              <button [hlmTabsTrigger]="t" class="gap-1.5 px-2.5" [attr.title]="tabHint(t) + ' (' + (n + 1) + ')'">
-                {{ tabLabel(t) }}
-                <span class="text-muted-foreground text-xs tabular-nums">{{ counts()[t] }}</span>
-              </button>
-            }
-          </hlm-tabs-list>
-        </hlm-tabs>
-        <label class="text-muted-foreground hover:text-foreground flex h-10 cursor-pointer items-center gap-2 text-xs select-none">
-          <input type="checkbox" class="accent-primary size-3.5" [checked]="showClosed()" (change)="showClosed.set($any($event.target).checked)" />
-          Show completed
-        </label>
+      <div class="border-b px-4 sm:px-6">
+        <div class="flex min-w-0 flex-wrap items-end justify-between gap-x-5 gap-y-2">
+          <hlm-tabs [tab]="tab()" (tabActivated)="setTab($event)" class="min-w-0 max-w-full">
+            <hlm-tabs-list variant="line" class="-mb-px h-11 max-w-full overflow-x-auto p-0" aria-label="My work sections">
+              @for (t of tabs; track t; let n = $index) {
+                <button
+                  [hlmTabsTrigger]="t"
+                  class="shrink-0 gap-2 px-3"
+                  [attr.title]="tabHint(t) + ' (' + (n + 1) + ')'"
+                >
+                  <span class="hidden lg:inline">{{ tabLabel(t) }}</span>
+                  <span class="lg:hidden">{{ tabCompactLabel(t) }}</span>
+                  <span class="rounded-full bg-muted px-1.5 py-0.5 text-[11px] leading-none tabular-nums">
+                    {{ counts()[t] }}
+                  </span>
+                </button>
+              }
+            </hlm-tabs-list>
+          </hlm-tabs>
+          <label
+            class="text-muted-foreground hover:text-foreground flex min-h-11 cursor-pointer items-center gap-2 pb-0.5 text-xs select-none"
+            title="Include done, shipped and cancelled items in these lists"
+          >
+            <input type="checkbox" class="accent-primary size-3.5" [checked]="showClosed()" (change)="showClosed.set($any($event.target).checked)" />
+            Show closed
+          </label>
+        </div>
+        <p class="text-muted-foreground pb-3 pt-2 text-xs">{{ tabHint(tab()) }}</p>
       </div>
     </app-page-header>
 
-    <!-- Waiting on me → My Attention -->
     @if (waiting().total > 0) {
-      <a
-        [routerLink]="['/', slug(), 'attention']"
-        class="hover:bg-hover group flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 text-xs sm:px-6"
-      >
-        <span class="text-foreground font-medium">Waiting on you</span>
-        @for (k of waiting().kinds; track k.kind) {
-          <span class="text-muted-foreground flex items-center gap-1.5">
-            <svg [lucideIcon]="k.icon" [size]="13" [class]="k.color"></svg>
-            <span class="text-foreground tabular-nums">{{ k.count }}</span>
-            {{ k.label }}
-          </span>
-        }
-        <span class="text-muted-foreground group-hover:text-foreground ms-auto flex items-center gap-1">
-          My Attention <svg [lucideIcon]="arrow" [size]="12"></svg>
-        </span>
-      </a>
+      <section class="border-b px-4 py-4 sm:px-6" aria-labelledby="my-work-attention-title">
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="my-work-attention-title" class="text-sm font-medium">Needs your attention</h2>
+            <p class="text-muted-foreground mt-1 text-xs">
+              {{ waiting().total }} {{ waiting().total === 1 ? 'item needs' : 'items need' }} a response from you
+            </p>
+          </div>
+          <a
+            [routerLink]="['/', slug(), 'attention']"
+            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Review attention queue <svg [lucideIcon]="arrow" [size]="13"></svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+          @for (k of waiting().kinds; track k.kind) {
+            <div class="bg-card flex min-h-14 items-center gap-3 rounded-lg border px-3 py-2">
+              <svg [lucideIcon]="k.icon" [size]="16" [class]="k.color"></svg>
+              <span class="text-base font-semibold tabular-nums">{{ k.count }}</span>
+              <span class="text-muted-foreground text-xs leading-tight">{{ k.label }}</span>
+            </div>
+          }
+        </div>
+      </section>
     }
 
-
-    <!-- Your week: a compact read on how the last 7 days went -->
     @if (week(); as w) {
-      <a
-        [routerLink]="['/', slug(), 'stats']"
-        [queryParams]="{ scope: 'estimates', person: 'me' }"
-        class="hover:bg-hover group flex flex-wrap items-center gap-x-5 gap-y-1 border-b px-4 py-2 text-xs sm:px-6"
-        aria-label="Your week, open insights filtered to you"
-      >
-        <span class="text-foreground font-medium">Your week</span>
-        <span class="text-muted-foreground">
-          <span class="text-foreground tabular-nums">{{ w.doneThis }}</span> done
-          <span class="tabular-nums" [class.text-tone-green]="w.doneThis > w.doneLast" [class.text-tone-red]="w.doneThis < w.doneLast">
-            ({{ w.doneThis >= w.doneLast ? '+' : '−' }}{{ abs(w.doneThis - w.doneLast) }} vs last week)
-          </span>
-        </span>
-        <span class="text-muted-foreground"><span class="text-foreground tabular-nums">{{ w.pointsThis }}</span> pts <span class="tabular-nums">(last week {{ w.pointsLast }})</span></span>
-        <span class="text-muted-foreground">median cycle <span class="text-foreground tabular-nums">{{ w.medianCycle === undefined ? '—' : fmtDays(w.medianCycle) }}</span></span>
-        <span class="text-muted-foreground" [attr.title]="w.draggingTitle">
-          <span class="tabular-nums" [class.text-tone-amber]="w.dragging > 0" [class.text-foreground]="w.dragging === 0">{{ w.dragging }}</span> taking longer than expected
-        </span>
-        <span class="text-muted-foreground group-hover:text-foreground ms-auto flex items-center gap-1">
-          Insights <svg [lucideIcon]="arrow" [size]="12"></svg>
-        </span>
-      </a>
+      <section class="border-b px-4 py-4 sm:px-6" aria-labelledby="my-work-week-title">
+        <div class="mb-3 flex flex-wrap items-end justify-between gap-2">
+          <div>
+            <h2 id="my-work-week-title" class="text-sm font-medium">This week</h2>
+            <p class="text-muted-foreground mt-1 text-xs">Last 7 days compared with the previous 7 days</p>
+          </div>
+          <a
+            [routerLink]="['/', slug(), 'stats']"
+            [queryParams]="{ scope: 'estimates', person: 'me' }"
+            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium focus-visible:outline-2 focus-visible:outline-ring"
+          >
+            Personal insights <svg [lucideIcon]="arrow" [size]="13"></svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5">
+            <p class="text-muted-foreground text-xs">Issues completed</p>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-lg font-semibold tabular-nums">{{ w.doneThis }}</span>
+              <span class="text-muted-foreground text-xs tabular-nums" [class.text-tone-green]="w.doneThis > w.doneLast" [class.text-tone-red]="w.doneThis < w.doneLast">
+                {{ w.doneThis >= w.doneLast ? '+' : '−' }}{{ abs(w.doneThis - w.doneLast) }} vs last week
+              </span>
+            </div>
+          </div>
+          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5">
+            <p class="text-muted-foreground text-xs">Estimate points completed</p>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-lg font-semibold tabular-nums">{{ w.pointsThis }}</span>
+              <span class="text-muted-foreground text-xs tabular-nums">{{ w.pointsLast }} last week</span>
+            </div>
+          </div>
+          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5" title="Median time from issue start to completion">
+            <p class="text-muted-foreground text-xs">Typical time to finish</p>
+            <p class="mt-1 text-lg font-semibold tabular-nums">{{ w.medianCycle === undefined ? '—' : fmtDays(w.medianCycle) }}</p>
+            <p class="text-muted-foreground text-[11px]">Completed issues this week</p>
+          </div>
+          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5" [attr.title]="w.draggingTitle">
+            <p class="text-muted-foreground text-xs">Issues past typical time</p>
+            <div class="mt-1 flex items-baseline gap-2">
+              <span class="text-lg font-semibold tabular-nums" [class.text-tone-amber]="w.dragging > 0">{{ w.dragging }}</span>
+              <span class="text-muted-foreground text-xs">active issues</span>
+            </div>
+          </div>
+        </div>
+      </section>
     }
 
     @switch (tab()) {
@@ -443,7 +485,6 @@ export class MyWorkPage {
   protected readonly waiting = computed(() => {
     const counts = this.store.attentionCounts();
     const kinds = ATTENTION_KINDS.filter((k) => counts[k] > 0)
-      .slice(0, 5)
       .map((kind: AttentionKind) => ({
         kind,
         count: counts[kind],
@@ -476,7 +517,7 @@ export class MyWorkPage {
 
   protected readonly description = computed(() => {
     const c = this.counts();
-    return `${c.assigned} open issue${c.assigned === 1 ? '' : 's'} · ${c.accountable} workstream${c.accountable === 1 ? '' : 's'} you own`;
+    return `${c.assigned} open issue${c.assigned === 1 ? '' : 's'} assigned to you · ${c.accountable} workstream${c.accountable === 1 ? '' : 's'} you own`;
   });
 
   // ── helpers ──
@@ -533,9 +574,21 @@ export class MyWorkPage {
       case 'assigned':
         return 'Assigned issues';
       case 'accountable':
-        return 'Accountable';
+        return 'Workstreams you own';
       case 'contributing':
-        return 'Contributing';
+        return 'Workstreams you contribute to';
+      case 'created':
+        return 'Created by you';
+    }
+  }
+  protected tabCompactLabel(t: Tab): string {
+    switch (t) {
+      case 'assigned':
+        return 'Assigned';
+      case 'accountable':
+        return 'Own';
+      case 'contributing':
+        return 'Contribute';
       case 'created':
         return 'Created';
     }
@@ -543,13 +596,13 @@ export class MyWorkPage {
   protected tabHint(t: Tab): string {
     switch (t) {
       case 'assigned':
-        return 'Issues assigned to you';
+        return 'Open issues assigned to you';
       case 'accountable':
-        return 'Workstreams you are accountable for';
+        return 'Open workstreams you are responsible for delivering';
       case 'contributing':
-        return 'Workstreams your teams, issues or artifacts contribute to';
+        return 'Open workstreams linked to your teams, issues or contributions';
       case 'created':
-        return 'Issues, workstreams and decisions you created';
+        return 'Open issues, workstreams and decisions you created';
     }
   }
 

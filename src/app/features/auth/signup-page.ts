@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { LucideCircleAlert, LucideDynamicIcon } from '@lucide/angular';
@@ -91,18 +91,27 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         <a
           class="text-foreground underline underline-offset-4"
           routerLink="/login"
-          [queryParams]="next() ? { next: next() } : null"
+          [queryParams]="authQuery()"
           >Sign in</a
         >
       </ng-container>
     </app-auth-shell>
   `,
 })
-export class SignupPage {
+export class SignupPage implements OnInit {
   private readonly session = inject(SessionStore);
 
   readonly next = input<string>();
+  /** `?email=` from an invitation link: prefilled, still editable. */
+  readonly emailHint = input<string>(undefined, { alias: 'email' });
   readonly workspaceSlug = input<string>();
+  /** Query params kept when switching between sign in and sign up. */
+  protected readonly authQuery = computed(() => {
+    const q: Record<string, string> = {};
+    if (this.next()) q['next'] = this.next()!;
+    if (this.emailHint()) q['email'] = this.emailHint()!;
+    return Object.keys(q).length ? q : null;
+  });
 
   protected readonly alertIcon = LucideCircleAlert;
   protected readonly name = signal('');
@@ -111,6 +120,11 @@ export class SignupPage {
   protected readonly busy = signal(false);
   protected readonly error = signal<string | null>(null);
   private readonly submitted = signal(false);
+
+  ngOnInit(): void {
+    const hint = this.emailHint();
+    if (hint) this.email.set(hint);
+  }
 
   protected nameError(): string | null {
     return this.submitted() && !this.name().trim() ? 'Enter your name.' : null;
@@ -135,7 +149,10 @@ export class SignupPage {
     try {
       await this.session.signup(this.name().trim(), this.email().trim(), this.password());
       // First run: no workspace yet → create one. Otherwise honour `next`.
-      await this.session.goAfterAuth(this.session.workspaces().length ? this.next() : null);
+      // An invitation link is the exception: it brings the new account into a workspace.
+      const next = this.next();
+      const invite = next?.startsWith('/invite/') ? next : null;
+      await this.session.goAfterAuth(this.session.workspaces().length ? next : invite);
     } catch (e) {
       const err = ApiError.from(e);
       this.error.set(

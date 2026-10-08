@@ -15,7 +15,7 @@ core/
   utils.ts format.ts       initials, uid, isTypingTarget, avatarColor, tint, clamp, nowIso | relativeTime, shortDate, fullDate, isOverdue
   meta.ts                  labels / tone / order for every enum (WORKSTREAM_STATUS_META, ...)
   api/                     ApiClient, ApiError, apiInterceptor, request DTO types (api.types.ts)
-  session/                 SessionStore, authGuard, guestGuard, workspaceGuard, rootRedirectGuard, roleGuard
+  session/                 SessionStore, authGuard, guestGuard, workspaceGuard, landingGuard, roleGuard
   stores/nabla.store.ts    NablaStore  (workspace data + mutations)
   stores/ui.store.ts       UiStore     (modals, sidebar, list focus/selection)
   sync/                    LiveSync (SSE), SyncStatus, reconcile, CLIENT_ID
@@ -28,15 +28,19 @@ core/
 
 ## 1. Routes (`src/app/app.routes.ts`)
 
-Top level (reserved, cannot be workspace slugs): `login`, `signup`, `new-workspace`, `404`.
+Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (redirects to `/register`), `invite`, `blog`, `roadmap`, `changelog`, `brand`, `new-workspace`, `404`.
 
 | path | page class (file) | guards |
 |---|---|---|
 | `/login` | `LoginPage` (features/auth/login-page.ts) | guestGuard |
-| `/signup` | `SignupPage` (features/auth/signup-page.ts) | guestGuard |
+| `/register` | `SignupPage` (features/auth/signup-page.ts) | guestGuard |
+| `/invite/:token` | `InvitePage` (features/auth/invite-page.ts); public, `?next=`/`?email=` flow through login and register | - |
+| `/blog`, `/blog/:slug` | `BlogIndexPage`, `BlogPostPage` (features/blog/), posts in blog-posts.ts | - |
+| `/roadmap`, `/changelog` | `RoadmapPage`, `ChangelogPage` (features/roadmap/, features/changelog/) | - |
+| `/brand` | `BrandPage` (features/brand/), logo copy/download via `BrandAssets` | - |
 | `/new-workspace` | `NewWorkspacePage` (features/auth/new-workspace-page.ts) | authGuard |
 | `/404` | `NotFoundPage` (features/not-found/not-found-page.ts), inputs `workspace`, `error` | - |
-| `/` | (no component) redirect: last-used or first workspace `/<slug>/overview`, `/new-workspace` if none, `/login` if signed out | rootRedirectGuard |
+| `/` | `LandingPage` (features/landing/landing-page.ts) when signed out; signed in → last-used or first workspace `/<slug>/overview`, `/new-workspace` if none | landingGuard |
 | `/:workspaceSlug` | `AppShell` (layout/app-shell.ts) | authGuard, workspaceGuard |
 
 Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
@@ -136,7 +140,7 @@ can(minRole: Role): boolean                            // role rank: viewer < me
 ```
 Extras: `goAfterAuth(next?)` (after login/signup: navigate to `next` if it is a same-origin path, else the default workspace), `defaultWorkspaceUrl()`, `enterWorkspace(slug)` (used by workspaceGuard), `updateWorkspace({name?,slug?})`, `deleteWorkspace()` (owner).
 
-Guards (`core/session/guards.ts`): `authGuard` (-> `/login?next=`), `guestGuard`, `rootRedirectGuard`, `workspaceGuard`, `roleGuard(minRole)` (use on a route to hide an admin screen; redirects to overview).
+Guards (`core/session/guards.ts`): `authGuard` (-> `/login?next=`), `guestGuard`, `landingGuard`, `workspaceGuard`, `roleGuard(minRole)` (use on a route to hide an admin screen; redirects to overview).
 
 In templates, hide admin-only controls with `nabla.can('admin')` (works in `computed`/templates; viewers are read-only; the server enforces anyway and a 403 toasts).
 

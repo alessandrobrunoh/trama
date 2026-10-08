@@ -1,16 +1,22 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   HttpCode,
   Post,
   Req,
   Res,
 } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { IsEmail, IsString, MaxLength, MinLength } from 'class-validator';
 import type { Response } from 'express';
+import type { Repository } from 'typeorm';
+import { API_PERMISSIONS } from '../contracts/domain.js';
+import { WorkspaceEntity } from '../database/entities/index.js';
 import { AuthService, SESSION_COOKIE, SESSION_TTL_MS } from './auth.service.js';
 import {
+  AllowCustomToken,
   Auth,
   Public,
   RequireUser,
@@ -41,7 +47,10 @@ export function setSessionCookie(res: Response, raw: string): void {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    @InjectRepository(WorkspaceEntity) private readonly workspaces: Repository<WorkspaceEntity>,
+  ) {}
 
   @Public()
   @Post('signup')
@@ -74,5 +83,25 @@ export class AuthController {
   @RequireUser()
   async me(@Auth() auth: AuthInfo) {
     return { user: auth.user, workspaces: await this.auth.workspacesOf(auth.user!.id) };
+  }
+
+  /**
+   * Introspection for API-token clients (the MCP server): which workspace the token belongs to and
+   * what it may do, so a client needs nothing but the key.
+   */
+  @Get('token')
+  @AllowCustomToken()
+  async token(@Auth() auth: AuthInfo) {
+    const token = auth.token;
+    if (!token) throw new ForbiddenException('Call this endpoint with an API token');
+    const workspace = await this.workspaces.findOneByOrFail({ id: token.workspaceId });
+    const permissions =
+      token.scope === 'custom' ? (token.permissions ?? []) : token.scope === 'read' ? API_PERMISSIONS.filter((p) => p.endsWith(':read')) : API_PERMISSIONS;
+    return {
+      token,
+      actor: auth.actor,
+      workspace: { id: workspace.id, slug: workspace.slug, name: workspace.name },
+      permissions,
+    };
   }
 }

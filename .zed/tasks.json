@@ -26,4 +26,18 @@
     "show_command": true,
     "tags": ["run"]
   },
+  {
+    "label": "Run MCP",
+    "command": "cargo run",
+    // "env": { "foo": "bar" },
+    "cwd": "$ZED_WORKTREE_ROOT/mcp",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal_target": "dock",
+    "hide": "never",
+    "shell": "system",
+    "show_summary": true,
+    "show_command": true,
+    "tags": ["run"]
+  },
 ]

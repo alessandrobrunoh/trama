@@ -29,6 +29,19 @@ Two ways, accepted on every route except the public ones (`/health`, `/auth/sign
 | `GET /auth/me` | – | `{ user, workspaces }`. `workspaces` = `Array<Workspace & { role }>`. Agent tokens get `403`. |
 | `GET /health` | – | `{ status: 'ok', db: 'up' }` or `503`. |
 
+### Custom tokens (resource × action permissions) and caps
+
+`scope` is `read`, `write`, `admin` or `custom`. A `custom` token (also implied by sending `permissions`) carries an explicit list of
+`<resource>:<action>` grants (catalog: `API_RESOURCES` in `contracts/domain.ts`; actions `read|write|delete`, plus `decisions:accept`). The
+required permission is derived from the route: `/w/:slug/<resource>/…` and the method (GET → read, POST/PATCH → write, DELETE → delete;
+`POST /decisions/:id/accept|reject|supersede` → `decisions:accept`; `/settings` and `/w/:slug` itself → `workspace`). `write`/`delete`/`accept`
+imply `read` on the same resource. Routes outside the catalog (e.g. `/ai/*`, `/workspaces`, `/auth/me`) are denied (fail closed), except
+`GET /auth/token`. The permission list only narrows: the acting user's role still applies, and a custom token can only mint custom tokens
+that are a subset of its own permissions.
+
+Every API token has caps (`limits`, defaults `requestsPerMinute` 600, `writesPerMinute` 60, `writesPerDay` 2000; configurable up to 6000 / 600 / 20000).
+Per-minute counters are per API process; the daily write counter is stored in Postgres. Over a cap: `429` with a message naming the cap.
+
 ## Roles (RBAC)
 
 `viewer` < `member` < `admin` < `owner`. Default: GET needs `viewer`, every write on domain entities needs `member`.
@@ -50,9 +63,24 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
 | `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Last owner cannot be demoted (`409`). |
 | `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
+| `GET /w/:slug/invites` | `inviteMembers` | Pending invitations (`WorkspaceInvite[]`), expired ones included so they can be resent. |
+| `POST /w/:slug/invites` | `inviteMembers` | `{ email, role }` → `{ invite, url, emailed }`. The person does not need an account yet. Same address again refreshes the invite (new link and expiry, the old link stops working). Already a member → `409`; a role above your own → `403`. `url` is the only time the secret link is returned (only its hash is stored). |
+| `POST /w/:slug/invites/:id/resend` | `inviteMembers` | New link and expiry, emailed again. Same response as create. |
+| `DELETE /w/:slug/invites/:id` | `inviteMembers` | Revoke. |
+| `GET /w/:slug/favorites` | user (viewer and up; agent tokens → `403`) | The caller's own favorites (`Favorite[]`, oldest first). Favorites whose subject was deleted, or a view that is no longer visible to the caller, are dropped here. |
+| `POST /w/:slug/favorites` | user | `{ type: issue\|workstream\|decision\|team\|repository\|view, subjectId }` (the entity's id, not its key). Idempotent. Unknown subject, or another person's private view → `404`; at most 100 per workspace (`409`). Viewers may keep favorites. |
+| `DELETE /w/:slug/favorites/:type/:subjectId` | user | Idempotent (`204` even when it was not pinned). Favorites are private: nobody else sees them. |
+| `GET /w/:slug/notifications` | user (agent tokens → `403`) | `?limit` (default 50, max 200) `&unread=true` → `{ items: Notification[], unread }`, newest first. `unread` counts the whole workspace, not just the page. |
+| `POST /w/:slug/notifications/read` | user | `{ ids? }` → `{ unread }`. Without `ids`, marks everything in the workspace as read. |
+| `GET /me/notification-settings`, `PATCH /me/notification-settings` | user | `{ settings: { <kind>: { inApp, email } }, emailAvailable }`. `PATCH { settings: { assigned: { inApp: false } } }` merges per kind and channel; unknown kinds or channels → `400`. Same in every workspace. |
+| `GET /invites/:token` | public | `InvitePreview` (`workspaceName`, `role`, `email`, `invitedByName`, `expiresAt`). `404` when unknown, used, revoked or expired. |
+| `POST /invites/:token/accept` | signed-in user | Joins the workspace; the account email must equal the invited one (`403` otherwise). → `{ workspace: { slug, name }, role }`. Single use; an existing member keeps their role. |
+
+Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP_URL`; without it `emailed` is `false` and the UI shows the link to share by hand. Not exposed to API tokens with custom permissions.
 | `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |
 | `GET /w/:slug/tokens` | member | Admins see all tokens, others only their own. `ApiToken[]` (never contains the hash). |
-| `POST /w/:slug/tokens` | member (user) | `{ name, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. |
+| `POST /w/:slug/tokens` | member (user) | `{ name, scope?, permissions?, limits?, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. See *Custom tokens* below. |
+| `GET /auth/token` | API token | `{ token, actor, workspace: { id, slug, name }, permissions }`: what the calling token is. Used by the MCP server. |
 | `DELETE /w/:slug/tokens/:id` | own or admin | revoke |
 
 ## Workspace snapshot
@@ -72,8 +100,8 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 ### Workstreams — `/workstreams`
 - `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
 - `GET /:idOrKey`
-- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, startDate?, targetDate? }`
-  - `deltaThreadUrl` is required: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream.
+- `POST { title, ownerTeamId, deltaThreadUrl?, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, startDate?, targetDate? }`
+  - `deltaThreadUrl`: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream. Required, except for `statusOverride: draft` and for workspaces that turned **Delta threads** off (`PATCH /w/:slug/settings { deltaThreads: false }`, admin; on by default and recommended). A supplied URL is always validated; the briefing omits the section when there is none.
   - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
   - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.
 - `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. `deltaThreadUrl` can be replaced but not cleared. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
@@ -96,11 +124,11 @@ Linear-style milestones inside a workstream (flat resource, like artifacts). `Mi
 
 ### Issues — `/issues`
 Demand items (bugs, requests, incidents, tasks). Status is a tracker workflow, separate from workstream status. Keys stay per kind: `BUG-n|FEAT-n|INC-n|DEBT-n|FB-n|IDEA-n|SEC-n`.
-- `GET ?kind&status&teamId&assigneeId&workstreamId&milestoneId&q`, `GET /:idOrKey` (`BUG-142`, an **alias** — an old key from before a kind change, case-insensitive — or id; the response carries the current `key`)
+- `GET ?kind&status&priority(comma list)&open(true = backlog|todo|in_progress|in_review)&limit(1-500, newest first)&teamId&assigneeId&workstreamId&milestoneId&q`, `GET /:idOrKey` (`BUG-142`, an **alias** — an old key from before a kind change, case-insensitive — or id; the response carries the current `key`)
 - `POST { kind, title, body?, source?, reporterName?, assigneeId?, teamId?, priority?, status?: backlog|todo|in_progress|in_review|done|canceled, externalUrl?, estimate? }` → status defaults to `backlog`.
 - `PATCH /:idOrKey { title?, kind?, estimate?, body?, reporterName?, assigneeId?, teamId?, priority?, status?, externalUrl?, workstreamIds?, milestoneIds?, duplicateOfId? }` — `duplicateOfId` (id or key, or `null`) marks the issue as a duplicate and sets status `canceled`; an issue cannot duplicate itself. `null` clears an optional field. `estimate` is a non-negative number (story points, ≤ 1000), `null` clears it; `issue.updated.data.fields` includes `estimate`. **`kind` re-keys the issue**: it takes the next number of the new kind (`BUG-148` → `FEAT-35`), the old key is appended to `aliases` (lookups by old keys keep working), and an `issue.rekeyed` event (`data: { from, to, fromKind, toKind }`) is recorded. Sending the current kind is a no-op.
 - Time facts (server-set, read-only): `startedAt` = first time the status enters `in_progress`/`in_review` (kept if moved back); `completedAt` = set when the status becomes `done`/`canceled`, cleared on reopen. Also applied by `POST` (initial status) and `/link`.
-- `POST /:idOrKey/link { workstreamIds?, createWorkstream?: { title, ownerTeamId, deltaThreadUrl, objective?, … same as workstream create }, status? }` — attaches existing and/or a newly created workstream (created atomically). `backlog`/`todo` move to `in_progress` unless `status` is set. A duplicate issue cannot be linked. At least one of `workstreamIds` / `createWorkstream` is required.
+- `POST /:idOrKey/link { workstreamIds?, createWorkstream?: { title, ownerTeamId, deltaThreadUrl?, objective?, … same as workstream create }, status? }` — attaches existing and/or a newly created workstream (created atomically). `backlog`/`todo` move to `in_progress` unless `status` is set. A duplicate issue cannot be linked. At least one of `workstreamIds` / `createWorkstream` is required.
 - `DELETE /:idOrKey`
 
 ### Artifacts — `/artifacts`
@@ -248,7 +276,7 @@ Idempotency: `X-GitHub-Delivery` / `X-Gitlab-Event-UUID` ids are stored in `webh
 
 ## Permission policy, team roles and token scopes
 
-- **Workspace settings** — `Workspace.settings` (always fully resolved in responses): `permissions` (minimum role per capability), `defaultTeamId?`, `estimateScale` (`fibonacci|linear|tshirt|none`), `weekStart`, `timeZone` (IANA or `auto`), `iconColor?`, `iconInitial?`. `PATCH /w/:slug/settings` (admin; `permissions` needs an owner; `null` clears `defaultTeamId`, `iconColor`, `iconInitial`). `permissions` is partial: send only the capabilities you change, each set to `member|admin|owner`.
+- **Workspace settings** — `Workspace.settings` (always fully resolved in responses): `permissions` (minimum role per capability), `defaultTeamId?`, `estimateScale` (`fibonacci|linear|tshirt|none`), `weekStart`, `timeZone` (IANA or `auto`), `iconColor?`, `iconInitial?`, `deltaThreads` (boolean, default `true`: link workstreams to a Delta thread). `PATCH /w/:slug/settings` (admin; `permissions` needs an owner; `null` clears `defaultTeamId`, `iconColor`, `iconInitial`). `permissions` is partial: send only the capabilities you change, each set to `member|admin|owner`.
 - **Capabilities** (defaults = historical behaviour): `createWorkstreams` member, `deleteWorkstreams` member, `createIssues` member, `deleteIssues` member, `acceptDecisions` member (accept/reject/supersede, always a person), `manageSharedViews` member (publish a view to the workspace), `createTeams` admin, `manageTeams` admin (edit/delete a team; a team lead may always edit their own team), `manageRepositories` admin, `inviteMembers` admin (a role above the inviter's own cannot be granted), `manageAgents` admin (agents and agent tokens), `manageTokens` member (personal tokens), `manageIntegrations` admin (integrations and outgoing webhooks). Enforced by `@Can(capability)` in `AccessGuard`; members/roles changes, workspace rename and delete keep their fixed roles.
 - **Team roles** — `Team.leadIds` (subset of `memberIds`) and `Team.editPolicy` (`workspace` | `members`). With `members`, creating/updating/deleting the team's workstreams (`ownerTeamId`) and issues (`teamId`) — including moving work into the team — needs a team member/lead, or a workspace admin+. Agents count through their owner (`ownerUserId`). Enforced by `@EditsTeamWork` in `AccessGuard` (`PermissionsService`).
 - **Token scopes** — `ApiToken.scope`: `read` (GET only, effective role viewer), `write` (default; effective role capped at member, so no admin routes), `admin` (full role of the acting user; only admins can mint one, never for agents). `POST /w/:slug/tokens { name, scope?, agentId?, expiresAt? }`.
@@ -258,3 +286,7 @@ Idempotency: `X-GitHub-Delivery` / `X-Gitlab-Event-UUID` ids are stored in `webh
 `OutgoingWebhook { id, name, url, events[], enabled, createdAt, lastDeliveryAt?, lastStatus? }`. `events`: event types (`issue.created`), entity wildcards (`issue.*`) or `*`. `GET`, `GET /:id`, `POST { name, url, events, enabled? }` → `{ webhook, secret }` (the `whsec_…` secret is shown once), `PATCH /:id`, `DELETE /:id`, `POST /:id/rotate-secret` → `{ webhook, secret }`, `POST /:id/test` → sends a `ping` now and answers the delivery result, `GET /:id/deliveries?limit` → last deliveries (newest first; the latest 50 are kept).
 
 Every `DomainEvent` (see *Events*) is delivered asynchronously (per webhook in order, 5 s timeout, one retry after ~2 s on a network error, 429 or 5xx): `POST url` with `Content-Type: application/json`, headers `X-Nabla-Event`, `X-Nabla-Delivery` (= event id), `X-Nabla-Signature: sha256=<hex HMAC-SHA256 of the raw body with the secret>`, body `{ id, event, workspaceId, at, actor, subject, workstreamId?, data }`. URLs must be http(s) without credentials; in production internal hosts (localhost, private IP ranges) are rejected unless `NABLA_ALLOW_PRIVATE_WEBHOOKS=true` (hostnames are not resolved: use an egress proxy for real SSRF protection). At most 20 webhooks per workspace. Limits: delivery is in-process (no durable queue), events emitted inside a transaction that later rolls back are still delivered.
+
+## Notifications
+
+Created on the server from domain events, for one person each, and never for whoever caused the event. Kinds (each switchable per channel; defaults: in-app on, email off): `assigned` (an issue assigned to you), `input_requested` (a question for you, or on a workstream you are accountable for), `decision_proposed`, `review_requested`, `ci_failed`, `comment` (on your issues, as assignee or reporter, and on workstreams and decisions you are accountable for) and `workstream_update` (shipped, blocked, ready to land). The recipient must still be a workspace member. The same message within a minute is stored once. Read notifications are removed after 90 days. A new one reaches only that person's live stream (`entity: "notification"`), so it never triggers a snapshot refetch. Email goes out through `SMTP_URL` (see Invitations); without it the email channel does nothing.

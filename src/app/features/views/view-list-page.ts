@@ -29,7 +29,7 @@ interface ViewSection {
       @if (canEdit()) {
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New view</span>
+          <span>New view</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
@@ -59,7 +59,7 @@ interface ViewSection {
               role="listitem"
               [routerLink]="['/', slug(), 'views', v.id]"
               [attr.data-row-id]="v.id"
-              class="hover:bg-hover focus-visible:bg-hover flex min-h-9 items-center gap-3 border-b px-4 py-1.5 outline-none sm:px-6"
+              class="hover:bg-hover focus-visible:bg-hover flex min-h-14 items-center gap-3 border-b px-4 py-2.5 outline-none sm:px-6 md:min-h-9 md:py-1.5"
               [class.bg-selected]="ui.focusedRowId() === v.id"
             >
               <svg

@@ -50,7 +50,7 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
       <div class="bg-muted/30 mb-8 rounded-lg border p-4">
         <h3 class="text-[13px] font-medium">What is an agent?</h3>
         <p class="text-muted-foreground mt-1 max-w-prose text-[13px] leading-snug">
-          An agent is an identity for an AI agent (Claude Code, Codex, Delta…) that reads and updates Nabla through the API. Everything it does shows up attributed to it, with an agent badge, so you always know what was done by a person and what by a machine.
+          An agent is an identity for an AI agent (Claude Code, Codex, Delta…) that reads and updates Trama through the API. Everything it does shows up attributed to it, with an agent badge, so you always know what was done by a person and what by a machine.
         </p>
         <ol class="text-muted-foreground mt-3 grid gap-2 text-xs leading-snug sm:grid-cols-3">
           <li><strong class="text-foreground font-medium">1. Register it.</strong> Give it a name, its runtime and an owner who is accountable for it.</li>

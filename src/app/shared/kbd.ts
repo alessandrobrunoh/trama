@@ -40,12 +40,17 @@ const GLYPHS: Record<string, string> = {
   host: { class: 'inline-flex items-center gap-0.5' },
   template: `
     @for (k of parts(); track $index) {
+      @if (chord() && $index > 0) {
+        <span class="text-muted-foreground mx-0.5 text-[11px]">then</span>
+      }
       <kbd hlmKbd class="font-mono text-[11px]">{{ k }}</kbd>
     }
   `,
 })
 export class Kbd {
   readonly keys = input.required<string | readonly string[]>();
+  /** Keys are pressed one after the other ("g i"), so show "G then I". */
+  readonly chord = input(false);
 
   protected readonly parts = computed(() => {
     const raw = this.keys();

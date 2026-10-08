@@ -61,7 +61,7 @@ export class EventsController {
   @Sse('stream')
   stream(@Ctx() ctx: WorkspaceContext): Observable<MessageEvent> {
     const live$ = this.events.stream$.pipe(
-      filter((e) => e.workspaceId === ctx.workspace.id),
+      filter((e) => e.workspaceId === ctx.workspace.id && (!e.userId || e.userId === ctx.userId)),
       map((e): MessageEvent => ({ data: e.event })),
     );
     const ping$ = interval(25_000).pipe(

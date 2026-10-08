@@ -89,7 +89,7 @@ export class ActorAvatar {
 
   protected readonly a = computed<ResolvedActor>(() => {
     const x = this.actor();
-    if (!x) return { type: 'system', name: 'Nabla', known: false };
+    if (!x) return { type: 'system', name: 'Trama', known: false };
     return isResolved(x) ? x : this.store.resolveActor(x);
   });
   protected readonly ini = computed(() => initials(this.a().name));
@@ -115,7 +115,7 @@ export class ActorLabel {
   readonly size = input(18);
   protected readonly name = computed(() => {
     const x = this.actor();
-    if (!x) return 'Nabla';
+    if (!x) return 'Trama';
     return isResolved(x) ? x.name : this.store.resolveActor(x).name;
   });
 }

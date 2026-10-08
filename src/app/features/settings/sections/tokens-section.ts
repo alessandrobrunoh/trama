@@ -4,11 +4,12 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore } from '../../../core/stores/nabla.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import { TOKEN_SCOPES, type ApiToken, type TokenScope } from '../../../core/contracts/domain';
+import { DEFAULT_TOKEN_LIMITS, MAX_TOKEN_LIMITS, TOKEN_SCOPES, type ApiPermission, type ApiToken, type TokenLimits, type TokenScope } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { AppSelect, type Option } from '../../create/form-kit';
 import { ConnectSnippets } from './connect-snippets';
+import { PermissionMatrix } from './permission-matrix';
 import { SECTION_KIT } from './section-kit';
 
 const ME = '';
@@ -24,13 +25,13 @@ const EXPIRY: Option[] = [
 @Component({
   selector: 'app-tokens-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, ActorAvatar, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, ActorAvatar, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, PermissionMatrix, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
       <app-section-header
         title="API tokens"
-        description="A token is a password for a script, CI job or AI agent: it lets that program call the Nabla API, as you or as an agent, without logging in."
+        description="A token is a password for a script, CI job, AI agent or MCP client (Claude, Cursor…): it lets that program use Trama, as you or as an agent, without logging in. Pick exactly what it may do."
       >
         @if (canCreate() && !creating() && !secret()) {
           <button actions hlmBtn size="sm" (click)="creating.set(true)">
@@ -69,7 +70,7 @@ const EXPIRY: Option[] = [
             <div class="px-4 py-3">
               <div class="text-[13px] font-medium">Scope</div>
               <div class="text-muted-foreground mb-2 text-xs">What the token may do. A scope only ever narrows what the actor could do anyway.</div>
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Scope">
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4" role="radiogroup" aria-label="Scope">
                 @for (sc of scopes; track sc.id) {
                   <button
                     type="button"
@@ -87,12 +88,39 @@ const EXPIRY: Option[] = [
                 }
               </div>
             </div>
+            @if (scope() === 'custom') {
+              <div class="px-4 pb-3">
+                <app-permission-matrix [(value)]="permissions" />
+              </div>
+            }
+            <div class="px-4 py-3">
+              <div class="text-[13px] font-medium">Usage caps</div>
+              <div class="text-muted-foreground mb-2 text-xs">A runaway script or model cannot exceed these. Over the cap, the API answers 429 until the window passes.</div>
+              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                @for (l of limitFields; track l.key) {
+                  <label class="flex flex-col gap-1 text-xs">
+                    <span class="text-muted-foreground">{{ l.label }}</span>
+                    <input
+                      hlmInput
+                      type="number"
+                      min="1"
+                      class="h-8 text-[13px]"
+                      [max]="l.max"
+                      [placeholder]="'' + l.default"
+                      [value]="limits()[l.key] ?? ''"
+                      (input)="setLimit(l.key, $any($event.target).value)"
+                      [attr.aria-label]="l.label"
+                    />
+                  </label>
+                }
+              </div>
+            </div>
             <app-settings-row label="Expiration" description="Expired tokens stop working; revoke them anytime." wide>
               <app-select size="sm" [options]="expiry" [(value)]="expiresIn" label="Expiration" />
             </app-settings-row>
             <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
               <button hlmBtn type="button" variant="ghost" size="sm" (click)="cancel()">Cancel</button>
-              <button hlmBtn type="submit" size="sm" [disabled]="!name().trim() || busy()">Create token</button>
+              <button hlmBtn type="submit" size="sm" [disabled]="!name().trim() || busy() || (scope() === 'custom' && !permissions().length)">Create token</button>
             </div>
           </form>
         </app-settings-group>
@@ -108,7 +136,7 @@ const EXPIRY: Option[] = [
               <div class="flex items-center gap-2 text-[13px] font-medium">
                 <span class="truncate">{{ t.name }}</span>
                 <code class="text-muted-foreground font-mono text-[11px] font-normal">{{ t.prefix }}</code>
-                <span class="rounded px-1 py-px text-[10px] font-normal" [class]="scopeClass(t.scope)" [title]="scopeInfo(t.scope).description">{{ scopeInfo(t.scope).label }}</span>
+                <span class="rounded px-1 py-px text-[10px] font-normal" [class]="scopeClass(t.scope)" [title]="scopeTitle(t)">{{ scopeInfo(t.scope).label }}@if (t.permissions) { · {{ t.permissions.length }} }</span>
                 @if (isExpired(t)) {
                   <span class="bg-destructive/10 text-destructive rounded px-1 py-px text-[10px] font-normal">Expired</span>
                 }
@@ -163,6 +191,13 @@ export class TokensSection {
   protected readonly canAgents = computed(() => this.store.allowed('manageAgents'));
   protected readonly scopes = (Object.keys(TOKEN_SCOPES) as TokenScope[]).map((id) => ({ id, ...TOKEN_SCOPES[id] }));
   protected readonly scope = signal<TokenScope>('write');
+  protected readonly permissions = signal<ApiPermission[]>([]);
+  protected readonly limits = signal<Partial<TokenLimits>>({});
+  protected readonly limitFields: { key: keyof TokenLimits; label: string; default: number; max: number }[] = [
+    { key: 'requestsPerMinute', label: 'Requests / minute', default: DEFAULT_TOKEN_LIMITS.requestsPerMinute, max: MAX_TOKEN_LIMITS.requestsPerMinute },
+    { key: 'writesPerMinute', label: 'Writes / minute', default: DEFAULT_TOKEN_LIMITS.writesPerMinute, max: MAX_TOKEN_LIMITS.writesPerMinute },
+    { key: 'writesPerDay', label: 'Writes / day', default: DEFAULT_TOKEN_LIMITS.writesPerDay, max: MAX_TOKEN_LIMITS.writesPerDay },
+  ];
   protected readonly createdScope = signal<TokenScope>('write');
   protected readonly actorOptions = computed<Option[]>(() => [
     { value: ME, label: `Me (${this.store.me()?.name ?? 'you'})` },
@@ -189,6 +224,20 @@ export class TokensSection {
   protected scopeAllowed(s: TokenScope): boolean {
     return s !== 'admin' || (this.canAdmin() && !this.actsAs());
   }
+  protected setLimit(key: keyof TokenLimits, raw: string): void {
+    const n = Math.floor(Number(raw));
+    const max = MAX_TOKEN_LIMITS[key];
+    this.limits.update((l) => {
+      const next = { ...l };
+      if (raw === '' || !Number.isFinite(n) || n < 1) delete next[key];
+      else next[key] = Math.min(n, max);
+      return next;
+    });
+  }
+  protected scopeTitle(t: ApiToken): string {
+    const caps = t.limits ? `\nCaps: ${t.limits.requestsPerMinute} req/min, ${t.limits.writesPerMinute} writes/min, ${t.limits.writesPerDay} writes/day` : '';
+    return (t.permissions ? t.permissions.join(', ') : this.scopeInfo(t.scope).description) + caps;
+  }
   protected scopeInfo(s: TokenScope | undefined) {
     return TOKEN_SCOPES[s ?? 'write'];
   }
@@ -209,6 +258,8 @@ export class TokensSection {
     this.actsAs.set(ME);
     this.expiresIn.set('');
     this.scope.set('write');
+    this.permissions.set([]);
+    this.limits.set({});
   }
 
   protected async create(event: Event): Promise<void> {
@@ -218,9 +269,15 @@ export class TokensSection {
     const days = Number(this.expiresIn());
     this.busy.set(true);
     const scope = this.scopeAllowed(this.scope()) ? this.scope() : 'write';
+    if (scope === 'custom' && !this.permissions().length) {
+      this.busy.set(false);
+      return;
+    }
     const created = await this.store.createToken({
       name,
       scope,
+      ...(scope === 'custom' ? { permissions: this.permissions() } : {}),
+      ...(Object.keys(this.limits()).length ? { limits: this.limits() } : {}),
       agentId: this.actsAs() || undefined,
       expiresAt: days ? new Date(Date.now() + days * 86_400_000).toISOString() : undefined,
     });

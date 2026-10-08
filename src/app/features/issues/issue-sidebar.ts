@@ -119,7 +119,8 @@ const BAR: Record<CostVerdict, string> = {
 
 /**
  * Created / Started / Completed (relative, exact on hover), cycle time, and — when the issue has an
- * estimate — its cycle time against the median of finished issues with the same estimate.
+ * estimate — its cycle time against the median of finished issues with the same estimate, personalized
+ * to the assignee when enough of their history is available.
  */
 @Component({
   selector: 'app-issue-time-card',
@@ -168,13 +169,13 @@ const BAR: Record<CostVerdict, string> = {
     @if (c.compare; as cmp) {
       <div class="border-border flex flex-col gap-2 border-t px-3 py-2.5">
         <div class="flex items-center justify-between gap-2 text-xs">
-          <span class="text-muted-foreground">Typical for <span class="text-foreground">{{ points(cmp.estimate) }}</span></span>
+          <span class="text-muted-foreground">Typical for <span class="text-foreground">{{ points(cmp.estimate) }}</span>@if (cmp.personalized) { <span class="text-foreground"> · {{ assigneeName() }}</span>}</span>
           @if (cmp.typicalMs) {
             <span class="text-[13px] font-medium tabular-nums">{{ span(cmp.typicalMs) }}</span>
           }
         </div>
         @if (cmp.typicalMs; as typical) {
-          <p class="text-muted-foreground -mt-1.5 text-[11px]">Median of {{ cmp.n }} finished {{ cmp.n === 1 ? 'issue' : 'issues' }}</p>
+          <p class="text-muted-foreground -mt-1.5 text-[11px]">{{ cmp.personalized ? 'Personal median' : 'Workspace median' }} · {{ cmp.n }} finished {{ cmp.n === 1 ? 'issue' : 'issues' }}</p>
           <div class="flex flex-col gap-1.5" aria-hidden="true">
             <span class="flex items-center gap-2">
               <span class="text-muted-foreground w-12 shrink-0 text-[11px]">Typical</span>
@@ -222,6 +223,10 @@ export class IssueTimeCard {
 
   protected readonly cost = computed(() => issueCost(this.issue(), this.store.issues(), this.now()));
   protected readonly showNudge = computed(() => this.store.estimateScale() !== 'none');
+  protected readonly assigneeName = computed(() => {
+    const assigneeId = this.issue().assigneeId;
+    return assigneeId ? this.store.getUser(assigneeId)?.name ?? 'assignee' : 'assignee';
+  });
   /** Bar widths in %, both on one scale so they compare. */
   protected readonly bars = computed(() => {
     const c = this.cost();

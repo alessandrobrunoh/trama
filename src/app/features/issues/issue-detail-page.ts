@@ -45,6 +45,8 @@ import { teamOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
+import { AiActions } from '../ai-actions/ai-actions.service';
+import { AiIssueSection } from '../ai-actions/ai-issue-cards';
 import { IssueSideWorkstreams, IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 
@@ -75,6 +77,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
     IssueCommandDialog,
     IssueSideWorkstreams,
     IssueTimeCard,
+    AiIssueSection,
   ],
   host: { class: 'flex min-h-full flex-col' },
   template: `
@@ -114,6 +117,22 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
                 <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+g" /></hlm-dropdown-menu-shortcut>
               </button>
             </hlm-dropdown-menu-group>
+            @if (ai.available()) {
+              <hlm-dropdown-menu-separator />
+              <hlm-dropdown-menu-group>
+                <button hlmDropdownMenuItem (triggered)="ai.request('summarize', i.id)">
+                  <svg [lucideIcon]="sparkles" [size]="14" class="text-entity-workstream"></svg> Summarize with AI
+                </button>
+                @if (canEdit()) {
+                  <button hlmDropdownMenuItem (triggered)="ai.request('triage', i.id)">
+                    <svg [lucideIcon]="sparkles" [size]="14" class="text-entity-workstream"></svg> Suggest properties with AI
+                  </button>
+                  <button hlmDropdownMenuItem (triggered)="ai.request('improve', i.id)">
+                    <svg [lucideIcon]="sparkles" [size]="14" class="text-entity-workstream"></svg> Improve description with AI
+                  </button>
+                }
+              </hlm-dropdown-menu-group>
+            }
             @if (canEdit()) {
               <hlm-dropdown-menu-separator />
               <hlm-dropdown-menu-group>
@@ -186,6 +205,8 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
 
         <!-- Properties -->
         <aside class="bg-sidebar/40 border-border flex flex-col gap-4 border-t px-4 py-5 lg:border-t-0 lg:border-l" aria-label="Properties">
+          <app-ai-issue-section [issue]="i" />
+
           <section class="bg-card border-border rounded-lg border">
             <h3 class="text-muted-foreground px-3 pt-2.5 pb-1 text-xs font-medium">Properties</h3>
             <div class="flex flex-col px-2.5 pb-2">
@@ -334,6 +355,7 @@ export class IssueDetailPage {
   private readonly document = inject(DOCUMENT);
   protected readonly store = inject(NablaStore);
   protected readonly actions = inject(IssueActions);
+  protected readonly ai = inject(AiActions);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();

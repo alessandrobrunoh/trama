@@ -98,7 +98,7 @@ function dayLabel(iso: string, now = new Date()): string {
           [class.bg-accent]="!showSystem()"
           [attr.aria-pressed]="!showSystem()"
           (click)="showSystem.set(!showSystem())"
-          title="Hide changes made automatically by Nabla and integrations"
+          title="Hide changes made automatically by Trama and integrations"
         >
           <svg [lucideIcon]="botIcon" [size]="13" class="text-muted-foreground"></svg>
           {{ showSystem() ? 'Automated shown' : 'Automated hidden' }}

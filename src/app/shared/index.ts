@@ -14,3 +14,4 @@ export * from './artifact';
 export * from './issue';
 export * from './entity-chip';
 export * from './estimate';
+export * from './favorite-button';

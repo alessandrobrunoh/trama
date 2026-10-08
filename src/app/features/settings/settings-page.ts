@@ -5,9 +5,11 @@ import {
   LucideBuilding2,
   LucideDynamicIcon,
   LucideKeyRound,
+  LucideBell,
   LucideKeyboard,
   LucideShieldCheck,
   LucidePlug,
+  LucideSlidersHorizontal,
   LucideSunMoon,
   LucideTriangleAlert,
   LucideUserRound,
@@ -19,9 +21,12 @@ import { NablaStore } from '../../core/stores/nabla.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
+import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { MembersSection } from './sections/members-section';
+import { NotificationsSection } from './sections/notifications-section';
+import { PreferencesSection } from './sections/preferences-section';
 import { ProfileSection } from './sections/profile-section';
 import { RolesSection } from './sections/roles-section';
 import { ShortcutsSection } from './sections/shortcuts-section';
@@ -43,6 +48,9 @@ const GROUPS: { title: string; sections: Section[] }[] = [
     title: 'Account',
     sections: [
       { id: 'profile', label: 'Profile', icon: LucideUserRound },
+      { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal },
+      { id: 'notifications', label: 'Notifications', icon: LucideBell },
+      { id: 'ai', label: 'AI & assistant', icon: LucideBot },
       { id: 'appearance', label: 'Appearance', icon: LucideSunMoon },
       { id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', icon: LucideKeyboard },
     ],
@@ -77,6 +85,8 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     PageHeader,
     EmptyState,
     ProfileSection,
+    PreferencesSection,
+    NotificationsSection,
     AppearanceSection,
     ShortcutsSection,
     WorkspaceSection,
@@ -84,6 +94,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     RolesSection,
     TeamsSection,
     AgentsSection,
+    AiSection,
     TokensSection,
     IntegrationsSection,
   ],
@@ -99,7 +110,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
           <div class="text-muted-foreground hidden px-2 pb-1 text-xs font-medium md:block" [class.md:pt-5]="!first">{{ g.title }}</div>
           @for (s of g.sections; track s.id) {
             <a
-              class="hover:bg-accent text-muted-foreground hover:text-foreground flex h-7 shrink-0 items-center gap-2 rounded-md px-2 text-[13px] whitespace-nowrap transition-colors"
+              class="hover:bg-accent text-muted-foreground hover:text-foreground flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm whitespace-nowrap transition-colors md:h-7 md:px-2 md:text-[13px]"
               [class.bg-accent]="sectionId() === s.id"
               [class.text-foreground]="sectionId() === s.id"
               [class.font-medium]="sectionId() === s.id"
@@ -116,8 +127,15 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
           @switch (sectionId()) {
+            @case ('ai') { <app-ai-section /> }
             @case ('profile') {
               <app-profile-section />
+            }
+            @case ('notifications') {
+              <app-notifications-section />
+            }
+            @case ('preferences') {
+              <app-preferences-section />
             }
             @case ('appearance') {
               <app-appearance-section />

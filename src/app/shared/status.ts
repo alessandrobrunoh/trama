@@ -1,4 +1,10 @@
-import { ChangeDetectionStrategy, Component, booleanAttribute, computed, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  booleanAttribute,
+  computed,
+  input,
+} from '@angular/core';
 import {
   LucideCircle,
   LucideCircleAlert,
@@ -22,12 +28,7 @@ import type {
 } from '../core/contracts/domain';
 
 /** Every enum value that has a status visual. */
-export type AnyStatus =
-  | WorkstreamStatus
-  | IssueStatus
-  | DecisionStatus
-  | ArtifactState
-  | CiState;
+export type AnyStatus = WorkstreamStatus | IssueStatus | DecisionStatus | ArtifactState | CiState;
 
 type Glyph =
   | { kind: 'icon'; icon: LucideIcon }
@@ -49,10 +50,19 @@ const TONE = {
   neutral: { text: 'text-status-draft', pill: 'bg-status-draft/10 border-status-draft/25' },
   planned: { text: 'text-status-planned', pill: 'bg-status-planned/10 border-status-planned/25' },
   active: { text: 'text-status-working', pill: 'bg-status-working/10 border-status-working/25' },
-  input: { text: 'text-status-needs-input', pill: 'bg-status-needs-input/10 border-status-needs-input/25' },
-  review: { text: 'text-status-in-review', pill: 'bg-status-in-review/10 border-status-in-review/25' },
+  input: {
+    text: 'text-status-needs-input',
+    pill: 'bg-status-needs-input/10 border-status-needs-input/25',
+  },
+  review: {
+    text: 'text-status-in-review',
+    pill: 'bg-status-in-review/10 border-status-in-review/25',
+  },
   danger: { text: 'text-status-blocked', pill: 'bg-status-blocked/10 border-status-blocked/25' },
-  ready: { text: 'text-status-ready-to-land', pill: 'bg-status-ready-to-land/10 border-status-ready-to-land/25' },
+  ready: {
+    text: 'text-status-ready-to-land',
+    pill: 'bg-status-ready-to-land/10 border-status-ready-to-land/25',
+  },
   done: { text: 'text-status-shipped', pill: 'bg-status-shipped/10 border-status-shipped/25' },
 } as const;
 
@@ -120,7 +130,10 @@ const ISSUE_ONLY = new Set<string>(['backlog', 'todo', 'in_progress', 'done']);
 type Shape = 'hex' | 'circle' | 'icon';
 
 /** Workstream glyph (hexagon) details: fill fraction + inner mark. */
-const HEX: Record<string, { fill: number; dashed?: boolean; mark?: 'check' | 'x' | 'q' | 'minus' | 'up'; solid?: boolean }> = {
+const HEX: Record<
+  string,
+  { fill: number; dashed?: boolean; mark?: 'check' | 'x' | 'q' | 'minus' | 'up'; solid?: boolean }
+> = {
   draft: { fill: 0, dashed: true },
   planned: { fill: 0 },
   working: { fill: 0.5 },
@@ -132,7 +145,11 @@ const HEX: Record<string, { fill: number; dashed?: boolean; mark?: 'check' | 'x'
   canceled: { fill: 1, mark: 'x', solid: true },
 };
 /** Issue glyph (circle) details. */
-const CIRCLE: Record<string, { fill: number; dashed?: boolean; mark?: 'check' | 'x'; solid?: boolean }> = {
+const CIRCLE: Record<
+  string,
+  { fill: number; dashed?: boolean; mark?: 'check' | 'x'; solid?: boolean }
+> = {
+  draft: { fill: 0, dashed: true },
   backlog: { fill: 0, dashed: true },
   todo: { fill: 0 },
   in_progress: { fill: 0.5 },
@@ -165,9 +182,21 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
     @switch (shape()) {
       @case ('hex') {
         @let h = hex();
-        <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <svg
+          [attr.width]="size()"
+          [attr.height]="size()"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+        >
           @if (h.solid) {
-            <polygon [attr.points]="outer" fill="currentColor" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+            <polygon
+              [attr.points]="outer"
+              fill="currentColor"
+              stroke="currentColor"
+              stroke-width="1.4"
+              stroke-linejoin="round"
+            />
           } @else {
             <polygon
               [attr.points]="outer"
@@ -178,26 +207,62 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
             />
             @if (h.fill > 0) {
               <clipPath [attr.id]="clipId">
-                <rect x="0" [attr.y]="11.7 - 7.4 * h.fill" width="16" [attr.height]="7.4 * h.fill + 0.1" />
+                <rect
+                  x="0"
+                  [attr.y]="11.7 - 7.4 * h.fill"
+                  width="16"
+                  [attr.height]="7.4 * h.fill + 0.1"
+                />
               </clipPath>
-              <polygon [attr.points]="inner" fill="currentColor" [attr.clip-path]="'url(#' + clipId + ')'" />
+              <polygon
+                [attr.points]="inner"
+                fill="currentColor"
+                [attr.clip-path]="'url(#' + clipId + ')'"
+              />
             }
           }
           @switch (h.mark) {
             @case ('check') {
-              <path d="M5.4 8.1 7.2 9.9 10.7 6.2" stroke="var(--background)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path
+                d="M5.4 8.1 7.2 9.9 10.7 6.2"
+                stroke="var(--background)"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             }
             @case ('x') {
-              <path d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2" stroke="var(--background)" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2"
+                stroke="var(--background)"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
             }
             @case ('minus') {
-              <path d="M5.3 8h5.4" stroke="var(--background)" stroke-width="1.7" stroke-linecap="round" />
+              <path
+                d="M5.3 8h5.4"
+                stroke="var(--background)"
+                stroke-width="1.7"
+                stroke-linecap="round"
+              />
             }
             @case ('up') {
-              <path d="M8 10.6V5.6M5.8 7.7 8 5.5l2.2 2.2" stroke="var(--background)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path
+                d="M8 10.6V5.6M5.8 7.7 8 5.5l2.2 2.2"
+                stroke="var(--background)"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             }
             @case ('q') {
-              <path d="M6.6 6.6a1.45 1.45 0 0 1 2.8.5c0 .95-1.4 1.2-1.4 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              <path
+                d="M6.6 6.6a1.45 1.45 0 0 1 2.8.5c0 .95-1.4 1.2-1.4 2"
+                stroke="currentColor"
+                stroke-width="1.3"
+                stroke-linecap="round"
+              />
               <circle cx="8" cy="10.9" r=".75" fill="currentColor" />
             }
           }
@@ -205,13 +270,30 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
       }
       @case ('circle') {
         @let c = circle();
-        <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <svg
+          [attr.width]="size()"
+          [attr.height]="size()"
+          viewBox="0 0 16 16"
+          fill="none"
+          aria-hidden="true"
+        >
           @if (c.solid) {
             <circle cx="8" cy="8" r="6.75" fill="currentColor" />
             @if (c.mark === 'check') {
-              <path d="M5.3 8.2 7.1 10l3.6-3.8" stroke="var(--background)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+              <path
+                d="M5.3 8.2 7.1 10l3.6-3.8"
+                stroke="var(--background)"
+                stroke-width="1.6"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
             } @else {
-              <path d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2" stroke="var(--background)" stroke-width="1.5" stroke-linecap="round" />
+              <path
+                d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2"
+                stroke="var(--background)"
+                stroke-width="1.5"
+                stroke-linecap="round"
+              />
             }
           } @else {
             <circle

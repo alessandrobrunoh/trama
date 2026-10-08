@@ -1,6 +1,12 @@
 // Series colours as design tokens (CSS variables), never raw hex. Status and priority keep the
 // colour they have everywhere else in the app; plain comparisons use the --chart-* slots in order.
-import type { CriterionState, IssueKind, IssueStatus, Priority, WorkstreamStatus } from '../../core';
+import type {
+  CriterionState,
+  IssueKind,
+  IssueStatus,
+  Priority,
+  WorkstreamStatus,
+} from '../../core';
 
 export const WS_COLOR: Record<WorkstreamStatus, string> = {
   draft: 'var(--status-draft)',
@@ -15,6 +21,7 @@ export const WS_COLOR: Record<WorkstreamStatus, string> = {
 };
 
 export const ISSUE_COLOR: Record<IssueStatus, string> = {
+  draft: 'var(--status-draft)',
   backlog: 'var(--status-draft)',
   todo: 'var(--status-planned)',
   in_progress: 'var(--status-working)',

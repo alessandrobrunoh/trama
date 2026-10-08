@@ -14,8 +14,8 @@ import { SECTION_KIT } from './section-kit';
  * (the live tokens can only describe the active theme), so they are literal values on purpose.
  */
 const PREVIEW = {
-  light: { chrome: '#f4f4f5', panel: '#ffffff', line: '#e4e4e7', text: '#d4d4d8', strong: '#a1a1aa', accent: '#5e6ad2' },
-  dark: { chrome: '#08090a', panel: '#141518', line: '#26272b', text: '#3a3b40', strong: '#5c5e66', accent: '#7c86e8' },
+  light: { chrome: '#f4f4f5', panel: '#ffffff', line: '#e4e4e7', text: '#d4d4d8', strong: '#a1a1aa', accent: '#b5583a' },
+  dark: { chrome: '#08090a', panel: '#141518', line: '#26272b', text: '#3a3b40', strong: '#5c5e66', accent: '#d0714f' },
 } as const;
 
 const THEMES: { id: ThemeMode; label: string; hint: string }[] = [
@@ -37,7 +37,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Appearance" description="Choose how Nabla looks on this device. Stored in this browser only." />
+      <app-section-header title="Appearance" description="Choose how Trama looks on this device. Stored in this browser only." />
 
       <app-settings-group title="Interface theme">
         <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">

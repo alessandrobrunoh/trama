@@ -35,6 +35,11 @@ export class CommentsController {
     return this.service.list(ctx.workspace.id, q);
   }
 
+  @Get(':id')
+  get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
+    return this.service.get(ctx.workspace.id, id);
+  }
+
   @Post()
   create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateCommentDto) {
     return this.service.create(ctx, dto.subject, dto.body);

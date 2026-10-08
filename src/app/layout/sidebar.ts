@@ -20,25 +20,30 @@ import {
   LucideLogOut,
   LucideMonitor,
   LucideMoon,
+  LucidePanelLeft,
   LucidePlus,
   LucideSearch,
   LucideSettings,
   LucideSquarePen,
   LucideSun,
   LucideUserRound,
+  LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
+import { FavoritesStore } from '../core/stores/favorites.store';
+import { NotificationsStore } from '../core/stores/notifications.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
 import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
-import { MAIN_NAV, PERSONAL_NAV } from './nav';
+import { StatusIcon } from '../shared/status';
+import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
 /**
  * Sidebar content (workspace switcher, search, navigation, teams, views, user menu).
@@ -58,10 +63,33 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
     HlmTooltip,
     Kbd,
     ActorAvatar,
+    StatusIcon,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <div hlmSidebarHeader class="gap-1 px-2 pt-2.5 pb-1">
+    <div class="border-sidebar-border flex items-center gap-2 border-b px-5 py-4 md:hidden">
+      <button
+        type="button"
+        class="hover:bg-sidebar-accent flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-start"
+        [hlmDropdownMenuTrigger]="userMenu"
+        align="start"
+        aria-label="Account menu"
+      >
+        <app-actor-avatar [actor]="meRef()" [size]="36" />
+        <span class="min-w-0 flex-1 truncate text-base font-medium">{{ session.user()?.name ?? 'Account' }}</span>
+        <svg [lucideIcon]="chevrons" [size]="17" class="text-muted-foreground shrink-0"></svg>
+      </button>
+      <button
+        type="button"
+        class="hover:bg-sidebar-accent flex size-10 shrink-0 items-center justify-center rounded-full"
+        aria-label="Settings"
+        (click)="go(['/', slug(), 'settings', 'profile'])"
+      >
+        <svg [lucideIcon]="settings" [size]="19"></svg>
+      </button>
+    </div>
+
+    <div hlmSidebarHeader class="gap-1 px-2 pt-2.5 pb-1 max-md:hidden">
       <div class="flex items-center gap-0.5">
         <!-- workspace switcher -->
         <button
@@ -107,20 +135,68 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
 
     <div hlmSidebarContent class="gap-0 px-2 pb-2">
       <ul hlmSidebarMenu class="gap-px">
-        @for (item of personal; track item.segment) {
+        @for (item of personal(); track item.segment) {
           <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
       </ul>
 
+      <!-- Favorites: only once something is pinned -->
+      @if (favorites.entries().length) {
+        <div class="mt-4 max-md:mt-2">
+          <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('favorites')" [attr.aria-expanded]="!ui.isFolded('favorites')">
+            Favorites
+            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('favorites')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+          </button>
+          @if (!ui.isFolded('favorites')) {
+            <ul hlmSidebarMenu class="gap-px">
+              @for (e of favorites.entries(); track e.favorite.id) {
+                <li hlmSidebarMenuItem class="group/fav relative">
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', slug(), ...e.link]"
+                    routerLinkActive
+                    #fla="routerLinkActive"
+                    [isActive]="fla.isActive"
+                    [tooltip]="e.key ? e.key + ' · ' + e.label : e.label"
+                    closeMobileSidebarOnClick
+                  >
+                    @switch (e.type) {
+                      @case ('issue') { <app-status-icon entity="issue" [status]="$any(e.status)" /> }
+                      @case ('workstream') { <app-status-icon entity="workstream" [status]="$any(e.status)" /> }
+                      @case ('decision') { <svg [lucideIcon]="decisionIcon" [size]="14" class="text-entity-decision shrink-0"></svg> }
+                      @case ('team') {
+                        <span class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white" [style.background]="e.color" aria-hidden="true">{{ e.label.slice(0, 1) }}</span>
+                      }
+                      @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                      @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                    }
+                    <span class="flex-1 truncate">{{ e.label }}</span>
+                  </a>
+                  <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                    aria-label="Remove from favorites"
+                    hlmTooltip="Remove from favorites"
+                    (click)="favorites.toggle(e.type, e.subjectId)"
+                  >
+                    <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
+
       <!-- Workspace -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-2">
         <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('workspace')" [attr.aria-expanded]="!ui.isFolded('workspace')">
           Workspace
           <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('workspace')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
         </button>
         @if (!ui.isFolded('workspace')) {
           <ul hlmSidebarMenu class="gap-px">
-            @for (item of nav; track item.segment) {
+            @for (item of nav(); track item.segment) {
               <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
             }
           </ul>
@@ -128,7 +204,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
       </div>
 
       <!-- Teams -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('teams')" [attr.aria-expanded]="!ui.isFolded('teams')">
             Your teams
@@ -207,7 +283,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
       </div>
 
       <!-- Views -->
-      <div class="mt-4">
+      <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('views')" [attr.aria-expanded]="!ui.isFolded('views')">
             Views
@@ -260,10 +336,23 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
           </ul>
         }
       </div>
+
+      <div class="mt-4 border-t border-sidebar-border pt-2 md:hidden">
+        <button
+          type="button"
+          hlmSidebarMenuButton
+          class="max-md:!h-12 max-md:!rounded-xl max-md:!px-4 max-md:!text-[15px]"
+          (click)="ui.openCommandPalette()"
+          closeMobileSidebarOnClick
+        >
+          <svg [lucideIcon]="search" [size]="17" class="text-muted-foreground"></svg>
+          <span>Search</span>
+        </button>
+      </div>
     </div>
 
     <!-- footer: user menu + help -->
-    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
       <button
         type="button"
         class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
@@ -303,7 +392,14 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
           <svg [lucideIcon]="item.icon" [size]="15" class="text-muted-foreground group-data-active/menu-button:text-foreground"></svg>
           <span class="flex-1 truncate">{{ item.label }}</span>
           @if (badge(item.badge); as n) {
-            @if (item.badge === 'attention') {
+            @if (ui.sidebarBadgeStyle() === 'dot') {
+              <span
+                class="size-1.5 shrink-0 rounded-full"
+                [class.bg-primary]="item.badge === 'attention' || item.badge === 'notifications'"
+                [class.bg-muted-foreground]="item.badge !== 'attention'"
+                [attr.aria-label]="n + ' pending'"
+              ></span>
+            } @else if (item.badge === 'attention' || item.badge === 'notifications') {
               <span class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ n }}</span>
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
@@ -406,6 +502,10 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
             Settings
             <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
           </button>
+          <button hlmDropdownMenuItem (triggered)="ui.openModal('customize-sidebar')">
+            <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
+            Customize sidebar
+          </button>
           <button hlmDropdownMenuItem (triggered)="ui.openModal('shortcuts')">
             <svg [lucideIcon]="help" [size]="14"></svg>
             Keyboard shortcuts
@@ -440,14 +540,22 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
 })
 export class AppSidebar {
   protected readonly ui = inject(UiStore);
+  protected readonly favorites = inject(FavoritesStore);
+  protected readonly notifications = inject(NotificationsStore);
   protected readonly store = inject(NablaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly sidebar = inject(HlmSidebarService);
 
-  protected readonly nav = MAIN_NAV;
-  protected readonly personal = PERSONAL_NAV;
+  protected readonly sidebarIcon = LucidePanelLeft;
+  /** Entries the user chose to show, in their order. "Only when badged" entries drop out while their badge is empty. */
+  protected readonly personal = computed(() =>
+    this.visible(orderNav(PERSONAL_NAV, this.ui.sidebarOrder().personal)),
+  );
+  protected readonly nav = computed(() =>
+    this.visible(orderNav(MAIN_NAV, this.ui.sidebarOrder().workspace)),
+  );
   protected readonly chevronDown = LucideChevronDown;
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
@@ -455,6 +563,7 @@ export class AppSidebar {
   protected readonly wsIcon = LucideHexagon;
   protected readonly decisionIcon = LucideScale;
   protected readonly layers = LucideLayers;
+  protected readonly closeIcon = LucideX;
   protected readonly repoIcon = LucideFolderGit2;
   protected readonly usersIcon = LucideUsers;
   protected readonly teamLinks = [
@@ -533,9 +642,17 @@ export class AppSidebar {
     return u ? ({ type: 'user', id: u.id } as const) : null;
   });
 
-  protected badge(kind: 'attention' | 'issues' | undefined): number {
+  private visible(items: NavItem[]): NavItem[] {
+    return items.filter((item) => {
+      const mode = this.ui.sidebarVisibilityOf(item.segment);
+      return mode === 'always' || (mode === 'badged' && this.badge(item.badge) > 0);
+    });
+  }
+
+  protected badge(kind: NavItem['badge']): number {
     if (kind === 'attention') return this.store.attentionCount();
     if (kind === 'issues') return this.store.backlogIssueCount();
+    if (kind === 'notifications') return this.notifications.unread();
     return 0;
   }
 

@@ -1,6 +1,239 @@
 @import 'tailwindcss';
 @import '@spartan-ng/brain/hlm-tailwind-preset.css';
 
+.mobile-nav {
+  position: relative;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  flex: none;
+  padding: 0.5rem 1rem max(0.625rem, env(safe-area-inset-bottom));
+}
+
+.mobile-menu__backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  border: 0;
+  background: rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(3px);
+}
+
+.mobile-menu {
+  position: fixed;
+  z-index: 45;
+  inset-inline: 1rem;
+  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  display: flex;
+  max-height: min(76dvh, 42rem);
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--border-strong) 72%, transparent);
+  border-radius: 1.75rem;
+  background: color-mix(in oklab, var(--popover) 94%, transparent);
+  color: var(--popover-foreground);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 0.28);
+  backdrop-filter: blur(24px);
+}
+
+.mobile-menu__header {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-inline: 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.mobile-menu__identity {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mobile-menu__avatar {
+  display: grid;
+  inline-size: 2.5rem;
+  block-size: 2.5rem;
+  flex: none;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 0.875rem;
+}
+
+.mobile-menu__account {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-menu__close {
+  display: grid;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  flex: none;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--foreground) 7%, transparent);
+  color: var(--foreground);
+}
+
+.mobile-menu__links {
+  overflow: auto;
+  padding: 0.625rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+}
+
+.mobile-menu__link {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0 0.875rem;
+  border: 0;
+  border-radius: 1rem;
+  background: transparent;
+  color: var(--foreground);
+  font: inherit;
+  font-size: 1rem;
+  text-align: start;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-menu__link svg {
+  flex: none;
+  color: var(--muted-foreground);
+}
+
+.mobile-menu__link--active {
+  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+}
+
+.mobile-nav__items {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 0.125rem;
+  padding: 0.3125rem;
+  border: 1px solid color-mix(in oklab, var(--border-strong) 80%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--popover) 88%, transparent);
+  box-shadow: var(--shadow-menu);
+  backdrop-filter: blur(18px);
+}
+
+.mobile-nav__link {
+  display: grid;
+  inline-size: clamp(2.625rem, 12vw, 3rem);
+  block-size: clamp(2.625rem, 12vw, 3rem);
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-nav__link--active {
+  background: color-mix(in oklab, var(--foreground) 8%, var(--popover));
+  color: var(--foreground);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+}
+
+.mobile-nav__link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.mobile-nav__link:active {
+  transform: scale(0.96);
+}
+
+@media (min-width: 48rem) {
+  .mobile-nav {
+    display: none;
+  }
+
+  .mobile-menu,
+  .mobile-menu__backdrop {
+    display: none;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  .text-xs {
+    font-size: 0.8125rem;
+    line-height: 1.25rem;
+  }
+
+  .text-\[13px\] {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  .text-\[11px\],
+  .text-meta {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  [data-slot='button'] {
+    min-block-size: 2.5rem;
+    min-inline-size: 2.5rem;
+  }
+
+  input[data-slot='input'],
+  textarea[data-slot='textarea'] {
+    min-block-size: 2.75rem;
+    font-size: 1rem;
+  }
+
+  app-issue-row > div[data-row-id],
+  app-workstream-row > div[data-row-id] {
+    min-block-size: 3rem;
+    padding-block: 0.5rem;
+  }
+
+  app-page-header nav[aria-label] a {
+    min-block-size: 2.5rem;
+  }
+
+  app-timeline-page [role='group'] > button {
+    min-block-size: 2.5rem;
+    min-inline-size: 2.5rem;
+  }
+
+  .top-bar__actions [data-slot='button'] {
+    min-block-size: 1.75rem;
+    min-inline-size: 0;
+    padding-inline: 0.625rem;
+    border-radius: 0.375rem;
+    font-size: 0.8rem;
+    font-weight: 500;
+  }
+
+  .top-bar__actions [data-slot='button'][aria-label] {
+    min-inline-size: 1.75rem;
+    padding-inline: 0;
+  }
+
+  .top-bar__actions app-kbd {
+    display: none;
+  }
+}
+
 /* ───────────────────────── Fonts (self-hosted) ───────────────────────── */
 @font-face {
   font-family: 'Inter';
@@ -20,7 +253,7 @@
 /* ───────────────────────── Tokens ─────────────────────────
    Light is :root, dark is :root.dark (class set by ThemeService).
    Linear-like: the app chrome (sidebar) is the darkest/most recessed surface and the page
-   sits on an inset panel. Neutral greys + ONE indigo accent. Status tones are muted and keep
+   sits on an inset panel. Neutral greys + ONE terracotta accent. Status tones are muted and keep
    the same meaning in both modes. Use the semantic Tailwind colors (bg-background,
    text-muted-foreground, text-status-working, …) — never raw hex / palette colors in feature code.
 
@@ -39,7 +272,7 @@
   --card-foreground: #1b1c1f;
   --popover: #ffffff;
   --popover-foreground: #1b1c1f;
-  --primary: #5e6ad2;
+  --primary: #b5583a;
   --primary-foreground: #ffffff;
   --secondary: #f3f3f5;
   --secondary-foreground: #26272b;
@@ -51,25 +284,25 @@
   --border: #e8e8ec;
   --border-strong: #dcdce1;
   --input: #dddde2;
-  --ring: #5e6ad2;
+  --ring: #b5583a;
   /* Faint row hover / selected fills */
   --hover: rgb(18 19 24 / 0.035);
   --selected: color-mix(in oklab, var(--primary) 8%, transparent);
 
-  --chart-1: #5e6ad2;
+  --chart-1: #b5583a;
   --chart-2: #2d9d8f;
   --chart-3: #d19a2a;
   --chart-4: #8a63d2;
-  --chart-5: #d9573f;
+  --chart-5: #5e6ad2;
 
   --sidebar: #f4f4f6;
   --sidebar-foreground: #3a3b40;
-  --sidebar-primary: #5e6ad2;
+  --sidebar-primary: #b5583a;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e8e8ec;
   --sidebar-accent-foreground: #1b1c1f;
   --sidebar-border: #e3e3e8;
-  --sidebar-ring: #5e6ad2;
+  --sidebar-ring: #b5583a;
 
   --entity-workstream: #7c5cc4;
   --entity-decision: #b7791f;
@@ -100,7 +333,7 @@
   --card-foreground: #e9eaee;
   --popover: #17181b;
   --popover-foreground: #e9eaee;
-  --primary: #6e79d6;
+  --primary: #c8643f;
   --primary-foreground: #ffffff;
   --secondary: #18191c;
   --secondary-foreground: #e9eaee;
@@ -112,24 +345,24 @@
   --border: #1e1f23;
   --border-strong: #2a2b30;
   --input: #2a2b30;
-  --ring: #6e79d6;
+  --ring: #c8643f;
   --hover: rgb(255 255 255 / 0.03);
   --selected: color-mix(in oklab, var(--primary) 12%, transparent);
 
-  --chart-1: #6e79d6;
+  --chart-1: #c8643f;
   --chart-2: #46b8a8;
   --chart-3: #e0b04a;
   --chart-4: #a389e6;
-  --chart-5: #ee7a63;
+  --chart-5: #6e79d6;
 
   --sidebar: #08090a;
   --sidebar-foreground: #c9cbd1;
-  --sidebar-primary: #6e79d6;
+  --sidebar-primary: #c8643f;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #17181b;
   --sidebar-accent-foreground: #f4f5f7;
   --sidebar-border: #17181b;
-  --sidebar-ring: #6e79d6;
+  --sidebar-ring: #c8643f;
 
   --entity-workstream: #a38bea;
   --entity-decision: #e0b04a;
@@ -348,4 +581,64 @@
 }
 .cdk-drop-list-receiving {
   background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* Shortcut chips on primary surfaces (e.g. "New issue C"): a lighter shade of the accent
+   instead of the muted keycap, so the chip reads as part of the button. */
+.bg-primary [data-slot='kbd'] {
+  border-color: color-mix(in oklab, var(--primary), white 30%);
+  background: color-mix(in oklab, var(--primary), white 12%);
+  color: var(--primary-foreground);
+}
+
+/* ───────────────────── Personal preferences (core/preferences.ts) ─────────────────────
+   Applied through attributes on <html>; src/index.html sets them before first paint. */
+
+/* Font size: scales every rem-based size and spacing; the fixed px text sizes below follow. */
+html {
+  font-size: calc(100% * var(--font-scale, 1));
+}
+html[data-font-size]:not([data-font-size='default']) {
+  .text-\[9px\] { font-size: calc(9px * var(--font-scale)); }
+  .text-\[10px\] { font-size: calc(10px * var(--font-scale)); }
+  .text-\[11px\] { font-size: calc(11px * var(--font-scale)); }
+  .text-\[12px\] { font-size: calc(12px * var(--font-scale)); }
+  .text-\[12\.5px\] { font-size: calc(12.5px * var(--font-scale)); }
+  .text-\[13px\] { font-size: calc(13px * var(--font-scale)); }
+  .text-\[14px\] { font-size: calc(14px * var(--font-scale)); }
+  .text-\[15px\] { font-size: calc(15px * var(--font-scale)); }
+}
+
+/* Pointer cursors off: interactive elements keep the arrow, text fields keep their I-beam. */
+html[data-pointer-cursors='false']
+  :is(a, button, summary, label, select, [role='button'], [role='tab'], [role='menuitem'], [role='option'], [role='checkbox'], [role='radio'], [role='switch'], .cursor-pointer):not(
+    :is(input, textarea, [disabled], :disabled)
+  ) {
+  cursor: default !important;
+}
+
+/* Underline links in text content (descriptions, comments, markdown), not in navigation. */
+html[data-underline-links='true'] :is(app-markdown, p, li) a:not([hlmBtn], [data-slot='button']) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Reduce motion: always, or when the operating system asks for it (unless set to "full"). */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) *,
+  html:not([data-motion='full']) *::before,
+  html:not([data-motion='full']) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

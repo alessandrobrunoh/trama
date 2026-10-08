@@ -5,7 +5,9 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmSidebarTrigger } from '@spartan-ng/helm/sidebar';
 import { filter, map, startWith } from 'rxjs';
+import { FavoritesStore } from '../core/stores/favorites.store';
 import { NablaStore } from '../core/stores/nabla.store';
+import { FavoriteButton } from '../shared/favorite-button';
 import { SyncStatus } from '../core/sync/sync-status';
 import { PageChrome, type Crumb } from './page-chrome';
 import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
@@ -14,13 +16,13 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
 @Component({
   selector: 'app-top-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger],
+  imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger, FavoriteButton],
   host: {
     class:
       'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 md:rounded-t-lg',
   },
   template: `
-    <button hlmSidebarTrigger class="-ml-1 size-9 md:size-7" srOnlyText="Toggle sidebar (⌘B)"></button>
+    <button hlmSidebarTrigger class="-ml-1 hidden size-7 md:inline-flex" srOnlyText="Toggle sidebar (⌘B)"></button>
 
     <nav aria-label="Breadcrumb" class="flex min-w-0 flex-1 items-center gap-1.5">
       @if (sectionIcon(); as icon) {
@@ -56,6 +58,10 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
       }
     </nav>
 
+    @if (favoriteTarget(); as t) {
+      <app-favorite-button [type]="t.type" [subjectId]="t.id" />
+    }
+
     @if (sync.live() === 'reconnecting' || sync.lastError()) {
       <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status">
         <span class="bg-status-needs-input size-1.5 rounded-full"></span>
@@ -63,7 +69,7 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
       </span>
     }
 
-    <div class="flex shrink-0 items-center gap-1.5 empty:hidden">
+    <div class="top-bar__actions flex shrink-0 items-center gap-1.5 empty:hidden">
       @if (chrome.actions(); as tpl) {
         <ng-container *ngTemplateOutlet="tpl" />
       }
@@ -75,6 +81,7 @@ export class TopBar {
   protected readonly sync = inject(SyncStatus);
   private readonly router = inject(Router);
   private readonly store = inject(NablaStore);
+  private readonly favorites = inject(FavoritesStore);
   protected readonly sep = LucideChevronRight;
 
   private readonly url = toSignal(
@@ -90,6 +97,8 @@ export class TopBar {
     const seg = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
     return [...PERSONAL_NAV, ...MAIN_NAV].find((n) => n.segment === seg)?.icon ?? null;
   });
+
+  protected readonly favoriteTarget = this.favorites.current;
 
   /** Page description from <app-page-header>, shown after the trail (muted). */
   protected readonly description = computed(() => {

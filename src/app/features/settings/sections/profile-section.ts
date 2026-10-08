@@ -20,7 +20,7 @@ import { SECTION_KIT } from './section-kit';
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Profile" description="How you appear to teammates and agents across Nabla." />
+      <app-section-header title="Profile" description="How you appear to teammates and agents across Trama." />
 
       <div class="mb-8 flex items-center gap-4">
         <app-actor-avatar [actor]="meRef()" [size]="56" />

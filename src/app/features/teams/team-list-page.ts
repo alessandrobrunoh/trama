@@ -24,7 +24,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
       @if (canAdmin()) {
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New team</span>
+          <span>New team</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
@@ -35,7 +35,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
     <div class="border-b px-4 py-2 sm:px-6">
       <div class="relative w-full sm:w-52">
         <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input hlmInput class="h-7 w-full pl-8 text-xs" placeholder="Search teams…" aria-label="Search teams" [value]="search()" (input)="search.set($any($event.target).value)" />
+        <input hlmInput class="h-10 w-full pl-9 text-sm" placeholder="Search teams…" aria-label="Search teams" [value]="search()" (input)="search.set($any($event.target).value)" />
       </div>
     </div>
 
@@ -60,7 +60,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             [routerLink]="['/', slug(), 'teams', r.team.key]"
             [attr.data-row-id]="r.team.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex items-center gap-3 border-b px-4 py-2 outline-none sm:px-6 md:min-h-11"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex min-h-16 items-center gap-3 border-b px-4 py-3 outline-none sm:px-6 md:min-h-11 md:py-2"
             [class.bg-muted]="ui.focusedRowId() === r.team.id"
           >
             <span class="flex size-6 shrink-0 items-center justify-center rounded-md" [style.background]="r.tint">
@@ -68,7 +68,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             </span>
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 items-center gap-2">
-                <span class="truncate text-[13px] font-medium">{{ r.team.name }}</span>
+                <span class="truncate text-sm font-medium">{{ r.team.name }}</span>
                 <app-key-chip [value]="r.team.key" />
               </span>
               @if (r.team.description) {
@@ -85,7 +85,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             <span class="text-muted-foreground flex w-28 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums max-md:hidden">
               <app-status-icon status="working" entity="workstream" [size]="12" />{{ r.active }}<span class="opacity-60">/ {{ r.owned }}</span>
             </span>
-            <span class="text-muted-foreground flex w-20 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums">
+            <span class="text-muted-foreground flex w-20 shrink-0 items-center justify-end gap-1.5 text-[13px] tabular-nums">
               <app-status-icon status="todo" entity="issue" [size]="12" />{{ r.openIssues }}
             </span>
           </a>

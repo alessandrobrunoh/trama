@@ -10,6 +10,7 @@ import {
   LucideColumns3,
   LucideCopy,
   LucideGitBranch,
+  LucideStar,
   LucideDynamicIcon,
   LucideExternalLink,
   LucideHexagon,
@@ -32,6 +33,7 @@ import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
+  FavoritesStore,
   NablaStore,
   UiStore,
   filterValues,
@@ -125,7 +127,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           (keydown.escape)="search.set(''); searchBox.blur()"
         />
       </div>
-      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full">
+      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain max-sm:basis-full">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
         <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
@@ -371,6 +373,10 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               <svg [lucideIcon]="branchIcon" [size]="14"></svg> Copy git branch name
               <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+g" /></hlm-dropdown-menu-shortcut>
             </button>
+            <button hlmDropdownMenuItem (triggered)="favorites.toggle('issue', i.id)">
+              <svg [lucideIcon]="starIcon" [size]="14" [attr.fill]="favorites.has('issue', i.id) ? 'currentColor' : 'none'"></svg>
+              {{ favorites.has('issue', i.id) ? 'Remove from favorites' : 'Add to favorites' }}
+            </button>
             <button hlmDropdownMenuItem (triggered)="actions.openPrompt('duplicate', ids)" [disabled]="!!i.duplicateOfId">
               <svg [lucideIcon]="copyIcon" [size]="14"></svg> Mark as duplicate…
             </button>
@@ -512,6 +518,7 @@ export class IssueBoard {
   protected readonly store = inject(NablaStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
+  protected readonly favorites = inject(FavoritesStore);
   private readonly document = inject(DOCUMENT);
 
   /** Issues this board shows. The issues page passes every issue; a workstream passes its own. */
@@ -574,6 +581,7 @@ export class IssueBoard {
   protected readonly teamIcon = LucideUsers;
   protected readonly copyIcon = LucideCopy;
   protected readonly branchIcon = LucideGitBranch;
+  protected readonly starIcon = LucideStar;
   protected readonly linkIcon = LucideLink;
   protected readonly openIcon = LucideExternalLink;
   protected readonly trash = LucideTrash2;

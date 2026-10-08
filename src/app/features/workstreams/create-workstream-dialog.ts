@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { NablaStore, WORKSTREAM_STATUS_META, type Priority, type WorkstreamStatus } from '../../core';
+import { NablaStore, WORKSTREAM_STATUS_META, isDeltaThreadUrl, type Priority, type WorkstreamStatus } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
 import { priorityOptions, repoOptions, teamOptions, userOptions } from './ws-model';
@@ -72,17 +72,19 @@ export interface CreateWorkstreamDefaults {
               (input)="description.set($any($event.target).value)"
             ></textarea>
           </div>
-          <div class="grid gap-1.5">
-            <label hlmLabel for="cw-delta">Delta thread</label>
-            <input
-              hlmInput
-              id="cw-delta"
-              placeholder="https://delta.dev/t/…"
-              autocomplete="off"
-              [value]="deltaUrl()"
-              (input)="deltaUrl.set($any($event.target).value)"
-            />
-          </div>
+          @if (deltaEnabled()) {
+            <div class="grid gap-1.5">
+              <label hlmLabel for="cw-delta">Delta thread</label>
+              <input
+                hlmInput
+                id="cw-delta"
+                placeholder="https://delta.dev/t/…"
+                autocomplete="off"
+                [value]="deltaUrl()"
+                (input)="deltaUrl.set($any($event.target).value)"
+              />
+            </div>
+          }
           <div class="grid gap-1.5">
             <label hlmLabel for="cw-objective">Objective <span class="text-muted-foreground font-normal">(markdown)</span></label>
             <textarea
@@ -198,8 +200,9 @@ export class CreateWorkstreamDialog {
   protected readonly participantOptions = computed(() =>
     this.teams().filter((t) => t.value !== this.ownerTeamId()),
   );
+  protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   protected readonly canSubmit = computed(
-    () => this.title().trim().length > 0 && !!this.ownerTeamId() && /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim()),
+    () => this.title().trim().length > 0 && !!this.ownerTeamId() && (!this.deltaEnabled() || isDeltaThreadUrl(this.deltaUrl().trim())),
   );
 
   constructor() {
@@ -243,7 +246,7 @@ export class CreateWorkstreamDialog {
     const ws = await this.store.createWorkstream({
       title: this.title().trim(),
       description: this.description().trim() || undefined,
-      deltaThreadUrl: this.deltaUrl().trim(),
+      deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() : undefined,
       objective: this.objective().trim() || undefined,
       ownerTeamId: this.ownerTeamId(),
       participatingTeamIds: this.participating(),

@@ -96,6 +96,7 @@ import { WsProperties } from './ws-properties';
           />
         </section>
 
+        @if (store.deltaThreads()) {
         <section aria-labelledby="ws-delta-title">
           <h2 id="ws-delta-title" class="mb-2 text-sm font-semibold">Workspace</h2>
           <div class="bg-card flex flex-wrap items-center gap-3 rounded-lg border border-border-strong px-3 py-2.5">
@@ -138,6 +139,7 @@ import { WsProperties } from './ws-properties';
             <p class="text-destructive mt-1 text-xs">Use an https link on delta.dev.</p>
           }
         </section>
+        }
 
         <section aria-labelledby="ws-comments-title">
           <h2 id="ws-comments-title" class="mb-3 flex items-center gap-1.5 text-sm font-semibold">

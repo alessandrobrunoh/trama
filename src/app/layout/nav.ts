@@ -1,15 +1,19 @@
 import {
   LucideActivity,
+  LucideBell,
   LucideBellRing,
   LucideChartColumn,
   LucideChartGantt,
   LucideCircleDot,
   LucideFolderGit2,
   LucideHexagon,
+  LucideLayers,
   LucideLayoutDashboard,
+  LucideMessageSquare,
   LucideNetwork,
   LucideScale,
   LucideUserRoundCheck,
+  LucideUsers,
   type LucideIcon,
 } from '@lucide/angular';
 
@@ -20,7 +24,7 @@ export interface NavItem {
   icon: LucideIcon;
   /** G-chord hint, e.g. "g o" */
   keys: string;
-  badge?: 'attention' | 'issues' | 'my-work';
+  badge?: 'attention' | 'issues' | 'my-work' | 'notifications';
   /** One-line explanation, shown as the item tooltip and on the page header. */
   hint?: string;
 }
@@ -41,6 +45,21 @@ export const PERSONAL_NAV: NavItem[] = [
     icon: LucideUserRoundCheck,
     keys: 'g m',
     hint: 'Issues assigned to you and workstreams you are accountable for',
+  },
+  {
+    segment: 'assistant',
+    label: 'Assistant',
+    icon: LucideMessageSquare,
+    keys: '',
+    hint: 'Chat with Trama about your work',
+  },
+  {
+    segment: 'notifications',
+    label: 'Notifications',
+    icon: LucideBell,
+    keys: 'g n',
+    badge: 'notifications',
+    hint: 'Assignments, questions, reviews and comments that concern you',
   },
 ];
 
@@ -68,10 +87,24 @@ export const MAIN_NAV: NavItem[] = [
   { segment: 'timeline', label: 'Timeline', icon: LucideChartGantt, keys: 'g l', hint: 'Workstreams and milestones on a calendar' },
   { segment: 'decisions', label: 'Decisions', icon: LucideScale, keys: 'g d', hint: 'What was decided and why' },
   { segment: 'projects', label: 'Projects', icon: LucideFolderGit2, keys: 'g p', hint: 'Repositories and the work touching them' },
+  { segment: 'teams', label: 'Teams', icon: LucideUsers, keys: 'g t', hint: 'Who works on what, team by team' },
+  { segment: 'views', label: 'Views', icon: LucideLayers, keys: 'g v', hint: 'Saved filters for issues, workstreams and decisions' },
   { segment: 'activity', label: 'Activity', icon: LucideActivity, keys: 'g e', hint: 'Everything that happened, newest first' },
   { segment: 'graph', label: 'Graph', icon: LucideNetwork, keys: 'g x', hint: 'Dependencies between workstreams' },
   { segment: 'stats', label: 'Statistics', icon: LucideChartColumn, keys: 'g y', hint: 'Throughput, health and trends' },
 ];
+
+/** `items` in the user's custom `order` (segments); entries missing from it keep their default order after the listed ones. */
+export function orderNav(items: readonly NavItem[], order: readonly string[]): NavItem[] {
+  const rank = (n: NavItem): number => {
+    const i = order.indexOf(n.segment);
+    return i < 0 ? order.length : i;
+  };
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index)
+    .map((x) => x.item);
+}
 
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
@@ -79,6 +112,8 @@ export const SECTION_LABELS: Record<string, string> = {
   stats: 'Statistics',
   attention: 'My Attention',
   'my-work': 'My Work',
+  assistant: 'Assistant',
+  notifications: 'Notifications',
   issues: 'Issues',
   workstreams: 'Workstreams',
   timeline: 'Timeline',

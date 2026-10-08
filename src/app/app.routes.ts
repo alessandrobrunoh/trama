@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { AppShell } from './layout/app-shell';
-import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core/session/guards';
+import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/session/guards';
 
 /**
  * Routes per PLAN.md §5. Every page is a lazy standalone component; route params and query
@@ -11,36 +11,79 @@ import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core
  * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
  * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
- * Reserved top-level paths (cannot be workspace slugs): login, signup, new-workspace, 404.
+ * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, blog, roadmap,
+ * changelog, brand, new-workspace, 404.
  */
 export const routes: Routes = [
   {
     path: 'login',
-    title: 'Sign in · Nabla',
+    title: 'Sign in · Trama',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/login-page').then((m) => m.LoginPage),
   },
   {
-    path: 'signup',
-    title: 'Create account · Nabla',
+    path: 'register',
+    title: 'Create account · Trama',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/signup-page').then((m) => m.SignupPage),
   },
+  // Old links: /signup → /register (query params such as `next` are kept).
+  { path: 'signup', pathMatch: 'full', redirectTo: 'register' },
+  {
+    // Public on purpose: shows the invitation, then asks to sign in or sign up (see InvitePage).
+    path: 'invite/:token',
+    title: 'Join a workspace · Trama',
+    loadComponent: () => import('./features/auth/invite-page').then((m) => m.InvitePage),
+  },
+  {
+    path: 'blog',
+    title: 'Blog · Trama',
+    loadComponent: () => import('./features/blog/blog-index-page').then((m) => m.BlogIndexPage),
+  },
+  {
+    path: 'blog/:slug',
+    title: (route) =>
+      import('./features/blog/blog-posts').then(
+        (m) => `${m.findPost(route.paramMap.get('slug') ?? '')?.title ?? 'Post not found'} · Trama Blog`,
+      ),
+    loadComponent: () => import('./features/blog/blog-post-page').then((m) => m.BlogPostPage),
+  },
+  {
+    path: 'roadmap',
+    title: 'Roadmap · Trama',
+    loadComponent: () => import('./features/roadmap/roadmap-page').then((m) => m.RoadmapPage),
+  },
+  {
+    path: 'changelog',
+    title: 'Changelog · Trama',
+    loadComponent: () => import('./features/changelog/changelog-page').then((m) => m.ChangelogPage),
+  },
+  {
+    path: 'brand',
+    title: 'Brand · Trama',
+    loadComponent: () => import('./features/brand/brand-page').then((m) => m.BrandPage),
+  },
   {
     path: 'new-workspace',
-    title: 'New workspace · Nabla',
+    title: 'New workspace · Trama',
     canActivate: [authGuard],
     loadComponent: () =>
       import('./features/auth/new-workspace-page').then((m) => m.NewWorkspacePage),
   },
   {
     path: '404',
-    title: 'Not found · Nabla',
+    title: 'Not found · Trama',
     loadComponent: () =>
       import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },
-  // `/` → last used (or first) workspace, /new-workspace if none, /login if signed out.
-  { path: '', pathMatch: 'full', canActivate: [rootRedirectGuard], children: [] },
+  // `/` → landing page when signed out; else last used (or first) workspace, /new-workspace if none.
+  {
+    path: '',
+    pathMatch: 'full',
+    title: 'Trama · Coordination for humans and coding agents',
+    canActivate: [landingGuard],
+    loadComponent: () => import('./features/landing/landing-page').then((m) => m.LandingPage),
+  },
   {
     path: ':workspaceSlug',
     component: AppShell,
@@ -49,50 +92,62 @@ export const routes: Routes = [
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
       {
         path: 'overview',
-        title: 'Overview · Nabla',
+        title: 'Overview · Trama',
         loadComponent: () => import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
       {
+        path: 'assistant',
+        title: 'Assistant · Trama',
+        loadComponent: () =>
+          import('./features/ai/assistant-page').then((m) => m.AssistantPage),
+      },
+      {
+        path: 'notifications',
+        title: 'Notifications · Trama',
+        loadComponent: () =>
+          import('./features/notifications/notifications-page').then((m) => m.NotificationsPage),
+      },
+      {
         path: 'stats',
-        title: 'Statistics · Nabla',
+        title: 'Statistics · Trama',
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
       },
       {
         path: 'attention',
-        title: 'My Attention · Nabla',
+        title: 'My Attention · Trama',
         loadComponent: () =>
           import('./features/attention/attention-page').then((m) => m.AttentionPage),
       },
       {
         path: 'my-work',
-        title: 'My Work · Nabla',
+        title: 'My Work · Trama',
         loadComponent: () => import('./features/my-work/my-work-page').then((m) => m.MyWorkPage),
       },
       {
         path: 'activity',
-        title: 'Activity · Nabla',
+        title: 'Activity · Trama',
         loadComponent: () => import('./features/activity/activity-page').then((m) => m.ActivityPage),
       },
       {
         path: 'issues',
-        title: 'Issues · Nabla',
+        title: 'Issues · Trama',
         loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
       },
       {
         path: 'issues/:key',
-        title: 'Issue · Nabla',
+        title: 'Issue · Trama',
         loadComponent: () =>
           import('./features/issues/issue-detail-page').then((m) => m.IssueDetailPage),
       },
       {
         path: 'workstreams',
-        title: 'Workstreams · Nabla',
+        title: 'Workstreams · Trama',
         loadComponent: () =>
           import('./features/workstreams/workstream-list-page').then((m) => m.WorkstreamListPage),
       },
       {
         path: 'workstreams/:key',
-        title: 'Workstream · Nabla',
+        title: 'Workstream · Trama',
         loadComponent: () =>
           import('./features/workstreams/workstream-detail-page').then(
             (m) => m.WorkstreamDetailPage,
@@ -100,35 +155,35 @@ export const routes: Routes = [
       },
       {
         path: 'timeline',
-        title: 'Timeline · Nabla',
+        title: 'Timeline · Trama',
         loadComponent: () => import('./features/timeline/timeline-page').then((m) => m.TimelinePage),
       },
       {
         path: 'graph',
-        title: 'Graph · Nabla',
+        title: 'Graph · Trama',
         loadComponent: () => import('./features/graph/graph-page').then((m) => m.GraphPage),
       },
       {
         path: 'decisions',
-        title: 'Decisions · Nabla',
+        title: 'Decisions · Trama',
         loadComponent: () =>
           import('./features/decisions/decision-list-page').then((m) => m.DecisionListPage),
       },
       {
         path: 'decisions/:key',
-        title: 'Decision · Nabla',
+        title: 'Decision · Trama',
         loadComponent: () =>
           import('./features/decisions/decision-detail-page').then((m) => m.DecisionDetailPage),
       },
       {
         path: 'projects',
-        title: 'Projects · Nabla',
+        title: 'Projects · Trama',
         loadComponent: () =>
           import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
       },
       {
         path: 'projects/:id',
-        title: 'Project · Nabla',
+        title: 'Project · Trama',
         loadComponent: () =>
           import('./features/repositories/repository-detail-page').then(
             (m) => m.RepositoryDetailPage,
@@ -138,36 +193,36 @@ export const routes: Routes = [
       { path: 'repositories/:id', redirectTo: 'projects/:id' },
       {
         path: 'teams',
-        title: 'Teams · Nabla',
+        title: 'Teams · Trama',
         loadComponent: () => import('./features/teams/team-list-page').then((m) => m.TeamListPage),
       },
       {
         path: 'teams/:key',
-        title: 'Team · Nabla',
+        title: 'Team · Trama',
         loadComponent: () =>
           import('./features/teams/team-detail-page').then((m) => m.TeamDetailPage),
       },
       {
         path: 'views',
-        title: 'Views · Nabla',
+        title: 'Views · Trama',
         loadComponent: () => import('./features/views/view-list-page').then((m) => m.ViewListPage),
       },
       {
         path: 'views/:id',
-        title: 'View · Nabla',
+        title: 'View · Trama',
         loadComponent: () =>
           import('./features/views/view-detail-page').then((m) => m.ViewDetailPage),
       },
       { path: 'settings', pathMatch: 'full', redirectTo: 'settings/profile' },
       {
         path: 'settings/:section',
-        title: 'Settings · Nabla',
+        title: 'Settings · Trama',
         loadComponent: () =>
           import('./features/settings/settings-page').then((m) => m.SettingsPage),
       },
       {
         path: '**',
-        title: 'Not found · Nabla',
+        title: 'Not found · Trama',
         loadComponent: () =>
           import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
       },
@@ -175,7 +230,7 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    title: 'Not found · Nabla',
+    title: 'Not found · Trama',
     loadComponent: () =>
       import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },

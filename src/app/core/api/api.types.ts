@@ -14,6 +14,8 @@ import type {
   PermissionMap,
   TeamEditPolicy,
   TokenScope,
+  ApiPermission,
+  TokenLimits,
   WeekStart,
   OutgoingWebhook,
   DependencyNodeType,
@@ -76,6 +78,11 @@ export interface UpdateWorkspaceSettingsInput {
   timeZone?: string;
   iconColor?: string | null;
   iconInitial?: string | null;
+  deltaThreads?: boolean;
+}
+export interface CreateInviteInput {
+  email: string;
+  role: Role;
 }
 export interface AddMemberInput {
   /** The person must already have an account. */
@@ -95,6 +102,10 @@ export interface CreateTokenInput {
   name: string;
   /** Default `write`. `admin` needs an admin caller and cannot be used for agents. */
   scope?: TokenScope;
+  /** Explicit resource × action grants; implies `scope: 'custom'`. */
+  permissions?: ApiPermission[];
+  /** Request / write caps; omitted values use the defaults. */
+  limits?: Partial<TokenLimits>;
   /** Omit: the token acts as you. Set (admin only): the token acts as this agent. */
   agentId?: ID;
   expiresAt?: ISODate;
@@ -150,8 +161,8 @@ export interface CreateWorkstreamInput {
   description?: string;
   objective?: string;
   context?: string;
-  /** https link on delta.dev. Required. */
-  deltaThreadUrl: string;
+  /** https link on delta.dev. Required unless the workstream is a draft or the workspace turned Delta threads off. */
+  deltaThreadUrl?: string;
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID;
@@ -288,10 +299,10 @@ export interface UpdateArtifactInput {
 // ───── decisions ─────
 export interface CreateDecisionInput {
   title: string;
-  statement: string;
+  statement?: string;
   rationale?: string;
   /** Default `proposed`; people can also record it directly as accepted / rejected. */
-  status?: 'proposed' | 'accepted' | 'rejected';
+  status?: 'draft' | 'proposed' | 'accepted' | 'rejected';
   originWorkstreamId?: ID;
   originExecutionId?: ID;
   relatedWorkstreamIds?: ID[];
@@ -300,6 +311,7 @@ export interface CreateDecisionInput {
 export interface UpdateDecisionInput {
   title?: string;
   statement?: string;
+  status?: 'proposed';
   rationale?: string | null;
   originWorkstreamId?: ID | null;
   originExecutionId?: ID | null;

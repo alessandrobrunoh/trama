@@ -4,6 +4,7 @@ import {
   provideAppInitializer,
   provideBrowserGlobalErrorListeners,
   provideZonelessChangeDetection,
+  isDevMode,
 } from '@angular/core';
 import { provideHttpClient, withFetch, withInterceptors } from '@angular/common/http';
 import {
@@ -19,6 +20,7 @@ import { routes } from './app.routes';
 import { apiInterceptor } from './core/api/api.interceptor';
 import { Notifier } from './core/notify/notifier';
 import { LiveSync } from './core/sync/live-sync.service';
+import { provideServiceWorker } from '@angular/service-worker';
 
 export const appConfig: ApplicationConfig = {
   providers: [
@@ -31,7 +33,7 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       // Children inherit `:workspaceSlug` so pages can bind it as an input.
       withRouterConfig({ paramsInheritanceStrategy: 'always' }),
-      withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
     ),
     // Cookie session + X-Client-Id on writes for requests to /api.
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),
@@ -42,7 +44,9 @@ export const appConfig: ApplicationConfig = {
         toast[kind](title, {
           description: options?.description,
           duration: options?.duration,
-          action: options?.action ? { label: options.action.label, onClick: options.action.run } : undefined,
+          action: options?.action
+            ? { label: options.action.label, onClick: options.action.run }
+            : undefined,
         });
       });
     }),
@@ -51,5 +55,9 @@ export const appConfig: ApplicationConfig = {
       inject(LiveSync);
     }),
     provideLucideConfig({ size: 16, strokeWidth: 1.75 }),
+    provideServiceWorker('ngsw-worker.js', {
+      enabled: !isDevMode(),
+      registrationStrategy: 'registerWhenStable:30000',
+    }),
   ],
 };

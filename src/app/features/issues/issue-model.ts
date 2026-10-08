@@ -28,45 +28,76 @@ export const SOURCE_LABEL: Record<string, string> = {
   agent: 'Agent',
 };
 
-export const isClosedIssue = (i: Pick<Issue, 'status'>): boolean => i.status === 'done' || i.status === 'canceled';
+export const isClosedIssue = (i: Pick<Issue, 'status'>): boolean =>
+  i.status === 'done' || i.status === 'canceled';
 const CLOSED_WS = new Set(['shipped', 'canceled']);
 export const isOpenWorkstream = (w: Workstream): boolean => !CLOSED_WS.has(w.status);
 
 // ───────────────────────── picker options ─────────────────────────
 
 export const issueStatusOptions = (): PickOption[] =>
-  ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, kind: 'status', statusEntity: 'issue' }));
+  ISSUE_STATUSES.map((s) => ({
+    value: s,
+    label: ISSUE_STATUS_META[s].label,
+    kind: 'status',
+    statusEntity: 'issue',
+  }));
 
 /**
  * Estimate picker options on a scale (`value` = points as a string): glyph + "3 points" ("M · 3 points" on the
  * t-shirt scale). A stored value that is not on the scale stays selectable. "No estimate" is the picker's clear row.
  */
-export function issueEstimateOptions(current?: number, scale: EstimateScale = DEFAULT_ESTIMATE_SCALE): PickOption[] {
+export function issueEstimateOptions(
+  current?: number,
+  scale: EstimateScale = DEFAULT_ESTIMATE_SCALE,
+): PickOption[] {
   const opts: PickOption[] = estimateOptions(scale).map((o) => ({
     value: String(o.value),
     label: formatEstimateLong(o.value, scale),
     kind: 'estimate',
     fraction: estimateFraction(o.value, scale),
     search: `${o.label} ${o.value}`,
-    quickKey: /^\d+$/.test(o.label) ? (o.value < 10 ? String(o.value) : undefined) : o.label.length === 1 ? o.label.toLowerCase() : undefined,
+    quickKey: /^\d+$/.test(o.label)
+      ? o.value < 10
+        ? String(o.value)
+        : undefined
+      : o.label.length === 1
+        ? o.label.toLowerCase()
+        : undefined,
   }));
   if (current !== undefined && !opts.some((o) => o.value === String(current))) {
-    opts.push({ value: String(current), label: formatEstimateLong(current, scale), kind: 'estimate', fraction: estimateFraction(current, scale) });
+    opts.push({
+      value: String(current),
+      label: formatEstimateLong(current, scale),
+      kind: 'estimate',
+      fraction: estimateFraction(current, scale),
+    });
   }
   return opts;
 }
 
 export const issueKindOptions = (): PickOption[] =>
-  ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label, hint: ISSUE_KIND_META[k].prefix }));
+  ISSUE_KINDS.map((k) => ({
+    value: k,
+    label: ISSUE_KIND_META[k].label,
+    hint: ISSUE_KIND_META[k].prefix,
+  }));
 
 /** Workstreams as picker options (hexagon glyph + key hint), open ones first. */
-export function workstreamPickOptions(store: NablaStore, exclude: readonly string[] = []): PickOption[] {
+export function workstreamPickOptions(
+  store: NablaStore,
+  exclude: readonly string[] = [],
+): PickOption[] {
   const skip = new Set(exclude);
   return store
     .workstreams()
     .filter((w) => !skip.has(w.id))
     .slice()
-    .sort((a, b) => Number(isOpenWorkstream(b)) - Number(isOpenWorkstream(a)) || (a.updatedAt < b.updatedAt ? 1 : -1))
+    .sort(
+      (a, b) =>
+        Number(isOpenWorkstream(b)) - Number(isOpenWorkstream(a)) ||
+        (a.updatedAt < b.updatedAt ? 1 : -1),
+    )
     .map((w) => ({
       value: w.id,
       label: w.title,
@@ -80,17 +111,32 @@ export function workstreamPickOptions(store: NablaStore, exclude: readonly strin
 
 // ───────────────────────── view tabs ─────────────────────────
 
-export type IssueViewTab = 'all' | 'active' | 'backlog' | 'done';
+export type IssueViewTab = 'all' | 'active' | 'backlog' | 'done' | 'draft';
 
-export const ISSUE_TABS: { id: IssueViewTab; label: string; statuses: readonly IssueStatus[] | null; hint: string }[] = [
+export const ISSUE_TABS: {
+  id: IssueViewTab;
+  label: string;
+  statuses: readonly IssueStatus[] | null;
+  hint: string;
+}[] = [
   { id: 'all', label: 'All issues', statuses: null, hint: 'Every issue' },
-  { id: 'active', label: 'Active', statuses: ['todo', 'in_progress', 'in_review'], hint: 'Todo, in progress and in review' },
+  {
+    id: 'active',
+    label: 'Active',
+    statuses: ['todo', 'in_progress', 'in_review'],
+    hint: 'Todo, in progress and in review',
+  },
   { id: 'backlog', label: 'Backlog', statuses: ['backlog'], hint: 'Unscheduled demand' },
   { id: 'done', label: 'Done', statuses: ['done', 'canceled'], hint: 'Done and canceled' },
+  { id: 'draft', label: 'Drafts', statuses: ['draft'], hint: 'Saved for later' },
 ];
 
 export const asViewTab = (v: string | null | undefined): IssueViewTab =>
-  oneOf(v, ISSUE_TABS.map((t) => t.id), 'all');
+  oneOf(
+    v,
+    ISSUE_TABS.map((t) => t.id),
+    'all',
+  );
 
 export function tabStatuses(tab: IssueViewTab): readonly IssueStatus[] | null {
   return ISSUE_TABS.find((t) => t.id === tab)?.statuses ?? null;
@@ -99,7 +145,8 @@ export function tabStatuses(tab: IssueViewTab): readonly IssueStatus[] | null {
 // ───────────────────────── display options ─────────────────────────
 
 export type IssueLayout = 'list' | 'board';
-export type IssueGroup = 'status' | 'kind' | 'priority' | 'teamId' | 'assigneeId' | 'workstreamIds' | 'none';
+export type IssueGroup =
+  'status' | 'kind' | 'priority' | 'teamId' | 'assigneeId' | 'workstreamIds' | 'none';
 export type IssueSort = 'updatedAt' | 'createdAt' | 'priority' | 'status' | 'key' | 'title';
 export type IssueDensity = 'comfortable' | 'compact';
 export type IssueProp = 'kind' | 'workstreams' | 'team' | 'assignee' | 'date';
@@ -114,8 +161,23 @@ export interface IssueDisplay {
   hidden: IssueProp[];
 }
 
-export const GROUPS: readonly IssueGroup[] = ['status', 'kind', 'priority', 'teamId', 'assigneeId', 'workstreamIds', 'none'];
-export const SORTS: readonly IssueSort[] = ['updatedAt', 'createdAt', 'priority', 'status', 'key', 'title'];
+export const GROUPS: readonly IssueGroup[] = [
+  'status',
+  'kind',
+  'priority',
+  'teamId',
+  'assigneeId',
+  'workstreamIds',
+  'none',
+];
+export const SORTS: readonly IssueSort[] = [
+  'updatedAt',
+  'createdAt',
+  'priority',
+  'status',
+  'key',
+  'title',
+];
 export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'team', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
@@ -160,9 +222,14 @@ export function readDisplay(key: string): IssueDisplay {
     groupBy: oneOf(raw.groupBy, GROUPS, DEFAULT_DISPLAY.groupBy),
     sortField: oneOf(raw.sortField, SORTS, DEFAULT_DISPLAY.sortField),
     sortDir: oneOf(raw.sortDir, ['asc', 'desc'], DEFAULT_DISPLAY.sortDir),
-    showEmptyGroups: typeof raw.showEmptyGroups === 'boolean' ? raw.showEmptyGroups : DEFAULT_DISPLAY.showEmptyGroups,
+    showEmptyGroups:
+      typeof raw.showEmptyGroups === 'boolean'
+        ? raw.showEmptyGroups
+        : DEFAULT_DISPLAY.showEmptyGroups,
     density: oneOf(raw.density, ['comfortable', 'compact'], DEFAULT_DISPLAY.density),
-    hidden: Array.isArray(raw.hidden) ? raw.hidden.filter((p): p is IssueProp => (PROPS as readonly string[]).includes(p)) : [],
+    hidden: Array.isArray(raw.hidden)
+      ? raw.hidden.filter((p): p is IssueProp => (PROPS as readonly string[]).includes(p))
+      : [],
   };
 }
 
@@ -184,7 +251,10 @@ export function groupUniverse(store: NablaStore, group: IssueGroup): string[] | 
     case 'assigneeId':
       return store.users().map((u) => u.id);
     case 'workstreamIds':
-      return store.workstreams().filter(isOpenWorkstream).map((w) => w.id);
+      return store
+        .workstreams()
+        .filter(isOpenWorkstream)
+        .map((w) => w.id);
     default:
       return undefined;
   }

@@ -29,6 +29,8 @@ import { KeyChip } from '../../shared/key-chip';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
+import { AiActions } from '../ai-actions/ai-actions.service';
+import { AiButton } from '../ai-actions/ai-button';
 import { MilestoneActions } from '../milestones/milestone-actions';
 import { MilestoneIcon } from '../milestones/milestone-icon';
 import { MilestoneInfo } from '../milestones/milestone-stats';
@@ -54,6 +56,7 @@ import { ISSUE_STATUS_COLOR, issueBreakdown, issueCounts, issueOptions, issueSta
     PriorityIcon,
     StatusIcon,
     Picker,
+    AiButton,
   ],
   host: { class: 'block' },
   template: `
@@ -95,6 +98,17 @@ import { ISSUE_STATUS_COLOR, issueBreakdown, issueCounts, issueOptions, issueSta
             <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground hover:text-foreground h-7 gap-1.5 px-2 text-xs font-normal" (click)="startNew()">
               <svg [lucideIcon]="plusIcon" [size]="13"></svg>New issue
             </button>
+            @if (fewIssues()) {
+              <app-ai-button
+                label="Break down"
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground"
+                tooltip="Propose issues from this workstream's objective"
+                hideWhenUnavailable
+                (pressed)="ai.request('breakdown', ws().id)"
+              />
+            }
           </span>
         }
         </span>
@@ -245,6 +259,7 @@ export class WsIssuesSection {
   protected readonly store = inject(NablaStore);
   private readonly notify = inject(Notifier);
   private readonly actions = inject(WsActions);
+  protected readonly ai = inject(AiActions);
   protected readonly msInfo = inject(MilestoneInfo);
   private readonly msActions = inject(MilestoneActions);
   readonly ws = input.required<Workstream>();
@@ -278,6 +293,8 @@ export class WsIssuesSection {
     return out;
   });
   protected readonly counts = computed(() => issueCounts(this.issues()));
+  /** A new or thin workstream: offer to break the objective down into issues. */
+  protected readonly fewIssues = computed(() => this.issues().length < 3);
   protected readonly breakdown = computed(() => issueBreakdown(this.issues()));
   protected readonly linkOptions = computed(() =>
     issueOptions(this.store.issues().filter((i) => !i.workstreamIds.includes(this.ws().id) && !i.duplicateOfId)),

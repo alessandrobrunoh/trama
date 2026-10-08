@@ -108,7 +108,7 @@ export class WsActions {
   }
 
   openDelta(ws: Workstream): void {
-    if (ws.deltaThreadUrl) globalThis.open?.(ws.deltaThreadUrl, '_blank', 'noopener,noreferrer');
+    if (ws.deltaThreadUrl && this.store.deltaThreads()) globalThis.open?.(ws.deltaThreadUrl, '_blank', 'noopener,noreferrer');
   }
 
   open(ws: Workstream, tab?: string): void {

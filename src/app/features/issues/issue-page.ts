@@ -21,43 +21,69 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   },
   active: {
     title: 'No active issues',
-    description: 'Nothing is scheduled. Move issues out of the backlog, or add them to a workstream to start resolving them.',
+    description:
+      'Nothing is scheduled. Move issues out of the backlog, or add them to a workstream to start resolving them.',
   },
   backlog: {
     title: 'Backlog is clear',
-    description: 'New demand lands here until someone triages it: set a priority, assign it, or add it to a workstream.',
+    description:
+      'New demand lands here until someone triages it: set a priority, assign it, or add it to a workstream.',
   },
   done: {
     title: 'Nothing done yet',
-    description: 'Done and canceled issues land here. Workstreams track whether the outcome actually shipped.',
+    description:
+      'Done and canceled issues land here. Workstreams track whether the outcome actually shipped.',
+  },
+  draft: {
+    title: 'No saved issue drafts',
+    description: 'Save an issue to finish writing or triaging it later.',
   },
 };
 
 @Component({
   selector: 'app-issue-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmTooltip, LucideDynamicIcon, RouterLink, PageHeader, Kbd, TopBarActions, IssueBoard, StatsBoard, IssueCommandDialog],
+  imports: [
+    HlmButtonImports,
+    HlmTooltip,
+    LucideDynamicIcon,
+    RouterLink,
+    PageHeader,
+    Kbd,
+    TopBarActions,
+    IssueBoard,
+    StatsBoard,
+    IssueCommandDialog,
+  ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (store.allowed('createIssues')) {
         <button hlmBtn size="sm" hlmTooltip="Report a bug, request or incident" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span class="max-sm:hidden">New issue</span>
+          <span>New issue</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
     </ng-template>
 
     <app-page-header [title]="title()" [description]="description()">
-      <nav leading class="scrollbar-none -mx-1 flex items-center gap-0.5 overflow-x-auto" aria-label="Issue views">
+      <nav
+        leading
+        class="scrollbar-none -mx-1 flex items-center gap-0.5 overflow-x-auto"
+        aria-label="Issue views"
+      >
         @for (t of tabs; track t.id) {
           <a
             [routerLink]="[]"
             [queryParams]="{ view: t.id === 'all' ? null : t.id }"
             queryParamsHandling="merge"
             class="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors"
-            [class]="tab() === t.id ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground hover:bg-hover hover:text-foreground'"
+            [class]="
+              tab() === t.id
+                ? 'bg-accent text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-hover hover:text-foreground'
+            "
             [attr.aria-current]="tab() === t.id ? 'page' : null"
             [hlmTooltip]="t.hint"
           >
@@ -100,7 +126,9 @@ export class IssuePage {
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
   protected readonly teamRef = computed(() => this.store.getTeam(this.team()));
-  protected readonly title = computed(() => (this.teamRef() ? `${this.teamRef()!.name} issues` : 'Issues'));
+  protected readonly title = computed(() =>
+    this.teamRef() ? `${this.teamRef()!.name} issues` : 'Issues',
+  );
   protected readonly description = computed(() =>
     this.teamRef()
       ? `Demand reported to ${this.teamRef()!.name}. Group related issues into a workstream to drive an outcome.`
@@ -109,19 +137,32 @@ export class IssuePage {
   /** Issue count per tab (within the team, when scoped to one). */
   protected readonly counts = computed(() => {
     const teamId = this.teamRef()?.id;
-    const list = teamId ? this.store.issues().filter((i) => i.teamId === teamId) : this.store.issues();
+    const list = teamId
+      ? this.store.issues().filter((i) => i.teamId === teamId)
+      : this.store.issues();
     const out = {} as Record<IssueViewTab, number>;
-    for (const t of ISSUE_TABS) out[t.id] = t.statuses ? list.filter((i) => t.statuses!.includes(i.status)).length : list.length;
+    for (const t of ISSUE_TABS)
+      out[t.id] = t.statuses
+        ? list.filter((i) => t.statuses!.includes(i.status)).length
+        : list.length;
     return out;
   });
 
   private readonly _keys = usePageShortcuts([
-    { keys: 'c', label: 'New issue', group: 'Issues', run: () => this.store.allowed('createIssues') && this.create() },
+    {
+      keys: 'c',
+      label: 'New issue',
+      group: 'Issues',
+      run: () => this.store.allowed('createIssues') && this.create(),
+    },
   ]);
 
   protected create(): void {
     const teamId = this.teamRef()?.id;
     const status = this.scope()?.[0];
-    this.ui.openCreate('issue', { ...(teamId ? { teamId } : {}), ...(status && status !== 'done' ? { status } : {}) });
+    this.ui.openCreate('issue', {
+      ...(teamId ? { teamId } : {}),
+      ...(status && status !== 'done' ? { status } : {}),
+    });
   }
 }

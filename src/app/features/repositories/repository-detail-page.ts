@@ -55,7 +55,7 @@ const ARTIFACT_CAP = 12;
     EventLine,
     StatsBoard,
   ],
-  host: { class: 'flex min-h-full flex-col' },
+  host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
     @if (repo(); as r) {
       <ng-template appTopBarActions>
@@ -106,13 +106,13 @@ const ARTIFACT_CAP = 12;
         </p>
       </header>
 
-      <div class="grid gap-x-10 gap-y-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div class="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div class="flex min-w-0 flex-col gap-8">
           <section aria-label="Project statistics">
             <app-stats-board [model]="stats()" />
           </section>
 
-          <section>
+          <section class="min-w-0">
             <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
               Workstreams <span class="text-muted-foreground font-normal tabular-nums">{{ workstreams().length }}</span>
             </h2>
@@ -152,7 +152,7 @@ const ARTIFACT_CAP = 12;
               <div class="flex flex-col border-t">
                 @for (a of shownArtifacts(); track a.id) {
                   <a
-                    class="hover:bg-muted/60 -mx-2 flex items-center gap-2.5 rounded-md border-b border-transparent px-2 py-1.5 text-[13px]"
+                    class="hover:bg-muted/60 -mx-2 flex min-w-0 items-center gap-2.5 rounded-md border-b border-transparent px-2 py-2.5 text-sm md:py-1.5 md:text-[13px]"
                     [routerLink]="['/', slug(), 'workstreams', workstreamKey(a.workstreamId)]"
                     [queryParams]="{ tab: 'artifacts' }"
                   >
@@ -200,7 +200,7 @@ const ARTIFACT_CAP = 12;
           </section>
         </div>
 
-        <aside class="flex flex-col gap-0.5 lg:sticky lg:top-4 lg:self-start">
+        <aside class="flex min-w-0 flex-col gap-0.5 lg:sticky lg:top-4 lg:self-start">
           <h2 class="text-muted-foreground mb-1 text-xs font-medium">Properties</h2>
           <app-property-row label="Provider">
             <app-provider-icon [provider]="r.provider" [size]="14" [showLabel]="true" />

@@ -59,7 +59,7 @@ interface Draft {
 const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true });
 
 /**
- * Custom integrations: outgoing webhooks. Nabla POSTs a signed JSON body to your URL for the
+ * Custom integrations: outgoing webhooks. Trama POSTs a signed JSON body to your URL for the
  * events you pick. Lives inside Settings → Integrations; managed with the manageIntegrations capability.
  */
 @Component({
@@ -79,7 +79,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
   template: `
     <app-settings-group
       title="Custom webhooks"
-      description="Send a signed JSON POST to your own URL when something happens in Nabla (an issue is filed, a workstream ships…). Feed a chat bridge, a dashboard or any automation."
+      description="Send a signed JSON POST to your own URL when something happens in Trama (an issue is filed, a workstream ships…). Feed a chat bridge, a dashboard or any automation."
     >
       @if (canManage() && !form()) {
         <button aside hlmBtn size="sm" variant="outline" class="h-7" (click)="startCreate()">
@@ -107,7 +107,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
           <app-settings-row label="Name" description="What this webhook is for, like “Ops chat bridge”." wide>
             <input hlmInput class="h-8 w-full text-[13px]" placeholder="Ops chat bridge" [value]="f.name" (input)="patch({ name: $any($event.target).value })" aria-label="Webhook name" />
           </app-settings-row>
-          <app-settings-row label="Payload URL" description="Nabla POSTs here. Must be reachable from the API server; redirects are not followed." wide>
+          <app-settings-row label="Payload URL" description="Trama POSTs here. Must be reachable from the API server; redirects are not followed." wide>
             <input hlmInput type="url" class="h-8 w-full font-mono text-xs" placeholder="https://example.com/hooks/nabla" [value]="f.url" (input)="patch({ url: $any($event.target).value })" aria-label="Payload URL" />
           </app-settings-row>
           <div class="px-4 py-3">
@@ -233,7 +233,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
           <div class="flex flex-col items-center gap-2 px-6 py-8 text-center">
             <p class="text-[13px] font-medium">No custom webhooks yet</p>
             <p class="text-muted-foreground max-w-sm text-xs leading-snug">
-              Create one to push Nabla events to your own systems. Deliveries are signed with a secret you keep, time out after 5 seconds and are retried once.
+              Create one to push Trama events to your own systems. Deliveries are signed with a secret you keep, time out after 5 seconds and are retried once.
             </p>
             @if (canManage()) {
               <button hlmBtn size="sm" variant="outline" (click)="startCreate()"><svg [lucideIcon]="plus" [size]="13"></svg> New webhook</button>
@@ -410,7 +410,7 @@ export class OutgoingWebhooks {
   protected remove(w: OutgoingWebhook): void {
     this.ui.setConfirmDelete({
       title: `Delete ${w.name}?`,
-      description: 'Nabla stops sending events to this URL and forgets its delivery log.',
+      description: 'Trama stops sending events to this URL and forgets its delivery log.',
       confirmLabel: 'Delete webhook',
       onConfirm: async () => {
         await this.store.deleteWebhook(w.id);

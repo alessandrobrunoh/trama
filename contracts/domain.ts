@@ -43,6 +43,125 @@ export interface Membership {
   createdAt: ISODate;
 }
 
+// ───────────────────────────── Notifications ─────────────────────────────
+
+/** Why a notification was sent. Each kind can be switched on or off per person and channel. */
+export const NOTIFICATION_KINDS = [
+  'assigned',
+  'input_requested',
+  'decision_proposed',
+  'review_requested',
+  'ci_failed',
+  'comment',
+  'workstream_update',
+] as const;
+export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+
+export const NOTIFICATION_KIND_META: Record<NotificationKind, { label: string; description: string }> = {
+  assigned: { label: 'Assigned to me', description: 'An issue is assigned to you.' },
+  input_requested: { label: 'Questions for me', description: 'Someone, or an agent, asks you a question on a workstream.' },
+  decision_proposed: { label: 'Decisions to review', description: 'A decision is proposed on a workstream you are accountable for.' },
+  review_requested: { label: 'Review requested', description: 'A pull request on a workstream you are accountable for needs a review.' },
+  ci_failed: { label: 'Failing checks', description: 'CI fails on a workstream you are accountable for.' },
+  comment: { label: 'Comments', description: 'New comments on issues you are assigned or reported, and on workstreams you are accountable for.' },
+  workstream_update: { label: 'Workstream updates', description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.' },
+};
+
+export type NotificationChannel = 'inApp' | 'email';
+export type NotificationChannels = Record<NotificationChannel, boolean>;
+/** Per kind and channel. Missing entries use the defaults (in-app on, email off). */
+export type NotificationSettings = Record<NotificationKind, NotificationChannels>;
+
+export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = { inApp: true, email: false };
+
+/** Fills the gaps of a stored (partial) settings object with the defaults. */
+export function resolveNotificationSettings(raw?: Partial<Record<string, Partial<NotificationChannels>>> | null): NotificationSettings {
+  const out = {} as NotificationSettings;
+  for (const kind of NOTIFICATION_KINDS) out[kind] = { ...DEFAULT_NOTIFICATION_CHANNELS, ...(raw?.[kind] ?? {}) };
+  return out;
+}
+
+/** A message for one person, created from something that happened in a workspace. */
+export interface Notification {
+  /** `ntf_…` */
+  id: ID;
+  workspaceId: ID;
+  kind: NotificationKind;
+  title: string;
+  /** A short excerpt (a comment, a question), when there is one. */
+  body?: string;
+  /** Who caused it. */
+  actor: ActorRef;
+  /** The record it is about. */
+  subject: SubjectRef;
+  /** Where it leads, relative to the workspace, e.g. `issues/BUG-142`. */
+  link: string;
+  createdAt: ISODate;
+  /** Absent while unread. */
+  readAt?: ISODate;
+}
+
+/** Response of GET /w/:slug/notifications. */
+export interface NotificationList {
+  items: Notification[];
+  /** Unread in this workspace, whatever the page size. */
+  unread: number;
+}
+
+/** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
+export const FAVORITE_TYPES = ['issue', 'workstream', 'decision', 'team', 'repository', 'view'] as const;
+export type FavoriteType = (typeof FAVORITE_TYPES)[number];
+/** Most favorites one person can keep in a workspace. */
+export const MAX_FAVORITES = 100;
+
+/** A pinned entity. Private to its owner: other people never see it. */
+export interface Favorite {
+  /** `fav_…` */
+  id: ID;
+  workspaceId: ID;
+  type: FavoriteType;
+  /** Id (not key) of the issue, workstream, decision, team, repository or view. */
+  subjectId: ID;
+  createdAt: ISODate;
+}
+
+/** Days an invitation stays valid. Resending an invitation starts a new period. */
+export const INVITE_TTL_DAYS = 7;
+
+/**
+ * A pending invitation to join a workspace, bound to one email address. The secret link is returned
+ * only when the invitation is created or resent (`InviteLink`); the server stores just its hash.
+ */
+export interface WorkspaceInvite {
+  /** `inv_…` */
+  id: ID;
+  workspaceId: ID;
+  email: string;
+  role: Role;
+  invitedByUserId?: ID;
+  createdAt: ISODate;
+  expiresAt: ISODate;
+  /** When an email was last sent (absent when the server has no mail configured). */
+  emailedAt?: ISODate;
+}
+
+/** Response of creating or resending an invitation: share `url` if the email did not arrive. */
+export interface InviteLink {
+  invite: WorkspaceInvite;
+  url: string;
+  /** False when the server has no mail transport configured (SMTP_URL), so the link must be shared by hand. */
+  emailed: boolean;
+}
+
+/** What anyone holding an invitation link may see before signing in. */
+export interface InvitePreview {
+  workspaceName: string;
+  role: Role;
+  email: string;
+  invitedByName?: string;
+  expiresAt: ISODate;
+}
+
 /** Runtimes that can act in a workspace. `human` = a person. */
 export type ExecutionProvider = 'human' | 'delta' | 'claude_code' | 'codex' | 'cursor' | 'other';
 
@@ -222,7 +341,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
  * Tracker status, independent of workstream status.
  * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
  */
-export type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
+export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
 
 /**
@@ -327,7 +446,7 @@ export interface Artifact {
 
 // ───────────────────────────── Decisions ─────────────────────────────
 
-export type DecisionStatus = 'proposed' | 'accepted' | 'superseded' | 'rejected';
+export type DecisionStatus = 'draft' | 'proposed' | 'accepted' | 'superseded' | 'rejected';
 
 /** Reusable project knowledge: what was decided and why. Key: ADR-<n> per workspace. */
 export interface Decision {
@@ -488,6 +607,10 @@ export interface ApiToken {
   actor: ActorRef;
   /** What the token may do: read = GET only, write = everyday work (member role), admin = everything the actor's role allows. */
   scope: TokenScope;
+  /** Granted permissions; present only for `custom` tokens. */
+  permissions?: ApiPermission[];
+  /** Request / write budget (defaults apply when not customized). */
+  limits: TokenLimits;
   lastUsedAt?: ISODate;
   createdAt: ISODate;
   expiresAt?: ISODate;
@@ -519,12 +642,87 @@ export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; descrip
   members: { label: 'Team members only', description: 'Only people on this team (and workspace admins) can edit its workstreams and issues.' },
 };
 
-export type TokenScope = 'read' | 'write' | 'admin';
+export type TokenScope = 'read' | 'write' | 'admin' | 'custom';
 export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: string }> = {
   read: { label: 'Read', description: 'Read-only: GET requests. Good for dashboards and reporting.' },
   write: { label: 'Write', description: 'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.' },
   admin: { label: 'Admin', description: 'Everything the acting user\'s role allows, including members, integrations and settings. Only admins can create one.' },
+  custom: { label: 'Custom', description: 'Only the listed permissions (resource × action), always within the acting user\'s role.' },
 };
+
+/**
+ * Fine-grained API permissions (`<resource>:<action>`), used by `custom` tokens. The required
+ * permission of a request is derived from its route: `/w/:slug/<resource>/…` plus the HTTP method
+ * (GET → read, POST/PUT/PATCH → write, DELETE → delete), with a few named exceptions
+ * (`decisions:accept`). A route whose resource is not listed here is denied to custom tokens.
+ */
+export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
+export type ApiResource =
+  | 'workspace' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
+  | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
+export type ApiPermission = `${ApiResource}:${ApiAction}`;
+
+export interface ApiResourceMeta {
+  label: string;
+  group: 'Work' | 'Insight' | 'Organization' | 'Access & automation';
+  actions: readonly ApiAction[];
+}
+
+const RWD = ['read', 'write', 'delete'] as const;
+export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
+  workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
+  issues: { label: 'Issues', group: 'Work', actions: RWD },
+  decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
+  milestones: { label: 'Milestones', group: 'Work', actions: RWD },
+  comments: { label: 'Comments', group: 'Work', actions: RWD },
+  artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
+  dependencies: { label: 'Dependencies', group: 'Work', actions: RWD },
+  'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
+  views: { label: 'Views', group: 'Work', actions: RWD },
+  attention: { label: 'Attention', group: 'Work', actions: ['read', 'write'] },
+  search: { label: 'Search', group: 'Insight', actions: ['read'] },
+  graph: { label: 'Graph', group: 'Insight', actions: ['read'] },
+  events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
+  snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
+  teams: { label: 'Teams', group: 'Organization', actions: RWD },
+  repositories: { label: 'Repositories', group: 'Organization', actions: RWD },
+  workspace: { label: 'Workspace & settings', group: 'Organization', actions: RWD },
+  members: { label: 'Members', group: 'Access & automation', actions: RWD },
+  agents: { label: 'Agents', group: 'Access & automation', actions: RWD },
+  tokens: { label: 'API tokens', group: 'Access & automation', actions: RWD },
+  integrations: { label: 'Integrations', group: 'Access & automation', actions: RWD },
+  'outgoing-webhooks': { label: 'Outgoing webhooks', group: 'Access & automation', actions: RWD },
+};
+
+export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOURCES) as ApiResource[]).flatMap((r) =>
+  API_RESOURCES[r].actions.map((a) => `${r}:${a}` as ApiPermission),
+);
+
+/** Every `*:read` permission. */
+const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
+const WORK: ApiResource[] = ['workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+
+/** Starting points offered in Settings; the final selection is always an explicit permission list. */
+export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
+  'read-only': { label: 'Read-only', description: 'Read every resource. Nothing can be changed.', permissions: READ_ALL },
+  contributor: {
+    label: 'Contributor',
+    description: 'Read everything and create/update work items. No deletes, no members, tokens or integrations.',
+    permissions: [...READ_ALL, ...WORK.filter((r) => r !== 'attention').map((r) => `${r}:write` as ApiPermission), 'attention:write'],
+  },
+  everything: { label: 'Everything', description: 'All permissions. The acting user\'s role still applies.', permissions: API_PERMISSIONS },
+};
+
+/** Request budget of an API token (enforced server-side; sessions are not limited). */
+export interface TokenLimits {
+  requestsPerMinute: number;
+  writesPerMinute: number;
+  writesPerDay: number;
+}
+export const DEFAULT_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 600, writesPerMinute: 60, writesPerDay: 2000 };
+/** Upper bounds a token can be configured with. */
+export const MAX_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 6000, writesPerMinute: 600, writesPerDay: 20000 };
 
 /** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
 export type Capability =
@@ -621,6 +819,11 @@ export interface WorkspaceSettings {
   iconColor?: string;
   /** 1-2 characters shown in the workspace icon (defaults to the name's initial). */
   iconInitial?: string;
+  /**
+   * Whether workstreams are linked to a Delta thread. Recommended for teams working in Delta. When off,
+   * the thread is hidden everywhere and no longer required to create a workstream.
+   */
+  deltaThreads: boolean;
 }
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -628,6 +831,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   estimateScale: 'fibonacci',
   weekStart: 'monday',
   timeZone: 'auto',
+  deltaThreads: true,
 };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
@@ -685,7 +889,7 @@ export interface WebhookDeliveryLog {
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
-  { entity: 'decision', label: 'Decisions', events: ['decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
+  { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
@@ -729,7 +933,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'notification' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;

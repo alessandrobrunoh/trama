@@ -37,6 +37,7 @@ import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { WsStatsTab } from '../stats/ws-stats-tab';
+import { AiWsActions } from '../ai-actions/ai-ws-dialogs';
 import { NextMilestoneChip } from '../milestones/milestone-chips';
 import { InlineText } from './inline-edit';
 import { Picker } from './picker';
@@ -91,6 +92,7 @@ const TAB_LABEL: Record<Tab, string> = {
     WsDatePicker,
     NextMilestoneChip,
     WsMenu,
+    AiWsActions,
     WsOverviewTab,
     WsIssuesSection,
     WsStatsTab,
@@ -103,12 +105,13 @@ const TAB_LABEL: Record<Tab, string> = {
   host: { class: 'flex min-h-full flex-col' },
   template: `
     @if (ws(); as w) {
-      <app-ws-menu #menu [ws]="w" [afterDelete]="backToList" />
+      <app-ws-menu #menu [ws]="w" [afterDelete]="backToList" aiHost />
+      <app-ai-ws-actions [ws]="w" />
       <ng-template appTopBarActions>
         <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" aria-label="Copy link" hlmTooltip="Copy link (⌘⇧C)" position="bottom" (click)="actions.copyLink([w])">
           <svg [lucideIcon]="linkIcon" [size]="15"></svg>
         </button>
-        @if (w.deltaThreadUrl) {
+        @if (w.deltaThreadUrl && store.deltaThreads()) {
           <a hlmBtn size="sm" variant="outline" [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer" hlmTooltip="Open Delta thread (⇧O)" position="bottom">
             <app-provider-icon provider="delta" [size]="14" /><span class="max-sm:hidden">Delta thread</span><svg [lucideIcon]="extIcon" [size]="13"></svg>
           </a>
@@ -252,7 +255,7 @@ const TAB_LABEL: Record<Tab, string> = {
             <app-ws-overview-tab [ws]="w" />
           }
           @case ('issues') {
-            <div class="max-w-4xl px-4 py-5 sm:px-6">
+            <div class="px-4 py-5 sm:px-6">
               <app-ws-issues-section [ws]="w" />
             </div>
           }

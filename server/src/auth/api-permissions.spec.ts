@@ -1,0 +1,66 @@
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import { normalizePermissions, requiredPermission } from './api-permissions.js';
+
+describe('requiredPermission', () => {
+  it('maps method + resource', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/issues')).toBe('issues:read');
+    expect(requiredPermission('POST', '/api/w/:slug/issues')).toBe('issues:write');
+    expect(requiredPermission('PATCH', '/api/w/:slug/issues/:idOrKey')).toBe('issues:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug/issues/:idOrKey')).toBe('issues:delete');
+    expect(requiredPermission('GET', '/api/w/:slug/workstreams/:idOrKey/graph')).toBe('workstreams:read');
+    expect(requiredPermission('POST', '/api/w/:slug/workstreams/:idOrKey/criteria')).toBe('workstreams:write');
+    expect(requiredPermission('GET', '/api/w/:slug/outgoing-webhooks/:id/deliveries')).toBe('outgoing-webhooks:read');
+  });
+
+  it('maps the workspace itself and its settings', () => {
+    expect(requiredPermission('GET', '/api/w/:slug')).toBe('workspace:read');
+    expect(requiredPermission('PATCH', '/api/w/:slug')).toBe('workspace:write');
+    expect(requiredPermission('PATCH', '/api/w/:slug/settings')).toBe('workspace:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug')).toBe('workspace:delete');
+  });
+
+  it('gives decision verdicts their own permission', () => {
+    expect(requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/accept')).toBe('decisions:accept');
+    expect(requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/supersede')).toBe('decisions:accept');
+    expect(requiredPermission('PATCH', '/api/w/:slug/decisions/:idOrKey')).toBe('decisions:write');
+  });
+
+  it('fails closed outside the catalog', () => {
+    expect(requiredPermission('GET', '/api/workspaces')).toBeNull();
+    expect(requiredPermission('GET', '/api/auth/me')).toBeNull();
+    expect(requiredPermission('POST', '/api/w/:slug/ai/chat')).toBeNull();
+    expect(requiredPermission('GET', '/api/w/:slug/something-new')).toBeNull();
+    // actions a resource does not offer
+    expect(requiredPermission('POST', '/api/w/:slug/search')).toBeNull();
+    expect(requiredPermission('DELETE', '/api/w/:slug/attention/:id')).toBeNull();
+  });
+});
+
+describe('normalizePermissions', () => {
+  it('drops unknown values, dedupes and adds the implied read', () => {
+    expect(normalizePermissions(['issues:write', 'issues:write', 'bogus:read', 'issues:fly', 'teams:read'])).toEqual([
+      'issues:read',
+      'issues:write',
+      'teams:read',
+    ]);
+    expect(normalizePermissions(['decisions:accept'])).toEqual(['decisions:read', 'decisions:accept']);
+  });
+});
+
+describe('MCP tool catalog', () => {
+  const tools = JSON.parse(readFileSync(new URL('../../../mcp/src/tools.json', import.meta.url), 'utf8')) as {
+    name: string;
+    method: string;
+    path: string;
+    permission: string;
+  }[];
+
+  it('declares exactly the permission the API derives from each tool\'s route', () => {
+    expect(tools.length).toBeGreaterThan(80);
+    for (const t of tools) {
+      const route = `/api/w/:slug${t.path.replace(/\{(\w+)\}/g, ':$1')}`;
+      expect(requiredPermission(t.method, route), `${t.name} (${t.method} ${t.path})`).toBe(t.permission);
+    }
+  });
+});

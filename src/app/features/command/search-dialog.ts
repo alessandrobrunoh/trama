@@ -14,7 +14,7 @@ import { CommandPanel } from './command-panel';
       description="Search workstreams, issues, decisions, executions, artifacts, projects and teams."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
-      dialogContentClass="sm:max-w-xl top-[12%] sm:top-[18%] translate-y-0 max-sm:max-w-[calc(100%-1rem)]"
+      dialogContentClass="w-[calc(100%-1rem)] max-w-none sm:w-[44rem] top-[10%] sm:top-[14%] translate-y-0 rounded-xl"
     >
       @if (open()) {
         <app-command-panel mode="search" />
