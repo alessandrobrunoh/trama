@@ -11,7 +11,14 @@
     <meta name="description" content="Nabla — where humans and agents get work done together." />
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <link rel="icon" type="image/x-icon" href="favicon.ico" />
-    <link rel="preload" href="fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="apple-touch-icon" href="icons/icon-180x180.png" />
+    <link
+      rel="preload"
+      href="fonts/InterVariable.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin=""
+    />
     <!-- Apply the saved theme before first paint (no flash). Mirrors core/theme/theme.service.ts. -->
     <script>
       (function () {
@@ -26,8 +33,10 @@
         } catch (e) {}
       })();
     </script>
+    <link rel="manifest" href="manifest.webmanifest" />
   </head>
   <body>
     <app-root></app-root>
+    <noscript>Please enable JavaScript to continue using this application.</noscript>
   </body>
 </html>

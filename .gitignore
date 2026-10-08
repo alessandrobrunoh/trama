@@ -54,3 +54,4 @@ Thumbs.db
 .playwright-mcp/
 .delta/
 .claude/
+.agents/plans/

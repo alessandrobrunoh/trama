@@ -1,5 +1,6 @@
 import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { AgentContextModule } from './agent-context/agent-context.module.js';
+import { AiModule } from './ai/ai.module.js';
 import { ArtifactsModule } from './artifacts/artifacts.module.js';
 import { AttentionModule } from './attention/attention.module.js';
 import { AuthModule } from './auth/auth.module.js';
@@ -50,6 +51,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     GraphModule,
     SearchModule,
     AgentContextModule,
+    AiModule,
     SnapshotModule,
     IntegrationsModule,
     WebhooksModule,

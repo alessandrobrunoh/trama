@@ -19,6 +19,7 @@ import { NablaStore } from '../../core/stores/nabla.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
+import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { MembersSection } from './sections/members-section';
@@ -43,6 +44,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
     title: 'Account',
     sections: [
       { id: 'profile', label: 'Profile', icon: LucideUserRound },
+      { id: 'ai', label: 'AI & assistant', icon: LucideBot },
       { id: 'appearance', label: 'Appearance', icon: LucideSunMoon },
       { id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', icon: LucideKeyboard },
     ],
@@ -84,6 +86,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     RolesSection,
     TeamsSection,
     AgentsSection,
+    AiSection,
     TokensSection,
     IntegrationsSection,
   ],
@@ -116,6 +119,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8 sm:py-12">
           @switch (sectionId()) {
+            @case ('ai') { <app-ai-section /> }
             @case ('profile') {
               <app-profile-section />
             }

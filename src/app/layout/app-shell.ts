@@ -11,6 +11,8 @@ import { ConfirmDialog } from './confirm-dialog';
 import { AppSidebar } from './sidebar';
 import { ShortcutsDialog } from './shortcuts-dialog';
 import { TopBar } from './top-bar';
+import { AssistantOverlay } from '../features/ai/assistant-overlay';
+import { MobileNav } from './mobile-nav';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
@@ -32,6 +34,8 @@ import { TopBar } from './top-bar';
     ConfirmDialog,
     CreateDialog,
     SearchDialog,
+    AssistantOverlay,
+    MobileNav,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
@@ -58,6 +62,7 @@ import { TopBar } from './top-bar';
         <div id="main-content" tabindex="-1" class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
         </div>
+        <app-mobile-nav />
       </main>
     </div>
 
@@ -88,6 +93,7 @@ import { TopBar } from './top-bar';
       <app-search-dialog />
     }
     <app-confirm-dialog />
+    <app-assistant-overlay />
   `,
 })
 export class AppShell {

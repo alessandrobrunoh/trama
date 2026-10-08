@@ -59,6 +59,7 @@ import { StatusIcon } from '../../shared/status';
 import { issueEstimateOptions } from '../issues/issue-model';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
+import { DraftSuggestions } from '../ai/draft-suggestions';
 
 type ComposerKind = 'issue' | 'workstream' | 'decision';
 
@@ -135,6 +136,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     Picker,
     AppSelect,
     FormRow,
+    DraftSuggestions,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -217,6 +219,10 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 name="body"
                 aria-label="Description"
               ></textarea>
+              @if (composer(); as composerKind) {
+                <app-draft-suggestions [kind]="composerKind.kind" [title]="title()" [description]="text()" [disabled]="busy()"
+                  (titleAccepted)="title.set($event)" (descriptionAccepted)="text.set($event)" (settingsRequested)="ui.closeModal()" />
+              }
               @if (err('statement'); as e) {
                 <p class="text-destructive text-xs" role="alert">{{ e }}</p>
               }
