@@ -22,7 +22,17 @@ Production stack: `server/docker-compose.yml` (web, app, mcp, postgres) behind T
 `docker compose -f server/docker-compose.yml up -d`. With a deploy tool (Komodo, Portainer…) you can instead define the
 same variables in the stack's environment: the tool writes them to `.env` in the repository root, which the `app` service
 also reads (`server/.env.production`, if present, overrides it). The API will not start in production without at least
-`DATABASE_URL` (host `postgres`, password `delta` unless you changed `POSTGRES_PASSWORD`) and `TRAMA_ENCRYPTION_KEY`.
+`DATABASE_URL` (host `postgres`, password = `POSTGRES_PASSWORD`, default `delta`) and `TRAMA_ENCRYPTION_KEY`.
+
+**Postgres password.** Define `POSTGRES_PASSWORD` in the stack's environment (the compose file reads it through
+`--env-file`, or pass `--env-file server/.env.production` when running by hand) and put the same value in
+`DATABASE_URL`. Postgres applies it only when the data volume is created. For a volume that already exists, change it
+once in the database, then redeploy:
+
+```bash
+docker exec delta-postgres psql -U delta -d trama -c "ALTER USER delta PASSWORD 'the-new-password'"
+```
+
 `npm run db:up` (development) starts only Postgres, published on `localhost:5434` by `server/docker-compose.dev.yml`.
 In production Postgres has **no** host port: only the API (same compose network) can reach it.
 

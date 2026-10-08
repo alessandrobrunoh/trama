@@ -105,7 +105,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: delta
-      POSTGRES_PASSWORD: delta
+      # Set POSTGRES_PASSWORD in the stack's environment and use the same one in DATABASE_URL. It only
+      # applies when the data volume is first created: for an existing volume run
+      # ALTER USER delta PASSWORD '...' once (see docker/README.md). Defaults to "delta" for development.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delta}
       POSTGRES_DB: trama
     # PG 18+ stores the cluster in a versioned dir under /var/lib/postgresql.
     volumes:
