@@ -13,23 +13,23 @@ x-hardened: &hardened
 services:
   web:
     <<: *hardened
-    image: ghcr.io/alessandrobrunoh/trama-web:latest
+    image: ghcr.io/alessandrobrunoh/trama-frontend:latest
     build:
       context: ..
       dockerfile: Dockerfile
-    container_name: trama-web
+    container_name: trama-frontend
     read_only: true
     tmpfs: [/tmp]
     networks: [proxy]
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.trama-web.rule=Host(`trama.alessandrobrunoh.it`)
-      - traefik.http.routers.trama-web.priority=1
-      - traefik.http.routers.trama-web.entrypoints=websecure
-      - traefik.http.routers.trama-web.tls=true
-      - traefik.http.routers.trama-web.tls.certresolver=le
-      - traefik.http.services.trama-web.loadbalancer.server.port=8080
+      - traefik.http.routers.trama-frontend.rule=Host(`trama.alessandrobrunoh.it`)
+      - traefik.http.routers.trama-frontend.priority=1
+      - traefik.http.routers.trama-frontend.entrypoints=websecure
+      - traefik.http.routers.trama-frontend.tls=true
+      - traefik.http.routers.trama-frontend.tls.certresolver=le
+      - traefik.http.services.trama-frontend.loadbalancer.server.port=8080
 
   app:
     <<: *hardened
