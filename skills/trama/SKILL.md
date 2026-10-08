@@ -19,6 +19,14 @@ Trama coordinates teams of humans and coding agents. It keeps the issue tracker 
 
 Issues are *demand*. A workstream groups the issues that share a root cause and is the unit you execute. Grouping is by **outcome, not convenience**: five bugs with one cause belong together; ten unrelated bugs do not.
 
+## One parent thread, one workstream
+
+If you are the parent agent of a Delta thread, that thread has one workstream. Link every issue you were asked to do in this thread to that workstream. A subagent works an issue; it is not a workstream and it is not a new issue when the issue already exists. Do not attach the same parent thread to several workstreams.
+
+"Group by outcome, not convenience" applies when you triage a backlog. It does not apply when a person has already told you to carry these issues in this thread. That request is the grouping. Do not split it, and do not ask again.
+
+People may say "workspace" for that thread. In Trama the object is still one workstream. Do not create extra Trama workspaces.
+
 A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. To understand a whole project in one read, call `get_project_context` (markdown "mega context"); to report on it, post a project update (see `trama-report-progress`).
 
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.

@@ -27,6 +27,10 @@ Read what comes back, including the `workspace` stamp on each row. Do not create
 
 A workstream is an outcome, not a container. One per outcome, never a second for the same outcome.
 
+If you are the parent agent of this Delta thread, stop here and do not apply the cases below. Search for a workstream whose `deltaThreadUrl` is this thread and continue it. If none exists, create one and link every issue you were asked to do. A subagent works one of those issues; it does not get a workstream, and it does not get a new issue when the issue already exists. A slice with no issue yet becomes an issue on that workstream, never a second workstream. Do not split the list because the issues look unrelated, and do not ask whether to: being told to do them here is the grouping. People may say "workspace" for this thread. The Trama object is still one workstream.
+
+Otherwise:
+
 - The issues are already on a workstream: use that one. Load it with `get_workstream_context` and continue at step 5.
 - Several issues share one outcome and have no workstream: create one and link them.
   ```

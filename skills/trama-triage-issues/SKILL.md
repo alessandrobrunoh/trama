@@ -39,6 +39,8 @@ create_issue {
 
 Group when several issues **share a root cause or need the same change**. Do not group by convenience or by team.
 
+Exception: the parent agent of a Delta thread was told to do these issues here, with subagents. Then there is one workstream for that thread, and every listed issue links to it. Do not invent one workstream per issue. Do not propose the split first. Spawn one subagent per issue; the subagent does not get its own workstream. If a slice has no issue yet, create an issue on that workstream, not a second workstream.
+
 1. Check there is not already a workstream for it (`search`, `list_workstreams`).
 2. To attach to an existing one:
    ```

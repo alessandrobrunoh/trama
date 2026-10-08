@@ -110,7 +110,7 @@ Success: JSON on stdout (`{"ok":true}` for deletes). Failure: JSON on stderr, `{
 
 ## Ground rules
 
-1. `whoami` first; read before you write (`workstream context`, `search`, targeted `list`/`get`).
+1. `whoami` first; read before you write (`workstream context`, `search`, targeted `list`/`get`). A parent Delta thread maps to one workstream (`deltaThreadUrl`). Subagents are not workstreams. See `trama-start-work`.
 2. Never set a workstream's status yourself: it is derived from criteria, artifacts and input requests. Leave `--status-override` alone unless the user asks.
 3. Report facts only (criteria met, PR state, CI result), never guesses or percentages.
 4. You cannot accept decisions: create them as `draft` or `proposed`.
