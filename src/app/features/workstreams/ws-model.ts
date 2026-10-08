@@ -241,7 +241,19 @@ export const projectOptions = (store: NablaStore, currentId?: string | null): Pi
   store
     .projects()
     .filter((p) => (p.status !== 'completed' && p.status !== 'canceled') || p.id === currentId)
-    .map((p) => ({ value: p.id, label: p.name, kind: 'plain' }));
+    .map((p) => ({ value: p.id, label: p.name, kind: 'project' }));
+
+/** Projects as filter options ("No project" first), closed ones included so old issues stay findable. */
+export function projectFilterOptions(store: NablaStore): PickOption[] {
+  return [
+    { value: '', label: 'No project' },
+    ...store
+      .projects()
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map((p) => ({ value: p.id, label: p.name, kind: 'project' as const })),
+  ];
+}
 
 /** Repositories a workstream of `projectId` may use: the project's own; everything when it has no project. */
 export const repoOptionsIn = (store: NablaStore, projectId?: string | null): PickOption[] => {

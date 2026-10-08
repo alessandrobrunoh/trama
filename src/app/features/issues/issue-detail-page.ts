@@ -44,6 +44,7 @@ import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
 import { projectOptions, teamOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
+import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { AiActions } from '../ai-actions/ai-actions.service';
@@ -74,6 +75,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
     IssueTitle,
     IssueDescription,
     IssueWorkstreams,
+    IssueArtifacts,
     IssueActivity,
     IssueCommandDialog,
     IssueSideWorkstreams,
@@ -197,6 +199,8 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
             </div>
 
             <app-issue-workstreams [issue]="i" />
+
+            <app-issue-artifacts [issue]="i" />
 
             <div class="border-t pt-6">
               <app-issue-activity [issue]="i" />

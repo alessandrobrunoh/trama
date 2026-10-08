@@ -103,8 +103,8 @@ const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = 
   view: { label: 'View', icon: LucideLayers },
 };
 
-const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'graph'];
-const VIEW_ENTITIES: readonly ViewEntity[] = ['workstream', 'issue', 'decision'];
+const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'graph', 'timeline'];
+const VIEW_ENTITIES: readonly ViewEntity[] = ['workstream', 'issue', 'decision', 'project'];
 
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] =>
@@ -392,6 +392,17 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     (valueChange)="workstreamIds.set($event)"
                     searchPlaceholder="Link to workstreams…"
                   />
+                  @if (projectOptions().length) {
+                    <app-picker
+                      variant="pill"
+                      label="Project"
+                      [options]="projectOptions()"
+                      [value]="opt(projectId())"
+                      [clearable]="true"
+                      clearLabel="No project"
+                      (valueChange)="projectId.set($event[0] ?? '')"
+                    />
+                  }
                 }
                 @case ('workstream') {
                   <app-picker
@@ -643,6 +654,14 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                         [disabled]="viewPreset()"
                       />
                     </app-form-row>
+                    <app-form-row label="Layout">
+                      <app-select
+                        [options]="viewLayoutOptions()"
+                        [value]="effectiveViewLayout()"
+                        (valueChange)="viewLayout.set($event)"
+                        label="Layout"
+                      />
+                    </app-form-row>
                     <app-form-row label="Visibility">
                       <label class="flex h-8 items-center gap-2 text-sm">
                         <hlm-switch
@@ -754,6 +773,7 @@ export class CreateDialog {
   private teamKeyTouched = false;
   protected readonly gitProvider = signal<string>('github');
   protected readonly viewEntity = signal<string>('workstream');
+  protected readonly viewLayout = signal<string>('list');
   protected readonly shared = signal(true);
   private viewExtras: {
     filters?: ViewFilter[];
@@ -801,7 +821,20 @@ export class CreateDialog {
     { value: 'workstream', label: 'Workstreams' },
     { value: 'issue', label: 'Issues' },
     { value: 'decision', label: 'Decisions' },
+    { value: 'project', label: 'Projects' },
   ];
+  /** Layouts of a view; the timeline needs dates, so only workstreams and projects offer it. */
+  protected readonly viewLayoutOptions = computed<Option[]>(() => {
+    const dated = this.viewEntity() === 'workstream' || this.viewEntity() === 'project';
+    return [
+      { value: 'list', label: 'List' },
+      { value: 'board', label: 'Board' },
+      ...(dated ? [{ value: 'timeline', label: 'Timeline' }] : []),
+    ];
+  });
+  protected readonly effectiveViewLayout = computed(() =>
+    this.viewLayoutOptions().some((o) => o.value === this.viewLayout()) ? this.viewLayout() : 'list',
+  );
 
   protected readonly teamOptions = computed<PickOption[]>(() =>
     this.store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team', hint: t.key })),
@@ -939,6 +972,7 @@ export class CreateDialog {
     this.gitProvider.set('github');
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'workstream');
+    this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
     this.shared.set(this.canShare() && (typeof d['shared'] === 'boolean' ? d['shared'] : true));
     this.viewExtras = {
       filters: Array.isArray(d['filters']) ? (d['filters'] as ViewFilter[]) : undefined,
@@ -1147,6 +1181,7 @@ export class CreateDialog {
             teamId: this.teamId() || undefined,
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
+            projectId: this.projectId() || undefined,
           });
           if (i) {
             const links = this.workstreamIds();
@@ -1226,6 +1261,7 @@ export class CreateDialog {
             entity: this.viewEntity() as ViewEntity,
             shared: this.shared() && this.canShare(),
             ...this.viewExtras,
+            layout: this.effectiveViewLayout() as ViewLayout,
           });
           if (v) done = { label: `View ${v.name} saved`, path: ['views', v.id] };
           break;

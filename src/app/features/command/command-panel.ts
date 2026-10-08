@@ -56,7 +56,7 @@ import {
 } from '@lucide/angular';
 import { BrnCommand, BrnCommandInput } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
-import type { ArtifactKind, IssueStatus, WorkstreamStatus } from '../../core/contracts/domain';
+import type { ArtifactKind, IssueStatus, Project, WorkstreamStatus } from '../../core/contracts/domain';
 import { ISSUE_STATUSES, ISSUE_STATUS_META, WORKSTREAM_STATUSES, WORKSTREAM_STATUS_META } from '../../core/meta';
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
@@ -72,6 +72,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { ArtifactIcon } from '../../shared/artifact';
 import { Kbd } from '../../shared/kbd';
 import { ProviderIcon } from '../../shared/provider-icon';
+import { ProjectGlyph } from '../projects/project-glyph';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import { fuzzyScore } from './fuzzy';
 import { RecentItems } from './recent.service';
@@ -109,8 +110,9 @@ interface ItemGroup {
 }
 
 interface Visual {
-  kind: 'status' | 'artifact' | 'avatar' | 'team' | 'repo' | 'icon';
+  kind: 'status' | 'artifact' | 'avatar' | 'team' | 'repo' | 'project' | 'icon';
   status?: any;
+  project?: Project;
   entity?: StatusEntity;
   artifactKind?: ArtifactKind;
   color?: string;
@@ -196,7 +198,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
 @Component({
   selector: 'app-command-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmCommandImports, LucideDynamicIcon, NgTemplateOutlet, StatusIcon, ArtifactIcon, ActorAvatar, ProviderIcon, Kbd, BrnCommandInput],
+  imports: [HlmCommandImports, LucideDynamicIcon, NgTemplateOutlet, StatusIcon, ArtifactIcon, ActorAvatar, ProviderIcon, Kbd, BrnCommandInput, ProjectGlyph],
   host: { class: 'block', '(keydown)': 'onKeydown($event)' },
   template: `
     <ng-template #glyph let-h>
@@ -216,6 +218,9 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
         }
         @case ('repo') {
           <app-provider-icon [provider]="$any(v.provider)" [size]="14" />
+        }
+        @case ('project') {
+          <app-project-glyph [project]="v.project!" [size]="14" />
         }
         @default {
           <svg [lucideIcon]="iconFor(h)" [size]="14" class="text-muted-foreground shrink-0"></svg>
@@ -922,6 +927,11 @@ export class CommandPanel {
       case 'repository': {
         const r = s.getRepository(h.id);
         if (r) return { kind: 'repo', provider: r.provider };
+        break;
+      }
+      case 'project': {
+        const p = s.getProject(h.id);
+        if (p) return { kind: 'project', project: p };
         break;
       }
     }
