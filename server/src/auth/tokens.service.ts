@@ -102,6 +102,8 @@ export class TokensService {
       },
     });
     if (!token) return null;
+    const expires = token.expiresAt?.getTime();
+    if (expires !== undefined && (Number.isNaN(expires) || expires <= Date.now())) return null;
     if (!token.lastUsedAt || Date.now() - token.lastUsedAt.getTime() > 60_000) {
       token.lastUsedAt = new Date();
       await this.repo.update({ id: token.id }, { lastUsedAt: token.lastUsedAt });

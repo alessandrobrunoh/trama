@@ -5,8 +5,10 @@ import {
   LucideCircleDot,
   LucideDynamicIcon,
   LucideBox,
+  LucideCheck,
   LucideMenu,
   LucideMessageSquare,
+  LucidePlus,
   LucideX,
   LucideSettings,
   LucideSearch,
@@ -36,6 +38,27 @@ import { SessionStore } from '../core/session/session.store';
           </button>
         </header>
         <nav class="mobile-menu__links" aria-label="All sections">
+          <div class="mobile-menu__workspaces" role="group" aria-label="Workspaces">
+            <p class="mobile-menu__label">Workspaces</p>
+            @for (w of session.workspaces(); track w.id) {
+              <button
+                type="button"
+                class="mobile-menu__link"
+                [class.mobile-menu__link--active]="w.slug === slug()"
+                [attr.aria-current]="w.slug === slug() ? 'true' : null"
+                (click)="switchTo(w.slug)"
+              >
+                <span class="mobile-menu__mark" aria-hidden="true">{{ w.name.slice(0, 1).toUpperCase() }}</span>
+                <span class="min-w-0 flex-1 truncate">{{ w.name }}</span>
+                @if (w.slug === slug()) {
+                  <svg [lucideIcon]="checkIcon" [size]="18" aria-hidden="true"></svg>
+                }
+              </button>
+            }
+            <a class="mobile-menu__link" routerLink="/new-workspace" (click)="closeMenu()">
+              <svg [lucideIcon]="plusIcon" [size]="21" aria-hidden="true"></svg><span>Create workspace</span>
+            </a>
+          </div>
           @for (item of menuItems; track item.segment) {
             <a [routerLink]="['/', slug(), item.segment]" routerLinkActive="mobile-menu__link--active"
               [routerLinkActiveOptions]="{ exact: false }" ariaCurrentWhenActive="page"
@@ -96,7 +119,7 @@ import { SessionStore } from '../core/session/session.store';
 export class MobileNav {
   protected readonly assistant = inject(AssistantStore);
   protected readonly ui = inject(UiStore);
-  private readonly session = inject(SessionStore);
+  protected readonly session = inject(SessionStore);
   protected readonly items = [
     { ...PERSONAL_NAV[0], label: 'Inbox' },
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
@@ -108,6 +131,8 @@ export class MobileNav {
   protected readonly menuIcon = LucideMenu;
   protected readonly closeIcon = LucideX;
   protected readonly searchIcon = LucideSearch;
+  protected readonly checkIcon = LucideCheck;
+  protected readonly plusIcon = LucidePlus;
   protected readonly menuItems = [
     { ...PERSONAL_NAV[0], label: 'Inbox' },
     { ...PERSONAL_NAV[1], label: 'My issues' },
@@ -124,6 +149,11 @@ export class MobileNav {
 
   protected closeMenu(): void {
     this.ui.setMobileSidebar(false);
+  }
+
+  protected switchTo(next: string): void {
+    this.closeMenu();
+    if (next !== this.slug()) void this.session.switchWorkspace(next);
   }
 
   protected openSearch(): void {

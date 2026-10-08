@@ -1,5 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
+import { DataSource } from 'typeorm';
 import { Client, TokenClient, createTestApp, uniq } from './app.js';
 
 describe('auth', () => {
@@ -40,7 +41,12 @@ describe('auth', () => {
     const client = new Client(app.getHttpServer(), cookie);
     const me = await client.get('/api/auth/me').expect(200);
     expect(me.body.user.email).toBe(email);
-    await client.post('/api/auth/logout').expect(204);
+    const logout = await client.post('/api/auth/logout').expect(204);
+    const cleared = (logout.headers['set-cookie'] as unknown as string[]).join('\n');
+    expect(cleared).toMatch(/nabla_session=/);
+    expect(cleared).toMatch(/HttpOnly/i);
+    expect(cleared).toMatch(/SameSite=Lax/i);
+    expect(cleared).toMatch(/Max-Age=0|Expires=/i);
     await client.get('/api/auth/me').expect(401);
   });
 
@@ -48,7 +54,7 @@ describe('auth', () => {
     await request(app.getHttpServer()).get('/api/auth/me').expect(401);
     await request(app.getHttpServer()).get('/api/workspaces').expect(401);
     const { client } = await Client.signup(app.getHttpServer());
-    const cookie = (await client.get('/api/auth/me')).request.header['Cookie'] as string;
+    const cookie = client.cookieHeader;
     // same cookie, no X-Client-Id / X-Requested-With → forbidden
     await request(app.getHttpServer()).post('/api/workspaces').set('Cookie', cookie).send({ name: 'Nope' }).expect(403);
     // non-JSON bodies are refused
@@ -78,6 +84,13 @@ describe('auth', () => {
     const asUser = new TokenClient(app.getHttpServer(), created.secret);
     expect((await asUser.get(`/api/w/${slug}/snapshot`).expect(200)).body.myRole).toBe('owner');
     await asUser.get('/api/workspaces').expect(200);
+    // A bogus bearer must not authenticate as some other live token, or as the browser session.
+    await request(app.getHttpServer()).get('/api/workspaces').set('Authorization', 'Bearer nbl_bogus').expect(401);
+    await request(app.getHttpServer())
+      .get('/api/auth/me')
+      .set('Cookie', client.cookieHeader)
+      .set('Authorization', 'Bearer nbl_bogus')
+      .expect(401);
 
     // agent token: role member, actor = agent, no user-only endpoints
     const agent = (await client.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'claude_code' }).expect(201)).body;
@@ -92,5 +105,30 @@ describe('auth', () => {
     await client.delete(`/api/w/${slug}/tokens/${created.token.id}`).expect(204);
     await asUser.get('/api/workspaces').expect(401);
     await request(app.getHttpServer()).get('/api/workspaces').set('Authorization', 'Bearer nbl_bogus').expect(401);
+  });
+
+  it('an expired session or API token is signed out, not still accepted', async () => {
+    const { client, user } = await Client.signup(app.getHttpServer());
+    const ws = (await client.post('/api/workspaces', { name: 'Expiry Inc' }).expect(201)).body;
+    const created = (
+      await client
+        .post(`/api/w/${ws.slug}/tokens`, {
+          name: 'laptop',
+          scope: 'read',
+          expiresAt: new Date(Date.now() + 86_400_000).toISOString(),
+        })
+        .expect(201)
+    ).body;
+    const asUser = new TokenClient(app.getHttpServer(), created.secret);
+    await asUser.get('/api/workspaces').expect(200);
+
+    const db = app.get(DataSource);
+    await db.query(`UPDATE api_tokens SET "expiresAt" = now() - interval '1 minute' WHERE id = $1`, [created.token.id]);
+    await asUser.get('/api/workspaces').expect(401);
+
+    await client.get('/api/auth/me').expect(200);
+    await db.query(`UPDATE sessions SET "expiresAt" = now() - interval '1 minute' WHERE "userId" = $1`, [user.id]);
+    await client.get('/api/auth/me').expect(401);
+    await client.get('/api/workspaces').expect(401);
   });
 });

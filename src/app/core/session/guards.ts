@@ -37,12 +37,18 @@ export const landingGuard: CanActivateFn = async () => {
  * Not a member / unknown → /404?workspace=<slug>. Server unreachable → /404?error=1.
  * Re-runs when `:workspaceSlug` changes. Requires authGuard before it.
  */
-export const workspaceGuard: CanActivateFn = async (route) => {
+export const workspaceGuard: CanActivateFn = async (route, state) => {
   const session = inject(SessionStore);
   const router = inject(Router);
   const slug = route.paramMap.get('workspaceSlug') ?? '';
   const result = await session.enterWorkspace(slug);
   if (result === 'ok') return true;
+  // A 401 while loading the snapshot clears the session. Do not leave that as a 404 inside the app.
+  if (!session.isAuthenticated()) {
+    return router.createUrlTree(['/login'], {
+      queryParams: state.url && state.url !== '/' ? { next: state.url } : {},
+    });
+  }
   return router.createUrlTree(['/404'], {
     queryParams: result === 'error' ? { error: 1 } : { workspace: slug },
   });

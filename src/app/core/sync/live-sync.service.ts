@@ -138,6 +138,9 @@ export class LiveSync {
         this.retryTimer = null;
         if (this.slug === slug) this.open(slug);
       }, backoff + Math.random() * 500);
+      // EventSource hides the status code. A dead session otherwise retries forever and the
+      // shell keeps showing the signed-in workspace. 401 on /auth/me signs the user out.
+      void this.api.auth.me().catch(() => undefined);
     };
   }
 }
