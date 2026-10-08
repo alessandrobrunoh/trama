@@ -17,7 +17,7 @@ import { UiStore } from '../core/stores/ui.store';
         </hlm-alert-dialog-header>
         <hlm-alert-dialog-footer>
           <button hlmAlertDialogCancel>Cancel</button>
-          <button hlmAlertDialogAction variant="destructive" [disabled]="busy()" (click)="confirm()">
+          <button hlmAlertDialogAction [variant]="state()?.destructive === false ? 'default' : 'destructive'" [disabled]="busy()" (click)="confirm()">
             {{ state()?.confirmLabel ?? 'Delete' }}
           </button>
         </hlm-alert-dialog-footer>

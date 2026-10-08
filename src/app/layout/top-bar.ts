@@ -8,7 +8,7 @@ import { filter, map, startWith } from 'rxjs';
 import { NablaStore } from '../core/stores/nabla.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { PageChrome, type Crumb } from './page-chrome';
-import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
+import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 
 /** Top bar: sidebar toggle, breadcrumb trail, live-sync dot and the page's action slot. */
 @Component({
@@ -17,12 +17,15 @@ import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
   imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger],
   host: {
     class:
-      'bg-background/90 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 backdrop-blur',
+      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 md:rounded-t-lg',
   },
   template: `
     <button hlmSidebarTrigger class="-ml-1 size-9 md:size-7" srOnlyText="Toggle sidebar (⌘B)"></button>
 
-    <nav aria-label="Breadcrumb" class="min-w-0 flex-1">
+    <nav aria-label="Breadcrumb" class="flex min-w-0 flex-1 items-center gap-1.5">
+      @if (sectionIcon(); as icon) {
+        <svg [lucideIcon]="icon" [size]="15" class="text-muted-foreground shrink-0 max-sm:hidden"></svg>
+      }
       <ol class="flex min-w-0 items-center gap-1 text-[13px]">
         @for (c of crumbs(); track $index; let last = $last) {
           <li class="flex min-w-0 items-center gap-1" [class.shrink-0]="!last" [class.min-w-0]="last">
@@ -48,6 +51,9 @@ import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
           </li>
         }
       </ol>
+      @if (description(); as d) {
+        <span class="text-muted-foreground min-w-0 truncate text-[13px] max-md:hidden">{{ d }}</span>
+      }
     </nav>
 
     @if (sync.live() === 'reconnecting' || sync.lastError()) {
@@ -80,9 +86,29 @@ export class TopBar {
     { initialValue: this.router.url },
   );
 
+  protected readonly sectionIcon = computed(() => {
+    const seg = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
+    return [...PERSONAL_NAV, ...MAIN_NAV].find((n) => n.segment === seg)?.icon ?? null;
+  });
+
+  /** Page description from <app-page-header>, shown after the trail (muted). */
+  protected readonly description = computed(() => {
+    const d = this.chrome.crumbs() ? undefined : this.chrome.page()?.description;
+    const labels = this.crumbs().map((c) => c.label.toLowerCase());
+    return d && !labels.includes(d.toLowerCase()) ? d : undefined;
+  });
+
   protected readonly crumbs = computed<readonly Crumb[]>(() => {
     const override = this.chrome.crumbs();
     if (override) return override;
+    const base = this.urlCrumbs();
+    const page = this.chrome.page();
+    if (!page || !base.length || base.some((c) => c.label === page.title)) return base;
+    // the page's own title replaces the URL-derived label of the last crumb
+    return [...base.slice(0, -1), { ...base[base.length - 1], label: page.title, mono: false }];
+  });
+
+  private readonly urlCrumbs = computed<readonly Crumb[]>(() => {
     const [path] = this.url().split(/[?#]/);
     const segs = path.split('/').filter(Boolean);
     const slug = segs[0] ?? this.store.slug() ?? '';

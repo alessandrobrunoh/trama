@@ -9,7 +9,7 @@ import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core
  * `workspaceSlug = input<string>()`.
  *
  * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
- * overview (default) | artifacts | decisions | graph | activity | context.
+ * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
  * Reserved top-level paths (cannot be workspace slugs): login, signup, new-workspace, 404.
  */
@@ -53,10 +53,25 @@ export const routes: Routes = [
         loadComponent: () => import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
       {
+        path: 'stats',
+        title: 'Statistics · Nabla',
+        loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
+      },
+      {
         path: 'attention',
         title: 'My Attention · Nabla',
         loadComponent: () =>
           import('./features/attention/attention-page').then((m) => m.AttentionPage),
+      },
+      {
+        path: 'my-work',
+        title: 'My Work · Nabla',
+        loadComponent: () => import('./features/my-work/my-work-page').then((m) => m.MyWorkPage),
+      },
+      {
+        path: 'activity',
+        title: 'Activity · Nabla',
+        loadComponent: () => import('./features/activity/activity-page').then((m) => m.ActivityPage),
       },
       {
         path: 'issues',
@@ -82,6 +97,11 @@ export const routes: Routes = [
           import('./features/workstreams/workstream-detail-page').then(
             (m) => m.WorkstreamDetailPage,
           ),
+      },
+      {
+        path: 'timeline',
+        title: 'Timeline · Nabla',
+        loadComponent: () => import('./features/timeline/timeline-page').then((m) => m.TimelinePage),
       },
       {
         path: 'graph',

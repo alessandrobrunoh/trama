@@ -23,10 +23,17 @@ export interface Crumb {
  *  - actions: project buttons into the right side of the top bar with
  *      <ng-template appTopBarActions><button hlmBtn size="sm">New</button></ng-template>
  */
+export interface PageTitle {
+  title: string;
+  description?: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class PageChrome {
   /** null = derive from the URL. */
   readonly crumbs = signal<readonly Crumb[] | null>(null);
+  /** Title + description registered by <app-page-header>; the top bar renders them in place of the last crumb. */
+  readonly page = signal<PageTitle | null>(null);
   readonly actions = signal<TemplateRef<unknown> | null>(null);
 }
 
