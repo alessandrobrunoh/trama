@@ -964,8 +964,8 @@ export class NablaStore {
 
   /**
    * Optimistic, except `kind`: changing it re-keys the issue, so the server's answer (new `key`,
-   * old key in `aliases`) is applied when it arrives. Unlinking a workstream also drops that
-   * workstream's milestone locally.
+   * old key in `aliases`) is applied when it arrives. Unlinking a workstream or changing the
+   * project also drops the milestones that no longer qualify locally.
    */
   async updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean> {
     return !!(await this.patchIssue(id, patch));
@@ -983,10 +983,14 @@ export class NablaStore {
     if (!current) return undefined;
     const { kind: _kind, ...local } = patch;
     const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
-    if (patch.workstreamIds && patch.milestoneIds === undefined) {
+    if ((patch.workstreamIds || patch.projectId !== undefined) && patch.milestoneIds === undefined) {
       const projects = new Set(
-        patch.workstreamIds.map((w) => this.workstreamById().get(w)?.projectId).filter((p): p is string => !!p),
+        (patch.workstreamIds ?? current.workstreamIds)
+          .map((w) => this.workstreamById().get(w)?.projectId)
+          .filter((p): p is string => !!p),
       );
+      const ownProject = patch.projectId !== undefined ? patch.projectId : current.projectId;
+      if (ownProject) projects.add(ownProject);
       optimistic['milestoneIds'] = (current.milestoneIds ?? []).filter((m) => {
         const ms = this._milestones().find((x) => x.id === m);
         return !!ms && projects.has(ms.projectId);

@@ -30,6 +30,8 @@ export interface IssueInput {
   reporterName?: string | null;
   assigneeId?: string | null;
   teamId?: string | null;
+  /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
+  projectId?: string | null;
   priority?: Priority;
   status?: IssueStatus;
   externalUrl?: string | null;
@@ -94,6 +96,7 @@ export class IssuesService {
       status?: IssueStatus;
       teamId?: string;
       assigneeId?: string;
+      projectId?: string;
       workstreamId?: string;
       milestoneId?: string;
       q?: string;
@@ -113,6 +116,7 @@ export class IssuesService {
     if (f.open) qb.andWhere("i.status IN ('backlog', 'todo', 'in_progress', 'in_review')");
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
+    if (f.projectId) qb.andWhere('i.projectId = :p', { p: f.projectId });
     if (f.workstreamId)
       qb.andWhere('i.workstreamIds @> :w::jsonb', {
         w: JSON.stringify([f.workstreamId]),
@@ -149,13 +153,28 @@ export class IssuesService {
     return row;
   }
 
+  /** Projects an issue may take milestones from: its own plus those its workstreams carry out. */
+  private async milestoneProjects(
+    workspaceId: string,
+    projectId: string | null,
+    workstreamIds: readonly string[],
+  ) {
+    const streams = workstreamIds.length
+      ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...workstreamIds]) })
+      : [];
+    const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
+    if (projectId) projects.add(projectId);
+    return projects;
+  }
+
   /**
-   * Milestones must exist, belong to a project of a workstream the issue is linked to, and an
-   * issue may be in at most one milestone per project.
+   * Milestones must exist, belong to the issue's project or to a project of a workstream the issue
+   * is linked to, and an issue may be in at most one milestone per project.
    */
   private async assertMilestones(
     workspaceId: string,
     milestoneIds: readonly string[],
+    projectId: string | null,
     workstreamIds: readonly string[],
   ) {
     if (!milestoneIds.length) return;
@@ -166,15 +185,12 @@ export class IssuesService {
       throw new BadRequestException(
         `Unknown milestone in: ${milestoneIds.join(', ')}`,
       );
-    const streams = workstreamIds.length
-      ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...workstreamIds]) })
-      : [];
-    const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
+    const projects = await this.milestoneProjects(workspaceId, projectId, workstreamIds);
     const seen = new Set<string>();
     for (const m of rows) {
       if (!projects.has(m.projectId))
         throw new BadRequestException(
-          `Milestone "${m.name}" belongs to a project none of this issue's workstreams carries out`,
+          `Milestone "${m.name}" belongs to a project that is neither this issue's project nor one its workstreams carry out`,
         );
       if (seen.has(m.projectId))
         throw new BadRequestException(
@@ -194,6 +210,7 @@ export class IssuesService {
       [input.teamId].filter((x): x is string => !!x),
     );
     await this.refs.users(workspaceId, [input.assigneeId]);
+    await this.refs.projects(workspaceId, [input.projectId].filter((x): x is string => !!x));
     const status = input.status ?? 'backlog';
     const facts: Pick<IssueEntity, 'startedAt' | 'completedAt'> = {
       startedAt: null,
@@ -220,6 +237,7 @@ export class IssuesService {
           reporterId: actor.type === 'user' ? (actor.id ?? null) : null,
           assigneeId: input.assigneeId ?? null,
           teamId: input.teamId ?? null,
+          projectId: input.projectId ?? null,
           priority: input.priority ?? 'none',
           status,
           estimate: input.estimate ?? null,
@@ -258,6 +276,7 @@ export class IssuesService {
       [patch.teamId].filter((x): x is string => !!x),
     );
     await this.refs.users(workspaceId, [patch.assigneeId]);
+    await this.refs.projects(workspaceId, [patch.projectId].filter((x): x is string => !!x));
     await this.refs.workstreams(workspaceId, patch.workstreamIds);
     const before = new Set(row.workstreamIds);
     const from = row.status;
@@ -289,6 +308,7 @@ export class IssuesService {
       patch.workstreamIds !== undefined
         ? unique(patch.workstreamIds)
         : row.workstreamIds;
+    const nextProjectId = patch.projectId !== undefined ? patch.projectId : row.projectId;
     let nextMilestoneIds =
       patch.milestoneIds !== undefined
         ? unique(patch.milestoneIds)
@@ -297,14 +317,15 @@ export class IssuesService {
       await this.assertMilestones(
         workspaceId,
         nextMilestoneIds,
+        nextProjectId,
         nextWorkstreamIds,
       );
-    } else if (patch.workstreamIds !== undefined && row.milestoneIds.length) {
-      // Unlinking the last workstream of a project drops that project's milestone.
-      const streams = nextWorkstreamIds.length
-        ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...nextWorkstreamIds]) })
-        : [];
-      const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
+    } else if (
+      (patch.workstreamIds !== undefined || patch.projectId !== undefined) &&
+      row.milestoneIds.length
+    ) {
+      // Leaving a project (clearing it, or unlinking its last workstream) drops that project's milestone.
+      const projects = await this.milestoneProjects(workspaceId, nextProjectId, nextWorkstreamIds);
       const kept = new Set(
         (
           await this.ds
@@ -324,6 +345,7 @@ export class IssuesService {
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
     if (patch.teamId !== undefined) row.teamId = patch.teamId;
+    if (patch.projectId !== undefined) row.projectId = patch.projectId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
     if (patch.workstreamIds !== undefined)

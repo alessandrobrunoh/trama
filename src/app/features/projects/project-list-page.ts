@@ -98,11 +98,13 @@ import { PROJECT_STATUS_META, isClosed, isOverdue, projectStatusOptions } from '
               <span class="flex w-28 items-center gap-1.5 max-md:w-auto" [class]="row.status.text">
                 <span class="size-2 shrink-0 rounded-full" [class]="row.status.dot"></span>{{ row.status.label }}
               </span>
-              <span class="w-32 truncate max-md:w-auto">{{ row.lead ?? '—' }}</span>
-              <span class="w-28 max-md:w-auto" [class.text-status-blocked]="row.overdue">
+              <span class="w-32 truncate max-md:w-auto max-md:max-w-32">{{ row.lead ?? '—' }}</span>
+              <span class="w-28 whitespace-nowrap max-md:w-auto" [class.text-status-blocked]="row.overdue">
                 {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
               </span>
-              <span class="w-20 text-right tabular-nums max-md:w-auto">{{ p.repositoryIds.length }}</span>
+              <span class="w-20 text-right whitespace-nowrap tabular-nums max-md:w-auto">
+                {{ p.repositoryIds.length }}<span class="md:hidden"> {{ p.repositoryIds.length === 1 ? 'repo' : 'repos' }}</span>
+              </span>
             </span>
           </a>
         }

@@ -200,7 +200,7 @@ answerInput(id: ID, answer: string): Promise<boolean>        // also clears its 
 dismissInput(id: ID): Promise<boolean>
 // issues
 createIssue(input: CreateIssueInput): Promise<Issue | undefined>
-updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean>   // patch: estimate (null clears), milestoneIds, kind (waits for server: re-keys)
+updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean>   // patch: estimate (null clears), projectId (null clears; drops its milestone), milestoneIds, kind (waits for server: re-keys)
 changeIssueKind(id: ID, kind: IssueKind): Promise<Issue | undefined>   // resolves the issue with its new key; old key stays in issue.aliases
 // milestones
 createMilestone(input: CreateMilestoneInput): Promise<Milestone | undefined>

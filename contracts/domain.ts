@@ -421,9 +421,12 @@ export interface Issue {
   status: IssueStatus;
   /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
   workstreamIds: ID[];
+  /** Project this issue is planned under. Independent of `workstreamIds`; deleting the project clears it. */
+  projectId?: ID;
   /**
-   * Milestones this issue is in: at most one per project, and only milestones of the projects of the
-   * workstreams in `workstreamIds`. Unlinking the last workstream of a project drops its milestone.
+   * Milestones this issue is in: at most one per project, and only milestones of `projectId` or of the
+   * projects of the workstreams in `workstreamIds`. Clearing `projectId` or unlinking the last
+   * workstream of a project drops that project's milestone.
    */
   milestoneIds: ID[];
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */

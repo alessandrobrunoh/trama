@@ -3,8 +3,8 @@ import { unique } from '../common/util.js';
 import { IssueEntity, MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
 
 /**
- * An issue may only be in milestones of the projects its workstreams belong to. Drops the milestones
- * that no longer qualify (a workstream was unlinked, left its project, or was deleted).
+ * An issue may only be in milestones of its own project or of the projects its workstreams belong to.
+ * Drops the milestones that no longer qualify (a workstream was unlinked, left its project, or was deleted).
  * Returns the ids of the issues that changed.
  */
 export async function pruneIssueMilestones(
@@ -27,6 +27,7 @@ export async function pruneIssueMilestones(
   const changed: string[] = [];
   for (const issue of issues) {
     const projects = new Set(issue.workstreamIds.map((w) => projectOf.get(w)).filter((p): p is string => !!p));
+    if (issue.projectId) projects.add(issue.projectId);
     const kept = issue.milestoneIds.filter((id) => {
       const p = milestoneProject.get(id);
       return !!p && projects.has(p);
