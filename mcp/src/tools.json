@@ -1,0 +1,1091 @@
+[
+ {
+  "name": "get_workspace",
+  "method": "GET",
+  "path": "",
+  "permission": "workspace:read",
+  "description": "Workspace details, settings and your role.",
+  "params": {}
+ },
+ {
+  "name": "update_workspace",
+  "method": "PATCH",
+  "path": "",
+  "permission": "workspace:write",
+  "description": "Rename the workspace or change its slug (admin).",
+  "params": {
+   "name": "body string Workspace name",
+   "slug": "body string URL slug"
+  }
+ },
+ {
+  "name": "get_snapshot",
+  "method": "GET",
+  "path": "/snapshot",
+  "permission": "snapshot:read",
+  "description": "Everything in the workspace in one (large) payload: users, teams, workstreams, issues, decisions, artifacts, events, attention, views. Prefer targeted list_* tools; only usable by user-acting tokens.",
+  "params": {}
+ },
+ {
+  "name": "search",
+  "method": "GET",
+  "path": "/search",
+  "permission": "search:read",
+  "description": "Full-text search across workstreams, issues, decisions, artifacts, repositories and teams.",
+  "params": {
+   "q": "query string! Search text",
+   "types": "query string Comma-separated: workstream,issue,decision,execution,artifact,repository,team",
+   "limit": "query integer Max results (1-100)"
+  }
+ },
+ {
+  "name": "list_events",
+  "method": "GET",
+  "path": "/events",
+  "permission": "events:read",
+  "description": "Activity log of every change, newest first.",
+  "params": {
+   "workstreamId": "query string Only events of this workstream",
+   "subject": "query string '<type>:<id>', e.g. issue:iss_abc",
+   "type": "query string Event type or prefix, e.g. 'issue.'",
+   "before": "query string ISO timestamp: only older events",
+   "limit": "query integer 1-500 (default 100)"
+  }
+ },
+ {
+  "name": "get_graph",
+  "method": "GET",
+  "path": "/graph",
+  "permission": "graph:read",
+  "description": "Dependency/ownership graph of workstreams, artifacts, actors and repositories.",
+  "params": {
+   "teamId": "query string Restrict to a team",
+   "workstreamId": "query string Restrict to a workstream",
+   "includeArtifacts": "query boolean Default true",
+   "includeActors": "query boolean Default true",
+   "includeRepositories": "query boolean Default true"
+  }
+ },
+ {
+  "name": "list_members",
+  "method": "GET",
+  "path": "/members",
+  "permission": "members:read",
+  "description": "Workspace members with their user profile and role.",
+  "params": {}
+ },
+ {
+  "name": "add_member",
+  "method": "POST",
+  "path": "/members",
+  "permission": "members:write",
+  "description": "Add an existing user to the workspace by email (admin).",
+  "params": {
+   "email": "body string! User email",
+   "role": "body string!(owner|admin|member|viewer) Role"
+  }
+ },
+ {
+  "name": "change_member_role",
+  "method": "PATCH",
+  "path": "/members/{id}",
+  "permission": "members:write",
+  "description": "Change a member's role (admin). id = membership id.",
+  "params": {
+   "id": "path string! Membership id",
+   "role": "body string!(owner|admin|member|viewer) New role"
+  }
+ },
+ {
+  "name": "remove_member",
+  "method": "DELETE",
+  "path": "/members/{id}",
+  "permission": "members:delete",
+  "description": "Remove a member (admin). id = membership id.",
+  "params": {
+   "id": "path string! Membership id"
+  }
+ },
+ {
+  "name": "list_agents",
+  "method": "GET",
+  "path": "/agents",
+  "permission": "agents:read",
+  "description": "AI agents registered in the workspace.",
+  "params": {}
+ },
+ {
+  "name": "get_agent",
+  "method": "GET",
+  "path": "/agents/{id}",
+  "permission": "agents:read",
+  "description": "One agent.",
+  "params": {
+   "id": "path string! Agent id"
+  }
+ },
+ {
+  "name": "create_agent",
+  "method": "POST",
+  "path": "/agents",
+  "permission": "agents:write",
+  "description": "Register an AI agent (admin).",
+  "params": {
+   "name": "body string! Name",
+   "provider": "body string!(delta|claude_code|codex|cursor|other) Provider",
+   "description": "body string Description",
+   "ownerUserId": "body string Owning user id"
+  }
+ },
+ {
+  "name": "update_agent",
+  "method": "PATCH",
+  "path": "/agents/{id}",
+  "permission": "agents:write",
+  "description": "Update an agent (admin).",
+  "params": {
+   "id": "path string! Agent id",
+   "name": "body string Name",
+   "provider": "body string(delta|claude_code|codex|cursor|other) Provider",
+   "description": "body string Description",
+   "ownerUserId": "body string Owning user id"
+  }
+ },
+ {
+  "name": "delete_agent",
+  "method": "DELETE",
+  "path": "/agents/{id}",
+  "permission": "agents:delete",
+  "description": "Delete an agent and revoke its tokens (admin).",
+  "params": {
+   "id": "path string! Agent id"
+  }
+ },
+ {
+  "name": "list_tokens",
+  "method": "GET",
+  "path": "/tokens",
+  "permission": "tokens:read",
+  "description": "API tokens (never their secrets). Admins see all, others their own.",
+  "params": {}
+ },
+ {
+  "name": "revoke_token",
+  "method": "DELETE",
+  "path": "/tokens/{id}",
+  "permission": "tokens:delete",
+  "description": "Revoke an API token.",
+  "params": {
+   "id": "path string! Token id"
+  }
+ },
+ {
+  "name": "list_integrations",
+  "method": "GET",
+  "path": "/integrations",
+  "permission": "integrations:read",
+  "description": "Git provider integrations (admin).",
+  "params": {}
+ },
+ {
+  "name": "get_integration",
+  "method": "GET",
+  "path": "/integrations/{id}",
+  "permission": "integrations:read",
+  "description": "One integration.",
+  "params": {
+   "id": "path string! Integration id"
+  }
+ },
+ {
+  "name": "list_outgoing_webhooks",
+  "method": "GET",
+  "path": "/outgoing-webhooks",
+  "permission": "outgoing-webhooks:read",
+  "description": "Outgoing webhooks (admin).",
+  "params": {}
+ },
+ {
+  "name": "get_outgoing_webhook",
+  "method": "GET",
+  "path": "/outgoing-webhooks/{id}",
+  "permission": "outgoing-webhooks:read",
+  "description": "One outgoing webhook.",
+  "params": {
+   "id": "path string! Webhook id"
+  }
+ },
+ {
+  "name": "list_webhook_deliveries",
+  "method": "GET",
+  "path": "/outgoing-webhooks/{id}/deliveries",
+  "permission": "outgoing-webhooks:read",
+  "description": "Recent deliveries of an outgoing webhook.",
+  "params": {
+   "id": "path string! Webhook id"
+  }
+ },
+ {
+  "name": "list_teams",
+  "method": "GET",
+  "path": "/teams",
+  "permission": "teams:read",
+  "description": "All teams.",
+  "params": {}
+ },
+ {
+  "name": "get_team",
+  "method": "GET",
+  "path": "/teams/{idOrKey}",
+  "permission": "teams:read",
+  "description": "One team.",
+  "params": {
+   "idOrKey": "path string! Team id or key (e.g. AUTH)"
+  }
+ },
+ {
+  "name": "create_team",
+  "method": "POST",
+  "path": "/teams",
+  "permission": "teams:write",
+  "description": "Create a team (admin). The key is immutable.",
+  "params": {
+   "name": "body string! Name",
+   "key": "body string! 2-8 uppercase letters/digits, starts with a letter (e.g. AUTH)",
+   "color": "body string Color",
+   "description": "body string Description",
+   "memberIds": "body string[] Member user ids",
+   "leadIds": "body string[] Lead user ids (subset of memberIds)",
+   "editPolicy": "body string(workspace|members) Who may edit its work"
+  }
+ },
+ {
+  "name": "update_team",
+  "method": "PATCH",
+  "path": "/teams/{idOrKey}",
+  "permission": "teams:write",
+  "description": "Update a team (admin).",
+  "params": {
+   "idOrKey": "path string! Team id or key (e.g. AUTH)",
+   "name": "body string Name",
+   "color": "body string Color",
+   "description": "body string Description",
+   "memberIds": "body string[] Member user ids",
+   "leadIds": "body string[] Lead user ids",
+   "editPolicy": "body string(workspace|members) Edit policy"
+  }
+ },
+ {
+  "name": "delete_team",
+  "method": "DELETE",
+  "path": "/teams/{idOrKey}",
+  "permission": "teams:delete",
+  "description": "Delete a team (409 while it owns workstreams).",
+  "params": {
+   "idOrKey": "path string! Team id or key (e.g. AUTH)"
+  }
+ },
+ {
+  "name": "list_repositories",
+  "method": "GET",
+  "path": "/repositories",
+  "permission": "repositories:read",
+  "description": "Linked git repositories.",
+  "params": {}
+ },
+ {
+  "name": "get_repository",
+  "method": "GET",
+  "path": "/repositories/{id}",
+  "permission": "repositories:read",
+  "description": "One repository.",
+  "params": {
+   "id": "path string! Repository id"
+  }
+ },
+ {
+  "name": "create_repository",
+  "method": "POST",
+  "path": "/repositories",
+  "permission": "repositories:write",
+  "description": "Register a repository.",
+  "params": {
+   "provider": "body string!(github|gitlab) Provider",
+   "fullName": "body string! 'owner/name'",
+   "url": "body string URL",
+   "defaultBranch": "body string Default branch",
+   "teamIds": "body string[] Owning team ids"
+  }
+ },
+ {
+  "name": "update_repository",
+  "method": "PATCH",
+  "path": "/repositories/{id}",
+  "permission": "repositories:write",
+  "description": "Update a repository.",
+  "params": {
+   "id": "path string! Repository id",
+   "url": "body string URL",
+   "defaultBranch": "body string Default branch",
+   "teamIds": "body string[] Team ids"
+  }
+ },
+ {
+  "name": "delete_repository",
+  "method": "DELETE",
+  "path": "/repositories/{id}",
+  "permission": "repositories:delete",
+  "description": "Remove a repository.",
+  "params": {
+   "id": "path string! Repository id"
+  }
+ },
+ {
+  "name": "list_workstreams",
+  "method": "GET",
+  "path": "/workstreams",
+  "permission": "workstreams:read",
+  "description": "List workstreams (the units of work an AI/human team ships).",
+  "params": {
+   "status": "query string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Status",
+   "ownerTeamId": "query string Owner team",
+   "teamId": "query string Owner or participating team",
+   "accountableUserId": "query string Accountable user",
+   "priority": "query string(none|urgent|high|medium|low) Priority",
+   "repositoryId": "query string Repository",
+   "label": "query string Label",
+   "q": "query string Text filter"
+  }
+ },
+ {
+  "name": "get_workstream",
+  "method": "GET",
+  "path": "/workstreams/{idOrKey}",
+  "permission": "workstreams:read",
+  "description": "One workstream with criteria and status.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
+  }
+ },
+ {
+  "name": "get_workstream_context",
+  "method": "GET",
+  "path": "/workstreams/{idOrKey}/context",
+  "permission": "workstreams:read",
+  "description": "Markdown briefing for a workstream: objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
+  }
+ },
+ {
+  "name": "get_workstream_graph",
+  "method": "GET",
+  "path": "/workstreams/{idOrKey}/graph",
+  "permission": "workstreams:read",
+  "description": "Graph around one workstream.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
+  }
+ },
+ {
+  "name": "create_workstream",
+  "method": "POST",
+  "path": "/workstreams",
+  "permission": "workstreams:write",
+  "description": "Create a workstream. Key = <ownerTeamKey>-<n>.",
+  "params": {
+   "title": "body string! Title",
+   "ownerTeamId": "body string! Owner team id",
+   "deltaThreadUrl": "body string! https URL on delta.dev (the Delta thread carrying this workstream)",
+   "description": "body string Description",
+   "objective": "body string Objective",
+   "context": "body string Context",
+   "participatingTeamIds": "body string[] Participating team ids",
+   "accountableUserId": "body string Accountable user id",
+   "repositoryIds": "body string[] Repository ids",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "labels": "body string[] Labels",
+   "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
+   "startDate": "body string ISO date",
+   "targetDate": "body string ISO date",
+   "acceptanceCriteria": "body object[] [{text, state?: pending|in_progress|met}]"
+  }
+ },
+ {
+  "name": "update_workstream",
+  "method": "PATCH",
+  "path": "/workstreams/{idOrKey}",
+  "permission": "workstreams:write",
+  "description": "Partially update a workstream; null clears optional fields.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
+   "title": "body string Title",
+   "ownerTeamId": "body string Owner team id",
+   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream)",
+   "description": "body string Description",
+   "objective": "body string Objective",
+   "context": "body string Context",
+   "participatingTeamIds": "body string[] Participating team ids",
+   "accountableUserId": "body string Accountable user id",
+   "repositoryIds": "body string[] Repository ids",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "labels": "body string[] Labels",
+   "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
+   "startDate": "body string ISO date",
+   "targetDate": "body string ISO date"
+  }
+ },
+ {
+  "name": "delete_workstream",
+  "method": "DELETE",
+  "path": "/workstreams/{idOrKey}",
+  "permission": "workstreams:delete",
+  "description": "Delete a workstream and everything attached to it.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
+  }
+ },
+ {
+  "name": "add_criterion",
+  "method": "POST",
+  "path": "/workstreams/{idOrKey}/criteria",
+  "permission": "workstreams:write",
+  "description": "Add an acceptance criterion.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
+   "text": "body string! Criterion",
+   "state": "body string(pending|in_progress|met) State"
+  }
+ },
+ {
+  "name": "update_criterion",
+  "method": "PATCH",
+  "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
+  "permission": "workstreams:write",
+  "description": "Update an acceptance criterion.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
+   "criterionId": "path string! Criterion id",
+   "text": "body string Text",
+   "state": "body string(pending|in_progress|met) State"
+  }
+ },
+ {
+  "name": "remove_criterion",
+  "method": "DELETE",
+  "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
+  "permission": "workstreams:delete",
+  "description": "Remove an acceptance criterion.",
+  "params": {
+   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
+   "criterionId": "path string! Criterion id"
+  }
+ },
+ {
+  "name": "list_milestones",
+  "method": "GET",
+  "path": "/milestones",
+  "permission": "milestones:read",
+  "description": "Milestones, ordered.",
+  "params": {
+   "workstreamId": "query string Workstream id"
+  }
+ },
+ {
+  "name": "get_milestone",
+  "method": "GET",
+  "path": "/milestones/{id}",
+  "permission": "milestones:read",
+  "description": "One milestone.",
+  "params": {
+   "id": "path string! Milestone id"
+  }
+ },
+ {
+  "name": "create_milestone",
+  "method": "POST",
+  "path": "/milestones",
+  "permission": "milestones:write",
+  "description": "Create a milestone in a workstream.",
+  "params": {
+   "workstreamId": "body string! Workstream id",
+   "name": "body string! Name",
+   "description": "body string Description",
+   "targetDate": "body string ISO date",
+   "sortOrder": "body integer Position (default last)"
+  }
+ },
+ {
+  "name": "update_milestone",
+  "method": "PATCH",
+  "path": "/milestones/{id}",
+  "permission": "milestones:write",
+  "description": "Update a milestone.",
+  "params": {
+   "id": "path string! Milestone id",
+   "name": "body string Name",
+   "description": "body string Description",
+   "targetDate": "body string ISO date",
+   "sortOrder": "body integer Position"
+  }
+ },
+ {
+  "name": "reorder_milestones",
+  "method": "POST",
+  "path": "/milestones/reorder",
+  "permission": "milestones:write",
+  "description": "Set the order of a workstream's milestones.",
+  "params": {
+   "workstreamId": "body string! Workstream id",
+   "ids": "body string[]! Milestone ids in the new order"
+  }
+ },
+ {
+  "name": "delete_milestone",
+  "method": "DELETE",
+  "path": "/milestones/{id}",
+  "permission": "milestones:delete",
+  "description": "Delete a milestone.",
+  "params": {
+   "id": "path string! Milestone id"
+  }
+ },
+ {
+  "name": "list_input_requests",
+  "method": "GET",
+  "path": "/input-requests",
+  "permission": "input-requests:read",
+  "description": "Questions agents/people asked humans.",
+  "params": {
+   "state": "query string(open|answered|dismissed) State",
+   "workstreamId": "query string Workstream",
+   "assigneeUserId": "query string Assignee"
+  }
+ },
+ {
+  "name": "get_input_request",
+  "method": "GET",
+  "path": "/input-requests/{id}",
+  "permission": "input-requests:read",
+  "description": "One input request.",
+  "params": {
+   "id": "path string! Input request id"
+  }
+ },
+ {
+  "name": "create_input_request",
+  "method": "POST",
+  "path": "/input-requests",
+  "permission": "input-requests:write",
+  "description": "Ask a human a question on a workstream.",
+  "params": {
+   "question": "body string! Question",
+   "workstreamId": "body string! Workstream id",
+   "options": "body string[] Suggested answers",
+   "assigneeUserId": "body string Who should answer"
+  }
+ },
+ {
+  "name": "update_input_request",
+  "method": "PATCH",
+  "path": "/input-requests/{id}",
+  "permission": "input-requests:write",
+  "description": "Edit an open input request.",
+  "params": {
+   "id": "path string! Input request id",
+   "question": "body string Question",
+   "options": "body string[] Options",
+   "assigneeUserId": "body string Assignee"
+  }
+ },
+ {
+  "name": "answer_input_request",
+  "method": "POST",
+  "path": "/input-requests/{id}/answer",
+  "permission": "input-requests:write",
+  "description": "Answer an open input request.",
+  "params": {
+   "id": "path string! Input request id",
+   "answer": "body string! Answer"
+  }
+ },
+ {
+  "name": "dismiss_input_request",
+  "method": "POST",
+  "path": "/input-requests/{id}/dismiss",
+  "permission": "input-requests:write",
+  "description": "Dismiss an open input request.",
+  "params": {
+   "id": "path string! Input request id"
+  }
+ },
+ {
+  "name": "delete_input_request",
+  "method": "DELETE",
+  "path": "/input-requests/{id}",
+  "permission": "input-requests:delete",
+  "description": "Delete an input request.",
+  "params": {
+   "id": "path string! Input request id"
+  }
+ },
+ {
+  "name": "list_issues",
+  "method": "GET",
+  "path": "/issues",
+  "permission": "issues:read",
+  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security).",
+  "params": {
+   "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
+   "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
+   "teamId": "query string Team",
+   "assigneeId": "query string Assignee",
+   "workstreamId": "query string Workstream",
+   "milestoneId": "query string Milestone",
+   "q": "query string Text filter"
+  }
+ },
+ {
+  "name": "get_issue",
+  "method": "GET",
+  "path": "/issues/{idOrKey}",
+  "permission": "issues:read",
+  "description": "One issue (old keys still resolve).",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+  }
+ },
+ {
+  "name": "create_issue",
+  "method": "POST",
+  "path": "/issues",
+  "permission": "issues:write",
+  "description": "Create an issue; status defaults to backlog. Subject to per-token write caps.",
+  "params": {
+   "title": "body string! Title",
+   "body": "body string Markdown body",
+   "reporterName": "body string Reporter name",
+   "assigneeId": "body string Assignee user id",
+   "teamId": "body string Team id",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
+   "externalUrl": "body string External URL",
+   "estimate": "body number Estimate in points (>=0, <=1000)",
+   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security)! Kind",
+   "source": "body string(manual|github|gitlab|email|api|agent) Source"
+  }
+ },
+ {
+  "name": "update_issue",
+  "method": "PATCH",
+  "path": "/issues/{idOrKey}",
+  "permission": "issues:write",
+  "description": "Partially update an issue. Changing kind re-keys it; duplicateOfId marks it a duplicate; null clears optional fields.",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
+   "title": "body string Title",
+   "body": "body string Markdown body",
+   "reporterName": "body string Reporter name",
+   "assigneeId": "body string Assignee user id",
+   "teamId": "body string Team id",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
+   "externalUrl": "body string External URL",
+   "estimate": "body number Estimate in points (>=0, <=1000)",
+   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Kind (re-keys the issue)",
+   "workstreamIds": "body string[] Linked workstream ids",
+   "milestoneIds": "body string[] Milestone ids (max one per workstream)",
+   "duplicateOfId": "body string Id or key of the original (null clears)"
+  }
+ },
+ {
+  "name": "link_issue",
+  "method": "POST",
+  "path": "/issues/{idOrKey}/link",
+  "permission": "issues:write",
+  "description": "Attach an issue to existing workstreams and/or a new one created atomically.",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
+   "workstreamIds": "body string[] Existing workstream ids",
+   "createWorkstream": "body object New workstream {title, ownerTeamId, deltaThreadUrl, objective?, ...}",
+   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Resulting status"
+  }
+ },
+ {
+  "name": "delete_issue",
+  "method": "DELETE",
+  "path": "/issues/{idOrKey}",
+  "permission": "issues:delete",
+  "description": "Delete an issue.",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+  }
+ },
+ {
+  "name": "list_artifacts",
+  "method": "GET",
+  "path": "/artifacts",
+  "permission": "artifacts:read",
+  "description": "PRs, docs, builds, deployments etc. attached to workstreams.",
+  "params": {
+   "workstreamId": "query string Workstream",
+   "executionId": "query string Execution",
+   "repositoryId": "query string Repository",
+   "kind": "query string Kind",
+   "state": "query string State"
+  }
+ },
+ {
+  "name": "get_artifact",
+  "method": "GET",
+  "path": "/artifacts/{id}",
+  "permission": "artifacts:read",
+  "description": "One artifact.",
+  "params": {
+   "id": "path string! Artifact id"
+  }
+ },
+ {
+  "name": "create_artifact",
+  "method": "POST",
+  "path": "/artifacts",
+  "permission": "artifacts:write",
+  "description": "Attach an artifact to a workstream.",
+  "params": {
+   "workstreamId": "body string! Workstream id",
+   "kind": "body string(pull_request|merge_request|document|design|image|file|build|test_report|deployment|release)! Kind",
+   "title": "body string! Title",
+   "executionId": "body string Execution id",
+   "repositoryId": "body string Repository id",
+   "provider": "body string Provider",
+   "url": "body string URL",
+   "externalId": "body string External id",
+   "state": "body string State",
+   "ci": "body string(pending|passing|failing) CI state",
+   "review": "body string(none|requested|approved|changes_requested) Review state",
+   "hasConflicts": "body boolean Merge conflicts",
+   "environment": "body string Deployment environment"
+  }
+ },
+ {
+  "name": "update_artifact",
+  "method": "PATCH",
+  "path": "/artifacts/{id}",
+  "permission": "artifacts:write",
+  "description": "Update an artifact.",
+  "params": {
+   "id": "path string! Artifact id",
+   "workstreamId": "body string Workstream id",
+   "kind": "body string(pull_request|merge_request|document|design|image|file|build|test_report|deployment|release) Kind",
+   "title": "body string Title",
+   "executionId": "body string Execution id",
+   "repositoryId": "body string Repository id",
+   "provider": "body string Provider",
+   "url": "body string URL",
+   "externalId": "body string External id",
+   "state": "body string State",
+   "ci": "body string(pending|passing|failing) CI state",
+   "review": "body string(none|requested|approved|changes_requested) Review state",
+   "hasConflicts": "body boolean Merge conflicts",
+   "environment": "body string Deployment environment"
+  }
+ },
+ {
+  "name": "delete_artifact",
+  "method": "DELETE",
+  "path": "/artifacts/{id}",
+  "permission": "artifacts:delete",
+  "description": "Delete an artifact.",
+  "params": {
+   "id": "path string! Artifact id"
+  }
+ },
+ {
+  "name": "list_decisions",
+  "method": "GET",
+  "path": "/decisions",
+  "permission": "decisions:read",
+  "description": "Architecture/product decisions (ADR-n).",
+  "params": {
+   "status": "query string(draft|proposed|accepted|superseded|rejected) Status",
+   "workstreamId": "query string Workstream",
+   "tag": "query string Tag",
+   "q": "query string Text"
+  }
+ },
+ {
+  "name": "get_decision",
+  "method": "GET",
+  "path": "/decisions/{idOrKey}",
+  "permission": "decisions:read",
+  "description": "One decision.",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
+  }
+ },
+ {
+  "name": "create_decision",
+  "method": "POST",
+  "path": "/decisions",
+  "permission": "decisions:write",
+  "description": "Propose a decision (status proposed or draft; accepted/rejected need a person).",
+  "params": {
+   "title": "body string! Title",
+   "statement": "body string! Decision statement",
+   "rationale": "body string Rationale",
+   "originWorkstreamId": "body string Origin workstream",
+   "originExecutionId": "body string Origin execution",
+   "relatedWorkstreamIds": "body string[] Related workstreams",
+   "tags": "body string[] Tags",
+   "status": "body string(draft|proposed) Initial status"
+  }
+ },
+ {
+  "name": "update_decision",
+  "method": "PATCH",
+  "path": "/decisions/{idOrKey}",
+  "permission": "decisions:write",
+  "description": "Update a decision's content.",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)",
+   "title": "body string Title",
+   "statement": "body string Decision statement",
+   "rationale": "body string Rationale",
+   "originWorkstreamId": "body string Origin workstream",
+   "originExecutionId": "body string Origin execution",
+   "relatedWorkstreamIds": "body string[] Related workstreams",
+   "tags": "body string[] Tags"
+  }
+ },
+ {
+  "name": "accept_decision",
+  "method": "POST",
+  "path": "/decisions/{idOrKey}/accept",
+  "permission": "decisions:accept",
+  "description": "Accept a proposed decision (people only; may be refused for agent tokens).",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
+  }
+ },
+ {
+  "name": "reject_decision",
+  "method": "POST",
+  "path": "/decisions/{idOrKey}/reject",
+  "permission": "decisions:accept",
+  "description": "Reject a proposed decision.",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
+  }
+ },
+ {
+  "name": "supersede_decision",
+  "method": "POST",
+  "path": "/decisions/{idOrKey}/supersede",
+  "permission": "decisions:accept",
+  "description": "Mark a decision superseded by another.",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)",
+   "byId": "body string! Id or key of the replacement"
+  }
+ },
+ {
+  "name": "delete_decision",
+  "method": "DELETE",
+  "path": "/decisions/{idOrKey}",
+  "permission": "decisions:delete",
+  "description": "Delete a decision.",
+  "params": {
+   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
+  }
+ },
+ {
+  "name": "list_dependencies",
+  "method": "GET",
+  "path": "/dependencies",
+  "permission": "dependencies:read",
+  "description": "Blocking relations between workstreams.",
+  "params": {
+   "fromId": "query string Blocker",
+   "toId": "query string Blocked"
+  }
+ },
+ {
+  "name": "get_dependency",
+  "method": "GET",
+  "path": "/dependencies/{id}",
+  "permission": "dependencies:read",
+  "description": "One dependency.",
+  "params": {
+   "id": "path string! Dependency id"
+  }
+ },
+ {
+  "name": "create_dependency",
+  "method": "POST",
+  "path": "/dependencies",
+  "permission": "dependencies:write",
+  "description": "'from' blocks 'to'. Cycles are rejected.",
+  "params": {
+   "fromType": "body string!(workstream|execution) From type",
+   "fromId": "body string! From id",
+   "toType": "body string!(workstream|execution) To type",
+   "toId": "body string! To id"
+  }
+ },
+ {
+  "name": "delete_dependency",
+  "method": "DELETE",
+  "path": "/dependencies/{id}",
+  "permission": "dependencies:delete",
+  "description": "Remove a dependency.",
+  "params": {
+   "id": "path string! Dependency id"
+  }
+ },
+ {
+  "name": "list_comments",
+  "method": "GET",
+  "path": "/comments",
+  "permission": "comments:read",
+  "description": "Comments on an entity.",
+  "params": {
+   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team) Subject type",
+   "subjectId": "query string Subject id"
+  }
+ },
+ {
+  "name": "create_comment",
+  "method": "POST",
+  "path": "/comments",
+  "permission": "comments:write",
+  "description": "Comment on an entity.",
+  "params": {
+   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team, id}",
+   "body": "body string! Comment (markdown)"
+  }
+ },
+ {
+  "name": "update_comment",
+  "method": "PATCH",
+  "path": "/comments/{id}",
+  "permission": "comments:write",
+  "description": "Edit your own comment.",
+  "params": {
+   "id": "path string! Comment id",
+   "body": "body string! New text"
+  }
+ },
+ {
+  "name": "delete_comment",
+  "method": "DELETE",
+  "path": "/comments/{id}",
+  "permission": "comments:delete",
+  "description": "Delete a comment (author or admin).",
+  "params": {
+   "id": "path string! Comment id"
+  }
+ },
+ {
+  "name": "list_views",
+  "method": "GET",
+  "path": "/views",
+  "permission": "views:read",
+  "description": "Saved views (shared + yours).",
+  "params": {}
+ },
+ {
+  "name": "get_view",
+  "method": "GET",
+  "path": "/views/{id}",
+  "permission": "views:read",
+  "description": "One saved view.",
+  "params": {
+   "id": "path string! View id"
+  }
+ },
+ {
+  "name": "create_view",
+  "method": "POST",
+  "path": "/views",
+  "permission": "views:write",
+  "description": "Create a saved view.",
+  "params": {
+   "name": "body string! Name",
+   "entity": "body string(workstream|issue|execution|decision)! Entity",
+   "filters": "body object[] [{field, op, value}]",
+   "sort": "body object {field, direction: asc|desc}",
+   "groupBy": "body string Group-by field",
+   "layout": "body string(list|board|graph) Layout",
+   "shared": "body boolean Visible to everyone"
+  }
+ },
+ {
+  "name": "update_view",
+  "method": "PATCH",
+  "path": "/views/{id}",
+  "permission": "views:write",
+  "description": "Update a saved view (owner or admin for shared).",
+  "params": {
+   "id": "path string! View id",
+   "name": "body string Name",
+   "entity": "body string(workstream|issue|execution|decision) Entity",
+   "filters": "body object[] [{field, op, value}]",
+   "sort": "body object {field, direction: asc|desc}",
+   "groupBy": "body string Group-by field",
+   "layout": "body string(list|board|graph) Layout",
+   "shared": "body boolean Visible to everyone"
+  }
+ },
+ {
+  "name": "delete_view",
+  "method": "DELETE",
+  "path": "/views/{id}",
+  "permission": "views:delete",
+  "description": "Delete a saved view.",
+  "params": {
+   "id": "path string! View id"
+  }
+ },
+ {
+  "name": "list_attention",
+  "method": "GET",
+  "path": "/attention",
+  "permission": "attention:read",
+  "description": "Things waiting for a human (input requested, decisions, failing CI, blocked, deadlines...). Needs a user token.",
+  "params": {
+   "scope": "query string(mine|all) mine (default) or all (admin)",
+   "state": "query string(open|snoozed|dismissed|active) State filter"
+  }
+ },
+ {
+  "name": "dismiss_attention",
+  "method": "POST",
+  "path": "/attention/{id}/dismiss",
+  "permission": "attention:write",
+  "description": "Dismiss an attention item.",
+  "params": {
+   "id": "path string! Attention item id, e.g. input_requested:ir_abc"
+  }
+ },
+ {
+  "name": "snooze_attention",
+  "method": "POST",
+  "path": "/attention/{id}/snooze",
+  "permission": "attention:write",
+  "description": "Snooze an attention item until a future time.",
+  "params": {
+   "id": "path string! Attention item id",
+   "until": "body string! ISO timestamp in the future"
+  }
+ },
+ {
+  "name": "restore_attention",
+  "method": "POST",
+  "path": "/attention/{id}/restore",
+  "permission": "attention:write",
+  "description": "Restore a dismissed/snoozed item.",
+  "params": {
+   "id": "path string! Attention item id"
+  }
+ }
+]

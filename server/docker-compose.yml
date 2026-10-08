@@ -26,6 +26,31 @@ services:
       - traefik.http.routers.trama.tls.certresolver=le
       - traefik.http.services.trama.loadbalancer.server.port=3000
 
+  # MCP server (Rust): talks to the API only, authenticated per client by the API key
+  # (Settings → API tokens). Public URL: https://trama.alessandrobrunoh.it/mcp
+  mcp:
+    image: ghcr.io/alessandrobrunoh/trama-mcp:latest
+    build: ../mcp
+    container_name: trama-mcp
+    restart: unless-stopped
+    environment:
+      NABLA_API_URL: http://app:3000/api
+      MCP_BIND: 0.0.0.0:8080
+    networks:
+      - default
+      - proxy
+    depends_on:
+      - app
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.trama-mcp.rule=Host(`trama.alessandrobrunoh.it`) && PathPrefix(`/mcp`)
+      - traefik.http.routers.trama-mcp.priority=100
+      - traefik.http.routers.trama-mcp.entrypoints=websecure
+      - traefik.http.routers.trama-mcp.tls=true
+      - traefik.http.routers.trama-mcp.tls.certresolver=le
+      - traefik.http.services.trama-mcp.loadbalancer.server.port=8080
+
   postgres:
     image: postgres:18
     container_name: delta-postgres

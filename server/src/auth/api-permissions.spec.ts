@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { normalizePermissions, requiredPermission } from './api-permissions.js';
 
@@ -44,5 +45,22 @@ describe('normalizePermissions', () => {
       'teams:read',
     ]);
     expect(normalizePermissions(['decisions:accept'])).toEqual(['decisions:read', 'decisions:accept']);
+  });
+});
+
+describe('MCP tool catalog', () => {
+  const tools = JSON.parse(readFileSync(new URL('../../../mcp/src/tools.json', import.meta.url), 'utf8')) as {
+    name: string;
+    method: string;
+    path: string;
+    permission: string;
+  }[];
+
+  it('declares exactly the permission the API derives from each tool\'s route', () => {
+    expect(tools.length).toBeGreaterThan(80);
+    for (const t of tools) {
+      const route = `/api/w/:slug${t.path.replace(/\{(\w+)\}/g, ':$1')}`;
+      expect(requiredPermission(t.method, route), `${t.name} (${t.method} ${t.path})`).toBe(t.permission);
+    }
   });
 });
