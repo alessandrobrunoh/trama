@@ -303,6 +303,9 @@ export function explainStatus(
   const incoming = store.incomingDependencies().get(ws.id) ?? [];
   const prs = arts.filter(isPr);
   const openPrs = prs.filter(isOpenPr);
+  const linked = (store.issuesByWorkstream().get(ws.id) ?? []).filter(
+    (i) => i.status !== 'canceled',
+  );
   const reasons: string[] = [];
   const s = ws.derivedStatus;
 
@@ -313,6 +316,12 @@ export function explainStatus(
       if (dep)
         reasons.push(`${dep.title} is healthy${dep.environment ? ` in ${dep.environment}` : ''}.`);
       else if (rel) reasons.push(`Release ${rel.title} is published.`);
+      else if (linked.length > 0 && linked.every((i) => i.status === 'done'))
+        reasons.push(
+          linked.length === 1
+            ? 'The linked issue is done.'
+            : `All ${linked.length} linked issues are done.`,
+        );
       else reasons.push('Every pull request is merged.');
       break;
     }
@@ -352,11 +361,18 @@ export function explainStatus(
     }
     case 'in_review': {
       for (const a of openPrs.slice(0, 2)) reasons.push(`${prLabel(a)} is open for review.`);
+      const reviewing = linked.filter((i) => i.status === 'in_review').length;
+      if (reviewing)
+        reasons.push(
+          reviewing === 1 ? 'An issue is in review.' : `${reviewing} issues are in review.`,
+        );
       break;
     }
     case 'working':
       reasons.push(
-        'Work is in progress: a criterion is underway, or there is a build or test report.',
+        linked.some((i) => i.status === 'in_progress')
+          ? 'An issue is in progress.'
+          : 'Work is in progress: a criterion is underway, or there is a build or test report.',
       );
       break;
     case 'planned':
