@@ -8,6 +8,7 @@ import {
   LucideCircleX,
   LucideDynamicIcon,
   LucideFlag,
+  LucideBox,
   LucideFolderGit2,
   LucideGitPullRequest,
   LucideInbox,
@@ -278,10 +279,23 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
     case 'repository.deleted':
       return {
         icon: LucideFolderGit2,
-        verb: `${e.type.split('.')[1]} project`,
+        verb: `${e.type.split('.')[1]} repository`,
         text: str(d['fullName']) ?? store.getRepository(e.subject.id)?.fullName,
-        link: e.type !== 'repository.deleted' ? ['/', slug, 'projects', e.subject.id] : undefined,
+        link: e.type !== 'repository.deleted' ? ['/', slug, 'repositories', e.subject.id] : undefined,
       };
+    case 'project.created':
+    case 'project.updated':
+    case 'project.status_changed':
+    case 'project.deleted': {
+      const verb = e.type === 'project.status_changed' ? 'changed status of' : e.type.split('.')[1];
+      return {
+        icon: LucideBox,
+        verb: `${verb} project`,
+        text: str(d['name']) ?? store.getProject(e.subject.id)?.name,
+        detail: e.type === 'project.status_changed' ? `${str(d['from']) ?? ''} → ${str(d['to']) ?? ''}`.replaceAll('_', ' ') : undefined,
+        link: e.type !== 'project.deleted' ? ['/', slug, 'projects', e.subject.id] : undefined,
+      };
+    }
     default:
       return { icon: LucideActivity, verb: humanize(e.type), subject: wsRef };
   }

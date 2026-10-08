@@ -31,6 +31,7 @@ export type CreateKind =
   | 'view'
   | 'team'
   | 'repository'
+  | 'project'
   | 'input-request';
 
 /** Prefill for the create dialog, e.g. `{ workstreamId }`, `{ ownerTeamId }`, `{ kind: 'bug' }`. */

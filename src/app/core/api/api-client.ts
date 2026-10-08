@@ -33,6 +33,7 @@ import type {
   Membership,
   Milestone,
   OutgoingWebhook,
+  Project,
   Repository,
   Role,
   SavedView,
@@ -66,6 +67,7 @@ import type {
   LinkRepositoryInput,
   RemoteRepositoryPage,
   UpdateIntegrationInput,
+  CreateProjectInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -87,6 +89,7 @@ import type {
   UpdateDecisionInput,
   UpdateIssueInput,
   UpdateMemberInput,
+  UpdateProjectInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -285,6 +288,14 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateTeamInput) =>
       this.patch<Team>(`${this.w(slug)}/teams/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/teams/${id}`),
+  };
+
+  readonly projects = {
+    list: (slug: string) => this.get<Project[]>(`${this.w(slug)}/projects`),
+    get: (slug: string, id: ID) => this.get<Project>(`${this.w(slug)}/projects/${id}`),
+    create: (slug: string, input: CreateProjectInput) => this.post<Project>(`${this.w(slug)}/projects`, input),
+    update: (slug: string, id: ID, input: UpdateProjectInput) => this.patch<Project>(`${this.w(slug)}/projects/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/projects/${id}`),
   };
 
   readonly repositories = {

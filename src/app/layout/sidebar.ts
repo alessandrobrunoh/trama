@@ -9,6 +9,7 @@ import {
   LucideCheck,
   LucideCircleDot,
   LucideEllipsis,
+  LucideBox,
   LucideFolderGit2,
   LucideHexagon,
   LucideLayers,
@@ -471,9 +472,13 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
             <svg [lucideIcon]="layers" [size]="14"></svg>
             <span class="flex-1">New view</span>
           </button>
+          <button hlmDropdownMenuItem (triggered)="ui.openCreate('project')">
+            <svg [lucideIcon]="projectIcon" [size]="14"></svg>
+            <span class="flex-1">New project</span>
+          </button>
           <button hlmDropdownMenuItem (triggered)="ui.openCreate('repository')">
             <svg [lucideIcon]="repoIcon" [size]="14"></svg>
-            <span class="flex-1">New project</span>
+            <span class="flex-1">New repository</span>
           </button>
           @if (canAdmin()) {
             <button hlmDropdownMenuItem (triggered)="ui.openCreate('team')">
@@ -565,6 +570,7 @@ export class AppSidebar {
   protected readonly layers = LucideLayers;
   protected readonly closeIcon = LucideX;
   protected readonly repoIcon = LucideFolderGit2;
+  protected readonly projectIcon = LucideBox;
   protected readonly usersIcon = LucideUsers;
   protected readonly teamLinks = [
     { label: 'Issues', segment: 'issues', icon: LucideCircleDot },

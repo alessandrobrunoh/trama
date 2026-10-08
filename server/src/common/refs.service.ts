@@ -8,6 +8,7 @@ import {
   IssueEntity,
   MembershipEntity,
   MilestoneEntity,
+  ProjectEntity,
   RepositoryEntity,
   TeamEntity,
   WorkstreamEntity,
@@ -38,6 +39,10 @@ export class RefsService {
 
   repositories(workspaceId: string, ids?: readonly string[] | null) {
     return this.assertAll(RepositoryEntity, workspaceId, ids, 'repository');
+  }
+
+  projects(workspaceId: string, ids?: readonly string[] | null) {
+    return this.assertAll(ProjectEntity, workspaceId, ids, 'project');
   }
 
   workstreams(workspaceId: string, ids?: readonly string[] | null) {
@@ -88,6 +93,8 @@ export class RefsService {
         return { exists: await db.getRepository(RepositoryEntity).existsBy(where) };
       case 'team':
         return { exists: await db.getRepository(TeamEntity).existsBy(where) };
+      case 'project':
+        return { exists: await db.getRepository(ProjectEntity).existsBy(where) };
     }
   }
 }

@@ -281,7 +281,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
         }
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Accountable" [multiple]="true" [options]="users()" [value]="fv('accountableUserId')" (valueChange)="setF('accountableUserId', $event)" />
-        <app-picker variant="chip" label="Project" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
+        <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
         @if (labels().length) {
           <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         }

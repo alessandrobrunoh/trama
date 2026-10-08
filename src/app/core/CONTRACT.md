@@ -58,8 +58,8 @@ Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
 | `graph` | `GraphPage` graph/graph-page.ts | |
 | `decisions` | `DecisionListPage` decisions/decision-list-page.ts | |
 | `decisions/:key` | `DecisionDetailPage` decisions/decision-detail-page.ts | `key` (ADR-7 or id) |
-| `projects` | `RepositoryListPage` repositories/repository-list-page.ts | The product calls these **projects**. `repositories` redirects here. |
-| `projects/:id` | `RepositoryDetailPage` repositories/repository-detail-page.ts | `id`. `repositories/:id` redirects here. |
+| `repositories` | `RepositoryListPage` repositories/repository-list-page.ts | Git repositories. |
+| `repositories/:id` | `RepositoryDetailPage` repositories/repository-detail-page.ts | `id`. |
 | `teams` | `TeamListPage` teams/team-list-page.ts | |
 | `teams/:key` | `TeamDetailPage` teams/team-detail-page.ts | `key` (team key AUTH or id) |
 | `views` | `ViewListPage` views/view-list-page.ts | |
@@ -308,9 +308,9 @@ Global bindings (single keys are ignored while typing in an input/textarea/conte
 | `⌘J` | toggle theme (`ThemeService.toggle()` from `core/theme`) |
 | `/` | search dialog (`ui.openModal('search')`) |
 | `?` | shortcuts dialog (`ui.openModal('shortcuts')`) |
-| `C` | create, context-aware: attention/issues -> issue; workstreams -> workstream; workstream detail -> execution (prefilled `workstreamId`); execution detail -> sub-execution (`workstreamId`, `parentExecutionId`); decisions -> decision; views -> view; teams list -> team; team detail -> workstream (`ownerTeamId`); projects -> project (`kind: 'repository'`) / workstream (`repositoryIds`); otherwise workstream. Opens `ui.openCreate(kind, defaults)`. |
-| `G` then `O` `A` `I` `W` `D` `P` `X` `S` (+ `T` teams, `V` views) | go to overview / attention / issues / workstreams / decisions / projects / graph / settings / teams / views of the active workspace (`GO_TO_ROUTES`) |
-| `Esc` | page shortcut first, then: close modal -> close mobile sidebar -> clear selection -> on `/:slug/{workstreams,issues,decisions,projects,teams,views}/:x` go back to the list |
+| `C` | create, context-aware: attention/issues -> issue; workstreams -> workstream; workstream detail -> execution (prefilled `workstreamId`); execution detail -> sub-execution (`workstreamId`, `parentExecutionId`); decisions -> decision; views -> view; teams list -> team; team detail -> workstream (`ownerTeamId`); repositories -> repository (`kind: 'repository'`) / workstream (`repositoryIds`); otherwise workstream. Opens `ui.openCreate(kind, defaults)`. |
+| `G` then `O` `A` `I` `W` `D` `R` `X` `S` (+ `T` teams, `V` views) | go to overview / attention / issues / workstreams / decisions / repositories (`G` `R`) / graph / settings / teams / views of the active workspace (`GO_TO_ROUTES`) |
+| `Esc` | page shortcut first, then: close modal -> close mobile sidebar -> clear selection -> on `/:slug/{workstreams,issues,decisions,repositories,teams,views}/:x` go back to the list |
 | `j` `k` / `↓` `↑` | move `ui.focusedRowId` through DOM elements carrying `data-row-id="<id>"` |
 | `Enter` | click the focused row (or its first `a[href]`) |
 | `Space` / `x` | toggle selection of the focused row (`ui.selectedRowIds`) |

@@ -42,7 +42,7 @@ export interface WsRec {
   team: string;
   teamId: string;
   accountableId?: string;
-  projects: string[];
+  repositories: string[];
   criteria: { met: number; inProgress: number; total: number };
   changes: Change[];
 }
@@ -126,7 +126,7 @@ export function buildTimeline(
           team: store.getTeam(w.ownerTeamId)?.name ?? 'Unknown team',
           teamId: w.ownerTeamId,
           accountableId: w.accountableUserId ?? undefined,
-          projects: w.repositoryIds.map((id) => store.getRepository(id)?.fullName ?? 'Unknown project'),
+          repositories: w.repositoryIds.map((id) => store.getRepository(id)?.fullName ?? 'Unknown repository'),
           criteria: {
             met: w.acceptanceCriteria.filter((c) => c.state === 'met').length,
             inProgress: w.acceptanceCriteria.filter((c) => c.state === 'in_progress').length,

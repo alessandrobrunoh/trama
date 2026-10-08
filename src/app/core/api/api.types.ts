@@ -29,6 +29,7 @@ import type {
   IntegrationConnection,
   IssueStatus,
   Priority,
+  ProjectStatus,
   ReviewState,
   Role,
   SubjectRef,
@@ -153,6 +154,34 @@ export interface UpdateRepositoryInput {
   url?: string;
   defaultBranch?: string;
   teamIds?: ID[];
+}
+
+// ───── projects ─────
+export interface CreateProjectInput {
+  name: string;
+  summary?: string;
+  description?: string;
+  color?: string;
+  status?: ProjectStatus;
+  priority?: Priority;
+  leadId?: ID;
+  teamIds?: ID[];
+  repositoryIds?: ID[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+}
+export interface UpdateProjectInput {
+  name?: string;
+  summary?: string | null;
+  description?: string | null;
+  color?: string;
+  status?: ProjectStatus;
+  priority?: Priority;
+  leadId?: ID | null;
+  teamIds?: ID[];
+  repositoryIds?: ID[];
+  startDate?: ISODate | null;
+  targetDate?: ISODate | null;
 }
 
 // ───── workstreams ─────

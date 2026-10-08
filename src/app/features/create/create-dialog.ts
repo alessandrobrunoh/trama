@@ -16,6 +16,7 @@ import {
   LucideCalendar,
   LucideCircleUser,
   LucideDynamicIcon,
+  LucideBox,
   LucideFolderGit2,
   LucideLayers,
   LucideScale,
@@ -97,7 +98,8 @@ const SWITCHER: KindDef[] = [
 ];
 const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = {
   team: { label: 'Team', icon: LucideUsers },
-  repository: { label: 'Project', icon: LucideFolderGit2 },
+  repository: { label: 'Repository', icon: LucideFolderGit2 },
+  project: { label: 'Project', icon: LucideBox },
   view: { label: 'View', icon: LucideLayers },
 };
 
@@ -115,7 +117,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 /**
  * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues,
  * workstreams and decisions (title · description · property chips), plus compact forms for
- * team / project / view.
+ * team / repository / view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
  *   issue:      status, priority, teamId (or ownerTeamId), kind, assigneeId, workstreamIds[], title, body
@@ -421,7 +423,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   @if (repoOptions().length) {
                     <app-picker
                       variant="pill"
-                      label="Projects"
+                      label="Repositories"
                       [multiple]="true"
                       [options]="repoOptions()"
                       [value]="repositoryIds()"
@@ -546,7 +548,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                         label="Provider"
                       />
                     </app-form-row>
-                    <app-form-row label="Project" [error]="err('title')">
+                    <app-form-row label="Repository" [error]="err('title')">
                       <input
                         hlmInput
                         class="font-mono"
@@ -555,7 +557,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                         name="fullName"
                         autocomplete="off"
                         autofocus
-                        aria-label="Project name"
+                        aria-label="Repository name"
                       />
                     </app-form-row>
                   </div>
@@ -570,6 +572,42 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Default branch"
                     />
                   </app-form-row>
+                }
+                @case ('project') {
+                  <app-form-row label="Name" [error]="err('title')">
+                    <input
+                      hlmInput
+                      placeholder="Checkout redesign"
+                      [(ngModel)]="title"
+                      name="projectName"
+                      autocomplete="off"
+                      autofocus
+                      aria-label="Project name"
+                    />
+                  </app-form-row>
+                  <app-form-row label="Summary" [optional]="true">
+                    <input
+                      hlmInput
+                      placeholder="What outcome is this project after?"
+                      [(ngModel)]="text"
+                      name="projectSummary"
+                      autocomplete="off"
+                      aria-label="Project summary"
+                    />
+                  </app-form-row>
+                  @if (repoOptions().length) {
+                    <app-form-row label="Repositories" [optional]="true">
+                      <app-picker
+                        variant="field"
+                        label="Repositories"
+                        placeholder="None"
+                        [multiple]="true"
+                        [options]="repoOptions()"
+                        [value]="repositoryIds()"
+                        (valueChange)="repositoryIds.set($event)"
+                      />
+                    </app-form-row>
+                  }
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -1136,7 +1174,16 @@ export class CreateDialog {
             fullName: title,
             defaultBranch: this.text().trim() || undefined,
           });
-          if (r) done = { label: `${r.fullName} added`, path: ['projects', r.id] };
+          if (r) done = { label: `${r.fullName} added`, path: ['repositories', r.id] };
+          break;
+        }
+        case 'project': {
+          const p = await this.store.createProject({
+            name: title,
+            summary: this.text().trim() || undefined,
+            repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
+          });
+          if (p) done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
           break;
         }
         case 'view': {
@@ -1159,7 +1206,7 @@ export class CreateDialog {
       // Linear behaviour: stay where you are, offer "Open" in the toast.
       // Views and teams are destinations of their own, so those still navigate.
       const navigate =
-        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository';
+        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository' || this.kind() === 'project';
       this.notifier.success(done.label, {
         description: navigate ? undefined : title,
         action: navigate

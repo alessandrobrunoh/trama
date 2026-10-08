@@ -124,7 +124,7 @@ const SCOPES: { id: Scope; label: string; placeholder: string }[] = [
   { id: 'issue', label: 'Issues', placeholder: 'Search issues…' },
   { id: 'workstream', label: 'Workstreams', placeholder: 'Search workstreams…' },
   { id: 'decision', label: 'Decisions', placeholder: 'Search decisions…' },
-  { id: 'repository', label: 'Projects', placeholder: 'Search projects…' },
+  { id: 'repository', label: 'Repositories', placeholder: 'Search repositories…' },
   { id: 'person', label: 'People', placeholder: 'Search people…' },
   { id: 'team', label: 'Teams', placeholder: 'Search teams…' },
 ];
@@ -141,8 +141,6 @@ const PREFIXES: Record<string, Scope> = {
   decision: 'decision',
   decisions: 'decision',
   adr: 'decision',
-  project: 'repository',
-  projects: 'repository',
   repo: 'repository',
   people: 'person',
   person: 'person',
@@ -184,7 +182,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog (Linear-style).
- *  - scope chips (All · Issues · Workstreams · Decisions · Projects · People · Teams); Tab cycles,
+ *  - scope chips (All · Issues · Workstreams · Decisions · Repositories · People · Teams); Tab cycles,
  *    prefixes like `issue:` / `@` switch scope, Backspace on an empty query goes back to All
  *  - `palette`: context actions for the open issue/workstream, recent items, Go to, Actions, live results
  *  - `search`:  recent items and results grouped by type
@@ -368,7 +366,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
           } @else if (mode() === 'search' && scope() === 'all' && !isSearching() && !groups().length) {
             <div class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm">
               <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-              <p>Search workstreams, issues, decisions, projects, people and teams.</p>
+              <p>Search workstreams, issues, decisions, repositories, people and teams.</p>
               <p class="text-xs">Tip: type <span class="font-mono">issue:</span>, <span class="font-mono">ws:</span> or <span class="font-mono">&#64;</span> to narrow.</p>
             </div>
           }
@@ -659,7 +657,7 @@ export class CommandPanel {
     const out: Cmd[] = nav.map((n) => ({
       id: 'nav:' + n.segment,
       label: `Go to ${n.label}`,
-      keywords: n.segment === 'projects' ? 'repository repositories repo git' : undefined,
+      keywords: n.segment === 'repositories' ? 'repository repositories repo git' : undefined,
       icon: n.icon,
       keys: n.keys,
       run: go(n.segment),

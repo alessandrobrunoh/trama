@@ -28,6 +28,7 @@ import type {
   LinkRepositoryInput,
   RemoteRepositoryPage,
   UpdateIntegrationInput,
+  CreateProjectInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -47,6 +48,7 @@ import type {
   UpdateDecisionInput,
   UpdateInputRequestInput,
   UpdateIssueInput,
+  UpdateProjectInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -74,6 +76,7 @@ import type {
   Membership,
   Milestone,
   OutgoingWebhook,
+  Project,
   Repository,
   Role,
   SavedView,
@@ -189,6 +192,7 @@ export class NablaStore {
   private readonly _agents = signal<readonly Agent[]>([]);
   private readonly _teams = signal<readonly Team[]>([]);
   private readonly _repositories = signal<readonly Repository[]>([]);
+  private readonly _projects = signal<readonly Project[]>([]);
   private readonly _workstreams = signal<readonly Workstream[]>([]);
   private readonly _milestones = signal<readonly Milestone[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
@@ -208,6 +212,7 @@ export class NablaStore {
   readonly agents = this._agents.asReadonly();
   readonly teams = this._teams.asReadonly();
   readonly repositories = this._repositories.asReadonly();
+  readonly projects = this._projects.asReadonly();
   readonly workstreams = this._workstreams.asReadonly();
   /** All milestones, ordered by workstream then `sortOrder`. */
   readonly milestones = this._milestones.asReadonly();
@@ -233,6 +238,7 @@ export class NablaStore {
   readonly teamById = computed(() => indexById(this._teams()));
   readonly teamByKey = computed(() => new Map(this._teams().map((t) => [t.key.toUpperCase(), t])));
   readonly repositoryById = computed(() => indexById(this._repositories()));
+  readonly projectById = computed(() => indexById(this._projects()));
   readonly workstreamById = computed(() => indexById(this._workstreams()));
   /** Keyed by upper-case key (`AUTH-42`). */
   readonly workstreamByKey = computed(
@@ -449,6 +455,10 @@ export class NablaStore {
     if (!ref) return undefined;
     return this.teamById().get(ref) ?? this.teamByKey().get(ref.toUpperCase());
   }
+  getProject(id: string | null | undefined): Project | undefined {
+    return id ? this.projectById().get(id) : undefined;
+  }
+
   getRepository(id: string | null | undefined): Repository | undefined {
     return id ? this.repositoryById().get(id) : undefined;
   }
@@ -570,7 +580,7 @@ export class NablaStore {
     this._me.set(null);
     this._myRole.set(null);
     for (const c of [
-      this._users, this._memberships, this._agents, this._teams, this._repositories,
+      this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
       this._workstreams, this._milestones, this._inputRequests, this._issues, this._artifacts,
       this._decisions, this._dependencies, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
@@ -620,6 +630,7 @@ export class NablaStore {
     list(this._agents, s.agents);
     list(this._teams, s.teams);
     list(this._repositories, s.repositories);
+    list(this._projects, s.projects ?? []);
     list(this._workstreams, s.workstreams);
     list(this._milestones, s.milestones ?? []);
     list(this._inputRequests, s.inputRequests);
@@ -1250,7 +1261,7 @@ export class NablaStore {
   }
 
   async createRepository(input: CreateRepositoryInput): Promise<Repository | undefined> {
-    return this.write('add project', (s) => this.api.repositories.create(s, input), {
+    return this.write('add repository', (s) => this.api.repositories.create(s, input), {
       onResult: (r) => this.upsert(this._repositories, r),
     });
   }
@@ -1259,7 +1270,7 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.patch(this._repositories, id, patch);
-    return this.write('update project', (s) => this.api.repositories.update(s, id, patch), {
+    return this.write('update repository', (s) => this.api.repositories.update(s, id, patch), {
       tx,
       onResult: (r) => this.upsert(this._repositories, r),
     }).then((r) => !!r);
@@ -1269,7 +1280,32 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._repositories, id);
-    return this.ok('remove project', (s) => this.api.repositories.remove(s, id), { tx });
+    return this.ok('remove repository', (s) => this.api.repositories.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── projects ───────────────────────────
+
+  async createProject(input: CreateProjectInput): Promise<Project | undefined> {
+    return this.write('create project', (s) => this.api.projects.create(s, input), {
+      onResult: (p) => this.upsert(this._projects, p),
+    });
+  }
+
+  async updateProject(id: ID, patch: UpdateProjectInput): Promise<boolean> {
+    if (!this.projectById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._projects, id, patch);
+    return this.write('update project', (s) => this.api.projects.update(s, id, patch), {
+      tx,
+      onResult: (p) => this.upsert(this._projects, p),
+    }).then((p) => !!p);
+  }
+
+  async deleteProject(id: ID): Promise<boolean> {
+    if (!this.projectById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._projects, id);
+    return this.ok('delete project', (s) => this.api.projects.remove(s, id), { tx });
   }
 
   // ─────────────────────────── admin: members, agents, tokens, integrations ───────────────────────────
@@ -1470,7 +1506,7 @@ export class NablaStore {
     return this.api.integrations.remoteRepositories(this.requireSlug(), id, page, perPage);
   }
 
-  /** Link a remote repository: creates (or adopts) the project and attaches it to the connection. */
+  /** Link a remote repository: creates (or adopts) the repository and attaches it to the connection. */
   async linkRepository(id: ID, input: LinkRepositoryInput): Promise<Repository | undefined> {
     return this.write('link repository', (s) => this.api.integrations.linkRepository(s, id, input), {
       onResult: (r) => {
@@ -1482,7 +1518,7 @@ export class NablaStore {
     });
   }
 
-  /** Detach a project from a connection (the project stays). Optimistic. */
+  /** Detach a repository from a connection (the repository stays). Optimistic. */
   async unlinkRepository(id: ID, repositoryId: ID): Promise<boolean> {
     const prev = this._integrationDetails();
     this._integrationDetails.update((list) =>

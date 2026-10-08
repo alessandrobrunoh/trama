@@ -179,18 +179,28 @@ export const routes: Routes = [
         path: 'projects',
         title: 'Projects · Trama',
         loadComponent: () =>
-          import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
+          import('./features/projects/project-list-page').then((m) => m.ProjectListPage),
       },
       {
         path: 'projects/:id',
         title: 'Project · Trama',
         loadComponent: () =>
+          import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
+      },
+      {
+        path: 'repositories',
+        title: 'Repositories · Trama',
+        loadComponent: () =>
+          import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
+      },
+      {
+        path: 'repositories/:id',
+        title: 'Repository · Trama',
+        loadComponent: () =>
           import('./features/repositories/repository-detail-page').then(
             (m) => m.RepositoryDetailPage,
           ),
       },
-      { path: 'repositories', pathMatch: 'full', redirectTo: 'projects' },
-      { path: 'repositories/:id', redirectTo: 'projects/:id' },
       {
         path: 'teams',
         title: 'Teams · Trama',

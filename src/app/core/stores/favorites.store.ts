@@ -47,7 +47,7 @@ export class FavoritesStore {
     { initialValue: this.router.url },
   );
 
-  /** The entity the current page is about (an issue, workstream, decision, team, project or view), if any. */
+  /** The entity the current page is about (an issue, workstream, decision, team, repository or view), if any. */
   readonly current = computed<{ type: FavoriteType; id: ID } | null>(() => {
     const [path] = this.url().split(/[?#]/);
     const [, section, ref, ...more] = path.split('/').filter(Boolean);
@@ -60,7 +60,6 @@ export class FavoritesStore {
       case 'workstreams': return found('workstream', n.getWorkstream(key)?.id);
       case 'decisions': return found('decision', n.getDecision(key)?.id);
       case 'teams': return found('team', n.getTeam(key)?.id);
-      case 'projects':
       case 'repositories': return found('repository', n.getRepository(key)?.id);
       case 'views': return found('view', n.getView(key)?.id);
       default: return null;
@@ -158,7 +157,7 @@ export class FavoritesStore {
       }
       case 'repository': {
         const r = this.nabla.getRepository(favorite.subjectId);
-        return r ? { ...base, label: r.fullName, link: ['projects', r.id] } : null;
+        return r ? { ...base, label: r.fullName, link: ['repositories', r.id] } : null;
       }
       case 'view': {
         const v = this.nabla.getView(favorite.subjectId);

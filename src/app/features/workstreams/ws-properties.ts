@@ -97,8 +97,8 @@ import { IssueProgress, WsDatePicker } from './ws-parts';
           }
         </span>
       </app-property-row>
-      <app-property-row label="Projects">
-        <app-picker variant="field" label="Projects" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
+      <app-property-row label="Repositories">
+        <app-picker variant="field" label="Repositories" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
       </app-property-row>
       <app-property-row label="Issues">
         <span class="px-1.5"><app-issue-progress [done]="counts().issuesDone" [active]="counts().issuesActive" [total]="counts().issuesTotal" /></span>

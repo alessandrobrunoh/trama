@@ -15,6 +15,7 @@ import {
   IntegrationConnectionEntity,
   MembershipEntity,
   MilestoneEntity,
+  ProjectEntity,
   RepositoryEntity,
   TeamEntity,
   UserEntity,
@@ -39,12 +40,13 @@ export class SnapshotService {
     const all = <T extends object>(e: new () => T, order?: Record<string, 'ASC' | 'DESC'>) =>
       this.ds.getRepository(e).find({ where: where as never, order: order as never });
     const memberships = await all(MembershipEntity, { createdAt: 'ASC' });
-    const [users, agents, teams, repositories, workstreams, milestones, inputRequests, issues, artifacts, decisions, dependencies, comments, events, views, integrations, attention] =
+    const [users, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, artifacts, decisions, dependencies, comments, events, views, integrations, attention] =
       await Promise.all([
         this.ds.getRepository(UserEntity).findBy({ id: In(memberships.map((m) => m.userId)) }),
         all(AgentEntity, { createdAt: 'ASC' }),
         all(TeamEntity, { name: 'ASC' }),
         all(RepositoryEntity, { fullName: 'ASC' }),
+        all(ProjectEntity, { name: 'ASC' }),
         all(WorkstreamEntity, { createdAt: 'ASC' }),
         all(MilestoneEntity, { sortOrder: 'ASC', createdAt: 'ASC' }),
         all(InputRequestEntity, { createdAt: 'ASC' }),
@@ -67,6 +69,7 @@ export class SnapshotService {
       agents,
       teams,
       repositories,
+      projects,
       workstreams,
       milestones,
       inputRequests,

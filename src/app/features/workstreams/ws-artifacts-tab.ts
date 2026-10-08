@@ -121,7 +121,7 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
             </span>
             <span class="text-muted-foreground flex items-center gap-2 text-xs max-sm:pl-[26px]">
               @if (repoOf(a); as repo) {
-                <a class="inline-flex items-center gap-1 hover:underline max-lg:hidden" [routerLink]="['/', slug(), 'projects', repo.id]">
+                <a class="inline-flex items-center gap-1 hover:underline max-lg:hidden" [routerLink]="['/', slug(), 'repositories', repo.id]">
                   <app-provider-icon [provider]="repo.provider" [size]="12" />{{ repo.fullName }}
                 </a>
               }

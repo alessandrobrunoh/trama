@@ -150,9 +150,9 @@ export interface CreateWorkstreamDefaults {
             </div>
           </div>
           <div class="grid gap-1.5">
-            <label hlmLabel>Projects</label>
+            <label hlmLabel>Repositories</label>
             <app-picker
-              label="Projects"
+              label="Repositories"
               placeholder="None"
               [multiple]="true"
               [options]="repos()"

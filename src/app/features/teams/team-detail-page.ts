@@ -21,8 +21,8 @@ import { buildSummary } from '../workstreams/ws-model';
 import { WorkstreamRow } from '../workstreams/workstream-items';
 import { TeamColorPicker } from './team-colors';
 
-type TeamTab = 'workstreams' | 'issues' | 'members' | 'projects';
-const TABS: TeamTab[] = ['workstreams', 'issues', 'members', 'projects'];
+type TeamTab = 'workstreams' | 'issues' | 'members' | 'repositories';
+const TABS: TeamTab[] = ['workstreams', 'issues', 'members', 'repositories'];
 const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 
 @Component({
@@ -227,16 +227,16 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
               <app-empty-state [icon]="usersIcon" title="No members yet" description="Add the people who own this team's workstreams and triage its issues." />
             }
           }
-          @case ('projects') {
-            @for (p of projects(); track p.id) {
-              <a class="hover:bg-muted/60 flex items-center gap-2.5 border-b px-4 py-2 sm:px-6" [routerLink]="['/', slug(), 'projects', p.id]">
+          @case ('repositories') {
+            @for (p of repositories(); track p.id) {
+              <a class="hover:bg-muted/60 flex items-center gap-2.5 border-b px-4 py-2 sm:px-6" [routerLink]="['/', slug(), 'repositories', p.id]">
                 <app-provider-icon [provider]="p.provider" [size]="14" />
                 <span class="min-w-0 flex-1 truncate font-mono text-[13px]">{{ p.fullName }}</span>
                 <span class="text-muted-foreground font-mono text-xs">{{ p.defaultBranch }}</span>
               </a>
             } @empty {
-              <app-empty-state [icon]="folder" title="No projects" description="Projects are the repositories this team's workstreams land in. Assign a team on a project's page." >
-                <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'projects']">Browse projects</a>
+              <app-empty-state [icon]="folder" title="No repositories" description="The repositories this team's workstreams land in. Assign a team on a repository's page." >
+                <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'repositories']">Browse repositories</a>
               </app-empty-state>
             }
           }
@@ -330,7 +330,7 @@ export class TeamDetailPage {
       .filter((u) => !ids.has(u.id) && this.store.membershipByUserId().has(u.id))
       .map((u) => ({ value: u.id, label: u.name, kind: 'user' as const, search: `${u.name} ${u.email}` }));
   });
-  protected readonly projects = computed(() => {
+  protected readonly repositories = computed(() => {
     const id = this.team()?.id;
     if (!id) return [];
     return this.store
@@ -345,7 +345,7 @@ export class TeamDetailPage {
   ]);
 
   protected tabLabel(t: TeamTab): string {
-    return t === 'workstreams' ? 'Workstreams' : t === 'issues' ? 'Issues' : t === 'members' ? 'Members' : 'Projects';
+    return t === 'workstreams' ? 'Workstreams' : t === 'issues' ? 'Issues' : t === 'members' ? 'Members' : 'Repositories';
   }
   protected tabCount(t: TeamTab): number {
     switch (t) {
@@ -355,8 +355,8 @@ export class TeamDetailPage {
         return this.issues().length;
       case 'members':
         return this.members().length;
-      case 'projects':
-        return this.projects().length;
+      case 'repositories':
+        return this.repositories().length;
     }
   }
   protected setTab(t: TeamTab): void {
@@ -412,7 +412,7 @@ export class TeamDetailPage {
     if (!t) return;
     this.ui.setConfirmDelete({
       title: `Delete ${t.name}?`,
-      description: 'Only possible while it owns no workstreams. Issues and projects are detached from it.',
+      description: 'Only possible while it owns no workstreams. Issues and repositories are detached from it.',
       onConfirm: async () => {
         const ok = await this.store.deleteTeam(t.id);
         if (ok) await this.router.navigate(['/', this.slug(), 'teams']);

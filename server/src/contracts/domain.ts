@@ -239,6 +239,41 @@ export interface Repository {
   createdAt: ISODate;
 }
 
+// ───────────────────────────── Projects ─────────────────────────────
+
+/** Linear-style project lifecycle. Planning-level: independent of workstream status. */
+export type ProjectStatus = 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+export const PROJECT_STATUSES: ProjectStatus[] = ['backlog', 'planned', 'in_progress', 'paused', 'completed', 'canceled'];
+
+/**
+ * A planned outcome (Linear-style): what we want to achieve, by when, in which repositories.
+ * Workstreams are the execution of a project; milestones belong to the project.
+ */
+export interface Project {
+  /** `pj_…` */
+  id: ID;
+  workspaceId: ID;
+  name: string;
+  /** One-line summary shown in lists. */
+  summary?: string;
+  /** Longer description (markdown). */
+  description?: string;
+  color: string;
+  status: ProjectStatus;
+  priority: Priority;
+  leadId?: ID;
+  /** Teams involved. */
+  teamIds: ID[];
+  /** Where the work happens. A workstream of this project picks its repositories from this list. */
+  repositoryIds: ID[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Set when the status becomes completed or canceled; cleared on reopen. */
+  completedAt?: ISODate;
+}
+
 // ───────────────────────────── Workstreams ─────────────────────────────
 
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
@@ -512,6 +547,7 @@ export type SubjectType =
   | 'input_request'
   | 'repository'
   | 'team'
+  | 'project'
   | 'milestone';
 
 export interface SubjectRef {
@@ -674,7 +710,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
   | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
@@ -687,6 +723,7 @@ export interface ApiResourceMeta {
 
 const RWD = ['read', 'write', 'delete'] as const;
 export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
+  projects: { label: 'Projects', group: 'Work', actions: RWD },
   workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
   issues: { label: 'Issues', group: 'Work', actions: RWD },
   decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
@@ -717,7 +754,7 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOUR
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
 export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
@@ -742,6 +779,7 @@ export const MAX_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 6000, writesPe
 
 /** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
 export type Capability =
+  | 'manageProjects'
   | 'createWorkstreams'
   | 'deleteWorkstreams'
   | 'createIssues'
@@ -769,6 +807,7 @@ export interface CapabilityMeta {
 }
 
 export const CAPABILITIES: Capability[] = [
+  'manageProjects',
   'createWorkstreams',
   'deleteWorkstreams',
   'createIssues',
@@ -785,6 +824,7 @@ export const CAPABILITIES: Capability[] = [
 ];
 
 export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
+  manageProjects: { group: 'Work', label: 'Manage projects', description: 'Create, edit and delete projects and their milestones.' },
   createWorkstreams: { group: 'Work', label: 'Create workstreams', description: 'Start a new workstream.' },
   deleteWorkstreams: { group: 'Work', label: 'Delete workstreams', description: 'Permanently delete a workstream with its input requests, artifacts and comments.' },
   createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
@@ -802,6 +842,7 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
 
 /** Today's behaviour: everyday work for members, structure and access for admins. */
 export const DEFAULT_PERMISSIONS: PermissionMap = {
+  manageProjects: 'member',
   createWorkstreams: 'member',
   deleteWorkstreams: 'member',
   createIssues: 'member',
@@ -903,6 +944,7 @@ export interface WebhookDeliveryLog {
 
 /** Event types a webhook can subscribe to, grouped by entity (for pickers). */
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
+  { entity: 'project', label: 'Projects', events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'] },
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
@@ -931,6 +973,7 @@ export interface WorkspaceSnapshot {
   agents: Agent[];
   teams: Team[];
   repositories: Repository[];
+  projects: Project[];
   workstreams: Workstream[];
   milestones: Milestone[];
   inputRequests: InputRequest[];

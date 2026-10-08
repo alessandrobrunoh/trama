@@ -24,6 +24,7 @@ import type {
   NotificationChannels,
   NotificationKind,
   Priority,
+  ProjectStatus,
   ReviewState,
   Role,
   SavedView,
@@ -201,6 +202,33 @@ export class RepositoryEntity extends Wire {
   @Column({ type: 'varchar', default: 'main' }) defaultBranch: string;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) teamIds: string[];
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+}
+
+// ───────────────────────────── projects ─────────────────────────────
+
+@Entity('projects')
+@Index('IDX_projects_workspace', ['workspaceId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => UserEntity, ['leadId'], ['id'], { onDelete: 'SET NULL' })
+export class ProjectEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'varchar', nullable: true }) summary: string | null;
+  @Column({ type: 'text', nullable: true }) description: string | null;
+  @Column({ type: 'varchar', default: '#6b7280' }) color: string;
+  @Column({ type: 'varchar', default: 'backlog' }) status: ProjectStatus;
+  @Column({ type: 'varchar', default: 'none' }) priority: Priority;
+  @Column({ type: 'varchar', nullable: true }) leadId: string | null;
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) teamIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) repositoryIds: string[];
+  @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+  @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
 }
 
 // ───────────────────────────── workstreams ─────────────────────────────
@@ -675,6 +703,7 @@ export const ENTITIES = [
   AgentEntity,
   TeamEntity,
   RepositoryEntity,
+  ProjectEntity,
   WorkstreamEntity,
   MilestoneEntity,
   InputRequestEntity,

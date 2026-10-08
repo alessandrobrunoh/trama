@@ -119,7 +119,7 @@ export function workstreamStats(store: NablaStore, workstreamId: string, now = n
   });
 }
 
-export function projectStats(store: NablaStore, repositoryId: string, now = new Date()): StatsModel {
+export function repositoryStats(store: NablaStore, repositoryId: string, now = new Date()): StatsModel {
   const workstreams = store.workstreamsByRepository().get(repositoryId) ?? [];
   const wsIds = new Set(workstreams.map((w) => w.id));
   const issues = store.issues().filter((i) => i.workstreamIds.some((id) => wsIds.has(id)));
