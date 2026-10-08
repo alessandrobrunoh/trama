@@ -54,7 +54,7 @@ applies), gives the model the tools that token allows, and deletes the token whe
   model is told to stop and ask the user.
 - The system prompt asks the model to confirm before deleting or changing more than three items. This is a
   soft rule; the caps above are the hard limits.
-- Replies end with `Actions: ✓ create_issue · ✗ delete_issue` for every change attempted.
+- The reply carries `activity: { seconds, steps }` (what it looked at and changed, failures marked), shown collapsed under the answer.
 - Not available while a user is connected to Grok Build (the CLI cannot call tools): chat falls back to text.
 - `GET /api/w/:slug/ai/status` reports `assistantTools.enabled`.
 

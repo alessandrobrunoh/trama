@@ -27,9 +27,29 @@ export const ASSISTANT_PERMISSIONS: ApiPermission[] = API_PERMISSIONS.filter((p)
 const TOKEN_LIMITS = { requestsPerMinute: 120, writesPerMinute: 20, writesPerDay: 200 };
 const TOKEN_TTL_MS = 10 * 60_000;
 const RPC_TIMEOUT_MS = 20_000;
-const MAX_TOOL_RESULT_CHARS = 12_000;
+const MAX_TOOL_RESULT_CHARS = 16_000;
+/** Long free-text and bookkeeping fields the model rarely needs when scanning a list. */
+const BULKY_FIELDS = new Set(['body', 'description', 'context', 'objective', 'rationale', 'statement', 'workspaceId', 'aliases', 'acceptanceCriteria']);
 /** The generic REST escape hatch is not offered to the model; dedicated tools cover the product. */
 const HIDDEN_TOOLS = new Set(['api_request']);
+
+/**
+ * Lists are slimmed (bulky fields dropped) so more rows fit in the model's window, and prefixed with
+ * their length because models miscount long lists. Details: use get_*.
+ */
+export function compactResult(text: string): string {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    return text;
+  }
+  if (!Array.isArray(parsed)) return text;
+  const rows = parsed.map((row) =>
+    record(row) ? Object.fromEntries(Object.entries(row as Record<string, unknown>).filter(([k]) => !BULKY_FIELDS.has(k))) : row,
+  );
+  return `${rows.length} result${rows.length === 1 ? '' : 's'}:\n${JSON.stringify(rows)}`;
+}
 
 export interface McpTool extends AiToolDef {
   readOnly: boolean;
@@ -125,8 +145,9 @@ export class AssistantToolsService {
           .filter((c) => c?.['type'] === 'text')
           .map((c) => String(c?.['text'] ?? ''))
           .join('\n');
+        const slim = result['isError'] === true ? text : compactResult(text);
         return {
-          text: text.length > MAX_TOOL_RESULT_CHARS ? `${text.slice(0, MAX_TOOL_RESULT_CHARS)}\n… [truncated; use filters to narrow the query]` : text,
+          text: slim.length > MAX_TOOL_RESULT_CHARS ? `${slim.slice(0, MAX_TOOL_RESULT_CHARS)}\n… [truncated; use filters to narrow the query]` : slim,
           isError: result['isError'] === true,
         };
       },

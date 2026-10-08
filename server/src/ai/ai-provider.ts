@@ -110,11 +110,15 @@ export class ChatCompletionsProvider extends AiProvider {
     const body = await this.post(
       {
         messages: messages.map(toWireMessage),
-        tools: tools.map((t) => ({
-          type: 'function',
-          function: { name: t.name, description: t.description, parameters: t.parameters },
-        })),
-        tool_choice: 'auto',
+        ...(tools.length
+          ? {
+              tools: tools.map((t) => ({
+                type: 'function',
+                function: { name: t.name, description: t.description, parameters: t.parameters },
+              })),
+              tool_choice: 'auto',
+            }
+          : {}),
         max_tokens: 2000,
       },
       signal,

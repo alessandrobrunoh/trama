@@ -14,8 +14,9 @@ function setup(turns: AiToolTurn[], opts: { callResult?: { text: string; isError
   const queue = [...turns];
   const provider = {
     supportsTools: async () => true,
-    completeWithTools: async (messages: AiTurnMessage[]) => {
+    completeWithTools: async (messages: AiTurnMessage[], tools: unknown[]) => {
       seen.push(structuredClone(messages));
+      if (!tools.length) return { content: 'summary', toolCalls: [] }; // the closing turn offers no tools
       return queue.shift() ?? { content: 'done', toolCalls: [] };
     },
     complete: async () => 'summary',
@@ -46,7 +47,11 @@ describe('assistant tool loop', () => {
     ]);
     const res = await run(service);
     expect(tools).toHaveBeenCalledTimes(2);
-    expect(res.content).toBe('Created it.\n\nActions: ✓ create_issue'); // reads are not listed
+    expect(res.content).toBe('Created it.');
+    expect(res.activity?.steps).toEqual([
+      { kind: 'read', label: 'Looked at issues' },
+      { kind: 'write', label: 'Created issue', ok: true },
+    ]);
     const last = seen[1].at(-1)!;
     expect(last).toMatchObject({ role: 'tool', toolCallId: 'create_issue' });
   });
@@ -73,15 +78,17 @@ describe('assistant tool loop', () => {
     expect(tools).toHaveBeenCalledTimes(10);
     const results = seen[1].filter((m) => m.role === 'tool').map((m) => m.content);
     expect(results.slice(10).every((r) => /Change limit reached/.test(r))).toBe(true);
-    expect(res.content.match(/✓/g)).toHaveLength(10);
+    expect(res.activity?.steps).toEqual([{ kind: 'write', label: 'Created issue', ok: true, count: 10 }]);
   });
 
   it('stops after the step budget and returns a plain summary', async () => {
-    const forever = Array.from({ length: 12 }, () => ({ content: '', toolCalls: [call('list_issues')] }));
+    const forever = Array.from({ length: 14 }, () => ({ content: '', toolCalls: [call('list_issues')] }));
     const { service, seen } = setup(forever);
     const res = await run(service);
-    expect(seen).toHaveLength(8);
+    expect(seen).toHaveLength(13); // 12 tool steps + the closing turn
+    expect(seen.at(-1)!.at(-1)).toMatchObject({ role: 'system' });
     expect(res.content).toBe('summary');
+    expect(res.activity?.steps[0]).toMatchObject({ kind: 'read', label: 'Looked at issues', count: 12 });
   });
 
   it('reports failed writes as failed', async () => {
@@ -89,7 +96,9 @@ describe('assistant tool loop', () => {
       [{ content: '', toolCalls: [call('delete_issue', { idOrKey: 'BUG-1' })] }, { content: 'Could not.', toolCalls: [] }],
       { callResult: { text: 'HTTP 403: nope', isError: true } },
     );
-    expect((await run(service)).content).toBe('Could not.\n\nActions: ✗ delete_issue');
+    const res = await run(service);
+    expect(res.content).toBe('Could not.');
+    expect(res.activity?.steps).toEqual([{ kind: 'write', label: 'Deleted issue', ok: false, detail: 'HTTP 403: nope' }]);
   });
 
   it('enforces a daily write budget per user', async () => {
