@@ -304,3 +304,17 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Board / list drag preview is portaled to the body, outside component styles. */
+.cdk-drag-preview {
+  box-sizing: border-box;
+  border-radius: var(--radius);
+  background: var(--card);
+  box-shadow: 0 10px 28px rgb(0 0 0 / 0.16);
+}
+.cdk-drag-placeholder {
+  opacity: 0.35;
+}
+.cdk-drop-list-receiving {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
