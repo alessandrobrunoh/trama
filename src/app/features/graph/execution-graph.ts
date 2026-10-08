@@ -21,13 +21,14 @@ import {
   LucideMinus,
   LucidePlus,
   LucideWorkflow,
+  LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmSheetImports } from '@spartan-ng/helm/sheet';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   NablaStore,
   statusVar,
+  usePageShortcuts,
   type ArtifactState,
   type CiState,
 } from '../../core';
@@ -94,7 +95,6 @@ let uidCounter = 0;
   imports: [
     LucideDynamicIcon,
     HlmButtonImports,
-    HlmSheetImports,
     HlmTooltip,
     StatusIcon,
     KeyChip,
@@ -111,9 +111,13 @@ let uidCounter = 0;
     } @else {
       <div
         #viewport
-        class="bg-muted/30 absolute inset-0 touch-none overflow-hidden select-none"
+        class="bg-background absolute inset-0 touch-none overflow-hidden select-none"
+        [style.background-image]="'radial-gradient(var(--border-strong) 1px, transparent 1px)'"
+        [style.background-size]="(20 * k()).toFixed(2) + 'px ' + (20 * k()).toFixed(2) + 'px'"
+        [style.background-position]="tx().toFixed(1) + 'px ' + ty().toFixed(1) + 'px'"
         [class.cursor-grabbing]="panning()"
         [class.cursor-grab]="!panning()"
+        (click)="onCanvasClick($event)"
         (pointerdown)="onDown($event)"
         (pointermove)="onMove($event)"
         (pointerup)="onUp($event)"
@@ -158,10 +162,11 @@ let uidCounter = 0;
             <div
               role="button"
               tabindex="0"
-              class="bg-card absolute overflow-hidden rounded-md border text-left transition-[opacity,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              data-graph-node
+              class="bg-card absolute overflow-hidden rounded-md border border-border-strong text-left shadow-[var(--shadow-panel)] transition-[opacity,border-color,box-shadow] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-ring"
               [class.border-dashed]="v.node.external"
-              [class.opacity-60]="v.node.external && !isLit(v.node.id)"
-              [class.opacity-25]="dimmed(v.node.id)"
+              [class.opacity-60]="v.node.external && !isLit(v.node.id) && !dimmed(v.node.id)"
+              [class.opacity-40]="dimmed(v.node.id)"
               [class.ring-2]="selectedId() === v.node.id"
               [class.ring-primary]="selectedId() === v.node.id"
               [class.border-foreground/40]="hovered() === v.node.id"
@@ -183,10 +188,13 @@ let uidCounter = 0;
                   @let w = $any(v.node.entity);
                   <div class="flex h-full flex-col justify-center gap-0.5 pr-2.5 pl-3.5">
                     <div class="flex min-w-0 items-center gap-1.5">
-                      <app-status-icon [status]="w.status" [size]="14" />
+                      <app-status-icon entity="workstream" [status]="w.status" [size]="14" />
                       <app-key-chip [value]="w.key" />
                       @if (w.priority !== 'none') {
                         <app-priority-icon [priority]="w.priority" />
+                      }
+                      @if (isBlocked(v.node.id)) {
+                        <span class="bg-status-blocked/10 text-status-blocked rounded px-1.5 py-0.5 text-[10px] font-medium">Blocked</span>
                       }
                       <span class="ml-auto flex shrink-0 items-center">
                         <app-avatar-stack [actors]="teamActors(w.ownerTeamId, w.participatingTeamIds)" [max]="3" [size]="16" />
@@ -219,7 +227,7 @@ let uidCounter = 0;
 
         <!-- controls -->
         <div
-          class="bg-card/95 absolute top-3 right-3 flex items-center gap-0.5 rounded-lg border p-0.5 backdrop-blur"
+          class="bg-popover/95 absolute top-3 left-3 flex items-center gap-0.5 rounded-lg border border-border-strong p-0.5 shadow-[var(--shadow-panel)] backdrop-blur"
           (pointerdown)="$event.stopPropagation()"
           (dblclick)="$event.stopPropagation()"
         >
@@ -238,7 +246,7 @@ let uidCounter = 0;
 
         @if (showLegend()) {
           <div
-            class="bg-card/95 text-muted-foreground absolute bottom-3 left-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border px-2.5 py-1.5 text-[11px] backdrop-blur max-sm:hidden"
+            class="bg-popover/95 text-muted-foreground absolute bottom-3 left-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-border-strong px-2.5 py-1.5 text-[11px] backdrop-blur max-sm:hidden"
             (pointerdown)="$event.stopPropagation()"
           >
             <span class="flex items-center gap-1.5">
@@ -247,35 +255,34 @@ let uidCounter = 0;
             </span>
             <span class="flex items-center gap-1.5">
               <svg width="22" height="6" aria-hidden="true"><line x1="0" y1="3" x2="22" y2="3" class="stroke-foreground/70" stroke-width="1.5" stroke-dasharray="4 3" /></svg>
-              waits on
+              A → B: B waits on A
             </span>
+            <span class="flex items-center gap-1.5"><app-status-icon entity="workstream" status="working" [size]="12" /> workstream</span>
             <span class="flex items-center gap-1.5"><svg [lucideIcon]="branch" [size]="12"></svg> artifact</span>
-            <span class="flex items-center gap-1.5">
-              <span class="bg-primary ring-background size-1.5 rounded-full"></span> agent
-            </span>
           </div>
         }
       </div>
 
-      @if (showSheet()) {
-        <hlm-sheet side="right" [state]="sheetOpen() ? 'open' : 'closed'" (closed)="sheetOpen.set(false)">
-          <hlm-sheet-content *hlmSheetPortal="let ctx" class="data-[side=right]:w-full data-[side=right]:sm:max-w-md">
-            <hlm-sheet-header class="pb-0">
-              <h2 hlmSheetTitle class="sr-only">Node details</h2>
-              <p hlmSheetDescription class="sr-only">Details of the selected graph node.</p>
-            </hlm-sheet-header>
-            <div class="min-h-0 flex-1 overflow-y-auto px-4 pb-6">
-              @if (detail(); as d) {
-                <app-graph-node-detail
-                  [node]="d.node"
-                  [blockedBy]="d.blockedBy"
-                  [blocks]="d.blocks"
-                  (focusNode)="focusNode($event)"
-                />
-              }
+      @if (showSheet() && sheetOpen()) {
+        @if (detail(); as d) {
+          <aside
+            class="bg-popover text-popover-foreground absolute inset-y-0 right-0 z-10 flex w-full flex-col border-l border-border-strong shadow-[var(--shadow-menu)] sm:w-[22rem]"
+            aria-label="Node details"
+            (pointerdown)="$event.stopPropagation()"
+            (dblclick)="$event.stopPropagation()"
+            (wheel)="$event.stopPropagation()"
+          >
+            <div class="flex h-10 shrink-0 items-center justify-between border-b px-3">
+              <span class="text-muted-foreground text-xs font-medium">{{ d.node.kind === 'workstream' ? 'Workstream' : 'Artifact' }}</span>
+              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" aria-label="Close details" hlmTooltip="Close (Esc)" (click)="select(null)">
+                <svg [lucideIcon]="closeIcon" [size]="15"></svg>
+              </button>
             </div>
-          </hlm-sheet-content>
-        </hlm-sheet>
+            <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+              <app-graph-node-detail [node]="d.node" [blockedBy]="d.blockedBy" [blocks]="d.blocks" (focusNode)="focusNode($event)" />
+            </div>
+          </aside>
+        }
       }
     }
   `,
@@ -297,6 +304,7 @@ export class ExecutionGraph {
   protected readonly plus = LucidePlus;
   protected readonly maximize = LucideMaximize;
   protected readonly branch = LucideGitBranch;
+  protected readonly closeIcon = LucideX;
 
   private readonly viewport = viewChild<ElementRef<HTMLElement>>('viewport');
 
@@ -343,6 +351,13 @@ export class ExecutionGraph {
     }
     return out;
   });
+  private readonly blockedIds = computed(() => {
+    const blocked = new Set<string>();
+    for (const edge of this.graph().edges) {
+      if (edge.kind === 'depends_on' && edge.blocking) blocked.add(edge.target);
+    }
+    return blocked;
+  });
   /** Changes only when the node / edge set changes (not on status updates). */
   private readonly structureKey = computed(
     () => this.graph().nodes.map((n) => n.id).join('|') + '#' + this.graph().edges.map((e) => e.id).join('|'),
@@ -362,21 +377,9 @@ export class ExecutionGraph {
   private readonly lineage = computed<ReadonlySet<string> | null>(() => {
     const id = this.activeId();
     if (!id) return null;
+    // the node and its direct neighbours only (a full lineage dims too much of a dense graph)
     const { out, inn } = this.adjacency();
-    const set = new Set<string>([id]);
-    for (const map of [out, inn]) {
-      const stack = [id];
-      while (stack.length) {
-        const cur = stack.pop()!;
-        for (const next of map.get(cur) ?? []) {
-          if (!set.has(next)) {
-            set.add(next);
-            stack.push(next);
-          }
-        }
-      }
-    }
-    return set;
+    return new Set<string>([id, ...(out.get(id) ?? []), ...(inn.get(id) ?? [])]);
   });
 
   // ── detail sheet ──
@@ -392,7 +395,13 @@ export class ExecutionGraph {
       if (!n) return undefined;
       return { id: n.id, label: this.label(n, true), status: this.statusOf(n), mono: false };
     };
-    const blockedBy = g.edges.filter((e) => e.kind === 'depends_on' && e.target === id).map((e) => link(e.source)).filter(Boolean) as DetailLink[];
+    const blockedBy = g.edges
+      .filter((e) => e.kind === 'depends_on' && e.target === id)
+      .map((e) => {
+        const item = link(e.source);
+        return item ? { ...item, blocking: e.blocking } : undefined;
+      })
+      .filter(Boolean) as DetailLink[];
     const blocks = g.edges.filter((e) => e.kind === 'depends_on' && e.source === id).map((e) => link(e.target)).filter(Boolean) as DetailLink[];
     return { node, blockedBy, blocks };
   });
@@ -572,6 +581,21 @@ export class ExecutionGraph {
     this.zoomBy(1.6, ev.clientX - r.left, ev.clientY - r.top);
   }
 
+  private readonly _keys = usePageShortcuts([
+    { keys: 'esc', label: 'Clear graph selection', when: () => !!this.selectedId() || this.sheetOpen(), run: () => this.select(null) },
+  ]);
+
+  /** Click on empty canvas (not after a pan) clears the selection. */
+  protected onCanvasClick(ev: MouseEvent): void {
+    const t = ev.target as HTMLElement;
+    if (t.closest('[data-graph-node], aside, button')) return;
+    if (this.suppressClick) {
+      this.suppressClick = false;
+      return;
+    }
+    if (this.selectedId() || this.sheetOpen()) this.select(null);
+  }
+
   // ── selection ──
   protected onNodeClick(node: GraphNode): void {
     if (this.suppressClick) {
@@ -587,6 +611,9 @@ export class ExecutionGraph {
     if (id && this.showSheet()) {
       this.sheetId.set(id);
       this.sheetOpen.set(true);
+    } else if (!id) {
+      this.sheetOpen.set(false);
+      this.sheetId.set(null);
     }
   }
 
@@ -597,7 +624,7 @@ export class ExecutionGraph {
     const { w, h } = this.size();
     if (!p || !w) return;
     const k = this.k();
-    const sheetW = w >= 640 ? 448 : 0;
+    const sheetW = w >= 640 ? 352 : 0;
     const left = this.tx() + p.x * k;
     const top = this.ty() + p.y * k;
     if (left < 8 || left + p.w * k > w - sheetW) this.tx.set(Math.max(8, (w - sheetW) / 2 - (p.x + p.w / 2) * k));
@@ -612,6 +639,9 @@ export class ExecutionGraph {
   protected dimmed(id: string): boolean {
     const l = this.lineage();
     return !!l && !l.has(id);
+  }
+  protected isBlocked(id: string): boolean {
+    return this.blockedIds().has(id);
   }
   protected markerFor(e: GraphEdge): string {
     const l = this.lineage();
@@ -630,7 +660,7 @@ export class ExecutionGraph {
           ? 'stroke-foreground/70 stroke-[1.5]'
           : 'stroke-muted-foreground/50 stroke-[1.5]'
         : 'stroke-muted-foreground/45 stroke-[1.25]';
-    return base + tone + (dim ? ' opacity-20' : '');
+    return base + tone + (dim ? ' opacity-30' : '');
   }
   protected label(n: GraphNode, long = false): string {
     switch (n.kind) {

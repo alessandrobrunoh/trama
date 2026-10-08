@@ -40,7 +40,7 @@ import { StatusBadge } from '../../shared/status';
     </div>
 
     @for (d of list(); track d.id) {
-      <article class="hover:bg-muted/30 flex flex-col gap-1.5 border-b px-4 py-3 sm:px-6">
+      <article class="hover:bg-hover flex flex-col gap-1.5 border-b px-4 py-3 sm:px-6">
         <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <app-key-chip [value]="d.key" />
           <a [routerLink]="['/', slug(), 'decisions', d.key]" class="min-w-0 flex-1 text-sm font-medium hover:underline">{{ d.title }}</a>
@@ -54,7 +54,7 @@ import { StatusBadge } from '../../shared/status';
           @for (t of d.tags; track t) {
             <span class="bg-muted rounded-md px-1.5 py-0.5">{{ t }}</span>
           }
-          @if (d.status === 'proposed' && canEdit()) {
+          @if (d.status === 'proposed' && canDecide()) {
             <span class="ml-auto flex gap-1.5">
               <button hlmBtn size="sm" variant="outline" class="h-7 gap-1 text-xs" (click)="accept(d)"><svg [lucideIcon]="check" [size]="13"></svg>Accept</button>
               <button hlmBtn size="sm" variant="ghost" class="h-7 gap-1 text-xs" (click)="reject(d)"><svg [lucideIcon]="x" [size]="13"></svg>Reject</button>
@@ -117,6 +117,7 @@ export class WsDecisionsTab {
   protected readonly gavel = LucideGavel;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
+  protected readonly canDecide = computed(() => this.store.allowed('acceptDecisions'));
   protected readonly list = computed(() =>
     [...(this.store.decisionsByWorkstream().get(this.ws().id) ?? [])].sort((a, b) =>
       a.status === 'proposed' && b.status !== 'proposed' ? -1 : b.status === 'proposed' && a.status !== 'proposed' ? 1 : b.number - a.number,

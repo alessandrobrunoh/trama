@@ -1,4 +1,4 @@
-// Graph tab (executions → artifacts of one workstream) and Agent-context tab.
+// Graph tab (one workstream, its artifacts and dependency neighbours) and Agent-context tab.
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
 import { LucideBot, LucideCheck, LucideCopy, LucideDynamicIcon, LucideTerminal } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -44,7 +44,7 @@ export class WsGraphTab {
       <div class="flex flex-wrap items-center gap-2">
         <div class="flex min-w-0 flex-1 items-center gap-2">
           <svg [lucideIcon]="bot" [size]="16" class="text-muted-foreground shrink-0"></svg>
-          <p class="text-muted-foreground text-sm">What an agent receives from <span class="text-foreground font-mono text-xs">get_context</span> for {{ ws().key }}.</p>
+          <p class="text-muted-foreground text-sm">What an agent receives for {{ ws().key }} from <span class="text-foreground font-mono text-xs">GET …/context</span>: objective, criteria, decisions, issues, artifacts, open questions.</p>
         </div>
         <hlm-toggle-group type="single" variant="outline" size="sm" [value]="mode()" (valueChange)="setMode($event)">
           <button hlmToggleGroupItem value="rendered" class="px-2.5 text-xs">Rendered</button>
@@ -64,7 +64,7 @@ export class WsGraphTab {
         <p class="text-muted-foreground text-sm">Loading context…</p>
       } @else if (error()) {
         <div class="rounded-lg border border-dashed p-6 text-center text-sm">
-          <p class="font-medium">Agent context isn’t available yet</p>
+          <p class="font-medium">Could not load the agent context</p>
           <p class="text-muted-foreground mt-1">{{ error() }}</p>
           <button hlmBtn size="sm" variant="outline" class="mt-3" (click)="load()">Try again</button>
         </div>
@@ -118,7 +118,7 @@ export class WsContextTab {
       this.error.set('');
     } catch (e) {
       const err = ApiError.from(e);
-      this.error.set(err.status === 404 ? 'The server doesn’t expose the context endpoint yet.' : err.message);
+      this.error.set(err.status === 404 ? `${this.ws().key} was not found on the server.` : err.message || 'The server did not answer.');
     } finally {
       this.loading.set(false);
     }

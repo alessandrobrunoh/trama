@@ -8,12 +8,17 @@ import {
   PRIORITY_META,
   PROVIDERS,
   PROVIDER_META,
+  ISSUE_STATUSES,
+  ISSUE_STATUS_META,
   WORKSTREAM_STATUSES,
   WORKSTREAM_STATUS_META,
   type ActorRef,
   type Artifact,
+  type Issue,
+  type IssueStatus,
   type NablaStore,
   type Workstream,
+  type WorkstreamStatus,
 } from '../../core';
 import type { PickOption } from './picker';
 
@@ -30,6 +35,12 @@ export interface WsSummary {
   /** Accountable person, when set. */
   performers: ActorRef[];
   openInputs: number;
+  /** Linked issues (demand this workstream resolves), canceled ones excluded. */
+  issuesTotal: number;
+  issuesDone: number;
+  issuesActive: number;
+  /** Unshipped workstreams this one waits on. */
+  waitingOn: number;
 }
 
 export const isPr = (a: Artifact): boolean => a.kind === 'pull_request' || a.kind === 'merge_request';
@@ -59,13 +70,107 @@ export function buildSummary(store: NablaStore, ws: Workstream): WsSummary {
     mergedPrs: arts.filter((a) => isPr(a) && a.state === 'merged').length,
     performers: uniqueActors(people),
     openInputs: (store.inputRequestsByWorkstream().get(ws.id) ?? []).filter((r) => r.state === 'open').length,
+    ...issueCounts(store.issuesByWorkstream().get(ws.id) ?? []),
+    waitingOn: (store.incomingDependencies().get(ws.id) ?? []).filter(
+      (d) => d.fromType === 'workstream' && store.getWorkstream(d.fromId)?.status !== 'shipped',
+    ).length,
   };
 }
+
+/** Issue progress of a workstream: done / active / total (canceled issues don't count). */
+export function issueCounts(issues: readonly Issue[]): { issuesTotal: number; issuesDone: number; issuesActive: number } {
+  let total = 0;
+  let done = 0;
+  let active = 0;
+  for (const i of issues) {
+    if (i.status === 'canceled') continue;
+    total++;
+    if (i.status === 'done') done++;
+    else if (i.status === 'in_progress' || i.status === 'in_review') active++;
+  }
+  return { issuesTotal: total, issuesDone: done, issuesActive: active };
+}
+
+/** Token colour per issue status (issues reuse the workstream status palette). */
+export const ISSUE_STATUS_COLOR: Record<IssueStatus, string> = {
+  backlog: 'var(--status-draft)',
+  todo: 'var(--status-planned)',
+  in_progress: 'var(--status-working)',
+  in_review: 'var(--status-in-review)',
+  done: 'var(--status-shipped)',
+  canceled: 'var(--status-canceled)',
+};
+
+/** Issue status breakdown in workflow order (only statuses that occur). */
+export function issueBreakdown(issues: readonly Issue[]): { status: IssueStatus; count: number; label: string }[] {
+  const counts = new Map<IssueStatus, number>();
+  for (const i of issues) counts.set(i.status, (counts.get(i.status) ?? 0) + 1);
+  return ISSUE_STATUSES.filter((s) => counts.has(s)).map((s) => ({
+    status: s,
+    count: counts.get(s)!,
+    label: ISSUE_STATUS_META[s].label,
+  }));
+}
+
+/**
+ * People and agents who actually worked on a workstream (VISION §19): accountable person,
+ * artifact authors, commenters, input requesters / answerers and assignees of linked issues.
+ * Teams and the system actor are left out.
+ */
+export function contributors(store: NablaStore, ws: Workstream): ActorRef[] {
+  const out: ActorRef[] = [];
+  if (ws.accountableUserId) out.push({ type: 'user', id: ws.accountableUserId });
+  for (const a of store.artifactsByWorkstream().get(ws.id) ?? []) if (a.authorRef) out.push(a.authorRef);
+  for (const i of store.issuesByWorkstream().get(ws.id) ?? []) if (i.assigneeId) out.push({ type: 'user', id: i.assigneeId });
+  for (const c of store.commentsFor({ type: 'workstream', id: ws.id })) out.push(c.author);
+  for (const r of store.inputRequestsByWorkstream().get(ws.id) ?? []) {
+    out.push(r.requestedBy);
+    if (r.answeredById) out.push({ type: 'user', id: r.answeredById });
+  }
+  return uniqueActors(out.filter((a) => (a.type === 'user' || a.type === 'agent') && !!a.id));
+}
+
+// ───────────────────────── list view tabs ─────────────────────────
+
+export type WsViewTab = 'active' | 'backlog' | 'shipped' | 'all';
+export const WS_VIEW_TABS: { id: WsViewTab; label: string; statuses: WorkstreamStatus[] | null; hint: string }[] = [
+  { id: 'active', label: 'Active', statuses: ['working', 'needs_input', 'in_review', 'blocked', 'ready_to_land'], hint: 'In flight: working, waiting for input, in review, blocked or ready to land' },
+  { id: 'backlog', label: 'Planned', statuses: ['draft', 'planned'], hint: 'Drafts and planned outcomes nobody started yet' },
+  { id: 'shipped', label: 'Shipped', statuses: ['shipped'], hint: 'Outcomes that reached production' },
+  { id: 'all', label: 'All', statuses: null, hint: 'Every workstream, including canceled' },
+];
 
 // ───────────────────────── picker options ─────────────────────────
 
 export const statusOptions = (): PickOption[] =>
-  WORKSTREAM_STATUSES.map((s) => ({ value: s, label: WORKSTREAM_STATUS_META[s].label, kind: 'status' }));
+  WORKSTREAM_STATUSES.map((s) => ({ value: s, label: WORKSTREAM_STATUS_META[s].label, kind: 'status', statusEntity: 'workstream' }));
+
+export const issueStatusOptions = (): PickOption[] =>
+  ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, kind: 'status', statusEntity: 'issue' }));
+
+/** Issues as picker options (circle status glyph, key as hint). */
+export const issueOptions = (issues: readonly Issue[]): PickOption[] =>
+  issues.map((i) => ({
+    value: i.id,
+    label: i.title,
+    kind: 'status',
+    status: i.status,
+    statusEntity: 'issue',
+    hint: i.key,
+    search: `${i.key} ${i.title}`,
+  }));
+
+/** Workstreams as picker options (hexagon status glyph, key as hint). */
+export const workstreamOptions = (list: readonly Workstream[]): PickOption[] =>
+  list.map((w) => ({
+    value: w.id,
+    label: w.title,
+    kind: 'status',
+    status: w.status,
+    statusEntity: 'workstream',
+    hint: w.key,
+    search: `${w.key} ${w.title}`,
+  }));
 
 export const priorityOptions = (): PickOption[] =>
   PRIORITIES.map((p) => ({ value: p, label: PRIORITY_META[p].label, kind: 'priority' }));
@@ -150,7 +255,7 @@ export function explainStatus(store: NablaStore, ws: Workstream): { headline: st
       break;
     }
     case 'working':
-      reasons.push('Work is in progress: a criterion is underway, or there is a branch, commit, or build.');
+      reasons.push('Work is in progress: a criterion is underway, or there is a build or test report.');
       break;
     case 'planned':
       reasons.push(`${ws.acceptanceCriteria.length} acceptance criteri${ws.acceptanceCriteria.length === 1 ? 'on' : 'a'}, and nothing is in review yet.`);
@@ -161,7 +266,7 @@ export function explainStatus(store: NablaStore, ws: Workstream): { headline: st
     default:
       break;
   }
-  if (!reasons.length) reasons.push('Computed from this workstream’s executions, artifacts and input requests.');
+  if (!reasons.length) reasons.push('Computed from this workstream’s criteria, artifacts, input requests and dependencies.');
   const headline = ws.statusOverride
     ? `Manually set to ${WORKSTREAM_STATUS_META[ws.statusOverride].label}. Derived status would be ${WORKSTREAM_STATUS_META[s].label}.`
     : `${WORKSTREAM_STATUS_META[s].label}, derived from the work.`;
@@ -171,7 +276,6 @@ export function explainStatus(store: NablaStore, ws: Workstream): { headline: st
 /** Artifact kinds in group display order for the Artifacts tab. */
 export const ARTIFACT_GROUPS: { id: string; title: string; kinds: Artifact['kind'][] }[] = [
   { id: 'pr', title: 'Pull & merge requests', kinds: ['pull_request', 'merge_request'] },
-  { id: 'commit', title: 'Commits & branches', kinds: ['commit', 'branch'] },
   { id: 'doc', title: 'Documents', kinds: ['document'] },
   { id: 'design', title: 'Designs', kinds: ['design'] },
   { id: 'build', title: 'Builds & tests', kinds: ['build', 'test_report'] },

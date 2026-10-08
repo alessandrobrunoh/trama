@@ -31,7 +31,7 @@ import { Markdown } from '../../shared/markdown';
     } @else {
       <button
         type="button"
-        class="hover:bg-muted focus-visible:ring-ring block w-full max-w-full min-w-0 rounded-md px-1.5 py-1 text-left outline-none focus-visible:ring-2 disabled:pointer-events-none"
+        class="hover:bg-accent focus-visible:ring-ring block w-full max-w-full min-w-0 rounded-md px-1.5 py-1 text-left outline-none focus-visible:ring-2 disabled:pointer-events-none"
         [class]="textClass()"
         [class.font-mono]="mono()"
         [disabled]="!canEdit()"
@@ -73,7 +73,8 @@ export class InlineText {
     });
   }
 
-  protected start(): void {
+  /** Enter edit mode (also used by keyboard shortcuts). */
+  start(): void {
     if (!this.canEdit()) return;
     this.draft.set(this.value());
     this.editing.set(true);
@@ -124,7 +125,7 @@ export class InlineText {
     } @else {
       <div
         class="group/md relative -mx-2 rounded-md px-2 py-1.5"
-        [class]="canEdit() ? 'hover:bg-muted/50 cursor-text' : ''"
+        [class]="canEdit() ? 'hover:bg-hover cursor-text' : ''"
         [attr.role]="canEdit() ? 'button' : null"
         [attr.tabindex]="canEdit() ? 0 : null"
         [attr.aria-label]="canEdit() ? 'Edit ' + label() : null"

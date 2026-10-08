@@ -27,7 +27,7 @@ const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', i
     </div>
     <ul class="flex flex-col">
       @for (c of ws().acceptanceCriteria; track c.id) {
-        <li class="group hover:bg-muted/40 -mx-1.5 flex items-center gap-1 rounded-md px-1.5">
+        <li class="group hover:bg-hover -mx-1.5 flex items-center gap-1 rounded-md px-1.5">
           <button
             type="button"
             class="hover:bg-accent focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"

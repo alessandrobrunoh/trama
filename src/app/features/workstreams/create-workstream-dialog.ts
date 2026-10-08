@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { NablaStore, type Priority } from '../../core';
+import { NablaStore, WORKSTREAM_STATUS_META, type Priority, type WorkstreamStatus } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
 import { priorityOptions, repoOptions, teamOptions, userOptions } from './ws-model';
@@ -15,6 +15,10 @@ export interface CreateWorkstreamDefaults {
   ownerTeamId?: string;
   repositoryIds?: string[];
   title?: string;
+  priority?: Priority;
+  accountableUserId?: string;
+  /** Pin the status (e.g. created from a board column). */
+  statusOverride?: WorkstreamStatus;
 }
 
 /** "New workstream" dialog: title, objective, owner / participating teams, accountable, priority, date, repos. */
@@ -36,8 +40,13 @@ export interface CreateWorkstreamDefaults {
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[92svh] overflow-y-auto sm:max-w-xl" (keydown.meta.enter)="submit()" (keydown.control.enter)="submit()">
         <hlm-dialog-header>
           <h2 hlmDialogTitle>New workstream</h2>
-          <p hlmDialogDescription>An outcome the team has decided to pursue. Executions and artifacts attach to it.</p>
+          <p hlmDialogDescription>An outcome the team decided to pursue. Link the issues it resolves, then track PRs, decisions and acceptance criteria on it.</p>
         </hlm-dialog-header>
+        @if (statusOverride(); as so) {
+          <p class="bg-muted text-muted-foreground -mt-1 rounded-md px-2.5 py-1.5 text-xs">
+            Status will be pinned to <span class="text-foreground font-medium">{{ statusLabel(so) }}</span>. You can switch it back to automatic later.
+          </p>
+        }
 
         <div class="grid gap-3">
           <div class="grid gap-1.5">
@@ -179,6 +188,7 @@ export class CreateWorkstreamDialog {
   protected readonly priority = signal<Priority>('none');
   protected readonly target = signal<Date | undefined>(undefined);
   protected readonly repositories = signal<string[]>([]);
+  protected readonly statusOverride = signal<WorkstreamStatus | undefined>(undefined);
   protected readonly busy = signal(false);
 
   protected readonly teams = computed(() => teamOptions(this.store));
@@ -208,11 +218,16 @@ export class CreateWorkstreamDialog {
     const mine = this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '';
     this.ownerTeamId.set(d.ownerTeamId ?? mine);
     this.participating.set([]);
-    this.accountable.set(this.store.me()?.id ?? '');
-    this.priority.set('none');
+    this.accountable.set(d.accountableUserId ?? this.store.me()?.id ?? '');
+    this.priority.set(d.priority ?? 'none');
+    this.statusOverride.set(d.statusOverride);
     this.target.set(undefined);
     this.repositories.set(d.repositoryIds ?? []);
     this.busy.set(false);
+  }
+
+  protected statusLabel(s: WorkstreamStatus): string {
+    return WORKSTREAM_STATUS_META[s].label;
   }
 
   protected setOwner(id: string | undefined): void {
@@ -236,6 +251,7 @@ export class CreateWorkstreamDialog {
       priority: this.priority(),
       repositoryIds: this.repositories(),
       targetDate: target ? new Date(target.getFullYear(), target.getMonth(), target.getDate(), 12).toISOString() : undefined,
+      statusOverride: this.statusOverride(),
     });
     this.busy.set(false);
     if (!ws) return;
