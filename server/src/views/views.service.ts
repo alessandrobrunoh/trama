@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { canDo, hasRole, type WorkspaceContext } from '../auth/request-context.js';
@@ -6,6 +6,7 @@ import type { SavedView, ViewEntity, ViewFilter, ViewLayout } from '../contracts
 import { notFound, uid } from '../common/util.js';
 import { SavedViewEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { viewLayoutProblem } from './view-rules.js';
 
 export interface ViewInput {
   name?: string;
@@ -42,6 +43,7 @@ export class ViewsService {
   async create(ctx: WorkspaceContext, input: ViewInput & { name: string; entity: ViewEntity }) {
     if (!ctx.userId) throw new ForbiddenException('Agents cannot own saved views');
     if (input.shared) this.assertCanShare(ctx);
+    this.assertLayoutFits(input.entity, input.layout ?? 'list');
     const row = await this.repo.save(
       this.repo.create({
         id: uid('vw'),
@@ -60,6 +62,11 @@ export class ViewsService {
     return row;
   }
 
+  private assertLayoutFits(entity: ViewEntity, layout: ViewLayout) {
+    const problem = viewLayoutProblem(entity, layout);
+    if (problem) throw new BadRequestException(problem);
+  }
+
   private assertCanShare(ctx: WorkspaceContext) {
     if (!canDo(ctx, 'manageSharedViews')) throw new ForbiddenException('You are not allowed to share views with the workspace');
   }
@@ -73,6 +80,7 @@ export class ViewsService {
     const row = await this.get(ctx, id);
     this.assertCanEdit(ctx, row);
     if (patch.shared === true && !row.shared) this.assertCanShare(ctx);
+    this.assertLayoutFits(patch.entity ?? row.entity, patch.layout ?? row.layout);
     if (patch.name !== undefined) row.name = patch.name.trim();
     if (patch.entity !== undefined) row.entity = patch.entity;
     if (patch.filters !== undefined) row.filters = patch.filters;

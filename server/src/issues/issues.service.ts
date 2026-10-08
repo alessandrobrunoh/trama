@@ -116,7 +116,12 @@ export class IssuesService {
     if (f.open) qb.andWhere("i.status IN ('backlog', 'todo', 'in_progress', 'in_review')");
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
-    if (f.projectId) qb.andWhere('i.projectId = :p', { p: f.projectId });
+    // Same meaning as the client's `issuesByProject`: planned under the project, or linked to one of its workstreams.
+    if (f.projectId)
+      qb.andWhere(
+        `(i.projectId = :p OR EXISTS (SELECT 1 FROM workstreams pw WHERE pw."workspaceId" = i."workspaceId" AND pw."projectId" = :p AND i."workstreamIds" @> jsonb_build_array(pw.id)))`,
+        { p: f.projectId },
+      );
     if (f.workstreamId)
       qb.andWhere('i.workstreamIds @> :w::jsonb', {
         w: JSON.stringify([f.workstreamId]),

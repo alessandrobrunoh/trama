@@ -4,10 +4,11 @@ import { Allow, IsArray, IsBoolean, IsIn, IsObject, IsOptional, IsString, MaxLen
 import { Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { SavedView, ViewEntity, ViewFilter, ViewLayout } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
+import { VIEW_ENTITIES, VIEW_LAYOUTS } from './view-rules.js';
 import { ViewsService } from './views.service.js';
 
-const ENTITIES: ViewEntity[] = ['workstream', 'issue', 'decision'];
-const LAYOUTS: ViewLayout[] = ['list', 'board', 'graph'];
+const ENTITIES = [...VIEW_ENTITIES];
+const LAYOUTS = [...VIEW_LAYOUTS];
 const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after'];
 
 class FilterDto {
@@ -21,7 +22,7 @@ class SortDto {
   @IsIn(['asc', 'desc']) direction: 'asc' | 'desc';
 }
 
-class CreateViewDto {
+export class CreateViewDto {
   @IsString() @MinLength(1) @MaxLength(100) name: string;
   @IsIn(ENTITIES) entity: ViewEntity;
   @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => FilterDto) filters?: FilterDto[];
@@ -31,7 +32,7 @@ class CreateViewDto {
   @IsOptional() @IsBoolean() shared?: boolean;
 }
 
-class UpdateViewDto {
+export class UpdateViewDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(100) name?: string;
   @OptionalNotNull() @IsIn(ENTITIES) entity?: ViewEntity;
   @OptionalNotNull() @IsArray() @ValidateNested({ each: true }) @Type(() => FilterDto) filters?: FilterDto[];
