@@ -19,6 +19,39 @@
   }
  },
  {
+  "name": "create_label",
+  "method": "POST",
+  "path": "/labels",
+  "permission": "workspace:write",
+  "description": "Add a custom workspace label (admin). Templates Bug, Feature, Improvement and Documentation already exist. Returns the workspace.",
+  "params": {
+   "name": "body string! Label name",
+   "color": "body string #rrggbb"
+  }
+ },
+ {
+  "name": "update_label",
+  "method": "PATCH",
+  "path": "/labels/{id}",
+  "permission": "workspace:write",
+  "description": "Rename or recolor a workspace label (admin). Templates can be recolored but not renamed.",
+  "params": {
+   "id": "path string! Label id",
+   "name": "body string New name (custom labels only)",
+   "color": "body string #rrggbb"
+  }
+ },
+ {
+  "name": "delete_label",
+  "method": "DELETE",
+  "path": "/labels/{id}",
+  "permission": "workspace:delete",
+  "description": "Delete a custom workspace label and remove it from issues, projects, repositories and workstreams (admin). Templates cannot be deleted.",
+  "params": {
+   "id": "path string! Label id"
+  }
+ },
+ {
   "name": "get_snapshot",
   "method": "GET",
   "path": "/snapshot",
@@ -314,7 +347,8 @@
    "fullName": "body string! 'owner/name'",
    "url": "body string URL",
    "defaultBranch": "body string Default branch",
-   "teamIds": "body string[] Owning team ids"
+   "teamIds": "body string[] Owning team ids",
+   "labels": "body string[] Workspace label ids"
   }
  },
  {
@@ -327,7 +361,8 @@
    "id": "path string! Repository id",
    "url": "body string URL",
    "defaultBranch": "body string Default branch",
-   "teamIds": "body string[] Team ids"
+   "teamIds": "body string[] Team ids",
+   "labels": "body string[] Workspace label ids"
   }
  },
  {
@@ -406,7 +441,7 @@
    "projectId": "body string Project id. The workstream then works in the project's repositories (inherited when repositoryIds is omitted)",
    "repositoryIds": "body string[] Repository ids",
    "priority": "body string(none|urgent|high|medium|low) Priority",
-   "labels": "body string[] Labels",
+   "labels": "body string[] Workspace label ids",
    "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
    "startDate": "body string ISO date",
    "targetDate": "body string ISO date",
@@ -432,7 +467,7 @@
    "projectId": "body string Project id (null detaches). repositoryIds must be a subset of the project's",
    "repositoryIds": "body string[] Repository ids",
    "priority": "body string(none|urgent|high|medium|low) Priority",
-   "labels": "body string[] Labels",
+   "labels": "body string[] Workspace label ids",
    "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
    "startDate": "body string ISO date",
    "targetDate": "body string ISO date"
@@ -524,6 +559,7 @@
    "leadId": "body string Lead user id",
    "teamIds": "body string[] Team ids",
    "repositoryIds": "body string[] Repository ids (where the work happens)",
+   "labels": "body string[] Workspace label ids",
    "startDate": "body string ISO date",
    "targetDate": "body string ISO date"
   }
@@ -546,6 +582,7 @@
    "leadId": "body string Lead user id (null clears)",
    "teamIds": "body string[] Team ids",
    "repositoryIds": "body string[] Repository ids",
+   "labels": "body string[] Workspace label ids",
    "startDate": "body string ISO date (null clears)",
    "targetDate": "body string ISO date (null clears)"
   }
@@ -833,7 +870,8 @@
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security)! Kind",
-   "source": "body string(manual|github|gitlab|email|api|agent) Source"
+   "source": "body string(manual|github|gitlab|email|api|agent) Source",
+   "labels": "body string[] Workspace label ids"
   }
  },
  {
@@ -857,7 +895,8 @@
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Kind (re-keys the issue)",
    "workstreamIds": "body string[] Linked workstream ids",
    "milestoneIds": "body string[] Milestone ids (max one per project; from the issue's project or its workstreams' projects)",
-   "duplicateOfId": "body string Id or key of the original (null clears)"
+   "duplicateOfId": "body string Id or key of the original (null clears)",
+   "labels": "body string[] Workspace label ids"
   }
  },
  {

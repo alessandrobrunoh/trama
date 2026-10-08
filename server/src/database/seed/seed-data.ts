@@ -362,5 +362,6 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   // ───────── ~12 weeks of finished/running/canceled issues with estimates (statistics → Estimates & time)
   if (opts.mockHistory !== false) addMockHistoryToSeed(b.data, now);
 
+  b.adoptLabels();
   return b.data;
 }

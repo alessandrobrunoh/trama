@@ -51,7 +51,7 @@ import { EventLine } from '../overview/event-line';
 import { CommentThread } from '../workstreams/comments';
 import { EditableMarkdown, InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { priorityOptions, repoOptions, teamOptions, userOptions } from '../workstreams/ws-model';
+import { labelOptions, priorityOptions, repoOptions, teamOptions, userOptions } from '../workstreams/ws-model';
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
@@ -499,6 +499,18 @@ const ACTIVITY_CAP = 20;
                   (valueChange)="update({ teamIds: $event })"
                 />
               </app-property-row>
+              <app-property-row label="Labels">
+                <app-picker
+                  variant="field"
+                  label="Labels"
+                  placeholder="None"
+                  [multiple]="true"
+                  [disabled]="!canManage()"
+                  [options]="labels()"
+                  [value]="p.labels"
+                  (valueChange)="update({ labels: $event })"
+                />
+              </app-property-row>
               <app-property-row label="Repositories">
                 <app-picker
                   variant="field"
@@ -601,6 +613,7 @@ export class ProjectDetailPage {
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly teams = computed(() => teamOptions(this.store));
+  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repoChoices = computed(() => repoOptions(this.store));
   protected readonly overdue = computed(() => {

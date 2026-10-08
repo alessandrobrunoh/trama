@@ -6,6 +6,7 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
 import { ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { LabelsService } from '../workspaces/labels.service.js';
 import { isProjectIcon } from './project-icon.js';
 
 export interface ProjectInput {
@@ -20,6 +21,7 @@ export interface ProjectInput {
   leadId?: string | null;
   teamIds?: string[];
   repositoryIds?: string[];
+  labels?: string[];
   startDate?: string | null;
   targetDate?: string | null;
 }
@@ -40,6 +42,7 @@ export class ProjectsService {
     private readonly ds: DataSource,
     private readonly refs: RefsService,
     private readonly events: EventsService,
+    private readonly labels: LabelsService,
     @InjectRepository(ProjectEntity) private readonly repo: Repository<ProjectEntity>,
   ) {}
 
@@ -79,6 +82,7 @@ export class ProjectsService {
         leadId: input.leadId ?? null,
         teamIds: unique(input.teamIds),
         repositoryIds: unique(input.repositoryIds),
+        labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
         startDate: toDate(input.startDate) ?? null,
         targetDate: toDate(input.targetDate) ?? null,
         completedAt: CLOSED.includes(status) ? new Date() : null,
@@ -101,6 +105,7 @@ export class ProjectsService {
     if (patch.leadId !== undefined) row.leadId = patch.leadId;
     if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
     if (patch.repositoryIds !== undefined) row.repositoryIds = unique(patch.repositoryIds);
+    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels)) ?? [];
     if (patch.startDate !== undefined) row.startDate = toDate(patch.startDate) ?? null;
     if (patch.targetDate !== undefined) row.targetDate = toDate(patch.targetDate) ?? null;
     if (patch.status !== undefined) {

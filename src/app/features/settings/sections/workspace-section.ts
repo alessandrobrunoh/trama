@@ -3,7 +3,7 @@ import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
-import { ESTIMATE_SCALES, WEEK_STARTS, type EstimateScale, type WeekStart } from '../../../core/contracts/domain';
+import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type WorkspaceLabel } from '../../../core/contracts/domain';
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
@@ -203,6 +203,50 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       </app-settings-row>
     </app-settings-group>
 
+    <app-settings-group title="Labels" description="Defined once for the workspace, then assigned to issues, projects, repositories and workstreams. Bug, Feature, Improvement and Documentation are always available.">
+      @for (label of catalog(); track label.id) {
+        <div class="flex items-center gap-2 border-t px-4 py-2 first:border-t-0">
+          <span class="flex items-center gap-1" role="radiogroup" [attr.aria-label]="label.name + ' color'">
+            @for (swatch of swatchList; track swatch) {
+              <button
+                type="button"
+                role="radio"
+                class="size-4 rounded-full border-2 disabled:opacity-50"
+                [style.background]="swatch"
+                [class]="label.color === swatch ? 'border-foreground' : 'border-transparent'"
+                [attr.aria-checked]="label.color === swatch"
+                [attr.aria-label]="swatch"
+                [disabled]="!canAdmin() || savingLabel()"
+                (click)="recolor(label, swatch)"
+              ></button>
+            }
+          </span>
+          @if (label.template) {
+            <span class="min-w-0 flex-1 truncate text-[13px]">{{ label.name }}</span>
+            <span class="text-muted-foreground text-[11px]">Template</span>
+          } @else {
+            <input
+              hlmInput
+              class="h-8 min-w-0 flex-1 text-[13px]"
+              [value]="label.name"
+              [disabled]="!canAdmin() || savingLabel()"
+              [attr.aria-label]="'Rename ' + label.name"
+              (change)="rename(label, $any($event.target).value)"
+            />
+            <button type="button" class="text-muted-foreground hover:text-destructive text-xs" [disabled]="!canAdmin() || savingLabel()" (click)="removeLabel(label)">Remove</button>
+          }
+        </div>
+      }
+      @if (canAdmin()) {
+        <form class="flex items-center gap-2 border-t px-4 py-2" (submit)="addLabel($event)">
+          <input hlmInput class="h-8 min-w-0 flex-1 text-[13px]" placeholder="New label" aria-label="New label" [value]="newLabel()" [disabled]="savingLabel()" (input)="newLabel.set($any($event.target).value)" />
+          <button hlmBtn type="submit" size="sm" [disabled]="!newLabel().trim() || savingLabel()">Add</button>
+        </form>
+      } @else {
+        <div class="text-muted-foreground border-t px-4 py-2 text-xs">Only admins and owners can change labels.</div>
+      }
+    </app-settings-group>
+
     <app-settings-group title="Danger zone">
       <app-settings-row
         label="Delete workspace"
@@ -239,6 +283,10 @@ export class WorkspaceSection {
   protected readonly checkIcon = LucideCheck;
   protected readonly savingScale = signal(false);
   protected readonly savingFeature = signal(false);
+  protected readonly savingLabel = signal(false);
+  protected readonly newLabel = signal('');
+  protected readonly swatchList = LABEL_SWATCHES;
+  protected readonly catalog = computed(() => this.store.settings().labels);
   protected readonly scale = computed(() => this.store.estimateScale());
   protected readonly scaleDefs = ESTIMATE_SCALE_ORDER.filter((s) => ESTIMATE_SCALES.includes(s)).map((id) => {
     const def = ESTIMATE_SCALE_DEFS[id];
@@ -363,6 +411,44 @@ export class WorkspaceSection {
     const ok = await this.session.updateWorkspace({ name: this.name().trim(), slug: this.slugValue().trim() });
     this.busy.set(false);
     if (ok) this.notify.success('Workspace updated');
+  }
+
+  protected async recolor(label: WorkspaceLabel, color: string): Promise<void> {
+    if (!this.canAdmin() || label.color === color || this.savingLabel()) return;
+    this.savingLabel.set(true);
+    const ok = await this.store.updateLabel(label.id, { color });
+    this.savingLabel.set(false);
+    if (ok) this.notify.success('Label updated');
+  }
+
+  protected async rename(label: WorkspaceLabel, value: string): Promise<void> {
+    const name = value.trim();
+    if (!this.canAdmin() || !name || name === label.name || this.savingLabel()) return;
+    this.savingLabel.set(true);
+    const ok = await this.store.updateLabel(label.id, { name });
+    this.savingLabel.set(false);
+    if (ok) this.notify.success('Label updated');
+  }
+
+  protected async removeLabel(label: WorkspaceLabel): Promise<void> {
+    if (!this.canAdmin() || label.template || this.savingLabel()) return;
+    this.savingLabel.set(true);
+    const ok = await this.store.deleteLabel(label.id);
+    this.savingLabel.set(false);
+    if (ok) this.notify.success('Label removed');
+  }
+
+  protected async addLabel(event: Event): Promise<void> {
+    event.preventDefault();
+    const name = this.newLabel().trim();
+    if (!this.canAdmin() || !name || this.savingLabel()) return;
+    this.savingLabel.set(true);
+    const ok = await this.store.createLabel({ name });
+    this.savingLabel.set(false);
+    if (ok) {
+      this.newLabel.set('');
+      this.notify.success('Label added');
+    }
   }
 
   protected deleteWorkspace(): void {

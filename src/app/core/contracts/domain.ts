@@ -239,6 +239,8 @@ export interface Repository {
   url: string;
   defaultBranch: string;
   teamIds: ID[];
+  /** Workspace label ids (`WorkspaceSettings.labels`). */
+  labels: ID[];
   createdAt: ISODate;
 }
 
@@ -275,6 +277,8 @@ export interface Project {
   teamIds: ID[];
   /** Where the work happens. A workstream of this project picks its repositories from this list. */
   repositoryIds: ID[];
+  /** Workspace label ids (`WorkspaceSettings.labels`). */
+  labels: ID[];
   startDate?: ISODate;
   targetDate?: ISODate;
   createdAt: ISODate;
@@ -425,7 +429,8 @@ export interface Workstream {
   repositoryIds: ID[];
   acceptanceCriteria: AcceptanceCriterion[];
   priority: Priority;
-  labels: string[];
+  /** Workspace label ids (`WorkspaceSettings.labels`), not free text. */
+  labels: ID[];
   /** Effective status (override ?? derived). Computed by the server. */
   status: WorkstreamStatus;
   /** The derived status, ignoring the override. Computed by the server. */
@@ -534,6 +539,8 @@ export interface Issue {
   startedAt?: ISODate;
   /** Set when the status becomes done or canceled; cleared on reopen. */
   completedAt?: ISODate;
+  /** Workspace label ids (`WorkspaceSettings.labels`). */
+  labels: ID[];
   /** Previous keys (changing `kind` re-keys the issue); lookups by key also match these. */
   aliases: string[];
   /** Set when this issue duplicates another. Status is `canceled`. */
@@ -976,6 +983,100 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   manageIntegrations: 'admin',
 };
 
+/** A label defined once for the workspace and assigned by id. */
+export interface WorkspaceLabel {
+  id: ID;
+  name: string;
+  /** `#rrggbb`. */
+  color: string;
+  /** Templates are always present and cannot be renamed or removed. */
+  template: boolean;
+}
+
+/** Always available. Ids are stable so existing assignments survive a settings rewrite. */
+export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
+  { id: 'lb_bug', name: 'Bug', color: '#e11d48', template: true },
+  { id: 'lb_feature', name: 'Feature', color: '#2563eb', template: true },
+  { id: 'lb_improvement', name: 'Improvement', color: '#16a34a', template: true },
+  { id: 'lb_documentation', name: 'Documentation', color: '#7c3aed', template: true },
+];
+
+/** Swatches offered when creating or recoloring a label. */
+export const LABEL_SWATCHES = ['#e11d48', '#f97316', '#eab308', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#64748b'] as const;
+
+export const LABEL_NAME_MAX = 40;
+export const LABEL_ASSIGN_MAX = 20;
+const LABEL_COLOR = /^#[0-9a-f]{6}$/;
+
+/** Templates first, then stored custom labels. Template names cannot drift. */
+export function resolveLabelCatalog(stored?: readonly WorkspaceLabel[] | null): WorkspaceLabel[] {
+  const incoming = Array.isArray(stored) ? stored : [];
+  const byId = new Map(incoming.filter((item) => item && typeof item.id === 'string').map((item) => [item.id, item]));
+  const templates = LABEL_TEMPLATES.map((template) => {
+    const saved = byId.get(template.id);
+    const color = saved && LABEL_COLOR.test(saved.color) ? saved.color : template.color;
+    return { id: template.id, name: template.name, color, template: true };
+  });
+  const templateIds = new Set(templates.map((label) => label.id));
+  const custom: WorkspaceLabel[] = [];
+  for (const item of incoming) {
+    if (!item || item.template || templateIds.has(item.id) || custom.some((label) => label.id === item.id)) continue;
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!name || name.length > LABEL_NAME_MAX || !LABEL_COLOR.test(item.color ?? '')) continue;
+    custom.push({ id: item.id, name, color: item.color, template: false });
+  }
+  return [...templates, ...custom];
+}
+
+/** Unique catalog ids, in order. Throws when an id is not in the catalog or the list is too long. */
+export function assignLabelIds(catalog: readonly WorkspaceLabel[], ids: readonly string[] | null | undefined): string[] {
+  const known = new Set(catalog.map((label) => label.id));
+  const out: string[] = [];
+  for (const id of ids ?? []) {
+    if (!known.has(id)) throw new Error(`Unknown label "${id}"`);
+    if (!out.includes(id)) out.push(id);
+  }
+  if (out.length > LABEL_ASSIGN_MAX) throw new Error(`A record can have at most ${LABEL_ASSIGN_MAX} labels`);
+  return out;
+}
+
+/**
+ * Turn free-text label lists into catalog ids.
+ * A string that is already a catalog id is kept. A name that matches a label (case-insensitive) reuses it.
+ * Anything else becomes a custom label. `groups` is rewritten in the same order.
+ */
+export function adoptFreeTextLabels(
+  stored: readonly WorkspaceLabel[] | null | undefined,
+  groups: readonly (readonly string[])[],
+): { catalog: WorkspaceLabel[]; groups: string[][]; lookup: Map<string, string> } {
+  let catalog = resolveLabelCatalog(stored);
+  const byName = new Map(catalog.map((label) => [label.name.toLowerCase(), label.id]));
+  const taken = new Set(catalog.map((label) => label.id));
+  const lookup = new Map<string, string>();
+  let colorAt = catalog.filter((label) => !label.template).length;
+  const mapOne = (raw: string): string => {
+    const name = raw.trim();
+    if (!name) return '';
+    const known = lookup.get(name) ?? (taken.has(name) ? name : byName.get(name.toLowerCase()));
+    if (known) {
+      lookup.set(name, known);
+      return known;
+    }
+    const slug = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'label';
+    let id = `lb_${slug}`;
+    for (let n = 2; taken.has(id); n++) id = `lb_${slug}${n}`;
+    const color = LABEL_SWATCHES[colorAt % LABEL_SWATCHES.length];
+    colorAt += 1;
+    catalog = [...catalog, { id, name: name.slice(0, LABEL_NAME_MAX), color, template: false }];
+    taken.add(id);
+    byName.set(name.toLowerCase(), id);
+    lookup.set(name, id);
+    return id;
+  };
+  const rewritten = groups.map((group) => [...new Set(group.map(mapOne).filter(Boolean))]);
+  return { catalog, lookup, groups: rewritten };
+}
+
 export type EstimateScale = 'fibonacci' | 'linear' | 'exponential' | 'tshirt' | 'none';
 export const ESTIMATE_SCALES: EstimateScale[] = ['fibonacci', 'linear', 'exponential', 'tshirt', 'none'];
 export type WeekStart = 'monday' | 'sunday' | 'saturday';
@@ -999,6 +1100,8 @@ export interface WorkspaceSettings {
    * the thread is hidden everywhere and no longer required to create a workstream.
    */
   deltaThreads: boolean;
+  /** Template labels plus any custom labels. Assign these ids; do not invent names. */
+  labels: WorkspaceLabel[];
 }
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -1007,6 +1110,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   weekStart: 'monday',
   timeZone: 'auto',
   deltaThreads: true,
+  labels: LABEL_TEMPLATES.map((label) => ({ ...label })),
 };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
@@ -1016,6 +1120,7 @@ export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, '
     ...DEFAULT_WORKSPACE_SETTINGS,
     ...r,
     permissions: { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) },
+    labels: resolveLabelCatalog(r.labels),
   } as WorkspaceSettings;
 }
 

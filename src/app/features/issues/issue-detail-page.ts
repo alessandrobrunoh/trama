@@ -42,7 +42,7 @@ import { IssueMilestoneProp } from '../milestones/milestone-chips';
 import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { projectOptions, teamOptions } from '../workstreams/ws-model';
+import { labelOptions, projectOptions, teamOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
 import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
@@ -253,6 +253,9 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
                 </app-property-row>
               }
               <app-issue-milestone-prop [issue]="i" />
+              <app-property-row label="Labels" [icon]="tagGlyph">
+                <app-picker variant="field" label="Labels" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="labels()" [value]="i.labels" (valueChange)="store.updateIssue(i.id, { labels: $event })" />
+              </app-property-row>
               <app-property-row label="Type" [icon]="tagGlyph">
                 <app-picker variant="bare" label="Type" [searchable]="false" [disabled]="!canEdit()" [options]="kindOpts" [value]="[i.kind]" triggerClass="h-7 px-1.5 text-[13px]" (valueChange)="actions.changeKind(i, $any($event[0]))">
                   <app-issue-kind [kind]="i.kind" showLabel />
@@ -396,6 +399,7 @@ export class IssueDetailPage {
     return i.reporterId ? (this.store.getUser(i.reporterId)?.name ?? i.reporterName ?? '') : (i.reporterName ?? '');
   });
   protected readonly teams = computed(() => teamOptions(this.store));
+  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly projects = computed(() => projectOptions(this.store, this.issue()?.projectId));
   protected readonly kindOpts = issueKindOptions();
   /** Estimates are off in this workspace, but an issue that still has one keeps showing it. */

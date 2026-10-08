@@ -53,6 +53,8 @@ export interface PickOption {
   quickKey?: string;
   /** 0..1 position on the estimate scale (kind `estimate`); omitted/0 = empty glyph. */
   fraction?: number;
+  /** Dot color for `label` options (`#rrggbb`). */
+  color?: string;
 }
 
 /** "user:usr_1" → ActorRef. */
@@ -353,7 +355,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           }
         }
         @case ('label') {
-          <span class="bg-muted-foreground/50 size-2 shrink-0 rounded-full"></span>
+          <span class="size-2 shrink-0 rounded-full" [style.background]="o.color || 'var(--color-muted-foreground)'"></span>
         }
         @case ('estimate') {
           <app-estimate-glyph

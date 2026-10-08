@@ -6,7 +6,7 @@ because a shell command is the cheapest tool a coding agent has: no tool schemas
 when it needs one.
 
 **Every API route is a command.** The CLI is generated from the same catalog as the MCP server
-(`mcp/src/tools.json`: 105 routes with parameters, enums and permissions), so the two can never drift apart:
+(`mcp/src/tools.json`: 107 routes with parameters, enums and permissions), so the two can never drift apart:
 a route added to the catalog appears here with its flags, types and allowed values.
 
 ```bash
