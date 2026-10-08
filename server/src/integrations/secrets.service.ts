@@ -6,8 +6,9 @@ const DEV_KEY_MATERIAL = 'nabla-dev-only-integration-key';
 /**
  * AES-256-GCM encryption of integration credentials at rest.
  *
- * Key: `NABLA_ENCRYPTION_KEY` — 32 bytes as 64 hex chars or base64, otherwise any
- * passphrase (hashed with sha256). `SECRETS_KEY` is accepted as a legacy alias.
+ * Key: `TRAMA_ENCRYPTION_KEY` — 32 bytes as 64 hex chars or base64, otherwise any
+ * passphrase (hashed with sha256). The older names `NABLA_ENCRYPTION_KEY` and `SECRETS_KEY` are still
+ * accepted (in that order) so existing deployments keep decrypting their data.
  * Without a key a fixed DEV key is used (loud warning); in production boot fails.
  * Format: `v2:<iv>:<tag>:<ciphertext>` (base64url), bound to `aad` (connection id + field).
  */
@@ -17,7 +18,7 @@ export class SecretsService {
   private readonly key: Buffer;
 
   constructor() {
-    this.key = SecretsService.resolveKey(process.env.NABLA_ENCRYPTION_KEY ?? process.env.SECRETS_KEY, (m) =>
+    this.key = SecretsService.resolveKey(process.env.TRAMA_ENCRYPTION_KEY ?? process.env.NABLA_ENCRYPTION_KEY ?? process.env.SECRETS_KEY, (m) =>
       this.logger.warn(m),
     );
   }
@@ -26,9 +27,9 @@ export class SecretsService {
     const value = raw?.trim();
     if (!value) {
       if (process.env.NODE_ENV === 'production')
-        throw new Error('NABLA_ENCRYPTION_KEY is required in production (integration secrets are encrypted at rest)');
+        throw new Error('TRAMA_ENCRYPTION_KEY is required in production (integration secrets are encrypted at rest)');
       warn(
-        '!!! NABLA_ENCRYPTION_KEY is not set: using a FIXED, PUBLIC development key. Integration tokens are NOT safely encrypted. Set NABLA_ENCRYPTION_KEY (e.g. `openssl rand -base64 32`) before storing real credentials.',
+        '!!! TRAMA_ENCRYPTION_KEY is not set: using a FIXED, PUBLIC development key. Integration tokens are NOT safely encrypted. Set TRAMA_ENCRYPTION_KEY (e.g. `openssl rand -base64 32`) before storing real credentials.',
       );
       return createHash('sha256').update(DEV_KEY_MATERIAL).digest();
     }

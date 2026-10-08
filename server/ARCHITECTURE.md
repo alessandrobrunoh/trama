@@ -108,7 +108,7 @@ Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` bel
 ## Integrations and webhooks (`src/integrations`, `src/webhooks`)
 
 ```
-integrations/  secrets.service (AES-256-GCM, NABLA_ENCRYPTION_KEY, AAD = connection id + field)
+integrations/  secrets.service (AES-256-GCM, TRAMA_ENCRYPTION_KEY, AAD = connection id + field)
                http-client (abstract HttpClient DI token; FetchHttpClient; tests override it, nothing hits the network)
                providers (GithubClient / GitlabClient: currentUser, listRepositories, getRepository; rate-limit aware errors)
                integrations.service/controller (connections CRUD, rotate secret, remote repos, link repository)

@@ -216,7 +216,7 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 
 ## Integrations — `/w/:slug/integrations` (admin and above)
 
-Connections to GitHub, GitLab (including GitHub Enterprise / self-hosted GitLab) and Delta. Tokens and webhook secrets are encrypted at rest (AES-256-GCM, key `NABLA_ENCRYPTION_KEY`) and **never returned**. Responses are the contract `IntegrationConnection` plus `webhookUrl`, `repositoryIds` (linked repositories) and `lastWebhookAt` (last delivery seen).
+Connections to GitHub, GitLab (including GitHub Enterprise / self-hosted GitLab) and Delta. Tokens and webhook secrets are encrypted at rest (AES-256-GCM, key `TRAMA_ENCRYPTION_KEY`) and **never returned**. Responses are the contract `IntegrationConnection` plus `webhookUrl`, `repositoryIds` (linked repositories) and `lastWebhookAt` (last delivery seen).
 
 | Route | Notes |
 |---|---|
