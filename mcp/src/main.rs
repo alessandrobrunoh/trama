@@ -191,7 +191,24 @@ async fn main() {
     }
 }
 
+/// `trama-mcp --healthcheck`: exits 0 when the local server answers `/healthz` (for container
+/// healthchecks in an image without a shell or curl).
+fn healthcheck() -> Result<(), String> {
+    use std::io::{Read, Write};
+    let bind = env("MCP_BIND").unwrap_or_else(|| "127.0.0.1:8787".into());
+    let port = bind.rsplit(':').next().unwrap_or("8787");
+    let mut stream = std::net::TcpStream::connect(format!("127.0.0.1:{port}")).map_err(|e| e.to_string())?;
+    stream.set_read_timeout(Some(Duration::from_secs(2))).ok();
+    stream.write_all(b"GET /healthz HTTP/1.0\r\n\r\n").map_err(|e| e.to_string())?;
+    let mut reply = String::new();
+    stream.read_to_string(&mut reply).map_err(|e| e.to_string())?;
+    if reply.starts_with("HTTP/1.1 200") || reply.starts_with("HTTP/1.0 200") { Ok(()) } else { Err(format!("unhealthy: {}", reply.lines().next().unwrap_or(""))) }
+}
+
 async fn start() -> Result<(), String> {
+    if std::env::args().any(|a| a == "--healthcheck") {
+        return tokio::task::spawn_blocking(healthcheck).await.map_err(|e| e.to_string())?;
+    }
     let cfg = Config::from_env()?;
     let upstream = Upstream::new(&cfg.api_url, cfg.timeout, cfg.max_output).map_err(|e| e.to_string())?;
     let server = Server::new(upstream)?;

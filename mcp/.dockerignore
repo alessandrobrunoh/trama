@@ -1,3 +1,5 @@
 target/
 .git/
 *.md
+Dockerfile
+.dockerignore

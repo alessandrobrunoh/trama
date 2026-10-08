@@ -1,17 +1,53 @@
-# trama API + dedicated Postgres (container name kept: `delta-postgres`).
-# Host port 5434 — 5432/5433 belong to other projects.
+# Trama production stack: web (static Angular), app (API), mcp (MCP server) and a dedicated Postgres.
+# Public URL: https://trama.alessandrobrunoh.it, routed by Traefik (external network `proxy`):
+#   /api -> app, /mcp -> mcp, everything else -> web.
+# Needs server/.env.production (copy .env.production.example and fill it in).
+# Host port 5434 for Postgres: 5432/5433 belong to other projects.
 name: delta
+
+x-hardened: &hardened
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
 services:
+  web:
+    <<: *hardened
+    image: ghcr.io/alessandrobrunoh/trama-web:latest
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: trama-web
+    read_only: true
+    tmpfs: [/tmp]
+    networks: [proxy]
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.trama-web.rule=Host(`trama.alessandrobrunoh.it`)
+      - traefik.http.routers.trama-web.priority=1
+      - traefik.http.routers.trama-web.entrypoints=websecure
+      - traefik.http.routers.trama-web.tls=true
+      - traefik.http.routers.trama-web.tls.certresolver=le
+      - traefik.http.services.trama-web.loadbalancer.server.port=8080
+
   app:
+    <<: *hardened
     image: ghcr.io/alessandrobrunoh/trama:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
     container_name: trama.alessandrobrunoh.it
-    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    # Optional so `npm run db:up` / `db:down` work in development; in production the API refuses to boot
+    # without TRAMA_ENCRYPTION_KEY and a DATABASE_URL, so a missing file shows up immediately.
+    env_file:
+      - path: .env.production
+        required: false
     environment:
-      DATABASE_URL: postgres://delta:delta@postgres:5432/trama
       PORT: 3000
-      NODE_ENV: production
-      CORS_ORIGIN: https://trama.alessandrobrunoh.it
-      MCP_URL: http://mcp:8080/mcp
     networks:
       - default
       - proxy
@@ -21,7 +57,8 @@ services:
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy
-      - traefik.http.routers.trama.rule=Host(`trama.alessandrobrunoh.it`)
+      - traefik.http.routers.trama.rule=Host(`trama.alessandrobrunoh.it`) && PathPrefix(`/api`)
+      - traefik.http.routers.trama.priority=100
       - traefik.http.routers.trama.entrypoints=websecure
       - traefik.http.routers.trama.tls=true
       - traefik.http.routers.trama.tls.certresolver=le
@@ -30,10 +67,12 @@ services:
   # MCP server (Rust): talks to the API only, authenticated per client by the API key
   # (Settings → API tokens). Public URL: https://trama.alessandrobrunoh.it/mcp
   mcp:
+    <<: *hardened
     image: ghcr.io/alessandrobrunoh/trama-mcp:latest
-    build: ../mcp
+    build:
+      context: ../mcp
     container_name: trama-mcp
-    restart: unless-stopped
+    read_only: true
     environment:
       TRAMA_API_URL: http://app:3000/api
       MCP_BIND: 0.0.0.0:8080
@@ -41,7 +80,8 @@ services:
       - default
       - proxy
     depends_on:
-      - app
+      app:
+        condition: service_healthy
     labels:
       - traefik.enable=true
       - traefik.docker.network=proxy

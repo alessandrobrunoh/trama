@@ -11,10 +11,10 @@ hides the tools the key may not use.
 ## Run
 
 ```bash
-docker compose -f server/docker-compose.yml up -d mcp        # production layout (behind Traefik at /mcp)
+docker compose -f server/docker-compose.yml up -d mcp        # production layout (behind Traefik at /mcp); see docker/README.md
 
-docker build -t trama-mcp mcp
-docker run --rm -p 8080:8080 -e TRAMA_API_URL=http://host.docker.internal:3000/api trama-mcp
+docker build -t ghcr.io/alessandrobrunoh/trama-mcp mcp
+docker run --rm -p 8080:8080 -e TRAMA_API_URL=http://host.docker.internal:3000/api ghcr.io/alessandrobrunoh/trama-mcp
 
 cd mcp && TRAMA_API_URL=http://localhost:3000/api cargo run   # local, listens on 127.0.0.1:8787
 ```

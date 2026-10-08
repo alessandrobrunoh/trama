@@ -1,23 +1,23 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.7
 FROM rust:1-bookworm AS build
 WORKDIR /src
-# Build dependencies first so source edits don't invalidate this layer.
+# Dependencies first: this layer is rebuilt only when Cargo.toml / Cargo.lock change.
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo 'fn main() {}' > src/main.rs && cargo build --release --locked && rm -rf src
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    mkdir src && echo 'fn main() {}' > src/main.rs \
+ && cargo build --release --locked && rm -rf src target/release/deps/trama_mcp* target/release/trama-mcp
 COPY src ./src
-RUN touch src/main.rs && cargo build --release --locked
+RUN --mount=type=cache,target=/usr/local/cargo/registry,sharing=locked \
+    touch src/main.rs && cargo build --release --locked \
+ && cp target/release/trama-mcp /trama-mcp
 
-FROM debian:bookworm-slim
-RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
- && rm -rf /var/lib/apt/lists/* \
- && useradd --system --uid 10001 --no-create-home mcp
-COPY --from=build /src/target/release/trama-mcp /usr/local/bin/trama-mcp
-USER mcp
+# distroless/cc: glibc, libgcc and CA certificates only. No shell, no package manager, non-root.
+FROM gcr.io/distroless/cc-debian12:nonroot
+COPY --from=build /trama-mcp /usr/local/bin/trama-mcp
 # TRAMA_API_URL: base URL of the Trama API as seen from this container.
 ENV TRAMA_API_URL=http://app:3000/api \
     MCP_BIND=0.0.0.0:8080
 EXPOSE 8080
-HEALTHCHECK --interval=15s --timeout=3s --retries=3 \
-  CMD bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080 && printf "GET /healthz HTTP/1.0\r\n\r\n" >&3 && grep -q ok <&3'
-ENTRYPOINT ["trama-mcp"]
+HEALTHCHECK --interval=15s --timeout=3s --start-period=3s --retries=3 \
+  CMD ["/usr/local/bin/trama-mcp", "--healthcheck"]
+ENTRYPOINT ["/usr/local/bin/trama-mcp"]
