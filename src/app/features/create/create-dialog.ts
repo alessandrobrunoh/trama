@@ -165,11 +165,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           <p hlmDialogDescription class="sr-only">
             Create a new {{ kindLabel().toLowerCase() }} in this workspace.
           </p>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2 max-sm:flex-wrap">
             @if (composer(); as c) {
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 max-sm:contents">
                 @if (kind() !== 'decision') {
                   <app-picker
+                    class="max-sm:order-2"
                     variant="pill"
                     label="Team"
                     [icon]="teamIcon"
@@ -183,7 +184,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 <div
                   role="tablist"
                   aria-label="What to create"
-                  class="bg-muted inline-flex rounded-md p-0.5"
+                  class="bg-muted inline-flex rounded-md p-0.5 max-sm:order-1 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-[calc(100%-3.5rem)]"
                 >
                   @for (k of switcher; track k.kind) {
                     <button
@@ -191,7 +192,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       role="tab"
                       [attr.aria-selected]="kind() === k.kind"
                       [title]="k.blurb"
-                      class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors"
+                      class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:px-1.5"
                       [class.bg-background]="kind() === k.kind"
                       [class.text-foreground]="kind() === k.kind"
                       [class.shadow-panel]="kind() === k.kind"
@@ -230,7 +231,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 type="button"
                 variant="outline"
                 size="sm"
-                class="h-7 px-2.5 text-xs"
+                class="h-7 px-2.5 text-xs max-sm:order-3 max-sm:ml-auto max-sm:h-9"
                 [disabled]="busy()"
                 (click)="saveDraft($event)"
               >
@@ -242,6 +243,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
               type="button"
               variant="ghost"
               size="icon-sm"
+              class="max-sm:order-1 max-sm:size-9"
               hlmDialogClose
               aria-label="Close"
             >
@@ -664,15 +666,15 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             class="mx-0 mb-0 flex-row items-center justify-end gap-3 rounded-b-xl px-4 py-3"
           >
             @if (composer()) {
-              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
+              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs max-sm:mr-auto">
                 <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
                 Create more
               </label>
             }
             @if (!composer()) {
-              <button hlmBtn type="button" variant="ghost" size="sm" hlmDialogClose>Cancel</button>
+              <button hlmBtn type="button" variant="ghost" size="sm" class="max-sm:h-10" hlmDialogClose>Cancel</button>
             }
-            <button hlmBtn type="submit" size="sm" class="" [disabled]="busy()">
+            <button hlmBtn type="submit" size="sm" class="max-sm:h-10 max-sm:flex-1" [disabled]="busy()">
               @if (busy()) {
                 <hlm-spinner />
               }
