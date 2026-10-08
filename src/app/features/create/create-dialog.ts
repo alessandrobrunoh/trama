@@ -18,10 +18,11 @@ import {
   LucideDynamicIcon,
   LucideFolderGit2,
   LucideLayers,
-  LucideLink2,
   LucideScale,
+  LucideLink2,
   LucideTag,
   LucideUsers,
+  LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -54,7 +55,6 @@ import {
 import { Notifier } from '../../core/notify/notifier';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
-import { Kbd } from '../../shared/kbd';
 import { StatusIcon } from '../../shared/status';
 import { issueEstimateOptions } from '../issues/issue-model';
 import { Picker, type PickOption } from '../workstreams/picker';
@@ -74,14 +74,24 @@ interface KindDef {
 
 /** The composer kinds, most common first. Other kinds (team, view, …) open in single-form mode. */
 const SWITCHER: KindDef[] = [
-  { kind: 'issue', label: 'Issue', blurb: "A problem or request: what's wrong or needed.", example: 'BUG-142' },
+  {
+    kind: 'issue',
+    label: 'Issue',
+    blurb: "A problem or request: what's wrong or needed.",
+    example: 'BUG-142',
+  },
   {
     kind: 'workstream',
     label: 'Workstream',
     blurb: "An outcome that resolves issues: what we're trying to accomplish.",
     example: 'AUTH-42',
   },
-  { kind: 'decision', label: 'Decision', blurb: 'Durable knowledge: what was decided and why.', example: 'ADR-7' },
+  {
+    kind: 'decision',
+    label: 'Decision',
+    blurb: 'Durable knowledge: what was decided and why.',
+    example: 'ADR-7',
+  },
 ];
 const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = {
   team: { label: 'Team', icon: LucideUsers },
@@ -93,11 +103,10 @@ const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'graph'];
 const VIEW_ENTITIES: readonly ViewEntity[] = ['workstream', 'issue', 'decision'];
 
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
-const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const asArr = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 const asTags = (v: unknown): string[] =>
-  (Array.isArray(v) ? asArr(v) : asStr(v).split(','))
-    .map((t) => t.trim())
-    .filter(Boolean);
+  (Array.isArray(v) ? asArr(v) : asStr(v).split(',')).map((t) => t.trim()).filter(Boolean);
 const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined =>
   typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : undefined;
 
@@ -132,7 +141,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     HlmSwitchImports,
     HlmSpinner,
     LucideDynamicIcon,
-    Kbd,
     StatusIcon,
     Picker,
     AppSelect,
@@ -143,64 +151,109 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-2xl"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[46rem]"
         [showCloseButton]="false"
         (keydown.meta.enter)="submit($event)"
         (keydown.control.enter)="submit($event)"
       >
-        <hlm-dialog-header class="gap-0 px-4 pt-3 pb-1">
+        <hlm-dialog-header class="gap-0 px-4 pt-3 pb-0">
           <h2 hlmDialogTitle class="sr-only">New {{ kindLabel() }}</h2>
-          <p hlmDialogDescription class="sr-only">Create a new {{ kindLabel().toLowerCase() }} in this workspace.</p>
-          @if (composer(); as c) {
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <div role="tablist" aria-label="What to create" class="bg-muted inline-flex rounded-md p-0.5">
-                @for (k of switcher; track k.kind) {
-                  <button
-                    type="button"
-                    role="tab"
-                    [attr.aria-selected]="kind() === k.kind"
-                    class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors"
-                    [class.bg-background]="kind() === k.kind"
-                    [class.text-foreground]="kind() === k.kind"
-                    [class.shadow-panel]="kind() === k.kind"
-                    (click)="onSwitch(k.kind)"
-                  >
-                    @switch (k.kind) {
-                      @case ('issue') {
-                        <app-status-icon entity="issue" status="todo" [size]="13" />
-                      }
-                      @case ('workstream') {
-                        <app-status-icon entity="workstream" status="planned" [size]="13" class="text-entity-workstream" />
-                      }
-                      @default {
-                        <svg [lucideIcon]="scale" [size]="13" class="text-entity-decision"></svg>
-                      }
-                    }
-                    {{ k.label }}
-                  </button>
+          <p hlmDialogDescription class="sr-only">
+            Create a new {{ kindLabel().toLowerCase() }} in this workspace.
+          </p>
+          <div class="flex items-center gap-2">
+            @if (composer(); as c) {
+              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                @if (kind() !== 'decision') {
+                  <app-picker
+                    variant="pill"
+                    label="Team"
+                    [icon]="teamIcon"
+                    [options]="teamOptions()"
+                    [value]="opt(headerTeamId())"
+                    [clearable]="kind() === 'issue'"
+                    clearLabel="No team"
+                    (valueChange)="setHeaderTeam($event[0] ?? '')"
+                  />
                 }
+                <div
+                  role="tablist"
+                  aria-label="What to create"
+                  class="bg-muted inline-flex rounded-md p-0.5"
+                >
+                  @for (k of switcher; track k.kind) {
+                    <button
+                      type="button"
+                      role="tab"
+                      [attr.aria-selected]="kind() === k.kind"
+                      [title]="k.blurb"
+                      class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors"
+                      [class.bg-background]="kind() === k.kind"
+                      [class.text-foreground]="kind() === k.kind"
+                      [class.shadow-panel]="kind() === k.kind"
+                      (click)="onSwitch(k.kind)"
+                    >
+                      @switch (k.kind) {
+                        @case ('issue') {
+                          <app-status-icon entity="issue" status="todo" [size]="13" />
+                        }
+                        @case ('workstream') {
+                          <app-status-icon
+                            entity="workstream"
+                            status="planned"
+                            [size]="13"
+                            class="text-entity-workstream"
+                          />
+                        }
+                        @default {
+                          <svg [lucideIcon]="scale" [size]="13" class="text-entity-decision"></svg>
+                        }
+                      }
+                      {{ k.label }}
+                    </button>
+                  }
+                </div>
               </div>
-              <p class="text-muted-foreground min-w-0 text-xs leading-snug">
-                {{ c.blurb }}
-                <span class="font-mono text-[11px] opacity-80">{{ keyPreview() }}</span>
-              </p>
-            </div>
-          } @else {
-            <div class="flex items-center gap-2 py-1 text-sm font-medium">
-              <svg [lucideIcon]="extraIcon()" [size]="15" class="text-muted-foreground"></svg>
-              New {{ kindLabel().toLowerCase() }}
-            </div>
-          }
+            } @else {
+              <div class="flex flex-1 items-center gap-2 py-1 text-sm font-medium">
+                <svg [lucideIcon]="extraIcon()" [size]="15" class="text-muted-foreground"></svg>
+                New {{ kindLabel().toLowerCase() }}
+              </div>
+            }
+            @if (composer()) {
+              <button
+                hlmBtn
+                type="button"
+                variant="outline"
+                size="sm"
+                class="h-7 px-2.5 text-xs"
+                [disabled]="busy()"
+                (click)="saveDraft($event)"
+              >
+                Save as draft
+              </button>
+            }
+            <button
+              hlmBtn
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              hlmDialogClose
+              aria-label="Close"
+            >
+              <svg [lucideIcon]="closeIcon" [size]="16"></svg>
+            </button>
+          </div>
         </hlm-dialog-header>
 
         <form (submit)="submit($event)" novalidate class="flex flex-col">
           @if (composer()) {
             <!-- title + description -->
-            <div class="flex flex-col gap-1 px-4 pt-2">
+            <div class="flex flex-col gap-1 px-5 pt-3">
               <input
                 #titleEl
                 id="cr-title"
-                class="placeholder:text-muted-foreground/70 w-full bg-transparent py-1 text-lg font-semibold tracking-tight outline-none"
+                class="placeholder:text-muted-foreground/60 w-full bg-transparent py-1 text-xl font-semibold tracking-tight outline-none"
                 [placeholder]="titlePlaceholder()"
                 [(ngModel)]="title"
                 name="title"
@@ -213,23 +266,19 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 <p class="text-destructive text-xs" role="alert">{{ e }}</p>
               }
               <textarea
-                class="placeholder:text-muted-foreground/70 min-h-20 w-full resize-y bg-transparent py-1 text-sm leading-relaxed outline-none"
-                rows="4"
+                class="placeholder:text-muted-foreground/60 field-sizing-content max-h-72 min-h-24 w-full resize-none bg-transparent py-1 text-sm leading-relaxed outline-none"
+                rows="3"
                 [placeholder]="bodyPlaceholder()"
                 [(ngModel)]="text"
                 name="body"
                 aria-label="Description"
               ></textarea>
-              @if (composer(); as composerKind) {
-                <app-draft-suggestions [kind]="composerKind.kind" [title]="title()" [description]="text()" [disabled]="busy()"
-                  (titleAccepted)="title.set($event)" (descriptionAccepted)="text.set($event)" (triageAccepted)="applyIssueSuggestion($event)" (settingsRequested)="ui.closeModal()" />
-              }
               @if (err('statement'); as e) {
                 <p class="text-destructive text-xs" role="alert">{{ e }}</p>
               }
               @if (kind() === 'decision') {
                 <textarea
-                  class="placeholder:text-muted-foreground/70 min-h-12 w-full resize-y border-t bg-transparent py-2 text-sm leading-relaxed outline-none"
+                  class="placeholder:text-muted-foreground/60 field-sizing-content max-h-48 min-h-12 w-full resize-none border-t bg-transparent py-2 text-sm leading-relaxed outline-none"
                   rows="2"
                   placeholder="Rationale: why this, and not the alternative? (optional)"
                   [(ngModel)]="text2"
@@ -242,7 +291,11 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   class="focus-within:border-ring/60 mt-1 flex h-8 items-center gap-2 rounded-md border px-2"
                   [class.border-destructive]="!!err('delta')"
                 >
-                  <svg [lucideIcon]="linkIcon" [size]="13" class="text-muted-foreground shrink-0"></svg>
+                  <svg
+                    [lucideIcon]="linkIcon"
+                    [size]="13"
+                    class="text-muted-foreground shrink-0"
+                  ></svg>
                   <input
                     class="placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-xs outline-none"
                     placeholder="Delta thread · https://delta.dev/t/…"
@@ -258,30 +311,135 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
               }
             </div>
 
+            <!-- quick suggestions -->
+            <div class="px-5 pt-3">
+              <app-draft-suggestions
+                [kind]="composer()!.kind"
+                [title]="title()"
+                [description]="text()"
+                [disabled]="busy()"
+                [current]="suggestionCurrent()"
+                (titleAccepted)="title.set($event)"
+                (descriptionAccepted)="text.set($event)"
+                (questionPicked)="addQuestion($event)"
+                (triageAccepted)="applyIssueSuggestion($event)"
+                (settingsRequested)="ui.closeModal()"
+              />
+            </div>
+
             <!-- property chips -->
-            <div class="flex flex-wrap items-center gap-1.5 px-4 pt-3 pb-3">
+            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-4">
               @switch (kind()) {
                 @case ('issue') {
-                  <app-picker variant="chip" label="Status" [searchable]="false" [options]="issueStatusOptions" [value]="[issueStatus()]" (valueChange)="setOne(issueStatus, $event)" />
-                  <app-picker variant="chip" label="Priority" [searchable]="false" [options]="priorityOptions" [value]="[priority()]" (valueChange)="setOne(priority, $event)" />
-                  <app-picker variant="chip" label="Type" [searchable]="false" [options]="issueKindOptions" [value]="[issueKind()]" (valueChange)="setOne(issueKind, $event)" />
+                  <app-picker
+                    variant="pill"
+                    label="Status"
+                    [searchable]="false"
+                    [options]="issueStatusOptions"
+                    [value]="[issueStatus()]"
+                    (valueChange)="setOne(issueStatus, $event)"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Priority"
+                    [searchable]="false"
+                    [options]="priorityOptions"
+                    [value]="[priority()]"
+                    (valueChange)="setOne(priority, $event)"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Type"
+                    [searchable]="false"
+                    [options]="issueKindOptions"
+                    [value]="[issueKind()]"
+                    (valueChange)="setOne(issueKind, $event)"
+                  />
                   @if (showEstimate()) {
-                    <app-picker variant="chip" label="Estimate" [searchable]="false" [options]="issueEstimateChoices()" [value]="opt(issueEstimate())" [clearable]="true" clearLabel="No estimate" (valueChange)="issueEstimate.set($event[0] ?? '')" />
+                    <app-picker
+                      variant="pill"
+                      label="Estimate"
+                      [searchable]="false"
+                      [options]="issueEstimateChoices()"
+                      [value]="opt(issueEstimate())"
+                      [clearable]="true"
+                      clearLabel="No estimate"
+                      (valueChange)="issueEstimate.set($event[0] ?? '')"
+                    />
                   }
-                  <app-picker variant="chip" label="Assignee" [icon]="userIcon" [options]="userOptions()" [value]="opt(assigneeId())" [clearable]="true" clearLabel="Unassigned" (valueChange)="assigneeId.set($event[0] ?? '')" />
-                  <app-picker variant="chip" label="Team" [icon]="teamIcon" [options]="teamOptions()" [value]="opt(teamId())" [clearable]="true" clearLabel="No team" (valueChange)="teamId.set($event[0] ?? '')" />
-                  <app-picker variant="chip" label="Workstreams" [multiple]="true" [options]="workstreamOptions()" [value]="workstreamIds()" (valueChange)="workstreamIds.set($event)" searchPlaceholder="Link to workstreams…" />
+                  <app-picker
+                    variant="pill"
+                    label="Assignee"
+                    [icon]="userIcon"
+                    [options]="userOptions()"
+                    [value]="opt(assigneeId())"
+                    [clearable]="true"
+                    clearLabel="Unassigned"
+                    (valueChange)="assigneeId.set($event[0] ?? '')"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Workstreams"
+                    [multiple]="true"
+                    [options]="workstreamOptions()"
+                    [value]="workstreamIds()"
+                    (valueChange)="workstreamIds.set($event)"
+                    searchPlaceholder="Link to workstreams…"
+                  />
                 }
                 @case ('workstream') {
-                  <app-picker variant="chip" label="Status" [searchable]="false" [options]="wsStatusOptions" [value]="opt(wsStatus())" [clearable]="true" clearLabel="Derived (automatic)" (valueChange)="wsStatus.set($event[0] ?? '')" />
-                  <app-picker variant="chip" label="Priority" [searchable]="false" [options]="priorityOptions" [value]="[priority()]" (valueChange)="setOne(priority, $event)" />
-                  <app-picker variant="chip" label="Owner team" [icon]="teamIcon" [options]="teamOptions()" [value]="opt(ownerTeamId())" (valueChange)="ownerTeamId.set($event[0] ?? '')" />
-                  <app-picker variant="chip" label="Accountable" [icon]="userIcon" [options]="userOptions()" [value]="opt(accountableId())" [clearable]="true" clearLabel="Nobody yet" (valueChange)="accountableId.set($event[0] ?? '')" />
+                  <app-picker
+                    variant="pill"
+                    label="Status"
+                    [searchable]="false"
+                    [options]="wsStatusOptions"
+                    [value]="opt(wsStatus())"
+                    [clearable]="true"
+                    clearLabel="Derived (automatic)"
+                    (valueChange)="wsStatus.set($event[0] ?? '')"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Priority"
+                    [searchable]="false"
+                    [options]="priorityOptions"
+                    [value]="[priority()]"
+                    (valueChange)="setOne(priority, $event)"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Accountable"
+                    [icon]="userIcon"
+                    [options]="userOptions()"
+                    [value]="opt(accountableId())"
+                    [clearable]="true"
+                    clearLabel="Nobody yet"
+                    (valueChange)="accountableId.set($event[0] ?? '')"
+                  />
                   @if (repoOptions().length) {
-                    <app-picker variant="chip" label="Projects" [multiple]="true" [options]="repoOptions()" [value]="repositoryIds()" (valueChange)="repositoryIds.set($event)" />
+                    <app-picker
+                      variant="pill"
+                      label="Projects"
+                      [multiple]="true"
+                      [options]="repoOptions()"
+                      [value]="repositoryIds()"
+                      (valueChange)="repositoryIds.set($event)"
+                    />
                   }
-                  <app-picker variant="chip" label="Issues" [multiple]="true" [options]="issueOptions()" [value]="issueIds()" (valueChange)="issueIds.set($event)" searchPlaceholder="Issues this resolves…" />
-                  <hlm-date-picker [date]="targetDate()" (dateChange)="targetDate.set($event ?? undefined)" align="start">
+                  <app-picker
+                    variant="pill"
+                    label="Issues"
+                    [multiple]="true"
+                    [options]="issueOptions()"
+                    [value]="issueIds()"
+                    (valueChange)="issueIds.set($event)"
+                    searchPlaceholder="Issues this resolves…"
+                  />
+                  <hlm-date-picker
+                    [date]="targetDate()"
+                    (dateChange)="targetDate.set($event ?? undefined)"
+                    align="start"
+                  >
                     <hlm-date-picker-trigger
                       variant="outline"
                       [showTrigger]="false"
@@ -293,17 +451,45 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   </hlm-date-picker>
                 }
                 @case ('decision') {
-                  <app-picker variant="chip" label="Status" [searchable]="false" [options]="decisionStatusOptions" [value]="[decisionStatus()]" (valueChange)="setOne(decisionStatus, $event)" />
-                  <app-picker variant="chip" label="Origin" [options]="workstreamOptions()" [value]="opt(workstreamId())" [clearable]="true" clearLabel="No origin" (valueChange)="workstreamId.set($event[0] ?? '')" />
-                  <label class="border-border-strong focus-within:border-ring/60 flex h-7 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs">
-                    <svg [lucideIcon]="tagIcon" [size]="13" class="text-muted-foreground shrink-0"></svg>
-                    <input class="placeholder:text-muted-foreground w-36 bg-transparent outline-none" placeholder="Tags, comma separated" [(ngModel)]="tags" name="tags" autocomplete="off" aria-label="Tags" />
+                  <app-picker
+                    variant="pill"
+                    label="Status"
+                    [searchable]="false"
+                    [options]="decisionStatusOptions"
+                    [value]="[decisionStatus()]"
+                    (valueChange)="setOne(decisionStatus, $event)"
+                  />
+                  <app-picker
+                    variant="pill"
+                    label="Origin"
+                    [options]="workstreamOptions()"
+                    [value]="opt(workstreamId())"
+                    [clearable]="true"
+                    clearLabel="No origin"
+                    (valueChange)="workstreamId.set($event[0] ?? '')"
+                  />
+                  <label
+                    class="border-border-strong focus-within:border-ring/60 flex h-7 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs"
+                  >
+                    <svg
+                      [lucideIcon]="tagIcon"
+                      [size]="13"
+                      class="text-muted-foreground shrink-0"
+                    ></svg>
+                    <input
+                      class="placeholder:text-muted-foreground w-36 bg-transparent outline-none"
+                      placeholder="Tags, comma separated"
+                      [(ngModel)]="tags"
+                      name="tags"
+                      autocomplete="off"
+                      aria-label="Tags"
+                    />
                   </label>
                 }
               }
             </div>
             @if (err('team'); as e) {
-              <p class="text-destructive -mt-1 px-4 pb-2 text-xs" role="alert">{{ e }}</p>
+              <p class="text-destructive -mt-2 px-5 pb-3 text-xs" role="alert">{{ e }}</p>
             }
           } @else {
             <div class="flex flex-col gap-3 px-4 pt-2 pb-4">
@@ -311,41 +497,106 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 @case ('team') {
                   <div class="grid gap-3 sm:grid-cols-[1fr_8rem]">
                     <app-form-row label="Name" [error]="err('title')">
-                      <input hlmInput placeholder="Platform" [ngModel]="title()" (ngModelChange)="onTeamName($event)" name="name" autocomplete="off" autofocus aria-label="Team name" />
+                      <input
+                        hlmInput
+                        placeholder="Platform"
+                        [ngModel]="title()"
+                        (ngModelChange)="onTeamName($event)"
+                        name="name"
+                        autocomplete="off"
+                        autofocus
+                        aria-label="Team name"
+                      />
                     </app-form-row>
                     <app-form-row label="Key" [error]="err('key')">
-                      <input hlmInput class="font-mono uppercase" placeholder="PLAT" [ngModel]="teamKey()" (ngModelChange)="onTeamKey($event)" name="key" maxlength="8" autocomplete="off" aria-label="Team key" />
+                      <input
+                        hlmInput
+                        class="font-mono uppercase"
+                        placeholder="PLAT"
+                        [ngModel]="teamKey()"
+                        (ngModelChange)="onTeamKey($event)"
+                        name="key"
+                        maxlength="8"
+                        autocomplete="off"
+                        aria-label="Team key"
+                      />
                     </app-form-row>
                   </div>
                   <app-form-row label="Description" [optional]="true">
-                    <textarea hlmTextarea rows="2" [(ngModel)]="text" name="description" placeholder="What does this team own?"></textarea>
+                    <textarea
+                      hlmTextarea
+                      rows="2"
+                      [(ngModel)]="text"
+                      name="description"
+                      placeholder="What does this team own?"
+                    ></textarea>
                   </app-form-row>
-                  <p class="text-muted-foreground text-xs">The key prefixes workstream ids (PLAT-12) and cannot be changed later.</p>
+                  <p class="text-muted-foreground text-xs">
+                    The key prefixes workstream ids (PLAT-12) and cannot be changed later.
+                  </p>
                 }
                 @case ('repository') {
                   <div class="grid gap-3 sm:grid-cols-[9rem_1fr]">
                     <app-form-row label="Provider">
-                      <app-select [options]="gitProviderOptions" [(value)]="gitProvider" label="Provider" />
+                      <app-select
+                        [options]="gitProviderOptions"
+                        [(value)]="gitProvider"
+                        label="Provider"
+                      />
                     </app-form-row>
                     <app-form-row label="Project" [error]="err('title')">
-                      <input hlmInput class="font-mono" placeholder="acme/api" [(ngModel)]="title" name="fullName" autocomplete="off" autofocus aria-label="Project name" />
+                      <input
+                        hlmInput
+                        class="font-mono"
+                        placeholder="acme/api"
+                        [(ngModel)]="title"
+                        name="fullName"
+                        autocomplete="off"
+                        autofocus
+                        aria-label="Project name"
+                      />
                     </app-form-row>
                   </div>
                   <app-form-row label="Default branch" [optional]="true">
-                    <input hlmInput class="font-mono" placeholder="main" [(ngModel)]="text" name="branch" autocomplete="off" aria-label="Default branch" />
+                    <input
+                      hlmInput
+                      class="font-mono"
+                      placeholder="main"
+                      [(ngModel)]="text"
+                      name="branch"
+                      autocomplete="off"
+                      aria-label="Default branch"
+                    />
                   </app-form-row>
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
-                    <input hlmInput placeholder="e.g. Blocked this week" [(ngModel)]="title" name="name" autocomplete="off" autofocus aria-label="View name" />
+                    <input
+                      hlmInput
+                      placeholder="e.g. Blocked this week"
+                      [(ngModel)]="title"
+                      name="name"
+                      autocomplete="off"
+                      autofocus
+                      aria-label="View name"
+                    />
                   </app-form-row>
                   <div class="grid gap-3 sm:grid-cols-2">
                     <app-form-row label="Shows">
-                      <app-select [options]="viewEntityOptions" [(value)]="viewEntity" label="Entity" [disabled]="viewPreset()" />
+                      <app-select
+                        [options]="viewEntityOptions"
+                        [(value)]="viewEntity"
+                        label="Entity"
+                        [disabled]="viewPreset()"
+                      />
                     </app-form-row>
                     <app-form-row label="Visibility">
                       <label class="flex h-8 items-center gap-2 text-sm">
-                        <hlm-switch [(checked)]="shared" [disabled]="!canShare()" aria-label="Share with the workspace" />
+                        <hlm-switch
+                          [(checked)]="shared"
+                          [disabled]="!canShare()"
+                          aria-label="Share with the workspace"
+                        />
                         {{ shared() ? 'Shared with the workspace' : 'Private to me' }}
                       </label>
                     </app-form-row>
@@ -358,27 +609,24 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             </div>
           }
 
-          <hlm-dialog-footer class="mx-0 mb-0 flex-row items-center justify-between gap-2 rounded-b-xl border-t px-4 py-2.5 sm:justify-between">
-            <span class="flex items-center gap-3">
-              @if (composer()) {
-                <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
-                  <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
-                  Create more
-                </label>
-              }
-              <span class="text-muted-foreground flex items-center gap-1 text-xs max-sm:hidden">
-                <app-kbd keys="mod+enter" /> to create
-              </span>
-            </span>
-            <span class="flex items-center gap-2">
+          <hlm-dialog-footer
+            class="mx-0 mb-0 flex-row items-center justify-end gap-3 rounded-b-xl px-4 py-3"
+          >
+            @if (composer()) {
+              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
+                <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
+                Create more
+              </label>
+            }
+            @if (!composer()) {
               <button hlmBtn type="button" variant="ghost" size="sm" hlmDialogClose>Cancel</button>
-              <button hlmBtn type="submit" size="sm" [disabled]="busy()">
-                @if (busy()) {
-                  <hlm-spinner />
-                }
-                Create {{ kindLabel().toLowerCase() }}
-              </button>
-            </span>
+            }
+            <button hlmBtn type="submit" size="sm" class="" [disabled]="busy()">
+              @if (busy()) {
+                <hlm-spinner />
+              }
+              Create {{ kindLabel().toLowerCase() }}
+            </button>
           </hlm-dialog-footer>
         </form>
       </hlm-dialog-content>
@@ -406,6 +654,7 @@ export class CreateDialog {
   protected readonly userIcon = LucideCircleUser;
   protected readonly teamIcon = LucideUsers;
   protected readonly calendarIcon = LucideCalendar;
+  protected readonly closeIcon = LucideX;
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
   protected readonly kind = signal<CreateKind>('issue');
@@ -429,7 +678,9 @@ export class CreateDialog {
   protected readonly issueEstimate = signal('');
   /** The workspace turned estimates off: do not offer the chip. */
   protected readonly showEstimate = computed(() => this.store.estimateScale() !== 'none');
-  protected readonly issueEstimateChoices = computed<PickOption[]>(() => issueEstimateOptions(undefined, this.store.estimateScale()));
+  protected readonly issueEstimateChoices = computed<PickOption[]>(() =>
+    issueEstimateOptions(undefined, this.store.estimateScale()),
+  );
   protected readonly assigneeId = signal('');
   protected readonly teamId = signal('');
   protected readonly workstreamIds = signal<string[]>([]);
@@ -449,16 +700,26 @@ export class CreateDialog {
   protected readonly gitProvider = signal<string>('github');
   protected readonly viewEntity = signal<string>('workstream');
   protected readonly shared = signal(true);
-  private viewExtras: { filters?: ViewFilter[]; sort?: { field: string; direction: 'asc' | 'desc' }; groupBy?: string; layout?: ViewLayout } = {};
+  private viewExtras: {
+    filters?: ViewFilter[];
+    sort?: { field: string; direction: 'asc' | 'desc' };
+    groupBy?: string;
+    layout?: ViewLayout;
+  } = {};
   protected readonly viewPreset = signal(false);
   protected readonly viewSummary = signal('');
 
   protected readonly createMore = signal(false);
   protected readonly busy = signal(false);
   private readonly submitted = signal(false);
+  private readonly draftAttempt = signal(false);
 
   // ── options ──
-  protected readonly priorityOptions: PickOption[] = PRIORITIES.map((p) => ({ value: p, label: PRIORITY_META[p].label, kind: 'priority' }));
+  protected readonly priorityOptions: PickOption[] = PRIORITIES.map((p) => ({
+    value: p,
+    label: PRIORITY_META[p].label,
+    kind: 'priority',
+  }));
   protected readonly issueStatusOptions: PickOption[] = ISSUE_STATUSES.map((s) => ({
     value: s,
     label: ISSUE_STATUS_META[s].label,
@@ -494,16 +755,24 @@ export class CreateDialog {
     this.store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team', hint: t.key })),
   );
   protected readonly userOptions = computed<PickOption[]>(() =>
-    this.store.users().map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
+    this.store
+      .users()
+      .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
   );
   protected readonly repoOptions = computed<PickOption[]>(() =>
-    this.store.repositories().map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider })),
+    this.store
+      .repositories()
+      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider })),
   );
   /** Open workstreams first (hexagon glyphs). */
   protected readonly workstreamOptions = computed<PickOption[]>(() => {
     const done = (s: WorkstreamStatus) => s === 'shipped' || s === 'canceled';
     return [...this.store.workstreams()]
-      .sort((a, b) => Number(done(a.status)) - Number(done(b.status)) || a.key.localeCompare(b.key, undefined, { numeric: true }))
+      .sort(
+        (a, b) =>
+          Number(done(a.status)) - Number(done(b.status)) ||
+          a.key.localeCompare(b.key, undefined, { numeric: true }),
+      )
       .map((w) => ({
         value: w.id,
         label: w.title,
@@ -551,20 +820,6 @@ export class CreateDialog {
         return 'Add a description, steps to reproduce, links… Markdown supported.';
     }
   });
-  protected readonly keyPreview = computed(() => {
-    switch (this.kind()) {
-      case 'issue':
-        return `${ISSUE_KIND_META[this.issueKind() as IssueKind]?.prefix ?? 'BUG'}-…`;
-      case 'workstream': {
-        const team = this.store.getTeam(this.ownerTeamId());
-        return team ? `${team.key}-…` : 'AUTH-42';
-      }
-      case 'decision':
-        return 'ADR-…';
-      default:
-        return '';
-    }
-  });
 
   constructor() {
     // Reset the form from the context defaults each time the dialog opens.
@@ -587,22 +842,35 @@ export class CreateDialog {
 
     this.issueStatus.set(oneOf(ISSUE_STATUSES, d['status']) ?? 'backlog');
     this.issueKind.set(oneOf(ISSUE_KINDS, d['kind']) ?? 'bug');
-    this.issueEstimate.set(typeof d['estimate'] === 'number' && d['estimate'] >= 0 ? String(d['estimate']) : '');
-    this.assigneeId.set(this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '');
+    this.issueEstimate.set(
+      typeof d['estimate'] === 'number' && d['estimate'] >= 0 ? String(d['estimate']) : '',
+    );
+    this.assigneeId.set(
+      this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '',
+    );
     this.teamId.set(asStr(d['teamId']) || asStr(d['ownerTeamId']) || this.defaultTeam());
-    this.workstreamIds.set(asArr(d['workstreamIds']).flatMap((r) => this.store.getWorkstream(r)?.id ?? []));
+    this.workstreamIds.set(
+      asArr(d['workstreamIds']).flatMap((r) => this.store.getWorkstream(r)?.id ?? []),
+    );
 
     const ws = oneOf(WORKSTREAM_STATUS_FLOW, d['status']);
     this.wsStatus.set(ws && ws !== 'planned' ? ws : '');
-    const myTeam = this.defaultTeam() || (this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '');
+    const myTeam =
+      this.defaultTeam() || (this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '');
     this.ownerTeamId.set(asStr(d['ownerTeamId']) || asStr(d['teamId']) || myTeam);
-    this.accountableId.set(this.store.userById().has(asStr(d['accountableUserId'])) ? asStr(d['accountableUserId']) : '');
+    this.accountableId.set(
+      this.store.userById().has(asStr(d['accountableUserId'])) ? asStr(d['accountableUserId']) : '',
+    );
     this.targetDate.set(undefined);
-    this.repositoryIds.set(asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)));
+    this.repositoryIds.set(
+      asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
+    );
     this.issueIds.set(asArr(d['issueIds']).flatMap((r) => this.store.getIssue(r)?.id ?? []));
 
     this.workstreamId.set(this.store.getWorkstream(asStr(d['workstreamId']))?.id ?? '');
-    this.decisionStatus.set(d['status'] === 'accepted' && kind === 'decision' ? 'accepted' : 'proposed');
+    this.decisionStatus.set(
+      d['status'] === 'accepted' && kind === 'decision' ? 'accepted' : 'proposed',
+    );
 
     this.teamKey.set('');
     this.teamKeyTouched = false;
@@ -613,27 +881,59 @@ export class CreateDialog {
     this.viewExtras = {
       filters: Array.isArray(d['filters']) ? (d['filters'] as ViewFilter[]) : undefined,
       sort:
-        d['sort'] && typeof d['sort'] === 'object' && typeof (d['sort'] as { field?: unknown }).field === 'string'
+        d['sort'] &&
+        typeof d['sort'] === 'object' &&
+        typeof (d['sort'] as { field?: unknown }).field === 'string'
           ? (d['sort'] as { field: string; direction: 'asc' | 'desc' })
           : undefined,
       groupBy: asStr(d['groupBy']) || undefined,
       layout: oneOf(VIEW_LAYOUTS, d['layout']),
     };
-    this.viewPreset.set(!!entity && (!!this.viewExtras.filters || !!this.viewExtras.sort || !!this.viewExtras.groupBy));
+    this.viewPreset.set(
+      !!entity &&
+        (!!this.viewExtras.filters || !!this.viewExtras.sort || !!this.viewExtras.groupBy),
+    );
     this.viewSummary.set(this.describeViewExtras());
 
     this.submitted.set(false);
+    this.draftAttempt.set(false);
     this.busy.set(false);
   }
 
   private describeViewExtras(): string {
     const x = this.viewExtras;
     const bits: string[] = [];
-    if (x.filters?.length) bits.push(`${x.filters.length} filter${x.filters.length === 1 ? '' : 's'}`);
+    if (x.filters?.length)
+      bits.push(`${x.filters.length} filter${x.filters.length === 1 ? '' : 's'}`);
     if (x.sort) bits.push(`sorted by ${x.sort.field} ${x.sort.direction}`);
     if (x.groupBy) bits.push(`grouped by ${x.groupBy}`);
     if (x.layout) bits.push(`${x.layout} layout`);
     return bits.join(' · ');
+  }
+
+  /** The breadcrumb team: the issue's team, or the workstream's owner team. */
+  protected readonly headerTeamId = computed(() =>
+    this.kind() === 'workstream' ? this.ownerTeamId() : this.teamId(),
+  );
+
+  /** What the draft already has, so quick suggestions skip no-ops. */
+  protected readonly suggestionCurrent = computed(() => ({
+    priority: this.priority(),
+    kind: this.issueKind(),
+    estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
+    teamId: this.teamId(),
+    assigneeId: this.assigneeId(),
+    workstreamId: this.workstreamIds(),
+  }));
+
+  protected addQuestion(question: string): void {
+    this.text.update((t) => `${t.trimEnd()}${t.trim() ? '\n\n' : ''}${question}\n`);
+  }
+
+  protected setHeaderTeam(id: string): void {
+    // Keep both in step so switching kind carries the team over.
+    if (id || this.kind() === 'issue') this.teamId.set(id);
+    if (id) this.ownerTeamId.set(id);
   }
 
   protected opt(v: string): string[] {
@@ -662,7 +962,12 @@ export class CreateDialog {
     if (!this.teamKeyTouched) {
       const words = v.trim().split(/\s+/);
       const initials = words.map((w) => w[0] ?? '').join('');
-      this.teamKey.set((words.length > 1 ? initials : v.trim().slice(0, 4)).toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8));
+      this.teamKey.set(
+        (words.length > 1 ? initials : v.trim().slice(0, 4))
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, '')
+          .slice(0, 8),
+      );
     }
   }
 
@@ -673,13 +978,20 @@ export class CreateDialog {
 
   protected err(field: 'title' | 'team' | 'statement' | 'key' | 'delta'): string | null {
     if (!this.submitted()) return null;
+    if (this.draftAttempt() && (field === 'delta' || field === 'statement')) return null;
     const k = this.kind();
     switch (field) {
       case 'title':
-        return this.title().trim() ? null : k === 'issue' || k === 'workstream' || k === 'decision' ? 'Give it a title.' : 'Required.';
+        return this.title().trim()
+          ? null
+          : k === 'issue' || k === 'workstream' || k === 'decision'
+            ? 'Give it a title.'
+            : 'Required.';
       case 'delta':
         if (k !== 'workstream') return null;
-        return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim()) ? null : 'Link the Delta thread: an https link on delta.dev.';
+        return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim())
+          ? null
+          : 'Link the Delta thread: an https link on delta.dev.';
       case 'team':
         if (k !== 'workstream') return null;
         return this.ownerTeamId() ? null : 'Pick the owner team.';
@@ -688,7 +1000,9 @@ export class CreateDialog {
         return this.text().trim() ? null : 'Say what was decided.';
       case 'key':
         if (k !== 'team') return null;
-        return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase()) ? null : '2 to 8 letters or digits, starting with a letter.';
+        return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
+          ? null
+          : '2 to 8 letters or digits, starting with a letter.';
     }
   }
 
@@ -718,17 +1032,32 @@ export class CreateDialog {
         this.assigneeId.set(suggestion.value);
         break;
       case 'workstreamId':
-        this.workstreamIds.update((ids) => ids.includes(suggestion.value) ? ids : [...ids, suggestion.value]);
+        this.workstreamIds.update((ids) =>
+          ids.includes(suggestion.value) ? ids : [...ids, suggestion.value],
+        );
         break;
     }
   }
 
-  protected async submit(ev: Event): Promise<void> {
+  protected saveDraft(ev: Event): void {
+    this.draftAttempt.set(true);
+    void this.submit(ev, true);
+  }
+
+  protected async submit(ev: Event, asDraft = false): Promise<void> {
     ev.preventDefault();
     ev.stopPropagation();
     if (this.busy()) return;
-    this.submitted.set(true);
-    if (!this.valid()) return;
+    if (asDraft) {
+      if (!this.title().trim() || (this.kind() === 'workstream' && !this.ownerTeamId())) {
+        this.submitted.set(true);
+        return;
+      }
+    } else {
+      this.draftAttempt.set(false);
+      this.submitted.set(true);
+      if (!this.valid()) return;
+    }
     this.busy.set(true);
     try {
       const slug = this.store.slug();
@@ -737,7 +1066,7 @@ export class CreateDialog {
       let done: { label: string; path: string[] } | undefined;
       switch (this.kind()) {
         case 'issue': {
-          const status = this.issueStatus() as IssueStatus;
+          const status = asDraft ? 'draft' : (this.issueStatus() as IssueStatus);
           const i = await this.store.createIssue({
             kind: this.issueKind() as IssueKind,
             title,
@@ -766,10 +1095,12 @@ export class CreateDialog {
             accountableUserId: this.accountableId() || undefined,
             repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
             targetDate: this.targetDate()?.toISOString(),
-            statusOverride: (this.wsStatus() as WorkstreamStatus) || undefined,
+            statusOverride: asDraft ? 'draft' : (this.wsStatus() as WorkstreamStatus) || undefined,
           });
           if (w) {
-            await Promise.all(this.issueIds().map((id) => this.store.linkIssue(id, { workstreamIds: [w.id] })));
+            await Promise.all(
+              this.issueIds().map((id) => this.store.linkIssue(id, { workstreamIds: [w.id] })),
+            );
             done = { label: `${w.key} created`, path: ['workstreams', w.key] };
           }
           break;
@@ -779,11 +1110,15 @@ export class CreateDialog {
             title,
             statement: this.text().trim(),
             rationale: this.text2().trim() || undefined,
-            status: this.decisionStatus() as 'proposed' | 'accepted',
+            status: asDraft ? 'draft' : (this.decisionStatus() as 'proposed' | 'accepted'),
             originWorkstreamId: this.workstreamId() || undefined,
             tags: asTags(this.tags()),
           });
-          if (d) done = { label: `${d.key} recorded`, path: ['decisions', d.key] };
+          if (d)
+            done = {
+              label: asDraft ? `${d.key} saved as draft` : `${d.key} recorded`,
+              path: ['decisions', d.key],
+            };
           break;
         }
         case 'team': {
@@ -818,13 +1153,18 @@ export class CreateDialog {
           return;
       }
       if (!done) return; // the store already toasted the failure; keep the form open
+      if (asDraft && this.kind() === 'issue') done.label = `${done.path[1]} saved as draft`;
+      if (asDraft && this.kind() === 'workstream') done.label = `${done.path[1]} saved as draft`;
       const commands = ['/', slug, ...done.path];
       // Linear behaviour: stay where you are, offer "Open" in the toast.
       // Views and teams are destinations of their own, so those still navigate.
-      const navigate = this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository';
+      const navigate =
+        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository';
       this.notifier.success(done.label, {
         description: navigate ? undefined : title,
-        action: navigate ? undefined : { label: 'Open', run: () => void this.router.navigate(commands) },
+        action: navigate
+          ? undefined
+          : { label: 'Open', run: () => void this.router.navigate(commands) },
       });
       if (this.createMore() && this.composer()) {
         this.title.set('');
@@ -832,6 +1172,7 @@ export class CreateDialog {
         this.text2.set('');
         this.issueIds.set([]);
         this.submitted.set(false);
+        this.draftAttempt.set(false);
         this.focusTitle();
         return;
       }

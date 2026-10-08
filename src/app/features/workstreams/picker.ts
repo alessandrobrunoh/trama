@@ -63,6 +63,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
 /**
  * Popover + command list. Trigger styles:
  *  - `chip`  : dashed filter chip ("+ Status" / "Status · Working")
+ *  - `pill`  : rounded property pill ("Priority" → "High"), used by the create composer
  *  - `field` : borderless row button for property panels
  *  - `input` : bordered full-width control for forms
  *  - `ghost` : compact ghost button (summary text only)
@@ -87,10 +88,15 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
   ],
   host: {
     class: 'inline-block min-w-0 max-w-full',
-    '[class.shrink-0]': "variant() === 'chip'",
+    '[class.shrink-0]': "variant() === 'chip' || variant() === 'pill'",
   },
   template: `
-    <hlm-popover [align]="align()" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
+    <hlm-popover
+      [align]="align()"
+      sideOffset="4"
+      [state]="state()"
+      (stateChanged)="state.set($event)"
+    >
       @switch (variant()) {
         @case ('bare') {
           <button
@@ -131,6 +137,34 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
                   <span>{{ selected().length }} selected</span>
                 }
               </span>
+            }
+          </button>
+        }
+        @case ('pill') {
+          <button
+            hlmBtn
+            hlmPopoverTrigger
+            type="button"
+            variant="outline"
+            size="sm"
+            class="h-7 max-w-full gap-1.5 px-2 text-xs font-normal"
+            [class.border-dashed]="selected().length === 0"
+            [class.bg-accent]="selected().length > 0"
+            [disabled]="disabled()"
+            [attr.aria-label]="label()"
+          >
+            @if (selected().length === 1) {
+              <ng-container *ngTemplateOutlet="glyph; context: { $implicit: selected()[0] }" />
+              <span class="truncate">{{ selected()[0].label }}</span>
+            } @else if (selected().length > 1) {
+              <span class="text-muted-foreground">{{ label() }}</span>
+              <span class="bg-border h-3.5 w-px shrink-0"></span>
+              <span>{{ selected().length }}</span>
+            } @else {
+              @if (icon(); as ic) {
+                <svg [lucideIcon]="ic" [size]="13" class="text-muted-foreground shrink-0"></svg>
+              }
+              <span class="text-muted-foreground">{{ label() }}</span>
             }
           </button>
         }
@@ -184,7 +218,11 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
                 }
               </span>
             }
-            <svg [lucideIcon]="chevron" [size]="14" class="text-muted-foreground ml-auto shrink-0"></svg>
+            <svg
+              [lucideIcon]="chevron"
+              [size]="14"
+              class="text-muted-foreground ml-auto shrink-0"
+            ></svg>
           </button>
         }
         @default {
@@ -214,21 +252,29 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
       <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-60 p-0 sm:w-64">
         <hlm-command class="h-auto max-h-[22rem] rounded-lg" (keydown)="onQuickKey($event)">
           @if (searchable()) {
-            <hlm-command-input [placeholder]="searchPlaceholder() ?? 'Search ' + label().toLowerCase() + '…'" />
+            <hlm-command-input
+              [placeholder]="searchPlaceholder() ?? 'Search ' + label().toLowerCase() + '…'"
+            />
           }
           <div *hlmCommandEmptyState hlmCommandEmpty>No matches.</div>
           <hlm-command-list class="max-h-64">
             <hlm-command-group>
               @if (clearable() && (clearAlways() || selected().length > 0)) {
                 <button hlmCommandItem value="__clear" (selected)="clear()">
-                  <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ clearLabel() }}</span>
+                  <span class="text-muted-foreground min-w-0 flex-1 truncate">{{
+                    clearLabel()
+                  }}</span>
                   @if (clearAlways() && selected().length === 0) {
                     <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
                   }
                 </button>
               }
               @for (o of options(); track o.value) {
-                <button hlmCommandItem [value]="(o.search ?? o.label) + ' ' + o.value" (selected)="pick(o)">
+                <button
+                  hlmCommandItem
+                  [value]="(o.search ?? o.label) + ' ' + o.value"
+                  (selected)="pick(o)"
+                >
                   <ng-container *ngTemplateOutlet="glyph; context: { $implicit: o }" />
                   <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
                   @if (o.hint) {
@@ -243,7 +289,13 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           </hlm-command-list>
           @if (create()) {
             <div class="border-t p-1">
-              <button hlmBtn variant="ghost" size="sm" class="w-full justify-start" (click)="createClicked.emit()">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="sm"
+                class="w-full justify-start"
+                (click)="createClicked.emit()"
+              >
                 <svg [lucideIcon]="plus" [size]="14"></svg>
                 {{ create() }}
               </button>
@@ -256,7 +308,10 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     <ng-template #glyph let-o>
       @switch (o.kind ?? 'plain') {
         @case ('status') {
-          <app-status-icon [status]="asStatus(o.status ?? o.value)" [entity]="o.statusEntity ?? 'auto'" />
+          <app-status-icon
+            [status]="asStatus(o.status ?? o.value)"
+            [entity]="o.statusEntity ?? 'auto'"
+          />
         }
         @case ('priority') {
           <app-priority-icon [priority]="asPriority(o.value)" />
@@ -274,16 +329,28 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           <app-actor-avatar [actor]="actorRef(o.value)" [size]="16" />
         }
         @case ('provider') {
-          <app-provider-icon [provider]="asProvider(o.value)" [size]="14" class="text-muted-foreground" />
+          <app-provider-icon
+            [provider]="asProvider(o.value)"
+            [size]="14"
+            class="text-muted-foreground"
+          />
         }
         @case ('repo') {
-          <app-provider-icon [provider]="repoProvider(o)" [size]="13" class="text-muted-foreground" />
+          <app-provider-icon
+            [provider]="repoProvider(o)"
+            [size]="13"
+            class="text-muted-foreground"
+          />
         }
         @case ('label') {
           <span class="bg-muted-foreground/50 size-2 shrink-0 rounded-full"></span>
         }
         @case ('estimate') {
-          <app-estimate-glyph class="text-muted-foreground" [fraction]="o.fraction ?? 0" [size]="14" />
+          <app-estimate-glyph
+            class="text-muted-foreground"
+            [fraction]="o.fraction ?? 0"
+            [size]="14"
+          />
         }
       }
     </ng-template>
@@ -294,7 +361,7 @@ export class Picker {
   /** Selected values. */
   readonly value = input<readonly string[]>([]);
   readonly multiple = input(false);
-  readonly variant = input<'chip' | 'field' | 'input' | 'ghost' | 'bare'>('input');
+  readonly variant = input<'chip' | 'pill' | 'field' | 'input' | 'ghost' | 'bare'>('input');
   /** Extra classes for the `bare` trigger button. */
   readonly triggerClass = input('');
   readonly align = input<'start' | 'center' | 'end'>('start');
@@ -358,7 +425,11 @@ export class Picker {
       if (set.has(o.value)) set.delete(o.value);
       else set.add(o.value);
       // keep option order
-      this.valueChange.emit(this.options().filter((x) => set.has(x.value)).map((x) => x.value));
+      this.valueChange.emit(
+        this.options()
+          .filter((x) => set.has(x.value))
+          .map((x) => x.value),
+      );
     } else {
       this.valueChange.emit([o.value]);
       this.state.set('closed');
@@ -377,5 +448,6 @@ export class Picker {
   protected userRef = (v: string): ActorRef => ({ type: 'user', id: v });
   protected agentRef = (v: string): ActorRef => ({ type: 'agent', id: v });
   protected actorRef = (v: string): ActorRef => parseActor(v);
-  protected repoProvider = (o: PickOption): AnyProvider => (o.provider === 'gitlab' ? 'gitlab' : 'github');
+  protected repoProvider = (o: PickOption): AnyProvider =>
+    o.provider === 'gitlab' ? 'gitlab' : 'github';
 }
