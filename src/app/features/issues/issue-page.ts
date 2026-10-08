@@ -99,6 +99,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       [scope]="scope()"
       [status]="status()"
       [team]="teamRef()?.id ?? team()"
+      [project]="project()"
       [emptyTitle]="empty().title"
       [emptyDescription]="empty().description"
     />
@@ -115,6 +116,8 @@ export class IssuePage {
   readonly status = input<string>();
   /** Query `?team=<teamId>` (sidebar team links). */
   readonly team = input<string>();
+  /** Query `?project=<projectId>`: only issues of that project (own or through its workstreams). */
+  readonly project = input<string>();
   /** Query `?view=active|backlog|done` (view tabs). */
   readonly view = input<string>();
 

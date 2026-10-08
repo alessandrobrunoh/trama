@@ -402,4 +402,53 @@ mod tests {
         assert_eq!(s["properties"]["status"]["type"], json!("string"));
         assert!(s["required"].as_array().unwrap().contains(&json!("kind")));
     }
+
+    #[test]
+    fn project_update_tools_use_the_nested_route() {
+        let call = tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "health": "at_risk", "body": "Slipping." })).unwrap();
+        assert_eq!(call.method, Method::Post);
+        assert_eq!(call.path, "/projects/prj_1/updates");
+        assert_eq!(call.body, Some(json!({ "health": "at_risk", "body": "Slipping." })));
+        assert!(tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "health": "fine", "body": "x" })).unwrap_err().contains("one of"));
+        assert!(tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "body": "x" })).unwrap_err().contains("health"));
+
+        let call = tool("update_project_update").build_call(&json!({ "projectId": "prj_1", "id": "pu_1", "health": "on_track" })).unwrap();
+        assert_eq!((call.method, call.path.as_str()), (Method::Patch, "/projects/prj_1/updates/pu_1"));
+        assert_eq!(call.body, Some(json!({ "health": "on_track" })));
+
+        assert_eq!(tool("delete_project_update").permission, "projects:delete");
+        assert_eq!(tool("list_project_updates").build_call(&json!({ "projectId": "prj_1" })).unwrap().path, "/projects/prj_1/updates");
+    }
+
+    #[test]
+    fn project_context_is_the_markdown_route() {
+        let t = tool("get_project_context");
+        assert_eq!(t.build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/context.md");
+        assert_eq!(t.permission, "projects:read");
+        assert!(t.listing()["annotations"]["readOnlyHint"].as_bool().unwrap());
+    }
+
+    #[test]
+    fn artifacts_attach_to_a_project_issue_or_workstream() {
+        let t = tool("create_artifact");
+        let s = t.input_schema();
+        assert_eq!(s["required"], json!(["kind", "title"]));
+        assert!(s["properties"]["kind"]["enum"].as_array().unwrap().contains(&json!("link")));
+        for owner in ["projectId", "issueId", "workstreamId"] {
+            assert!(s["properties"][owner].is_object(), "{owner}");
+        }
+        let call = t.build_call(&json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })).unwrap();
+        assert_eq!(call.body, Some(json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })));
+        assert!(t.listing()["description"].as_str().unwrap().contains("[requires permission artifacts:write]"));
+        assert_eq!(tool("list_project_artifacts").build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/artifacts");
+        let call = tool("list_issue_artifacts").build_call(&json!({ "idOrKey": "BUG-1" })).unwrap();
+        assert_eq!(call.path, "/issues/BUG-1/artifacts");
+        assert_eq!(tool("list_issue_artifacts").permission, "issues:read");
+    }
+
+    #[test]
+    fn project_icon() {
+        let call = tool("update_project").build_call(&json!({ "id": "prj_1", "icon": null })).unwrap();
+        assert_eq!(call.body, Some(json!({ "icon": null })));
+    }
 }

@@ -1,7 +1,7 @@
 // Searchable single / multi picker built on Spartan popover + command. Used for filter chips,
 // the properties sidebar and the form fields of the create dialogs.
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import {
   LucideCheck,
   LucideChevronDown,
@@ -12,12 +12,13 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import type { ActorRef } from '../../core';
+import { NablaStore, type ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { ProviderIcon, type AnyProvider } from '../../shared/provider-icon';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
+import { ProjectGlyph } from '../projects/project-glyph';
 import type { Priority } from '../../core';
 
 export type PickKind =
@@ -30,6 +31,7 @@ export type PickKind =
   | 'actor'
   | 'provider'
   | 'repo'
+  | 'project'
   | 'label'
   | 'estimate';
 
@@ -84,6 +86,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     ActorAvatar,
     ProviderIcon,
     EstimateGlyph,
+    ProjectGlyph,
     NgTemplateOutlet,
   ],
   host: {
@@ -342,6 +345,13 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             class="text-muted-foreground"
           />
         }
+        @case ('project') {
+          @if (projectOf(o.value); as pj) {
+            <app-project-glyph [project]="pj" [size]="14" />
+          } @else {
+            <span class="bg-muted-foreground/50 size-2 shrink-0 rounded-full"></span>
+          }
+        }
         @case ('label') {
           <span class="bg-muted-foreground/50 size-2 shrink-0 rounded-full"></span>
         }
@@ -357,6 +367,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
   `,
 })
 export class Picker {
+  private readonly store = inject(NablaStore);
   readonly options = input.required<readonly PickOption[]>();
   /** Selected values. */
   readonly value = input<readonly string[]>([]);
@@ -445,6 +456,7 @@ export class Picker {
   protected asPriority = (v: string) => v as Priority;
   protected asProvider = (v: string) => v as AnyProvider;
   protected teamRef = (v: string): ActorRef => ({ type: 'team', id: v });
+  protected projectOf = (id: string) => this.store.getProject(id);
   protected userRef = (v: string): ActorRef => ({ type: 'user', id: v });
   protected agentRef = (v: string): ActorRef => ({ type: 'agent', id: v });
   protected actorRef = (v: string): ActorRef => parseActor(v);

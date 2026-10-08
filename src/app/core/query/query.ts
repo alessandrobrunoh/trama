@@ -1,4 +1,4 @@
-// Generic filter / sort / group for workstreams, issues, executions and decisions,
+// Generic filter / sort / group for workstreams, issues, decisions and projects,
 // driven by the contract's ViewFilter / SavedView. Pure functions: use inside `computed()`.
 import type { SavedView, ViewEntity, ViewFilter } from '../contracts/domain';
 import {
@@ -6,6 +6,8 @@ import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
+  PROJECT_HEALTH_META,
+  PROJECT_STATUS_META,
   PROVIDER_META,
   WORKSTREAM_STATUS_META,
 } from '../meta';
@@ -36,6 +38,8 @@ export function enumOrder(entity: ViewEntity, field: string, value: string): num
     if (field === 'status' && entity === 'workstream') return WORKSTREAM_STATUS_META;
     if (field === 'status' && entity === 'decision') return DECISION_STATUS_META;
     if (field === 'status' && entity === 'issue') return ISSUE_STATUS_META;
+    if (field === 'status' && entity === 'project') return PROJECT_STATUS_META;
+    if (field === 'health' && entity === 'project') return PROJECT_HEALTH_META;
     if (field === 'kind' && entity === 'issue') return ISSUE_KIND_META;
     if (field === 'priority') return PRIORITY_META;
     if (field === 'provider') return PROVIDER_META;
@@ -98,7 +102,7 @@ export function matchesSearch(item: Queryable, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const a = item as unknown as Record<string, unknown>;
-  const hay = [a['key'], a['title'], a['objective'], a['statement'], a['body'], a['description']]
+  const hay = [a['key'], a['title'], a['name'], a['summary'], a['objective'], a['statement'], a['body'], a['description']]
     .filter((x): x is string => typeof x === 'string')
     .join('\n')
     .toLowerCase();

@@ -19,12 +19,14 @@ Trama coordinates teams of humans and coding agents. It keeps the issue tracker 
 
 Issues are *demand*. A workstream groups the issues that share a root cause and is the unit you execute. Grouping is by **outcome, not convenience**: five bugs with one cause belong together; ten unrelated bugs do not.
 
+A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. To understand a whole project in one read, call `get_project_context` (markdown "mega context"); to report on it, post a project update (see `trama-report-progress`).
+
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.
 
 ## Ground rules
 
 1. **Start with `whoami`.** It tells you which workspace and role you act as and which tools your token allows. Tools your key cannot use are hidden; do not look for workarounds.
-2. **Read before you write.** To work on a workstream call `get_workstream_context` (a markdown briefing). Use targeted `list_*` / `get_*` / `search` tools. Avoid `get_snapshot`: it is huge and only works for user tokens.
+2. **Read before you write.** To work on a workstream call `get_workstream_context` (a markdown briefing); for a project call `get_project_context`. Use targeted `list_*` / `get_*` / `search` tools. Avoid `get_snapshot`: it is huge and only works for user tokens.
 3. **Never set a workstream's status yourself.** Status is *derived* from facts (see `trama-report-progress`). `statusOverride` exists for people pinning a board column; leave it alone unless the user explicitly asks.
 4. **Facts, not guesses.** Do not invent progress, percentages or completion. Report what exists: criteria met, PR state, CI result.
 5. **You cannot accept decisions.** Propose them (`draft` or `proposed`). A person accepts, rejects or supersedes.
@@ -42,6 +44,6 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 
 ## Tool map
 
-`workspace/whoami` · `search` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
+`workspace/whoami` · `search` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
 
 `api_request` is an escape hatch for workspace routes with no dedicated tool. Prefer the dedicated tools; it only takes plain workspace-relative paths.

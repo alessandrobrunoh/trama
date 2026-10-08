@@ -6,6 +6,7 @@ import {
   LucideFileText,
   LucideFlaskConical,
   LucideImage,
+  LucideLink,
   LucidePaperclip,
   LucideGitMerge,
   LucideGitPullRequest,
@@ -30,6 +31,7 @@ const KIND_ICON: Record<ArtifactKind, LucideIcon> = {
   test_report: LucideFlaskConical,
   deployment: LucideCloud,
   release: LucideRocket,
+  link: LucideLink,
 };
 
 /** Kind glyph for an artifact (PR, MR, deployment…), tinted by its state. */

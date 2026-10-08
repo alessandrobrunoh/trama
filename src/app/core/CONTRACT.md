@@ -63,7 +63,8 @@ Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
 | `teams` | `TeamListPage` teams/team-list-page.ts | |
 | `teams/:key` | `TeamDetailPage` teams/team-detail-page.ts | `key` (team key AUTH or id) |
 | `views` | `ViewListPage` views/view-list-page.ts | |
-| `views/:id` | `ViewDetailPage` views/view-detail-page.ts | `id` |
+| `views/:id` | `ViewDetailPage` views/view-detail-page.ts | `id`. Layouts `list`, `board`, `timeline` (workstream and project views; draws `TimelineView`, features/timeline/timeline-view.ts) |
+| `timeline` | redirect -> `views` (the timeline used to be a page; it is a view layout now) | |
 | `settings` | redirect -> `settings/profile` | |
 | `settings/:section` | `SettingsPage` settings/settings-page.ts | `section`: profile, appearance, workspace, members, teams, agents, tokens, integrations, danger |
 | `**` | `NotFoundPage` (renders inside the shell) | |
@@ -108,7 +109,13 @@ api.executions.list|get|create|update|remove|progress(slug,id,{note,state?})|com
 api.inputRequests.list|create|answer(slug,id,answer)|dismiss(slug,id)
 api.issues.list|get|create|update|remove|link(slug,idOrKey,{workstreamIds?,createWorkstream?,status?})
 api.milestones.list(slug,workstreamId?)|create({workstreamId,name,description?,targetDate?,sortOrder?})|update(id,{name?,description?,targetDate?,sortOrder?})|reorder(slug,workstreamId,ids)|remove(id)
-api.artifacts.list|create|update|remove          api.decisions.list|get|create|update|remove|accept(slug,id)|reject(slug,id)|supersede(slug,id,byId)
+api.projects.list|get|create|update(…,{…,icon?: string|null})|remove      // icon = lucide kebab name or one emoji
+api.projects.updates.list(slug,projectId) | get(slug,projectId,id) | create(slug,projectId,{health,body,aiDrafted?}) | update(slug,projectId,id,{health?,body?}) | remove(slug,projectId,id)   // ProjectUpdate, newest first
+api.projects.context(slug,projectId) -> ProjectContext     api.projects.contextMarkdown(slug,projectId) -> string (text/markdown)
+api.projects.ai(slug,projectId,kind: 'update_draft'|'summary'|'issues'|'risks') -> ProjectAiResult   // discriminated by .kind
+api.projects.artifacts.list(slug,projectId) | create(slug,projectId,CreateOwnedArtifactInput)         // artifacts attached to the project itself
+api.issues.artifacts.list(slug,idOrKey) | create(slug,idOrKey,CreateOwnedArtifactInput)              // artifacts attached to an issue
+api.artifacts.list|create({workstreamId,…})|update|remove          api.decisions.list|get|create|update|remove|accept(slug,id)|reject(slug,id)|supersede(slug,id,byId)
 api.dependencies.list|create({fromType,fromId,toType,toId})|remove
 api.comments.list(slug,{type,id}?)|create({subject,body})|update(slug,id,body)|remove
 api.events.list(slug,{workstreamId?,subject?,before?,limit?}) -> DomainEvent[]
@@ -117,7 +124,7 @@ api.views.list|create|update|remove      api.graph(slug) -> GraphResponse      a
 api.integrations.list|create({provider,account?,baseUrl?,token?,webhookSecret?})|remove|sync(slug,id)
 api.request(method, path, {body?,params?,text?,accept?})   // escape hatch (path relative to /api)
 ```
-Request DTO types (`CreateWorkstreamInput`, `UpdateExecutionInput`, ...) live in `api/api.types.ts`; in `Update*` inputs `null` clears an optional field, `undefined` is ignored.
+Artifact creation inputs: `CreateArtifactInput` (workstream, `POST /artifacts`) and `CreateOwnedArtifactInput` (= `CreateArtifactFields`: `kind`, `title`, `provider?`, `url?`, `externalId?`, `description?`, `state?`, `repositoryId?`, ci/review/…; the owner is in the path). Request DTO types (`CreateWorkstreamInput`, `UpdateExecutionInput`, ...) live in `api/api.types.ts`; in `Update*` inputs `null` clears an optional field, `undefined` is ignored.
 
 ---
 
@@ -154,12 +161,13 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 
 **Meta signals**: `workspace`, `me` (User), `myRole`.
 
-**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `workstreams`, `milestones` (by workstream then `sortOrder`), `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
+**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `projects`, `workstreams`, `milestones` (by workstream then `sortOrder`), `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
 
 **Lookup computeds** (Maps; use `.get(...)` after calling the signal: `store.teamById().get(id)`):
 - by id: `userById`, `agentById`, `teamById`, `repositoryById`, `workstreamById`, `executionById`, `inputRequestById`, `issueById`, `artifactById`, `decisionById`, `viewById`, `integrationById`
 - by key (UPPER-CASE keys): `workstreamByKey` (AUTH-42), `issueByKey` (BUG-142), `decisionByKey` (ADR-7), `teamByKey` (AUTH); `membershipByUserId`
-- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `decisionsByWorkstream` (origin or related), `issuesByWorkstream`, `issuesByMilestone`, `milestonesByWorkstream` (workstream id -> milestones by `sortOrder`), `issuesByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
+- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `artifactsByProject`, `artifactsByIssue` (artifacts attached **directly** to that owner; `Artifact.workstreamId` is optional: an artifact belongs to a project, a workstream and/or an issue), `decisionsByWorkstream` (origin or related), `issuesByWorkstream`, `issuesByMilestone`, `milestonesByWorkstream` (workstream id -> milestones by `sortOrder`), `issuesByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
+- project tree (local, derived from the snapshot, works without `/context`): `projectArtifactTree` (`Map<projectId, ArtifactTreeNode>`; node = `{ subject: SubjectRef, artifacts: Artifact[], children: ArtifactTreeNode[] }`: project → workstreams of the project → their issues, plus issues planned under the project (`issue.projectId`) that are in none of its workstreams; `artifacts` = attached directly to the node) and `projectArtifacts` (`Map<projectId, ProjectContextArtifact[]>` = `{ artifact, path: SubjectRef[] }[]`, same shape as `ProjectContext.artifacts`, each artifact once, `path` = chain project → … → owner). `issuesByProject` includes issues with `issue.projectId` as well as those linked to a workstream of the project.
 - lists: `members` (`{membership,user}[]`), `openInputRequests`, `myTeams`, `myTeamIds`, `myWorkstreams` (I am accountable), `actors` (`ResolvedActor[]`: all users+agents+teams, for pickers)
 - attention: `openAttention` (state open, severity then newest), `snoozedAttention`, `attentionByKind` (Map<AttentionKind, AttentionItem[]>), `attentionCounts` (`Record<AttentionKind, number>`, zeros included), `attentionCount` (total open; sidebar badge), `highAttentionCount`, `backlogIssues`, `backlogIssueCount`
 
@@ -211,7 +219,9 @@ getMilestone(id): Milestone | undefined   // milestoneById map; getIssue(ref) al
 deleteIssue(id: ID): Promise<boolean>
 linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined>   // {workstreamIds?, createWorkstream?, status?}
 // artifacts, decisions, dependencies
-attachArtifact(input: CreateArtifactInput): Promise<Artifact | undefined>
+attachArtifact(input: CreateArtifactInput): Promise<Artifact | undefined>                 // to a workstream (input.workstreamId)
+attachProjectArtifact(projectId: ID, input: CreateOwnedArtifactInput): Promise<Artifact | undefined>   // to the project itself
+attachIssueArtifact(issueRef: string, input: CreateOwnedArtifactInput): Promise<Artifact | undefined>    // to an issue (id or key)
 updateArtifact(id: ID, patch: UpdateArtifactInput): Promise<boolean>
 removeArtifact(id: ID): Promise<boolean>
 proposeDecision(input: CreateDecisionInput): Promise<Decision | undefined>      // status 'proposed' (default) or 'accepted'
@@ -229,6 +239,16 @@ deleteComment(id: ID): Promise<boolean>
 // attention (ids are AttentionItem.id, e.g. "input_requested:ir_1")
 dismissAttention(id: string): Promise<boolean>
 snoozeAttention(id: string, untilIso: string): Promise<boolean>
+// projects: createProject(input) / updateProject(id, patch: UpdateProjectInput incl. icon) / deleteProject(id)
+// project updates (Updates feed; on demand, see "Project data" below)
+loadProjectUpdates(projectId: ID, options?: { force?: boolean; quiet?: boolean }): Promise<void>
+createProjectUpdate(projectId: ID, input: { health: ProjectHealth; body: string; aiDrafted?: boolean }): Promise<ProjectUpdate | undefined>   // waits for the server
+updateProjectUpdate(projectId: ID, id: ID, patch: { health?; body? }): Promise<boolean>     // optimistic (sets editedAt)
+deleteProjectUpdate(projectId: ID, id: ID): Promise<boolean>                                  // optimistic
+// project context + AI (reads: never reject, toast on error, resolve undefined)
+projectContext(projectId: ID, options?: { force?: boolean }): Promise<ProjectContext | undefined>
+projectContextMarkdown(projectId: ID): Promise<string | undefined>
+aiProject<K extends ProjectAiKind>(projectId: ID, kind: K): Promise<Extract<ProjectAiResult, { kind: K }> | undefined>
 // views
 createView(input: CreateViewInput): Promise<SavedView | undefined>
 updateView(id: ID, patch: UpdateViewInput): Promise<boolean>
@@ -241,6 +261,24 @@ createAgent({name, provider, description?, ownerUserId?}) / updateAgent(id, patc
 loadTokens(): Promise<void>   createToken({name, agentId?, expiresAt?}): Promise<{token, secret} | undefined>   deleteToken(id)   // secret is shown once
 createIntegration({provider, token, baseUrl?}) → {connection, webhook?} / updateIntegration(id, {token?, baseUrl?}) / rotateWebhookSecret(id) / deleteIntegration(id) / loadIntegrationDetails() + integrationDetails() / remoteRepositories(id, page?) / linkRepository(id, {fullName, teamIds?}) / unlinkRepository(id, repositoryId)
 ```
+### Project data (updates feed, context, AI)
+
+Not part of the snapshot; loaded on demand, cached per project, exposed as **stable per-id signals** (the same `Signal` object is returned for an id, so it is safe inside `computed()` / templates):
+
+```ts
+type LoadState = 'idle' | 'loading' | 'ready' | 'error'
+projectUpdates(projectId): Signal<readonly ProjectUpdate[]>        // newest first; [] until loaded
+projectUpdatesState(projectId): Signal<LoadState>
+projectContextOf(projectId): Signal<ProjectContext | undefined>    // cached /context (stale-while-revalidate)
+projectContextState(projectId): Signal<LoadState>
+```
+Typical page: `effect(() => { void store.loadProjectUpdates(id()); })` (a no-op when already `ready`) and read `store.projectUpdates(id())()`; for the context call `store.projectContext(id)` (served from cache while fresh) and read `projectContextOf(id)()`.
+
+- **Health stays consistent**: creating / editing / deleting an update re-derives `Project.health` and `Project.lastUpdateAt` locally (newest update wins; no updates → both cleared), then the snapshot refetch confirms. Rolled back if the write fails. Discussion on an update = comments with subject `{ type: 'project_update', id }` (`store.commentsFor(...)`, `addComment(...)`).
+- **Freshness**: a live `project_update` event reloads every loaded feed; any live event on `project | project_update | workstream | issue | artifact | milestone | decision | input_request | dependency`, and every write from this tab, marks cached contexts stale and reloads them in the background (debounced, old value stays visible). `store.invalidateProjectContexts()` forces that. Deleting a project drops its caches.
+- `projectContext(id)` (`ProjectContext` = project, milestones, updates, workstreams, issues, artifacts-with-path, decisions, input requests) is the server's authoritative tree; the local `projectArtifactTree` / `projectArtifacts` computeds give the same project → workstream → issue → artifact view from the snapshot alone.
+- `aiProject(id, 'update_draft')` → `{ kind, health, body }` (feed it to `createProjectUpdate(id, { health, body, aiDrafted: true })`); `'summary'` → `{ summary, description }`; `'issues'` → `{ suggestions: { issueId, reason }[] }`; `'risks'` → `{ health, risks[] }`. Nothing is persisted by the call. Not queued with writes; the caller tracks its own busy flag.
+
 Workspace-level admin (rename, delete) is on SessionStore (`updateWorkspace`, `deleteWorkspace`).
 
 Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnecting'`), `lastSyncedAt`, `lastError`, `pendingWrites`, `label` (computed short text).
@@ -249,13 +287,13 @@ Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnec
 
 ## 5. LiveSync (`core/sync`)
 
-`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
+`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `NablaStore.handleLiveEvent(event)`, which refreshes the on-demand project data (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
 
 ---
 
 ## 6. Query utilities (`core/query`)
 
-Pure functions, drive list/board screens and saved views from `ViewFilter` / `SavedView` (contract). Entities: `'workstream' | 'issue' | 'execution' | 'decision'`.
+Pure functions, drive list/board screens and saved views from `ViewFilter` / `SavedView` (contract). Entities (`ViewEntity`): `'workstream' | 'issue' | 'decision' | 'project'`.
 
 ```ts
 FIELD_DEFS: Record<ViewEntity, FieldDef[]>    // { field, label, kind: 'enum'|'id'|'multi-id'|'tags'|'text'|'date', values?, refersTo?, sortable, groupable }
@@ -263,7 +301,7 @@ fieldDef(entity, field) | fieldValues(entity, item, field, ctx?) -> string[]
 
 applyFilters(entity, items, filters?, ctx?)    // AND of all filters
 matchesFilter(entity, item, filter, ctx?)      // ops: is, is_not, in, not_in, contains, before, after; value '' means "no value"
-matchesSearch(item, text)
+matchesSearch(item, text)                 // searches key/title/name/summary/objective/statement/body/description
 sortItems(entity, items, { field, direction }?, ctx?)       // stable; enum fields sort by display order; empty values last
 groupItems(entity, items, groupBy?, ctx?, include?)         // Group<T>[] = { key, items }; key '' = none (last); `include` forces empty columns
 queryItems(entity, items, { filters?, sort?, groupBy?, search? }, ctx?)    // filter -> search -> sort
@@ -272,12 +310,12 @@ specFromView(view) -> QuerySpec
 setFilter(filters, field, op, value | null) | toggleFilterValue(filters, field, value) | filterValues(filters, field)   // filter-bar helpers
 enumOrder(entity, field, value)
 ```
-Filterable fields — workstream: `status`, `ownerTeamId`, `participatingTeamIds`, `teamId` (owner OR participating), `accountableUserId`, `priority`, `labels`, `repositoryIds`, `targetDate`, `title`, `createdAt`, `updatedAt`. issue: `kind`, `status`, `assigneeId`, `teamId`, `priority`, `source`, `title`, dates. execution: `state`, `provider`, `performers` (matches performer ids of any type), `teamId`, `workstreamId`, `repositoryIds`, `title`, dates. decision: `status`, `tags`, `originWorkstreamId`, `title`, `decidedAt`, dates. `ctx.workstreamById` is only needed for execution `ownerTeamId`.
+Filterable fields — workstream: `status`, `ownerTeamId`, `participatingTeamIds`, `teamId` (owner OR participating), `accountableUserId`, `priority`, `labels`, `projectId`, `repositoryIds`, `startDate`, `targetDate`, `title`, `createdAt`, `updatedAt`. issue: `kind`, `status`, `assigneeId`, `teamId`, `priority`, `source`, `title`, dates. execution: `state`, `provider`, `performers` (matches performer ids of any type), `teamId`, `workstreamId`, `repositoryIds`, `title`, dates. issue also: `projectId` (id, groupable, refersTo project), `milestoneIds` (multi-id, refersTo milestone). project: `status`, `priority`, `health` (enums), `leadId` (user, groupable), `teamIds` (multi-id, groupable), `repositoryIds`, `targetDate`, `startDate`, `name`, `createdAt`, `updatedAt`. `FieldDef.refersTo` is `'team'|'user'|'repository'|'project'|'workstream'|'milestone'|'actor'`. decision: `status`, `tags`, `originWorkstreamId`, `title`, `decidedAt`, dates. `ctx.workstreamById` is needed for an issue's `projectId`: it matches the issue's own project and the projects of its workstreams (same meaning as `issuesByProject`; `issueProjectIds(issue, workstreamById)` returns them). Without it only `issue.projectId` is used.
 
 ```ts
 readonly rows = computed(() => queryGroups('workstream', this.store.workstreams(), { filters, sort, groupBy: 'status', search }, {}, WORKSTREAM_STATUS_FLOW));
 ```
-Enum display metadata (`meta.ts`): `WORKSTREAM_STATUS_META`, `WORKSTREAM_STATUS_FLOW` (board column order), `EXECUTION_STATE_META`, `PRIORITY_META`, `PROVIDER_META`, `ISSUE_KIND_META`, `ISSUE_STATUS_META`, `ARTIFACT_KIND_META`, `DECISION_STATUS_META`, `CRITERION_STATE_META`, `ATTENTION_KIND_META` (label, groupTitle, order), `ROLE_META`; each `{ label, tone, order }` where `tone` is `neutral|muted|info|accent|success|warning|danger`; ordered key arrays `WORKSTREAM_STATUSES`, `EXECUTION_STATES`, `PRIORITIES`, `PROVIDERS`, `ISSUE_KINDS`, `ISSUE_STATUSES`, `ARTIFACT_KINDS`, `DECISION_STATUSES`, `ATTENTION_KINDS`, `ROLES`. `statusVar('needs_input')` -> `var(--status-needs-input)` (the conventional CSS token; check `src/styles` for the real names).
+Enum display metadata (`meta.ts`): `WORKSTREAM_STATUS_META`, `WORKSTREAM_STATUS_FLOW` (board column order), `EXECUTION_STATE_META`, `PRIORITY_META`, `PROVIDER_META`, `ISSUE_KIND_META`, `ISSUE_STATUS_META`, `ARTIFACT_KIND_META`, `DECISION_STATUS_META`, `CRITERION_STATE_META`, `ATTENTION_KIND_META` (label, groupTitle, order), `ROLE_META`, `PROJECT_STATUS_META` (core; the projects feature keeps its own Tailwind-class variant in `features/projects/project-model.ts`), `PROJECT_HEALTH_META` (On track / At risk / Off track; tones success / warning / danger), `VIEW_LAYOUT_META` + `VIEW_LAYOUTS` (`list|board|graph|timeline`); `ARTIFACT_KIND_META` also has `link`; each `{ label, tone, order }` where `tone` is `neutral|muted|info|accent|success|warning|danger`; ordered key arrays `WORKSTREAM_STATUSES`, `EXECUTION_STATES`, `PRIORITIES`, `PROVIDERS`, `ISSUE_KINDS`, `ISSUE_STATUSES`, `ARTIFACT_KINDS`, `DECISION_STATUSES`, `ATTENTION_KINDS`, `ROLES`. `statusVar('needs_input')` -> `var(--status-needs-input)` (the conventional CSS token; check `src/styles` for the real names).
 
 ---
 

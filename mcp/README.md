@@ -1,6 +1,6 @@
 # trama-mcp
 
-MCP server for Trama, written in Rust. It exposes the REST API as ~90 tools (plus `whoami` and a
+MCP server for Trama, written in Rust. It exposes the REST API as ~100 tools (plus `whoami` and a
 path-restricted `api_request`) to any MCP client: Claude, Cursor, VS Code, or the in-app Assistant.
 
 **It holds no data and no secrets.** Each client connects with its own API key
@@ -43,6 +43,12 @@ stdin/stdout for local clients, with the key in `TRAMA_API_KEY`. The [`trama` CL
 `src/tools.json` is the catalog: one entry per route with its permission and a compact parameter spec (see
 `src/catalog.rs`). To add a tool, add an entry; `server/src/auth/api-permissions.spec.ts` fails if a tool's
 `permission` differs from what the API derives from its route, and `cargo test` validates the catalog.
+
+Project-level tools: `get_project_context` (markdown "mega context" of a project: updates, milestones,
+workstreams, issues, artifacts, decisions), `list_project_updates` / `get_project_update` /
+`create_project_update` / `update_project_update` / `delete_project_update` (health + markdown status posts),
+`list_project_artifacts` and `list_issue_artifacts`, and `create_artifact` with any of `projectId` / `issueId` / `workstreamId`.
+Project routes are permissioned as `projects:*` and issue routes as `issues:*`.
 
 ## Security notes
 

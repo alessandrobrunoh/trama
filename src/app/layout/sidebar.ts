@@ -51,6 +51,7 @@ import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
+import { ProjectGlyph } from '../features/projects/project-glyph';
 import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
 /**
@@ -72,6 +73,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
     Kbd,
     ActorAvatar,
     StatusIcon,
+    ProjectGlyph,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -170,7 +172,10 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
                       @case ('team') {
                         <span class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white" [style.background]="e.color" aria-hidden="true">{{ e.label.slice(0, 1) }}</span>
                       }
-                      @case ('project') { <svg [lucideIcon]="projectIcon" [size]="14" class="shrink-0" [style.color]="e.color"></svg> }
+                      @case ('project') {
+                        @if (store.getProject(e.subjectId); as pj) { <app-project-glyph [project]="pj" [size]="14" /> }
+                        @else { <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                      }
                       @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
                       @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
                     }

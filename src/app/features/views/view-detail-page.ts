@@ -4,6 +4,7 @@ import { Router, RouterLink } from '@angular/router';
 import {
   LucideArrowDownWideNarrow,
   LucideArrowUpNarrowWide,
+  LucideChartGantt,
   LucideCheck,
   LucideCopy,
   LucideDynamicIcon,
@@ -37,6 +38,7 @@ import {
   type Decision,
   type Issue,
   type Priority,
+  type Project,
   type Queryable,
   type SavedView,
   type ViewFilter,
@@ -50,12 +52,14 @@ import { KeyChip } from '../../shared/key-chip';
 import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
-import { StatusIcon, type AnyStatus } from '../../shared/status';
+import { StatusIcon } from '../../shared/status';
 import { IssueCard, IssueRow } from '../issues/issue-items';
+import { TimelineView } from '../timeline/timeline-view';
 import { InlineText } from '../workstreams/inline-edit';
 import { buildSummary, type WsSummary } from '../workstreams/ws-model';
 import { WorkstreamCard, WorkstreamRow } from '../workstreams/workstream-items';
 import { OptionMenu } from './option-controls';
+import { ViewProjectCard, ViewProjectRow } from './view-project-items';
 import {
   ENTITY_ICON,
   ENTITY_LABEL,
@@ -65,22 +69,18 @@ import {
   fieldOptions,
   filterableFields,
   isEditableFilter,
+  valueColor,
   valueGlyph,
   valueLabel,
+  type ViewGroup,
 } from './view-model';
 
-interface ViewGroup {
-  key: string;
-  label: string;
-  status?: AnyStatus;
-  priority?: Priority;
-  actor?: { type: 'team' | 'user'; id: string };
-  items: Queryable[];
-}
+/** Layouts the toggle offers; the timeline only for entities that have dates. */
+type PageLayout = 'list' | 'board' | 'timeline';
 
 /**
- * A saved view: renders its entity with the right rows (issues = circles, workstreams = hexagons),
- * honours `layout` (list / board) and `groupBy`, and lets the owner edit name, filters, sort,
+ * A saved view: renders its entity with the right rows (issues = circles, workstreams = hexagons,
+ * projects = glyphs), honours `layout` (list / board / timeline) and `groupBy`, and lets the owner edit name, filters, sort,
  * grouping, layout and visibility in place. Every change is saved immediately.
  */
 @Component({
@@ -107,6 +107,9 @@ interface ViewGroup {
     WorkstreamCard,
     IssueRow,
     IssueCard,
+    ViewProjectRow,
+    ViewProjectCard,
+    TimelineView,
     TopBarActions,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
@@ -182,6 +185,11 @@ interface ViewGroup {
             <button hlmToggleGroupItem value="board" aria-label="Board" class="h-7 px-2" hlmTooltip="Board" position="bottom">
               <svg [lucideIcon]="boardIcon" [size]="14"></svg>
             </button>
+            @if (supportsTimeline()) {
+              <button hlmToggleGroupItem value="timeline" aria-label="Timeline" class="h-7 px-2" hlmTooltip="Timeline" position="bottom">
+                <svg [lucideIcon]="timelineIcon" [size]="14"></svg>
+              </button>
+            }
           </hlm-toggle-group>
         </span>
 
@@ -350,6 +358,9 @@ interface ViewGroup {
                     @case ('issue') {
                       <app-issue-card [issue]="asIssue(item)" [focused]="ui.focusedRowId() === item.id" />
                     }
+                    @case ('project') {
+                      <app-view-project-card [project]="asProject(item)" [focused]="ui.focusedRowId() === item.id" />
+                    }
                     @default {
                       @let d = asDecision(item);
                       <a
@@ -373,6 +384,8 @@ interface ViewGroup {
             </section>
           }
         </div>
+      } @else if (layout() === 'timeline') {
+        <app-timeline-view [entity]="v.entity === 'project' ? 'project' : 'workstream'" [groups]="groups()" [grouped]="grouped()" />
       } @else {
         <div class="min-h-0 flex-1 overflow-y-auto">
           @for (g of groups(); track g.key) {
@@ -390,6 +403,9 @@ interface ViewGroup {
                 }
                 @case ('issue') {
                   <app-issue-row [issue]="asIssue(item)" [focused]="ui.focusedRowId() === item.id" />
+                }
+                @case ('project') {
+                  <app-view-project-row [project]="asProject(item)" [focused]="ui.focusedRowId() === item.id" />
                 }
                 @default {
                   @let d = asDecision(item);
@@ -421,6 +437,8 @@ interface ViewGroup {
           <app-priority-icon [priority]="g.priority" />
         } @else if (g.actor) {
           <app-actor-avatar [actor]="g.actor" [size]="16" />
+        } @else if (g.color) {
+          <span class="size-2 shrink-0 rounded-full" [style.background]="g.color"></span>
         }
       </ng-template>
     } @else {
@@ -450,6 +468,7 @@ export class ViewDetailPage {
   protected readonly lockIcon = LucideLock;
   protected readonly listIcon = LucideList;
   protected readonly boardIcon = LucideKanban;
+  protected readonly timelineIcon = LucideChartGantt;
   protected readonly xIcon = LucideX;
   protected readonly plusIcon = LucidePlus;
   protected readonly filterIcon = LucideListFilter;
@@ -470,19 +489,34 @@ export class ViewDetailPage {
   protected readonly entityIcon = computed(() => ENTITY_ICON[this.view()?.entity ?? 'workstream']);
   protected readonly entityLabel = computed(() => ENTITY_LABEL[this.view()?.entity ?? 'workstream']);
   protected readonly statusEntity = computed(() => STATUS_ENTITY[this.view()?.entity ?? 'workstream']);
-  protected readonly layout = computed<'list' | 'board'>(() => (this.view()?.layout === 'board' ? 'board' : 'list'));
+  /** Workstreams and projects have dates, so they can be drawn as a timeline. */
+  protected readonly supportsTimeline = computed(() => {
+    const e = this.view()?.entity;
+    return e === 'workstream' || e === 'project';
+  });
+  protected readonly layout = computed<PageLayout>(() => {
+    const l = this.view()?.layout;
+    if (l === 'board') return 'board';
+    return l === 'timeline' && this.supportsTimeline() ? 'timeline' : 'list';
+  });
 
   /** Fields a user added via "+ Filter" that have no values yet (not persisted). */
   private readonly pending = signal<string[]>([]);
 
   // ── query ──
+  /** An issue's project filter / grouping also counts the projects of its workstreams. */
+  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById() }));
   protected readonly rows = computed<Queryable[]>(() => {
     const v = this.view();
     if (!v) return [];
-    const spec = { filters: v.filters, sort: v.sort };
-    if (v.entity === 'workstream') return queryItems('workstream', this.store.workstreams(), spec);
-    if (v.entity === 'issue') return queryItems('issue', this.store.issues(), spec);
-    return queryItems('decision', this.store.decisions(), spec);
+    // A timeline reads left to right: without an explicit order, earliest start first.
+    const sort = v.sort ?? (this.layout() === 'timeline' ? { field: 'startDate', direction: 'asc' as const } : undefined);
+    const spec = { filters: v.filters, sort };
+    const ctx = this.queryCtx();
+    if (v.entity === 'workstream') return queryItems('workstream', this.store.workstreams(), spec, ctx);
+    if (v.entity === 'issue') return queryItems('issue', this.store.issues(), spec, ctx);
+    if (v.entity === 'project') return queryItems('project', this.store.projects(), spec, ctx);
+    return queryItems('decision', this.store.decisions(), spec, ctx);
   });
 
   /** Board always groups (default status); list groups only when `groupBy` is set. */
@@ -500,7 +534,7 @@ export class ViewDetailPage {
     if (!field) return [{ key: '__all', label: '', items: this.rows() }];
     const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
     const include = this.layout() === 'board' && def?.kind === 'enum' ? def.values : undefined;
-    const raw = groupItems(v.entity, this.rows() as never[], field, {}, include) as { key: string; items: Queryable[] }[];
+    const raw = groupItems(v.entity, this.rows() as never[], field, this.queryCtx(), include) as { key: string; items: Queryable[] }[];
     return raw.map((g) => {
       const glyph = valueGlyph(v.entity, field, g.key, this.store);
       return {
@@ -509,6 +543,7 @@ export class ViewDetailPage {
         status: glyph.status,
         priority: field === 'priority' && g.key ? (g.key as Priority) : undefined,
         actor: glyph.actor?.id ? { type: glyph.actor.type as 'team' | 'user', id: glyph.actor.id } : undefined,
+        color: valueColor(v.entity, field, g.key),
         items: g.items,
       };
     });
@@ -591,6 +626,9 @@ export class ViewDetailPage {
   protected asDecision(item: Queryable): Decision {
     return item as Decision;
   }
+  protected asProject(item: Queryable): Project {
+    return item as Project;
+  }
 
   // ── edits (persisted immediately) ──
   private patch(p: Parameters<NablaStore['updateView']>[1]): void {
@@ -607,7 +645,7 @@ export class ViewDetailPage {
     this.notifier.success(v.shared ? 'View is now private' : 'View shared with the workspace');
   }
   protected setLayout(value: unknown): void {
-    const next: ViewLayout = value === 'board' ? 'board' : 'list';
+    const next: ViewLayout = value === 'board' ? 'board' : value === 'timeline' && this.supportsTimeline() ? 'timeline' : 'list';
     if (!value || next === this.layout()) return;
     this.patch({ layout: next });
   }

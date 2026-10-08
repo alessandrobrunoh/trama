@@ -2,9 +2,11 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { LucideArrowRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
+import { NablaStore } from '../../core';
 import { KeyChip } from '../../shared/key-chip';
 import { StatusIcon } from '../../shared/status';
 import { MilestoneIcon } from '../milestones/milestone-icon';
+import { timelineViewLink } from '../views/view-model';
 import { HEALTH_VIEW, OverviewModel } from './overview-model';
 
 /**
@@ -54,7 +56,7 @@ import { HEALTH_VIEW, OverviewModel } from './overview-model';
         <header class="mb-1 flex items-baseline gap-3 border-b pb-2">
           <h2 id="ov-next" class="text-sm font-medium">Next 14 days</h2>
           <span class="flex-1"></span>
-          <a [routerLink]="['/', m.slug(), 'timeline']" class="text-meta hover:text-foreground inline-flex items-center gap-1">
+          <a [routerLink]="timelineLink()" class="text-meta hover:text-foreground inline-flex items-center gap-1">
             Timeline <svg [lucideIcon]="arrow" [size]="12"></svg>
           </a>
         </header>
@@ -91,7 +93,7 @@ import { HEALTH_VIEW, OverviewModel } from './overview-model';
           }
         </ul>
         @if (m.upcomingMore() > 0) {
-          <a [routerLink]="['/', m.slug(), 'timeline']" class="text-meta hover:text-foreground mt-1 inline-flex items-center gap-1">
+          <a [routerLink]="timelineLink()" class="text-meta hover:text-foreground mt-1 inline-flex items-center gap-1">
             {{ m.upcomingMore() }} more on the timeline <svg [lucideIcon]="arrow" [size]="12"></svg>
           </a>
         }
@@ -101,6 +103,8 @@ import { HEALTH_VIEW, OverviewModel } from './overview-model';
 })
 export class OverviewUpcoming {
   protected readonly m = inject(OverviewModel);
+  private readonly store = inject(NablaStore);
+  protected readonly timelineLink = computed(() => timelineViewLink(this.store));
   protected readonly health = HEALTH_VIEW;
   protected readonly arrow = LucideArrowRight;
   protected readonly riskTop = computed(() => this.m.atRiskRows().slice(0, 5));

@@ -9,6 +9,7 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
+  ProjectUpdateEntity,
   RepositoryEntity,
   TeamEntity,
   WorkstreamEntity,
@@ -88,7 +89,7 @@ export class RefsService {
       }
       case 'artifact': {
         const r = await db.getRepository(ArtifactEntity).findOne({ where, select: { id: true, workstreamId: true } });
-        return { exists: !!r, workstreamId: r?.workstreamId };
+        return { exists: !!r, workstreamId: r?.workstreamId ?? undefined };
       }
       case 'input_request': {
         const r = await db.getRepository(InputRequestEntity).findOne({ where, select: { id: true, workstreamId: true } });
@@ -109,6 +110,8 @@ export class RefsService {
         return { exists: await db.getRepository(TeamEntity).existsBy(where) };
       case 'project':
         return { exists: await db.getRepository(ProjectEntity).existsBy(where) };
+      case 'project_update':
+        return { exists: await db.getRepository(ProjectUpdateEntity).existsBy(where) };
     }
   }
 }

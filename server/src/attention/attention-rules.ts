@@ -39,7 +39,8 @@ export interface AInputRequest {
 }
 export interface AArtifact {
   id: string;
-  workstreamId: string;
+  /** Artifacts of a project or an issue only have no workstream: nothing to flag on a workstream. */
+  workstreamId: string | null;
   kind: ArtifactKind;
   title: string;
   externalId?: string | null;
@@ -195,7 +196,7 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
 
   // artifact based kinds
   for (const a of d.artifacts) {
-    const w = wsById.get(a.workstreamId);
+    const w = a.workstreamId ? wsById.get(a.workstreamId) : undefined;
     if (!w || !liveIds.has(w.id) || !isOpenPr(a)) continue;
     const label = a.externalId ? `${a.title} (${a.externalId})` : a.title;
     const base = { workstreamId: w.id, artifactId: a.id };

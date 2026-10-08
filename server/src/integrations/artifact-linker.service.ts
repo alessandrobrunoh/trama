@@ -67,7 +67,7 @@ export class ArtifactLinkerService {
     ];
     const artifactRepo = this.ds.getRepository(ArtifactEntity);
     const existing = await artifactRepo.findBy({ workspaceId, repositoryId: repo.id, kind: c.kind, externalId: c.externalId });
-    const byWorkstream = new Map(existing.map((a) => [a.workstreamId, a]));
+    const byWorkstream = new Map(existing.flatMap((a) => (a.workstreamId ? [[a.workstreamId, a] as const] : [])));
     const targets = new Set<string>([...keys.map((k) => keyMap.get(k)!), ...byWorkstream.keys()]);
     const result: LinkResult = { created: 0, updated: 0, workstreamKeys: keys };
 

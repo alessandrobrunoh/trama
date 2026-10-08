@@ -35,7 +35,7 @@ describe('MilestonesToProjects migration', () => {
     await admin.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
     await admin.query(`CREATE DATABASE "${dbName}"`);
     await admin.end();
-    ds = new DataSource({ type: 'postgres', url: url.toString(), migrations: MIGRATIONS.slice(0, -1), migrationsRun: false });
+    ds = new DataSource({ type: 'postgres', url: url.toString(), migrations: MIGRATIONS.slice(0, MIGRATIONS.indexOf(MilestonesToProjects1792500000000)), migrationsRun: false });
     await ds.initialize();
     await ds.runMigrations();
   });

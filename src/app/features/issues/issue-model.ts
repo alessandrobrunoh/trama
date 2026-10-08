@@ -146,10 +146,10 @@ export function tabStatuses(tab: IssueViewTab): readonly IssueStatus[] | null {
 
 export type IssueLayout = 'list' | 'board';
 export type IssueGroup =
-  'status' | 'kind' | 'priority' | 'teamId' | 'assigneeId' | 'workstreamIds' | 'none';
+  'status' | 'kind' | 'priority' | 'teamId' | 'assigneeId' | 'workstreamIds' | 'projectId' | 'none';
 export type IssueSort = 'updatedAt' | 'createdAt' | 'priority' | 'status' | 'key' | 'title';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'workstreams' | 'team' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'workstreams' | 'project' | 'team' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -168,6 +168,7 @@ export const GROUPS: readonly IssueGroup[] = [
   'teamId',
   'assigneeId',
   'workstreamIds',
+  'projectId',
   'none',
 ];
 export const SORTS: readonly IssueSort[] = [
@@ -178,7 +179,7 @@ export const SORTS: readonly IssueSort[] = [
   'key',
   'title',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'team', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'project', 'team', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
@@ -187,6 +188,7 @@ export const GROUP_LABEL: Record<IssueGroup, string> = {
   teamId: 'Team',
   assigneeId: 'Assignee',
   workstreamIds: 'Workstream',
+  projectId: 'Project',
   none: 'No grouping',
 };
 export const SORT_LABEL: Record<IssueSort, string> = {
@@ -200,6 +202,7 @@ export const SORT_LABEL: Record<IssueSort, string> = {
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
   workstreams: 'Workstreams',
+  project: 'Project',
   team: 'Team',
   assignee: 'Assignee',
   date: 'Date',
@@ -255,6 +258,11 @@ export function groupUniverse(store: NablaStore, group: IssueGroup): string[] | 
         .workstreams()
         .filter(isOpenWorkstream)
         .map((w) => w.id);
+    case 'projectId':
+      return store
+        .projects()
+        .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
+        .map((p) => p.id);
     default:
       return undefined;
   }
@@ -274,7 +282,20 @@ export function groupLabel(store: NablaStore, group: IssueGroup, key: string): s
       return key ? (store.getUser(key)?.name ?? 'Unknown') : 'Unassigned';
     case 'workstreamIds':
       return key ? (store.getWorkstream(key)?.title ?? 'Unknown workstream') : 'No workstream';
+    case 'projectId':
+      return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
     default:
       return 'Issues';
   }
+}
+
+/** Milestones as filter options; the hint is the project they belong to. */
+export function milestoneFilterOptions(store: NablaStore): PickOption[] {
+  return store
+    .milestones()
+    .map((m) => {
+      const hint = store.getProject(m.projectId)?.name ?? '';
+      return { value: m.id, label: m.name, hint, search: `${hint} ${m.name}` };
+    })
+    .sort((a, b) => a.hint.localeCompare(b.hint) || a.label.localeCompare(b.label));
 }

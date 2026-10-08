@@ -307,7 +307,7 @@ export class GraphNodeDetail {
   protected readonly parentWs = computed(() => {
     const n = this.node();
     if (n.kind === 'workstream') return undefined;
-    return this.store.workstreamById().get(n.entity.workstreamId);
+    return n.entity.workstreamId ? this.store.workstreamById().get(n.entity.workstreamId) : undefined;
   });
   protected readonly artifactRepo = computed(() => {
     const id = this.art().repositoryId;

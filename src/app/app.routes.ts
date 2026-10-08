@@ -154,11 +154,8 @@ export const routes: Routes = [
             (m) => m.WorkstreamDetailPage,
           ),
       },
-      {
-        path: 'timeline',
-        title: 'Timeline · Trama',
-        loadComponent: () => import('./features/timeline/timeline-page').then((m) => m.TimelinePage),
-      },
+      // The timeline is a layout of saved views now (views/:id with layout "timeline"); keep old links working.
+      { path: 'timeline', pathMatch: 'full', redirectTo: 'views' },
       {
         path: 'graph',
         title: 'Graph · Trama',

@@ -111,7 +111,7 @@ export class SearchService {
   /** Instant fuzzy search over everything already in the snapshot. */
   local(q: string, perType = 6, only?: HitType): SearchHit[] {
     const s = this.store;
-    const wsKey = (id: string) => s.workstreamById().get(id)?.key;
+    const wsKey = (id: string | undefined) => (id ? s.workstreamById().get(id)?.key : undefined);
     const scored: { hit: SearchHit; score: number }[] = [];
     const push = (hit: SearchHit, text: string, extra = '') => {
       if (only && hit.type !== only) return;
@@ -154,13 +154,19 @@ export class SearchService {
       case 'team':
         return ['teams', h.key ?? h.id];
       case 'artifact': {
-        const key = h.workstreamKey ?? this.store.workstreamById().get(this.store.artifactById().get(h.id)?.workstreamId ?? '')?.key;
-        return key ? ['workstreams', key] : ['workstreams'];
+        const a = this.store.artifactById().get(h.id);
+        const key = h.workstreamKey ?? this.store.getWorkstream(a?.workstreamId)?.key;
+        if (key) return ['workstreams', key];
+        const issue = this.store.getIssue(a?.issueId);
+        if (issue) return ['issues', issue.key];
+        return a?.projectId ? ['projects', a.projectId] : ['workstreams'];
       }
     }
   }
 
   queryParams(h: SearchHit): Record<string, string> | undefined {
-    return h.type === 'artifact' ? { tab: 'artifacts' } : undefined;
+    if (h.type !== 'artifact') return undefined;
+    const a = this.store.artifactById().get(h.id);
+    return a?.workstreamId || h.workstreamKey ? { tab: 'artifacts' } : undefined;
   }
 }

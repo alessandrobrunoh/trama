@@ -39,6 +39,7 @@ const KIND_STATES: Record<ArtifactKind, ArtifactState[]> = {
   test_report: ['pending', 'running', 'succeeded', 'failed'],
   deployment: ['pending', 'running', 'healthy', 'degraded', 'failed'],
   release: ['draft', 'published'],
+  link: ['draft', 'published'],
 };
 const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'bitbucket', 'delta', 'figma', 'docs', 'ci', 'other'];
 const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {

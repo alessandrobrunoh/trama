@@ -11,13 +11,17 @@ import type {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { ArtifactEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ArtifactEntity, IssueEntity, ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
+/** `null` detaches an owner (PATCH); `undefined` leaves it alone. */
 export interface ArtifactInput {
-  workstreamId?: string;
+  workstreamId?: string | null;
+  projectId?: string | null;
+  issueId?: string | null;
   repositoryId?: string | null;
+  description?: string | null;
   kind?: ArtifactKind;
   provider?: ArtifactProvider;
   title?: string;
@@ -30,11 +34,21 @@ export interface ArtifactInput {
   environment?: string | null;
 }
 
+export interface ArtifactFilter {
+  workstreamId?: string;
+  projectId?: string;
+  issueId?: string;
+  repositoryId?: string;
+  kind?: ArtifactKind;
+  state?: ArtifactState;
+}
+
 /** Initial state when none is given. */
 const DEFAULT_STATE: Record<ArtifactKind, ArtifactState> = {
   pull_request: 'open',
   merge_request: 'open',
   document: 'published',
+  link: 'published',
   design: 'published',
   image: 'published',
   file: 'published',
@@ -43,6 +57,28 @@ const DEFAULT_STATE: Record<ArtifactKind, ArtifactState> = {
   deployment: 'pending',
   release: 'published',
 };
+
+const ISSUE_KEY_RE = /^[A-Za-z]+-\d+$/;
+
+/** A `link` artifact must point to a http(s) URL. */
+export function isHttpUrl(value: string | null | undefined): boolean {
+  if (!value) return false;
+  try {
+    const u = new URL(value);
+    return u.protocol === 'http:' || u.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+/** The owner ids of an artifact row (only the ones that are set). */
+export function artifactOwners(row: Pick<ArtifactEntity, 'workstreamId' | 'projectId' | 'issueId'>) {
+  return {
+    ...(row.workstreamId ? { workstreamId: row.workstreamId } : {}),
+    ...(row.projectId ? { projectId: row.projectId } : {}),
+    ...(row.issueId ? { issueId: row.issueId } : {}),
+  };
+}
 
 @Injectable()
 export class ArtifactsService {
@@ -54,9 +90,11 @@ export class ArtifactsService {
     @InjectRepository(ArtifactEntity) private readonly repo: Repository<ArtifactEntity>,
   ) {}
 
-  list(workspaceId: string, f: { workstreamId?: string; repositoryId?: string; kind?: ArtifactKind; state?: ArtifactState } = {}) {
+  list(workspaceId: string, f: ArtifactFilter = {}) {
     const qb = this.repo.createQueryBuilder('a').where('a.workspaceId = :workspaceId', { workspaceId }).orderBy('a.createdAt', 'DESC');
     if (f.workstreamId) qb.andWhere('a.workstreamId = :w', { w: f.workstreamId });
+    if (f.projectId) qb.andWhere('a.projectId = :p', { p: f.projectId });
+    if (f.issueId) qb.andWhere('a.issueId = :i', { i: f.issueId });
     if (f.repositoryId) qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
@@ -69,21 +107,78 @@ export class ArtifactsService {
     return row;
   }
 
-  private async validate(workspaceId: string, input: ArtifactInput) {
-    if (input.repositoryId) await this.refs.repositories(workspaceId, [input.repositoryId]);
+  /** Resolves a workstream by id or key; 404 when unknown. */
+  async resolveWorkstreamId(workspaceId: string, idOrKey: string): Promise<string> {
+    const repo = this.ds.getRepository(WorkstreamEntity);
+    const row = /^[A-Za-z][A-Za-z0-9]*-\d+$/.test(idOrKey)
+      ? await repo.findOne({ where: { workspaceId, key: idOrKey.toUpperCase() }, select: { id: true } })
+      : await repo.findOne({ where: { workspaceId, id: idOrKey }, select: { id: true } });
+    if (!row) throw notFound('Workstream', idOrKey);
+    return row.id;
   }
 
-  async create(workspaceId: string, actor: ActorRef, input: ArtifactInput & { workstreamId: string; kind: ArtifactKind; title: string }) {
-    if (!(await this.ds.getRepository(WorkstreamEntity).existsBy({ id: input.workstreamId, workspaceId })))
-      throw new BadRequestException(`Unknown workstream "${input.workstreamId}"`);
+  /** 404 when the project does not exist in the workspace. */
+  async assertProject(workspaceId: string, projectId: string): Promise<void> {
+    if (!(await this.ds.getRepository(ProjectEntity).existsBy({ id: projectId, workspaceId })))
+      throw notFound('Project', projectId);
+  }
+
+  /** Resolves an issue by id, key (`BUG-12`) or alias; 404 when unknown. */
+  async resolveIssueId(workspaceId: string, idOrKey: string): Promise<string> {
+    const repo = this.ds.getRepository(IssueEntity);
+    let row: IssueEntity | null = null;
+    if (ISSUE_KEY_RE.test(idOrKey)) {
+      const key = idOrKey.toUpperCase();
+      row =
+        (await repo.findOne({ where: { workspaceId, key }, select: { id: true } })) ??
+        (await repo
+          .createQueryBuilder('i')
+          .select('i.id')
+          .where('i.workspaceId = :workspaceId', { workspaceId })
+          .andWhere('i.aliases @> :a::jsonb', { a: JSON.stringify([key]) })
+          .getOne());
+    } else {
+      row = await repo.findOne({ where: { workspaceId, id: idOrKey }, select: { id: true } });
+    }
+    if (!row) throw notFound('Issue', idOrKey);
+    return row.id;
+  }
+
+  /** Every referenced owner must exist in the workspace. */
+  private async validateOwners(workspaceId: string, o: { workstreamId?: string | null; projectId?: string | null; issueId?: string | null }) {
+    if (o.workstreamId) await this.refs.workstreams(workspaceId, [o.workstreamId]);
+    if (o.projectId && !(await this.ds.getRepository(ProjectEntity).existsBy({ id: o.projectId, workspaceId })))
+      throw new BadRequestException(`Unknown project "${o.projectId}"`);
+    if (o.issueId && !(await this.ds.getRepository(IssueEntity).existsBy({ id: o.issueId, workspaceId })))
+      throw new BadRequestException(`Unknown issue "${o.issueId}"`);
+  }
+
+  private async validate(workspaceId: string, input: ArtifactInput) {
+    if (input.repositoryId) await this.refs.repositories(workspaceId, [input.repositoryId]);
+    await this.validateOwners(workspaceId, input);
+  }
+
+  /** Every artifact url is http(s) (never `javascript:`, `data:`…); a `link` must have one. */
+  private assertLinkUrl(kind: ArtifactKind, url: string | null | undefined) {
+    if (kind === 'link' && !url) throw new BadRequestException('A link artifact needs a valid http(s) url');
+    if (url && !isHttpUrl(url)) throw new BadRequestException('An artifact url must be a valid http(s) url');
+  }
+
+  async create(workspaceId: string, actor: ActorRef, input: ArtifactInput & { kind: ArtifactKind; title: string }) {
+    if (!input.workstreamId && !input.projectId && !input.issueId)
+      throw new BadRequestException('An artifact needs at least one owner: workstreamId, projectId or issueId');
+    this.assertLinkUrl(input.kind, input.url);
     await this.validate(workspaceId, input);
     const isPr = input.kind === 'pull_request' || input.kind === 'merge_request';
     const row = await this.repo.save(
       this.repo.create({
         id: uid('ar'),
         workspaceId,
-        workstreamId: input.workstreamId,
+        workstreamId: input.workstreamId ?? null,
+        projectId: input.projectId ?? null,
+        issueId: input.issueId ?? null,
         repositoryId: input.repositoryId ?? null,
+        description: input.description?.trim() || null,
         kind: input.kind,
         provider: input.provider ?? (input.kind === 'merge_request' ? 'gitlab' : input.kind === 'pull_request' ? 'github' : 'other'),
         title: input.title.trim(),
@@ -102,11 +197,11 @@ export class ArtifactsService {
       actor,
       type: 'artifact.attached',
       subject: { type: 'artifact', id: row.id },
-      workstreamId: row.workstreamId,
-      data: { kind: row.kind, title: row.title, externalId: row.externalId, state: row.state },
+      workstreamId: row.workstreamId ?? undefined,
+      data: { kind: row.kind, title: row.title, externalId: row.externalId, state: row.state, ...artifactOwners(row) },
     });
     if (row.review === 'requested') await this.reviewRequested(row, actor);
-    await this.bus.touch(workspaceId, row.workstreamId, 'artifact.attached');
+    if (row.workstreamId) await this.bus.touch(workspaceId, row.workstreamId, 'artifact.attached');
     return row;
   }
 
@@ -117,8 +212,8 @@ export class ArtifactsService {
         actor,
         type: 'review.requested',
         subject: { type: 'artifact', id: row.id },
-        workstreamId: row.workstreamId,
-        data: { title: row.title, externalId: row.externalId },
+        workstreamId: row.workstreamId ?? undefined,
+        data: { title: row.title, externalId: row.externalId, ...artifactOwners(row) },
       },
       false,
     );
@@ -126,6 +221,7 @@ export class ArtifactsService {
 
   async update(workspaceId: string, actor: ActorRef, id: string, patch: ArtifactInput) {
     const row = await this.get(workspaceId, id);
+    const before = artifactOwners(row);
     await this.validate(workspaceId, patch);
     const fields: string[] = [];
     const changes: Record<string, [unknown, unknown]> = {};
@@ -137,9 +233,13 @@ export class ArtifactsService {
       }
     };
     if (patch.title !== undefined) set('title', patch.title.trim());
-    for (const k of ['repositoryId', 'provider', 'url', 'externalId', 'state', 'ci', 'review', 'hasConflicts', 'environment'] as const)
+    if (patch.description !== undefined) set('description', patch.description?.trim() || null);
+    for (const k of ['workstreamId', 'projectId', 'issueId', 'repositoryId', 'provider', 'url', 'externalId', 'state', 'ci', 'review', 'hasConflicts', 'environment'] as const)
       set(k, patch[k]);
     if (!fields.length) return row;
+    if (!row.workstreamId && !row.projectId && !row.issueId)
+      throw new BadRequestException('An artifact needs at least one owner: workstreamId, projectId or issueId');
+    this.assertLinkUrl(row.kind, row.url);
     row.updatedAt = new Date();
     await this.repo.save(row);
     await this.events.record({
@@ -147,11 +247,13 @@ export class ArtifactsService {
       actor,
       type: 'artifact.updated',
       subject: { type: 'artifact', id },
-      workstreamId: row.workstreamId,
-      data: { title: row.title, externalId: row.externalId, changes },
+      workstreamId: row.workstreamId ?? undefined,
+      data: { title: row.title, externalId: row.externalId, ...artifactOwners(row), changes },
     });
     if (changes.review && row.review === 'requested') await this.reviewRequested(row, actor);
-    await this.bus.touch(workspaceId, row.workstreamId, 'artifact.updated');
+    // Both the workstream it left and the one it joined care about the change.
+    const touched = new Set([before.workstreamId, row.workstreamId].filter((w): w is string => !!w));
+    for (const w of touched) await this.bus.touch(workspaceId, w, 'artifact.updated');
     return row;
   }
 
@@ -164,9 +266,9 @@ export class ArtifactsService {
       actor,
       type: 'artifact.deleted',
       subject: { type: 'artifact', id },
-      workstreamId: row.workstreamId,
-      data: { title: row.title },
+      workstreamId: row.workstreamId ?? undefined,
+      data: { title: row.title, ...artifactOwners(row) },
     });
-    await this.bus.touch(workspaceId, row.workstreamId, 'artifact.deleted');
+    if (row.workstreamId) await this.bus.touch(workspaceId, row.workstreamId, 'artifact.deleted');
   }
 }

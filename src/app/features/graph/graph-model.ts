@@ -95,7 +95,7 @@ export function buildExecutionGraph(src: GraphSource, opts: GraphOptions = {}): 
   }
   if (includeArtifacts) {
     for (const a of src.artifacts) {
-      if (!selected.has(a.workstreamId)) continue;
+      if (!a.workstreamId || !selected.has(a.workstreamId)) continue;
       nodes.set(a.id, { kind: 'artifact', id: a.id, entity: a });
       addEdge(a.workstreamId, a.id, 'contains');
     }

@@ -46,6 +46,9 @@ const OVERRIDES: &[(&str, &str, &str)] = &[
     ("change_member_role", "member", "set-role"),
     ("get_workstream_context", "workstream", "context"),
     ("get_workstream_graph", "workstream", "graph"),
+    ("get_project_context", "project", "context"),
+    ("list_project_artifacts", "project", "artifacts"),
+    ("list_issue_artifacts", "issue", "artifacts"),
     ("list_webhook_deliveries", "outgoing-webhook", "deliveries"),
 ];
 
@@ -56,12 +59,16 @@ const GROUP_ABOUT: &[(&str, &str)] = &[
     ("workstream", "Units of work an AI/human team ships"),
     ("member", "Workspace members and their roles"),
     ("team", "Teams and their keys"),
+    ("project-update", "Status updates (health + write-up) posted on a project"),
     ("token", "API tokens (never their secrets)"),
     ("event", "Activity log of every change"),
 ];
 
 /// Short names people actually type.
 const GROUP_ALIASES: &[(&str, &str)] = &[("workstream", "ws"), ("repository", "repo"), ("outgoing-webhook", "webhook")];
+
+/// Extra verbs for commands people already have a word for: `(group, verb, alias)`.
+const VERB_ALIASES: &[(&str, &str, &str)] = &[("project-update", "create", "post"), ("project-update", "update", "edit"), ("artifact", "create", "add")];
 
 fn singular(word: &str) -> String {
     if let Some(stem) = word.strip_suffix("ies") {
@@ -156,6 +163,9 @@ impl Registry {
                         "delete" => sub.visible_alias("rm"),
                         _ => sub,
                     };
+                    if let Some((_, _, alias)) = VERB_ALIASES.iter().find(|(g, v, _)| *g == group && *v == verb) {
+                        sub = sub.visible_alias(*alias);
+                    }
                     cmd = cmd.subcommand(sub);
                 }
                 cmd

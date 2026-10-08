@@ -121,6 +121,8 @@ export class LiveSync {
       if (!event || event.type === 'ping' || event.type === 'hello') return;
       if (event.clientId && event.clientId === CLIENT_ID) return;
       this.incoming.next(event as LiveEvent);
+      // On-demand project data (updates feeds, /context) is not part of the snapshot.
+      if (event.entity) this.nabla.handleLiveEvent({ entity: event.entity, type: event.type as LiveEvent['type'] });
       // Favorites and notifications belong to one person: they never change the workspace snapshot.
       if (event.entity !== 'favorite' && event.entity !== 'notification') this.nabla.scheduleRefetch(EVENT_REFETCH_DEBOUNCE_MS);
     };

@@ -22,6 +22,7 @@ import { MailModule } from './mail/mail.module.js';
 import { MilestonesModule } from './milestones/milestones.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { ProjectUpdatesModule } from './project-updates/project-updates.module.js';
 import { RepositoriesModule } from './repositories/repositories.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
@@ -47,6 +48,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     TeamsModule,
     RepositoriesModule,
     ProjectsModule,
+    ProjectUpdatesModule,
     WorkstreamsModule,
     InputRequestsModule,
     IssuesModule,

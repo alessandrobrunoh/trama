@@ -1,15 +1,19 @@
 // Pure helpers for saved views: value labels, picker options per field, filter descriptions.
-import { LucideCircle, LucideHexagon, LucideScale, type LucideIcon } from '@lucide/angular';
+import { LucideBox, LucideCircle, LucideHexagon, LucideScale, type LucideIcon } from '@lucide/angular';
 import {
   DECISION_STATUS_META,
   FIELD_DEFS,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
+  PROJECT_HEALTH_META,
+  PROJECT_STATUS_META,
   WORKSTREAM_STATUS_META,
   type ActorRef,
   type FieldDef,
   type NablaStore,
+  type Priority,
+  type Queryable,
   type SavedView,
   type ViewEntity,
   type ViewFilter,
@@ -17,10 +21,23 @@ import {
 import type { AnyStatus, StatusEntity } from '../../shared/status';
 import type { PickOption } from './option-controls';
 
+/** One group of a view (a list section, a board column, or a timeline band). */
+export interface ViewGroup {
+  key: string;
+  label: string;
+  status?: AnyStatus;
+  priority?: Priority;
+  actor?: { type: 'team' | 'user'; id: string };
+  /** CSS colour of a leading dot (project status / health). */
+  color?: string;
+  items: Queryable[];
+}
+
 export const ENTITY_LABEL: Record<ViewEntity, string> = {
   workstream: 'Workstreams',
   issue: 'Issues',
   decision: 'Decisions',
+  project: 'Projects',
 };
 
 /** Hexagon = workstreams (outcomes), circle = issues (demand), scale = decisions. */
@@ -28,12 +45,14 @@ export const ENTITY_ICON: Record<ViewEntity, LucideIcon> = {
   workstream: LucideHexagon,
   issue: LucideCircle,
   decision: LucideScale,
+  project: LucideBox,
 };
 
 export const STATUS_ENTITY: Record<ViewEntity, StatusEntity> = {
   workstream: 'workstream',
   issue: 'issue',
   decision: 'other',
+  project: 'other',
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -57,9 +76,16 @@ export function fieldLabel(entity: ViewEntity, field: string): string {
 function enumLabel(entity: ViewEntity, field: string, value: string): string | undefined {
   if (field === 'status') {
     const t =
-      entity === 'workstream' ? WORKSTREAM_STATUS_META : entity === 'issue' ? ISSUE_STATUS_META : DECISION_STATUS_META;
+      entity === 'workstream'
+        ? WORKSTREAM_STATUS_META
+        : entity === 'issue'
+          ? ISSUE_STATUS_META
+          : entity === 'project'
+            ? PROJECT_STATUS_META
+            : DECISION_STATUS_META;
     return (t as Record<string, { label: string }>)[value]?.label;
   }
+  if (field === 'health') return PROJECT_HEALTH_META[value as keyof typeof PROJECT_HEALTH_META]?.label;
   if (field === 'priority') return PRIORITY_META[value as keyof typeof PRIORITY_META]?.label;
   if (field === 'kind') return ISSUE_KIND_META[value as keyof typeof ISSUE_KIND_META]?.label;
   if (field === 'source') return SOURCE_LABEL[value];
@@ -80,6 +106,10 @@ export function valueLabel(store: NablaStore, entity: ViewEntity, field: string,
       return store.getRepository(value)?.fullName ?? value;
     case 'project':
       return store.getProject(value)?.name ?? value;
+    case 'milestone': {
+      const m = store.getMilestone(value);
+      return m ? m.name : value;
+    }
     case 'workstream': {
       const w = store.getWorkstream(value);
       return w ? `${w.key} ${w.title}` : value;
@@ -96,6 +126,8 @@ export function valueGlyph(
   store: NablaStore,
 ): { status?: AnyStatus; statusEntity?: StatusEntity; actor?: ActorRef } {
   if (!value) return {};
+  // Project statuses have their own coloured dot (see valueDot), not a status glyph.
+  if (entity === 'project' && field === 'status') return {};
   if (field === 'status') return { status: value as AnyStatus, statusEntity: STATUS_ENTITY[entity] };
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (def?.refersTo === 'team') return { actor: { type: 'team', id: value } };
@@ -107,6 +139,28 @@ export function valueGlyph(
   return {};
 }
 
+const PROJECT_STATUS_COLOR: Record<string, string> = {
+  backlog: 'var(--status-draft)',
+  planned: 'var(--status-planned)',
+  in_progress: 'var(--status-working)',
+  paused: 'var(--status-needs-input)',
+  completed: 'var(--status-shipped)',
+  canceled: 'var(--status-draft)',
+};
+const PROJECT_HEALTH_COLOR: Record<string, string> = {
+  on_track: 'var(--status-shipped)',
+  at_risk: 'var(--status-needs-input)',
+  off_track: 'var(--status-blocked)',
+};
+
+/** CSS colour of the dot that marks a project status / health value (undefined for every other field). */
+export function valueColor(entity: ViewEntity, field: string, value: string): string | undefined {
+  if (!value || entity !== 'project') return undefined;
+  if (field === 'status') return PROJECT_STATUS_COLOR[value];
+  if (field === 'health') return PROJECT_HEALTH_COLOR[value];
+  return undefined;
+}
+
 /** All selectable values for a filterable field. */
 export function fieldOptions(store: NablaStore, entity: ViewEntity, field: string): PickOption[] {
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
@@ -115,6 +169,7 @@ export function fieldOptions(store: NablaStore, entity: ViewEntity, field: strin
     value,
     label: valueLabel(store, entity, field, value),
     ...valueGlyph(entity, field, value, store),
+    color: valueColor(entity, field, value),
     ...extra,
   });
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));
@@ -136,6 +191,8 @@ export function fieldOptions(store: NablaStore, entity: ViewEntity, field: strin
       return [...none, ...store.projects().map((p) => opt(p.id))];
     case 'workstream':
       return [...none, ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true }))];
+    case 'milestone':
+      return store.milestones().map((m) => opt(m.id, { hint: store.getProject(m.projectId)?.name }));
   }
   return none;
 }
@@ -166,4 +223,12 @@ export function describeFilter(store: NablaStore, entity: ViewEntity, f: ViewFil
 export function describeFilters(store: NablaStore, view: SavedView): string {
   if (!view.filters.length) return 'No filters';
   return view.filters.map((f) => describeFilter(store, view.entity, f)).join(' · ');
+}
+
+/** Router commands to the workspace's timeline: its first timeline view (workstreams first), else the views list. */
+export function timelineViewLink(store: NablaStore): string[] {
+  const views = store.views();
+  const view = views.find((v) => v.layout === 'timeline' && v.entity === 'workstream') ?? views.find((v) => v.layout === 'timeline');
+  const base = ['/', store.slug() ?? '', 'views'];
+  return view ? [...base, view.id] : base;
 }

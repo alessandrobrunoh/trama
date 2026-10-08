@@ -356,6 +356,8 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.view(maya, 'Needs a decision', 'decision', { filters: [{ field: 'status', op: 'is', value: 'proposed' }], layout: 'list', shared: true, created: 20 });
   b.view(maya, 'Backlog issues', 'issue', { filters: [{ field: 'status', op: 'is', value: 'backlog' }], sort: { field: 'createdAt', direction: 'desc' }, layout: 'list', shared: true, created: 18 });
   b.view(ale, 'Agents at work', 'execution', { filters: [{ field: 'state', op: 'in', value: ['running', 'needs_input'] }, { field: 'provider', op: 'not_in', value: ['human'] }], groupBy: 'provider', layout: 'board', shared: false, created: 10 });
+  b.view(ale, 'Workstream roadmap', 'workstream', { filters: [{ field: 'status', op: 'not_in', value: ['shipped', 'canceled'] }], groupBy: 'projectId', layout: 'timeline', shared: true, created: 8 });
+  b.view(ale, 'Project roadmap', 'project', { filters: [{ field: 'status', op: 'not_in', value: ['completed', 'canceled'] }], layout: 'timeline', shared: true, created: 7 });
 
   // ───────── ~12 weeks of finished/running/canceled issues with estimates (statistics → Estimates & time)
   if (opts.mockHistory !== false) addMockHistoryToSeed(b.data, now);

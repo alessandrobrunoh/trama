@@ -210,7 +210,7 @@
     min-block-size: 2.5rem;
   }
 
-  app-timeline-page [role='group'] > button {
+  app-timeline-view [role='group'] > button {
     min-block-size: 2.5rem;
     min-inline-size: 2.5rem;
   }

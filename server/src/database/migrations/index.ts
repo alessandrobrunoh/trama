@@ -13,6 +13,8 @@ import { WorkstreamProject1792400000000 } from './1792400000000-WorkstreamProjec
 import { MilestonesToProjects1792500000000 } from './1792500000000-MilestonesToProjects.js';
 import { IssueProject1792600000000 } from './1792600000000-IssueProject.js';
 import { PushSubscriptions1792700000000 } from './1792700000000-PushSubscriptions.js';
+import { ProjectUpdates1792800000000 } from './1792800000000-ProjectUpdates.js';
+import { ArtifactOwners1792800000100 } from './1792800000100-ArtifactOwners.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
-export const MIGRATIONS = [NablaBaseline1791387672836, IntegrationsWebhooks1791500000000, Issues1791600000000, DropExecutions1791700000000, MilestonesEstimates1791810000000, AccessWebhooks1791820000000, TokenPermissions1791900000000, Invites1792000000000, Favorites1792100000000, Notifications1792200000000, Projects1792300000000, WorkstreamProject1792400000000, MilestonesToProjects1792500000000, IssueProject1792600000000, PushSubscriptions1792700000000];
+export const MIGRATIONS = [NablaBaseline1791387672836, IntegrationsWebhooks1791500000000, Issues1791600000000, DropExecutions1791700000000, MilestonesEstimates1791810000000, AccessWebhooks1791820000000, TokenPermissions1791900000000, Invites1792000000000, Favorites1792100000000, Notifications1792200000000, Projects1792300000000, WorkstreamProject1792400000000, MilestonesToProjects1792500000000, IssueProject1792600000000, PushSubscriptions1792700000000, ProjectUpdates1792800000000, ArtifactOwners1792800000100];

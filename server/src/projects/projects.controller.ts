@@ -3,6 +3,7 @@ import { IsArray, IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength, Min
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import { PROJECT_STATUSES, type ActorRef, type Priority, type ProjectStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
+import { PROJECT_ICON_MAX, PROJECT_ICON_PATTERN } from './project-icon.js';
 import { ProjectsService } from './projects.service.js';
 
 const PRIORITIES: Priority[] = ['none', 'urgent', 'high', 'medium', 'low'];
@@ -13,6 +14,7 @@ class CreateProjectDto {
   @IsOptional() @IsString() @MaxLength(300) summary?: string;
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @Matches(COLOR) color?: string;
+  @IsOptional() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string;
   @IsOptional() @IsIn(PROJECT_STATUSES) status?: ProjectStatus;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsString() leadId?: string;
@@ -27,6 +29,7 @@ class UpdateProjectDto {
   @Clearable() @IsString() @MaxLength(300) summary?: string | null;
   @Clearable() @IsString() @MaxLength(20000) description?: string | null;
   @OptionalNotNull() @Matches(COLOR) color?: string;
+  @Clearable() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string | null;
   @OptionalNotNull() @IsIn(PROJECT_STATUSES) status?: ProjectStatus;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() leadId?: string | null;

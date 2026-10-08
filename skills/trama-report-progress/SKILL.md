@@ -43,11 +43,30 @@ update_artifact { id, ci: "passing" }            // when CI finishes
 update_artifact { id, review: "approved" }       // when a person approves
 update_artifact { id, state: "merged" }          // when it merges
 ```
-Allowed values: `kind` pull_request, merge_request, document, design, image, file, build, test_report, deployment, release · `state` draft, open, merged, closed, pending, running, succeeded, failed, healthy, degraded, published · `ci` pending, passing, failing · `review` none, requested, approved, changes_requested.
+Allowed values: `kind` pull_request, merge_request, document, link, design, image, file, build, test_report, deployment, release · `state` draft, open, merged, closed, pending, running, succeeded, failed, healthy, degraded, published · `ci` pending, passing, failing · `review` none, requested, approved, changes_requested.
 
 Before creating, `list_artifacts` for the workstream and update an existing entry instead of duplicating. Use the **real** values from the forge. Never mark `ci: "passing"` or `state: "merged"` unless you saw it.
 
-Other artifacts: a test run → `kind: "test_report"` with `state: "succeeded"` / `"failed"`; a design or doc → `kind: "design"` / `"document"` with its `url`; a deploy → `kind: "deployment"`, `environment`, `state: "healthy"`.
+Other artifacts: a plain URL (spec, dashboard, ticket elsewhere) → `kind: "link"` with `url` and an optional `description`; a test run → `kind: "test_report"` with `state: "succeeded"` / `"failed"`; a design or doc → `kind: "design"` / `"document"` with its `url`; a deploy → `kind: "deployment"`, `environment`, `state: "healthy"`.
+
+### Attaching an artifact to a project or an issue
+`create_artifact` takes any of `projectId`, `issueId`, `workstreamId` (at least one; you may pass several). Attach it where it belongs, not everywhere:
+```
+create_artifact { projectId, kind: "document", title: "Q4 launch plan", url, description: "Scope and rollout order" }
+create_artifact { issueId: "BUG-142", kind: "pull_request", title: "Fix login timeout", url, state: "open" }
+list_project_artifacts { id }      // the project's own + its workstreams' + its issues' artifacts
+list_issue_artifacts { idOrKey }
+```
+A project sees the artifacts of its workstreams and issues automatically, so do not duplicate an artifact onto the project just to make it visible there. PR state (`ci`, `review`) only drives a workstream's status when the artifact is attached to that workstream.
+
+### Project updates
+A project update is the status post people read on the project: a `health` and a short markdown write-up. Post one when you finish a meaningful body of work for a project (a milestone reached, something shipped, a risk appeared), not after every commit:
+```
+get_project_context { id }                 // read what is actually true first
+create_project_update { projectId, health: "at_risk", body: "## Shipped\n- Importer merged (#318)\n\n## Next\n- Safari fix\n\n## Risks\n- Waiting on the legal review" }
+update_project_update { projectId, id, body: "…" }    // fix your own update; do not post a second one
+```
+`health` is `on_track`, `at_risk` or `off_track`, and the newest update sets the project's health. Base it on facts (milestones, blocked workstreams, failing CI), say what you based it on, and prefer `at_risk` over a rosy guess. Do not delete updates written by other people.
 
 ### Issues
 Issue status is separate. When the fix for an issue is merged, set it:
@@ -66,6 +85,7 @@ Skip comments for trivial steps; the activity log already records every change.
 ## Checklist before you say "done"
 
 - Criteria reflect reality (`met` only where true).
+- If the work moved a project (milestone, risk), a project update says so, with an honest `health`.
 - Every PR you opened exists as an artifact with current `state`, `ci`, `review`.
 - Linked issues have the right status.
 - Anything unresolved is an input request or a comment, not silence.

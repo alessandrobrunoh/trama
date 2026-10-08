@@ -305,7 +305,7 @@ export class WorkstreamsService {
     await this.ds.transaction(async (m) => {
       const ids = (
         await m.query<{ id: string }[]>(
-          `SELECT "id" FROM "artifacts" WHERE "workstreamId" = $1
+          `SELECT "id" FROM "artifacts" WHERE "workstreamId" = $1 AND "projectId" IS NULL AND "issueId" IS NULL
            UNION SELECT "id" FROM "input_requests" WHERE "workstreamId" = $1`,
           [ws.id],
         )

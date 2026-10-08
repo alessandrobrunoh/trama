@@ -49,8 +49,8 @@ docker push ghcr.io/alessandrobrunoh/trama-frontend:latest   # likewise trama-se
 New packages on GitHub are **private**. Until the deploy host can read them, `docker compose pull` fails with
 `error from registry: denied` and the deploy stops before the stack starts. Pick one:
 
-- **Make the packages public** (GitHub → the package → *Package settings* → *Change visibility*). Simplest; fine for an
-  open-source project, since the images contain no secrets (those come from the environment at runtime).
+- **Make the packages public** (GitHub → the package → *Package settings* → *Change visibility*). Simplest; fine for a
+  source-available project, since the images contain no secrets (those come from the environment at runtime).
 - **Give the host read access.** Create a token (classic, scope `read:packages`) and either add it in Komodo as a
   *Docker registry account* for `ghcr.io` and select it on the stack, or log in once on the host:
   `echo "$TOKEN" | docker login ghcr.io -u alessandrobrunoh --password-stdin`.
