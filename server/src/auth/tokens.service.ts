@@ -87,6 +87,11 @@ export class TokensService {
     return { token, secret };
   }
 
+  /** Deletes a token (and, through the FK, its usage counters). */
+  async revoke(id: string): Promise<void> {
+    await this.repo.delete({ id });
+  }
+
   /** Resolves a bearer secret to its (unexpired) token row, touching `lastUsedAt` at most once a minute. */
   async authenticate(secret: string): Promise<ApiTokenEntity | null> {
     if (!secret.startsWith(TOKEN_PREFIX)) return null;

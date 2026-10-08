@@ -20,6 +20,7 @@ import type { Response } from 'express';
 import { AiConfig } from './ai.config.js';
 import { ChatDto, SuggestionDto } from './ai.dto.js';
 import { AiService } from './ai.service.js';
+import { AiProvider } from './ai-provider.js';
 import { GrokBuildService } from './grok-build.service.js';
 
 @Controller('w/:slug/ai')
@@ -30,6 +31,7 @@ export class AiController {
     private readonly config: AiConfig,
     private readonly ai: AiService,
     private readonly grok: GrokBuildService,
+    private readonly provider: AiProvider,
   ) {}
 
   @Get('status')
@@ -38,6 +40,7 @@ export class AiController {
     return {
       suggestions: this.config.status(),
       supergrok: await this.grok.status(userId),
+      assistantTools: { enabled: this.ai.toolsEnabled() && (await this.provider.supportsTools(userId)) },
       chatgpt: {
         status: 'unavailable' as const,
         reason:

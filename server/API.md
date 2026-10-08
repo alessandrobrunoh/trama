@@ -29,6 +29,19 @@ Two ways, accepted on every route except the public ones (`/health`, `/auth/sign
 | `GET /auth/me` | – | `{ user, workspaces }`. `workspaces` = `Array<Workspace & { role }>`. Agent tokens get `403`. |
 | `GET /health` | – | `{ status: 'ok', db: 'up' }` or `503`. |
 
+### Custom tokens (resource × action permissions) and caps
+
+`scope` is `read`, `write`, `admin` or `custom`. A `custom` token (also implied by sending `permissions`) carries an explicit list of
+`<resource>:<action>` grants (catalog: `API_RESOURCES` in `contracts/domain.ts`; actions `read|write|delete`, plus `decisions:accept`). The
+required permission is derived from the route: `/w/:slug/<resource>/…` and the method (GET → read, POST/PATCH → write, DELETE → delete;
+`POST /decisions/:id/accept|reject|supersede` → `decisions:accept`; `/settings` and `/w/:slug` itself → `workspace`). `write`/`delete`/`accept`
+imply `read` on the same resource. Routes outside the catalog (e.g. `/ai/*`, `/workspaces`, `/auth/me`) are denied (fail closed), except
+`GET /auth/token`. The permission list only narrows: the acting user's role still applies, and a custom token can only mint custom tokens
+that are a subset of its own permissions.
+
+Every API token has caps (`limits`, defaults `requestsPerMinute` 600, `writesPerMinute` 60, `writesPerDay` 2000; configurable up to 6000 / 600 / 20000).
+Per-minute counters are per API process; the daily write counter is stored in Postgres. Over a cap: `429` with a message naming the cap.
+
 ## Roles (RBAC)
 
 `viewer` < `member` < `admin` < `owner`. Default: GET needs `viewer`, every write on domain entities needs `member`.
@@ -52,7 +65,8 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
 | `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |
 | `GET /w/:slug/tokens` | member | Admins see all tokens, others only their own. `ApiToken[]` (never contains the hash). |
-| `POST /w/:slug/tokens` | member (user) | `{ name, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. |
+| `POST /w/:slug/tokens` | member (user) | `{ name, scope?, permissions?, limits?, expiresAt?, agentId? }` → `201 { token: ApiToken, secret }`. Without `agentId` the token acts as you; with `agentId` (admin only) it acts as that agent. See *Custom tokens* below. |
+| `GET /auth/token` | API token | `{ token, actor, workspace: { id, slug, name }, permissions }`: what the calling token is. Used by the MCP server. |
 | `DELETE /w/:slug/tokens/:id` | own or admin | revoke |
 
 ## Workspace snapshot

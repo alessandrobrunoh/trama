@@ -12,9 +12,12 @@ import { AiService } from './ai.service.js';
 import { AiProvider, ChatCompletionsProvider } from './ai-provider.js';
 import { AiContextService } from './ai-context.service.js';
 import { GrokBuildService } from './grok-build.service.js';
+import { AssistantToolsService } from './assistant-tools.service.js';
+import { AuthModule } from '../auth/auth.module.js';
 
 @Module({
   imports: [
+    AuthModule,
     TypeOrmModule.forFeature([
       IssueEntity,
       WorkstreamEntity,
@@ -28,6 +31,7 @@ import { GrokBuildService } from './grok-build.service.js';
     AiService,
     AiContextService,
     GrokBuildService,
+    AssistantToolsService,
     { provide: AiProvider, useClass: ChatCompletionsProvider },
   ],
 })

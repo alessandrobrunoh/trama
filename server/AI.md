@@ -37,7 +37,26 @@ reports configuration presence, not a successful upstream connection.
 - Closing the panel preserves the conversation. New chat, sign-out, workspace
   changes and page reload clear it. Conversations are held only in browser memory,
   with up to 100 visible messages and bounded request history.
-- This assistant answers and proposes text; it has no mutation tools.
+- With `MCP_URL` set (see below) the assistant can also read and change the workspace through the
+  MCP server, as the signed-in user; without it, it stays text-only and never claims to act.
+
+## Assistant tools (MCP)
+
+Set `MCP_URL` to the Nabla MCP server (`mcp/`, Docker service `mcp`, e.g. `http://mcp:8080/mcp`). For each
+chat reply the API mints a temporary `custom` API token that acts as the user (their workspace role still
+applies), gives the model the tools that token allows, and deletes the token when the reply is done.
+
+- Withheld from the model whatever the user's role: API tokens, member changes, integration and webhook
+  changes, workspace deletion, and the generic `api_request` tool.
+- Caps per reply: 8 model steps, 20 tool calls, 10 changes. Per user: 200 changes per day
+  (`AI_ASSISTANT_MAX_WRITES_PER_DAY`, counted per API process, so it resets on restart). The temporary token
+  adds burst caps (20 changes and 120 requests per minute). Over a cap the tool answers with an error and the
+  model is told to stop and ask the user.
+- The system prompt asks the model to confirm before deleting or changing more than three items. This is a
+  soft rule; the caps above are the hard limits.
+- Replies end with `Actions: ✓ create_issue · ✗ delete_issue` for every change attempted.
+- Not available while a user is connected to Grok Build (the CLI cannot call tools): chat falls back to text.
+- `GET /api/w/:slug/ai/status` reports `assistantTools.enabled`.
 
 ## ChatGPT subscription connection
 

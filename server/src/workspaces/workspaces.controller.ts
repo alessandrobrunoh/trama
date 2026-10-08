@@ -28,6 +28,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { normalizePermissions } from '../auth/api-permissions.js';
+import { ASSISTANT_TOKEN_NAME } from '../ai/assistant-tools.service.js';
 import {
   Auth,
   Can,
@@ -234,8 +235,10 @@ export class TokensController {
 
   /** Admins see every token of the workspace; others only their own. */
   @Get()
-  list(@Ctx() ctx: WorkspaceContext) {
-    return this.service.listTokens(ctx.workspace.id, ctx.role === 'admin' || ctx.role === 'owner' ? undefined : ctx.userId ?? '-');
+  async list(@Ctx() ctx: WorkspaceContext) {
+    const all = await this.service.listTokens(ctx.workspace.id, ctx.role === 'admin' || ctx.role === 'owner' ? undefined : ctx.userId ?? '-');
+    // the assistant's per-turn tokens live for seconds; they are not something to manage
+    return all.filter((t) => t.name !== ASSISTANT_TOKEN_NAME);
   }
 
   /** Returns `{ token, secret }`; the secret is shown only this once. */

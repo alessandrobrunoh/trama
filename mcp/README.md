@@ -1,0 +1,51 @@
+# nabla-mcp
+
+MCP server for Nabla/Trama, written in Rust. It exposes the REST API as ~90 tools (plus `whoami` and a
+path-restricted `api_request`) to any MCP client: Claude, Cursor, VS Code, or the in-app Assistant.
+
+**It holds no data and no secrets.** Each client connects with its own API key
+(Settings → API tokens → *Custom*). The server forwards that key to the API, which remains the only authority:
+permissions (resource × action), the user's role and usage caps are all enforced there. The server only
+hides the tools the key may not use.
+
+## Run
+
+```bash
+docker compose -f server/docker-compose.yml up -d mcp        # production layout (behind Traefik at /mcp)
+
+docker build -t nabla-mcp mcp
+docker run --rm -p 8080:8080 -e NABLA_API_URL=http://host.docker.internal:3000/api nabla-mcp
+
+cd mcp && NABLA_API_URL=http://localhost:3000/api cargo run   # local, listens on 0.0.0.0:8080
+```
+
+| Env | Default | |
+|---|---|---|
+| `NABLA_API_URL` | `http://localhost:3000/api` | API base URL as seen from the server |
+| `MCP_BIND` | `0.0.0.0:8080` | listen address |
+| `MCP_ALLOWED_ORIGINS` | none | comma-separated browser origins allowed (requests with any other `Origin` get 403) |
+| `MCP_MAX_OUTPUT_BYTES` | `200000` | tool output beyond this is truncated |
+| `MCP_UPSTREAM_TIMEOUT_SECS` | `30` | per API call |
+
+## Connect a client
+
+```bash
+claude mcp add --transport http nabla https://trama.alessandrobrunoh.it/mcp \
+  --header "Authorization: Bearer nbl_…"
+```
+
+Streamable HTTP, stateless (`POST /mcp` only, JSON replies, no sessions). `--stdio` runs the same server over
+stdin/stdout for local clients, with the key in `NABLA_API_KEY`. `GET /healthz` is unauthenticated.
+
+## Tools
+
+`src/tools.json` is the catalog: one entry per route with its permission and a compact parameter spec (see
+`src/catalog.rs`). To add a tool, add an entry; `server/src/auth/api-permissions.spec.ts` fails if a tool's
+`permission` differs from what the API derives from its route, and `cargo test` validates the catalog.
+
+## Security notes
+
+- The key is never logged or cached (introspection is cached by its sha256 for 30 s).
+- Redirects are never followed, so the key only goes to `NABLA_API_URL`.
+- `api_request` accepts plain workspace-relative paths only (no `..`, `%`, query, fragment) and always acts inside the key's workspace.
+- Over-cap responses (HTTP 429) are surfaced to the model with an instruction to stop, not retry.

@@ -11,6 +11,7 @@ services:
       PORT: 3000
       NODE_ENV: production
       CORS_ORIGIN: https://trama.alessandrobrunoh.it
+      MCP_URL: http://mcp:8080/mcp
     networks:
       - default
       - proxy
