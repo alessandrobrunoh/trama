@@ -14,7 +14,7 @@ import { CommandPanel } from './command-panel';
       description="Search for a screen, an action or any workstream, issue or decision."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
-      dialogContentClass="sm:max-w-[40rem] top-[12%] sm:top-[16%] translate-y-0 rounded-xl max-sm:max-w-[calc(100%-1rem)]"
+      dialogContentClass="w-[calc(100%-1rem)] max-w-none sm:w-[44rem] top-[10%] sm:top-[14%] translate-y-0 rounded-xl"
     >
       @if (open()) {
         <app-command-panel mode="palette" />

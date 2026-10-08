@@ -214,12 +214,12 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
       }
     </ng-template>
 
-    <hlm-command class="h-[min(34rem,76svh)]" [filter]="filter" [(search)]="query">
-      <div class="flex shrink-0 items-center gap-3 px-4 pt-3.5 pb-2.5">
+    <hlm-command class="h-[min(40rem,78svh)]" [filter]="filter" [(search)]="query">
+      <div class="flex shrink-0 items-center gap-3 px-5 pt-4.5 pb-3">
         <input
           brnCommandInput
           data-slot="command-input"
-          class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-hidden"
+          class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-base outline-hidden"
           [placeholder]="placeholder()"
           [attr.aria-label]="placeholder()"
           (keydown.meta.enter)="askAssistant($event)"
@@ -272,7 +272,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) => (a.updatedAt 
       </div>
 
       <hlm-command-list
-        class="max-h-none flex-1 px-1 pb-1 [&_[data-slot=command-group-label]]:px-3 [&_[data-slot=command-group-label]]:pt-3 [&_[data-slot=command-group-label]]:pb-1.5 [&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-item]]:gap-3 [&_[data-slot=command-item]]:px-3 [&_[data-slot=command-item]]:text-sm"
+        class="max-h-none flex-1 px-1 pb-1 [&_[data-slot=command-group-label]]:px-3.5 [&_[data-slot=command-group-label]]:pt-3 [&_[data-slot=command-group-label]]:pb-1.5 [&_[data-slot=command-group-label]]:text-[13px] [&_[data-slot=command-item]]:min-h-11 [&_[data-slot=command-item]]:gap-3 [&_[data-slot=command-item]]:px-3.5 [&_[data-slot=command-item]]:text-[15px]"
       >
         @if (page() === 'status') {
           <hlm-command-group>
