@@ -35,7 +35,8 @@ claude mcp add --transport http trama https://trama.alessandrobrunoh.it/mcp \
 ```
 
 Streamable HTTP, stateless (`POST /mcp` only, JSON replies, no sessions). `--stdio` runs the same server over
-stdin/stdout for local clients, with the key in `TRAMA_API_KEY`. `GET /healthz` is unauthenticated.
+stdin/stdout for local clients, with the key in `TRAMA_API_KEY`. The [`trama` CLI](../cli/README.md) embeds this protocol layer too:
+`trama mcp` serves it over stdio using the CLI's saved login (`claude mcp add trama -- trama mcp`). `GET /healthz` is unauthenticated.
 
 ## Tools
 

@@ -148,6 +148,13 @@ claude mcp add --transport http trama http://localhost:8787/mcp \
 mkdir -p ~/.claude/skills && cp -R skills/trama* ~/.claude/skills/
 ```
 
+No MCP, or you prefer a shell? The [`trama` CLI](cli/README.md) is one small binary (macOS, Linux, Windows) with the same commands as the MCP tools:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alessandrobrunoh/trama/main/cli/install/install.sh | sh
+trama login && trama skill install   # sign in, then teach your coding agent the commands
+```
+
 Give agents the narrowest permissions that do the job, and keep the default usage caps. More in [mcp/README.md](mcp/README.md) and [skills/README.md](skills/README.md).
 
 ## Self-hosting
@@ -183,6 +190,7 @@ All containers run as non-root with `cap_drop: ALL`, `no-new-privileges` and a r
 ├── src/            Angular app: core (state, services), features (product areas), shared, ui
 ├── server/         NestJS API: src/, unit tests beside code, e2e in test/
 ├── mcp/            MCP server in Rust (tools.json is the catalog)
+├── cli/            `trama` command line in Rust, generated from the same catalog
 ├── skills/         SKILL.md packs that teach agents to work in Trama
 ├── contracts/      Shared domain types, synced into the server by scripts/sync-contracts.mjs
 ├── docker/         nginx config and deployment guide
@@ -215,6 +223,7 @@ npm run lint && npm run build
 | [server/ARCHITECTURE.md](server/ARCHITECTURE.md) | Request pipeline, modules, extension points |
 | [server/AI.md](server/AI.md) | Configuring the assistant and AI suggestions |
 | [mcp/README.md](mcp/README.md) | MCP tools, configuration, security notes |
+| [cli/README.md](cli/README.md) | The `trama` command line: install, connect, agent mode |
 | [skills/README.md](skills/README.md) | Agent skills and how to install them |
 | [docker/README.md](docker/README.md) | Images, production stack, registry |
 | [DESIGN.md](DESIGN.md) | Design language and tokens |
