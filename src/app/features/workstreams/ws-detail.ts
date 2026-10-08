@@ -111,7 +111,7 @@ const TAB_LABEL: Record<Tab, string> = {
         <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" aria-label="Copy link" hlmTooltip="Copy link (⌘⇧C)" position="bottom" (click)="actions.copyLink([w])">
           <svg [lucideIcon]="linkIcon" [size]="15"></svg>
         </button>
-        @if (w.deltaThreadUrl) {
+        @if (w.deltaThreadUrl && store.deltaThreads()) {
           <a hlmBtn size="sm" variant="outline" [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer" hlmTooltip="Open Delta thread (⇧O)" position="bottom">
             <app-provider-icon provider="delta" [size]="14" /><span class="max-sm:hidden">Delta thread</span><svg [lucideIcon]="extIcon" [size]="13"></svg>
           </a>

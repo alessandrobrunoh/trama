@@ -12,6 +12,7 @@ import {
 } from '@nestjs/common';
 import {
   IsArray,
+  IsBoolean,
   IsEmail,
   IsIn,
   IsISO8601,
@@ -68,6 +69,7 @@ class UpdateSettingsDto {
   @OptionalNotNull() @IsString() @MaxLength(64) timeZone?: string;
   @Clearable() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'iconColor must be #rrggbb' }) iconColor?: string | null;
   @Clearable() @IsString() @MaxLength(2) iconInitial?: string | null;
+  @OptionalNotNull() @IsBoolean() deltaThreads?: boolean;
 }
 
 class AddMemberDto {

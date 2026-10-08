@@ -12,6 +12,8 @@ export interface AiStatus {
     login: { code: string | null; url: string | null; error: string | null } | null;
   };
   chatgpt: { status: 'unavailable'; reason: string };
+  /** The assistant can use tools (read and change the workspace) for this user. */
+  assistantTools?: { enabled: boolean };
 }
 export interface SuperGrokLogin {
   connected?: boolean;
@@ -50,9 +52,26 @@ export interface AiSuggestion {
   questions: string[];
   triage?: AiIssueDraftTriage;
 }
+/** One thing the assistant did while preparing a reply. */
+export interface ActivityStep {
+  kind: 'note' | 'read' | 'write';
+  label: string;
+  /** False when the step failed or was refused (always present on writes). */
+  ok?: boolean;
+  /** Consecutive identical steps are merged. */
+  count?: number;
+  /** Failed steps: why, in the API's words. */
+  detail?: string;
+}
+export interface AssistantActivity {
+  seconds: number;
+  steps: ActivityStep[];
+}
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Assistant replies only; never sent back to the server. */
+  activity?: AssistantActivity;
 }
 export interface ChatContext {
   kind: 'page' | 'issue' | 'workstream' | 'project' | 'decision';
@@ -93,7 +112,12 @@ export class AiApi {
     context: ChatContext | undefined,
     signal: AbortSignal,
   ) {
-    return this.post<{ content: string }>(slug, 'chat', { messages, context }, signal);
+    return this.post<{ content: string; activity?: AssistantActivity }>(
+      slug,
+      'chat',
+      { messages: messages.map(({ role, content }) => ({ role, content })), context },
+      signal,
+    );
   }
 
   private async post<T>(

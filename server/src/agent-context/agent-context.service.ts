@@ -196,7 +196,7 @@ export class AgentContextService {
     const status = c.status.replace('_', ' ');
     out.push(`# ${c.key} — ${c.title}`, '', `Status: ${status} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
     section('Description', [c.description?.trim() || '_No description yet._']);
-    section('Delta thread', [c.deltaThreadUrl]);
+    if (c.deltaThreadUrl) section('Delta thread', [c.deltaThreadUrl]);
     section('Objective', [c.objective.trim() || '_No objective written yet._']);
     section(
       'Acceptance Criteria',

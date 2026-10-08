@@ -78,6 +78,7 @@ export interface UpdateWorkspaceSettingsInput {
   timeZone?: string;
   iconColor?: string | null;
   iconInitial?: string | null;
+  deltaThreads?: boolean;
 }
 export interface CreateInviteInput {
   email: string;
@@ -160,8 +161,8 @@ export interface CreateWorkstreamInput {
   description?: string;
   objective?: string;
   context?: string;
-  /** https link on delta.dev. Required. */
-  deltaThreadUrl: string;
+  /** https link on delta.dev. Required unless the workstream is a draft or the workspace turned Delta threads off. */
+  deltaThreadUrl?: string;
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID;

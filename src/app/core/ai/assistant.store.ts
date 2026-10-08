@@ -4,7 +4,13 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { SessionStore } from '../session/session.store';
 import { NablaStore } from '../stores/nabla.store';
-import { AiApi, type AiStatus, type ChatContext, type ChatMessage } from './ai-api';
+import {
+  AiApi,
+  type AiStatus,
+  type AssistantActivity,
+  type ChatContext,
+  type ChatMessage,
+} from './ai-api';
 
 /** One saved conversation. Kept in this browser only, per user and workspace. */
 export interface AssistantChat {
@@ -22,6 +28,28 @@ const MAX_MESSAGES = 100;
 function isMessage(value: unknown): value is ChatMessage {
   const m = value as ChatMessage | null;
   return !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string';
+}
+
+function validActivity(value: unknown): value is AssistantActivity {
+  const a = value as AssistantActivity | null;
+  return (
+    !!a &&
+    typeof a.seconds === 'number' &&
+    Array.isArray(a.steps) &&
+    a.steps.length <= 60 &&
+    a.steps.every(
+      (s) =>
+        !!s &&
+        ['note', 'read', 'write'].includes(s.kind) &&
+        typeof s.label === 'string' &&
+        s.label.length <= 700,
+    )
+  );
+}
+
+/** Drops an activity block that does not look like one (old or edited storage). */
+function cleanMessage(m: ChatMessage): ChatMessage {
+  return m.activity && !validActivity(m.activity) ? { role: m.role, content: m.content } : m;
 }
 
 function titleFrom(content: string): string {
@@ -277,7 +305,14 @@ export class AssistantStore {
       if (this.controller === controller)
         this.writeChat(
           chatId,
-          [...messages, { role: 'assistant', content: result.content }],
+          [
+            ...messages,
+            {
+              role: 'assistant',
+              content: result.content,
+              ...(result.activity ? { activity: result.activity } : {}),
+            },
+          ],
           !(this.activeId() === chatId && this.viewing()),
         );
     } catch (error) {
@@ -347,7 +382,8 @@ export class AssistantStore {
                 c.messages.length > 0 &&
                 c.messages.every(isMessage),
             )
-            .slice(0, MAX_CHATS);
+            .slice(0, MAX_CHATS)
+            .map((c) => ({ ...c, messages: c.messages.map(cleanMessage) }));
       } catch {
         chats = [];
       }

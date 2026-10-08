@@ -72,7 +72,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
         <app-property-row label="Issues">
           <span class="px-1.5"><app-issue-progress [done]="counts().issuesDone" [active]="counts().issuesActive" [total]="counts().issuesTotal" /></span>
         </app-property-row>
-        @if (w.deltaThreadUrl) {
+        @if (w.deltaThreadUrl && deltaEnabled()) {
           <app-property-row label="Delta thread">
             <a [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer" class="hover:bg-accent inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px]" hlmTooltip="Open Delta thread" position="bottom">
               <app-provider-icon provider="delta" [size]="14" />Open thread<svg [lucideIcon]="ext" [size]="12" class="text-muted-foreground"></svg>
@@ -95,6 +95,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
 })
 export class TimelinePanel {
   private readonly store = inject(NablaStore);
+  protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   protected readonly actions = inject(WsActions);
   readonly ws = input.required<Workstream>();
   readonly closed = output<void>();

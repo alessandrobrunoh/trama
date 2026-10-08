@@ -5,6 +5,7 @@ import {
   isDeltaThreadUrl,
   type AcceptanceCriterion,
   type ActorRef,
+  resolveWorkspaceSettings,
   type CriterionState,
   type Priority,
   type WorkstreamStatus,
@@ -12,7 +13,7 @@ import {
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
-import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { TeamEntity, WorkspaceEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
@@ -131,7 +132,6 @@ export class WorkstreamsService {
     input: WorkstreamInput & {
       title: string;
       ownerTeamId: string;
-      deltaThreadUrl: string;
     },
     options: { manager?: EntityManager; data?: Record<string, unknown> } = {},
   ): Promise<WorkstreamEntity & { after?: () => Promise<void> }> {
@@ -145,10 +145,16 @@ export class WorkstreamsService {
       typeof input.deltaThreadUrl === 'string'
         ? input.deltaThreadUrl.trim()
         : '';
-    const deltaThreadUrl =
-      input.statusOverride === 'draft' && !suppliedDeltaThreadUrl
+    // The thread is optional for drafts and for workspaces that turned Delta threads off; a supplied
+    // URL is always validated.
+    const { deltaThreads } = resolveWorkspaceSettings(
+      (await this.ds.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId }))?.settings,
+    );
+    const deltaThreadUrl = suppliedDeltaThreadUrl
+      ? assertDeltaThreadUrl(suppliedDeltaThreadUrl)
+      : input.statusOverride === 'draft' || !deltaThreads
         ? ''
-        : assertDeltaThreadUrl(suppliedDeltaThreadUrl);
+        : assertDeltaThreadUrl('');
     const run = async (m: EntityManager) => {
       const team = await m.findOneByOrFail(TeamEntity, {
         id: input.ownerTeamId,
@@ -418,6 +424,10 @@ export class WorkstreamsService {
 
 function assertDeltaThreadUrl(value: string): string {
   const url = value.trim();
+  if (!url)
+    throw new BadRequestException(
+      'deltaThreadUrl is required: link the workstream to its Delta thread (or turn Delta threads off in Settings → General)',
+    );
   if (!isDeltaThreadUrl(url)) {
     throw new BadRequestException(
       'deltaThreadUrl must be an https link on delta.dev',

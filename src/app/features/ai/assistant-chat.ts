@@ -10,9 +10,17 @@ import {
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { LucideArrowUp, LucideDynamicIcon, LucideFileText, LucideSquare } from '@lucide/angular';
+import {
+  LucideArrowUp,
+  LucideChevronRight,
+  LucideDynamicIcon,
+  LucideFileText,
+  LucideSquare,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../core/ai/assistant.store';
+import { EntityRefs } from '../../shared/entity-ref';
+import { Markdown } from '../../shared/markdown';
 
 /** Compact relative time: now, 5m, 3h, 2d, 4mo. */
 export function timeAgo(time: number): string {
@@ -32,7 +40,7 @@ export function timeAgo(time: number): string {
 @Component({
   selector: 'app-assistant-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports],
+  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports, Markdown],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     @if (ai.messages().length || !page()) {
@@ -71,9 +79,57 @@ export function timeAgo(time: number): string {
               <div class="text-muted-foreground mb-1 text-[11px] font-medium">
                 {{ message.role === 'user' ? 'You' : 'Trama' }}
               </div>
-              <p class="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
-                {{ message.content }}
-              </p>
+              @if (message.activity; as activity) {
+                <details
+                  class="group mb-2"
+                  [attr.open]="$last && !ai.busy() && activity.steps.length <= 6 ? '' : null"
+                >
+                  <summary
+                    class="text-muted-foreground hover:text-foreground flex w-fit cursor-pointer list-none items-center gap-1 text-[13px] select-none [&::-webkit-details-marker]:hidden"
+                  >
+                    Worked for {{ activity.seconds }}
+                    {{ activity.seconds === 1 ? 'second' : 'seconds' }}
+                    <svg
+                      [lucideIcon]="chevronIcon"
+                      [size]="12"
+                      class="transition-transform group-open:rotate-90"
+                    ></svg>
+                  </summary>
+                  <ul class="mt-2 space-y-1.5 text-[13px] leading-snug">
+                    @for (step of activity.steps; track $index) {
+                      @if (step.kind === 'note') {
+                        <li class="text-muted-foreground border-l-2 pl-3 whitespace-pre-wrap">
+                          {{ step.label }}
+                        </li>
+                      } @else {
+                        <li
+                          [class]="step.ok === false ? 'text-destructive' : 'text-muted-foreground'"
+                        >
+                          {{ step.label }}
+                          @if (step.count) {
+                            ×{{ step.count }}
+                          }
+                          @if (step.ok === false) {
+                            · failed
+                            @if (step.detail) {
+                              <span class="text-muted-foreground block text-xs">{{
+                                step.detail
+                              }}</span>
+                            }
+                          }
+                        </li>
+                      }
+                    }
+                  </ul>
+                </details>
+              }
+              @if (message.role === 'user') {
+                <p class="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
+                  {{ message.content }}
+                </p>
+              } @else {
+                <app-markdown [source]="message.content" [link]="refs.linker()" />
+              }
             </article>
           }
           @if (ai.busy()) {
@@ -201,7 +257,9 @@ export function timeAgo(time: number): string {
         {{
           ai.shareContext()
             ? ai.context().kind === 'page'
-              ? 'Shares the page name and your open issues (titles only).'
+              ? ai.status()?.assistantTools?.enabled
+                ? 'Shares the page name. The assistant can look up and change records in this workspace for you, within your permissions and usage caps.'
+                : 'Shares the page name and your open issues (titles only).'
               : 'Shares this item’s details with the AI provider.'
             : 'No current page data will be added.'
         }}
@@ -223,6 +281,7 @@ export function timeAgo(time: number): string {
 })
 export class AssistantChat {
   protected readonly ai = inject(AssistantStore);
+  protected readonly refs = inject(EntityRefs);
   readonly page = input(false);
   readonly navigated = output<void>();
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
@@ -230,6 +289,7 @@ export class AssistantChat {
   protected readonly contextIcon = LucideFileText;
   protected readonly sendIcon = LucideArrowUp;
   protected readonly stopIcon = LucideSquare;
+  protected readonly chevronIcon = LucideChevronRight;
   protected readonly prompts = [
     'Summarize this item',
     'What information is missing?',

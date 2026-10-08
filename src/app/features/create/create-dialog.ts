@@ -286,7 +286,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   aria-label="Rationale"
                 ></textarea>
               }
-              @if (kind() === 'workstream') {
+              @if (kind() === 'workstream' && deltaEnabled()) {
                 <div
                   class="focus-within:border-ring/60 mt-1 flex h-8 items-center gap-2 rounded-md border px-2"
                   [class.border-destructive]="!!err('delta')"
@@ -636,6 +636,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 export class CreateDialog {
   protected readonly ui = inject(UiStore);
   private readonly store = inject(NablaStore);
+  protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   /** Workspace default team (Settings → General), if it still exists. */
   private defaultTeam(): string {
     const id = this.store.settings().defaultTeamId;
@@ -988,7 +989,7 @@ export class CreateDialog {
             ? 'Give it a title.'
             : 'Required.';
       case 'delta':
-        if (k !== 'workstream') return null;
+        if (k !== 'workstream' || !this.deltaEnabled()) return null;
         return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim())
           ? null
           : 'Link the Delta thread: an https link on delta.dev.';
@@ -1089,7 +1090,7 @@ export class CreateDialog {
           const w = await this.store.createWorkstream({
             title,
             description: this.text().trim() || undefined,
-            deltaThreadUrl: this.deltaUrl().trim(),
+            deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() : undefined,
             ownerTeamId: this.ownerTeamId(),
             priority: this.priority() as Priority,
             accountableUserId: this.accountableId() || undefined,

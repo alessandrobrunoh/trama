@@ -50,12 +50,12 @@ Group when several issues **share a root cause or need the same change**. Do not
      idOrKey: "BUG-142",
      createWorkstream: {
        title: "Stabilize authentication before v2",
-       ownerTeamId, deltaThreadUrl,       // https URL of the Delta thread, required
+       ownerTeamId, deltaThreadUrl,       // https URL of the Delta thread; omit it if the workspace turned Delta threads off
        objective: "Sessions survive token rotation on all supported browsers."
      }
    }
    ```
-   If you do not have a `deltaThreadUrl`, **ask the user**; do not invent one.
+   If the workspace uses Delta threads and you do not have a `deltaThreadUrl`, **ask the user**; do not invent one. The create call tells you when it is required.
 4. Then add acceptance criteria that are *observable* ("OAuth login passes on Safari 18"), not tasks ("fix OAuth").
 
 An issue can belong to several workstreams, but only if it truly contributes to each; keep that rare.

@@ -112,7 +112,7 @@ import { WsActions } from './ws-actions';
               Copy git branch name
               <app-kbd keys="mod+shift+g" class="ml-auto opacity-70" />
             </button>
-            @if (ws().deltaThreadUrl) {
+            @if (ws().deltaThreadUrl && store.deltaThreads()) {
               <button hlmDropdownMenuItem (triggered)="actions.openDelta(ws())">
                 <app-provider-icon provider="delta" [size]="14" class="text-muted-foreground" />
                 Open Delta thread

@@ -109,6 +109,7 @@ export class WorkspacesService {
       timeZone?: string;
       iconColor?: string | null;
       iconInitial?: string | null;
+      deltaThreads?: boolean;
     },
   ) {
     const ws = ctx.workspace;
@@ -133,6 +134,7 @@ export class WorkspacesService {
       }
     }
     if (patch.estimateScale !== undefined) next.estimateScale = patch.estimateScale;
+    if (patch.deltaThreads !== undefined) next.deltaThreads = patch.deltaThreads;
     if (patch.weekStart !== undefined) next.weekStart = patch.weekStart;
     if (patch.timeZone !== undefined) {
       if (patch.timeZone !== 'auto') {

@@ -737,6 +737,11 @@ export interface WorkspaceSettings {
   iconColor?: string;
   /** 1-2 characters shown in the workspace icon (defaults to the name's initial). */
   iconInitial?: string;
+  /**
+   * Whether workstreams are linked to a Delta thread. Recommended for teams working in Delta. When off,
+   * the thread is hidden everywhere and no longer required to create a workstream.
+   */
+  deltaThreads: boolean;
 }
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -744,6 +749,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   estimateScale: 'fibonacci',
   weekStart: 'monday',
   timeZone: 'auto',
+  deltaThreads: true,
 };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */

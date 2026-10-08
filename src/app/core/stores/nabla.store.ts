@@ -476,6 +476,8 @@ export class NablaStore {
   readonly settings = computed<WorkspaceSettings>(() => resolveWorkspaceSettings(this._workspace()?.settings));
   /** Scale used by the estimate pickers (`estimateOptions(scale)` in core/estimates.ts). */
   readonly estimateScale = computed(() => this.settings().estimateScale);
+  /** Whether workstreams are linked to a Delta thread (workspace setting, on by default). */
+  readonly deltaThreads = computed(() => this.settings().deltaThreads !== false);
   /** IANA zone to display dates in, or `undefined` to follow the browser. */
   readonly timeZone = computed(() => {
     const tz = this.settings().timeZone;

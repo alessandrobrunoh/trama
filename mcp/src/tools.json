@@ -396,7 +396,7 @@
   "params": {
    "title": "body string! Title",
    "ownerTeamId": "body string! Owner team id",
-   "deltaThreadUrl": "body string! https URL on delta.dev (the Delta thread carrying this workstream)",
+   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Required unless status is draft or the workspace turned Delta threads off",
    "description": "body string Description",
    "objective": "body string Objective",
    "context": "body string Context",
@@ -710,7 +710,7 @@
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
    "workstreamIds": "body string[] Existing workstream ids",
-   "createWorkstream": "body object New workstream {title, ownerTeamId, deltaThreadUrl, objective?, ...}",
+   "createWorkstream": "body object New workstream {title, ownerTeamId, deltaThreadUrl?, objective?, ...}",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Resulting status"
   }
  },

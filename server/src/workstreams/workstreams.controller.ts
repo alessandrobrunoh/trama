@@ -19,7 +19,6 @@ import {
   IsString,
   MaxLength,
   MinLength,
-  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import {
@@ -72,11 +71,8 @@ class UpdateCriterionDto {
 export class CreateWorkstreamDto {
   @IsString() @MinLength(1) @MaxLength(200) title: string;
   @IsString() ownerTeamId: string;
-  @ValidateIf((dto: CreateWorkstreamDto) => dto.statusOverride !== 'draft')
-  @IsString()
-  @MinLength(1)
-  @MaxLength(500)
-  deltaThreadUrl: string;
+  /** Required unless the workstream is a draft or the workspace turned Delta threads off (checked in the service). */
+  @IsOptional() @IsString() @MaxLength(500) deltaThreadUrl?: string;
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @IsString() @MaxLength(20000) objective?: string;
   @IsOptional() @IsString() @MaxLength(20000) context?: string;

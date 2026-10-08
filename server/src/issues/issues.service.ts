@@ -44,7 +44,7 @@ export interface LinkIssueInput {
   createWorkstream?: WorkstreamInput & {
     title: string;
     ownerTeamId: string;
-    deltaThreadUrl: string;
+    deltaThreadUrl?: string;
   };
   /** Defaults to `in_progress` when the issue is still `backlog` or `todo`. */
   status?: IssueStatus;

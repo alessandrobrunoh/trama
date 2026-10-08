@@ -31,10 +31,13 @@ type Block =
       items: ListItem[];
       /** Every item starts with a record mention: shown as a card of rows. */ entities?: boolean;
     }
-  | { t: 'ol'; items: ListItem[] }
+  | { t: 'ol'; items: ListItem[]; entities?: boolean }
+  | { t: 'table'; head: Inline[][]; align: Align[]; rows: Inline[][][] }
   | { t: 'code'; lang: string; v: string }
   | { t: 'quote'; blocks: Block[] }
   | { t: 'hr' };
+
+type Align = 'left' | 'center' | 'right';
 
 const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
 
@@ -113,6 +116,27 @@ export function plainText(nodes: Inline[]): string {
     .join('');
 }
 
+/** `| a | b |` → ['a', 'b'] (escaped pipes stay inside the cell). */
+function splitRow(line: string): string[] {
+  let l = line.trim();
+  if (l.startsWith('|')) l = l.slice(1);
+  if (l.endsWith('|') && !l.endsWith('\\|')) l = l.slice(0, -1);
+  return l.split(/(?<!\\)\|/).map((c) => c.replace(/\\\|/g, '|').trim());
+}
+
+const SEPARATOR_RE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
+
+/** A GFM table starts with a header row containing a pipe, followed by a `---|---` separator row. */
+function isTableStart(lines: string[], i: number): boolean {
+  return i + 1 < lines.length && lines[i].includes('|') && SEPARATOR_RE.test(lines[i + 1]) && lines[i + 1].includes('-');
+}
+
+function cellAlign(cell: string): Align {
+  const left = cell.startsWith(':');
+  const right = cell.endsWith(':');
+  return left && right ? 'center' : right ? 'right' : 'left';
+}
+
 const LIST_RE = /^(\s*)([-*+]|\d+[.)])\s+(.*)$/;
 
 /** Parse block structure. Exported for tests / reuse. */
@@ -164,6 +188,19 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
       blocks.push({ t: 'quote', blocks: parseBlocks(q, link) });
       continue;
     }
+    // table
+    if (isTableStart(lines, i)) {
+      const head = splitRow(lines[i]);
+      const align = splitRow(lines[i + 1]).map(cellAlign);
+      i += 2;
+      const rows: Inline[][][] = [];
+      while (i < lines.length && lines[i].trim() && lines[i].includes('|')) {
+        const cells = splitRow(lines[i++]);
+        rows.push(head.map((_, c) => parseInline(cells[c] ?? '', link)));
+      }
+      blocks.push({ t: 'table', head: head.map((h) => parseInline(h, link)), align, rows });
+      continue;
+    }
     // list
     m = line.match(LIST_RE);
     if (m) {
@@ -205,7 +242,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           (it) => !it.children.length && it.checked === undefined && leadingRef(it.inline),
         );
       blocks.push(
-        ordered ? { t: 'ol', items } : { t: 'ul', items, ...(entities ? { entities } : {}) },
+        { t: ordered ? 'ol' : 'ul', items, ...(entities ? { entities } : {}) },
       );
       continue;
     }
@@ -217,7 +254,8 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
       !/^```/.test(lines[i]) &&
       !/^#{1,6}\s/.test(lines[i]) &&
       !/^\s*>/.test(lines[i]) &&
-      !LIST_RE.test(lines[i])
+      !LIST_RE.test(lines[i]) &&
+      !isTableStart(lines, i)
     ) {
       para.push(lines[i++].trim());
     }
@@ -351,6 +389,15 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
             }
           }
           @case ('ol') {
+            @if (b.entities) {
+              <div class="bg-card my-2 divide-y overflow-hidden rounded-lg border">
+                @for (it of b.items; track $index) {
+                  <app-entity-row [token]="lead(it.inline)!" [trailText]="text(trail(it.inline))">
+                    <ng-container *ngTemplateOutlet="inl; context: { $implicit: trail(it.inline) }" />
+                  </app-entity-row>
+                }
+              </div>
+            } @else {
             <ol class="my-2 list-decimal space-y-1 ps-5 marker:text-muted-foreground">
               @for (it of b.items; track $index) {
                 <li>
@@ -359,6 +406,36 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
                 </li>
               }
             </ol>
+            }
+          }
+          @case ('table') {
+            <div class="bg-card my-3 overflow-x-auto rounded-lg border">
+              <table class="w-full border-collapse text-[13px]">
+                <thead class="bg-muted/40 text-muted-foreground">
+                  <tr>
+                    @for (h of b.head; track $index) {
+                      <th
+                        class="px-3 py-2 font-medium whitespace-nowrap"
+                        [style.text-align]="b.align[$index]"
+                      >
+                        <ng-container *ngTemplateOutlet="inl; context: { $implicit: h }" />
+                      </th>
+                    }
+                  </tr>
+                </thead>
+                <tbody class="divide-y">
+                  @for (row of b.rows; track $index) {
+                    <tr class="hover:bg-accent/40 transition-colors">
+                      @for (cell of row; track $index) {
+                        <td class="px-3 py-2 align-top" [style.text-align]="b.align[$index]">
+                          <ng-container *ngTemplateOutlet="inl; context: { $implicit: cell }" />
+                        </td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            </div>
           }
           @case ('code') {
             <pre

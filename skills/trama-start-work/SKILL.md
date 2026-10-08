@@ -43,7 +43,7 @@ That is the signal Trama uses to show the workstream as `working`. Do not touch 
 
 ## 5. Work where the code lives
 
-Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.
+Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` (empty when the workspace does not use Delta threads) and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.
 
 ## 6. Leave a short trail
 
