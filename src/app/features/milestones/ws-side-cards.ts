@@ -5,6 +5,8 @@ import { Router } from '@angular/router';
 import { LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NablaStore, shortDate, type Workstream } from '../../core';
+import { AiActions } from '../ai-actions/ai-actions.service';
+import { AiButton } from '../ai-actions/ai-button';
 import { EventLine } from '../overview/event-line';
 import { MilestoneActions } from './milestone-actions';
 import { MilestoneIcon } from './milestone-icon';
@@ -15,12 +17,23 @@ import { ProgressChart } from './progress-chart';
 @Component({
   selector: 'app-ws-side-cards',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon, MilestoneIcon, ProgressChart, EventLine],
+  imports: [HlmButtonImports, LucideDynamicIcon, MilestoneIcon, ProgressChart, EventLine, AiButton],
   host: { class: 'flex flex-col gap-3' },
   template: `
     <!-- Progress -->
     <section class="bg-card border-border-strong rounded-lg border px-3 pt-2.5 pb-2" aria-label="Progress">
-      <h3 class="mb-2 text-[13px] font-medium">Progress</h3>
+      <div class="mb-2 flex items-center">
+        <h3 class="text-[13px] font-medium">Progress</h3>
+        <app-ai-button
+          class="ml-auto -mr-1"
+          label="Draft update"
+          variant="ghost"
+          size="xs"
+          tooltip="Draft a stakeholder status update from this workstream's data"
+          hideWhenUnavailable
+          (pressed)="ai.request('update', ws().id)"
+        />
+      </div>
       <div class="grid grid-cols-3 gap-2">
         @for (s of summary(); track s.label) {
           <div class="min-w-0">
@@ -97,6 +110,7 @@ import { ProgressChart } from './progress-chart';
 export class WsSideCards {
   protected readonly store = inject(NablaStore);
   protected readonly info = inject(MilestoneInfo);
+  protected readonly ai = inject(AiActions);
   private readonly actions = inject(MilestoneActions);
   private readonly router = inject(Router);
 

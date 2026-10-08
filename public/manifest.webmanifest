@@ -1,9 +1,9 @@
 {
-  "name": "Nabla — Work for humans and agents",
-  "short_name": "Nabla",
+  "name": "Trama — Work for humans and agents",
+  "short_name": "Trama",
   "display": "standalone",
   "background_color": "#0e0f11",
-  "theme_color": "#5e6ad2",
+  "theme_color": "#08090b",
   "scope": "./",
   "start_url": "./",
   "icons": [

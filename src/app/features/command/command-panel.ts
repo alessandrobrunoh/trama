@@ -41,6 +41,7 @@ import {
   LucideScale,
   LucideSearch,
   LucideSettings,
+  LucideSparkles,
   LucideSun,
   LucideSunMoon,
   LucideUserRound,
@@ -55,6 +56,7 @@ import type { ArtifactKind, IssueStatus, WorkstreamStatus } from '../../core/con
 import { ISSUE_STATUSES, ISSUE_STATUS_META, WORKSTREAM_STATUSES, WORKSTREAM_STATUS_META } from '../../core/meta';
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
+import { AiActions } from '../ai-actions/ai-actions.service';
 import { SessionStore } from '../../core/session/session.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
@@ -372,6 +374,7 @@ export class CommandPanel {
   private readonly searchSvc = inject(SearchService);
   private readonly recents = inject(RecentItems);
   private readonly clipboard = inject(Clipboard);
+  private readonly ai = inject(AiActions);
   private readonly branches = inject(BranchNames);
   private readonly document = inject(DOCUMENT);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
@@ -524,6 +527,23 @@ export class CommandPanel {
           icon: LucideUserRoundCheck,
           run: () => void this.store.updateIssue(c.id, { assigneeId: me }),
         });
+      }
+    }
+    if (this.ai.available()) {
+      const ask = (kind: 'summarize' | 'triage' | 'improve' | 'update' | 'breakdown') => () => this.ai.request(kind, c.id);
+      if (c.issue) {
+        out.push({ id: 'ctx:ai-summarize', label: 'AI: Summarize this issue', keywords: 'ai tldr summary explain', icon: LucideSparkles, run: ask('summarize') });
+        if (this.ai.canEditIssue(c.issue)) {
+          out.push(
+            { id: 'ctx:ai-triage', label: 'AI: Suggest properties', keywords: 'ai triage priority estimate type workstream', icon: LucideSparkles, run: ask('triage') },
+            { id: 'ctx:ai-improve', label: 'AI: Improve description', keywords: 'ai rewrite clearer title', icon: LucideSparkles, run: ask('improve') },
+          );
+        }
+      } else if (c.ws) {
+        out.push({ id: 'ctx:ai-update', label: 'AI: Draft status update', keywords: 'ai report stakeholder summary', icon: LucideSparkles, run: ask('update') });
+        if (this.ai.canEditWorkstream(c.ws)) {
+          out.push({ id: 'ctx:ai-breakdown', label: 'AI: Break down into issues', keywords: 'ai plan split tasks', icon: LucideSparkles, run: ask('breakdown') });
+        }
       }
     }
     out.push(

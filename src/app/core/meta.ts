@@ -15,7 +15,7 @@ import type {
   WorkstreamStatus,
 } from './contracts/domain';
 
-export const APP_NAME = 'Nabla';
+export const APP_NAME = 'Trama';
 
 export type Tone =
   | 'neutral'

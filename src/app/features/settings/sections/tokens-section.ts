@@ -30,7 +30,7 @@ const EXPIRY: Option[] = [
     <div>
       <app-section-header
         title="API tokens"
-        description="A token is a password for a script, CI job or AI agent: it lets that program call the Nabla API, as you or as an agent, without logging in."
+        description="A token is a password for a script, CI job or AI agent: it lets that program call the Trama API, as you or as an agent, without logging in."
       >
         @if (canCreate() && !creating() && !secret()) {
           <button actions hlmBtn size="sm" (click)="creating.set(true)">

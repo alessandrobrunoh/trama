@@ -129,7 +129,7 @@ import { SECTION_KIT } from './section-kit';
           </button>
         </div>
         <p class="text-muted-foreground text-xs">
-          Each Nabla account gets a separate Grok home directory. The official CLI stores its own
+          Each Trama account gets a separate Grok home directory. The official CLI stores its own
           credentials there; protect the configured volume and its backups.
         </p>
       </div>

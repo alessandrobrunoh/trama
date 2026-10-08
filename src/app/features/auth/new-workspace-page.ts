@@ -65,7 +65,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
         <hlm-field>
           <label hlmFieldLabel for="ws-slug">URL</label>
           <div class="flex items-center gap-1.5">
-            <span class="text-muted-foreground shrink-0 font-mono text-xs">nabla/</span>
+            <span class="text-muted-foreground shrink-0 font-mono text-xs">trama/</span>
             <input
               hlmInput
               id="ws-slug"

@@ -38,7 +38,7 @@ export class ApiError extends Error {
   static from(error: unknown): ApiError {
     if (error instanceof ApiError) return error;
     if (error instanceof HttpErrorResponse) {
-      if (error.status === 0) return new ApiError(0, 'Cannot reach the Nabla server');
+      if (error.status === 0) return new ApiError(0, 'Cannot reach the Trama server');
       const body: unknown = error.error;
       let message = error.statusText || `Request failed (${error.status})`;
       let code: string | undefined;

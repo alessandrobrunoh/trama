@@ -23,7 +23,7 @@ export function redact(text: string): string {
     .replace(EMAIL, '[email]')
     .replace(BEARER, (_m, k: string) => `${k} [redacted]`)
     .replace(SECRET, '[redacted]')
-    .replace(LONG_BLOB, '[redacted]');
+    .replace(LONG_BLOB, (m) => (/[A-Z]/.test(m) && /[a-z]/.test(m) && /\d/.test(m) ? '[redacted]' : m));
 }
 
 /** Scrub, collapse blank runs and cut to `max` characters (adds an ellipsis). */
@@ -192,7 +192,7 @@ export function updatePrompt(ws: PromptWorkstream, locale?: string): string {
   return envelope(
     'Write a short stakeholder status update for this workstream (markdown, at most about 180 words). Use exactly these sections in this order: "## Done", "## In progress", "## Risks", "## Next". Use short bullets that cite issue keys. Write "Nothing to report" for an empty section. Be factual and calm, do not over-promise.',
     '{"markdown": string}',
-    ws,
+    cleanWorkstream(ws),
     locale,
   );
 }
@@ -236,6 +236,28 @@ export function digestPrompt(d: PromptDigest, locale?: string): string {
 }
 
 // ───────────────────────────── helpers ─────────────────────────────
+
+function cleanWorkstream(w: PromptWorkstream): PromptWorkstream {
+  const list = (xs: readonly string[], n: number) => xs.slice(0, n).map((x) => oneLine(x, 160));
+  return {
+    ...w,
+    title: oneLine(w.title, LIMITS.title),
+    statusNote: w.statusNote ? oneLine(w.statusNote, 240) : undefined,
+    objective: clip(w.objective, 1200),
+    description: w.description ? clip(w.description, 1500) : undefined,
+    criteria: { ...w.criteria, open: list(w.criteria.open, 8) },
+    issues: {
+      ...w.issues,
+      doneList: list(w.issues.doneList, 8),
+      inProgressList: list(w.issues.inProgressList, 8),
+      todoList: list(w.issues.todoList, 8),
+    },
+    milestones: w.milestones.slice(0, 8).map((m) => ({ ...m, name: oneLine(m.name, 80) })),
+    openQuestions: list(w.openQuestions, 5),
+    signals: list(w.signals, 8),
+    recent: list(w.recent, 10),
+  };
+}
 
 function issueData(i: PromptIssue): Record<string, unknown> {
   return {

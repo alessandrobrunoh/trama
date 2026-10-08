@@ -85,7 +85,10 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     EstimateGlyph,
     NgTemplateOutlet,
   ],
-  host: { class: 'inline-block min-w-0 max-w-full' },
+  host: {
+    class: 'inline-block min-w-0 max-w-full',
+    '[class.shrink-0]': "variant() === 'chip'",
+  },
   template: `
     <hlm-popover [align]="align()" sideOffset="4" [state]="state()" (stateChanged)="state.set($event)">
       @switch (variant()) {

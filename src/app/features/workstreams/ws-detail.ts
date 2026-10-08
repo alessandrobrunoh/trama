@@ -37,6 +37,7 @@ import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { WsStatsTab } from '../stats/ws-stats-tab';
+import { AiWsActions } from '../ai-actions/ai-ws-dialogs';
 import { NextMilestoneChip } from '../milestones/milestone-chips';
 import { InlineText } from './inline-edit';
 import { Picker } from './picker';
@@ -91,6 +92,7 @@ const TAB_LABEL: Record<Tab, string> = {
     WsDatePicker,
     NextMilestoneChip,
     WsMenu,
+    AiWsActions,
     WsOverviewTab,
     WsIssuesSection,
     WsStatsTab,
@@ -103,7 +105,8 @@ const TAB_LABEL: Record<Tab, string> = {
   host: { class: 'flex min-h-full flex-col' },
   template: `
     @if (ws(); as w) {
-      <app-ws-menu #menu [ws]="w" [afterDelete]="backToList" />
+      <app-ws-menu #menu [ws]="w" [afterDelete]="backToList" aiHost />
+      <app-ai-ws-actions [ws]="w" />
       <ng-template appTopBarActions>
         <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" aria-label="Copy link" hlmTooltip="Copy link (⌘⇧C)" position="bottom" (click)="actions.copyLink([w])">
           <svg [lucideIcon]="linkIcon" [size]="15"></svg>

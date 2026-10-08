@@ -140,7 +140,7 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
           } @empty {
             @if (!creating() && !secret()) {
               <div class="text-muted-foreground px-4 py-6 text-center text-[13px]">
-                No token yet, so this agent cannot call Nabla.{{ canTokens() ? ' Create one to connect it.' : '' }}
+                No token yet, so this agent cannot call Trama.{{ canTokens() ? ' Create one to connect it.' : '' }}
               </div>
             }
           }
@@ -148,15 +148,15 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
       </div>
 
       <!-- Connect -->
-      <app-settings-group title="Connect" description="Give your agent runtime these and it reads and updates Nabla over the REST API as {{ a.name }}.">
+      <app-settings-group title="Connect" description="Give your agent runtime these and it reads and updates Trama over the REST API as {{ a.name }}.">
         <div class="flex flex-col gap-3 p-4">
           <ol class="text-muted-foreground list-decimal space-y-1 pl-5 text-xs leading-snug">
             <li>Create a token above (write scope lets the agent update work, read scope only lets it look).</li>
             <li>Put the three variables in the runtime’s environment, or call the API directly like in the examples.</li>
-            <li>Actions show up in Nabla with {{ a.name }}’s name and an agent badge.</li>
+            <li>Actions show up in Trama with {{ a.name }}’s name and an agent badge.</li>
           </ol>
           <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
-          <p class="text-muted-foreground text-xs leading-snug">Nabla does not expose an MCP server yet, so agents talk to the REST API with this token.</p>
+          <p class="text-muted-foreground text-xs leading-snug">Trama does not expose an MCP server yet, so agents talk to the REST API with this token.</p>
         </div>
       </app-settings-group>
 

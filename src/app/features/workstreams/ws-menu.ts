@@ -7,7 +7,7 @@
 //
 // When the workstream is part of a multi-selection, every action applies to the whole selection.
 import { ProviderIcon } from '../../shared/provider-icon';
-import { ChangeDetectionStrategy, Component, TemplateRef, computed, inject, input, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, TemplateRef, booleanAttribute, computed, inject, input, viewChild } from '@angular/core';
 import {
   LucideCalendar,
   LucideCheck,
@@ -17,6 +17,7 @@ import {
   LucideGitBranch,
   LucideLink,
   LucideRotateCcw,
+  LucideSparkles,
   LucideTrash2,
   LucideUserRound,
 } from '@lucide/angular';
@@ -35,6 +36,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
+import { AiActions } from '../ai-actions/ai-actions.service';
 import { WsActions } from './ws-actions';
 
 @Component({
@@ -71,6 +73,21 @@ import { WsActions } from './ws-actions';
               Target date
               <hlm-dropdown-menu-item-sub-indicator />
             </button>
+          </hlm-dropdown-menu-group>
+          <hlm-dropdown-menu-separator />
+        }
+        @if (aiHost() && ai.available() && targets().length === 1) {
+          <hlm-dropdown-menu-group>
+            <button hlmDropdownMenuItem (triggered)="ai.request('update', ws().id)">
+              <svg [lucideIcon]="sparkleIcon" [size]="14" class="text-entity-workstream"></svg>
+              Draft status update…
+            </button>
+            @if (canEdit()) {
+              <button hlmDropdownMenuItem (triggered)="ai.request('breakdown', ws().id)">
+                <svg [lucideIcon]="sparkleIcon" [size]="14" class="text-entity-workstream"></svg>
+                Break down into issues…
+              </button>
+            }
           </hlm-dropdown-menu-group>
           <hlm-dropdown-menu-separator />
         }
@@ -199,10 +216,13 @@ import { WsActions } from './ws-actions';
 export class WsMenu {
   protected readonly store = inject(NablaStore);
   protected readonly actions = inject(WsActions);
+  protected readonly ai = inject(AiActions);
 
   readonly ws = input.required<Workstream>();
   /** Called after a confirmed delete (e.g. navigate back to the list). */
   readonly afterDelete = input<(() => void) | undefined>(undefined);
+  /** The host page mounts `<app-ai-ws-actions>` (the workstream detail page): show the AI entries. */
+  readonly aiHost = input(false, { transform: booleanAttribute });
 
   /** Reference this from `[hlmContextMenuTrigger]` / `[hlmDropdownMenuTrigger]`. */
   readonly template = viewChild<TemplateRef<unknown>>('menu');
@@ -221,6 +241,7 @@ export class WsMenu {
   protected readonly autoIcon = LucideRotateCcw;
   protected readonly userIcon = LucideUserRound;
   protected readonly calIcon = LucideCalendar;
+  protected readonly sparkleIcon = LucideSparkles;
 
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly me = this.store.me;

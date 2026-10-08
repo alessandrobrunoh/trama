@@ -17,7 +17,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [FormsModule, RouterLink, HlmButtonImports, HlmFieldImports, HlmInputImports, HlmSpinner, LucideDynamicIcon, AuthShell],
   template: `
-    <app-auth-shell title="Sign in to Nabla" subtitle="Coordination for teams of humans and coding agents.">
+    <app-auth-shell title="Sign in to Trama" subtitle="Coordination for teams of humans and coding agents.">
       <form (submit)="submit($event)" novalidate class="flex flex-col gap-4">
         @if (error(); as e) {
           <div
@@ -75,7 +75,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         }
       </form>
       <ng-container footer>
-        New to Nabla?
+        New to Trama?
         <a
           class="text-foreground underline underline-offset-4"
           routerLink="/signup"

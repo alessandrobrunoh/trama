@@ -125,7 +125,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           (keydown.escape)="search.set(''); searchBox.blur()"
         />
       </div>
-      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full">
+      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain max-sm:basis-full">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
         <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />

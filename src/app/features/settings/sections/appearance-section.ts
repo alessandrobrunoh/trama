@@ -37,7 +37,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Appearance" description="Choose how Nabla looks on this device. Stored in this browser only." />
+      <app-section-header title="Appearance" description="Choose how Trama looks on this device. Stored in this browser only." />
 
       <app-settings-group title="Interface theme">
         <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">

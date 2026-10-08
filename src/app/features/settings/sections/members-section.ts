@@ -18,7 +18,7 @@ import { SECTION_KIT } from './section-kit';
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Members" description="People who can open this workspace. Invite someone who already has a Nabla account." />
+      <app-section-header title="Members" description="People who can open this workspace. Invite someone who already has a Trama account." />
 
       @if (canInvite()) {
         <app-settings-group title="Invite">

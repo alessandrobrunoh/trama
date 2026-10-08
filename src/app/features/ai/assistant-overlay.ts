@@ -7,6 +7,7 @@ import {
   inject,
   viewChild,
 } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import {
@@ -39,7 +40,7 @@ import { AssistantStore } from '../../core/ai/assistant.store';
       >
         <header class="flex h-12 shrink-0 items-center gap-2 border-b px-3">
           <svg [lucideIcon]="chatIcon" [size]="16" class="text-muted-foreground"></svg>
-          <h2 id="assistant-title" class="flex-1 text-sm font-medium">Nabla assistant</h2>
+          <h2 id="assistant-title" class="flex-1 text-sm font-medium">Trama assistant</h2>
           <button
             hlmBtn
             variant="ghost"
@@ -104,7 +105,7 @@ import { AssistantStore } from '../../core/ai/assistant.store';
           @for (message of ai.messages(); track $index) {
             <article [class]="message.role === 'user' ? 'bg-muted ml-5 rounded-xl p-3' : 'pr-2'">
               <div class="text-muted-foreground mb-1 text-[11px] font-medium">
-                {{ message.role === 'user' ? 'You' : 'Nabla' }}
+                {{ message.role === 'user' ? 'You' : 'Trama' }}
               </div>
               <p class="m-0 whitespace-pre-wrap break-words text-sm leading-relaxed">
                 {{ message.content }}
@@ -160,12 +161,12 @@ import { AssistantStore } from '../../core/ai/assistant.store';
           <form (submit)="send($event)" class="bg-muted/50 rounded-lg border p-2">
             <textarea
               #composer
-              aria-label="Message Nabla assistant"
+              aria-label="Message Trama assistant"
               aria-describedby="assistant-context-hint"
               rows="3"
               maxlength="8000"
               class="placeholder:text-muted-foreground w-full resize-none bg-transparent text-sm focus-visible:outline focus-visible:outline-1 focus-visible:outline-ring"
-              placeholder="Ask Nabla…"
+              placeholder="Ask Trama…"
               name="message"
               [ngModel]="ai.draft()"
               (ngModelChange)="ai.draft.set($event)"
@@ -212,7 +213,8 @@ import { AssistantStore } from '../../core/ai/assistant.store';
       #launcher
       hlmBtn
       variant="outline"
-      class="bg-popover fixed right-5 bottom-4 z-40 h-8 gap-2 rounded-full shadow-md"
+      id="desktop-assistant-launcher"
+      class="bg-popover fixed right-5 bottom-4 z-40 h-8 gap-2 rounded-full shadow-md max-md:hidden"
       aria-controls="nabla-assistant"
       [attr.aria-expanded]="ai.open()"
       (click)="toggle()"
@@ -248,6 +250,7 @@ import { AssistantStore } from '../../core/ai/assistant.store';
 })
 export class AssistantOverlay {
   protected readonly ai = inject(AssistantStore);
+  private readonly document = inject(DOCUMENT);
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
   private readonly launcher = viewChild<ElementRef<HTMLButtonElement>>('launcher');
   private readonly conversation = viewChild<ElementRef<HTMLElement>>('conversation');
@@ -287,7 +290,12 @@ export class AssistantOverlay {
   protected close(event?: Event): void {
     event?.stopPropagation();
     this.ai.open.set(false);
-    this.launcher()?.nativeElement.focus();
+    const mobileLauncher = this.document.getElementById('mobile-assistant-launcher');
+    if (mobileLauncher?.getClientRects().length) {
+      mobileLauncher.focus();
+    } else {
+      this.launcher()?.nativeElement.focus();
+    }
   }
   protected focusComposer(): void {
     this.composer()?.nativeElement.focus();
