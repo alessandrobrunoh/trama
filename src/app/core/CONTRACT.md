@@ -28,7 +28,7 @@ core/
 
 ## 1. Routes (`src/app/app.routes.ts`)
 
-Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (redirects to `/register`), `blog`, `roadmap`, `changelog`, `new-workspace`, `404`.
+Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (redirects to `/register`), `blog`, `roadmap`, `changelog`, `brand`, `new-workspace`, `404`.
 
 | path | page class (file) | guards |
 |---|---|---|
@@ -36,6 +36,7 @@ Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (
 | `/register` | `SignupPage` (features/auth/signup-page.ts) | guestGuard |
 | `/blog`, `/blog/:slug` | `BlogIndexPage`, `BlogPostPage` (features/blog/), posts in blog-posts.ts | - |
 | `/roadmap`, `/changelog` | `RoadmapPage`, `ChangelogPage` (features/roadmap/, features/changelog/) | - |
+| `/brand` | `BrandPage` (features/brand/), logo copy/download via `BrandAssets` | - |
 | `/new-workspace` | `NewWorkspacePage` (features/auth/new-workspace-page.ts) | authGuard |
 | `/404` | `NotFoundPage` (features/not-found/not-found-page.ts), inputs `workspace`, `error` | - |
 | `/` | `LandingPage` (features/landing/landing-page.ts) when signed out; signed in → last-used or first workspace `/<slug>/overview`, `/new-workspace` if none | landingGuard |

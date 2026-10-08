@@ -39,6 +39,7 @@ import { RouterLink } from '@angular/router';
         <a routerLink="/blog" class="text-muted-foreground hover:text-foreground">Blog</a>
         <a routerLink="/roadmap" class="text-muted-foreground hover:text-foreground">Roadmap</a>
         <a routerLink="/changelog" class="text-muted-foreground hover:text-foreground">Changelog</a>
+        <a routerLink="/brand" class="text-muted-foreground hover:text-foreground">Brand</a>
         <a routerLink="/login" class="text-muted-foreground hover:text-foreground">Sign in</a>
         <a routerLink="/register" class="text-muted-foreground hover:text-foreground"
           >Create account</a

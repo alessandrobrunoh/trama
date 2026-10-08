@@ -12,7 +12,7 @@ import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/sess
  * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
  * Reserved top-level paths (cannot be workspace slugs): login, register, signup, blog, roadmap,
- * changelog, new-workspace, 404.
+ * changelog, brand, new-workspace, 404.
  */
 export const routes: Routes = [
   {
@@ -51,6 +51,11 @@ export const routes: Routes = [
     path: 'changelog',
     title: 'Changelog · Trama',
     loadComponent: () => import('./features/changelog/changelog-page').then((m) => m.ChangelogPage),
+  },
+  {
+    path: 'brand',
+    title: 'Brand · Trama',
+    loadComponent: () => import('./features/brand/brand-page').then((m) => m.BrandPage),
   },
   {
     path: 'new-workspace',
