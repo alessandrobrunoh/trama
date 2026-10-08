@@ -41,7 +41,10 @@ export class CodeBlock {
   }
 }
 
-type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'env' | 'read' | 'write' | 'context';
+/** Installer of the trama CLI (see cli/README.md). */
+const INSTALL_URL = 'https://raw.githubusercontent.com/alessandrobrunoh/trama/main/cli/install/install.sh';
+
+type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'write' | 'context';
 
 /**
  * Copy-paste examples for connecting an MCP client (the trama-mcp server) or calling the Trama REST
@@ -98,6 +101,7 @@ export class ConnectSnippets {
     { id: 'mcp-cli', label: 'MCP · Claude Code' },
     { id: 'mcp-json', label: 'MCP · JSON config' },
     { id: 'mcp-docker', label: 'MCP · Docker' },
+    { id: 'cli', label: 'CLI' },
     { id: 'env', label: 'Environment' },
     { id: 'read', label: 'Read (curl)' },
     ...(this.scope() === 'read' ? [] : [{ id: 'write' as Tab, label: 'Write (curl)' }]),
@@ -112,8 +116,13 @@ export class ConnectSnippets {
         return { label: 'MCP config', hint: 'For clients that take a Streamable HTTP server with headers (Cursor, Windsurf, VS Code…). Same key, same permissions.' };
       case 'mcp-docker':
         return { label: 'docker command', hint: 'Run your own MCP server next to the API. Clients then connect to http://localhost:8080/mcp with the same Authorization header.' };
+      case 'cli':
+        return {
+          label: 'Shell',
+          hint: 'The trama command works anywhere a shell does, with or without MCP. `trama login` asks for the token (so it never lands in your shell history) and saves it; `trama skill install` teaches your coding agent the commands.',
+        };
       case 'env':
-        return { label: 'Environment', hint: 'Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
+        return { label: 'Environment', hint: 'Read by the trama CLI and by `trama mcp`. Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
       case 'read':
         return { label: 'curl command', hint: 'Lists the workspace’s workstreams. Any GET route works with every scope.' };
       case 'write':
@@ -136,8 +145,18 @@ export class ConnectSnippets {
         return JSON.stringify({ mcpServers: { trama: { url: this.mcpUrl, headers: { Authorization: `Bearer ${this.secret()}` } } } }, null, 2);
       case 'mcp-docker':
         return [`docker run --rm -p 8080:8080 \\`, `  -e TRAMA_API_URL=${url} \\`, `  ghcr.io/alessandrobrunoh/trama-mcp:latest`].join('\n');
+      case 'cli':
+        return [
+          `# install (macOS, Linux); on Windows: irm ${INSTALL_URL.replace('install.sh', 'install.ps1')} | iex`,
+          `curl -fsSL ${INSTALL_URL} | sh`,
+          ``,
+          `trama login --api-url ${url}   # paste the token when asked`,
+          `trama whoami`,
+          `trama issue list --open --limit 5`,
+          `trama skill install            # teach Claude Code / agents the commands`,
+        ].join('\n');
       case 'env':
-        return [`TRAMA_API_URL=${url}`, `TRAMA_WORKSPACE=${slug}`, `TRAMA_TOKEN=${this.secret()}`].join('\n');
+        return [`TRAMA_API_URL=${url}`, `TRAMA_WORKSPACE=${slug}`, `TRAMA_API_KEY=${this.secret()}`].join('\n');
       case 'read':
         return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/workstreams"`;
       case 'write':
