@@ -590,3 +590,55 @@
   background: color-mix(in oklab, var(--primary), white 12%);
   color: var(--primary-foreground);
 }
+
+/* ───────────────────── Personal preferences (core/preferences.ts) ─────────────────────
+   Applied through attributes on <html>; src/index.html sets them before first paint. */
+
+/* Font size: scales every rem-based size and spacing; the fixed px text sizes below follow. */
+html {
+  font-size: calc(100% * var(--font-scale, 1));
+}
+html[data-font-size]:not([data-font-size='default']) {
+  .text-\[9px\] { font-size: calc(9px * var(--font-scale)); }
+  .text-\[10px\] { font-size: calc(10px * var(--font-scale)); }
+  .text-\[11px\] { font-size: calc(11px * var(--font-scale)); }
+  .text-\[12px\] { font-size: calc(12px * var(--font-scale)); }
+  .text-\[12\.5px\] { font-size: calc(12.5px * var(--font-scale)); }
+  .text-\[13px\] { font-size: calc(13px * var(--font-scale)); }
+  .text-\[14px\] { font-size: calc(14px * var(--font-scale)); }
+  .text-\[15px\] { font-size: calc(15px * var(--font-scale)); }
+}
+
+/* Pointer cursors off: interactive elements keep the arrow, text fields keep their I-beam. */
+html[data-pointer-cursors='false']
+  :is(a, button, summary, label, select, [role='button'], [role='tab'], [role='menuitem'], [role='option'], [role='checkbox'], [role='radio'], [role='switch'], .cursor-pointer):not(
+    :is(input, textarea, [disabled], :disabled)
+  ) {
+  cursor: default !important;
+}
+
+/* Underline links in text content (descriptions, comments, markdown), not in navigation. */
+html[data-underline-links='true'] :is(app-markdown, p, li) a:not([hlmBtn], [data-slot='button']) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Reduce motion: always, or when the operating system asks for it (unless set to "full"). */
+html[data-motion='reduce'] *,
+html[data-motion='reduce'] *::before,
+html[data-motion='reduce'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not([data-motion='full']) *,
+  html:not([data-motion='full']) *::before,
+  html:not([data-motion='full']) *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

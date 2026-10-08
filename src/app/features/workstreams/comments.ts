@@ -4,7 +4,7 @@ import { LucideDynamicIcon, LucidePencil, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, UiStore, type Comment, type SubjectRef } from '../../core';
+import { NablaStore, Preferences, UiStore, type Comment, type SubjectRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
@@ -26,13 +26,12 @@ import { RelativeTimePipe } from '../../shared/pipes';
         [attr.aria-label]="placeholder()"
         [value]="draft()"
         (input)="draft.set($any($event.target).value)"
-        (keydown.meta.enter)="send()"
-        (keydown.control.enter)="send()"
+        (keydown)="onKeydown($event)"
       ></textarea>
       <div class="mt-1.5 flex items-center justify-between gap-2">
-        <span class="text-meta">Markdown supported</span>
+        <span class="text-meta">Markdown supported{{ prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : '' }}</span>
         <button hlmBtn size="sm" type="button" [disabled]="!draft().trim() || busy()" (click)="send()">
-          Comment <app-kbd keys="mod+enter" class="opacity-70 max-sm:hidden" />
+          Comment <app-kbd [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'" class="opacity-70 max-sm:hidden" />
         </button>
       </div>
     </div>
@@ -40,6 +39,7 @@ import { RelativeTimePipe } from '../../shared/pipes';
 })
 export class CommentComposer {
   protected readonly store = inject(NablaStore);
+  protected readonly prefs = inject(Preferences);
   readonly placeholder = input('Leave a comment…');
   readonly submitted = output<string>();
   protected readonly draft = signal('');
@@ -49,6 +49,15 @@ export class CommentComposer {
   reset(): void {
     this.draft.set('');
     this.busy.set(false);
+  }
+
+  /** ⌘/Ctrl + Enter always sends; plain Enter sends only when the user prefers it (Shift + Enter adds a line). */
+  protected onKeydown(ev: KeyboardEvent): void {
+    if (ev.key !== 'Enter' || ev.isComposing) return;
+    const modified = ev.metaKey || ev.ctrlKey;
+    if (!modified && (!this.prefs.sendsOnEnter() || ev.shiftKey || ev.altKey)) return;
+    ev.preventDefault();
+    this.send();
   }
 
   protected send(): void {

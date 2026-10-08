@@ -8,6 +8,7 @@ import type { UpdateWorkspaceInput } from '../api/api.types';
 import type { Role, User, Workspace } from '../contracts/domain';
 import { ROLE_META } from '../meta';
 import { Notifier } from '../notify/notifier';
+import { Preferences } from '../preferences';
 import { readJson, writeJson } from '../stores/storage';
 import { NablaStore } from '../stores/nabla.store';
 
@@ -21,6 +22,7 @@ export class SessionStore {
   private readonly nabla = inject(NablaStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
+  private readonly preferences = inject(Preferences);
 
   private readonly _user = signal<User | null>(null);
   private readonly _workspaces = signal<Workspace[]>([]);
@@ -170,12 +172,12 @@ export class SessionStore {
     await this.router.navigateByUrl(safe ?? this.defaultWorkspaceUrl());
   }
 
-  /** `/<last used or first workspace>/overview`, or `/new-workspace` when there is none. */
+  /** `/<last used or first workspace>/<home view>`, or `/new-workspace` when there is none. */
   defaultWorkspaceUrl(): string {
     const list = this._workspaces();
     const last = readJson<{ lastSlug: string }>(LAST_WORKSPACE_KEY)?.lastSlug;
     const target = list.find((w) => w.slug === last) ?? list[0];
-    return target ? `/${target.slug}/overview` : '/new-workspace';
+    return target ? `/${target.slug}/${this.preferences.homeView()}` : '/new-workspace';
   }
 
   /**

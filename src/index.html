@@ -22,14 +22,26 @@
     <!-- Apply the saved theme before first paint (no flash). Mirrors core/theme/theme.service.ts. -->
     <script>
       (function () {
+        var el = document.documentElement;
         try {
           var pref = localStorage.getItem('nabla.theme') || 'system';
           var dark =
             pref === 'dark' ||
             (pref !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-          var el = document.documentElement;
           if (dark) el.classList.add('dark');
           el.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {}
+        // Personal preferences (core/preferences.ts): same attributes, before first paint.
+        try {
+          var p = JSON.parse(localStorage.getItem('nabla.preferences.v1') || '{}');
+          var scale = { small: 0.9, large: 1.1, xlarge: 1.2 }[p.fontSize];
+          if (scale) {
+            el.style.setProperty('--font-scale', String(scale));
+            el.dataset.fontSize = p.fontSize;
+          }
+          if (p.pointerCursors === false) el.dataset.pointerCursors = 'false';
+          if (p.underlineLinks === true) el.dataset.underlineLinks = 'true';
+          if (p.motion === 'reduce' || p.motion === 'full') el.dataset.motion = p.motion;
         } catch (e) {}
       })();
     </script>

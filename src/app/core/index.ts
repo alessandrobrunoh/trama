@@ -7,6 +7,7 @@ export * from './meta';
 export * from './estimates';
 export * from './branch-name';
 export * from './branch-prefs';
+export * from './preferences';
 export * from './api';
 export * from './session';
 export * from './notify/notifier';
