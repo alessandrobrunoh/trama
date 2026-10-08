@@ -15,6 +15,7 @@ import type {
   DecisionStatus,
   DependencyNodeType,
   ExecutionProvider,
+  FavoriteType,
   GitProvider,
   InputRequestState,
   IssueKind,
@@ -509,6 +510,24 @@ export class ApiTokenEntity extends Wire {
   }
 }
 
+/** A person's pinned entity (unique per user, workspace, type and subject). */
+@Entity('favorites')
+@Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], { unique: true })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class FavoriteEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'varchar' }) type: FavoriteType;
+  @Column({ type: 'varchar' }) subjectId: string;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['userId'];
+  }
+}
+
 /** Per-user dismiss / snooze state for derived AttentionItems (item id = `${kind}:${sourceId}`). */
 @Entity('attention_state')
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
@@ -624,6 +643,7 @@ export const ENTITIES = [
   WorkspaceEntity,
   MembershipEntity,
   InviteEntity,
+  FavoriteEntity,
   AgentEntity,
   TeamEntity,
   RepositoryEntity,

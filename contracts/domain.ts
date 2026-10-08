@@ -43,6 +43,23 @@ export interface Membership {
   createdAt: ISODate;
 }
 
+/** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
+export const FAVORITE_TYPES = ['issue', 'workstream', 'decision', 'team', 'repository', 'view'] as const;
+export type FavoriteType = (typeof FAVORITE_TYPES)[number];
+/** Most favorites one person can keep in a workspace. */
+export const MAX_FAVORITES = 100;
+
+/** A pinned entity. Private to its owner: other people never see it. */
+export interface Favorite {
+  /** `fav_…` */
+  id: ID;
+  workspaceId: ID;
+  type: FavoriteType;
+  /** Id (not key) of the issue, workstream, decision, team, repository or view. */
+  subjectId: ID;
+  createdAt: ISODate;
+}
+
 /** Days an invitation stays valid. Resending an invitation starts a new period. */
 export const INVITE_TTL_DAYS = 7;
 
@@ -851,7 +868,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;

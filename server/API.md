@@ -67,6 +67,9 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `POST /w/:slug/invites` | `inviteMembers` | `{ email, role }` → `{ invite, url, emailed }`. The person does not need an account yet. Same address again refreshes the invite (new link and expiry, the old link stops working). Already a member → `409`; a role above your own → `403`. `url` is the only time the secret link is returned (only its hash is stored). |
 | `POST /w/:slug/invites/:id/resend` | `inviteMembers` | New link and expiry, emailed again. Same response as create. |
 | `DELETE /w/:slug/invites/:id` | `inviteMembers` | Revoke. |
+| `GET /w/:slug/favorites` | user (viewer and up; agent tokens → `403`) | The caller's own favorites (`Favorite[]`, oldest first). Favorites whose subject was deleted, or a view that is no longer visible to the caller, are dropped here. |
+| `POST /w/:slug/favorites` | user | `{ type: issue\|workstream\|decision\|team\|repository\|view, subjectId }` (the entity's id, not its key). Idempotent. Unknown subject, or another person's private view → `404`; at most 100 per workspace (`409`). Viewers may keep favorites. |
+| `DELETE /w/:slug/favorites/:type/:subjectId` | user | Idempotent (`204` even when it was not pinned). Favorites are private: nobody else sees them. |
 | `GET /invites/:token` | public | `InvitePreview` (`workspaceName`, `role`, `email`, `invitedByName`, `expiresAt`). `404` when unknown, used, revoked or expired. |
 | `POST /invites/:token/accept` | signed-in user | Joins the workspace; the account email must equal the invited one (`403` otherwise). → `{ workspace: { slug, name }, role }`. Single use; an existing member keeps their role. |
 

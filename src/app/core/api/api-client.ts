@@ -19,6 +19,8 @@ import type {
   Decision,
   Dependency,
   DomainEvent,
+  Favorite,
+  FavoriteType,
   ID,
   InputRequest,
   InviteLink,
@@ -208,6 +210,15 @@ export class ApiClient {
       this.post<InviteLink>(`${this.w(slug)}/invites`, input),
     resend: (slug: string, id: ID) => this.post<InviteLink>(`${this.w(slug)}/invites/${id}/resend`),
     revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
+  };
+
+  /** The signed-in user's favorites in a workspace (private to them). `remove` is idempotent. */
+  readonly favorites = {
+    list: (slug: string) => this.get<Favorite[]>(`${this.w(slug)}/favorites`, undefined, { quiet: true }),
+    add: (slug: string, type: FavoriteType, subjectId: ID) =>
+      this.post<Favorite>(`${this.w(slug)}/favorites`, { type, subjectId }),
+    remove: (slug: string, type: FavoriteType, subjectId: ID) =>
+      this.del(`${this.w(slug)}/favorites/${type}/${encodeURIComponent(subjectId)}`),
   };
 
   /** The page behind an invitation link: `preview` is public, `accept` needs a signed-in user. */

@@ -27,18 +27,21 @@ import {
   LucideSquarePen,
   LucideSun,
   LucideUserRound,
+  LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
+import { FavoritesStore } from '../core/stores/favorites.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
 import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
+import { StatusIcon } from '../shared/status';
 import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
 /**
@@ -59,6 +62,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
     HlmTooltip,
     Kbd,
     ActorAvatar,
+    StatusIcon,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -134,6 +138,54 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
           <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
       </ul>
+
+      <!-- Favorites: only once something is pinned -->
+      @if (favorites.entries().length) {
+        <div class="mt-4 max-md:mt-2">
+          <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('favorites')" [attr.aria-expanded]="!ui.isFolded('favorites')">
+            Favorites
+            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('favorites')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+          </button>
+          @if (!ui.isFolded('favorites')) {
+            <ul hlmSidebarMenu class="gap-px">
+              @for (e of favorites.entries(); track e.favorite.id) {
+                <li hlmSidebarMenuItem class="group/fav relative">
+                  <a
+                    hlmSidebarMenuButton
+                    [routerLink]="['/', slug(), ...e.link]"
+                    routerLinkActive
+                    #fla="routerLinkActive"
+                    [isActive]="fla.isActive"
+                    [tooltip]="e.key ? e.key + ' · ' + e.label : e.label"
+                    closeMobileSidebarOnClick
+                  >
+                    @switch (e.type) {
+                      @case ('issue') { <app-status-icon entity="issue" [status]="$any(e.status)" /> }
+                      @case ('workstream') { <app-status-icon entity="workstream" [status]="$any(e.status)" /> }
+                      @case ('decision') { <svg [lucideIcon]="decisionIcon" [size]="14" class="text-entity-decision shrink-0"></svg> }
+                      @case ('team') {
+                        <span class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white" [style.background]="e.color" aria-hidden="true">{{ e.label.slice(0, 1) }}</span>
+                      }
+                      @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                      @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                    }
+                    <span class="flex-1 truncate">{{ e.label }}</span>
+                  </a>
+                  <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                    aria-label="Remove from favorites"
+                    hlmTooltip="Remove from favorites"
+                    (click)="favorites.toggle(e.type, e.subjectId)"
+                  >
+                    <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      }
 
       <!-- Workspace -->
       <div class="mt-4 max-md:mt-2">
@@ -487,6 +539,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 })
 export class AppSidebar {
   protected readonly ui = inject(UiStore);
+  protected readonly favorites = inject(FavoritesStore);
   protected readonly store = inject(NablaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
@@ -508,6 +561,7 @@ export class AppSidebar {
   protected readonly wsIcon = LucideHexagon;
   protected readonly decisionIcon = LucideScale;
   protected readonly layers = LucideLayers;
+  protected readonly closeIcon = LucideX;
   protected readonly repoIcon = LucideFolderGit2;
   protected readonly usersIcon = LucideUsers;
   protected readonly teamLinks = [

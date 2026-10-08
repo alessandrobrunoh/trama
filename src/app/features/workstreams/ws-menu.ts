@@ -15,6 +15,7 @@ import {
   LucideDynamicIcon,
   LucideExternalLink,
   LucideGitBranch,
+  LucideStar,
   LucideLink,
   LucideRotateCcw,
   LucideSparkles,
@@ -23,6 +24,7 @@ import {
 } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
+  FavoritesStore,
   NablaStore,
   PRIORITIES,
   PRIORITY_META,
@@ -111,6 +113,10 @@ import { WsActions } from './ws-actions';
               <svg [lucideIcon]="branchIcon" [size]="14" class="text-muted-foreground"></svg>
               Copy git branch name
               <app-kbd keys="mod+shift+g" class="ml-auto opacity-70" />
+            </button>
+            <button hlmDropdownMenuItem (triggered)="favorites.toggle('workstream', ws().id)">
+              <svg [lucideIcon]="starIcon" [size]="14" class="text-muted-foreground" [attr.fill]="favorites.has('workstream', ws().id) ? 'currentColor' : 'none'"></svg>
+              {{ favorites.has('workstream', ws().id) ? 'Remove from favorites' : 'Add to favorites' }}
             </button>
             @if (ws().deltaThreadUrl && store.deltaThreads()) {
               <button hlmDropdownMenuItem (triggered)="actions.openDelta(ws())">
@@ -234,6 +240,8 @@ export class WsMenu {
   protected readonly datePresets = DATE_PRESETS;
   protected readonly copyIcon = LucideCopy;
   protected readonly branchIcon = LucideGitBranch;
+  protected readonly starIcon = LucideStar;
+  protected readonly favorites = inject(FavoritesStore);
   protected readonly linkIcon = LucideLink;
   protected readonly extIcon = LucideExternalLink;
   protected readonly trashIcon = LucideTrash2;

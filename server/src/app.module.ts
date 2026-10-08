@@ -11,6 +11,7 @@ import { DecisionsModule } from './decisions/decisions.module.js';
 import { DependenciesModule } from './dependencies/dependencies.module.js';
 import { EventsModule } from './events/events.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
+import { FavoritesModule } from './favorites/favorites.module.js';
 import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
@@ -39,6 +40,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     AuthModule,
     WorkspacesModule,
     InvitesModule,
+    FavoritesModule,
     TeamsModule,
     RepositoriesModule,
     WorkstreamsModule,

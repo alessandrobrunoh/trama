@@ -40,6 +40,7 @@ import {
   LucidePlus,
   LucideScale,
   LucideSearch,
+  LucideStar,
   LucideSettings,
   LucideSparkles,
   LucideSun,
@@ -59,6 +60,7 @@ import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
+import { FavoritesStore } from '../../core/stores/favorites.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { ThemeService } from '../../core/theme';
@@ -390,6 +392,7 @@ export class CommandPanel {
 
   private readonly ui = inject(UiStore);
   private readonly store = inject(NablaStore);
+  private readonly favorites = inject(FavoritesStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
   private readonly theme = inject(ThemeService);
@@ -693,6 +696,17 @@ export class CommandPanel {
       out.push({ id: 'new:workstream', label: 'Create workstream', keywords: 'new', icon: LucidePlus, keys: 'c', run: create('workstream') });
     if (this.store.can('member'))
       out.push({ id: 'new:decision', label: 'Create decision', keywords: 'new adr', icon: LucidePlus, run: create('decision') });
+    const page = this.favorites.current();
+    if (page) {
+      const pinned = this.favorites.has(page.type, page.id);
+      out.push({
+        id: 'favorite:toggle',
+        label: pinned ? 'Remove from favorites' : 'Add to favorites',
+        keywords: 'star pin bookmark favourite',
+        icon: LucideStar,
+        run: () => void this.favorites.toggle(page.type, page.id),
+      });
+    }
     out.push(
       { id: 'search', label: 'Search everything', icon: LucideSearch, keys: '/', run: () => this.ui.openModal('search') },
       {
