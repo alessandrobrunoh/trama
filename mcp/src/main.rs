@@ -42,7 +42,7 @@ impl Config {
         if !(api_url.starts_with("http://") || api_url.starts_with("https://")) {
             return Err("TRAMA_API_URL must start with http:// or https://".into());
         }
-        let bind = env("MCP_BIND").unwrap_or_else(|| "0.0.0.0:8080".into()).parse().map_err(|e| format!("MCP_BIND: {e}"))?;
+        let bind = env("MCP_BIND").unwrap_or_else(|| "127.0.0.1:8787".into()).parse().map_err(|e| format!("MCP_BIND: {e}"))?;
         let number = |name: &str, default: u64| -> Result<u64, String> {
             env(name).map_or(Ok(default), |v| v.parse().map_err(|_| format!("{name} must be a number")))
         };

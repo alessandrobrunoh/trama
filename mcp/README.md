@@ -16,13 +16,13 @@ docker compose -f server/docker-compose.yml up -d mcp        # production layout
 docker build -t trama-mcp mcp
 docker run --rm -p 8080:8080 -e TRAMA_API_URL=http://host.docker.internal:3000/api trama-mcp
 
-cd mcp && TRAMA_API_URL=http://localhost:3000/api cargo run   # local, listens on 0.0.0.0:8080
+cd mcp && TRAMA_API_URL=http://localhost:3000/api cargo run   # local, listens on 127.0.0.1:8787
 ```
 
 | Env | Default | |
 |---|---|---|
 | `TRAMA_API_URL` | `http://localhost:3000/api` | API base URL as seen from the server |
-| `MCP_BIND` | `0.0.0.0:8080` | listen address |
+| `MCP_BIND` | `127.0.0.1:8787` | listen address (the Docker image sets `0.0.0.0:8080`) |
 | `MCP_ALLOWED_ORIGINS` | none | comma-separated browser origins allowed (requests with any other `Origin` get 403) |
 | `MCP_MAX_OUTPUT_BYTES` | `200000` | tool output beyond this is truncated |
 | `MCP_UPSTREAM_TIMEOUT_SECS` | `30` | per API call |
