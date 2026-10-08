@@ -128,7 +128,12 @@ const SEPARATOR_RE = /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/;
 
 /** A GFM table starts with a header row containing a pipe, followed by a `---|---` separator row. */
 function isTableStart(lines: string[], i: number): boolean {
-  return i + 1 < lines.length && lines[i].includes('|') && SEPARATOR_RE.test(lines[i + 1]) && lines[i + 1].includes('-');
+  return (
+    i + 1 < lines.length &&
+    lines[i].includes('|') &&
+    SEPARATOR_RE.test(lines[i + 1]) &&
+    lines[i + 1].includes('-')
+  );
 }
 
 function cellAlign(cell: string): Align {
@@ -241,9 +246,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
         items.every(
           (it) => !it.children.length && it.checked === undefined && leadingRef(it.inline),
         );
-      blocks.push(
-        { t: ordered ? 'ol' : 'ul', items, ...(entities ? { entities } : {}) },
-      );
+      blocks.push({ t: ordered ? 'ol' : 'ul', items, ...(entities ? { entities } : {}) });
       continue;
     }
     // paragraph (until blank line / block start)
@@ -393,19 +396,21 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
               <div class="bg-card my-2 divide-y overflow-hidden rounded-lg border">
                 @for (it of b.items; track $index) {
                   <app-entity-row [token]="lead(it.inline)!" [trailText]="text(trail(it.inline))">
-                    <ng-container *ngTemplateOutlet="inl; context: { $implicit: trail(it.inline) }" />
+                    <ng-container
+                      *ngTemplateOutlet="inl; context: { $implicit: trail(it.inline) }"
+                    />
                   </app-entity-row>
                 }
               </div>
             } @else {
-            <ol class="my-2 list-decimal space-y-1 ps-5 marker:text-muted-foreground">
-              @for (it of b.items; track $index) {
-                <li>
-                  <ng-container *ngTemplateOutlet="inl; context: { $implicit: it.inline }" />
-                  <ng-container *ngTemplateOutlet="blk; context: { $implicit: it.children }" />
-                </li>
-              }
-            </ol>
+              <ol class="my-2 list-decimal space-y-1 ps-5 marker:text-muted-foreground">
+                @for (it of b.items; track $index) {
+                  <li>
+                    <ng-container *ngTemplateOutlet="inl; context: { $implicit: it.inline }" />
+                    <ng-container *ngTemplateOutlet="blk; context: { $implicit: it.children }" />
+                  </li>
+                }
+              </ol>
             }
           }
           @case ('table') {
