@@ -23,15 +23,22 @@ export class AiContextService {
     private readonly decisions: Repository<DecisionEntity>,
   ) {}
 
+  /** `withTools`: the model can look records up itself, so no record lists are pre-loaded into the prompt. */
   async resolve(
     ctx: WorkspaceContext,
     context?: ChatContextDto,
+    withTools = false,
   ): Promise<string> {
     if (!context) return 'No page data has been shared.';
     const workspaceId = ctx.workspace.id;
     const id = context.id;
     const base = { workspace: ctx.workspace.name, page: context.label };
     if (!id || context.kind === 'page') {
+      if (withTools)
+        return JSON.stringify({
+          ...base,
+          note: 'Only the page name is shared. Use the tools to look up any record.',
+        });
       const mine = ctx.userId
         ? await this.assignedIssues(workspaceId, ctx.userId)
         : [];
