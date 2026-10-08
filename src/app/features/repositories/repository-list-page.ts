@@ -4,6 +4,7 @@ import { LucideDownload, LucideDynamicIcon, LucideFolderGit2, LucidePlus, Lucide
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, UiStore } from '../../core';
+import { GIT_PROVIDERS, GIT_PROVIDER_META } from '../../core/contracts/domain';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
@@ -15,10 +16,7 @@ import { Picker, type PickOption } from '../workstreams/picker';
 import { ImportRepositoriesDialog } from './import-repositories-dialog';
 import { teamOptions } from '../workstreams/ws-model';
 
-const PROVIDERS: PickOption[] = [
-  { value: 'github', label: 'GitHub', kind: 'provider', provider: 'github' },
-  { value: 'gitlab', label: 'GitLab', kind: 'provider', provider: 'gitlab' },
-];
+const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label, kind: 'provider', provider: p }));
 
 @Component({
   selector: 'app-repository-list-page',
@@ -80,9 +78,9 @@ const PROVIDERS: PickOption[] = [
     </div>
 
     @if (total() === 0) {
-      <app-empty-state [icon]="folder" title="No projects yet" description="A project is a GitHub or GitLab repository a workstream can land in. Import them from a connected account, or add one by hand.">
+      <app-empty-state [icon]="folder" title="No projects yet" description="A project is a repository on GitHub, GitLab or Bitbucket that a workstream can land in. Import them from a connected account, or add one by hand.">
         @if (canAdmin()) {
-          <button hlmBtn size="sm" (click)="importOpen.set(true)"><svg [lucideIcon]="download" [size]="14"></svg>Import from GitHub or GitLab</button>
+          <button hlmBtn size="sm" (click)="importOpen.set(true)"><svg [lucideIcon]="download" [size]="14"></svg>Import from a git host</button>
           <button hlmBtn size="sm" variant="outline" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>Add manually</button>
         }
       </app-empty-state>

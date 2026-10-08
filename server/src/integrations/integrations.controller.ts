@@ -3,12 +3,12 @@ import type { Request, Response } from 'express';
 import { Type } from 'class-transformer';
 import { IsArray, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import type { ActorRef } from '../contracts/domain.js';
+import { GIT_PROVIDERS, type ActorRef } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { IntegrationsService, type ConnectionProvider } from './integrations.service.js';
 
 class CreateIntegrationDto {
-  @IsIn(['github', 'gitlab', 'delta']) provider: ConnectionProvider;
+  @IsIn([...GIT_PROVIDERS, 'delta']) provider: ConnectionProvider;
   @IsString() @MinLength(1) @MaxLength(500) token: string;
   @IsOptional() @IsString() @MaxLength(500) baseUrl?: string;
 }
@@ -28,7 +28,7 @@ class LinkRepositoryDto {
   @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
 }
 
-/** Connections to GitHub / GitLab / Delta. Admin and above only; secrets are never returned. */
+/** Connections to a git host (GitHub, GitLab, Bitbucket) or Delta. Admin and above only; secrets are never returned. */
 @Controller('w/:slug/integrations')
 @Can('manageIntegrations')
 export class IntegrationsController {

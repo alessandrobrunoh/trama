@@ -10,7 +10,7 @@ import type { Repository } from '../../core/contracts/domain';
 import { NablaStore } from '../../core/stores/nabla.store';
 
 /**
- * Lists the repositories a GitHub / GitLab connection can see (`GET /integrations/:id/remote-repositories`)
+ * Lists the repositories a git host connection can see (`GET /integrations/:id/remote-repositories`)
  * and links them as projects (`POST /integrations/:id/link-repository`). Used by Settings → Integrations
  * and the Projects "Import" dialog.
  *   <app-remote-repo-browser [connectionId]="c.id" [teamIds]="teams()" (linked)="onLinked($event)" />

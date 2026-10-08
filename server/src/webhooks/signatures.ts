@@ -20,3 +20,8 @@ export function signGithub(secret: string, body: string | Buffer): string {
 export function verifyGitlabToken(secret: string, header: string | undefined): boolean {
   return !!header && safeEqual(secret, header);
 }
+
+/** Bitbucket Cloud: `X-Hub-Signature: sha256=<hex hmac of the raw body>`, the same scheme as GitHub's, in another header. */
+export function verifyBitbucketSignature(secret: string, rawBody: Buffer, header: string | undefined): boolean {
+  return verifyGithubSignature(secret, rawBody, header);
+}

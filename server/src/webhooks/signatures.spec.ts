@@ -1,4 +1,4 @@
-import { signGithub, verifyGithubSignature, verifyGitlabToken } from './signatures.js';
+import { signGithub, verifyBitbucketSignature, verifyGithubSignature, verifyGitlabToken } from './signatures.js';
 
 describe('webhook signatures', () => {
   const body = Buffer.from('{"action":"opened"}');
@@ -18,5 +18,10 @@ describe('webhook signatures', () => {
     expect(verifyGitlabToken('tok', 'tok2')).toBe(false);
     expect(verifyGitlabToken('tok', undefined)).toBe(false);
     expect(verifyGitlabToken('tok', '')).toBe(false);
+  });
+  it('verifies Bitbucket HMACs (sha256=<hex>)', () => {
+    expect(verifyBitbucketSignature('s3cret', body, signGithub('s3cret', body))).toBe(true);
+    expect(verifyBitbucketSignature('other', body, signGithub('s3cret', body))).toBe(false);
+    expect(verifyBitbucketSignature('s3cret', body, undefined)).toBe(false);
   });
 });

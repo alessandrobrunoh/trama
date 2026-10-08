@@ -157,6 +157,71 @@ export class GitlabClient implements GitProviderClient {
   }
 }
 
+/**
+ * Bitbucket Cloud (API 2.0). The credential is either an Atlassian API token, entered as
+ * `email:token` (HTTP Basic), or a repository / workspace access token (Bearer).
+ */
+export class BitbucketClient implements GitProviderClient {
+  private readonly api = 'https://api.bitbucket.org/2.0';
+  constructor(
+    private readonly http: HttpClient,
+    private readonly credential: string,
+  ) {}
+
+  private authorization(): string {
+    return this.credential.includes(':')
+      ? `Basic ${Buffer.from(this.credential).toString('base64')}`
+      : `Bearer ${this.credential}`;
+  }
+
+  private async get(path: string): Promise<HttpResponse> {
+    const res = await this.http.request({
+      url: `${this.api}${path}`,
+      headers: { Authorization: this.authorization(), Accept: 'application/json', 'User-Agent': 'nabla' },
+    });
+    ensureOk(res);
+    return res;
+  }
+
+  async currentUser() {
+    const j = (await this.get('/user')).json as { nickname?: string; display_name?: string };
+    const account = j?.nickname || j?.display_name;
+    if (!account) throw new ProviderHttpError(502, 'Unexpected response from Bitbucket /user');
+    return { account };
+  }
+
+  private map(r: Record<string, unknown>): RemoteRepository {
+    const links = r.links as { html?: { href?: unknown } } | undefined;
+    const main = r.mainbranch as { name?: unknown } | undefined;
+    return {
+      fullName: String(r.full_name),
+      url: typeof links?.html?.href === 'string' ? links.html.href : `https://bitbucket.org/${String(r.full_name)}`,
+      defaultBranch: typeof main?.name === 'string' ? main.name : 'main',
+      private: typeof r.is_private === 'boolean' ? r.is_private : undefined,
+      description: typeof r.description === 'string' && r.description ? r.description : undefined,
+    };
+  }
+
+  async listRepositories(page: number, perPage: number): Promise<RemoteRepositoryPage> {
+    const res = await this.get(`/user/permissions/repositories?pagelen=${perPage}&page=${page}`);
+    const j = res.json as { values?: { repository?: Record<string, unknown> }[]; next?: unknown } | null;
+    const items = (j?.values ?? []).flatMap((v) => (v.repository ? [this.map(v.repository)] : []));
+    return { items, page, perPage, hasMore: typeof j?.next === 'string' };
+  }
+
+  async getRepository(fullName: string) {
+    const path = fullName.split('/').map(encodeURIComponent).join('/');
+    return this.map((await this.get(`/repositories/${path}`)).json as Record<string, unknown>);
+  }
+}
+
 export function createGitClient(provider: GitProvider, http: HttpClient, token: string, baseUrl?: string | null): GitProviderClient {
-  return provider === 'github' ? new GithubClient(http, token, baseUrl) : new GitlabClient(http, token, baseUrl);
+  switch (provider) {
+    case 'github':
+      return new GithubClient(http, token, baseUrl);
+    case 'gitlab':
+      return new GitlabClient(http, token, baseUrl);
+    case 'bitbucket':
+      return new BitbucketClient(http, token);
+  }
 }

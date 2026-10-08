@@ -6,8 +6,8 @@ import type { ArtifactKind, ArtifactProvider, ArtifactState, CiState, ReviewStat
  */
 export interface ArtifactCandidate {
   kind: Extract<ArtifactKind, 'pull_request' | 'merge_request'>;
-  provider: Extract<ArtifactProvider, 'github' | 'gitlab'>;
-  /** `#182` (GitHub) / `!12` (GitLab). */
+  provider: Extract<ArtifactProvider, 'github' | 'gitlab' | 'bitbucket'>;
+  /** `#182` (GitHub, Bitbucket) / `!12` (GitLab). */
   externalId: string;
   title: string;
   url?: string;

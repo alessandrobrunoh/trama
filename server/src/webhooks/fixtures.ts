@@ -67,3 +67,32 @@ export const glPipeline = (status: string, mrIid?: number) => ({
   object_attributes: { id: 99, status, sha: 'b'.repeat(40), ref: 'web-7/ttl' },
   ...(mrIid ? { merge_request: { iid: mrIid } } : {}),
 });
+
+export const bbRepo = {
+  full_name: 'acme-bb/payments',
+  links: { html: { href: 'https://bitbucket.org/acme-bb/payments' } },
+  mainbranch: { name: 'main' },
+  is_private: true,
+};
+
+export function bbPullRequest(attrs: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
+  return {
+    repository: bbRepo,
+    pullrequest: {
+      id: 21,
+      title: 'PAY-3: Retry failed charges',
+      description: 'Retries',
+      state: 'OPEN',
+      source: { branch: { name: 'pay-3/retry' }, commit: { hash: 'c'.repeat(40) } },
+      links: { html: { href: 'https://bitbucket.org/acme-bb/payments/pull-requests/21' } },
+      reviewers: [],
+      ...attrs,
+    },
+    ...extra,
+  };
+}
+
+export const bbCommitStatus = (state: string) => ({
+  repository: bbRepo,
+  commit_status: { state, commit: { hash: 'c'.repeat(40) }, refname: 'pay-3/retry' },
+});

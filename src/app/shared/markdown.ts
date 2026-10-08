@@ -14,10 +14,14 @@ type Inline =
   | { t: 'del'; c: Inline[] }
   | { t: 'link'; href: string; c: Inline[] }
   /** A mention of a workspace record (key or project name) found by the optional `TextLinker`. */
-  | { t: 'ref'; v: string };
+  | { t: 'ref'; v: string }
+  /** `@Name` of a member or agent, found by the optional `TextLinker`. */
+  | { t: 'mention'; v: string };
 
 /** Splits plain text into text and `ref` nodes; supplied by the host so this file stays data-agnostic. */
-export type TextLinker = (text: string) => ({ t: 'text'; v: string } | { t: 'ref'; v: string })[];
+export type TextLinker = (
+  text: string,
+) => ({ t: 'text'; v: string } | { t: 'ref'; v: string } | { t: 'mention'; v: string })[];
 
 interface ListItem {
   checked?: boolean;
@@ -114,7 +118,7 @@ export function trailing(nodes: Inline[]): Inline[] {
 /** Plain text of inline nodes (for comparisons). */
 export function plainText(nodes: Inline[]): string {
   return nodes
-    .map((n) => (n.t === 'text' || n.t === 'code' || n.t === 'ref' ? n.v : plainText(n.c)))
+    .map((n) => (n.t === 'text' || n.t === 'code' || n.t === 'ref' || n.t === 'mention' ? n.v : plainText(n.c)))
     .join('');
 }
 
@@ -294,6 +298,9 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           }
           @case ('ref') {
             <app-entity-ref [token]="n.v" />
+          }
+          @case ('mention') {
+            <span class="text-primary bg-primary/10 rounded px-1 font-medium">{{ n.v }}</span>
           }
           @case ('strong') {
             <strong class="font-semibold"

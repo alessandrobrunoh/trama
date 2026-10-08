@@ -1,7 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
-import type { ActorRef, GitProvider } from '../contracts/domain.js';
+import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
 import { RepositoryEntity, WorkstreamEntity } from '../database/entities/index.js';
@@ -38,7 +38,7 @@ export class RepositoriesService {
     await this.refs.teams(workspaceId, input.teamIds);
     if (await this.repo.existsBy({ workspaceId, provider: input.provider, fullName: input.fullName }))
       throw new ConflictException(`Repository ${input.fullName} already exists`);
-    const host = input.provider === 'github' ? 'github.com' : 'gitlab.com';
+    const host = GIT_PROVIDER_META[input.provider].host;
     const row = await this.repo.save(
       this.repo.create({
         id: uid('rp'),

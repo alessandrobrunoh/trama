@@ -1,5 +1,5 @@
-import { PayloadError, githubCi, gitlabCi, parseGithubEvent, parseGitlabEvent } from './events.js';
-import { ghCheckRun, ghCheckSuite, ghPullRequest, ghStatus, glMergeRequest, glPipeline } from './fixtures.js';
+import { PayloadError, bitbucketCi, githubCi, gitlabCi, parseBitbucketEvent, parseGithubEvent, parseGitlabEvent } from './events.js';
+import { bbCommitStatus, bbPullRequest, ghCheckRun, ghCheckSuite, ghPullRequest, ghStatus, glMergeRequest, glPipeline } from './fixtures.js';
 
 describe('GitHub payload mapping', () => {
   it('maps an opened PR', () => {
@@ -96,5 +96,48 @@ describe('GitLab payload mapping', () => {
     expect(parseGitlabEvent({ object_kind: 'push', project: {} }).kind).toBe('ignored');
     expect(() => parseGitlabEvent({})).toThrow(PayloadError);
     expect(() => parseGitlabEvent({ object_kind: 'merge_request', project: {}, object_attributes: {} })).toThrow(PayloadError);
+  });
+});
+
+describe('Bitbucket payload mapping', () => {
+  const pr = (event: string, attrs: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => {
+    const r = parseBitbucketEvent(event, bbPullRequest(attrs, extra));
+    if (r.kind !== 'pr') throw new Error('expected pr');
+    return r;
+  };
+  it('maps a created PR with its repository', () => {
+    const r = pr('pullrequest:created');
+    expect(r.repo).toEqual({ fullName: 'acme-bb/payments', url: 'https://bitbucket.org/acme-bb/payments', defaultBranch: 'main' });
+    expect(r.candidate).toMatchObject({
+      kind: 'pull_request', provider: 'bitbucket', externalId: '#21', state: 'open', headSha: 'c'.repeat(40), headBranch: 'pay-3/retry',
+      url: 'https://bitbucket.org/acme-bb/payments/pull-requests/21',
+    });
+  });
+  it('maps states, drafts and reviews', () => {
+    expect(pr('pullrequest:fulfilled', { state: 'MERGED' }).candidate.state).toBe('merged');
+    expect(pr('pullrequest:rejected', { state: 'DECLINED' }).candidate.state).toBe('closed');
+    expect(pr('pullrequest:updated', { draft: true }).candidate.state).toBe('draft');
+    expect(pr('pullrequest:approved').candidate.review).toBe('approved');
+    expect(pr('pullrequest:unapproved').candidate).toMatchObject({ review: 'none', reviewOnlyFrom: ['approved'] });
+    expect(pr('pullrequest:unapproved', { reviewers: [{ uuid: 'x' }] }).candidate.review).toBe('requested');
+    expect(pr('pullrequest:changes_request_created').candidate.review).toBe('changes_requested');
+    expect(pr('pullrequest:created', { reviewers: [{ uuid: 'x' }] }).candidate).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
+  });
+  it('maps build statuses', () => {
+    const ci = (state: string) => {
+      const r = parseBitbucketEvent('repo:commit_status_updated', bbCommitStatus(state));
+      return r.kind === 'ci' ? r.patch : r.kind;
+    };
+    expect(ci('SUCCESSFUL')).toMatchObject({ ci: 'passing', sha: 'c'.repeat(40) });
+    expect(ci('FAILED')).toMatchObject({ ci: 'failing' });
+    expect(ci('INPROGRESS')).toMatchObject({ ci: 'pending' });
+    expect(bitbucketCi('STOPPED')).toBe('pending');
+  });
+  it('answers pings, ignores unhandled events and rejects malformed payloads', () => {
+    expect(parseBitbucketEvent('diagnostics:ping', {}).kind).toBe('ping');
+    expect(parseBitbucketEvent('pullrequest:comment_created', bbPullRequest()).kind).toBe('ignored');
+    expect(parseBitbucketEvent('repo:push', {}).kind).toBe('ignored');
+    expect(() => parseBitbucketEvent('pullrequest:created', {})).toThrow(PayloadError);
+    expect(() => parseBitbucketEvent('pullrequest:created', { repository: {}, pullrequest: {} })).toThrow(PayloadError);
   });
 });

@@ -1,12 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { IsArray, IsIn, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import type { ActorRef, GitProvider } from '../contracts/domain.js';
+import { GIT_PROVIDERS, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { OptionalNotNull } from '../common/validation.js';
 import { RepositoriesService } from './repositories.service.js';
 
 class CreateRepositoryDto {
-  @IsIn(['github', 'gitlab']) provider: GitProvider;
+  @IsIn(GIT_PROVIDERS) provider: GitProvider;
   /** e.g. "acme/api" */
   @Matches(/^[\w.-]+(\/[\w.-]+)+$/, { message: 'fullName must look like "owner/name"' }) fullName: string;
   @IsOptional() @IsString() @MaxLength(300) url?: string;

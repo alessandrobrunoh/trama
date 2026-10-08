@@ -209,7 +209,22 @@ export interface Team {
   editPolicy: TeamEditPolicy;
 }
 
-export type GitProvider = 'github' | 'gitlab';
+export type GitProvider = 'github' | 'gitlab' | 'bitbucket';
+
+export const GIT_PROVIDERS: GitProvider[] = ['github', 'gitlab', 'bitbucket'];
+
+/**
+ * What differs between git hosts. `host` is the public web host used to build repository URLs
+ * (`https://<host>/<fullName>`); `selfHosted` is whether a connection may point at another instance
+ * (GitHub Enterprise Server, self-hosted GitLab) via its base URL. To add a host: extend `GitProvider`,
+ * add its entry here, implement a client in server/src/integrations/providers.ts and a webhook parser
+ * in server/src/webhooks.
+ */
+export const GIT_PROVIDER_META: Record<GitProvider, { label: string; host: string; selfHosted: boolean }> = {
+  github: { label: 'GitHub', host: 'github.com', selfHosted: true },
+  gitlab: { label: 'GitLab', host: 'gitlab.com', selfHosted: true },
+  bitbucket: { label: 'Bitbucket', host: 'bitbucket.org', selfHosted: false },
+};
 
 export interface Repository {
   id: ID;
@@ -402,7 +417,7 @@ export type ArtifactKind =
   | 'deployment'
   | 'release';
 
-export type ArtifactProvider = 'github' | 'gitlab' | 'delta' | 'figma' | 'docs' | 'ci' | 'other';
+export type ArtifactProvider = 'github' | 'gitlab' | 'bitbucket' | 'delta' | 'figma' | 'docs' | 'ci' | 'other';
 
 export type ArtifactState =
   | 'draft'
@@ -624,7 +639,7 @@ export interface IntegrationConnection {
   provider: GitProvider | 'delta';
   /** Display account, e.g. GitHub org/user. */
   account: string;
-  /** Base URL for self-hosted GitLab / GitHub Enterprise. */
+  /** Base URL for self-hosted GitLab / GitHub Enterprise (not used by Bitbucket Cloud). */
   baseUrl?: string;
   /** Whether a webhook secret is configured (secret itself never returned). */
   webhookConfigured: boolean;

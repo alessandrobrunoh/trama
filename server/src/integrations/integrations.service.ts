@@ -2,7 +2,7 @@ import { BadGatewayException, BadRequestException, ConflictException, Injectable
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { Repository } from 'typeorm';
-import type { ActorRef, GitProvider } from '../contracts/domain.js';
+import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { notFound, uid } from '../common/util.js';
 import { IntegrationConnectionEntity, RepositoryEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -24,7 +24,10 @@ export interface WebhookSetup {
 export const WEBHOOK_EVENTS: Record<GitProvider, string[]> = {
   github: ['pull_request', 'check_suite', 'check_run', 'status'],
   gitlab: ['merge_request', 'pipeline'],
+  bitbucket: ['pullrequest:created', 'pullrequest:updated', 'pullrequest:approved', 'pullrequest:unapproved', 'pullrequest:fulfilled', 'pullrequest:rejected', 'repo:commit_status_created', 'repo:commit_status_updated'],
 };
+
+const label = (provider: ConnectionProvider) => (provider === 'delta' ? 'Delta' : GIT_PROVIDER_META[provider].label);
 
 const SECRET = (id: string) => `${id}:secret`;
 const WEBHOOK = (id: string) => `${id}:webhook`;
@@ -102,6 +105,8 @@ export class IntegrationsService {
     try {
       const url = normalizeBaseUrl(raw);
       if (provider === 'delta' && !url) throw new Error('baseUrl is required for Delta');
+      if (provider !== 'delta' && url && !GIT_PROVIDER_META[provider].selfHosted)
+        throw new Error(`${label(provider)} has no custom base URL`);
       return url;
     } catch (e) {
       throw new BadRequestException(`Invalid baseUrl: ${(e as Error).message}`);
@@ -120,9 +125,9 @@ export class IntegrationsService {
     if (input.provider === 'delta') account = new URL(baseUrl!).host; // stub: no validation call yet
     else {
       const client = createGitClient(input.provider, this.http, input.token, baseUrl);
-      account = (await this.guard(input.provider === 'github' ? 'GitHub' : 'GitLab', () => client.currentUser())).account;
+      account = (await this.guard(label(input.provider), () => client.currentUser())).account;
     }
-    const defaultBase = input.provider === 'github' ? 'https://github.com' : input.provider === 'gitlab' ? 'https://gitlab.com' : null;
+    const defaultBase = input.provider === 'delta' ? null : `https://${GIT_PROVIDER_META[input.provider].host}`;
     const stored = baseUrl && baseUrl !== defaultBase ? baseUrl : input.provider === 'delta' ? baseUrl : null;
     const clash = (await this.repo.findBy({ workspaceId, provider: input.provider, account })).some((c) => (c.baseUrl ?? null) === stored);
     if (clash) throw new ConflictException(`A ${input.provider} connection for "${account}" already exists`);
@@ -173,7 +178,7 @@ export class IntegrationsService {
       if (row.provider !== 'delta') {
         const token = patch.token ?? this.secrets.decrypt(row.secret ?? '', SECRET(id));
         const client = this.client(row, token);
-        row.account = (await this.guard(row.provider === 'github' ? 'GitHub' : 'GitLab', () => client.currentUser())).account;
+        row.account = (await this.guard(label(row.provider), () => client.currentUser())).account;
         row.status = 'connected';
         row.lastError = null;
       }
@@ -202,7 +207,7 @@ export class IntegrationsService {
 
   async remoteRepositories(workspaceId: string, id: string, page: number, perPage: number) {
     const row = await this.getRow(workspaceId, id);
-    const result = await this.guard(row.provider === 'github' ? 'GitHub' : 'GitLab', () => this.client(row).listRepositories(page, perPage));
+    const result = await this.guard(label(row.provider), () => this.client(row).listRepositories(page, perPage));
     const local = await this.repos.findBy({ workspaceId, provider: row.provider as GitProvider });
     const byName = new Map(local.map((r) => [r.fullName.toLowerCase(), r.id]));
     return {
@@ -216,7 +221,7 @@ export class IntegrationsService {
     const row = await this.getRow(workspaceId, id);
     if (row.provider === 'delta') throw new BadRequestException('Delta connections cannot link repositories');
     const provider = row.provider;
-    const remote = await this.guard(provider === 'github' ? 'GitHub' : 'GitLab', () => this.client(row).getRepository(input.fullName));
+    const remote = await this.guard(label(provider), () => this.client(row).getRepository(input.fullName));
     const existing = await this.repos
       .createQueryBuilder('r')
       .where('r.workspaceId = :workspaceId AND r.provider = :provider AND lower(r.fullName) = lower(:n)', { workspaceId, provider, n: remote.fullName })
