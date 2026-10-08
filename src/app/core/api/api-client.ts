@@ -23,6 +23,10 @@ import type {
   FavoriteType,
   ID,
   InputRequest,
+  NotificationKind,
+  NotificationChannels,
+  NotificationList,
+  NotificationSettings,
   InviteLink,
   InvitePreview,
   Issue,
@@ -210,6 +214,23 @@ export class ApiClient {
       this.post<InviteLink>(`${this.w(slug)}/invites`, input),
     resend: (slug: string, id: ID) => this.post<InviteLink>(`${this.w(slug)}/invites/${id}/resend`),
     revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
+  };
+
+  /** The signed-in user's notifications in a workspace, and their settings (the same in every workspace). */
+  readonly notifications = {
+    list: (slug: string, opts: { limit?: number; unread?: boolean } = {}) =>
+      this.get<NotificationList>(
+        `${this.w(slug)}/notifications`,
+        { ...(opts.limit ? { limit: opts.limit } : {}), ...(opts.unread ? { unread: true } : {}) },
+        { quiet: true },
+      ),
+    /** Without `ids`, marks everything in the workspace as read. */
+    markRead: (slug: string, ids?: ID[]) =>
+      this.post<{ unread: number }>(`${this.w(slug)}/notifications/read`, ids ? { ids } : {}, { quiet: true }),
+    settings: () =>
+      this.get<{ settings: NotificationSettings; emailAvailable: boolean }>('/me/notification-settings'),
+    updateSettings: (settings: Partial<Record<NotificationKind, Partial<NotificationChannels>>>) =>
+      this.patch<{ settings: NotificationSettings; emailAvailable: boolean }>('/me/notification-settings', { settings }),
   };
 
   /** The signed-in user's favorites in a workspace (private to them). `remove` is idempotent. */

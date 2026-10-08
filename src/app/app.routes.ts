@@ -102,6 +102,12 @@ export const routes: Routes = [
           import('./features/ai/assistant-page').then((m) => m.AssistantPage),
       },
       {
+        path: 'notifications',
+        title: 'Notifications · Trama',
+        loadComponent: () =>
+          import('./features/notifications/notifications-page').then((m) => m.NotificationsPage),
+      },
+      {
         path: 'stats',
         title: 'Statistics · Trama',
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),

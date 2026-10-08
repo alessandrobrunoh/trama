@@ -5,6 +5,7 @@ import {
   LucideBuilding2,
   LucideDynamicIcon,
   LucideKeyRound,
+  LucideBell,
   LucideKeyboard,
   LucideShieldCheck,
   LucidePlug,
@@ -24,6 +25,7 @@ import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { MembersSection } from './sections/members-section';
+import { NotificationsSection } from './sections/notifications-section';
 import { PreferencesSection } from './sections/preferences-section';
 import { ProfileSection } from './sections/profile-section';
 import { RolesSection } from './sections/roles-section';
@@ -47,6 +49,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
     sections: [
       { id: 'profile', label: 'Profile', icon: LucideUserRound },
       { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal },
+      { id: 'notifications', label: 'Notifications', icon: LucideBell },
       { id: 'ai', label: 'AI & assistant', icon: LucideBot },
       { id: 'appearance', label: 'Appearance', icon: LucideSunMoon },
       { id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', icon: LucideKeyboard },
@@ -83,6 +86,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     EmptyState,
     ProfileSection,
     PreferencesSection,
+    NotificationsSection,
     AppearanceSection,
     ShortcutsSection,
     WorkspaceSection,
@@ -126,6 +130,9 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             @case ('ai') { <app-ai-section /> }
             @case ('profile') {
               <app-profile-section />
+            }
+            @case ('notifications') {
+              <app-notifications-section />
             }
             @case ('preferences') {
               <app-preferences-section />

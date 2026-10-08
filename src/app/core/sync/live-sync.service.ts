@@ -121,8 +121,8 @@ export class LiveSync {
       if (!event || event.type === 'ping' || event.type === 'hello') return;
       if (event.clientId && event.clientId === CLIENT_ID) return;
       this.incoming.next(event as LiveEvent);
-      // A favorite is one person's pin: it never changes the workspace snapshot.
-      if (event.entity !== 'favorite') this.nabla.scheduleRefetch(EVENT_REFETCH_DEBOUNCE_MS);
+      // Favorites and notifications belong to one person: they never change the workspace snapshot.
+      if (event.entity !== 'favorite' && event.entity !== 'notification') this.nabla.scheduleRefetch(EVENT_REFETCH_DEBOUNCE_MS);
     };
     source.onerror = () => {
       if (this.source !== source) return;

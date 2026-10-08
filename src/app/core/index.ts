@@ -15,6 +15,7 @@ export * from './stores/nabla.store';
 export * from './stores/ui.store';
 export * from './stores/invites.store';
 export * from './stores/favorites.store';
+export * from './stores/notifications.store';
 export * from './sync';
 export * from './query';
 export * from './keyboard';

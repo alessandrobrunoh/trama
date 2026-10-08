@@ -39,7 +39,9 @@ import {
   LucidePlug,
   LucidePlus,
   LucideScale,
+  LucideBell,
   LucideSearch,
+  LucideSlidersHorizontal,
   LucideStar,
   LucideSettings,
   LucideSparkles,
@@ -161,6 +163,8 @@ const HIT_ICON: Record<ItemType, LucideIcon> = {
 
 const SETTINGS_SECTIONS: { id: string; label: string; icon: LucideIcon; keywords?: string }[] = [
   { id: 'profile', label: 'Profile', icon: LucideUserRound },
+  { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal, keywords: 'home font cursor links motion comments enter' },
+  { id: 'notifications', label: 'Notifications', icon: LucideBell, keywords: 'email alerts inbox' },
   { id: 'appearance', label: 'Appearance', icon: LucideSunMoon, keywords: 'theme dark light' },
   { id: 'workspace', label: 'Workspace', icon: LucideBuilding2 },
   { id: 'members', label: 'Members & roles', icon: LucideUsers, keywords: 'people invite' },

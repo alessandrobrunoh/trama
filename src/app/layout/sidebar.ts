@@ -35,6 +35,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { FavoritesStore } from '../core/stores/favorites.store';
+import { NotificationsStore } from '../core/stores/notifications.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
@@ -394,11 +395,11 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
             @if (ui.sidebarBadgeStyle() === 'dot') {
               <span
                 class="size-1.5 shrink-0 rounded-full"
-                [class.bg-primary]="item.badge === 'attention'"
+                [class.bg-primary]="item.badge === 'attention' || item.badge === 'notifications'"
                 [class.bg-muted-foreground]="item.badge !== 'attention'"
                 [attr.aria-label]="n + ' pending'"
               ></span>
-            } @else if (item.badge === 'attention') {
+            } @else if (item.badge === 'attention' || item.badge === 'notifications') {
               <span class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ n }}</span>
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
@@ -540,6 +541,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 export class AppSidebar {
   protected readonly ui = inject(UiStore);
   protected readonly favorites = inject(FavoritesStore);
+  protected readonly notifications = inject(NotificationsStore);
   protected readonly store = inject(NablaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
@@ -650,6 +652,7 @@ export class AppSidebar {
   protected badge(kind: NavItem['badge']): number {
     if (kind === 'attention') return this.store.attentionCount();
     if (kind === 'issues') return this.store.backlogIssueCount();
+    if (kind === 'notifications') return this.notifications.unread();
     return 0;
   }
 

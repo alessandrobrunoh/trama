@@ -1,5 +1,6 @@
 import {
   LucideActivity,
+  LucideBell,
   LucideBellRing,
   LucideChartColumn,
   LucideChartGantt,
@@ -23,7 +24,7 @@ export interface NavItem {
   icon: LucideIcon;
   /** G-chord hint, e.g. "g o" */
   keys: string;
-  badge?: 'attention' | 'issues' | 'my-work';
+  badge?: 'attention' | 'issues' | 'my-work' | 'notifications';
   /** One-line explanation, shown as the item tooltip and on the page header. */
   hint?: string;
 }
@@ -51,6 +52,14 @@ export const PERSONAL_NAV: NavItem[] = [
     icon: LucideMessageSquare,
     keys: '',
     hint: 'Chat with Trama about your work',
+  },
+  {
+    segment: 'notifications',
+    label: 'Notifications',
+    icon: LucideBell,
+    keys: 'g n',
+    badge: 'notifications',
+    hint: 'Assignments, questions, reviews and comments that concern you',
   },
 ];
 
@@ -104,6 +113,7 @@ export const SECTION_LABELS: Record<string, string> = {
   attention: 'My Attention',
   'my-work': 'My Work',
   assistant: 'Assistant',
+  notifications: 'Notifications',
   issues: 'Issues',
   workstreams: 'Workstreams',
   timeline: 'Timeline',
