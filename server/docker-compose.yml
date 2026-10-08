@@ -2,7 +2,8 @@
 # Public URL: https://trama.alessandrobrunoh.it, routed by Traefik (external network `proxy`):
 #   /api -> app, /mcp -> mcp, everything else -> web.
 # Needs server/.env.production (copy .env.production.example and fill it in).
-# Host port 5434 for Postgres: 5432/5433 belong to other projects.
+# Postgres is NOT published on the host here: the API reaches it as postgres:5432 on the compose network.
+# For development, docker-compose.dev.yml publishes it on localhost:5434 (npm run db:up).
 name: delta
 
 x-hardened: &hardened
@@ -101,8 +102,6 @@ services:
       POSTGRES_USER: delta
       POSTGRES_PASSWORD: delta
       POSTGRES_DB: trama
-    ports:
-      - '127.0.0.1:5434:5432'
     # PG 18+ stores the cluster in a versioned dir under /var/lib/postgresql.
     volumes:
       - delta-pgdata:/var/lib/postgresql

@@ -20,7 +20,8 @@ Production stack: `server/docker-compose.yml` (web, app, mcp, postgres) behind T
 `trama.alessandrobrunoh.it`: `/api` → app, `/mcp` → mcp, everything else → web. Copy
 `server/.env.production.example` to `server/.env.production` and fill in the `CHANGE_ME` values, then
 `docker compose -f server/docker-compose.yml up -d`.
-`npm run db:up` (development) starts only Postgres.
+`npm run db:up` (development) starts only Postgres, published on `localhost:5434` by `server/docker-compose.dev.yml`.
+In production Postgres has **no** host port: only the API (same compose network) can reach it.
 
 ## What makes them small and safe
 - Multi-stage builds with dependency layers cached separately (npm / cargo caches via BuildKit).
