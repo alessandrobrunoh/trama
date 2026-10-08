@@ -12,6 +12,8 @@ export interface AssistantChat {
   title: string;
   messages: ChatMessage[];
   updatedAt: number;
+  /** The assistant answered while the chat was out of sight; cleared when it is opened. */
+  unread?: boolean;
 }
 
 const MAX_CHATS = 30;
@@ -103,7 +105,16 @@ export class AssistantStore {
       this.status()?.suggestions.configured === true || this.status()?.supergrok.connected === true,
   );
 
+  /** True when the active chat is on screen: the popup is open or the full page is showing. */
+  readonly viewing = computed(
+    () => this.activeId() !== null && (this.open() || this.onAssistantPage()),
+  );
+
   constructor() {
+    effect(() => {
+      const id = this.activeId();
+      if (id && this.viewing()) untracked(() => this.markRead(id));
+    });
     effect(() => {
       const user = this.session.user()?.id;
       const slug = this.slug();
@@ -200,6 +211,12 @@ export class AssistantStore {
     this.saveChats();
   }
 
+  private markRead(id: string): void {
+    if (!this.chats().some((c) => c.id === id && c.unread)) return;
+    this.chats.update((items) => items.map((c) => (c.id === id ? { ...c, unread: false } : c)));
+    this.saveChats();
+  }
+
   /** Removes a chat's chip from the dock; the chat stays in the history. */
   unpin(id: string): void {
     this.dock.update((ids) => ids.filter((x) => x !== id));
@@ -256,7 +273,11 @@ export class AssistantStore {
         controller.signal,
       );
       if (this.controller === controller)
-        this.writeChat(chatId, [...messages, { role: 'assistant', content: result.content }]);
+        this.writeChat(
+          chatId,
+          [...messages, { role: 'assistant', content: result.content }],
+          !(this.activeId() === chatId && this.viewing()),
+        );
     } catch (error) {
       if (this.controller === controller && !controller.signal.aborted) {
         this.removeLastMessage(chatId);
@@ -272,7 +293,7 @@ export class AssistantStore {
   }
 
   /** Replaces a chat's messages (creating it if new) and moves it to the top of the list. */
-  private writeChat(id: string, messages: ChatMessage[]): void {
+  private writeChat(id: string, messages: ChatMessage[], unread = false): void {
     const kept = messages.slice(-MAX_MESSAGES);
     this.chats.update((items) => {
       const current = items.find((c) => c.id === id);
@@ -282,6 +303,7 @@ export class AssistantStore {
         title: title || 'New chat',
         messages: kept,
         updatedAt: Date.now(),
+        unread,
       };
       return [chat, ...items.filter((c) => c.id !== id)].slice(0, MAX_CHATS);
     });

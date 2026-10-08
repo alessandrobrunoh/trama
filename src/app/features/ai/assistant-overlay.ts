@@ -96,6 +96,12 @@ import { AssistantChat, timeAgo } from './assistant-chat';
             [attr.aria-label]="'Open chat: ' + chat.title"
             (click)="resume(chat.id)"
           >
+            @if (chat.unread) {
+              <span
+                class="bg-primary mr-1.5 inline-block size-1.5 rounded-full align-middle"
+                aria-label="Unread"
+              ></span>
+            }
             <span class="truncate">{{ chat.title }}</span>
           </button>
         }
@@ -143,10 +149,12 @@ import { AssistantChat, timeAgo } from './assistant-chat';
             >
               <span
                 class="size-1.5 shrink-0 rounded-full"
-                [class.bg-primary]="ai.activeId() === chat.id"
+                [class.bg-primary]="ai.activeId() === chat.id || chat.unread"
                 aria-hidden="true"
               ></span>
-              <span class="min-w-0 flex-1 truncate">{{ chat.title }}</span>
+              <span class="min-w-0 flex-1 truncate" [class.font-medium]="chat.unread">{{
+                chat.title
+              }}</span>
               <span class="text-muted-foreground shrink-0 text-xs">{{ ago(chat.updatedAt) }}</span>
             </button>
           } @empty {
