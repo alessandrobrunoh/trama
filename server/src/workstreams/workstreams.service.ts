@@ -69,7 +69,8 @@ export class WorkstreamsService {
     private readonly counters: CountersService,
     private readonly events: EventsService,
     private readonly bus: WorkstreamBus,
-    @InjectRepository(WorkstreamEntity) private readonly repo: Repository<WorkstreamEntity>,
+    @InjectRepository(WorkstreamEntity)
+    private readonly repo: Repository<WorkstreamEntity>,
   ) {}
 
   list(workspaceId: string, f: WorkstreamFilter = {}) {
@@ -78,26 +79,41 @@ export class WorkstreamsService {
       .where('w.workspaceId = :workspaceId', { workspaceId })
       .orderBy('w.updatedAt', 'DESC');
     if (f.status) qb.andWhere('w.status = :status', { status: f.status });
-    if (f.ownerTeamId) qb.andWhere('w.ownerTeamId = :ot', { ot: f.ownerTeamId });
+    if (f.ownerTeamId)
+      qb.andWhere('w.ownerTeamId = :ot', { ot: f.ownerTeamId });
     if (f.teamId)
-      qb.andWhere(`(w.ownerTeamId = :tid OR w.participatingTeamIds @> :tidj::jsonb)`, {
-        tid: f.teamId,
-        tidj: JSON.stringify([f.teamId]),
-      });
-    if (f.accountableUserId) qb.andWhere('w.accountableUserId = :au', { au: f.accountableUserId });
+      qb.andWhere(
+        `(w.ownerTeamId = :tid OR w.participatingTeamIds @> :tidj::jsonb)`,
+        {
+          tid: f.teamId,
+          tidj: JSON.stringify([f.teamId]),
+        },
+      );
+    if (f.accountableUserId)
+      qb.andWhere('w.accountableUserId = :au', { au: f.accountableUserId });
     if (f.priority) qb.andWhere('w.priority = :p', { p: f.priority });
     if (f.repositoryId)
-      qb.andWhere('w.repositoryIds @> :rid::jsonb', { rid: JSON.stringify([f.repositoryId]) });
-    if (f.label) qb.andWhere('w.labels @> :lb::jsonb', { lb: JSON.stringify([f.label]) });
-    if (f.q) qb.andWhere('(w.title ILIKE :q OR w.key ILIKE :q)', { q: `%${f.q}%` });
+      qb.andWhere('w.repositoryIds @> :rid::jsonb', {
+        rid: JSON.stringify([f.repositoryId]),
+      });
+    if (f.label)
+      qb.andWhere('w.labels @> :lb::jsonb', { lb: JSON.stringify([f.label]) });
+    if (f.q)
+      qb.andWhere('(w.title ILIKE :q OR w.key ILIKE :q)', { q: `%${f.q}%` });
     return qb.getMany();
   }
 
   /** `idOrKey`: a workstream id (`wk_…`) or a key (`AUTH-42`, case-insensitive). */
-  async get(workspaceId: string, idOrKey: string, manager?: EntityManager): Promise<WorkstreamEntity> {
+  async get(
+    workspaceId: string,
+    idOrKey: string,
+    manager?: EntityManager,
+  ): Promise<WorkstreamEntity> {
     const repo = manager ? manager.getRepository(WorkstreamEntity) : this.repo;
     const row = await repo.findOne({
-      where: KEY_RE.test(idOrKey) ? { workspaceId, key: idOrKey.toUpperCase() } : { workspaceId, id: idOrKey },
+      where: KEY_RE.test(idOrKey)
+        ? { workspaceId, key: idOrKey.toUpperCase() }
+        : { workspaceId, id: idOrKey },
     });
     if (!row) throw notFound('Workstream', idOrKey);
     return row;
@@ -112,18 +128,37 @@ export class WorkstreamsService {
   async create(
     workspaceId: string,
     actor: ActorRef,
-    input: WorkstreamInput & { title: string; ownerTeamId: string; deltaThreadUrl: string },
+    input: WorkstreamInput & {
+      title: string;
+      ownerTeamId: string;
+      deltaThreadUrl: string;
+    },
     options: { manager?: EntityManager; data?: Record<string, unknown> } = {},
   ): Promise<WorkstreamEntity & { after?: () => Promise<void> }> {
-    await this.refs.teams(workspaceId, [input.ownerTeamId, ...(input.participatingTeamIds ?? [])]);
+    await this.refs.teams(workspaceId, [
+      input.ownerTeamId,
+      ...(input.participatingTeamIds ?? []),
+    ]);
     await this.refs.users(workspaceId, [input.accountableUserId]);
     await this.refs.repositories(workspaceId, input.repositoryIds);
-    const deltaThreadUrl = assertDeltaThreadUrl(input.deltaThreadUrl);
+    const suppliedDeltaThreadUrl =
+      typeof input.deltaThreadUrl === 'string'
+        ? input.deltaThreadUrl.trim()
+        : '';
+    const deltaThreadUrl =
+      input.statusOverride === 'draft' && !suppliedDeltaThreadUrl
+        ? ''
+        : assertDeltaThreadUrl(suppliedDeltaThreadUrl);
     const run = async (m: EntityManager) => {
-      const team = await m.findOneByOrFail(TeamEntity, { id: input.ownerTeamId, workspaceId });
+      const team = await m.findOneByOrFail(TeamEntity, {
+        id: input.ownerTeamId,
+        workspaceId,
+      });
       const number = await this.counters.next(m, workspaceId, `ws:${team.id}`);
       const acceptanceCriteria = criteria(input.acceptanceCriteria);
-      const derived: WorkstreamStatus = acceptanceCriteria.length ? 'planned' : 'draft';
+      const derived: WorkstreamStatus = acceptanceCriteria.length
+        ? 'planned'
+        : 'draft';
       return m.save(
         m.create(WorkstreamEntity, {
           id: uid('wk'),
@@ -136,7 +171,9 @@ export class WorkstreamsService {
           context: input.context ?? null,
           deltaThreadUrl,
           ownerTeamId: team.id,
-          participatingTeamIds: unique(input.participatingTeamIds).filter((t) => t !== team.id),
+          participatingTeamIds: unique(input.participatingTeamIds).filter(
+            (t) => t !== team.id,
+          ),
           accountableUserId: input.accountableUserId ?? null,
           repositoryIds: unique(input.repositoryIds),
           acceptanceCriteria,
@@ -145,8 +182,10 @@ export class WorkstreamsService {
           derivedStatus: derived,
           statusOverride: input.statusOverride ?? null,
           status: input.statusOverride ?? derived,
-          startDate: (toDate(input.startDate) as Date | null | undefined) ?? null,
-          targetDate: (toDate(input.targetDate) as Date | null | undefined) ?? null,
+          startDate:
+            (toDate(input.startDate) as Date | null | undefined) ?? null,
+          targetDate:
+            (toDate(input.targetDate) as Date | null | undefined) ?? null,
           createdById: actor.id ?? 'system',
         }),
       );
@@ -171,31 +210,48 @@ export class WorkstreamsService {
     return row;
   }
 
-  async update(workspaceId: string, actor: ActorRef, idOrKey: string, patch: WorkstreamInput) {
+  async update(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    patch: WorkstreamInput,
+  ) {
     const ws = await this.get(workspaceId, idOrKey);
-    if (patch.ownerTeamId !== undefined) await this.refs.teams(workspaceId, [patch.ownerTeamId]);
+    if (patch.ownerTeamId !== undefined)
+      await this.refs.teams(workspaceId, [patch.ownerTeamId]);
     await this.refs.teams(workspaceId, patch.participatingTeamIds);
     await this.refs.users(workspaceId, [patch.accountableUserId]);
     await this.refs.repositories(workspaceId, patch.repositoryIds);
     const changed: string[] = [];
-    const set = <K extends keyof WorkstreamEntity>(k: K, v: WorkstreamEntity[K]) => {
+    const set = <K extends keyof WorkstreamEntity>(
+      k: K,
+      v: WorkstreamEntity[K],
+    ) => {
       if (JSON.stringify(ws[k]) !== JSON.stringify(v)) {
         ws[k] = v;
         changed.push(k);
       }
     };
     if (patch.title !== undefined) set('title', patch.title.trim());
-    if (patch.description !== undefined) set('description', patch.description?.trim() || null);
+    if (patch.description !== undefined)
+      set('description', patch.description?.trim() || null);
     if (patch.objective !== undefined) set('objective', patch.objective);
     if (patch.context !== undefined) set('context', patch.context);
-    if (patch.deltaThreadUrl !== undefined) set('deltaThreadUrl', assertDeltaThreadUrl(patch.deltaThreadUrl));
+    if (patch.deltaThreadUrl !== undefined)
+      set('deltaThreadUrl', assertDeltaThreadUrl(patch.deltaThreadUrl));
     // NOTE: changing the owner team does NOT rename the workstream: the key stays (AUTH-42 remains AUTH-42).
     if (patch.ownerTeamId !== undefined) set('ownerTeamId', patch.ownerTeamId);
     if (patch.participatingTeamIds !== undefined)
-      set('participatingTeamIds', unique(patch.participatingTeamIds).filter((t) => t !== ws.ownerTeamId));
-    if (patch.accountableUserId !== undefined) set('accountableUserId', patch.accountableUserId);
-    if (patch.repositoryIds !== undefined) set('repositoryIds', unique(patch.repositoryIds));
-    if (patch.acceptanceCriteria !== undefined) set('acceptanceCriteria', criteria(patch.acceptanceCriteria));
+      set(
+        'participatingTeamIds',
+        unique(patch.participatingTeamIds).filter((t) => t !== ws.ownerTeamId),
+      );
+    if (patch.accountableUserId !== undefined)
+      set('accountableUserId', patch.accountableUserId);
+    if (patch.repositoryIds !== undefined)
+      set('repositoryIds', unique(patch.repositoryIds));
+    if (patch.acceptanceCriteria !== undefined)
+      set('acceptanceCriteria', criteria(patch.acceptanceCriteria));
     if (patch.priority !== undefined) set('priority', patch.priority);
     if (patch.labels !== undefined) set('labels', unique(patch.labels));
     if (patch.startDate !== undefined)
@@ -232,7 +288,12 @@ export class WorkstreamsService {
         )
       ).map((r) => r.id);
       ids.push(ws.id);
-      const milestoneIds = (await m.query<{ id: string }[]>(`SELECT "id" FROM "milestones" WHERE "workstreamId" = $1`, [ws.id])).map((r) => r.id);
+      const milestoneIds = (
+        await m.query<{ id: string }[]>(
+          `SELECT "id" FROM "milestones" WHERE "workstreamId" = $1`,
+          [ws.id],
+        )
+      ).map((r) => r.id);
       if (milestoneIds.length) {
         // milestones cascade with the workstream; drop their ids from issues and their comments
         await m.query(
@@ -241,8 +302,14 @@ export class WorkstreamsService {
         );
         ids.push(...milestoneIds);
       }
-      await m.query(`DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`, [workspaceId, ids]);
-      await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`, [workspaceId, ids]);
+      await m.query(
+        `DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`,
+        [workspaceId, ids],
+      );
+      await m.query(
+        `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
+        [workspaceId, ids],
+      );
       await m.query(
         `UPDATE "issues" SET "workstreamIds" = "workstreamIds" - $2::text WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text`,
         [workspaceId, ws.id],
@@ -264,14 +331,29 @@ export class WorkstreamsService {
 
   // ───────── acceptance criteria
 
-  async addCriterion(workspaceId: string, actor: ActorRef, idOrKey: string, input: CriterionInput) {
+  async addCriterion(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    input: CriterionInput,
+  ) {
     const ws = await this.get(workspaceId, idOrKey);
-    const criterion: AcceptanceCriterion = { id: uid('ac'), text: input.text.trim(), state: input.state ?? 'pending' };
+    const criterion: AcceptanceCriterion = {
+      id: uid('ac'),
+      text: input.text.trim(),
+      state: input.state ?? 'pending',
+    };
     ws.acceptanceCriteria = [...ws.acceptanceCriteria, criterion];
     return this.saveCriteria(ws, actor, 'added', criterion);
   }
 
-  async updateCriterion(workspaceId: string, actor: ActorRef, idOrKey: string, criterionId: string, patch: Partial<CriterionInput>) {
+  async updateCriterion(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    criterionId: string,
+    patch: Partial<CriterionInput>,
+  ) {
     const ws = await this.get(workspaceId, idOrKey);
     const current = ws.acceptanceCriteria.find((c) => c.id === criterionId);
     if (!current) throw notFound('Criterion', criterionId);
@@ -280,15 +362,24 @@ export class WorkstreamsService {
       ...(patch.text !== undefined ? { text: patch.text.trim() } : {}),
       ...(patch.state !== undefined ? { state: patch.state } : {}),
     };
-    ws.acceptanceCriteria = ws.acceptanceCriteria.map((c) => (c.id === criterionId ? next : c));
+    ws.acceptanceCriteria = ws.acceptanceCriteria.map((c) =>
+      c.id === criterionId ? next : c,
+    );
     return this.saveCriteria(ws, actor, 'updated', next, current.state);
   }
 
-  async removeCriterion(workspaceId: string, actor: ActorRef, idOrKey: string, criterionId: string) {
+  async removeCriterion(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    criterionId: string,
+  ) {
     const ws = await this.get(workspaceId, idOrKey);
     const current = ws.acceptanceCriteria.find((c) => c.id === criterionId);
     if (!current) throw notFound('Criterion', criterionId);
-    ws.acceptanceCriteria = ws.acceptanceCriteria.filter((c) => c.id !== criterionId);
+    ws.acceptanceCriteria = ws.acceptanceCriteria.filter(
+      (c) => c.id !== criterionId,
+    );
     return this.saveCriteria(ws, actor, 'removed', current);
   }
 
@@ -299,7 +390,8 @@ export class WorkstreamsService {
     criterion: AcceptanceCriterion,
     previousState?: CriterionState,
   ) {
-    if (ws.acceptanceCriteria.length > 50) throw new BadRequestException('At most 50 acceptance criteria');
+    if (ws.acceptanceCriteria.length > 50)
+      throw new BadRequestException('At most 50 acceptance criteria');
     ws.updatedAt = new Date();
     await this.repo.save(ws);
     await this.events.record(
@@ -309,7 +401,13 @@ export class WorkstreamsService {
         type: 'criterion.updated',
         subject: { type: 'workstream', id: ws.id },
         workstreamId: ws.id,
-        data: { change, criterionId: criterion.id, text: criterion.text, state: criterion.state, previousState },
+        data: {
+          change,
+          criterionId: criterion.id,
+          text: criterion.text,
+          state: criterion.state,
+          previousState,
+        },
       },
       { type: 'updated', entity: 'workstream', id: ws.id },
     );
@@ -321,7 +419,9 @@ export class WorkstreamsService {
 function assertDeltaThreadUrl(value: string): string {
   const url = value.trim();
   if (!isDeltaThreadUrl(url)) {
-    throw new BadRequestException('deltaThreadUrl must be an https link on delta.dev');
+    throw new BadRequestException(
+      'deltaThreadUrl must be an https link on delta.dev',
+    );
   }
   return url;
 }

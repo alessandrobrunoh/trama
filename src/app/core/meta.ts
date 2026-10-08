@@ -17,14 +17,7 @@ import type {
 
 export const APP_NAME = 'Trama';
 
-export type Tone =
-  | 'neutral'
-  | 'muted'
-  | 'info'
-  | 'accent'
-  | 'success'
-  | 'warning'
-  | 'danger';
+export type Tone = 'neutral' | 'muted' | 'info' | 'accent' | 'success' | 'warning' | 'danger';
 
 export interface Meta {
   label: string;
@@ -82,18 +75,20 @@ export const PROVIDER_META: Record<ExecutionProvider, { label: string; order: nu
 };
 export const PROVIDERS = sortedKeys(PROVIDER_META);
 
-export const ISSUE_KIND_META: Record<IssueKind, { label: string; prefix: string; order: number }> = {
-  incident: { label: 'Incident', prefix: 'INC', order: 0 },
-  security: { label: 'Security', prefix: 'SEC', order: 1 },
-  bug: { label: 'Bug', prefix: 'BUG', order: 2 },
-  feature: { label: 'Feature', prefix: 'FEAT', order: 3 },
-  tech_debt: { label: 'Tech debt', prefix: 'DEBT', order: 4 },
-  feedback: { label: 'Feedback', prefix: 'FB', order: 5 },
-  idea: { label: 'Idea', prefix: 'IDEA', order: 6 },
-};
+export const ISSUE_KIND_META: Record<IssueKind, { label: string; prefix: string; order: number }> =
+  {
+    incident: { label: 'Incident', prefix: 'INC', order: 0 },
+    security: { label: 'Security', prefix: 'SEC', order: 1 },
+    bug: { label: 'Bug', prefix: 'BUG', order: 2 },
+    feature: { label: 'Feature', prefix: 'FEAT', order: 3 },
+    tech_debt: { label: 'Tech debt', prefix: 'DEBT', order: 4 },
+    feedback: { label: 'Feedback', prefix: 'FB', order: 5 },
+    idea: { label: 'Idea', prefix: 'IDEA', order: 6 },
+  };
 export const ISSUE_KINDS = sortedKeys(ISSUE_KIND_META);
 
 export const ISSUE_STATUS_META: Record<IssueStatus, Meta> = {
+  draft: { label: 'Draft', tone: 'muted', order: -1 },
   backlog: { label: 'Backlog', tone: 'muted', order: 0 },
   todo: { label: 'Todo', tone: 'accent', order: 1 },
   in_progress: { label: 'In Progress', tone: 'info', order: 2 },
@@ -118,6 +113,7 @@ export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: nu
 export const ARTIFACT_KINDS = sortedKeys(ARTIFACT_KIND_META);
 
 export const DECISION_STATUS_META: Record<DecisionStatus, Meta> = {
+  draft: { label: 'Draft', tone: 'muted', order: -1 },
   proposed: { label: 'Proposed', tone: 'warning', order: 0 },
   accepted: { label: 'Accepted', tone: 'success', order: 1 },
   superseded: { label: 'Superseded', tone: 'muted', order: 2 },
@@ -135,16 +131,51 @@ export const ATTENTION_KIND_META: Record<
   AttentionKind,
   { label: string; groupTitle: string; defaultSeverity: AttentionSeverity; order: number }
 > = {
-  input_requested: { label: 'Input requested', groupTitle: 'Needs your input', defaultSeverity: 'high', order: 0 },
-  needs_decision: { label: 'Needs decision', groupTitle: 'Needs decision', defaultSeverity: 'high', order: 1 },
+  input_requested: {
+    label: 'Input requested',
+    groupTitle: 'Needs your input',
+    defaultSeverity: 'high',
+    order: 0,
+  },
+  needs_decision: {
+    label: 'Needs decision',
+    groupTitle: 'Needs decision',
+    defaultSeverity: 'high',
+    order: 1,
+  },
   ci_failed: { label: 'CI failed', groupTitle: 'CI failed', defaultSeverity: 'high', order: 2 },
   blocked: { label: 'Blocked', groupTitle: 'Blocked', defaultSeverity: 'high', order: 3 },
-  review_requested: { label: 'Review requested', groupTitle: 'Review requested', defaultSeverity: 'medium', order: 4 },
-  conflict: { label: 'Conflict', groupTitle: 'Merge conflicts', defaultSeverity: 'medium', order: 5 },
-  ready_to_land: { label: 'Ready to land', groupTitle: 'Ready to land', defaultSeverity: 'medium', order: 6 },
+  review_requested: {
+    label: 'Review requested',
+    groupTitle: 'Review requested',
+    defaultSeverity: 'medium',
+    order: 4,
+  },
+  conflict: {
+    label: 'Conflict',
+    groupTitle: 'Merge conflicts',
+    defaultSeverity: 'medium',
+    order: 5,
+  },
+  ready_to_land: {
+    label: 'Ready to land',
+    groupTitle: 'Ready to land',
+    defaultSeverity: 'medium',
+    order: 6,
+  },
   deadline: { label: 'Deadline', groupTitle: 'Deadlines', defaultSeverity: 'medium', order: 7 },
-  dependency: { label: 'Waiting on dependency', groupTitle: 'Waiting on others', defaultSeverity: 'low', order: 8 },
-  ready_to_ship: { label: 'Ready to ship', groupTitle: 'Ready to ship', defaultSeverity: 'low', order: 9 },
+  dependency: {
+    label: 'Waiting on dependency',
+    groupTitle: 'Waiting on others',
+    defaultSeverity: 'low',
+    order: 8,
+  },
+  ready_to_ship: {
+    label: 'Ready to ship',
+    groupTitle: 'Ready to ship',
+    defaultSeverity: 'low',
+    order: 9,
+  },
   triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 10 },
 };
 export const ATTENTION_KINDS = sortedKeys(ATTENTION_KIND_META);
@@ -160,9 +191,12 @@ export const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
 
 /** Longer role explanations for Settings → Members and Roles & permissions. */
 export const ROLE_DETAILS: Record<Role, string> = {
-  owner: 'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
-  admin: 'Manages people and structure: members, teams, projects, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
-  member: 'Does the everyday work: creates and edits workstreams, issues, decisions and comments. What else a member may do is set in Roles & permissions.',
+  owner:
+    'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
+  admin:
+    'Manages people and structure: members, teams, projects, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
+  member:
+    'Does the everyday work: creates and edits workstreams, issues, decisions and comments. What else a member may do is set in Roles & permissions.',
   viewer: 'Read-only. Can browse everything in the workspace but cannot change anything.',
 };
 

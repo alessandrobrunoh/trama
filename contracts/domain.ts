@@ -222,7 +222,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
  * Tracker status, independent of workstream status.
  * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
  */
-export type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
+export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
 
 /**
@@ -327,7 +327,7 @@ export interface Artifact {
 
 // ───────────────────────────── Decisions ─────────────────────────────
 
-export type DecisionStatus = 'proposed' | 'accepted' | 'superseded' | 'rejected';
+export type DecisionStatus = 'draft' | 'proposed' | 'accepted' | 'superseded' | 'rejected';
 
 /** Reusable project knowledge: what was decided and why. Key: ADR-<n> per workspace. */
 export interface Decision {
@@ -685,7 +685,7 @@ export interface WebhookDeliveryLog {
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
-  { entity: 'decision', label: 'Decisions', events: ['decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
+  { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },

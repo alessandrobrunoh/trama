@@ -31,6 +31,7 @@ import { DecisionTags } from './decision-tags';
 
 /** Status-specific one-liner under the title. */
 const STATUS_HINT: Record<string, string> = {
+  draft: 'Draft — finish it when you are ready to share the decision.',
   proposed: 'Proposed — waiting for someone to accept or reject it.',
   accepted: 'Accepted — this is how we do it now.',
   superseded: 'Superseded — kept for history; a newer decision replaces it.',
@@ -65,6 +66,11 @@ const STATUS_HINT: Record<string, string> = {
   template: `
     @if (decision(); as d) {
       <ng-template appTopBarActions>
+        @if (canEdit() && d.status === 'draft') {
+          <button hlmBtn size="sm" [disabled]="!d.statement.trim()" (click)="proposeDraft()">
+            Propose decision
+          </button>
+        }
         @if (canDecide() && d.status === 'proposed') {
           <button hlmBtn size="sm" (click)="accept()">
             <svg [lucideIcon]="checkIcon" [size]="14"></svg>
@@ -75,7 +81,14 @@ const STATUS_HINT: Record<string, string> = {
             Reject
           </button>
         }
-        <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="Decision actions">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
+          [hlmDropdownMenuTrigger]="more"
+          aria-label="Decision actions"
+        >
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
         </button>
         <ng-template #more>
@@ -96,7 +109,9 @@ const STATUS_HINT: Record<string, string> = {
         </ng-template>
       </ng-template>
 
-      <div class="mx-auto grid w-full max-w-[1200px] gap-x-10 gap-y-6 px-4 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_17rem]">
+      <div
+        class="mx-auto grid w-full max-w-[1200px] gap-x-10 gap-y-6 px-4 py-6 sm:px-8 lg:grid-cols-[minmax(0,1fr)_17rem]"
+      >
         <div class="flex min-w-0 flex-col gap-7">
           <header class="flex flex-col gap-2">
             <div class="flex items-center gap-2 text-xs">
@@ -122,7 +137,9 @@ const STATUS_HINT: Record<string, string> = {
             />
             <p class="text-meta">{{ statusHint() }}</p>
             @if (canDecide() && d.status === 'proposed') {
-              <div class="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md px-3 py-2 text-sm">
+              <div
+                class="bg-muted/50 flex flex-wrap items-center gap-2 rounded-md px-3 py-2 text-sm"
+              >
                 <app-status-icon status="proposed" entity="other" />
                 <span class="min-w-0 flex-1">This decision is waiting for a call.</span>
                 <button hlmBtn size="sm" variant="outline" (click)="accept()">Accept</button>
@@ -173,7 +190,12 @@ const STATUS_HINT: Record<string, string> = {
                 <span class="flex items-center gap-2 px-1.5">
                   <app-actor [actor]="{ type: 'user', id: d.decidedById }" [size]="18" />
                   @if (d.decidedAt) {
-                    <span class="text-meta" [hlmTooltip]="(d.decidedAt | fullDate)" position="bottom">{{ d.decidedAt | relativeTime }}</span>
+                    <span
+                      class="text-meta"
+                      [hlmTooltip]="d.decidedAt | fullDate"
+                      position="bottom"
+                      >{{ d.decidedAt | relativeTime }}</span
+                    >
                   }
                 </span>
               </app-property-row>
@@ -209,7 +231,9 @@ const STATUS_HINT: Record<string, string> = {
                   [options]="originCandidates()"
                   (picked)="setOrigin($event)"
                 >
-                  <span class="text-muted-foreground text-xs">{{ d.originWorkstreamId ? 'Change' : '+ Set origin' }}</span>
+                  <span class="text-muted-foreground text-xs">{{
+                    d.originWorkstreamId ? 'Change' : '+ Set origin'
+                  }}</span>
                 </app-entity-picker>
               }
             </div>
@@ -247,7 +271,9 @@ const STATUS_HINT: Record<string, string> = {
                   (picked)="addRelated($event)"
                 >
                   <svg [lucideIcon]="plusIcon" [size]="12"></svg>
-                  <span class="text-muted-foreground text-xs">{{ d.relatedWorkstreamIds.length ? 'Add' : 'Link workstream' }}</span>
+                  <span class="text-muted-foreground text-xs">{{
+                    d.relatedWorkstreamIds.length ? 'Add' : 'Link workstream'
+                  }}</span>
                 </app-entity-picker>
               }
             </div>
@@ -300,8 +326,14 @@ const STATUS_HINT: Record<string, string> = {
         </aside>
       </div>
     } @else {
-      <app-empty-state [icon]="scale" title="Decision not found" description="It may have been deleted.">
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'decisions']">Back to decisions</a>
+      <app-empty-state
+        [icon]="scale"
+        title="Decision not found"
+        description="It may have been deleted."
+      >
+        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'decisions']"
+          >Back to decisions</a
+        >
       </app-empty-state>
     }
   `,
@@ -348,14 +380,28 @@ export class DecisionDetailPage {
     return this.store
       .decisions()
       .filter((d) => d.id !== current && d.status !== 'rejected')
-      .map((d) => ({ value: d.id, label: d.key, hint: d.title, mono: true, status: d.status, statusEntity: 'other' }));
+      .map((d) => ({
+        value: d.id,
+        label: d.key,
+        hint: d.title,
+        mono: true,
+        status: d.status,
+        statusEntity: 'other',
+      }));
   });
   protected readonly originCandidates = computed<EntityOption[]>(() => {
     const current = this.decision()?.originWorkstreamId;
     return this.store
       .workstreams()
       .filter((w) => w.id !== current)
-      .map((w) => ({ value: w.id, label: w.key, hint: w.title, mono: true, status: w.status, statusEntity: 'workstream' }));
+      .map((w) => ({
+        value: w.id,
+        label: w.key,
+        hint: w.title,
+        mono: true,
+        status: w.status,
+        statusEntity: 'workstream',
+      }));
   });
   protected readonly relatedCandidates = computed<EntityOption[]>(() => {
     const d = this.decision();
@@ -364,7 +410,14 @@ export class DecisionDetailPage {
     return this.store
       .workstreams()
       .filter((w) => !taken.has(w.id))
-      .map((w) => ({ value: w.id, label: w.key, hint: w.title, mono: true, status: w.status, statusEntity: 'workstream' }));
+      .map((w) => ({
+        value: w.id,
+        label: w.key,
+        hint: w.title,
+        mono: true,
+        status: w.status,
+        statusEntity: 'workstream',
+      }));
   });
   protected readonly allTags = computed(() => {
     const set = new Set<string>();
@@ -403,27 +456,41 @@ export class DecisionDetailPage {
   protected addRelated(id: string): void {
     const d = this.decision();
     if (d && !d.relatedWorkstreamIds.includes(id)) {
-      void this.store.updateDecision(d.id, { relatedWorkstreamIds: [...d.relatedWorkstreamIds, id] });
+      void this.store.updateDecision(d.id, {
+        relatedWorkstreamIds: [...d.relatedWorkstreamIds, id],
+      });
     }
   }
   protected removeRelated(id: string): void {
     const d = this.decision();
-    if (d) void this.store.updateDecision(d.id, { relatedWorkstreamIds: d.relatedWorkstreamIds.filter((x) => x !== id) });
+    if (d)
+      void this.store.updateDecision(d.id, {
+        relatedWorkstreamIds: d.relatedWorkstreamIds.filter((x) => x !== id),
+      });
   }
   protected async accept(): Promise<void> {
     const d = this.decision();
-    if (d && (await this.store.acceptDecision(d.id))) this.notifier.success(`${d.key} accepted`, { description: d.title });
+    if (d && (await this.store.acceptDecision(d.id)))
+      this.notifier.success(`${d.key} accepted`, { description: d.title });
+  }
+  protected async proposeDraft(): Promise<void> {
+    const d = this.decision();
+    if (d?.statement.trim() && (await this.store.updateDecision(d.id, { status: 'proposed' })))
+      this.notifier.success(`${d.key} proposed`, { description: d.title });
   }
   protected async reject(): Promise<void> {
     const d = this.decision();
-    if (d && (await this.store.rejectDecision(d.id))) this.notifier.success(`${d.key} rejected`, { description: d.title });
+    if (d && (await this.store.rejectDecision(d.id)))
+      this.notifier.success(`${d.key} rejected`, { description: d.title });
   }
   protected async supersede(byId: string): Promise<void> {
     const d = this.decision();
     if (!d) return;
     const by = this.store.decisionById().get(byId);
     if (await this.store.supersedeDecision(d.id, byId)) {
-      this.notifier.success(`${d.key} superseded`, { description: by ? `Replaced by ${by.key}` : undefined });
+      this.notifier.success(`${d.key} superseded`, {
+        description: by ? `Replaced by ${by.key}` : undefined,
+      });
     }
   }
   protected copyLink(): void {

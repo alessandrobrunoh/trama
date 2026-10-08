@@ -288,10 +288,10 @@ export interface UpdateArtifactInput {
 // ───── decisions ─────
 export interface CreateDecisionInput {
   title: string;
-  statement: string;
+  statement?: string;
   rationale?: string;
   /** Default `proposed`; people can also record it directly as accepted / rejected. */
-  status?: 'proposed' | 'accepted' | 'rejected';
+  status?: 'draft' | 'proposed' | 'accepted' | 'rejected';
   originWorkstreamId?: ID;
   originExecutionId?: ID;
   relatedWorkstreamIds?: ID[];
@@ -300,6 +300,7 @@ export interface CreateDecisionInput {
 export interface UpdateDecisionInput {
   title?: string;
   statement?: string;
+  status?: 'proposed';
   rationale?: string | null;
   originWorkstreamId?: ID | null;
   originExecutionId?: ID | null;
