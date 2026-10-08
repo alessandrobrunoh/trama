@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="112" fill="#08090B"/><g fill="#FFFFFF"><g transform="translate(-221.065 -217.065) scale(0.7608696)"><path d="M 453 351 H 725 Q 738 351 738 364 V 377
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><style>g{fill:#08090B}@media (prefers-color-scheme:dark){g{fill:#FFFFFF}}</style><g><g transform="translate(-221.065 -217.065) scale(0.7608696)"><path d="M 453 351 H 725 Q 738 351 738 364 V 377
 C 738 410 713 435 681 435 H 483
 C 458 435 440 454 440 478 V 680
 C 440 708 418 731 390 731 H 364
