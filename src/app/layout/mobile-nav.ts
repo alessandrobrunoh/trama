@@ -113,7 +113,7 @@ export class MobileNav {
     { ...PERSONAL_NAV[1], label: 'My issues' },
     { segment: 'activity', label: 'Pulse', icon: LucideActivity },
     ...MAIN_NAV.filter((item) => item.segment !== 'activity'),
-    { segment: 'settings/profile', label: 'Settings', icon: LucideSettings },
+    { segment: 'settings', label: 'Settings', icon: LucideSettings },
   ];
   protected get accountName(): string {
     return this.session.user()?.name ?? 'Account';

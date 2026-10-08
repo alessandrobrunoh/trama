@@ -1,6 +1,6 @@
 # Trama agent skills
 
-Skills teach a coding agent how to work in Trama through the [MCP server](../mcp/README.md): what each
+Skills teach a coding agent how to work in Trama through the [MCP server](../mcp/README.md) (or the [`trama` CLI](../cli/README.md)): what each
 object is for, which tools to call, and the rules that keep the workspace trustworthy. They use the standard
 `SKILL.md` format (a folder with a `SKILL.md` file and YAML frontmatter), so any skills-aware agent can load them.
 
@@ -11,6 +11,7 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 | [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording criteria, PRs, CI, issue status |
 | [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Blocked, or a choice should be recorded |
 | [`trama-triage-issues`](trama-triage-issues/SKILL.md) | Filing, deduplicating and grouping issues |
+| [`trama-cli`](trama-cli/SKILL.md) | The same work through the `trama` shell command, when MCP is unavailable (`trama skill install` installs it) |
 
 ## Install
 
@@ -38,5 +39,5 @@ Create the key in Trama under Settings → API tokens. Give agents the narrowest
 The skills describe behaviour that lives in code. When it changes, update them:
 
 - Status derivation: `server/src/status/derive-status.ts`
-- Tool names and parameters: `mcp/src/tools.json`
+- Tool names and parameters: `mcp/src/tools.json` (the CLI's commands and flags come from it too; `cli/tests/cli.rs` checks that every example in `trama-cli/SKILL.md` still parses)
 - Enums and defaults (kinds, states, token limits): `contracts/domain.ts`

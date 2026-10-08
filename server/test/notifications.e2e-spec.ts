@@ -99,12 +99,12 @@ describe('notifications', () => {
 
   it('respects the settings: a muted kind produces nothing', async () => {
     const before = (await dev.get('/api/me/notification-settings').expect(200)).body;
-    expect(before.settings.assigned).toEqual({ inApp: true, email: false });
+    expect(before.settings.assigned).toEqual({ inApp: true, email: false, push: true });
     expect(before.emailAvailable).toBe(false);
 
     const updated = (await dev.patch('/api/me/notification-settings', { settings: { assigned: { inApp: false } } }).expect(200)).body;
-    expect(updated.settings.assigned).toEqual({ inApp: false, email: false });
-    expect(updated.settings.comment).toEqual({ inApp: true, email: false }); // untouched
+    expect(updated.settings.assigned).toEqual({ inApp: false, email: false, push: true });
+    expect(updated.settings.comment).toEqual({ inApp: true, email: false, push: true }); // untouched
 
     const count = (await inbox(dev)).items.length;
     await owner.post(`${base()}/issues`, { title: 'Muted assignment', kind: 'bug', assigneeId: devId }).expect(201);

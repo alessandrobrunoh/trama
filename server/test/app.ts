@@ -40,6 +40,7 @@ export class Client {
   }
   get = (url: string) => this.with(request(this.server).get(url));
   post = (url: string, body?: object) => this.with(request(this.server).post(url)).send(body);
+  put = (url: string, body?: object) => this.with(request(this.server).put(url)).send(body);
   patch = (url: string, body?: object) => this.with(request(this.server).patch(url)).send(body);
   delete = (url: string) => this.with(request(this.server).delete(url));
 }

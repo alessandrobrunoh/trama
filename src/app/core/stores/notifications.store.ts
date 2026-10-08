@@ -1,6 +1,7 @@
 // The signed-in user's notifications in the open workspace (Inbox, sidebar badge) and their settings.
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
-import { filter } from 'rxjs';
+import { SwPush } from '@angular/service-worker';
+import { filter, firstValueFrom } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import { ApiError } from '../api/api-error';
 import type {
@@ -23,6 +24,7 @@ export class NotificationsStore {
   private readonly nabla = inject(NablaStore);
   private readonly notifier = inject(Notifier);
   private readonly live = inject(LiveSync);
+  private readonly swPush = inject(SwPush);
 
   /** Newest first. */
   readonly items = signal<readonly Notification[]>([]);
@@ -35,6 +37,21 @@ export class NotificationsStore {
   readonly emailAvailable = signal(false);
 
   readonly hasUnread = computed(() => this.unread() > 0);
+
+  // ───────── push (system notifications on this device) ─────────
+
+  /** False in dev builds and browsers without service workers / the Notification API. */
+  readonly pushSupported = this.swPush.isEnabled && typeof Notification !== 'undefined';
+  /** The server has VAPID keys, so it can send pushes. */
+  readonly pushAvailable = signal(false);
+  private readonly pushKey = signal<string | null>(null);
+  /** This device is registered for push. */
+  readonly pushSubscribed = signal(false);
+  /** `denied` means the browser blocks notifications for this site until the person changes it there. */
+  readonly pushPermission = signal<NotificationPermission>(
+    typeof Notification !== 'undefined' ? Notification.permission : 'default',
+  );
+  readonly pushBusy = signal(false);
 
   constructor() {
     effect(() => {
@@ -96,6 +113,59 @@ export class NotificationsStore {
       this.emailAvailable.set(res.emailAvailable);
     } catch {
       /* keep the defaults; saving will report errors */
+    }
+    await this.loadPush();
+  }
+
+  private async loadPush(): Promise<void> {
+    try {
+      const res = await this.api.push.status();
+      this.pushAvailable.set(res.enabled);
+      this.pushKey.set(res.publicKey);
+    } catch {
+      this.pushAvailable.set(false);
+    }
+    if (!this.pushSupported) return;
+    this.pushPermission.set(Notification.permission);
+    const sub = await firstValueFrom(this.swPush.subscription).catch(() => null);
+    this.pushSubscribed.set(!!sub);
+  }
+
+  /** Asks for permission (must be called from a click) and registers this device. */
+  async enablePush(): Promise<void> {
+    const serverPublicKey = this.pushKey();
+    if (!this.pushSupported || !serverPublicKey || this.pushBusy()) return;
+    this.pushBusy.set(true);
+    try {
+      const sub = await this.swPush.requestSubscription({ serverPublicKey });
+      const json = sub.toJSON();
+      if (!json.endpoint || !json.keys?.['p256dh'] || !json.keys['auth']) throw new Error('The browser returned an incomplete subscription');
+      await this.api.push.subscribe({ endpoint: json.endpoint, keys: { p256dh: json.keys['p256dh'], auth: json.keys['auth'] } });
+      this.pushSubscribed.set(true);
+    } catch (e) {
+      if (Notification.permission !== 'denied')
+        this.notifier.error('Could not turn on notifications', { description: ApiError.from(e).message });
+    } finally {
+      this.pushPermission.set(Notification.permission);
+      this.pushBusy.set(false);
+    }
+  }
+
+  /** Unregisters this device; the browser permission stays as it is. */
+  async disablePush(): Promise<void> {
+    if (!this.pushSupported || this.pushBusy()) return;
+    this.pushBusy.set(true);
+    try {
+      const sub = await firstValueFrom(this.swPush.subscription);
+      if (sub) {
+        await this.api.push.unsubscribe(sub.endpoint);
+        await this.swPush.unsubscribe();
+      }
+      this.pushSubscribed.set(false);
+    } catch (e) {
+      this.notifier.error('Could not turn off notifications', { description: ApiError.from(e).message });
+    } finally {
+      this.pushBusy.set(false);
     }
   }
 

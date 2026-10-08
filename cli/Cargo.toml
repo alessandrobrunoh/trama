@@ -1,0 +1,33 @@
+[package]
+name = "trama-cli"
+version = "0.1.0"
+edition = "2024"
+description = "Agent-first command line for Trama"
+publish = false
+
+[[bin]]
+name = "trama"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4.5", features = ["string", "wrap_help"] }
+clap_complete = "4.5"
+hex = "0.4.3"
+reqwest = { version = "0.13.5", features = ["json", "query"] }
+rpassword = "7.4"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = { version = "1.0.151", features = ["preserve_order"] }
+sha2 = "0.11.0"
+tokio = { version = "1.53.2", features = ["rt", "macros", "io-std", "io-util", "time", "signal"] }
+tracing = "0.1.44"
+
+[dev-dependencies]
+tokio = { version = "1.53.2", features = ["test-util"] }
+
+# Small, self-contained release binary.
+[profile.release]
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

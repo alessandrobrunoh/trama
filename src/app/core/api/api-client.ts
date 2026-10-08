@@ -236,6 +236,16 @@ export class ApiClient {
       this.patch<{ settings: NotificationSettings; emailAvailable: boolean }>('/me/notification-settings', { settings }),
   };
 
+  /** Web Push for the signed-in user's devices. `publicKey` is null when the server has no VAPID keys. */
+  readonly push = {
+    status: () =>
+      this.get<{ enabled: boolean; publicKey: string | null }>('/me/push', undefined, { quiet: true }),
+    subscribe: (subscription: { endpoint: string; keys: { p256dh: string; auth: string } }) =>
+      this.request<{ enabled: boolean }>('PUT', '/me/push/subscription', { body: subscription }),
+    unsubscribe: (endpoint: string) =>
+      this.request<void>('DELETE', '/me/push/subscription', { body: { endpoint } }),
+  };
+
   /** The signed-in user's favorites in a workspace (private to them). `remove` is idempotent. */
   readonly favorites = {
     list: (slug: string) => this.get<Favorite[]>(`${this.w(slug)}/favorites`, undefined, { quiet: true }),

@@ -1,0 +1,44 @@
+name: CLI
+
+on:
+  pull_request:
+    paths: ['cli/**', 'mcp/src/**', 'skills/trama-cli/**', '.github/workflows/cli-*.yml']
+  push:
+    branches: [main]
+    paths: ['cli/**', 'mcp/src/**', 'skills/trama-cli/**', '.github/workflows/cli-*.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ilammy/setup-nasm@v1
+        if: runner.os == 'Windows'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: cli
+      # The CLI shares mcp/src/{catalog,generic,protocol,upstream}.rs and tools.json with the MCP server.
+      - run: cargo test --locked
+        working-directory: cli
+      - run: cargo build --locked
+        working-directory: cli
+      - name: Smoke test
+        run: cargo run --locked -q -- commands --fields command | head -c 200
+        working-directory: cli
+        shell: bash
+
+  install-script:
+    name: install.sh
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sh -n cli/install/install.sh
