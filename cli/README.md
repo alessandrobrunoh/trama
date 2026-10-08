@@ -6,12 +6,15 @@ because a shell command is the cheapest tool a coding agent has: no tool schemas
 when it needs one.
 
 **Every API route is a command.** The CLI is generated from the same catalog as the MCP server
-(`mcp/src/tools.json`: 96 routes with parameters, enums and permissions), so the two can never drift apart:
+(`mcp/src/tools.json`: 105 routes with parameters, enums and permissions), so the two can never drift apart:
 a route added to the catalog appears here with its flags, types and allowed values.
 
 ```bash
 trama issue list --open --priority urgent,high --fields key,title,status
 trama workstream context AUTH-42          # markdown briefing
+trama project context prj_…               # markdown "mega context" of a whole project
+trama project-update post prj_… --health on_track --file body=update.md
+trama artifact add --issue-id BUG-142 --kind pull_request --title "Fix login" --url https://…
 trama issue create --kind bug --title "Login times out" --file body=notes.md
 trama issue update BUG-142 --status in_progress --unset estimate
 ```
@@ -74,10 +77,10 @@ trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
 Resources: `issue` `workstream` `criterion` `decision` `artifact` `input-request` `comment` `project`
-`milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
+`project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
 `outgoing-webhook` `graph` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
-plus actions (`issue link`, `decision accept`, `input-request answer`, `workstream context`, …).
-Aliases: `issues`, `ws`, `repo`, `webhook`; `ls`, `show`, `rm`. Items are addressed by id or key (`BUG-142`, `AUTH-42`, `ADR-21`).
+plus actions (`issue link`, `decision accept`, `input-request answer`, `workstream context`, `project context`, `project artifacts`, …).
+Aliases: `issues`, `ws`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`BUG-142`, `AUTH-42`, `ADR-21`).
 
 ```bash
 trama commands                      # every command with its HTTP route and permission
@@ -102,7 +105,7 @@ Everything is predictable so an agent can use it without reading docs twice.
 
 - **Output.** Compact JSON on stdout when piped, a table (lists) or indented JSON (objects) in a terminal.
   `-o json|pretty|jsonl|table|raw`; `--fields id,assignee.name` keeps only what you need (dot paths, arrays and
-  `{"results":[…]}` envelopes handled). The markdown briefing (`workstream context`) is passed through as is.
+  `{"results":[…]}` envelopes handled). The markdown briefings (`workstream context`, `project context`) are passed through as is.
 - **Errors.** JSON on stderr: `{"error":{"code","message","status","hint"}}` (plain text in a terminal), and a stable exit code:
 
   | exit | code | |

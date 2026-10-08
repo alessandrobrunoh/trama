@@ -16,6 +16,8 @@ get_workstream_context { idOrKey: "AUTH-42" }
 
 The briefing contains the objective, acceptance criteria, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. If the user gave an **issue** key, call `get_issue` and check its `workstreamIds`; then load the briefing of the workstream it belongs to.
 
+If the user hands you a **project** (or you need the big picture across several workstreams), call `get_project_context { id }` instead: one markdown "mega context" with the project's updates, milestones, workstreams, issues, artifacts, decisions and open questions, each traceable to where it is attached. Then pick a workstream and load its own briefing.
+
 If the user only describes the work, `search { q, types: "workstream,issue,decision" }` first. Do not create a second workstream for something that exists.
 
 ## 2. Check you should proceed

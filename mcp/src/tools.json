@@ -540,6 +540,7 @@
    "summary": "body string Summary",
    "description": "body string Description",
    "color": "body string Hex colour",
+   "icon": "body string Lucide icon name (kebab-case, e.g. rocket) or one emoji (null clears)",
    "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "leadId": "body string Lead user id (null clears)",
@@ -555,6 +556,83 @@
   "path": "/projects/{id}",
   "permission": "projects:delete",
   "description": "Delete a project and its milestones. Its workstreams are kept, detached.",
+  "params": {
+   "id": "path string! Project id"
+  }
+ },
+ {
+  "name": "get_project_context",
+  "method": "GET",
+  "path": "/projects/{id}/context.md",
+  "permission": "projects:read",
+  "description": "Markdown briefing for a whole project (mega context): overview, latest updates, milestones, workstreams, issues, artifacts, decisions, open questions. Read it before working on a project.",
+  "params": {
+   "id": "path string! Project id"
+  }
+ },
+ {
+  "name": "list_project_updates",
+  "method": "GET",
+  "path": "/projects/{projectId}/updates",
+  "permission": "projects:read",
+  "description": "Status updates posted on a project (health + markdown write-up), newest first.",
+  "params": {
+   "projectId": "path string! Project id"
+  }
+ },
+ {
+  "name": "get_project_update",
+  "method": "GET",
+  "path": "/projects/{projectId}/updates/{id}",
+  "permission": "projects:read",
+  "description": "One project update.",
+  "params": {
+   "projectId": "path string! Project id",
+   "id": "path string! Project update id (pu_…)"
+  }
+ },
+ {
+  "name": "create_project_update",
+  "method": "POST",
+  "path": "/projects/{projectId}/updates",
+  "permission": "projects:write",
+  "description": "Post a status update on a project. The newest update sets the project's health. Report facts, not guesses.",
+  "params": {
+   "projectId": "path string! Project id",
+   "health": "body string(on_track|at_risk|off_track)! Project health",
+   "body": "body string! Markdown write-up: what shipped, what is next, risks"
+  }
+ },
+ {
+  "name": "update_project_update",
+  "method": "PATCH",
+  "path": "/projects/{projectId}/updates/{id}",
+  "permission": "projects:write",
+  "description": "Edit the health or body of a project update.",
+  "params": {
+   "projectId": "path string! Project id",
+   "id": "path string! Project update id (pu_…)",
+   "health": "body string(on_track|at_risk|off_track) Project health",
+   "body": "body string Markdown write-up"
+  }
+ },
+ {
+  "name": "delete_project_update",
+  "method": "DELETE",
+  "path": "/projects/{projectId}/updates/{id}",
+  "permission": "projects:delete",
+  "description": "Delete a project update; the project's health falls back to the previous update.",
+  "params": {
+   "projectId": "path string! Project id",
+   "id": "path string! Project update id (pu_…)"
+  }
+ },
+ {
+  "name": "list_project_artifacts",
+  "method": "GET",
+  "path": "/projects/{id}/artifacts",
+  "permission": "projects:read",
+  "description": "Artifacts attached to the project itself, plus those of its workstreams and issues.",
   "params": {
    "id": "path string! Project id"
   }
@@ -810,7 +888,7 @@
   "method": "GET",
   "path": "/artifacts",
   "permission": "artifacts:read",
-  "description": "PRs, docs, builds, deployments etc. attached to workstreams.",
+  "description": "PRs, docs, builds, deployments, links etc. attached to workstreams, issues and projects.",
   "params": {
    "workstreamId": "query string Workstream",
    "executionId": "query string Execution",
@@ -834,11 +912,14 @@
   "method": "POST",
   "path": "/artifacts",
   "permission": "artifacts:write",
-  "description": "Attach an artifact to a workstream.",
+  "description": "Attach an artifact (PR, build, document, link…) to a project, an issue and/or a workstream. At least one of projectId, issueId, workstreamId is required.",
   "params": {
-   "workstreamId": "body string! Workstream id",
-   "kind": "body string(pull_request|merge_request|document|design|image|file|build|test_report|deployment|release)! Kind",
+   "projectId": "body string Project id",
+   "issueId": "body string Issue id",
+   "workstreamId": "body string Workstream id",
+   "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release)! Kind",
    "title": "body string! Title",
+   "description": "body string Why it is attached / what it is (markdown)",
    "executionId": "body string Execution id",
    "repositoryId": "body string Repository id",
    "provider": "body string Provider",
@@ -860,7 +941,7 @@
   "params": {
    "id": "path string! Artifact id",
    "workstreamId": "body string Workstream id",
-   "kind": "body string(pull_request|merge_request|document|design|image|file|build|test_report|deployment|release) Kind",
+   "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release) Kind",
    "title": "body string Title",
    "executionId": "body string Execution id",
    "repositoryId": "body string Repository id",
@@ -882,6 +963,16 @@
   "description": "Delete an artifact.",
   "params": {
    "id": "path string! Artifact id"
+  }
+ },
+ {
+  "name": "list_issue_artifacts",
+  "method": "GET",
+  "path": "/issues/{idOrKey}/artifacts",
+  "permission": "issues:read",
+  "description": "Artifacts attached to an issue.",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
   }
  },
  {
@@ -1095,11 +1186,11 @@
   "description": "Create a saved view.",
   "params": {
    "name": "body string! Name",
-   "entity": "body string(workstream|issue|execution|decision)! Entity",
+   "entity": "body string(workstream|issue|decision|project)! Entity",
    "filters": "body object[] [{field, op, value}]",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
-   "layout": "body string(list|board|graph) Layout",
+   "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
    "shared": "body boolean Visible to everyone"
   }
  },
@@ -1112,11 +1203,11 @@
   "params": {
    "id": "path string! View id",
    "name": "body string Name",
-   "entity": "body string(workstream|issue|execution|decision) Entity",
+   "entity": "body string(workstream|issue|decision|project) Entity",
    "filters": "body object[] [{field, op, value}]",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
-   "layout": "body string(list|board|graph) Layout",
+   "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
    "shared": "body boolean Visible to everyone"
   }
  },

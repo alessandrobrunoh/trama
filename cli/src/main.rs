@@ -118,8 +118,12 @@ async fn run_tool(reg: &Registry, group: &str, group_matches: &ArgMatches, ctx: 
             label.push_str(v);
         }
     }
-    // The workstream briefing is markdown unless JSON was asked for.
-    let accept = if entry.tool.name == "get_workstream_context" && !ctx.fmt.mode.wants_json() { http::ACCEPT_MARKDOWN } else { http::ACCEPT_JSON };
+    // The workstream briefing is markdown unless JSON was asked for; the project briefing only exists as markdown.
+    let accept = match entry.tool.name.as_str() {
+        "get_workstream_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
+        "get_project_context" => http::ACCEPT_MARKDOWN,
+        _ => http::ACCEPT_JSON,
+    };
     exec::run(&label, &call, accept, ctx).await
 }
 

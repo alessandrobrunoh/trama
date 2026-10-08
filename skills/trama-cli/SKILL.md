@@ -29,7 +29,7 @@ Never print, log or commit the key. Use the narrowest permissions that do the jo
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `issue` `workstream` `criterion` `decision` `artifact` `input-request` `comment` `project` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration` `outgoing-webhook` `graph` `snapshot` `workspace`, plus `search`.
+Resources: `issue` `workstream` `criterion` `decision` `artifact` `input-request` `comment` `project` `project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration` `outgoing-webhook` `graph` `snapshot` `workspace`, plus `search`.
 Verbs: `list` `get` `create` `update` `delete` and action verbs (`link`, `accept`, `answer`, `dismiss`, `context`, …).
 
 **Discover instead of guessing:**
@@ -51,6 +51,10 @@ trama issue list --open --priority urgent,high --fields key,title,status,assigne
 trama issue get BUG-142
 trama workstream get AUTH-42
 trama workstream context AUTH-42          # markdown briefing: read this before starting work
+trama project context prj_…               # markdown "mega context" of a whole project: read before reporting on it
+trama project-update list prj_…
+trama project artifacts prj_…
+trama issue artifacts BUG-142
 trama workstream list --status working --team-id tm_…
 trama event list --workstream-id wk_… --limit 20
 ```
@@ -69,6 +73,18 @@ trama criterion update AUTH-42 crit_… --state met
 trama input-request create --workstream-id wk_… --question "Keep the old endpoint?" --options "yes,no"
 trama decision create --title "Use OAuth device flow" --statement "…" --rationale "…" --status proposed
 ```
+
+### Project updates and artifacts
+
+```bash
+trama project-update post prj_… --health at_risk --file body=notes.md   # alias of `create`; health: on_track | at_risk | off_track
+trama project-update edit prj_… pu_… --body "Corrected: the importer is merged."   # alias of `update`
+trama project update prj_… --icon rocket                  # icon: Lucide name or one emoji; --unset icon clears it
+trama artifact add --project-id prj_… --kind link --title "Launch plan" --url https://example.com/plan   # alias of `create`
+trama artifact add --issue-id BUG-142 --kind pull_request --title "Fix login timeout" --state open
+```
+
+An artifact needs at least one of `--project-id`, `--issue-id`, `--workstream-id`. Write the update after reading `project context`, base `--health` on facts, and prefer `at_risk` over a rosy guess.
 
 - Long text: `--file body=notes.md` (or `--file body=-` to read stdin), never shell-escape paragraphs.
 - Whole bodies as JSON: `--data '{"kind":"bug","title":"…"}'`, `--data @payload.json` or `--data -`. Explicit flags win over `--data`.
@@ -109,4 +125,4 @@ Each line is a pointer (`entity`, `id`, `type`); read the object with the matchi
 
 ## From MCP tool names
 
-An MCP tool `create_issue` is `trama issue create`; `get_workstream_context` is `trama workstream context`; `answer_input_request` is `trama input-request answer`; `list_webhook_deliveries` is `trama outgoing-webhook deliveries`. `trama schema create_issue` accepts the MCP name too.
+An MCP tool `create_issue` is `trama issue create`; `get_workstream_context` is `trama workstream context`; `get_project_context` is `trama project context`; `create_project_update` is `trama project-update create` (alias `post`); `list_project_artifacts` is `trama project artifacts`; `answer_input_request` is `trama input-request answer`; `list_webhook_deliveries` is `trama outgoing-webhook deliveries`. `trama schema create_issue` accepts the MCP name too.
