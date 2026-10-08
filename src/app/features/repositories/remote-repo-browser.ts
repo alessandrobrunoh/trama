@@ -11,8 +11,8 @@ import { NablaStore } from '../../core/stores/nabla.store';
 
 /**
  * Lists the repositories a git host connection can see (`GET /integrations/:id/remote-repositories`)
- * and links them as projects (`POST /integrations/:id/link-repository`). Used by Settings → Integrations
- * and the Projects "Import" dialog.
+ * and links them as repositories (`POST /integrations/:id/link-repository`). Used by Settings → Integrations
+ * and the Repositories "Import" dialog.
  *   <app-remote-repo-browser [connectionId]="c.id" [teamIds]="teams()" (linked)="onLinked($event)" />
  */
 @Component({
@@ -62,7 +62,7 @@ import { NablaStore } from '../../core/stores/nabla.store';
                 </div>
               </div>
               @if (isLinked(r); as id) {
-                <a class="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 text-xs" [routerLink]="['/', slug(), 'projects', id]">
+                <a class="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1 text-xs" [routerLink]="['/', slug(), 'repositories', id]">
                   <svg [lucideIcon]="check" [size]="13" class="text-status-shipped"></svg> Linked
                 </a>
               } @else {
@@ -98,7 +98,7 @@ export class RemoteRepoBrowser {
   private readonly store = inject(NablaStore);
 
   readonly connectionId = input.required<string>();
-  /** Teams assigned to newly created projects. */
+  /** Teams assigned to newly created repositories. */
   readonly teamIds = input<readonly string[]>([]);
   readonly maxHeight = input('22rem');
   readonly linked = output<Repository>();
@@ -114,7 +114,7 @@ export class RemoteRepoBrowser {
   protected readonly error = signal<string | null>(null);
   protected readonly hasMore = signal(false);
   protected readonly linking = signal<ReadonlySet<string>>(new Set());
-  /** fullName (lower case) → project id, for repositories linked in this session. */
+  /** fullName (lower case) → repository id, for repositories linked in this session. */
   private readonly justLinked = signal<ReadonlyMap<string, string>>(new Map());
   private page = 1;
   private gen = 0;
@@ -133,13 +133,13 @@ export class RemoteRepoBrowser {
     });
   }
 
-  /** Project id when the repository is attached to this connection (or exists and was linked here). */
+  /** Repository id when the repository is attached to this connection (or exists and was linked here). */
   protected isLinked(r: RemoteRepository): string | null {
     const mine = this.justLinked().get(r.fullName.toLowerCase());
     if (mine) return mine;
     if (!r.linked || !r.repositoryId) return null;
     const conn = this.store.integrationDetails().find((c) => c.id === this.connectionId());
-    // Without details (non-admin view) treat an existing project as linked.
+    // Without details (non-admin view) treat an existing repository as linked.
     return !conn || conn.repositoryIds.includes(r.repositoryId) ? r.repositoryId : null;
   }
 
