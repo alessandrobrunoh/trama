@@ -100,24 +100,33 @@ Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP
 ### Workstreams — `/workstreams`
 - `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
 - `GET /:idOrKey`
-- `POST { title, ownerTeamId, deltaThreadUrl?, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, startDate?, targetDate? }`
+- `POST { title, ownerTeamId, deltaThreadUrl?, description?, objective?, context?, participatingTeamIds?, accountableUserId?, projectId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled, startDate?, targetDate? }`
   - `deltaThreadUrl`: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream. Required, except for `statusOverride: draft` and for workspaces that turned **Delta threads** off (`PATCH /w/:slug/settings { deltaThreads: false }`, admin; on by default and recommended). A supplied URL is always validated; the briefing omits the section when there is none.
   - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
   - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.
 - `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. `deltaThreadUrl` can be replaced but not cleared. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
-- `DELETE /:idOrKey` (cascades input requests, artifacts, milestones, dependencies, comments; unlinks issues/decisions and drops the deleted milestones from issues).
+- `projectId` links the workstream to the project it carries out (`null` on PATCH detaches; `GET ?projectId=` filters). Its `repositoryIds` must be a subset of the project's: omitted on create they are inherited from the project, otherwise `400` naming the offenders. Leaving a project drops the project's milestones from the workstream's issues that no longer qualify.
+- `DELETE /:idOrKey` (cascades input requests, artifacts, dependencies, comments; unlinks issues/decisions and drops project milestones from issues that no longer have a workstream in that project).
 - Criteria (each returns the updated workstream): `POST /:idOrKey/criteria { text, state? }`, `PATCH /:idOrKey/criteria/:criterionId { text?, state? }`, `DELETE /:idOrKey/criteria/:criterionId`. States: `pending|in_progress|met`.
 - `status` / `derivedStatus` / `shippedAt` are written by the status engine (see *Derived workstream status* below); `status = statusOverride ?? derivedStatus`.
 
-### Milestones — `/milestones`
-Linear-style milestones inside a workstream (flat resource, like artifacts). `Milestone { id: ms_…, workspaceId, workstreamId, name, description?, targetDate?, sortOrder, createdAt, updatedAt }`; also in the snapshot (`milestones`, ordered by `sortOrder`).
-- `GET ?workstreamId` (ordered by workstream, `sortOrder`), `GET /:id`
-- `POST { workstreamId, name, description?, targetDate?, sortOrder? }` → `sortOrder` defaults to last (max + 1).
+### Projects — `/projects` (writes: `manageProjects`, members by default)
+Linear-style planning entity: the outcome we want, by when, and where. Workstreams carry a project out; milestones belong to it. `Project { id: pj_…, workspaceId, name, summary?, description?, color, status, priority, leadId?, teamIds, repositoryIds, startDate?, targetDate?, createdAt, updatedAt, completedAt? }`; also in the snapshot (`projects`). `status`: `backlog|planned|in_progress|paused|completed|canceled` (`completedAt` is set on completed/canceled and cleared on reopen).
+- `GET ?status&teamId&leadId&repositoryId&q`, `GET /:id`
+- `POST { name, summary?, description?, color?, status?, priority?, leadId?, teamIds?, repositoryIds?, startDate?, targetDate? }` (`400` for unknown teams, repositories or a lead who is not a member).
+- `PATCH /:id` any of the create fields (`null` clears `summary`, `description`, `leadId`, dates). Removing a repository also removes it from the project's workstreams.
+- `DELETE /:id` (`204`; its milestones are deleted and removed from issues, its workstreams are kept and detached).
+- Events: `project.created|updated|status_changed|deleted` (subject `project`). Repositories deleted from the workspace are removed from projects.
+
+### Milestones — `/milestones` (writes: `manageProjects`)
+Linear-style milestones inside a project (flat resource). `Milestone { id: ms_…, workspaceId, projectId, name, description?, targetDate?, sortOrder, createdAt, updatedAt }`; also in the snapshot (`milestones`, ordered by `sortOrder`).
+- `GET ?projectId` (ordered by project, `sortOrder`), `GET /:id`
+- `POST { projectId, name, description?, targetDate?, sortOrder? }` → `sortOrder` defaults to last (max + 1).
 - `PATCH /:id { name?, description?, targetDate?, sortOrder? }` (`null` clears `description` / `targetDate`).
-- `POST /reorder { workstreamId, ids: [...] }` → re-numbers `sortOrder` to 0..n-1 following `ids` (milestones not listed follow, in their current order); `400` for ids that are not milestones of that workstream. Returns the ordered list.
-- `DELETE /:id` (`204`; removes the id from `Issue.milestoneIds`, deletes its comments). Milestones are deleted with their workstream.
-- Events: `milestone.created|updated|deleted` (subject `milestone`, `workstreamId` set; `data.name`, `data.fields`). Live (SSE) events use entity `milestone`.
-- Issue rule: an issue is in at most one milestone per workstream and only in milestones of workstreams in its `workstreamIds` (`PATCH /issues/:idOrKey { milestoneIds }` → `400` otherwise). Removing a workstream from `workstreamIds` drops that workstream's milestone from the issue.
+- `POST /reorder { projectId, ids: [...] }` → re-numbers `sortOrder` to 0..n-1 following `ids` (milestones not listed follow, in their current order); `400` for ids that are not milestones of that project. Returns the ordered list.
+- `DELETE /:id` (`204`; removes the id from `Issue.milestoneIds`, deletes its comments). Milestones are deleted with their project.
+- Events: `milestone.created|updated|deleted` (subject `milestone`; `data.name`, `data.projectId`, `data.fields`; no `workstreamId`). Live (SSE) events use entity `milestone`.
+- Issue rule: an issue is in at most one milestone per project and only in milestones of the projects of its workstreams (`PATCH /issues/:idOrKey { milestoneIds }` → `400` otherwise). Unlinking the last workstream of a project drops that project's milestone from the issue.
 
 ### Input requests — `/input-requests`
 `GET ?state&workstreamId&assigneeUserId`, `GET /:id`, `POST { question, workstreamId, options?, assigneeUserId? }` (`requestedBy` = caller), `PATCH` (open only), `POST /:id/answer { answer }`, `POST /:id/dismiss` (`409` if not open), `DELETE`.
