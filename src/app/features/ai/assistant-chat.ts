@@ -3,8 +3,10 @@ import {
   Component,
   ElementRef,
   effect,
+  computed,
   inject,
   input,
+  signal,
   output,
   viewChild,
 } from '@angular/core';
@@ -21,6 +23,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Markdown } from '../../shared/markdown';
+import { ActivitySteps } from './activity-steps';
 
 /** Compact relative time: now, 5m, 3h, 2d, 4mo. */
 export function timeAgo(time: number): string {
@@ -40,7 +43,7 @@ export function timeAgo(time: number): string {
 @Component({
   selector: 'app-assistant-chat',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports, Markdown],
+  imports: [FormsModule, RouterLink, LucideDynamicIcon, HlmButtonImports, Markdown, ActivitySteps],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
   template: `
     @if (ai.messages().length || !page()) {
@@ -95,32 +98,7 @@ export function timeAgo(time: number): string {
                       class="transition-transform group-open:rotate-90"
                     ></svg>
                   </summary>
-                  <ul class="mt-2 space-y-1.5 text-[13px] leading-snug">
-                    @for (step of activity.steps; track $index) {
-                      @if (step.kind === 'note') {
-                        <li class="text-muted-foreground border-l-2 pl-3 whitespace-pre-wrap">
-                          {{ step.label }}
-                        </li>
-                      } @else {
-                        <li
-                          [class]="step.ok === false ? 'text-destructive' : 'text-muted-foreground'"
-                        >
-                          {{ step.label }}
-                          @if (step.count) {
-                            ×{{ step.count }}
-                          }
-                          @if (step.ok === false) {
-                            · failed
-                            @if (step.detail) {
-                              <span class="text-muted-foreground block text-xs">{{
-                                step.detail
-                              }}</span>
-                            }
-                          }
-                        </li>
-                      }
-                    }
-                  </ul>
+                  <app-activity-steps class="mt-2" [steps]="activity.steps" />
                 </details>
               }
               @if (message.role === 'user') {
@@ -133,7 +111,22 @@ export function timeAgo(time: number): string {
             </article>
           }
           @if (ai.busy()) {
-            <p class="text-muted-foreground text-xs" role="status">Thinking…</p>
+            <article class="pr-2" role="status">
+              <div class="text-muted-foreground mb-1 text-[11px] font-medium">Trama</div>
+              <div class="text-muted-foreground mb-2 flex items-center gap-1.5 text-[13px]">
+                @if (live(); as l) {
+                  {{ l.steps.length || l.working ? 'Working' : 'Thinking' }} for {{ elapsed() }}s
+                }
+              </div>
+              @if (live(); as l) {
+                @if (l.steps.length || l.working) {
+                  <app-activity-steps class="mb-2" [steps]="l.steps" [working]="l.working" />
+                }
+                @if (l.text) {
+                  <app-markdown [source]="l.text" [link]="refs.linker()" />
+                }
+              }
+            </article>
           }
         </div>
       </div>
@@ -282,6 +275,13 @@ export function timeAgo(time: number): string {
 export class AssistantChat {
   protected readonly ai = inject(AssistantStore);
   protected readonly refs = inject(EntityRefs);
+  protected readonly live = this.ai.live;
+  private readonly tick = signal(Date.now());
+  /** Seconds since the reply started; ticks once a second while the assistant is busy. */
+  protected readonly elapsed = computed(() => {
+    const l = this.live();
+    return l ? Math.max(0, Math.floor((this.tick() - l.startedAt) / 1000)) : 0;
+  });
   readonly page = input(false);
   readonly navigated = output<void>();
   private readonly composer = viewChild<ElementRef<HTMLTextAreaElement>>('composer');
@@ -297,9 +297,16 @@ export class AssistantChat {
   ];
 
   constructor() {
+    effect((onCleanup) => {
+      if (!this.ai.busy()) return;
+      this.tick.set(Date.now());
+      const timer = setInterval(() => this.tick.set(Date.now()), 1000);
+      onCleanup(() => clearInterval(timer));
+    });
     effect(() => {
       this.ai.messages();
       this.ai.busy();
+      this.ai.live();
       const element = this.conversation()?.nativeElement;
       if (element)
         queueMicrotask(() => {

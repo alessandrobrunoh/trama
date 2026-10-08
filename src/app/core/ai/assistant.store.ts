@@ -6,6 +6,7 @@ import { SessionStore } from '../session/session.store';
 import { NablaStore } from '../stores/nabla.store';
 import {
   AiApi,
+  type ActivityStep,
   type AiStatus,
   type AssistantActivity,
   type ChatContext,
@@ -90,6 +91,13 @@ export class AssistantStore {
   readonly messages = computed(() => this.active()?.messages ?? []);
   readonly draft = signal('');
   readonly busy = signal(false);
+  /** The reply being prepared right now: steps so far, the tool running, text as it is written. */
+  readonly live = signal<{
+    steps: ActivityStep[];
+    working: string | null;
+    text: string;
+    startedAt: number;
+  } | null>(null);
   readonly error = signal('');
   readonly shareContext = signal(true);
   readonly slug = this.store.slug;
@@ -268,6 +276,7 @@ export class AssistantStore {
     this.controller?.abort();
     this.controller = undefined;
     this.busy.set(false);
+    this.live.set(null);
   }
 
   async send(): Promise<void> {
@@ -295,12 +304,39 @@ export class AssistantStore {
     this.draft.set('');
     this.error.set('');
     this.busy.set(true);
+    this.live.set({ steps: [], working: null, text: '', startedAt: Date.now() });
+    const update = (change: (live: NonNullable<ReturnType<typeof this.live>>) => void) =>
+      this.live.update((live) => {
+        if (!live || this.controller !== controller) return live;
+        const next = { ...live, steps: [...live.steps] };
+        change(next);
+        return next;
+      });
     try {
-      const result = await this.api.chat(
+      const result = await this.api.chatStream(
         slug,
         history,
         this.shareContext() ? this.context() : undefined,
         controller.signal,
+        (event) => {
+          switch (event.type) {
+            case 'working':
+              update((l) => (l.working = event.label));
+              break;
+            case 'step':
+              update((l) => {
+                l.steps[event.index] = event.step;
+                l.working = null;
+              });
+              break;
+            case 'text':
+              update((l) => (l.text += event.delta));
+              break;
+            case 'reset':
+              update((l) => (l.text = ''));
+              break;
+          }
+        },
       );
       if (this.controller === controller)
         this.writeChat(
@@ -325,6 +361,7 @@ export class AssistantStore {
       if (this.controller === controller) {
         this.controller = undefined;
         this.busy.set(false);
+        this.live.set(null);
       }
     }
   }

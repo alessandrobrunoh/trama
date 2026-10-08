@@ -1,6 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { EntityRefChip, EntityRow } from './entity-ref';
+import { PriorityIcon } from './priority-icon';
+import { STATUS_VISUALS, StatusLabel } from './status';
 
 /* ───────────── tiny, safe markdown → AST → Angular template (no innerHTML) ───────────── */
 
@@ -276,7 +278,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
 @Component({
   selector: 'app-markdown',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, EntityRefChip, EntityRow],
+  imports: [NgTemplateOutlet, EntityRefChip, EntityRow, PriorityIcon, StatusLabel],
   host: {
     class: 'block text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words',
   },
@@ -433,7 +435,15 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
                     <tr class="hover:bg-accent/40 transition-colors">
                       @for (cell of row; track $index) {
                         <td class="px-3 py-2 align-top" [style.text-align]="b.align[$index]">
-                          <ng-container *ngTemplateOutlet="inl; context: { $implicit: cell }" />
+                          @if (special(cell); as sp) {
+                            @if (sp.k === 'priority') {
+                              <app-priority-icon [priority]="$any(sp.v)" showLabel />
+                            } @else {
+                              <app-status-label [status]="$any(sp.v)" />
+                            }
+                          } @else {
+                            <ng-container *ngTemplateOutlet="inl; context: { $implicit: cell }" />
+                          }
                         </td>
                       }
                     </tr>
@@ -467,6 +477,13 @@ export class Markdown {
   /** Turns mentions of workspace records into interactive chips (and lists of them into cards). */
   readonly link = input<TextLinker>();
   protected readonly blocks = computed(() => parseMarkdown(this.source() ?? '', this.link()));
+  /** A table cell that is exactly a status or priority word shows the app's own glyph and label. */
+  protected special(cell: Inline[]): { k: 'status' | 'priority'; v: string } | null {
+    if (cell.length !== 1 || cell[0].t !== 'text') return null;
+    const v = cell[0].v.trim().toLowerCase().replace(/\s+/g, '_');
+    if (['urgent', 'high', 'medium', 'low'].includes(v)) return { k: 'priority', v };
+    return v in STATUS_VISUALS ? { k: 'status', v } : null;
+  }
   protected readonly lead = leadingRef;
   protected readonly trail = trailing;
   protected readonly text = plainText;

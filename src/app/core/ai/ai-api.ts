@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom, fromEvent, takeUntil } from 'rxjs';
 import { ApiClient } from '../api/api-client';
 import { ApiError } from '../api/api-error';
+import { CLIENT_ID } from '../sync/client-id';
 
 export interface AiStatus {
   suggestions: { configured: boolean; model: string | null };
@@ -34,7 +35,14 @@ export interface AiIssueDraftOptions {
   teams: { id: string; label: string }[];
   assignees: { id: string; label: string }[];
   workstreams: { id: string; key: string; title: string; objective: string }[];
-  similar: { key: string; title: string; kind: string; priority: string; estimate: number | null; cycleDays: number | null }[];
+  similar: {
+    key: string;
+    title: string;
+    kind: string;
+    priority: string;
+    estimate: number | null;
+    cycleDays: number | null;
+  }[];
 }
 export type AiIssueDraftSuggestion =
   | { field: 'priority'; value: string; why: string }
@@ -73,6 +81,15 @@ export interface ChatMessage {
   /** Assistant replies only; never sent back to the server. */
   activity?: AssistantActivity;
 }
+/** What the server streams while it prepares a reply. */
+export type ChatStreamEvent =
+  | { type: 'working'; label: string }
+  | { type: 'step'; index: number; step: ActivityStep }
+  | { type: 'text'; delta: string }
+  | { type: 'reset' }
+  | { type: 'done'; content: string; activity?: AssistantActivity }
+  | { type: 'error'; message: string };
+
 export interface ChatContext {
   kind: 'page' | 'issue' | 'workstream' | 'project' | 'decision';
   label: string;
@@ -118,6 +135,81 @@ export class AiApi {
       { messages: messages.map(({ role, content }) => ({ role, content })), context },
       signal,
     );
+  }
+
+  /**
+   * Like `chat`, but reports progress as it happens (steps, text as it is written) through
+   * `onEvent`. Resolves with the final reply; rejects with the server's message on failure.
+   */
+  async chatStream(
+    slug: string,
+    messages: ChatMessage[],
+    context: ChatContext | undefined,
+    signal: AbortSignal,
+    onEvent: (event: ChatStreamEvent) => void,
+  ): Promise<{ content: string; activity?: AssistantActivity }> {
+    signal.throwIfAborted();
+    let response: Response;
+    try {
+      response = await fetch(`${this.api.baseUrl}/w/${encodeURIComponent(slug)}/ai/chat/stream`, {
+        method: 'POST',
+        credentials: 'include',
+        signal,
+        headers: { 'Content-Type': 'application/json', 'X-Client-Id': CLIENT_ID },
+        body: JSON.stringify({
+          messages: messages.map(({ role, content }) => ({ role, content })),
+          context,
+        }),
+      });
+    } catch {
+      if (signal.aborted) throw new DOMException('Request cancelled', 'AbortError');
+      throw new ApiError(0, 'Could not reach the server.');
+    }
+    if (!response.ok || !response.body) {
+      if (response.status === 401) this.api.sessionExpired.next();
+      const body = (await response.json().catch(() => null)) as {
+        message?: string | string[];
+      } | null;
+      const message = Array.isArray(body?.message) ? body.message.join('; ') : body?.message;
+      throw new ApiError(response.status, message || 'Could not send your message.');
+    }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let result: { content: string; activity?: AssistantActivity } | null = null;
+    const handle = (block: string) => {
+      let name = 'message';
+      let data = '';
+      for (const line of block.split('\n')) {
+        if (line.startsWith('event:')) name = line.slice(6).trim();
+        else if (line.startsWith('data:')) data += line.slice(5).trim();
+      }
+      if (!data) return;
+      const payload = JSON.parse(data) as Record<string, unknown>;
+      const event = { type: name, ...payload } as ChatStreamEvent;
+      if (event.type === 'error') throw new ApiError(502, event.message);
+      if (event.type === 'done') result = { content: event.content, activity: event.activity };
+      onEvent(event);
+    };
+    try {
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        let end: number;
+        while ((end = buffer.indexOf('\n\n')) >= 0) {
+          handle(buffer.slice(0, end));
+          buffer = buffer.slice(end + 2);
+        }
+      }
+    } catch (error) {
+      if (signal.aborted) throw new DOMException('Request cancelled', 'AbortError');
+      throw error instanceof ApiError ? error : new ApiError(0, 'The connection was interrupted.');
+    } finally {
+      reader.releaseLock();
+    }
+    if (!result) throw new ApiError(502, 'The reply was interrupted. Try again.');
+    return result;
   }
 
   private async post<T>(
