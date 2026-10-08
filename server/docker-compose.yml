@@ -55,8 +55,11 @@ services:
     environment:
       PORT: 3000
     networks:
-      - default
-      - proxy
+      default:
+        # Unique name for in-stack callers (mcp). `app` is too generic: on a shared network it can resolve to
+        # another stack's container.
+        aliases: [trama-api]
+      proxy:
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,7 +84,7 @@ services:
     container_name: trama-mcp
     read_only: true
     environment:
-      TRAMA_API_URL: http://app:3000/api
+      TRAMA_API_URL: http://trama-api:3000/api
       MCP_BIND: 0.0.0.0:8080
     networks:
       - default
