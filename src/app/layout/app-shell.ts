@@ -10,6 +10,7 @@ import { SearchDialog } from '../features/command/search-dialog';
 import { ConfirmDialog } from './confirm-dialog';
 import { AppSidebar } from './sidebar';
 import { ShortcutsDialog } from './shortcuts-dialog';
+import { CustomizeSidebarDialog } from './customize-sidebar-dialog';
 import { TopBar } from './top-bar';
 import { AssistantOverlay } from '../features/ai/assistant-overlay';
 import { MobileNav } from './mobile-nav';
@@ -31,6 +32,7 @@ import { MobileNav } from './mobile-nav';
     TopBar,
     CommandPalette,
     ShortcutsDialog,
+    CustomizeSidebarDialog,
     ConfirmDialog,
     CreateDialog,
     SearchDialog,
@@ -89,6 +91,7 @@ import { MobileNav } from './mobile-nav';
     @defer (on idle) {
       <app-command-palette />
       <app-shortcuts-dialog />
+      <app-customize-sidebar-dialog />
       <app-create-dialog />
       <app-search-dialog />
     }

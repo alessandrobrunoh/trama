@@ -20,6 +20,7 @@ import {
   LucideLogOut,
   LucideMonitor,
   LucideMoon,
+  LucidePanelLeft,
   LucidePlus,
   LucideSearch,
   LucideSettings,
@@ -38,7 +39,7 @@ import { SessionStore } from '../core/session/session.store';
 import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
-import { MAIN_NAV, PERSONAL_NAV } from './nav';
+import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
 /**
  * Sidebar content (workspace switcher, search, navigation, teams, views, user menu).
@@ -129,7 +130,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
 
     <div hlmSidebarContent class="gap-0 px-2 pb-2">
       <ul hlmSidebarMenu class="gap-px">
-        @for (item of personal; track item.segment) {
+        @for (item of personal(); track item.segment) {
           <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
       </ul>
@@ -142,7 +143,7 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
         </button>
         @if (!ui.isFolded('workspace')) {
           <ul hlmSidebarMenu class="gap-px">
-            @for (item of nav; track item.segment) {
+            @for (item of nav(); track item.segment) {
               <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
             }
           </ul>
@@ -338,7 +339,14 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
           <svg [lucideIcon]="item.icon" [size]="15" class="text-muted-foreground group-data-active/menu-button:text-foreground"></svg>
           <span class="flex-1 truncate">{{ item.label }}</span>
           @if (badge(item.badge); as n) {
-            @if (item.badge === 'attention') {
+            @if (ui.sidebarBadgeStyle() === 'dot') {
+              <span
+                class="size-1.5 shrink-0 rounded-full"
+                [class.bg-primary]="item.badge === 'attention'"
+                [class.bg-muted-foreground]="item.badge !== 'attention'"
+                [attr.aria-label]="n + ' pending'"
+              ></span>
+            } @else if (item.badge === 'attention') {
               <span class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ n }}</span>
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
@@ -441,6 +449,10 @@ import { MAIN_NAV, PERSONAL_NAV } from './nav';
             Settings
             <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
           </button>
+          <button hlmDropdownMenuItem (triggered)="ui.openModal('customize-sidebar')">
+            <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
+            Customize sidebar
+          </button>
           <button hlmDropdownMenuItem (triggered)="ui.openModal('shortcuts')">
             <svg [lucideIcon]="help" [size]="14"></svg>
             Keyboard shortcuts
@@ -481,8 +493,14 @@ export class AppSidebar {
   private readonly router = inject(Router);
   private readonly sidebar = inject(HlmSidebarService);
 
-  protected readonly nav = MAIN_NAV;
-  protected readonly personal = PERSONAL_NAV;
+  protected readonly sidebarIcon = LucidePanelLeft;
+  /** Entries the user chose to show, in their order. "Only when badged" entries drop out while their badge is empty. */
+  protected readonly personal = computed(() =>
+    this.visible(orderNav(PERSONAL_NAV, this.ui.sidebarOrder().personal)),
+  );
+  protected readonly nav = computed(() =>
+    this.visible(orderNav(MAIN_NAV, this.ui.sidebarOrder().workspace)),
+  );
   protected readonly chevronDown = LucideChevronDown;
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
@@ -568,7 +586,14 @@ export class AppSidebar {
     return u ? ({ type: 'user', id: u.id } as const) : null;
   });
 
-  protected badge(kind: 'attention' | 'issues' | undefined): number {
+  private visible(items: NavItem[]): NavItem[] {
+    return items.filter((item) => {
+      const mode = this.ui.sidebarVisibilityOf(item.segment);
+      return mode === 'always' || (mode === 'badged' && this.badge(item.badge) > 0);
+    });
+  }
+
+  protected badge(kind: NavItem['badge']): number {
     if (kind === 'attention') return this.store.attentionCount();
     if (kind === 'issues') return this.store.backlogIssueCount();
     return 0;

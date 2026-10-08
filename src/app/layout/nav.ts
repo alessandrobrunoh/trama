@@ -81,6 +81,18 @@ export const MAIN_NAV: NavItem[] = [
   { segment: 'stats', label: 'Statistics', icon: LucideChartColumn, keys: 'g y', hint: 'Throughput, health and trends' },
 ];
 
+/** `items` in the user's custom `order` (segments); entries missing from it keep their default order after the listed ones. */
+export function orderNav(items: readonly NavItem[], order: readonly string[]): NavItem[] {
+  const rank = (n: NavItem): number => {
+    const i = order.indexOf(n.segment);
+    return i < 0 ? order.length : i;
+  };
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((a, b) => rank(a.item) - rank(b.item) || a.index - b.index)
+    .map((x) => x.item);
+}
+
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
   overview: 'Overview',
