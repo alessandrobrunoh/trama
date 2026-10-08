@@ -78,7 +78,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         New to Trama?
         <a
           class="text-foreground underline underline-offset-4"
-          routerLink="/signup"
+          routerLink="/register"
           [queryParams]="next() ? { next: next() } : null"
           >Create an account</a
         >

@@ -25,6 +25,11 @@ import { EventsService } from '../events/events.service.js';
 export const RESERVED_SLUGS = new Set([
   'login',
   'signup',
+  'register',
+  'blog',
+  'roadmap',
+  'changelog',
+  '404',
   'new-workspace',
   'settings',
   'api',

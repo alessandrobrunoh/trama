@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { AppShell } from './layout/app-shell';
-import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core/session/guards';
+import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/session/guards';
 
 /**
  * Routes per PLAN.md §5. Every page is a lazy standalone component; route params and query
@@ -11,7 +11,8 @@ import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core
  * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
  * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
- * Reserved top-level paths (cannot be workspace slugs): login, signup, new-workspace, 404.
+ * Reserved top-level paths (cannot be workspace slugs): login, register, signup, blog, roadmap,
+ * changelog, new-workspace, 404.
  */
 export const routes: Routes = [
   {
@@ -21,10 +22,35 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login-page').then((m) => m.LoginPage),
   },
   {
-    path: 'signup',
+    path: 'register',
     title: 'Create account · Trama',
     canActivate: [guestGuard],
     loadComponent: () => import('./features/auth/signup-page').then((m) => m.SignupPage),
+  },
+  // Old links: /signup → /register (query params such as `next` are kept).
+  { path: 'signup', pathMatch: 'full', redirectTo: 'register' },
+  {
+    path: 'blog',
+    title: 'Blog · Trama',
+    loadComponent: () => import('./features/blog/blog-index-page').then((m) => m.BlogIndexPage),
+  },
+  {
+    path: 'blog/:slug',
+    title: (route) =>
+      import('./features/blog/blog-posts').then(
+        (m) => `${m.findPost(route.paramMap.get('slug') ?? '')?.title ?? 'Post not found'} · Trama Blog`,
+      ),
+    loadComponent: () => import('./features/blog/blog-post-page').then((m) => m.BlogPostPage),
+  },
+  {
+    path: 'roadmap',
+    title: 'Roadmap · Trama',
+    loadComponent: () => import('./features/roadmap/roadmap-page').then((m) => m.RoadmapPage),
+  },
+  {
+    path: 'changelog',
+    title: 'Changelog · Trama',
+    loadComponent: () => import('./features/changelog/changelog-page').then((m) => m.ChangelogPage),
   },
   {
     path: 'new-workspace',
@@ -39,8 +65,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },
-  // `/` → last used (or first) workspace, /new-workspace if none, /login if signed out.
-  { path: '', pathMatch: 'full', canActivate: [rootRedirectGuard], children: [] },
+  // `/` → landing page when signed out; else last used (or first) workspace, /new-workspace if none.
+  {
+    path: '',
+    pathMatch: 'full',
+    title: 'Trama · Coordination for humans and coding agents',
+    canActivate: [landingGuard],
+    loadComponent: () => import('./features/landing/landing-page').then((m) => m.LandingPage),
+  },
   {
     path: ':workspaceSlug',
     component: AppShell,

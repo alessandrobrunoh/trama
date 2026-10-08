@@ -220,7 +220,7 @@ export class SessionStore {
     if (!this._user()) return;
     this.clear();
     const url = this.router.url;
-    const onAuthPage = /^\/(login|signup)(\?|$)/.test(url);
+    const onAuthPage = /^\/(login|register)(\?|$)/.test(url);
     if (onAuthPage) return;
     this.notifier.info('Your session expired', { description: 'Sign in again to continue.' });
     void this.router.navigate(['/login'], { queryParams: url && url !== '/' ? { next: url } : {} });

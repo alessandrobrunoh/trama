@@ -33,7 +33,7 @@ export const appConfig: ApplicationConfig = {
       withComponentInputBinding(),
       // Children inherit `:workspaceSlug` so pages can bind it as an input.
       withRouterConfig({ paramsInheritanceStrategy: 'always' }),
-      withInMemoryScrolling({ scrollPositionRestoration: 'top' }),
+      withInMemoryScrolling({ scrollPositionRestoration: 'top', anchorScrolling: 'enabled' }),
     ),
     // Cookie session + X-Client-Id on writes for requests to /api.
     provideHttpClient(withFetch(), withInterceptors([apiInterceptor])),

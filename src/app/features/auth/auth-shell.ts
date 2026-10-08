@@ -1,17 +1,18 @@
 import { ChangeDetectionStrategy, Component, inject, input } from '@angular/core';
 import { LucideMonitor, LucideMoon, LucideSun, LucideDynamicIcon } from '@lucide/angular';
+import { RouterLink } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { ThemeService } from '../../core/theme';
 
 /**
- * Centered, calm frame for /login, /signup, /new-workspace.
+ * Centered, calm frame for /login, /register, /new-workspace.
  *   <app-auth-shell title="Sign in" subtitle="…"> form … <ng-container footer>…</ng-container> </app-auth-shell>
  */
 @Component({
   selector: 'app-auth-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmTooltip, LucideDynamicIcon],
+  imports: [RouterLink, HlmButtonImports, HlmTooltip, LucideDynamicIcon],
   host: { class: 'bg-background text-foreground relative isolate flex min-h-svh flex-col overflow-hidden' },
   template: `
     <!-- Soft light from above, using the active theme tokens. -->
@@ -37,7 +38,7 @@ import { ThemeService } from '../../core/theme';
 
     <main class="flex flex-1 items-start justify-center px-4 pt-[min(7svh,3rem)] pb-12 sm:items-center sm:pt-0 sm:pb-20">
       <div class="w-full max-w-[25rem]">
-        <a class="mb-7 flex justify-center" href="/login" aria-label="Trama home">
+        <a class="mb-7 flex justify-center" routerLink="/" aria-label="Trama home">
           <img src="/icons/trama-horizontal-black.svg" alt="Trama" class="h-10 w-auto dark:hidden" />
           <img src="/icons/trama-horizontal-white.svg" alt="Trama" class="hidden h-10 w-auto dark:block" />
         </a>

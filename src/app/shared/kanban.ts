@@ -107,7 +107,7 @@ export class KanbanLabelDirective {
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" class="cursor-grab">
+                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [class.cursor-grab]="!disabled()">
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 } @empty {

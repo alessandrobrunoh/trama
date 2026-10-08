@@ -14,7 +14,7 @@ export const authGuard: CanActivateFn = async (_route, state) => {
   });
 };
 
-/** Signed OUT only (login / signup); signed-in users go to their workspace. */
+/** Signed OUT only (login / register); signed-in users go to their workspace. */
 export const guestGuard: CanActivateFn = async (route) => {
   const session = inject(SessionStore);
   const router = inject(Router);
@@ -24,12 +24,12 @@ export const guestGuard: CanActivateFn = async (route) => {
   return router.parseUrl(next && next.startsWith('/') && !next.startsWith('//') ? next : session.defaultWorkspaceUrl());
 };
 
-/** `/` → last used (or first) workspace, or /new-workspace. Always redirects. */
-export const rootRedirectGuard: CanActivateFn = async () => {
+/** `/`: signed out → the landing page; signed in → last used (or first) workspace, or /new-workspace. */
+export const landingGuard: CanActivateFn = async () => {
   const session = inject(SessionStore);
   const router = inject(Router);
   await session.init();
-  return router.parseUrl(session.isAuthenticated() ? session.defaultWorkspaceUrl() : '/login');
+  return session.isAuthenticated() ? router.parseUrl(session.defaultWorkspaceUrl()) : true;
 };
 
 /**
