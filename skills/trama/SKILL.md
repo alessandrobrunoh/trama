@@ -41,6 +41,7 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 
 ## Which skill next
 
+- Starting, continuing, or closing work → `trama-workflow` (it decides whether a workstream exists, then hands off)
 - Picking up work on a workstream → `trama-start-work`
 - Reporting progress, PRs, CI → `trama-report-progress`
 - Blocked, or a choice needs recording → `trama-ask-and-decide`

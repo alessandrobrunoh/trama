@@ -7,6 +7,7 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 | Skill | Use it when |
 |---|---|
 | [`trama`](trama/SKILL.md) | Always first: concepts, ground rules, tool map |
+| [`trama-workflow`](trama-workflow/SKILL.md) | The work cycle: search, reuse or create the workstream, then hand off |
 | [`trama-start-work`](trama-start-work/SKILL.md) | Picking up a workstream or issue |
 | [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording criteria, PRs, CI, issue status |
 | [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Blocked, or a choice should be recorded |
