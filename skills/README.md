@@ -29,10 +29,13 @@ Connect the MCP server too (the skills assume its tools exist):
 ```bash
 claude mcp add --transport http trama https://<your-trama-host>/mcp \
   --header "Authorization: Bearer nbl_…"
+# several workspaces, one key each: Bearer nbl_one,nbl_two
 ```
 
 Create the key in Trama under Settings → API tokens. Give agents the narrowest permissions that do the job
-(see `trama-report-progress` for what it writes), and keep the default usage caps.
+(see `trama-report-progress` for what it writes), and keep the default usage caps. One key is bound to one
+workspace. To cover more, connect several keys (comma-separated bearer, or `trama mcp` after `trama account add`).
+Reads then span every connected workspace; writes still need exactly one (`workspace` on MCP, `--workspace` on the CLI).
 
 ## Keeping them accurate
 

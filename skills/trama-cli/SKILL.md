@@ -14,7 +14,7 @@ trama whoami            # which workspace, role and permissions this key has
 trama doctor            # if something fails: config, connectivity, key
 ```
 
-If `whoami` says you are not signed in, ask the user to run `trama login` (they pick a method), or use environment variables:
+If `whoami` says you are not signed in, ask the user to run `trama login` (they pick a method). If the user works in more than one workspace, ask them to add each key with `trama account add` and then read with `--account <name>` (or `--all-workspaces`). Or use environment variables:
 
 ```bash
 export TRAMA_API_KEY=nbl_…            # a key from Settings → API tokens
@@ -60,6 +60,8 @@ trama event list --workstream-id wk_… --limit 20
 ```
 
 Output is compact JSON when piped. Keep it small with `--fields a,b.c` (dot paths work on arrays too); `-o table` for a human view, `-o jsonl` for one object per line, `-o raw` for the exact reply. Avoid `trama snapshot get`: it is huge.
+
+Several workspaces: `trama issue list --account work` (or `--all-workspaces`, or `--workspace acme,beta`) reads every matching profile and stamps each row with `workspace` and `profile`. Use it for reads only. A write (`create`, `update`, `delete`) is refused when it matches more than one workspace: add `--workspace <slug>` or `--profile <name>` so it lands in exactly one. The same rule as MCP: one key is one workspace; a read may span them, a write may not.
 
 ## Writing
 
@@ -125,4 +127,4 @@ Each line is a pointer (`entity`, `id`, `type`); read the object with the matchi
 
 ## From MCP tool names
 
-An MCP tool `create_issue` is `trama issue create`; `get_workstream_context` is `trama workstream context`; `get_project_context` is `trama project context`; `create_project_update` is `trama project-update create` (alias `post`); `list_project_artifacts` is `trama project artifacts`; `answer_input_request` is `trama input-request answer`; `list_webhook_deliveries` is `trama outgoing-webhook deliveries`. `trama schema create_issue` accepts the MCP name too.
+An MCP tool `create_issue` is `trama issue create`. MCP's `workspace` argument is `--workspace` (or `--account` / `--profile` / `--all-workspaces`); `list_accounts` is `trama account list`. `get_workstream_context` is `trama workstream context`; `get_project_context` is `trama project context`; `create_project_update` is `trama project-update create` (alias `post`); `list_project_artifacts` is `trama project artifacts`; `answer_input_request` is `trama input-request answer`; `list_webhook_deliveries` is `trama outgoing-webhook deliveries`. `trama schema create_issue` accepts the MCP name too.
