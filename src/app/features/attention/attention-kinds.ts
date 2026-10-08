@@ -90,7 +90,7 @@ export const ATTENTION_SECTIONS: readonly AttentionSection[] = [
   {
     id: 'triage',
     title: 'Triage',
-    hint: 'New intake for your teams',
+    hint: 'Backlog issues for your teams',
     kinds: ['triage'],
     icon: LucideInbox,
   },

@@ -1,5 +1,5 @@
-export type GraphNodeType = 'workstream' | 'execution' | 'artifact' | 'agent' | 'user' | 'team' | 'repository';
-export type GraphEdgeKind = 'contains' | 'subthread' | 'depends_on' | 'produces' | 'performed_by' | 'targets';
+export type GraphNodeType = 'workstream' | 'artifact' | 'agent' | 'user' | 'team' | 'repository';
+export type GraphEdgeKind = 'contains' | 'depends_on' | 'targets';
 
 export interface GraphNode {
   id: string;
@@ -7,9 +7,9 @@ export interface GraphNode {
   label: string;
   /** workstreams only: the effective WorkstreamStatus */
   status?: string;
-  /** executions and artifacts: ExecutionState / ArtifactState */
+  /** artifacts: ArtifactState */
   state?: string;
-  /** execution → parent execution or workstream; artifact → execution or workstream; workstream → owner team */
+  /** artifact → workstream; workstream → owner team */
   parentId?: string;
   data: Record<string, unknown>;
 }

@@ -130,7 +130,7 @@ Light is `:root`, dark is `:root.dark` (class set by `ThemeService`). All are us
 - **Status colors** (muted, same meaning in both modes: neutral = not started, blue = active, amber = waiting on a human, violet = review, red = broken, teal = ready, green = done):
   - WorkstreamStatus: `status-draft|planned|working|needs-input|in-review|blocked|ready-to-land|shipped|canceled`
   - ExecutionState extras: `status-queued|running|failed|completed`
-  - IntakeState: `status-new|triaged|accepted|declined|duplicate`; DecisionStatus: `status-proposed|accepted|superseded|rejected`
+  - IssueStatus: `status-backlog|todo|in-progress|in-review|done|canceled`; DecisionStatus: `status-proposed|accepted|superseded|rejected`
   - Artifact/CI: `status-passing|failing|pending|healthy|degraded`
   - Priority: `priority-urgent|high|medium|low|none`
   - Usage: `text-status-blocked`, `bg-status-working/10`, `border-status-shipped/25`, or in CSS `var(--status-needs-input)` (matches core `statusVar()`).
@@ -143,7 +143,7 @@ All standalone, OnPush, signal inputs, no raw HTML.
 
 | selector | class | inputs |
 |---|---|---|
-| `<app-status-icon>` | `StatusIcon` | `status` (any Workstream/Execution/Intake/Decision/Artifact/CI state), `size=14` |
+| `<app-status-icon>` | `StatusIcon` | `status` (any Workstream/Execution/Issue/Decision/Artifact/CI state), `size=14` |
 | `<app-status-badge>` | `StatusBadge` | `status`, `label?`, `iconOnly?` — tinted pill |
 | `<app-status-label>` | `StatusLabel` | `status`, `label?` — icon + text, no pill |
 | `<app-priority-icon>` | `PriorityIcon` | `priority`, `showLabel?` |
@@ -159,7 +159,7 @@ All standalone, OnPush, signal inputs, no raw HTML.
 | `<app-markdown>` | `Markdown` | `source` — headings, lists, task lists, code, quotes, links; raw HTML is shown as text |
 | `<app-artifact-icon>` | `ArtifactIcon` | `kind`, `state?` |
 | `<app-ci-chip>` / `<app-review-chip>` / `<app-conflict-chip>` | | `ci` / `review` / — |
-| `<app-intake-kind>` | `IntakeKindLabel` | `kind`, `showLabel?` |
+| `<app-issue-kind>` | `IssueKindLabel` | `kind`, `showLabel?` |
 | pipes | `relativeTime`, `shortDate`, `fullDate` | `{{ iso | relativeTime }}` |
 
 Status labels also available as `statusLabel(status)`, providers as `providerLabel()`. Enum labels/ordering for pickers come from `core/meta.ts` (`WORKSTREAM_STATUS_META`…).

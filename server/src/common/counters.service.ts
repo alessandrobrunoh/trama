@@ -4,7 +4,7 @@ import type { EntityManager } from 'typeorm';
 /**
  * Atomic per-workspace sequences (table `workspace_counters`):
  *   `ws:<teamId>`  workstream numbers per owner team (AUTH-42)
- *   `intake:<kind>` intake numbers per kind (BUG-142)
+ *   `issue:<kind>` issue numbers per kind (BUG-142)
  *   `adr`          decision numbers (ADR-21)
  * Always call inside the transaction that inserts the numbered row.
  */

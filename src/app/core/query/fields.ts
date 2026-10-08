@@ -2,26 +2,22 @@
 // grouped per entity, and how to read their value(s) from an item.
 import type {
   Decision,
-  Execution,
   ID,
-  IntakeItem,
+  Issue,
   ViewEntity,
   Workstream,
 } from '../contracts/domain';
 import {
   DECISION_STATUS_META,
-  EXECUTION_STATE_META,
-  INTAKE_KIND_META,
-  INTAKE_STATE_META,
+  ISSUE_KIND_META,
+  ISSUE_STATUS_META,
   PRIORITY_META,
-  PROVIDER_META,
   WORKSTREAM_STATUS_META,
 } from '../meta';
 
 export type EntityOf = {
   workstream: Workstream;
-  intake: IntakeItem;
-  execution: Execution;
+  issue: Issue;
   decision: Decision;
 };
 export type Queryable = EntityOf[ViewEntity];
@@ -64,23 +60,13 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
     { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
     { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
   ],
-  intake: [
-    { field: 'kind', label: 'Kind', kind: 'enum', values: keysByOrder(INTAKE_KIND_META), sortable: true, groupable: true },
-    { field: 'state', label: 'State', kind: 'enum', values: keysByOrder(INTAKE_STATE_META), sortable: true, groupable: true },
+  issue: [
+    { field: 'kind', label: 'Type', kind: 'enum', values: keysByOrder(ISSUE_KIND_META), sortable: true, groupable: true },
+    { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(ISSUE_STATUS_META), sortable: true, groupable: true },
+    { field: 'assigneeId', label: 'Assignee', kind: 'id', refersTo: 'user', sortable: true, groupable: true },
     { field: 'teamId', label: 'Team', kind: 'id', refersTo: 'team', sortable: true, groupable: true },
     { field: 'priority', label: 'Priority', kind: 'enum', values: keysByOrder(PRIORITY_META), sortable: true, groupable: true },
     { field: 'source', label: 'Source', kind: 'enum', values: ['manual', 'github', 'gitlab', 'email', 'api', 'agent'], sortable: false, groupable: true },
-    { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
-    { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
-    { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
-  ],
-  execution: [
-    { field: 'state', label: 'State', kind: 'enum', values: keysByOrder(EXECUTION_STATE_META), sortable: true, groupable: true },
-    { field: 'provider', label: 'Provider', kind: 'enum', values: keysByOrder(PROVIDER_META), sortable: true, groupable: true },
-    { field: 'performers', label: 'Performers', kind: 'multi-id', refersTo: 'actor', sortable: false, groupable: true },
-    { field: 'teamId', label: 'Team', kind: 'id', refersTo: 'team', sortable: true, groupable: true },
-    { field: 'workstreamId', label: 'Workstream', kind: 'id', refersTo: 'workstream', sortable: true, groupable: true },
-    { field: 'repositoryIds', label: 'Repositories', kind: 'multi-id', refersTo: 'repository', sortable: false, groupable: false },
     { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
     { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
     { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
@@ -109,12 +95,6 @@ export function fieldValues(entity: ViewEntity, item: Queryable, field: string, 
   if (entity === 'workstream' && field === 'teamId') {
     const w = item as Workstream;
     return [w.ownerTeamId, ...w.participatingTeamIds];
-  }
-  if (entity === 'execution' && field === 'performers') {
-    return (item as Execution).performers.filter((p) => p.id).map((p) => p.id as string);
-  }
-  if (entity === 'execution' && field === 'ownerTeamId') {
-    return [ctx.workstreamById?.get((item as Execution).workstreamId)?.ownerTeamId ?? ''].filter(Boolean);
   }
   const raw = any[field];
   if (raw === undefined || raw === null || raw === '') return [];

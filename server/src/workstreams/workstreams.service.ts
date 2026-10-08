@@ -1,12 +1,13 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
-import type {
-  AcceptanceCriterion,
-  ActorRef,
-  CriterionState,
-  Priority,
-  WorkstreamStatus,
+import {
+  isDeltaThreadUrl,
+  type AcceptanceCriterion,
+  type ActorRef,
+  type CriterionState,
+  type Priority,
+  type WorkstreamStatus,
 } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
@@ -23,8 +24,10 @@ export interface CriterionInput {
 
 export interface WorkstreamInput {
   title?: string;
+  description?: string | null;
   objective?: string;
   context?: string | null;
+  deltaThreadUrl?: string;
   ownerTeamId?: string;
   participatingTeamIds?: string[];
   accountableUserId?: string | null;
@@ -102,18 +105,19 @@ export class WorkstreamsService {
   /**
    * Creates a workstream; its key is `${ownerTeam.key}-${n}` with `n` from the
    * owner team's counter. Pass `manager` to run inside a caller transaction
-   * (intake triage); events/bus then fire after the caller commits via the
+   * (linking an issue); events/bus then fire after the caller commits via the
    * returned `after()` callback — when no manager is passed they fire here.
    */
   async create(
     workspaceId: string,
     actor: ActorRef,
-    input: WorkstreamInput & { title: string; ownerTeamId: string },
+    input: WorkstreamInput & { title: string; ownerTeamId: string; deltaThreadUrl: string },
     options: { manager?: EntityManager; data?: Record<string, unknown> } = {},
   ): Promise<WorkstreamEntity & { after?: () => Promise<void> }> {
     await this.refs.teams(workspaceId, [input.ownerTeamId, ...(input.participatingTeamIds ?? [])]);
     await this.refs.users(workspaceId, [input.accountableUserId]);
     await this.refs.repositories(workspaceId, input.repositoryIds);
+    const deltaThreadUrl = assertDeltaThreadUrl(input.deltaThreadUrl);
     const run = async (m: EntityManager) => {
       const team = await m.findOneByOrFail(TeamEntity, { id: input.ownerTeamId, workspaceId });
       const number = await this.counters.next(m, workspaceId, `ws:${team.id}`);
@@ -126,8 +130,10 @@ export class WorkstreamsService {
           key: `${team.key}-${number}`,
           number,
           title: input.title.trim(),
+          description: input.description?.trim() || null,
           objective: input.objective ?? '',
           context: input.context ?? null,
+          deltaThreadUrl,
           ownerTeamId: team.id,
           participatingTeamIds: unique(input.participatingTeamIds).filter((t) => t !== team.id),
           accountableUserId: input.accountableUserId ?? null,
@@ -177,8 +183,10 @@ export class WorkstreamsService {
       }
     };
     if (patch.title !== undefined) set('title', patch.title.trim());
+    if (patch.description !== undefined) set('description', patch.description?.trim() || null);
     if (patch.objective !== undefined) set('objective', patch.objective);
     if (patch.context !== undefined) set('context', patch.context);
+    if (patch.deltaThreadUrl !== undefined) set('deltaThreadUrl', assertDeltaThreadUrl(patch.deltaThreadUrl));
     // NOTE: changing the owner team does NOT rename the workstream: the key stays (AUTH-42 remains AUTH-42).
     if (patch.ownerTeamId !== undefined) set('ownerTeamId', patch.ownerTeamId);
     if (patch.participatingTeamIds !== undefined)
@@ -214,8 +222,7 @@ export class WorkstreamsService {
     await this.ds.transaction(async (m) => {
       const ids = (
         await m.query<{ id: string }[]>(
-          `SELECT "id" FROM "executions" WHERE "workstreamId" = $1
-           UNION SELECT "id" FROM "artifacts" WHERE "workstreamId" = $1
+          `SELECT "id" FROM "artifacts" WHERE "workstreamId" = $1
            UNION SELECT "id" FROM "input_requests" WHERE "workstreamId" = $1`,
           [ws.id],
         )
@@ -224,7 +231,7 @@ export class WorkstreamsService {
       await m.query(`DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`, [workspaceId, ids]);
       await m.query(`DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`, [workspaceId, ids]);
       await m.query(
-        `UPDATE "intake_items" SET "workstreamIds" = "workstreamIds" - $2::text WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text`,
+        `UPDATE "issues" SET "workstreamIds" = "workstreamIds" - $2::text WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text`,
         [workspaceId, ws.id],
       );
       await m.query(
@@ -296,4 +303,12 @@ export class WorkstreamsService {
     await this.bus.touch(ws.workspaceId, ws.id, 'criterion.updated');
     return this.get(ws.workspaceId, ws.id);
   }
+}
+
+function assertDeltaThreadUrl(value: string): string {
+  const url = value.trim();
+  if (!isDeltaThreadUrl(url)) {
+    throw new BadRequestException('deltaThreadUrl must be an https link on delta.dev');
+  }
+  return url;
 }

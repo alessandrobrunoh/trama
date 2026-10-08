@@ -1,11 +1,10 @@
-// Generic filter / sort / group for workstreams, intake, executions and decisions,
+// Generic filter / sort / group for workstreams, issues, executions and decisions,
 // driven by the contract's ViewFilter / SavedView. Pure functions: use inside `computed()`.
 import type { SavedView, ViewEntity, ViewFilter } from '../contracts/domain';
 import {
   DECISION_STATUS_META,
-  EXECUTION_STATE_META,
-  INTAKE_KIND_META,
-  INTAKE_STATE_META,
+  ISSUE_KIND_META,
+  ISSUE_STATUS_META,
   PRIORITY_META,
   PROVIDER_META,
   WORKSTREAM_STATUS_META,
@@ -36,9 +35,8 @@ export function enumOrder(entity: ViewEntity, field: string, value: string): num
   const table = (): Record<string, { order: number }> | null => {
     if (field === 'status' && entity === 'workstream') return WORKSTREAM_STATUS_META;
     if (field === 'status' && entity === 'decision') return DECISION_STATUS_META;
-    if (field === 'state' && entity === 'execution') return EXECUTION_STATE_META;
-    if (field === 'state' && entity === 'intake') return INTAKE_STATE_META;
-    if (field === 'kind' && entity === 'intake') return INTAKE_KIND_META;
+    if (field === 'status' && entity === 'issue') return ISSUE_STATUS_META;
+    if (field === 'kind' && entity === 'issue') return ISSUE_KIND_META;
     if (field === 'priority') return PRIORITY_META;
     if (field === 'provider') return PROVIDER_META;
     return null;

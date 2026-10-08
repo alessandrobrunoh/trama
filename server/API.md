@@ -9,7 +9,7 @@ Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after fir
 ## Conventions
 
 - JSON in, JSON out. Optional fields are **omitted**, never `null`, in responses. In `PATCH` bodies `null` clears an optional field; unknown fields are dropped silently.
-- Ids are opaque prefixed strings (`wk_…`, `ex_…`). Workstreams, intake items, decisions and teams can also be addressed by **key** (`AUTH-42`, `BUG-142`, `ADR-21`, `AUTH`) wherever the route says `:idOrKey`.
+- Ids are opaque prefixed strings (`wk_…`, `ex_…`). Workstreams, issues, decisions and teams can also be addressed by **key** (`AUTH-42`, `BUG-142`, `ADR-21`, `AUTH`) wherever the route says `:idOrKey`.
 - Dates are ISO-8601. Lists have no pagination except `events`.
 - Errors: `{ "statusCode": 400, "message": "…" | ["field validation messages"], "error": "Bad Request" }`. 400 validation / unknown reference, 401 not authenticated, 403 role too low (or missing CSRF header), 404 not found **or not a member of that workspace**, 409 conflict (duplicate key, cycle, wrong state), 415 non-JSON body.
 - Mutations return the updated entity (`204` for deletes). Actions (`/answer`, `/accept`, `/triage`, …) return the updated entity with `200`.
@@ -57,14 +57,14 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 
 ## Workspace snapshot
 
-`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, workstreams, executions, inputRequests, intake, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
+`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, workstreams, executions, inputRequests, issues, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
 
 ## Domain routes (all under `/w/:slug`)
 
 `PATCH` is partial. List filters are query params. “member” = default write role.
 
 ### Teams — `/teams` (writes: admin)
-`GET`, `GET /:idOrKey`, `POST { name, key (^[A-Z][A-Z0-9]{1,7}$), color?, description?, memberIds? }`, `PATCH /:idOrKey { name?, color?, description?, memberIds? }` (the key is immutable), `DELETE /:idOrKey` (`409` while it owns workstreams; detaches it from participating lists, intake and executions otherwise). `memberIds` must be workspace members.
+`GET`, `GET /:idOrKey`, `POST { name, key (^[A-Z][A-Z0-9]{1,7}$), color?, description?, memberIds? }`, `PATCH /:idOrKey { name?, color?, description?, memberIds? }` (the key is immutable), `DELETE /:idOrKey` (`409` while it owns workstreams; detaches it from participating lists, issues and executions otherwise). `memberIds` must be workspace members.
 
 ### Repositories — `/repositories` (writes: admin)
 `POST { provider: github|gitlab, fullName: "owner/name", url?, defaultBranch?, teamIds? }` (unique per provider+name), `PATCH { url?, defaultBranch?, teamIds? }`, `DELETE` (removes it from workstreams/executions).
@@ -72,29 +72,24 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 ### Workstreams — `/workstreams`
 - `GET ?status&ownerTeamId&teamId(owner or participating)&accountableUserId&priority&repositoryId&label&q`
 - `GET /:idOrKey`
-- `POST { title, ownerTeamId, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|canceled, targetDate? }`
+- `POST { title, ownerTeamId, deltaThreadUrl, description?, objective?, context?, participatingTeamIds?, accountableUserId?, repositoryIds?, acceptanceCriteria?: [{ text, state? }], priority?, labels?, statusOverride?: draft|canceled, targetDate? }`
+  - `deltaThreadUrl` is required: an `https` URL on `delta.dev` (or a subdomain), the Delta thread that carries this workstream.
   - Key = `${ownerTeam.key}-${n}` with `n` from a per-owner-team counter (atomic, never reused).
   - Initial `status`/`derivedStatus`: `planned` if it has criteria, else `draft`.
-- `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
-- `DELETE /:idOrKey` (cascades executions, input requests, artifacts, dependencies, comments; unlinks intake/decisions).
+- `PATCH /:idOrKey` any of the create fields, `statusOverride: null` clears the override. `deltaThreadUrl` can be replaced but not cleared. **Changing `ownerTeamId` keeps the key** (`AUTH-42` stays `AUTH-42`); numbering continues per team.
+- `DELETE /:idOrKey` (cascades input requests, artifacts, dependencies, comments; unlinks issues/decisions).
 - Criteria (each returns the updated workstream): `POST /:idOrKey/criteria { text, state? }`, `PATCH /:idOrKey/criteria/:criterionId { text?, state? }`, `DELETE /:idOrKey/criteria/:criterionId`. States: `pending|in_progress|met`.
 - `status` / `derivedStatus` / `shippedAt` are written by the status engine (see *Derived workstream status* below); `status = statusOverride ?? derivedStatus`.
 
-### Executions — `/executions`
-- `GET ?workstreamId&state&parentExecutionId&teamId`, `GET /:id`
-- `POST { workstreamId, title, parentExecutionId?, description?, teamId?, repositoryIds?, performers?: [{type: user|agent|team, id}], provider?, state?, dependsOnExecutionIds?, sessionUrl?, branch?, progressNote? }`. Performers default to the caller; `provider` defaults from the first agent performer (else `human`); state default `queued`. The parent must be an execution of the same workstream.
-- `PATCH /:id` (same fields, no `workstreamId`). Moving the state sets `startedAt` / `completedAt`; parent cycles → `400`.
-- `POST /:id/progress { note, state? }` → sets `progressNote`, optionally moves the state. `POST /:id/complete { note? }` → state `completed`.
-- `dependsOnExecutionIds` is **derived from `dependencies`** (execution→execution edges); writing it creates/removes those edges (cycles → `409`).
-
 ### Input requests — `/input-requests`
-`GET ?state&workstreamId&executionId&assigneeUserId`, `GET /:id`, `POST { question, executionId?, workstreamId?, options?, assigneeUserId? }` (one of workstreamId/executionId required; `requestedBy` = caller), `PATCH` (open only), `POST /:id/answer { answer }`, `POST /:id/dismiss` (`409` if not open), `DELETE`.
+`GET ?state&workstreamId&assigneeUserId`, `GET /:id`, `POST { question, workstreamId, options?, assigneeUserId? }` (`requestedBy` = caller), `PATCH` (open only), `POST /:id/answer { answer }`, `POST /:id/dismiss` (`409` if not open), `DELETE`.
 
-### Intake — `/intake`
-- `GET ?kind&state&teamId&workstreamId&q`, `GET /:idOrKey` (`BUG-142` or id)
-- `POST { kind, title, body?, source?, reporterName?, teamId?, priority?, externalUrl? }` → key `BUG-n|FEAT-n|INC-n|DEBT-n|FB-n|IDEA-n|SEC-n`, numbering per kind. State `new`.
-- `PATCH /:idOrKey { title?, body?, reporterName?, teamId?, priority?, externalUrl?, workstreamIds? }`
-- `POST /:idOrKey/triage { state: new|triaged|accepted|declined|duplicate, workstreamIds?, createWorkstream?: { title, ownerTeamId, objective?, … same as workstream create }, duplicateOfId?, teamId?, priority? }` — links existing and/or newly created workstreams (created atomically); `duplicate` requires `duplicateOfId` (id or key); `declined`/`duplicate` cannot link workstreams.
+### Issues — `/issues`
+Demand items (bugs, requests, incidents, tasks). Status is a tracker workflow, separate from workstream status. Keys stay per kind: `BUG-n|FEAT-n|INC-n|DEBT-n|FB-n|IDEA-n|SEC-n`.
+- `GET ?kind&status&teamId&assigneeId&workstreamId&q`, `GET /:idOrKey` (`BUG-142` or id)
+- `POST { kind, title, body?, source?, reporterName?, assigneeId?, teamId?, priority?, status?: backlog|todo|in_progress|in_review|done|canceled, externalUrl? }` → status defaults to `backlog`.
+- `PATCH /:idOrKey { title?, body?, reporterName?, assigneeId?, teamId?, priority?, status?, externalUrl?, workstreamIds?, duplicateOfId? }` — `duplicateOfId` (id or key, or `null`) marks the issue as a duplicate and sets status `canceled`; an issue cannot duplicate itself. `null` clears an optional field.
+- `POST /:idOrKey/link { workstreamIds?, createWorkstream?: { title, ownerTeamId, deltaThreadUrl, objective?, … same as workstream create }, status? }` — attaches existing and/or a newly created workstream (created atomically). `backlog`/`todo` move to `in_progress` unless `status` is set. A duplicate issue cannot be linked. At least one of `workstreamIds` / `createWorkstream` is required.
 - `DELETE /:idOrKey`
 
 ### Artifacts — `/artifacts`
@@ -107,15 +102,15 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 `GET ?fromId&toId`, `POST { fromType, fromId, toType, toId }` (types `workstream|execution`; `from` blocks `to`; `400` for self/unknown nodes, `409` for duplicates and **cycles**), `DELETE /:id`.
 
 ### Comments — `/comments`
-`GET ?subjectType&subjectId`, `POST { subject: { type, id }, body }` (subject must exist in the workspace; types: workstream, execution, intake, artifact, decision, input_request, repository, team), `PATCH /:id { body }` (author only), `DELETE /:id` (author or admin).
+`GET ?subjectType&subjectId`, `POST { subject: { type, id }, body }` (subject must exist in the workspace; types: workstream, execution, issue, artifact, decision, input_request, repository, team), `PATCH /:id { body }` (author only), `DELETE /:id` (author or admin).
 
 ### Views — `/views`
-`GET` (shared + your private), `GET /:id`, `POST { name, entity: workstream|intake|execution|decision, filters?, sort?, groupBy?, layout?: list|board|graph, shared? }`, `PATCH`, `DELETE`. Only the owner (or an admin, for shared views) can change a view; other people's private views are `404`.
+`GET` (shared + your private), `GET /:id`, `POST { name, entity: workstream|issue|execution|decision, filters?, sort?, groupBy?, layout?: list|board|graph, shared? }`, `PATCH`, `DELETE`. Only the owner (or an admin, for shared views) can change a view; other people's private views are `404`.
 
 ### Attention — `/attention` (human attention: agent tokens get `403`)
 `GET /attention?scope=mine|all&state=open|snoozed|dismissed|active` → `AttentionItem[]` for the caller (PLAN.md §3). `scope=all` (admin+, else `403`) returns every item of the workspace. `state=active` = open + snoozed. Without `state` dismissed/snoozed items are included with their `state` (the snapshot's `attention` is this unfiltered list). Sorted by severity (high → low), then `since` ascending (longest waiting first).
 
-- **Relevance**: accountable user, members of the owner/participating teams. Narrower: `input_requested` goes to the assignee (else the accountable user, else the owner team); `review_requested` to the accountable user + owner team; `triage` to members of the item's team (intake without a team: workspace admins/owners, id `triage:workspace`). Workstreams with a `statusOverride` and shipped workstreams raise nothing.
+- **Relevance**: accountable user, members of the owner/participating teams. Narrower: `input_requested` goes to the assignee (else the accountable user, else the owner team); `review_requested` to the accountable user + owner team; `triage` to members of the issue's team (backlog issues without a team: workspace admins/owners, id `triage:workspace`). Workstreams with a `statusOverride` and shipped workstreams raise nothing.
 - **Kinds / severity**: `input_requested` high, `needs_decision` high, `ci_failed` high, `blocked` high (blocked/failed executions; CI, conflicts and dependencies have their own kinds), `review_requested` medium, `conflict` medium, `ready_to_land` medium, `deadline` medium (high when overdue; within 3 days), `dependency` low (another team's unshipped workstream), `ready_to_ship` low, `triage` low (one item per team, with a count).
 - **Ids** are stable: `${kind}:${sourceEntityId}` (`ci_failed:ar_…`, `triage:tm_…`). URL-encode the colon in paths if your client does not.
 - `since` is when the condition started (event log where available, else the entity timestamp). A **dismissed item reappears only if its `since` changes**; a **snoozed item reappears after `until`**.
@@ -155,10 +150,10 @@ export interface Graph { nodes: GraphNode[]; edges: GraphEdge[] }
 Edge semantics: `contains` team → workstream, workstream → top-level execution, workstream → artifact without an execution; `subthread` parent execution → child execution; `produces` execution → artifact; `performed_by` execution → agent/user/team; `targets` workstream/execution → repository; **`depends_on` source depends on (waits for) target**, i.e. it points from the blocked node to its blocker (workstream↔workstream or execution↔execution, as stored in `dependencies`).
 
 ### Search — `GET /search?q=&types=&limit=`
-`types` is a comma list of `workstream,intake,decision,execution,artifact,repository,team` (default all); `limit` 1–100 (default 20). ILIKE on key / title / body (workstream objective, decision statement, intake body, execution description, artifact title + externalId, repository fullName, team name + key); every whitespace-separated term must match. Response `{ results: [{ type, id, key?, title, subtitle, workstreamKey?, score }] }` sorted by score (exact key 100, key prefix 80, key contains 60, title exact 70 / prefix 55 / contains 40, all terms in title 30, body 20), ties broken by type (workstream, decision, intake, execution, artifact, repository, team). `workstreamKey` is set for executions and artifacts. Readable by agent tokens.
+`types` is a comma list of `workstream,issue,decision,execution,artifact,repository,team` (default all); `limit` 1–100 (default 20). ILIKE on key / title / body (workstream objective, decision statement, issue body, execution description, artifact title + externalId, repository fullName, team name + key); every whitespace-separated term must match. Response `{ results: [{ type, id, key?, title, subtitle, workstreamKey?, score }] }` sorted by score (exact key 100, key prefix 80, key contains 60, title exact 70 / prefix 55 / contains 40, all terms in title 30, body 20), ties broken by type (workstream, decision, issue, execution, artifact, repository, team). `workstreamKey` is set for executions and artifacts. Readable by agent tokens.
 
 ### Agent Context — `GET /workstreams/:idOrKey/context`
-Viewer+ and agent tokens. `text/markdown` by default; JSON with `Accept: application/json` or `?format=json`. Markdown sections: `# KEY — title`, status line, Objective, Acceptance Criteria (`- [x]` met, `- [ ]` pending, `- [ ] … _(in progress)_`), Context, Repositories (fullName — url, default branch), Teams, Dependencies (what it waits on with resolution state, what it blocks), Decisions (accepted with rationale one-liners; proposed flagged; superseded marked "do not follow"), Related intake, Artifacts (state, CI, review, conflicts), Executions, Open input requests, Recent progress (last 10 progress notes / state changes / answers). Empty sections are omitted. The JSON mirrors the same data (`AgentContext` in `src/agent-context/agent-context.service.ts`).
+Viewer+ and agent tokens. `text/markdown` by default; JSON with `Accept: application/json` or `?format=json`. Markdown sections: `# KEY — title`, status line, Objective, Acceptance Criteria (`- [x]` met, `- [ ]` pending, `- [ ] … _(in progress)_`), Context, Repositories (fullName — url, default branch), Teams, Dependencies (what it waits on with resolution state, what it blocks), Decisions (accepted with rationale one-liners; proposed flagged; superseded marked "do not follow"), Related issues, Artifacts (state, CI, review, conflicts), Executions, Open input requests, Recent progress (last 10 progress notes / state changes / answers). Empty sections are omitted. The JSON mirrors the same data (`AgentContext` in `src/agent-context/agent-context.service.ts`).
 
 ### MCP
 Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools over the same services; see PLAN.md §4). Agents can use the REST API with a `Bearer nbl_…` agent token in the meantime.
@@ -169,12 +164,12 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 
 ## Events (activity log + live updates)
 
-- `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `intake.created|triaged|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
+- `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `issue.created|status_changed|linked|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
 - `GET /events/stream` — **Server-Sent Events**, one `LiveEvent` JSON per message (`{ type: created|updated|deleted|attention, entity, id, clientId?, at }`), plus a named `ping` event every 25 s. `clientId` echoes the `X-Client-Id` header of the request that caused the change, so a tab can ignore its own echoes. Use `new EventSource(url, { withCredentials: true })` (cookie auth; EventSource cannot send headers).
 
 ## Dev utilities
 
-`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 intake items, comments, 5 saved views and ~300 events over the last 6 weeks.
+`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 5 saved views and ~300 events over the last 6 weeks.
 
 ## Configuration
 

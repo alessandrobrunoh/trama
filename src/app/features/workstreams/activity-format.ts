@@ -16,7 +16,7 @@ import {
   LucideWorkflow,
   type LucideIcon,
 } from '@lucide/angular';
-import { WORKSTREAM_STATUS_META, EXECUTION_STATE_META, type DomainEvent, type NablaStore } from '../../core';
+import { WORKSTREAM_STATUS_META, type DomainEvent, type NablaStore } from '../../core';
 
 export interface EventLine {
   icon: LucideIcon;
@@ -34,9 +34,7 @@ function stateLabel(v: unknown): string {
   const s = str(v);
   if (!s) return '';
   return (
-    (WORKSTREAM_STATUS_META as Record<string, { label: string }>)[s]?.label ??
-    (EXECUTION_STATE_META as Record<string, { label: string }>)[s]?.label ??
-    s.replace(/_/g, ' ')
+    (WORKSTREAM_STATUS_META as Record<string, { label: string }>)[s]?.label ?? s.replace(/_/g, ' ')
   );
 }
 
@@ -45,15 +43,13 @@ export function describeEvent(store: NablaStore, ev: DomainEvent): EventLine {
   const title = str(d['title']);
   const subjectLink = (): string[] | undefined => {
     switch (ev.subject.type) {
-      case 'execution':
-        return ['executions', ev.subject.id];
       case 'decision': {
         const key = str(d['key']) ?? store.getDecision(ev.subject.id)?.key;
         return key ? ['decisions', key] : undefined;
       }
-      case 'intake': {
-        const key = str(d['key']) ?? store.getIntake(ev.subject.id)?.key;
-        return key ? ['intake', key] : undefined;
+      case 'issue': {
+        const key = str(d['key']) ?? store.getIssue(ev.subject.id)?.key;
+        return key ? ['issues', key] : undefined;
       }
       default:
         return undefined;
@@ -118,14 +114,17 @@ export function describeEvent(store: NablaStore, ev: DomainEvent): EventLine {
       return { icon: LucideGavel, verb: 'rejected a decision', detail: [str(d['key']), title].filter(Boolean).join(' · '), link: subjectLink() };
     case 'decision.superseded':
       return { icon: LucideGavel, verb: 'superseded a decision', detail: [str(d['key']), title].filter(Boolean).join(' · '), link: subjectLink() };
-    case 'intake.created':
-    case 'intake.triaged':
+    case 'issue.created':
+      return { icon: LucideInbox, verb: 'opened an issue', detail: [str(d['key']), title].filter(Boolean).join(' · '), link: subjectLink() };
+    case 'issue.status_changed':
       return {
         icon: LucideInbox,
-        verb: ev.type === 'intake.created' ? 'logged an intake item' : `triaged an intake item as ${stateLabel(d['state']).toLowerCase()}`,
+        verb: `moved an issue to ${stateLabel(d['to']).toLowerCase()}`,
         detail: [str(d['key']), title].filter(Boolean).join(' · '),
         link: subjectLink(),
       };
+    case 'issue.linked':
+      return { icon: LucideInbox, verb: 'linked an issue to this workstream', detail: [str(d['key']), title].filter(Boolean).join(' · '), link: subjectLink() };
     case 'dependency.added':
       return { icon: LucideLink, verb: 'added a dependency' };
     case 'comment.created':

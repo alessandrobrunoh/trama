@@ -29,12 +29,11 @@ const data = (p: Partial<AttentionData> = {}): AttentionData => ({
   names: new Map([['alice', 'Alice'], ['ag1', 'Claude']]),
   adminIds: ['alice'],
   workstreams: [ws()],
-  executions: [],
   inputRequests: [],
   artifacts: [],
   decisions: [],
   dependencies: [],
-  intake: [],
+  issues: [],
   ...p,
 });
 
@@ -83,16 +82,10 @@ describe('computeAttention', () => {
     expect(computeAttention(data({ artifacts: [pr({ review: 'approved', ci: 'passing', hasConflicts: true })] })).some((i) => i.kind === 'ready_to_land')).toBe(false);
   });
 
-  it('blocked: only execution blocked/failed, for a blocked workstream', () => {
-    const e = { id: 'e1', workstreamId: 'w1', title: 'Migrate', state: 'blocked' as const, progressNote: 'Waiting on DB access', createdAt: day(-5), updatedAt: day(-1) };
+  it('ci-caused blocking only yields ci_failed, and shipped workstreams raise nothing', () => {
     const blocked = ws({ status: 'blocked', derivedStatus: 'blocked' });
-    const [i] = computeAttention(data({ workstreams: [blocked], executions: [e] }));
-    expect(i).toMatchObject({ id: 'blocked:e1', kind: 'blocked', severity: 'high', executionId: 'e1' });
-    expect(i.detail).toBe('Waiting on DB access');
-    // CI-caused blocking only yields ci_failed
     expect(kinds(computeAttention(data({ workstreams: [blocked], artifacts: [pr({ ci: 'failing' })] })))).toEqual(['ci_failed']);
-    // shipped workstreams raise nothing
-    expect(computeAttention(data({ workstreams: [ws({ status: 'shipped', derivedStatus: 'shipped' })], executions: [e] }))).toEqual([]);
+    expect(computeAttention(data({ workstreams: [ws({ status: 'shipped', derivedStatus: 'shipped' })], artifacts: [pr({ ci: 'failing' })] }))).toEqual([]);
   });
 
   it('dependency: waiting on another team\'s unshipped workstream (low)', () => {
@@ -124,10 +117,10 @@ describe('computeAttention', () => {
   });
 
   it('triage: one item per team with a count, for that team\'s members', () => {
-    const mk = (id: string, teamId: string | null, at: number) => ({ id, key: id.toUpperCase(), title: id, teamId, state: 'new' as const, createdAt: day(at) });
-    const items = computeAttention(data({ workstreams: [], intake: [mk('bug1', 't1', -3), mk('bug2', 't1', -1), mk('fb1', 't3', -2), mk('x', null, -1)] }));
+    const mk = (id: string, teamId: string | null, at: number) => ({ id, key: id.toUpperCase(), title: id, teamId, status: 'backlog' as const, createdAt: day(at) });
+    const items = computeAttention(data({ workstreams: [], issues: [mk('bug1', 't1', -3), mk('bug2', 't1', -1), mk('fb1', 't3', -2), mk('x', null, -1)] }));
     const t1 = items.find((i) => i.id === 'triage:t1')!;
-    expect(t1.title).toMatch(/^2 new intake items/);
+    expect(t1.title).toMatch(/^2 backlog issues/);
     expect(t1.since).toEqual(day(-1));
     expect([...t1.audience]).toEqual(['bob']);
     expect([...items.find((i) => i.id === 'triage:workspace')!.audience]).toEqual(['alice']);

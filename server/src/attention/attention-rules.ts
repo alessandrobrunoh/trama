@@ -6,13 +6,11 @@ import type {
   AttentionSeverity,
   CiState,
   DecisionStatus,
-  ExecutionState,
   InputRequestState,
-  IntakeState,
+  IssueStatus,
   ReviewState,
   WorkstreamStatus,
 } from '../contracts/domain.js';
-import { blockers } from '../status/derive-status.js';
 
 // ───── input shapes (entities satisfy these structurally)
 
@@ -28,16 +26,6 @@ export interface AWorkstream {
   derivedStatus: WorkstreamStatus;
   statusOverride?: 'draft' | 'canceled' | null;
   targetDate?: Date | null;
-  updatedAt: Date;
-}
-export interface AExecution {
-  id: string;
-  workstreamId: string;
-  parentExecutionId?: string | null;
-  title: string;
-  state: ExecutionState;
-  progressNote?: string | null;
-  createdAt: Date;
   updatedAt: Date;
 }
 export interface AInputRequest {
@@ -74,18 +62,18 @@ export interface ADecision {
 }
 export interface ADependency {
   id: string;
-  fromType: 'workstream' | 'execution';
+  fromType: 'workstream';
   fromId: string;
-  toType: 'workstream' | 'execution';
+  toType: 'workstream';
   toId: string;
   createdAt: Date;
 }
-export interface AIntake {
+export interface AIssue {
   id: string;
   key: string;
   title: string;
   teamId?: string | null;
-  state: IntakeState;
+  status: IssueStatus;
   createdAt: Date;
 }
 export interface ATeam {
@@ -99,15 +87,14 @@ export interface AttentionData {
   teams: ATeam[];
   /** id → display name (users and agents). */
   names: Map<string, string>;
-  /** user ids with an admin or owner role (they triage intake without a team). */
+  /** user ids with an admin or owner role (they see backlog issues without a team). */
   adminIds: string[];
   workstreams: AWorkstream[];
-  executions: AExecution[];
   inputRequests: AInputRequest[];
   artifacts: AArtifact[];
   decisions: ADecision[];
   dependencies: ADependency[];
-  intake: AIntake[];
+  issues: AIssue[];
   /** Better `since` timestamps keyed by item id (from the event log); fall back to entity timestamps. */
   since?: Map<string, Date>;
 }
@@ -120,11 +107,10 @@ export interface RawAttentionItem {
   title: string;
   detail: string;
   workstreamId?: string;
-  executionId?: string;
   artifactId?: string;
   decisionId?: string;
   inputRequestId?: string;
-  intakeId?: string;
+  issueId?: string;
   since: Date;
   audience: Set<string>;
 }
@@ -139,7 +125,6 @@ const short = (s: string, n = 140) => (s.length > n ? `${s.slice(0, n - 1)}…` 
 export function computeAttention(d: AttentionData): RawAttentionItem[] {
   const teams = new Map(d.teams.map((t) => [t.id, t]));
   const wsById = new Map(d.workstreams.map((w) => [w.id, w]));
-  const exById = new Map(d.executions.map((e) => [e.id, e]));
   const sinceOf = (id: string, fallback: Date) => d.since?.get(id) ?? fallback;
   const nameOf = (a: ActorRef) => (a.id ? (d.names.get(a.id) ?? a.id) : 'system');
 
@@ -180,7 +165,6 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
       title: short(r.question),
       detail: `${w.key} · ${w.title} — asked by ${nameOf(r.requestedBy)}`,
       workstreamId: w.id,
-      executionId: undefined,
       inputRequestId: r.id,
       since: r.createdAt,
       audience,
@@ -261,37 +245,13 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
       });
   }
 
-  // blocked (execution blocked / failed; CI and conflicts have their own kinds, dependencies too)
-  for (const w of live) {
-    if (w.derivedStatus !== 'blocked') continue;
-    const execs = d.executions.filter((e) => e.workstreamId === w.id);
-    for (const reason of blockers({ executions: execs, artifacts: [], incomingDependencies: [] })) {
-      if (reason.kind !== 'execution_blocked' && reason.kind !== 'execution_failed') continue;
-      const e = exById.get(reason.executionId)!;
-      items.push({
-        id: `blocked:${e.id}`,
-        kind: 'blocked',
-        severity: 'high',
-        title: `${w.key} is blocked: ${short(e.title, 100)}`,
-        detail: e.progressNote ? short(e.progressNote, 200) : `Execution ${e.state === 'failed' ? 'failed' : 'is blocked'}`,
-        workstreamId: w.id,
-        executionId: e.id,
-        since: sinceOf(`blocked:${e.id}`, e.updatedAt),
-        audience: relevant(w),
-      });
-    }
-  }
-
-  // dependency: waiting on someone else's unshipped workstream
+  // dependency: waiting on another team's unshipped workstream
   for (const dep of d.dependencies) {
-    const target = dep.toType === 'workstream' ? wsById.get(dep.toId) : wsById.get(exById.get(dep.toId)?.workstreamId ?? '');
-    const source =
-      dep.fromType === 'workstream' ? wsById.get(dep.fromId) : wsById.get(exById.get(dep.fromId)?.workstreamId ?? '');
+    if (dep.fromType !== 'workstream' || dep.toType !== 'workstream') continue;
+    const target = wsById.get(dep.toId);
+    const source = wsById.get(dep.fromId);
     if (!target || !source || target.id === source.id || !liveIds.has(target.id)) continue;
-    if (dep.toType === 'execution' && ['completed', 'failed', 'canceled'].includes(exById.get(dep.toId)?.state ?? '')) continue;
-    const resolved =
-      dep.fromType === 'workstream' ? source.status === 'shipped' : exById.get(dep.fromId)?.state === 'completed';
-    if (resolved || source.ownerTeamId === target.ownerTeamId) continue;
+    if (source.status === 'shipped' || source.ownerTeamId === target.ownerTeamId) continue;
     items.push({
       id: `dependency:${dep.id}`,
       kind: 'dependency',
@@ -341,10 +301,10 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
     });
   }
 
-  // triage: one item per team (plus one for intake without a team, for admins)
-  const newIntake = d.intake.filter((i) => i.state === 'new');
-  const groups = new Map<string, AIntake[]>();
-  for (const i of newIntake) groups.set(i.teamId ?? '', [...(groups.get(i.teamId ?? '') ?? []), i]);
+  // triage: backlog issues, one item per team (plus one for issues without a team, for admins)
+  const backlog = d.issues.filter((i) => i.status === 'backlog');
+  const groups = new Map<string, AIssue[]>();
+  for (const i of backlog) groups.set(i.teamId ?? '', [...(groups.get(i.teamId ?? '') ?? []), i]);
   for (const [teamId, list] of groups) {
     const t = teamId ? teams.get(teamId) : undefined;
     if (teamId && !t) continue;
@@ -354,9 +314,9 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
       id: `triage:${teamId || 'workspace'}`,
       kind: 'triage',
       severity: 'low',
-      title: `${list.length} new intake item${list.length === 1 ? '' : 's'} for ${t?.name ?? 'the workspace'}`,
+      title: `${list.length} backlog issue${list.length === 1 ? '' : 's'} for ${t?.name ?? 'the workspace'}`,
       detail: list.length > 3 ? `${keys} and ${list.length - 3} more` : keys,
-      intakeId: list[0].id,
+      issueId: list[0].id,
       since,
       audience: new Set(t ? t.memberIds : d.adminIds),
     });

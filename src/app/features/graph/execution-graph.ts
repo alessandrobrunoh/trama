@@ -26,7 +26,6 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSheetImports } from '@spartan-ng/helm/sheet';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
-  EXECUTION_STATE_META,
   NablaStore,
   statusVar,
   type ArtifactState,
@@ -37,7 +36,6 @@ import { ArtifactIcon } from '../../shared/artifact';
 import { EmptyState } from '../../shared/empty-state';
 import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
-import { ProviderIcon } from '../../shared/provider-icon';
 import { StatusIcon, type AnyStatus } from '../../shared/status';
 import { GraphNodeDetail, type DetailLink } from './graph-node-detail';
 import { layoutGraph, routePath, type PlacedNode } from './graph-layout';
@@ -45,7 +43,6 @@ import type { ExecutionGraphData, GraphEdge, GraphNode } from './graph-model';
 
 const SIZE = {
   workstream: { w: 248, h: 58 },
-  execution: { w: 224, h: 46 },
   artifact: { w: 200, h: 28 },
 } as const;
 const MIN_K = 0.12;
@@ -102,7 +99,6 @@ let uidCounter = 0;
     StatusIcon,
     KeyChip,
     PriorityIcon,
-    ProviderIcon,
     AvatarStack,
     ArtifactIcon,
     EmptyState,
@@ -203,22 +199,6 @@ let uidCounter = 0;
                       <div class="h-full" [style.width.%]="criteria(w)" [style.background]="v.accent"></div>
                     </div>
                   }
-                }
-                @case ('execution') {
-                  @let e = $any(v.node.entity);
-                  <div class="flex h-full flex-col justify-center gap-1 pr-2.5 pl-3.5">
-                    <div class="flex min-w-0 items-center gap-1.5">
-                      <app-status-icon [status]="e.state" [size]="13" />
-                      <span class="truncate text-xs font-medium">{{ e.title }}</span>
-                    </div>
-                    <div class="text-muted-foreground flex min-w-0 items-center gap-1.5 text-[11px]">
-                      <app-provider-icon [provider]="e.provider" [size]="11" />
-                      <span class="truncate">{{ stateLabel(e.state) }}</span>
-                      <span class="ml-auto flex shrink-0 items-center">
-                        <app-avatar-stack [actors]="e.performers" [max]="3" [size]="16" />
-                      </span>
-                    </div>
-                  </div>
                 }
                 @case ('artifact') {
                   @let a = $any(v.node.entity);
@@ -660,9 +640,6 @@ export class ExecutionGraph {
         return n.entity.title;
     }
   }
-  protected stateLabel(s: keyof typeof EXECUTION_STATE_META): string {
-    return EXECUTION_STATE_META[s].label;
-  }
   protected criteria(w: { acceptanceCriteria: { state: string }[] }): number {
     const total = w.acceptanceCriteria.length;
     return total ? (w.acceptanceCriteria.filter((c) => c.state === 'met').length / total) * 100 : 0;
@@ -674,8 +651,6 @@ export class ExecutionGraph {
     switch (n.kind) {
       case 'workstream':
         return n.entity.status;
-      case 'execution':
-        return n.entity.state;
       default:
         return n.entity.state;
     }

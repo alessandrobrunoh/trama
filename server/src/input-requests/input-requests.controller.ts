@@ -6,9 +6,7 @@ import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { InputRequestsService } from './input-requests.service.js';
 
 class CreateInputRequestDto {
-  /** Optional when `executionId` is given (derived from the execution). */
-  @IsOptional() @IsString() workstreamId?: string;
-  @IsOptional() @IsString() executionId?: string;
+  @IsString() workstreamId: string;
   @IsString() @MinLength(1) @MaxLength(2000) question: string;
   @IsOptional() @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) options?: string[];
   @IsOptional() @IsString() assigneeUserId?: string;
@@ -27,7 +25,6 @@ class AnswerDto {
 class ListQuery {
   @IsOptional() @IsIn(['open', 'answered', 'dismissed']) state?: InputRequestState;
   @IsOptional() @IsString() workstreamId?: string;
-  @IsOptional() @IsString() executionId?: string;
   @IsOptional() @IsString() assigneeUserId?: string;
 }
 

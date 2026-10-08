@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, DependencyNodeType } from '../contracts/domain.js';
 import { notFound, uid } from '../common/util.js';
-import { DependencyEntity, ExecutionEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { DependencyEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
@@ -38,12 +38,8 @@ export class DependenciesService {
 
   /** The workstream a node belongs to (or is), `undefined` when the node does not exist in the workspace. */
   async workstreamOf(workspaceId: string, node: Node): Promise<string | undefined> {
-    if (node.type === 'workstream') {
-      const w = await this.ds.getRepository(WorkstreamEntity).findOne({ where: { workspaceId, id: node.id }, select: { id: true } });
-      return w?.id;
-    }
-    const e = await this.ds.getRepository(ExecutionEntity).findOne({ where: { workspaceId, id: node.id }, select: { id: true, workstreamId: true } });
-    return e?.workstreamId;
+    const w = await this.ds.getRepository(WorkstreamEntity).findOne({ where: { workspaceId, id: node.id }, select: { id: true } });
+    return w?.id;
   }
 
   /** True when adding `from → to` would close a loop (i.e. `from` is already reachable from `to`). */
@@ -113,33 +109,5 @@ export class DependenciesService {
       { type: 'deleted', entity: 'dependency', id },
     );
     await this.bus.touchMany(workspaceId, [fromWs, toWs].filter((x): x is string => !!x), 'dependency.removed');
-  }
-
-  /** execution → execution edges pointing AT an execution (its `dependsOnExecutionIds`). */
-  async executionDeps(workspaceId: string, executionIds: string[]): Promise<Map<string, string[]>> {
-    const out = new Map<string, string[]>();
-    if (!executionIds.length) return out;
-    const rows = await this.ds
-      .getRepository(DependencyEntity)
-      .createQueryBuilder('d')
-      .where("d.workspaceId = :workspaceId AND d.fromType = 'execution' AND d.toType = 'execution' AND d.toId IN (:...ids)", {
-        workspaceId,
-        ids: executionIds,
-      })
-      .getMany();
-    for (const r of rows) out.set(r.toId, [...(out.get(r.toId) ?? []), r.fromId]);
-    return out;
-  }
-
-  /** Makes the execution→execution edges into `executionId` match `dependsOn` (adds/removes, cycle-checked). */
-  async syncExecutionDeps(workspaceId: string, actor: ActorRef, executionId: string, dependsOn: string[]): Promise<void> {
-    const current = (await this.executionDeps(workspaceId, [executionId])).get(executionId) ?? [];
-    const wanted = new Set(dependsOn);
-    for (const id of dependsOn.filter((d) => !current.includes(d)))
-      await this.create(workspaceId, actor, { type: 'execution', id }, { type: 'execution', id: executionId });
-    for (const id of current.filter((c) => !wanted.has(c))) {
-      const dep = await this.repo.findOneBy({ workspaceId, fromType: 'execution', fromId: id, toType: 'execution', toId: executionId });
-      if (dep) await this.remove(workspaceId, actor, dep.id);
-    }
   }
 }

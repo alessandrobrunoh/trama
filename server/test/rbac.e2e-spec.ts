@@ -32,13 +32,13 @@ describe('workspaces, RBAC and tenancy', () => {
     const { viewer, slug, team } = await setup();
     await viewer.get(`/api/w/${slug}/snapshot`).expect(200);
     await viewer.get(`/api/w/${slug}/workstreams`).expect(200);
-    await viewer.post(`/api/w/${slug}/workstreams`, { title: 'Nope', ownerTeamId: team.id }).expect(403);
+    await viewer.post(`/api/w/${slug}/workstreams`, { title: 'Nope', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(403);
     await viewer.post(`/api/w/${slug}/comments`, { subject: { type: 'team', id: team.id }, body: 'hi' }).expect(403);
   });
 
   it('member writes domain entities but cannot manage teams, repositories, agents or members', async () => {
     const { member, slug, team } = await setup();
-    await member.post(`/api/w/${slug}/workstreams`, { title: 'Ok', ownerTeamId: team.id }).expect(201);
+    await member.post(`/api/w/${slug}/workstreams`, { title: 'Ok', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201);
     await member.post(`/api/w/${slug}/teams`, { name: 'X', key: 'XX' }).expect(403);
     await member.post(`/api/w/${slug}/repositories`, { provider: 'github', fullName: 'a/b' }).expect(403);
     await member.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'codex' }).expect(403);
@@ -60,16 +60,15 @@ describe('workspaces, RBAC and tenancy', () => {
   it('isolates workspaces: other tenants get 404 on everything, ids do not leak across', async () => {
     const a = await setup();
     const b = await setup();
-    const wsA = (await a.owner.client.post(`/api/w/${a.slug}/workstreams`, { title: 'Secret', ownerTeamId: a.team.id }).expect(201)).body;
+    const wsA = (await a.owner.client.post(`/api/w/${a.slug}/workstreams`, { title: 'Secret', ownerTeamId: a.team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201)).body;
     await b.owner.client.get(`/api/w/${a.slug}/snapshot`).expect(404);
     await b.owner.client.get(`/api/w/${a.slug}/workstreams`).expect(404);
-    await b.owner.client.post(`/api/w/${a.slug}/workstreams`, { title: 'x', ownerTeamId: a.team.id }).expect(404);
+    await b.owner.client.post(`/api/w/${a.slug}/workstreams`, { title: 'x', ownerTeamId: a.team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(404);
     // addressing A's workstream through B's slug must not find it
     await b.owner.client.get(`/api/w/${b.slug}/workstreams/${wsA.id}`).expect(404);
     await b.owner.client.get(`/api/w/${b.slug}/workstreams/${wsA.key}`).expect(404);
     // ... and cannot be referenced from B's entities
-    await b.owner.client.post(`/api/w/${b.slug}/workstreams`, { title: 'x', ownerTeamId: a.team.id }).expect(400);
-    await b.owner.client.post(`/api/w/${b.slug}/executions`, { workstreamId: wsA.id, title: 'x' }).expect(400);
+    await b.owner.client.post(`/api/w/${b.slug}/workstreams`, { title: 'x', ownerTeamId: a.team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(400);
     // a token of workspace B does not open workspace A either
     const tk = (await b.owner.client.post(`/api/w/${b.slug}/tokens`, { name: 't' }).expect(201)).body;
     await new TokenClient(app.getHttpServer(), tk.secret).get(`/api/w/${a.slug}/snapshot`).expect(404);

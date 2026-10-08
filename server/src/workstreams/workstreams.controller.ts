@@ -44,6 +44,8 @@ class UpdateCriterionDto {
 export class CreateWorkstreamDto {
   @IsString() @MinLength(1) @MaxLength(200) title: string;
   @IsString() ownerTeamId: string;
+  @IsString() @MinLength(1) @MaxLength(500) deltaThreadUrl: string;
+  @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @IsString() @MaxLength(20000) objective?: string;
   @IsOptional() @IsString() @MaxLength(20000) context?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) participatingTeamIds?: string[];
@@ -58,6 +60,8 @@ export class CreateWorkstreamDto {
 
 class UpdateWorkstreamDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(200) title?: string;
+  @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(500) deltaThreadUrl?: string;
+  @Clearable() @IsString() @MaxLength(20000) description?: string | null;
   @OptionalNotNull() @IsString() @MaxLength(20000) objective?: string;
   @Clearable() @IsString() @MaxLength(20000) context?: string | null;
   @OptionalNotNull() @IsString() ownerTeamId?: string;

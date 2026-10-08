@@ -7,9 +7,8 @@ import {
   DecisionEntity,
   DependencyEntity,
   DomainEventEntity,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   RepositoryEntity,
   TeamEntity,
   UserEntity,
@@ -27,17 +26,19 @@ export interface AgentContext {
   status: string;
   priority: string;
   targetDate?: string;
+  description?: string;
   objective: string;
   context?: string;
+  deltaThreadUrl: string;
   acceptanceCriteria: AcceptanceCriterion[];
   accountable?: string;
   teams: { owner: { key: string; name: string }; participating: { key: string; name: string }[] };
   repositories: { fullName: string; url: string; defaultBranch: string; provider: string }[];
   dependencies: {
     /** what this workstream waits for */
-    blockedBy: { type: 'workstream' | 'execution'; key?: string; title: string; state: string; resolved: boolean }[];
+    blockedBy: { type: 'workstream'; key?: string; title: string; state: string; resolved: boolean }[];
     /** what waits for this workstream */
-    blocking: { type: 'workstream' | 'execution'; key?: string; title: string; state: string }[];
+    blocking: { type: 'workstream'; key?: string; title: string; state: string }[];
   };
   decisions: {
     key: string;
@@ -48,7 +49,7 @@ export interface AgentContext {
     rationale?: string;
     supersededBy?: string;
   }[];
-  intake: { key: string; title: string; kind: string; state: string }[];
+  issues: { key: string; title: string; kind: string; status: string }[];
   artifacts: {
     kind: ArtifactKind;
     title: string;
@@ -60,9 +61,8 @@ export interface AgentContext {
     hasConflicts?: boolean;
     environment?: string;
   }[];
-  executions: { id: string; title: string; state: string; provider: string; parentExecutionId?: string; progressNote?: string }[];
-  openInputRequests: { id: string; question: string; options?: string[]; executionId?: string }[];
-  recentProgress: { at: string; by: string; text: string; execution?: string }[];
+  openInputRequests: { id: string; question: string; options?: string[] }[];
+  recentProgress: { at: string; by: string; text: string }[];
 }
 
 @Injectable()
@@ -76,46 +76,35 @@ export class AgentContextService {
     const ws = await this.workstreams.get(workspaceId, idOrKey);
     const where = { workspaceId };
     const repo = <T extends object>(e: new () => T) => this.ds.getRepository(e);
-    const [teams, repos, execs, artifacts, inputs, decisions, deps, intake, agents, users] = await Promise.all([
+    const [teams, repos, artifacts, inputs, decisions, deps, issueRows, agents, users] = await Promise.all([
       repo(TeamEntity).find({ where }),
       repo(RepositoryEntity).find({ where }),
-      repo(ExecutionEntity).find({ where: { workstreamId: ws.id }, order: { createdAt: 'ASC' } }),
       repo(ArtifactEntity).find({ where: { workstreamId: ws.id }, order: { createdAt: 'ASC' } }),
       repo(InputRequestEntity).find({ where: { workstreamId: ws.id, state: 'open' }, order: { createdAt: 'ASC' } }),
       repo(DecisionEntity).find({ where, order: { number: 'ASC' } }),
       repo(DependencyEntity).find({ where }),
-      repo(IntakeItemEntity).find({ where, order: { number: 'ASC' } }),
+      repo(IssueEntity).find({ where, order: { number: 'ASC' } }),
       repo(AgentEntity).find({ where }),
       repo(UserEntity).find(),
     ]);
     const names = new Map<string, string>([...agents.map((a) => [a.id, a.name] as const), ...users.map((u) => [u.id, u.name] as const)]);
     const nameOf = (a?: ActorRef | null) => (a?.id ? (names.get(a.id) ?? a.id) : 'system');
     const teamById = new Map(teams.map((t) => [t.id, t]));
-    const execIds = new Set(execs.map((e) => e.id));
-    const execById = new Map(execs.map((e) => [e.id, e]));
     const decisionById = new Map(decisions.map((d) => [d.id, d]));
 
-    // dependencies: resolve both ends
-    const lookupNode = async (type: 'workstream' | 'execution', id: string) => {
-      if (type === 'workstream') {
-        const w = await repo(WorkstreamEntity).findOneBy({ id });
-        return w ? { type, key: w.key, title: w.title, state: w.status, resolved: w.status === 'shipped' } : null;
-      }
-      const e = await repo(ExecutionEntity).findOneBy({ id });
-      if (!e) return null;
-      const w = await repo(WorkstreamEntity).findOneBy({ id: e.workstreamId });
-      return { type, key: w?.key, title: e.title, state: e.state, resolved: e.state === 'completed' };
+    const lookupNode = async (id: string) => {
+      const w = await repo(WorkstreamEntity).findOneBy({ id });
+      return w ? { type: 'workstream' as const, key: w.key, title: w.title, state: w.status, resolved: w.status === 'shipped' } : null;
     };
     const blockedBy: AgentContext['dependencies']['blockedBy'] = [];
     const blocking: AgentContext['dependencies']['blocking'] = [];
     for (const d of deps) {
-      const toMine = d.toId === ws.id || execIds.has(d.toId);
-      const fromMine = d.fromId === ws.id || execIds.has(d.fromId);
-      if (toMine && !fromMine) {
-        const n = await lookupNode(d.fromType, d.fromId);
+      if (d.fromType !== 'workstream' || d.toType !== 'workstream') continue;
+      if (d.toId === ws.id && d.fromId !== ws.id) {
+        const n = await lookupNode(d.fromId);
         if (n) blockedBy.push(n);
-      } else if (fromMine && !toMine) {
-        const n = await lookupNode(d.toType, d.toId);
+      } else if (d.fromId === ws.id && d.toId !== ws.id) {
+        const n = await lookupNode(d.toId);
         if (n) blocking.push({ type: n.type, key: n.key, title: n.title, state: n.state });
       }
     }
@@ -136,20 +125,19 @@ export class AgentContextService {
     const events = await repo(DomainEventEntity)
       .createQueryBuilder('e')
       .where('e.workspaceId = :workspaceId AND e.workstreamId = :w', { workspaceId, w: ws.id })
-      .andWhere(`e.type IN ('execution.progress', 'execution.state_changed', 'input.answered')`)
+      .andWhere(`e.type IN ('workstream.status_changed', 'input.answered', 'comment.created')`)
       .orderBy('e.at', 'DESC')
       .limit(RECENT_PROGRESS)
       .getMany();
     const recentProgress = events.map((e) => {
-      const exec = execById.get(e.subject.id);
       const d = e.data as Record<string, unknown>;
       const text =
-        e.type === 'execution.progress'
-          ? str(d.note)
-          : e.type === 'execution.state_changed'
-            ? `state ${str(d.from)} → ${str(d.to)}`
+        e.type === 'workstream.status_changed'
+          ? `status ${str(d.from)} → ${str(d.to)}`
+          : e.type === 'comment.created'
+            ? str(d.excerpt) || str(d.body)
             : `input answered: ${str(d.answer)}`;
-      return { at: e.at.toISOString(), by: nameOf(e.actor), text, ...(exec ? { execution: exec.title } : {}) };
+      return { at: e.at.toISOString(), by: nameOf(e.actor), text };
     });
 
     const owner = teamById.get(ws.ownerTeamId);
@@ -161,6 +149,8 @@ export class AgentContextService {
       priority: ws.priority,
       ...(ws.targetDate ? { targetDate: ws.targetDate.toISOString().slice(0, 10) } : {}),
       objective: ws.objective,
+      ...(ws.description ? { description: ws.description } : {}),
+      deltaThreadUrl: ws.deltaThreadUrl,
       ...(ws.context ? { context: ws.context } : {}),
       acceptanceCriteria: ws.acceptanceCriteria,
       ...(ws.accountableUserId && names.get(ws.accountableUserId) ? { accountable: names.get(ws.accountableUserId) } : {}),
@@ -174,9 +164,9 @@ export class AgentContextService {
       }),
       dependencies: { blockedBy, blocking },
       decisions: ctxDecisions,
-      intake: intake
+      issues: issueRows
         .filter((i) => i.workstreamIds.includes(ws.id))
-        .map((i) => ({ key: i.key, title: i.title, kind: i.kind, state: i.state })),
+        .map((i) => ({ key: i.key, title: i.title, kind: i.kind, status: i.status })),
       artifacts: artifacts.map((a) => ({
         kind: a.kind,
         title: a.title,
@@ -188,19 +178,10 @@ export class AgentContextService {
         ...(a.hasConflicts ? { hasConflicts: true } : {}),
         ...(a.environment ? { environment: a.environment } : {}),
       })),
-      executions: execs.map((e) => ({
-        id: e.id,
-        title: e.title,
-        state: e.state,
-        provider: e.provider,
-        ...(e.parentExecutionId ? { parentExecutionId: e.parentExecutionId } : {}),
-        ...(e.progressNote ? { progressNote: e.progressNote } : {}),
-      })),
       openInputRequests: inputs.map((r) => ({
         id: r.id,
         question: r.question,
         ...(r.options?.length ? { options: r.options } : {}),
-        ...(r.executionId ? { executionId: r.executionId } : {}),
       })),
       recentProgress,
     };
@@ -214,6 +195,8 @@ export class AgentContextService {
     };
     const status = c.status.replace('_', ' ');
     out.push(`# ${c.key} — ${c.title}`, '', `Status: ${status} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
+    section('Description', [c.description?.trim() || '_No description yet._']);
+    section('Delta thread', [c.deltaThreadUrl]);
     section('Objective', [c.objective.trim() || '_No objective written yet._']);
     section(
       'Acceptance Criteria',
@@ -240,7 +223,7 @@ export class AgentContextService {
       ...c.decisions.filter((d) => d.status === 'proposed').map((d) => `- ${d.key} ${d.title} — proposed, not yet accepted`),
       ...c.decisions.filter((d) => d.status === 'superseded').map((d) => `- ${d.key} ${d.title} — superseded${d.supersededBy ? ` by ${d.supersededBy}` : ''}; do not follow`),
     ]);
-    section('Related intake', c.intake.map((i) => `- ${i.key} ${i.title} (${i.kind}, ${i.state})`));
+    section('Related issues', c.issues.map((i) => `- ${i.key} ${i.title} (${i.kind}, ${i.status.replace(/_/g, ' ')})`));
     section(
       'Artifacts',
       c.artifacts.map((a) => {
@@ -248,14 +231,13 @@ export class AgentContextService {
         return `- ${a.kind.replace('_', ' ')}${a.externalId ? ` ${a.externalId}` : ''}: ${a.title}${a.url ? ` — ${a.url}` : ''} (${bits.join(', ')})`;
       }),
     );
-    section('Executions', c.executions.map((e) => `- ${e.parentExecutionId ? '  ' : ''}${e.title} — ${e.state.replace('_', ' ')} (${e.provider}, id ${e.id})`));
     section(
       'Open input requests',
       c.openInputRequests.map((r) => `- ${r.question}${r.options ? ` [options: ${r.options.join(' / ')}]` : ''}`),
     );
     section(
       'Recent progress',
-      c.recentProgress.map((p) => `- ${p.at.slice(0, 16).replace('T', ' ')} — ${p.by}${p.execution ? ` (${p.execution})` : ''}: ${p.text}`),
+      c.recentProgress.map((p) => `- ${p.at.slice(0, 16).replace('T', ' ')} — ${p.by}: ${p.text}`),
     );
     return `${out.join('\n').trimEnd()}\n`;
   }

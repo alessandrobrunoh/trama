@@ -16,7 +16,7 @@ import { buildExecutionGraph, graphStats } from './graph-model';
   template: `
     <app-page-header
       title="Execution graph"
-      [description]="stats().workstreams + ' workstreams · ' + stats().executions + ' executions · ' + stats().artifacts + ' artifacts · ' + stats().dependencies + ' dependencies'"
+      [description]="stats().workstreams + ' workstreams · ' + stats().artifacts + ' artifacts · ' + stats().dependencies + ' dependencies'"
     />
     <div class="flex flex-wrap items-center gap-2 border-b px-4 py-2 sm:px-6">
       <app-option-menu label="Team" [options]="teamOptions()" [(selected)]="team" anyLabel="All teams" [icon]="usersIcon" />
@@ -57,7 +57,6 @@ export class GraphPage {
     buildExecutionGraph(
       {
         workstreams: this.store.workstreams(),
-        executions: this.store.executions(),
         artifacts: this.store.artifacts(),
         dependencies: this.store.dependencies(),
       },

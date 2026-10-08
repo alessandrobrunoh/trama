@@ -5,10 +5,8 @@ import { LucideArrowUpRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import {
   ARTIFACT_KIND_META,
-  EXECUTION_STATE_META,
   NablaStore,
   type Artifact,
-  type Execution,
   type Workstream,
 } from '../../core';
 import { ActorLabel, AvatarStack } from '../../shared/actor-avatar';
@@ -91,56 +89,15 @@ export interface DetailLink {
           <app-property-row label="Criteria">
             <span>{{ criteriaMet() }} of {{ w.acceptanceCriteria.length }} met</span>
           </app-property-row>
-          <app-property-row label="Executions"><span>{{ execCount() }}</span></app-property-row>
+          @if (w.deltaThreadUrl) {
+            <app-property-row label="Delta">
+              <a class="truncate text-xs hover:underline" [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer">Thread</a>
+            </app-property-row>
+          }
         </div>
         <a hlmBtn variant="outline" size="sm" class="mt-4 w-fit" [routerLink]="['/', slug(), 'workstreams', w.key]">
           Open workstream <svg [lucideIcon]="arrow" [size]="13"></svg>
         </a>
-      }
-      @case ('execution') {
-        @let e = exec();
-        <div class="flex flex-col gap-3">
-          <div class="flex min-w-0 items-center gap-2">
-            <app-status-icon [status]="e.state" [size]="16" />
-            <app-status-badge [status]="e.state" [label]="stateLabel()" />
-            @if (parentWs(); as p) {
-              <app-key-chip [value]="p.key" />
-            }
-          </div>
-          <h3 class="text-base leading-snug font-medium">{{ e.title }}</h3>
-          @if (e.progressNote) {
-            <p class="text-muted-foreground border-l-2 pl-2.5 text-sm italic">{{ e.progressNote }}</p>
-          } @else if (e.description) {
-            <p class="text-muted-foreground line-clamp-4 text-sm">{{ e.description }}</p>
-          }
-        </div>
-        <div class="mt-3 flex flex-col">
-          <app-property-row label="Provider"><app-provider-icon [provider]="e.provider" showLabel /></app-property-row>
-          <app-property-row label="Performers">
-            @if (e.performers.length) {
-              <div class="flex flex-col gap-1">
-                @for (p of e.performers; track $index) {
-                  <app-actor [actor]="p" [size]="16" />
-                }
-              </div>
-            } @else {
-              <span class="text-muted-foreground">Unassigned</span>
-            }
-          </app-property-row>
-          @if (e.branch) {
-            <app-property-row label="Branch"><span class="truncate font-mono text-xs">{{ e.branch }}</span></app-property-row>
-          }
-        </div>
-        <div class="mt-4 flex flex-wrap gap-2">
-          <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'executions', e.id]">
-            Open execution <svg [lucideIcon]="arrow" [size]="13"></svg>
-          </a>
-          @if (e.sessionUrl) {
-            <a hlmBtn variant="ghost" size="sm" [href]="e.sessionUrl" target="_blank" rel="noopener noreferrer">
-              Session <svg [lucideIcon]="arrow" [size]="13"></svg>
-            </a>
-          }
-        </div>
       }
       @case ('artifact') {
         @let a = art();
@@ -247,7 +204,6 @@ export class GraphNodeDetail {
   protected readonly slug = this.store.slug;
 
   protected readonly ws = computed(() => this.node().entity as Workstream);
-  protected readonly exec = computed(() => this.node().entity as Execution);
   protected readonly art = computed(() => this.node().entity as Artifact);
 
   protected readonly ownerTeam = computed(() => this.store.teamById().get(this.ws().ownerTeamId));
@@ -255,8 +211,6 @@ export class GraphNodeDetail {
     this.ws().participatingTeamIds.map((id) => ({ type: 'team' as const, id })),
   );
   protected readonly criteriaMet = computed(() => this.ws().acceptanceCriteria.filter((c) => c.state === 'met').length);
-  protected readonly execCount = computed(() => this.store.executionsByWorkstream().get(this.ws().id)?.length ?? 0);
-  protected readonly stateLabel = computed(() => EXECUTION_STATE_META[this.exec().state].label);
   protected readonly kindLabel = computed(() => ARTIFACT_KIND_META[this.art().kind].label);
   protected readonly parentWs = computed(() => {
     const n = this.node();

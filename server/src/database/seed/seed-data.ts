@@ -5,7 +5,7 @@ export const DEMO_PASSWORD = 'nabla-demo';
 
 /**
  * The "Acme" demo workspace: 14 workstreams covering every derived status, executions with
- * subthreads and dependencies, artifacts, decisions (ADR-1…23), intake, comments, views and
+ * subthreads and dependencies, artifacts, decisions (ADR-1…23), issues, comments, views and
  * ~6 weeks of event history, all relative to `now`. Stored `status` values follow PLAN.md §2
  * so the UI is right before the status engine runs.
  */
@@ -313,26 +313,26 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   adr(22, 'Audit log retention: 400 days hot, 7 years cold', 'Keep audit logs queryable for 400 days, then archive to cold storage for 7 years.', 'Covers SOC 2 and the longest regulatory retention requirement we know of.', ['compliance', 'security'], { by: agent(claude), created: 3, origin: sec11, related: [sec11], status: 'proposed' });
   adr(23, 'Hash refresh tokens at rest with HMAC-SHA256', 'Refresh tokens are stored as HMAC-SHA256 digests keyed with a server secret, never in plaintext.', 'A database leak must not expose usable refresh tokens.', ['auth', 'security'], { by: agent(claude), created: 2, origin: auth42, related: [auth42], status: 'proposed' });
 
-  // ───────── intake
-  const bug142 = b.intake({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', state: 'accepted', workstreams: [auth42], created: 24, triaged: 21, triagedBy: maya });
-  b.intake({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', state: 'accepted', workstreams: [auth42], created: 27, triaged: 21, triagedBy: maya });
-  b.intake({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', state: 'accepted', workstreams: [auth42], created: 8, triaged: 7, triagedBy: maya });
-  b.intake({ kind: 'bug', number: 150, title: 'Checkout button misaligned on Safari 17', source: 'github', team: WEB, priority: 'medium', state: 'accepted', workstreams: [web81], created: 16, triaged: 15, triagedBy: priya, url: 'https://github.com/acme/web/issues/1150' });
-  b.intake({ kind: 'bug', number: 151, title: 'Coupon field loses focus on mobile', source: 'github', team: WEB, priority: 'low', state: 'new', created: 1, url: 'https://github.com/acme/web/issues/1161' });
-  b.intake({ kind: 'bug', number: 148, title: 'Webhook retries sometimes deliver duplicate events', source: 'email', reporterName: 'Customer: Globex', team: API, priority: 'high', state: 'accepted', workstreams: [api57], created: 15, triaged: 14, triagedBy: jonas });
-  b.intake({ kind: 'feature', number: 31, title: 'Dark mode for checkout', source: 'manual', reporter: elena, team: WEB, priority: 'low', state: 'accepted', workstreams: [web81], created: 17, triaged: 16, triagedBy: priya });
-  b.intake({ kind: 'feature', number: 34, title: 'Bulk export of audit logs', source: 'email', reporterName: 'Customer: Initech', team: SEC, priority: 'medium', state: 'new', created: 2 });
-  b.intake({ kind: 'incident', number: 8, title: 'Elevated 5xx on /v2/orders', body: 'p99 latency tripled for 40 minutes. Root cause unclear without cross-service traces.', source: 'api', team: INF, priority: 'urgent', state: 'accepted', workstreams: [inf31], created: 16, triaged: 15, triagedBy: tomas });
-  b.intake({ kind: 'incident', number: 9, title: 'Payment webhooks delayed by ~20 minutes', source: 'api', team: PAY, priority: 'high', state: 'new', created: 0.3 });
-  b.intake({ kind: 'tech_debt', number: 12, title: 'Remove deprecated v1 sessions table', source: 'manual', reporter: maya, team: AUTH, priority: 'low', state: 'triaged', created: 12, triaged: 10, triagedBy: maya });
-  b.intake({ kind: 'tech_debt', number: 14, title: 'Replace moment with date-fns in web', source: 'manual', reporter: priya, team: WEB, priority: 'low', state: 'new', created: 4 });
-  const fb20 = b.intake({ kind: 'feedback', number: 20, title: 'Customer asks for SSO with Okta', source: 'email', reporterName: 'Customer: Globex', team: AUTH, priority: 'medium', state: 'new', created: 6 });
-  b.intake({ kind: 'feedback', number: 23, title: 'SAML SSO support', source: 'email', reporterName: 'Customer: Hooli', team: AUTH, priority: 'medium', state: 'duplicate', duplicateOf: fb20, created: 5, triaged: 4, triagedBy: maya });
-  b.intake({ kind: 'idea', number: 5, title: 'Agent-written changelog per workstream', source: 'manual', reporter: ale, team: PLAT, priority: 'none', state: 'new', created: 2 });
-  b.intake({ kind: 'idea', number: 4, title: 'Public status page', source: 'manual', reporter: tomas, team: INF, priority: 'low', state: 'declined', created: 30, triaged: 28, triagedBy: ale });
-  b.intake({ kind: 'security', number: 6, title: 'Outdated lodash in api (CVE-2026-1182)', source: 'github', team: SEC, priority: 'high', state: 'accepted', workstreams: [sec9], created: 9, triaged: 9, triagedBy: tomas });
-  b.intake({ kind: 'security', number: 7, title: 'No rate limit on password reset endpoint', source: 'agent', team: SEC, priority: 'high', state: 'accepted', workstreams: [api58], created: 10, triaged: 9, triagedBy: tomas });
-  b.comment({ type: 'intake', id: bug142 }, null, user(maya), 'Linking this and BUG-139 to AUTH-42; same root cause (non-deterministic refresh).', 21);
+  // ───────── issues
+  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], created: 24, moved: 21, movedBy: maya });
+  b.issue({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', status: 'in_progress', workstreams: [auth42], created: 27, moved: 21, movedBy: maya });
+  b.issue({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], created: 8, moved: 7, movedBy: maya });
+  b.issue({ kind: 'bug', number: 150, title: 'Checkout button misaligned on Safari 17', source: 'github', team: WEB, priority: 'medium', status: 'in_progress', workstreams: [web81], created: 16, moved: 15, movedBy: priya, url: 'https://github.com/acme/web/issues/1150' });
+  b.issue({ kind: 'bug', number: 151, title: 'Coupon field loses focus on mobile', source: 'github', team: WEB, priority: 'low', status: 'backlog', created: 1, url: 'https://github.com/acme/web/issues/1161' });
+  b.issue({ kind: 'bug', number: 148, title: 'Webhook retries sometimes deliver duplicate events', source: 'email', reporterName: 'Customer: Globex', team: API, priority: 'high', status: 'in_progress', workstreams: [api57], created: 15, moved: 14, movedBy: jonas });
+  b.issue({ kind: 'feature', number: 31, title: 'Dark mode for checkout', source: 'manual', reporter: elena, team: WEB, priority: 'low', status: 'in_progress', workstreams: [web81], created: 17, moved: 16, movedBy: priya });
+  b.issue({ kind: 'feature', number: 34, title: 'Bulk export of audit logs', source: 'email', reporterName: 'Customer: Initech', team: SEC, priority: 'medium', status: 'backlog', created: 2 });
+  b.issue({ kind: 'incident', number: 8, title: 'Elevated 5xx on /v2/orders', body: 'p99 latency tripled for 40 minutes. Root cause unclear without cross-service traces.', source: 'api', team: INF, priority: 'urgent', status: 'in_progress', workstreams: [inf31], created: 16, moved: 15, movedBy: tomas });
+  b.issue({ kind: 'incident', number: 9, title: 'Payment webhooks delayed by ~20 minutes', source: 'api', team: PAY, priority: 'high', status: 'backlog', created: 0.3 });
+  b.issue({ kind: 'tech_debt', number: 12, title: 'Remove deprecated v1 sessions table', source: 'manual', reporter: maya, team: AUTH, priority: 'low', status: 'todo', created: 12, moved: 10, movedBy: maya });
+  b.issue({ kind: 'tech_debt', number: 14, title: 'Replace moment with date-fns in web', source: 'manual', reporter: priya, team: WEB, priority: 'low', status: 'backlog', created: 4 });
+  const fb20 = b.issue({ kind: 'feedback', number: 20, title: 'Customer asks for SSO with Okta', source: 'email', reporterName: 'Customer: Globex', team: AUTH, priority: 'medium', status: 'backlog', created: 6 });
+  b.issue({ kind: 'feedback', number: 23, title: 'SAML SSO support', source: 'email', reporterName: 'Customer: Hooli', team: AUTH, priority: 'medium', status: 'canceled', duplicateOf: fb20, created: 5, moved: 4, movedBy: maya });
+  b.issue({ kind: 'idea', number: 5, title: 'Agent-written changelog per workstream', source: 'manual', reporter: ale, team: PLAT, priority: 'none', status: 'backlog', created: 2 });
+  b.issue({ kind: 'idea', number: 4, title: 'Public status page', source: 'manual', reporter: tomas, team: INF, priority: 'low', status: 'canceled', created: 30, moved: 28, movedBy: ale });
+  b.issue({ kind: 'security', number: 6, title: 'Outdated lodash in api (CVE-2026-1182)', source: 'github', team: SEC, priority: 'high', status: 'in_review', workstreams: [sec9], created: 9, moved: 9, movedBy: tomas });
+  b.issue({ kind: 'security', number: 7, title: 'No rate limit on password reset endpoint', source: 'agent', team: SEC, priority: 'high', status: 'done', workstreams: [api58], created: 10, moved: 9, movedBy: tomas });
+  b.comment({ type: 'issue', id: bug142 }, null, user(maya), 'Linking this and BUG-139 to AUTH-42; same root cause (non-deterministic refresh).', 21);
 
   // ───────── decision comments
   b.comment({ type: 'decision', id: b.data.decisions.find((d) => d.number === 23)!.id! }, auth42, user(tomas), 'Good idea. Please also specify the key rotation story for the HMAC secret.', 1);
@@ -342,7 +342,7 @@ export function createSeed(now: number, passwordHash: string): SeedData {
   b.view(ale, 'Blocked work', 'workstream', { filters: [{ field: 'status', op: 'is', value: 'blocked' }], groupBy: 'ownerTeamId', layout: 'board', shared: true, created: 30 });
   b.view(ale, 'My active workstreams', 'workstream', { filters: [{ field: 'accountableUserId', op: 'is', value: ale }, { field: 'status', op: 'not_in', value: ['shipped', 'canceled'] }], sort: { field: 'priority', direction: 'asc' }, layout: 'list', shared: false, created: 25 });
   b.view(maya, 'Needs a decision', 'decision', { filters: [{ field: 'status', op: 'is', value: 'proposed' }], layout: 'list', shared: true, created: 20 });
-  b.view(maya, 'Untriaged intake', 'intake', { filters: [{ field: 'state', op: 'is', value: 'new' }], sort: { field: 'createdAt', direction: 'desc' }, layout: 'list', shared: true, created: 18 });
+  b.view(maya, 'Backlog issues', 'issue', { filters: [{ field: 'status', op: 'is', value: 'backlog' }], sort: { field: 'createdAt', direction: 'desc' }, layout: 'list', shared: true, created: 18 });
   b.view(ale, 'Agents at work', 'execution', { filters: [{ field: 'state', op: 'in', value: ['running', 'needs_input'] }, { field: 'provider', op: 'not_in', value: ['human'] }], groupBy: 'provider', layout: 'board', shared: false, created: 10 });
 
   return b.data;

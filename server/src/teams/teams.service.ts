@@ -81,7 +81,7 @@ export class TeamsService {
       for (const w of streams)
         if (w.participatingTeamIds.includes(team.id))
           await m.update(WorkstreamEntity, { id: w.id }, { participatingTeamIds: w.participatingTeamIds.filter((t) => t !== team.id) });
-      await m.query(`UPDATE "intake_items" SET "teamId" = NULL WHERE "teamId" = $1`, [team.id]);
+      await m.query(`UPDATE "issues" SET "teamId" = NULL WHERE "teamId" = $1`, [team.id]);
       await m.delete(TeamEntity, { id: team.id });
     });
     await this.events.record({ workspaceId, actor, type: 'team.deleted', subject: { type: 'team', id: team.id }, data: { key: team.key } });

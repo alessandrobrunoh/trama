@@ -22,8 +22,8 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
-import type { ExecutionProvider, GitProvider, IntakeKind, Priority, ViewEntity } from '../../core/contracts/domain';
-import { INTAKE_KIND_META, INTAKE_KINDS, PRIORITIES, PRIORITY_META, PROVIDER_META, PROVIDERS } from '../../core/meta';
+import type { ExecutionProvider, GitProvider, IssueKind, Priority, ViewEntity } from '../../core/contracts/domain';
+import { ISSUE_KIND_META, ISSUE_KINDS, PRIORITIES, PRIORITY_META, PROVIDER_META, PROVIDERS } from '../../core/meta';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { Kbd } from '../../shared/kbd';
@@ -38,8 +38,7 @@ interface KindDef {
 /** The four entities shown in the switcher. Other kinds (team, view, …) open the dialog in single-form mode. */
 const SWITCHER: KindDef[] = [
   { kind: 'workstream', label: 'Workstream', icon: LucideWorkflow },
-  { kind: 'intake', label: 'Intake', icon: LucideInbox },
-  { kind: 'execution', label: 'Execution', icon: LucideTerminal },
+  { kind: 'issue', label: 'Issue', icon: LucideInbox },
   { kind: 'decision', label: 'Decision', icon: LucideScale },
 ];
 const EXTRA: Partial<Record<CreateKind, KindDef>> = {
@@ -53,7 +52,7 @@ const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 /**
- * Global create dialog (`ui.modal() === 'create'`). Entity switcher for workstream / intake / execution /
+ * Global create dialog (`ui.modal() === 'create'`). Entity switcher for workstream / issue / execution /
  * decision with context defaults from `ui.createDefaults()`, plus compact forms for team / repository / view.
  * On success: toast with a link, navigate to the new entity.
  */
@@ -116,7 +115,10 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
                 <input hlmInput id="cr-title" class="text-base font-medium md:text-base" placeholder="Workstream title, e.g. Stabilize authentication" [(ngModel)]="title" name="title" autocomplete="off" autofocus />
               </app-form-row>
               <app-form-row>
-                <textarea hlmTextarea rows="3" class="min-h-16" placeholder="Objective: the outcome that needs to happen" [(ngModel)]="text" name="objective"></textarea>
+                <textarea hlmTextarea rows="3" class="min-h-16" placeholder="Description" [(ngModel)]="text" name="description"></textarea>
+              </app-form-row>
+              <app-form-row [error]="err('delta')">
+                <input hlmInput placeholder="Delta thread, e.g. https://delta.dev/t/…" [(ngModel)]="deltaUrl" name="delta" autocomplete="off" />
               </app-form-row>
               <div class="grid gap-3 sm:grid-cols-2">
                 <app-form-row label="Owner team" [error]="err('team')">
@@ -141,7 +143,7 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
               }
             }
 
-            @case ('intake') {
+            @case ('issue') {
               <app-form-row for="cr-title" [error]="err('title')">
                 <input hlmInput id="cr-title" class="text-base font-medium md:text-base" placeholder="What happened, or what is needed?" [(ngModel)]="title" name="title" autocomplete="off" autofocus />
               </app-form-row>
@@ -150,7 +152,7 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
               </app-form-row>
               <div class="grid gap-3 sm:grid-cols-3">
                 <app-form-row label="Type">
-                  <app-select [options]="intakeKindOptions" [(value)]="intakeKind" label="Type" />
+                  <app-select [options]="issueKindOptions" [(value)]="issueKind" label="Type" />
                 </app-form-row>
                 <app-form-row label="Priority">
                   <app-select [options]="priorityOptions" [(value)]="priority" label="Priority" />
@@ -158,31 +160,6 @@ const asArr = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is s
                 <app-form-row label="Team" [optional]="true">
                   <app-select [options]="teamOptionsOptional()" [(value)]="teamId" placeholder="No team" label="Team" />
                 </app-form-row>
-              </div>
-            }
-
-            @case ('execution') {
-              <app-form-row for="cr-title" [error]="err('title')">
-                <input hlmInput id="cr-title" class="text-base font-medium md:text-base" placeholder="What will be done? e.g. Implement token rotation" [(ngModel)]="title" name="title" autocomplete="off" autofocus />
-              </app-form-row>
-              <app-form-row>
-                <textarea hlmTextarea rows="3" class="min-h-16" placeholder="Description (optional)" [(ngModel)]="text" name="description"></textarea>
-              </app-form-row>
-              <div class="grid gap-3 sm:grid-cols-2">
-                <app-form-row label="Workstream" [error]="err('workstream')" class="sm:col-span-2">
-                  <app-select [options]="workstreamOptions()" [(value)]="workstreamId" placeholder="Choose a workstream" label="Workstream" [invalid]="!!err('workstream')" />
-                </app-form-row>
-                <app-form-row label="Performed by" [optional]="true">
-                  <app-select [options]="actorOptions()" [(value)]="performer" placeholder="Me" label="Performed by" />
-                </app-form-row>
-                <app-form-row label="Provider">
-                  <app-select [options]="providerOptions" [(value)]="provider" label="Provider" />
-                </app-form-row>
-                @if (parentOptions().length > 1) {
-                  <app-form-row label="Parent execution" [optional]="true" class="sm:col-span-2">
-                    <app-select [options]="parentOptions()" [(value)]="parentId" placeholder="None (top level)" label="Parent execution" />
-                  </app-form-row>
-                }
               </div>
             }
 
@@ -292,6 +269,7 @@ export class CreateDialog {
   // ── form state (shared across kinds; reset on open / switch) ──
   protected readonly title = signal('');
   protected readonly text = signal('');
+  protected readonly deltaUrl = signal('');
   protected readonly text2 = signal('');
   protected readonly tags = signal('');
   protected readonly priority = signal<string>('none');
@@ -299,7 +277,7 @@ export class CreateDialog {
   protected readonly accountableId = signal('');
   protected readonly targetDate = signal<Date | undefined>(undefined);
   protected readonly repositoryIds = signal<string[]>([]);
-  protected readonly intakeKind = signal<string>('bug');
+  protected readonly issueKind = signal<string>('bug');
   protected readonly teamId = signal('');
   protected readonly workstreamId = signal('');
   protected readonly parentId = signal('');
@@ -317,7 +295,7 @@ export class CreateDialog {
 
   // ── options ──
   protected readonly priorityOptions: Option[] = PRIORITIES.map((p) => ({ value: p, label: PRIORITY_META[p].label }));
-  protected readonly intakeKindOptions: Option[] = INTAKE_KINDS.map((k) => ({ value: k, label: INTAKE_KIND_META[k].label, hint: INTAKE_KIND_META[k].prefix }));
+  protected readonly issueKindOptions: Option[] = ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label, hint: ISSUE_KIND_META[k].prefix }));
   protected readonly providerOptions: Option[] = PROVIDERS.map((p) => ({ value: p, label: PROVIDER_META[p].label }));
   protected readonly decisionStatusOptions: Option[] = [
     { value: 'proposed', label: 'Proposed' },
@@ -329,8 +307,7 @@ export class CreateDialog {
   ];
   protected readonly viewEntityOptions: Option[] = [
     { value: 'workstream', label: 'Workstreams' },
-    { value: 'intake', label: 'Intake' },
-    { value: 'execution', label: 'Executions' },
+    { value: 'issue', label: 'Issues' },
     { value: 'decision', label: 'Decisions' },
   ];
 
@@ -351,12 +328,6 @@ export class CreateDialog {
     ...this.store.agents().map((a) => ({ value: 'agent:' + a.id, label: a.name, hint: 'agent' })),
     ...this.store.teams().map((t) => ({ value: 'team:' + t.id, label: t.name, hint: 'team' })),
   ]);
-  protected readonly parentOptions = computed<Option[]>(() => {
-    const ws = this.workstreamId();
-    const list = (ws ? (this.store.executionsByWorkstream().get(ws) ?? []) : []).map((e) => ({ value: e.id, label: e.title }));
-    return [{ value: NONE, label: 'None (top level)' }, ...list];
-  });
-
   constructor() {
     // Reset the form from the context defaults each time the dialog opens.
     effect(() => {
@@ -365,18 +336,13 @@ export class CreateDialog {
       const defaults = this.ui.createDefaults();
       untracked(() => this.reset(kind, defaults));
     });
-    // Keep the parent valid when the workstream changes.
-    effect(() => {
-      const parents = this.parentOptions();
-      const cur = untracked(() => this.parentId());
-      if (cur && !parents.some((p) => p.value === cur)) untracked(() => this.parentId.set(NONE));
-    });
   }
 
   private reset(kind: CreateKind, d: Record<string, unknown>): void {
     this.kind.set(kind);
     this.title.set('');
     this.text.set('');
+    this.deltaUrl.set('');
     this.text2.set('');
     this.tags.set('');
     this.priority.set('none');
@@ -392,13 +358,12 @@ export class CreateDialog {
     this.shared.set(true);
     this.submitted.set(false);
     this.busy.set(false);
-    this.intakeKind.set(asStr(d['kind']) || 'bug');
+    this.issueKind.set(asStr(d['kind']) || 'bug');
     this.teamId.set(asStr(d['teamId']) || asStr(d['ownerTeamId']) || NONE);
     const myTeam = this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '';
     this.ownerTeamId.set(asStr(d['ownerTeamId']) || myTeam);
     this.repositoryIds.set(asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)));
-    this.workstreamId.set(asStr(d['workstreamId']) || (kind === 'execution' ? (this.store.workstreams()[0]?.id ?? '') : NONE));
-    this.parentId.set(asStr(d['parentExecutionId']) || NONE);
+    this.workstreamId.set(asStr(d['workstreamId']) || NONE);
   }
 
   protected onSwitch(v: unknown): void {
@@ -408,7 +373,6 @@ export class CreateDialog {
     this.kind.set(next);
     this.submitted.set(false);
     this.ui.createKind.set(next);
-    if (next === 'execution' && !this.workstreamId()) this.workstreamId.set(this.store.workstreams()[0]?.id ?? '');
     if (next === 'decision' && this.workstreamId() === (this.store.workstreams()[0]?.id ?? '') && !this.ui.createDefaults()['workstreamId']) {
       this.workstreamId.set(NONE);
     }
@@ -430,11 +394,13 @@ export class CreateDialog {
     }
   }
 
-  protected err(field: 'title' | 'team' | 'workstream' | 'statement' | 'key'): string | null {
+  protected err(field: 'title' | 'team' | 'workstream' | 'statement' | 'key' | 'delta'): string | null {
     if (!this.submitted()) return null;
     switch (field) {
       case 'title':
         return this.title().trim() ? null : 'Required.';
+      case 'delta':
+        return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim()) ? null : 'Use an https link on delta.dev.';
       case 'team':
         return this.ownerTeamId() ? null : 'Pick the owning team.';
       case 'workstream':
@@ -449,8 +415,7 @@ export class CreateDialog {
   private valid(): boolean {
     const k = this.kind();
     const needs: Parameters<CreateDialog['err']>[0][] = ['title'];
-    if (k === 'workstream') needs.push('team');
-    if (k === 'execution') needs.push('workstream');
+    if (k === 'workstream') needs.push('team', 'delta');
     if (k === 'decision') needs.push('statement');
     if (k === 'team') needs.push('key');
     return needs.every((f) => !this.err(f));
@@ -471,7 +436,8 @@ export class CreateDialog {
         case 'workstream': {
           const w = await this.store.createWorkstream({
             title,
-            objective: this.text().trim() || undefined,
+            description: this.text().trim() || undefined,
+            deltaThreadUrl: this.deltaUrl().trim(),
             ownerTeamId: this.ownerTeamId(),
             priority: this.priority() as Priority,
             accountableUserId: this.accountableId() || undefined,
@@ -481,28 +447,15 @@ export class CreateDialog {
           if (w) done = { label: `${w.key} created`, path: ['workstreams', w.key] };
           break;
         }
-        case 'intake': {
-          const i = await this.store.createIntake({
-            kind: this.intakeKind() as IntakeKind,
+        case 'issue': {
+          const i = await this.store.createIssue({
+            kind: this.issueKind() as IssueKind,
             title,
             body: this.text().trim() || undefined,
             priority: this.priority() as Priority,
             teamId: this.teamId() || undefined,
           });
-          if (i) done = { label: `${i.key} created`, path: ['intake', i.key] };
-          break;
-        }
-        case 'execution': {
-          const [ptype, pid] = this.performer().split(':');
-          const e = await this.store.createExecution({
-            workstreamId: this.workstreamId(),
-            title,
-            description: this.text().trim() || undefined,
-            parentExecutionId: this.parentId() || undefined,
-            provider: this.provider() as ExecutionProvider,
-            performers: pid ? [{ type: ptype as 'user' | 'agent' | 'team', id: pid }] : undefined,
-          });
-          if (e) done = { label: 'Execution created', path: ['executions', e.id] };
+          if (i) done = { label: `${i.key} created`, path: ['issues', i.key] };
           break;
         }
         case 'decision': {

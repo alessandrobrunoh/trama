@@ -4,7 +4,6 @@ import type { ActorRef } from '../contracts/domain.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
 import {
   ArtifactEntity,
-  ExecutionEntity,
   type RepositoryEntity,
   WorkstreamEntity,
 } from '../database/entities/index.js';
@@ -74,11 +73,6 @@ export class ArtifactLinkerService {
 
     for (const workstreamId of targets) {
       const current = byWorkstream.get(workstreamId);
-      const executionId =
-        current?.executionId ??
-        (c.headBranch
-          ? (await this.ds.getRepository(ExecutionEntity).findOne({ where: { workspaceId, workstreamId, branch: c.headBranch }, select: { id: true } }))?.id
-          : undefined);
       const applyReview = c.review !== undefined && (!c.reviewOnlyFrom || !current || c.reviewOnlyFrom.includes(current.review ?? 'none'));
       let row: ArtifactEntity;
       if (current) {
@@ -89,7 +83,6 @@ export class ArtifactLinkerService {
           ci: c.ci,
           review: applyReview ? c.review : undefined,
           hasConflicts: c.hasConflicts,
-          executionId: executionId ?? undefined,
         });
         if (row.updatedAt.getTime() > current.updatedAt.getTime()) result.updated++;
       } else {
@@ -101,7 +94,6 @@ export class ArtifactLinkerService {
           url: c.url,
           externalId: c.externalId,
           repositoryId: repo.id,
-          executionId,
           state: c.state,
           ci: c.ci,
           review: c.review,

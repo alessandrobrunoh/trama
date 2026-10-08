@@ -42,8 +42,19 @@ export interface Membership {
   createdAt: ISODate;
 }
 
-/** Execution environments that can perform work. `human` = done by a person. */
+/** Runtimes that can act in a workspace. `human` = a person. */
 export type ExecutionProvider = 'human' | 'delta' | 'claude_code' | 'codex' | 'cursor' | 'other';
+
+/** https URL on delta.dev (or a subdomain), e.g. a Delta thread. */
+export function isDeltaThreadUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    const host = url.hostname.toLowerCase();
+    return url.protocol === 'https:' && (host === 'delta.dev' || host.endsWith('.delta.dev'));
+  } catch {
+    return false;
+  }
+}
 
 /** A registered agent identity inside a workspace (its own actor, with API tokens). */
 export interface Agent {
@@ -93,9 +104,8 @@ export interface Repository {
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
 /**
- * Derived from executions / artifacts / input requests / dependencies (see
- * PLAN.md §Derived status). `draft` and `canceled` can also be set manually via
- * `statusOverride`.
+ * Derived from artifacts / input requests / decisions / dependencies.
+ * `draft` and `canceled` can also be set manually via `statusOverride`.
  */
 export type WorkstreamStatus =
   | 'draft'
@@ -122,10 +132,17 @@ export interface Workstream {
   key: string;
   number: number;
   title: string;
+  /** What this workstream is (markdown). */
+  description?: string;
   /** The outcome that needs to happen (markdown). */
   objective: string;
   /** Why this work exists (markdown). */
   context?: string;
+  /**
+   * Delta thread that carries this workstream (a chat on delta.dev).
+   * Required: one workstream is linked to one Delta thread.
+   */
+  deltaThreadUrl: string;
   ownerTeamId: ID;
   participatingTeamIds: ID[];
   accountableUserId?: ID;
@@ -145,53 +162,14 @@ export interface Workstream {
   shippedAt?: ISODate;
 }
 
-// ───────────────────────────── Executions ─────────────────────────────
-
-export type ExecutionState =
-  | 'queued'
-  | 'running'
-  | 'needs_input'
-  | 'in_review'
-  | 'blocked'
-  | 'failed'
-  | 'completed'
-  | 'canceled';
-
-export const TERMINAL_EXECUTION_STATES: readonly ExecutionState[] = ['completed', 'failed', 'canceled'];
-
-/** A concrete attempt to perform part of a workstream, by humans and/or agents. */
-export interface Execution {
-  id: ID;
-  workstreamId: ID;
-  parentExecutionId?: ID;
-  title: string;
-  description?: string;
-  teamId?: ID;
-  repositoryIds: ID[];
-  /** Who performs it — one or more users / agents / teams. */
-  performers: ActorRef[];
-  provider: ExecutionProvider;
-  state: ExecutionState;
-  /** Executions that must complete before this one can proceed. */
-  dependsOnExecutionIds: ID[];
-  /** Link to the agent session (e.g. a Delta thread) if any. */
-  sessionUrl?: string;
-  branch?: string;
-  /** Latest progress note reported by the performer. */
-  progressNote?: string;
-  startedAt?: ISODate;
-  completedAt?: ISODate;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
+// ───────────────────────────── Input requests ─────────────────────────
 
 export type InputRequestState = 'open' | 'answered' | 'dismissed';
 
-/** A question an execution (usually an agent) needs a human to answer. */
+/** A question on a workstream that needs a human answer. */
 export interface InputRequest {
   id: ID;
   workstreamId: ID;
-  executionId?: ID;
   question: string;
   /** Optional suggested answers. */
   options?: string[];
@@ -204,11 +182,11 @@ export interface InputRequest {
   answeredAt?: ISODate;
 }
 
-// ───────────────────────────── Intake ─────────────────────────────
+// ───────────────────────────── Issues ─────────────────────────────
 
-export type IntakeKind = 'bug' | 'feature' | 'incident' | 'tech_debt' | 'feedback' | 'idea' | 'security';
+export type IssueKind = 'bug' | 'feature' | 'incident' | 'tech_debt' | 'feedback' | 'idea' | 'security';
 /** Key prefix per kind: BUG-142, FEAT-12, INC-3, DEBT-7, FB-20, IDEA-4, SEC-2 (numbering per kind). */
-export const INTAKE_KEY_PREFIX: Record<IntakeKind, string> = {
+export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
   bug: 'BUG',
   feature: 'FEAT',
   incident: 'INC',
@@ -218,27 +196,38 @@ export const INTAKE_KEY_PREFIX: Record<IntakeKind, string> = {
   security: 'SEC',
 };
 
-export type IntakeState = 'new' | 'triaged' | 'accepted' | 'declined' | 'duplicate';
-export type IntakeSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
+/**
+ * Tracker status, independent of workstream status.
+ * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
+ */
+export type IssueStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
+export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
 
-/** Incoming information (bug reports, requests, incidents…), triaged into workstreams. */
-export interface IntakeItem {
+/**
+ * A unit of demand: one bug, request, incident, or task.
+ * Several issues can contribute to one workstream; an issue is not the unit of execution.
+ */
+export interface Issue {
   id: ID;
   workspaceId: ID;
   key: string;
   number: number;
-  kind: IntakeKind;
+  kind: IssueKind;
   title: string;
+  /** Description. */
   body?: string;
-  source: IntakeSource;
+  source: IssueSource;
   /** Free-text reporter (customer, email…) when not a workspace user. */
   reporterName?: string;
   reporterId?: ID;
+  /** Person responsible for this issue. Distinct from workstream accountability. */
+  assigneeId?: ID;
   teamId?: ID;
   priority: Priority;
-  state: IntakeState;
-  /** Workstreams this item contributes to (many intake → one workstream). */
+  status: IssueStatus;
+  /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
   workstreamIds: ID[];
+  /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
   createdAt: ISODate;
@@ -254,6 +243,8 @@ export type ArtifactKind =
   | 'branch'
   | 'document'
   | 'design'
+  | 'image'
+  | 'file'
   | 'build'
   | 'test_report'
   | 'deployment'
@@ -280,7 +271,6 @@ export type ReviewState = 'none' | 'requested' | 'approved' | 'changes_requested
 export interface Artifact {
   id: ID;
   workstreamId: ID;
-  executionId?: ID;
   repositoryId?: ID;
   kind: ArtifactKind;
   provider: ArtifactProvider;
@@ -319,7 +309,6 @@ export interface Decision {
   rationale?: string;
   status: DecisionStatus;
   originWorkstreamId?: ID;
-  originExecutionId?: ID;
   relatedWorkstreamIds: ID[];
   supersededById?: ID;
   proposedBy: ActorRef;
@@ -332,9 +321,9 @@ export interface Decision {
 
 // ───────────────────────────── Dependencies ─────────────────────────────
 
-export type DependencyNodeType = 'workstream' | 'execution';
+export type DependencyNodeType = 'workstream';
 
-/** `from` blocks `to` until `from` is shipped (workstream) / completed (execution). */
+/** `from` blocks `to` until `from` is shipped. */
 export interface Dependency {
   id: ID;
   workspaceId: ID;
@@ -349,8 +338,7 @@ export interface Dependency {
 
 export type SubjectType =
   | 'workstream'
-  | 'execution'
-  | 'intake'
+  | 'issue'
   | 'artifact'
   | 'decision'
   | 'input_request'
@@ -376,10 +364,9 @@ export interface Comment {
  * Append-only activity log (event-based activity model). Written by the server
  * on every mutation and by integrations/agents. `type` examples:
  * workstream.created, workstream.updated, workstream.status_changed,
- * criterion.updated, execution.created, execution.state_changed,
- * execution.progress, input.requested, input.answered, artifact.attached,
- * artifact.updated, decision.proposed, decision.accepted, intake.created,
- * intake.triaged, dependency.added, comment.created, review.requested.
+ * criterion.updated, input.requested, input.answered, artifact.attached,
+ * artifact.updated, decision.proposed, decision.accepted, issue.created,
+ * issue.status_changed, issue.linked, dependency.added, comment.created, review.requested.
  */
 export interface DomainEvent {
   id: ID;
@@ -418,11 +405,10 @@ export interface AttentionItem {
   title: string;
   detail: string;
   workstreamId?: ID;
-  executionId?: ID;
   artifactId?: ID;
   decisionId?: ID;
   inputRequestId?: ID;
-  intakeId?: ID;
+  issueId?: ID;
   /** When the underlying condition started. */
   since: ISODate;
   /** Per-user state. */
@@ -432,7 +418,7 @@ export interface AttentionItem {
 
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
-export type ViewEntity = 'workstream' | 'intake' | 'execution' | 'decision';
+export type ViewEntity = 'workstream' | 'issue' | 'decision';
 export type ViewLayout = 'list' | 'board' | 'graph';
 
 export interface ViewFilter {
@@ -502,9 +488,8 @@ export interface WorkspaceSnapshot {
   teams: Team[];
   repositories: Repository[];
   workstreams: Workstream[];
-  executions: Execution[];
   inputRequests: InputRequest[];
-  intake: IntakeItem[];
+  issues: Issue[];
   artifacts: Artifact[];
   decisions: Decision[];
   dependencies: Dependency[];

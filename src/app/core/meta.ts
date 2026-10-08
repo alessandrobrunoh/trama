@@ -8,9 +8,8 @@ import type {
   CriterionState,
   DecisionStatus,
   ExecutionProvider,
-  ExecutionState,
-  IntakeKind,
-  IntakeState,
+  IssueKind,
+  IssueStatus,
   Priority,
   Role,
   WorkstreamStatus,
@@ -64,18 +63,6 @@ export const WORKSTREAM_STATUS_FLOW: WorkstreamStatus[] = [
   'canceled',
 ];
 
-export const EXECUTION_STATE_META: Record<ExecutionState, Meta> = {
-  running: { label: 'Running', tone: 'info', order: 0 },
-  needs_input: { label: 'Needs input', tone: 'warning', order: 1 },
-  blocked: { label: 'Blocked', tone: 'danger', order: 2 },
-  in_review: { label: 'In review', tone: 'accent', order: 3 },
-  queued: { label: 'Queued', tone: 'neutral', order: 4 },
-  failed: { label: 'Failed', tone: 'danger', order: 5 },
-  completed: { label: 'Completed', tone: 'success', order: 6 },
-  canceled: { label: 'Canceled', tone: 'muted', order: 7 },
-};
-export const EXECUTION_STATES = sortedKeys(EXECUTION_STATE_META);
-
 export const PRIORITY_META: Record<Priority, Meta> = {
   urgent: { label: 'Urgent', tone: 'danger', order: 0 },
   high: { label: 'High', tone: 'warning', order: 1 },
@@ -95,7 +82,7 @@ export const PROVIDER_META: Record<ExecutionProvider, { label: string; order: nu
 };
 export const PROVIDERS = sortedKeys(PROVIDER_META);
 
-export const INTAKE_KIND_META: Record<IntakeKind, { label: string; prefix: string; order: number }> = {
+export const ISSUE_KIND_META: Record<IssueKind, { label: string; prefix: string; order: number }> = {
   incident: { label: 'Incident', prefix: 'INC', order: 0 },
   security: { label: 'Security', prefix: 'SEC', order: 1 },
   bug: { label: 'Bug', prefix: 'BUG', order: 2 },
@@ -104,16 +91,17 @@ export const INTAKE_KIND_META: Record<IntakeKind, { label: string; prefix: strin
   feedback: { label: 'Feedback', prefix: 'FB', order: 5 },
   idea: { label: 'Idea', prefix: 'IDEA', order: 6 },
 };
-export const INTAKE_KINDS = sortedKeys(INTAKE_KIND_META);
+export const ISSUE_KINDS = sortedKeys(ISSUE_KIND_META);
 
-export const INTAKE_STATE_META: Record<IntakeState, Meta> = {
-  new: { label: 'New', tone: 'accent', order: 0 },
-  triaged: { label: 'Triaged', tone: 'info', order: 1 },
-  accepted: { label: 'Accepted', tone: 'success', order: 2 },
-  duplicate: { label: 'Duplicate', tone: 'muted', order: 3 },
-  declined: { label: 'Declined', tone: 'muted', order: 4 },
+export const ISSUE_STATUS_META: Record<IssueStatus, Meta> = {
+  backlog: { label: 'Backlog', tone: 'muted', order: 0 },
+  todo: { label: 'Todo', tone: 'accent', order: 1 },
+  in_progress: { label: 'In Progress', tone: 'info', order: 2 },
+  in_review: { label: 'In Review', tone: 'warning', order: 3 },
+  done: { label: 'Done', tone: 'success', order: 4 },
+  canceled: { label: 'Canceled', tone: 'muted', order: 5 },
 };
-export const INTAKE_STATES = sortedKeys(INTAKE_STATE_META);
+export const ISSUE_STATUSES = sortedKeys(ISSUE_STATUS_META);
 
 export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: number }> = {
   pull_request: { label: 'Pull request', order: 0 },
@@ -126,6 +114,8 @@ export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: nu
   release: { label: 'Release', order: 7 },
   document: { label: 'Document', order: 8 },
   design: { label: 'Design', order: 9 },
+  image: { label: 'Image', order: 10 },
+  file: { label: 'File', order: 11 },
 };
 export const ARTIFACT_KINDS = sortedKeys(ARTIFACT_KIND_META);
 

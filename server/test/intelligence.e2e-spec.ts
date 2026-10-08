@@ -20,7 +20,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
   const get = async (url: string) => (await c.get(`${base()}${url}`).expect(200)).body;
   const ws = (idOrKey: string) => get(`/workstreams/${idOrKey}`);
   const mk = async (title: string, extra: object = {}, team = auth) =>
-    (await c.post(`${base()}/workstreams`, { title, ownerTeamId: team.id, accountableUserId: me.id, ...extra }).expect(201)).body;
+    (await c.post(`${base()}/workstreams`, { title, ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e', accountableUserId: me.id, ...extra }).expect(201)).body;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -47,7 +47,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       await c.post(`${base()}/workstreams/${w.key}/criteria`, { text: 'Sessions survive' }).expect(201);
       expect((await ws(w.key)).status).toBe('planned');
 
-      const ex = (await c.post(`${base()}/executions`, { workstreamId: w.id, title: 'Implement', state: 'running' }).expect(201)).body;
+      await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'branch', title: 'auth-42/rotation' }).expect(201);
       expect((await ws(w.key)).status).toBe('working');
 
       const pr = (await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'pull_request', title: 'PR', externalId: '#1' }).expect(201)).body;
@@ -58,13 +58,12 @@ describe('intelligence: status, attention, graph, search, context', () => {
       expect((await ws(w.key)).status).toBe('blocked');
       await c.patch(`${base()}/artifacts/${pr.id}`, { ci: 'passing' }).expect(200);
 
-      const ir = (await c.post(`${base()}/input-requests`, { executionId: ex.id, question: 'Which TTL?' }).expect(201)).body;
+      const ir = (await c.post(`${base()}/input-requests`, { workstreamId: w.id, question: 'Which TTL?' }).expect(201)).body;
       expect((await ws(w.key)).status).toBe('needs_input');
       await c.post(`${base()}/input-requests/${ir.id}/answer`, { answer: '30s' }).expect(200);
       expect((await ws(w.key)).status).toBe('ready_to_land');
 
       await c.patch(`${base()}/artifacts/${pr.id}`, { state: 'merged' }).expect(200);
-      await c.post(`${base()}/executions/${ex.id}/complete`, {}).expect(200);
       const shipped = await ws(w.key);
       expect(shipped.status).toBe('shipped');
       expect(shipped.shippedAt).toBeTruthy();
@@ -72,7 +71,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       const evs = (await get(`/events?workstreamId=${w.id}&type=workstream.status&limit=50`)) as Ev[];
       expect(evs.every((e) => e.actor.type === 'system')).toBe(true);
       const path = evs.map((e) => e.data.to).reverse();
-      expect(path).toEqual(['planned', 'working', 'in_review', 'ready_to_land', 'blocked', 'ready_to_land', 'needs_input', 'ready_to_land', 'working', 'shipped']);
+      expect(path).toEqual(['planned', 'working', 'in_review', 'ready_to_land', 'blocked', 'ready_to_land', 'needs_input', 'ready_to_land', 'shipped']);
 
       // override wins but derivedStatus follows reality
       await c.patch(`${base()}/workstreams/${w.key}`, { statusOverride: 'canceled' }).expect(200);
@@ -89,15 +88,6 @@ describe('intelligence: status, attention, graph, search, context', () => {
       expect((await ws(waiting.key)).status).toBe('draft');
     });
 
-    it('execution dependencies: blocked until the source execution completes', async () => {
-      const a = await mk('Exec dep A');
-      const b = await mk('Exec dep B');
-      const ea = (await c.post(`${base()}/executions`, { workstreamId: a.id, title: 'first', state: 'running' }).expect(201)).body;
-      await c.post(`${base()}/executions`, { workstreamId: b.id, title: 'second', state: 'running', dependsOnExecutionIds: [ea.id] }).expect(201);
-      expect((await ws(b.key)).status).toBe('blocked');
-      await c.post(`${base()}/executions/${ea.id}/complete`, {}).expect(200);
-      expect((await ws(b.key)).status).toBe('working');
-    });
   });
 
   describe('attention', () => {
@@ -106,8 +96,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
 
     beforeAll(async () => {
       w = await mk('Needs a human');
-      const ex = (await c.post(`${base()}/executions`, { workstreamId: w.id, title: 'Agent run', state: 'running' }).expect(201)).body;
-      await agent.post(`${base()}/input-requests`, { executionId: ex.id, question: 'Use refresh rotation?' }).expect(201);
+      await agent.post(`${base()}/input-requests`, { workstreamId: w.id, question: 'Use refresh rotation?' }).expect(201);
     });
 
     it('derives items for the accountable user, sorted by severity', async () => {
@@ -145,8 +134,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       // change the underlying condition's `since`: a fresh request replaces the old one
       const reqs = (await get(`/input-requests?workstreamId=${w.id}&state=open`)) as { id: string }[];
       await c.post(`${base()}/input-requests/${reqs[0].id}/dismiss`).expect(200);
-      const ex = (await get(`/executions?workstreamId=${w.id}`))[0];
-      await agent.post(`${base()}/input-requests`, { executionId: ex.id, question: 'Use refresh rotation, take two?' }).expect(201);
+      await agent.post(`${base()}/input-requests`, { workstreamId: w.id, question: 'Use refresh rotation, take two?' }).expect(201);
       const items = (await get('/attention')) as { kind: string; workstreamId?: string; state: string }[];
       expect(items.filter((i) => i.kind === 'input_requested' && i.workstreamId === w.id)).toMatchObject([{ state: 'open' }]);
     });
@@ -162,29 +150,26 @@ describe('intelligence: status, attention, graph, search, context', () => {
 
   describe('graph, search, context', () => {
     let w: { id: string; key: string };
-    let ex: { id: string };
 
     beforeAll(async () => {
       const repo = (await c.post(`${base()}/repositories`, { provider: 'github', fullName: 'acme/auth-service' }).expect(201)).body;
       w = await mk('Graph subject', { objective: 'Users stay signed in when tokens rotate.', context: 'Sessions drop at 15 minutes.', repositoryIds: [repo.id], acceptanceCriteria: [{ text: 'Sessions survive rotation', state: 'met' }, { text: 'Replay is rejected', state: 'in_progress' }, { text: 'Metrics exposed' }] });
-      ex = (await c.post(`${base()}/executions`, { workstreamId: w.id, title: 'Implement rotation', state: 'running', performers: [{ type: 'user', id: me.id }] }).expect(201)).body;
-      await c.post(`${base()}/executions`, { workstreamId: w.id, title: 'Write tests', parentExecutionId: ex.id }).expect(201);
-      await c.post(`${base()}/artifacts`, { workstreamId: w.id, executionId: ex.id, repositoryId: repo.id, kind: 'pull_request', title: 'Rotate refresh tokens', externalId: '#182', review: 'requested' }).expect(201);
+      await c.post(`${base()}/artifacts`, { workstreamId: w.id, repositoryId: repo.id, kind: 'pull_request', title: 'Rotate refresh tokens', externalId: '#182', review: 'requested' }).expect(201);
       const dec = (await c.post(`${base()}/decisions`, { title: 'Rotating refresh tokens', statement: 'Use rotating refresh tokens', rationale: 'Limits replay window', status: 'accepted', originWorkstreamId: w.id }).expect(201)).body;
       const old = (await c.post(`${base()}/decisions`, { title: 'Static tokens', statement: 'Static tokens', status: 'accepted', relatedWorkstreamIds: [w.id] }).expect(201)).body;
       await c.post(`${base()}/decisions/${old.key}/supersede`, { byId: dec.key }).expect(200);
-      await agent.post(`${base()}/executions/${ex.id}/progress`, { note: 'Rotation service skeleton done' }).expect(200);
-      await c.post(`${base()}/intake`, { kind: 'bug', title: 'Users logged out every 15m', teamId: auth.id }).then(async (r) =>
-        c.post(`${base()}/intake/${r.body.key}/triage`, { state: 'accepted', workstreamIds: [w.id] }).expect(200),
+      await c.post(`${base()}/comments`, { subject: { type: 'workstream', id: w.id }, body: 'Rotation service skeleton done' }).expect(201);
+      await c.post(`${base()}/issues`, { kind: 'bug', title: 'Users logged out every 15m', teamId: auth.id }).then(async (r) =>
+        c.post(`${base()}/issues/${r.body.key}/link`, { workstreamIds: [w.id] }).expect(200),
       );
     });
 
     it('graph: workspace, filtered and per workstream', async () => {
       const g = await get(`/workstreams/${w.key}/graph`);
       const types = new Set(g.nodes.map((n: { type: string }) => n.type));
-      for (const t of ['workstream', 'execution', 'artifact', 'user', 'team', 'repository']) expect(types).toContain(t);
+      for (const t of ['workstream', 'artifact', 'team', 'repository']) expect(types).toContain(t);
       const kinds = new Set(g.edges.map((e: { kind: string }) => e.kind));
-      for (const k of ['contains', 'subthread', 'produces', 'performed_by', 'targets']) expect(kinds).toContain(k);
+      for (const k of ['contains', 'targets']) expect(kinds).toContain(k);
       const ids = new Set(g.nodes.map((n: { id: string }) => n.id));
       for (const e of g.edges) {
         expect(ids.has(e.source)).toBe(true);
@@ -193,7 +178,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       expect(g.nodes.find((n: { id: string }) => n.id === w.id)).toMatchObject({ type: 'workstream', status: 'in_review', data: { key: w.key } });
 
       const slim = await get(`/graph?workstreamId=${w.id}&includeArtifacts=false&includeActors=false&includeRepositories=false`);
-      expect(new Set(slim.nodes.map((n: { type: string }) => n.type))).toEqual(new Set(['workstream', 'execution']));
+      expect(new Set(slim.nodes.map((n: { type: string }) => n.type))).toEqual(new Set(['workstream']));
 
       const all = await get('/graph');
       expect(all.nodes.length).toBeGreaterThan(g.nodes.length);
@@ -211,14 +196,14 @@ describe('intelligence: status, attention, graph, search, context', () => {
 
       const r = (await get('/search?q=rotat')).results as { type: string; score: number; workstreamKey?: string }[];
       const found = new Set(r.map((x) => x.type));
-      for (const t of ['workstream', 'decision', 'execution', 'artifact']) expect(found).toContain(t);
+      for (const t of ['workstream', 'decision', 'artifact']) expect(found).toContain(t);
       const scores = r.map((x) => x.score);
       expect(scores).toEqual(scores.toSorted((a, b) => b - a));
-      expect(r.find((x) => x.type === 'execution')!.workstreamKey).toBe(w.key);
+      expect(r.find((x) => x.type === 'artifact')!.workstreamKey).toBe(w.key);
 
       expect((await get('/search?q=%23182')).results[0]).toMatchObject({ type: 'artifact', key: '#182' });
       expect((await get('/search?q=auth-service&types=repository')).results.map((x: { type: string }) => x.type)).toEqual(['repository']);
-      expect((await get('/search?q=logged&types=intake')).results[0]).toMatchObject({ type: 'intake', key: expect.stringMatching(/^BUG-/) });
+      expect((await get('/search?q=logged&types=issue')).results[0]).toMatchObject({ type: 'issue', key: expect.stringMatching(/^BUG-/) });
       expect((await get('/search?q=identity&types=team')).results[0]).toMatchObject({ type: 'team', key: 'AUTH' });
       expect((await get('/search?q=%25_')).results).toEqual([]);
       expect((await get('/search?q=rotat&limit=2')).results).toHaveLength(2);
@@ -243,7 +228,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
       expect(md).toContain('Use rotating refresh tokens');
       expect(md).toContain('because Limits replay window');
       expect(md).toMatch(/Static tokens — superseded by ADR-\d+/);
-      expect(md).toContain('## Related intake');
+      expect(md).toContain('## Related issues');
       expect(md).toContain('#182');
       expect(md).toContain('review requested');
       expect(md).toContain('Rotation service skeleton done');

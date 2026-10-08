@@ -10,9 +10,8 @@ import {
   DecisionEntity,
   DependencyEntity,
   DomainEventEntity,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
   RepositoryEntity,
@@ -20,7 +19,6 @@ import {
   UserEntity,
   WorkstreamEntity,
 } from '../database/entities/index.js';
-import { ExecutionsService } from '../executions/executions.service.js';
 import { ViewsService } from '../views/views.service.js';
 
 export const SNAPSHOT_EVENTS = 500;
@@ -29,7 +27,6 @@ export const SNAPSHOT_EVENTS = 500;
 export class SnapshotService {
   constructor(
     private readonly ds: DataSource,
-    private readonly executions: ExecutionsService,
     private readonly views: ViewsService,
     private readonly attention: AttentionService,
   ) {}
@@ -41,16 +38,15 @@ export class SnapshotService {
     const all = <T extends object>(e: new () => T, order?: Record<string, 'ASC' | 'DESC'>) =>
       this.ds.getRepository(e).find({ where: where as never, order: order as never });
     const memberships = await all(MembershipEntity, { createdAt: 'ASC' });
-    const [users, agents, teams, repositories, workstreams, executions, inputRequests, intake, artifacts, decisions, dependencies, comments, events, views, integrations, attention] =
+    const [users, agents, teams, repositories, workstreams, inputRequests, issues, artifacts, decisions, dependencies, comments, events, views, integrations, attention] =
       await Promise.all([
         this.ds.getRepository(UserEntity).findBy({ id: In(memberships.map((m) => m.userId)) }),
         all(AgentEntity, { createdAt: 'ASC' }),
         all(TeamEntity, { name: 'ASC' }),
         all(RepositoryEntity, { fullName: 'ASC' }),
         all(WorkstreamEntity, { createdAt: 'ASC' }),
-        all(ExecutionEntity, { createdAt: 'ASC' }).then((rows) => this.executions.attach(workspaceId, rows)),
         all(InputRequestEntity, { createdAt: 'ASC' }),
-        all(IntakeItemEntity, { createdAt: 'ASC' }),
+        all(IssueEntity, { createdAt: 'ASC' }),
         all(ArtifactEntity, { createdAt: 'ASC' }),
         all(DecisionEntity, { number: 'ASC' }),
         all(DependencyEntity, { createdAt: 'ASC' }),
@@ -70,9 +66,8 @@ export class SnapshotService {
       teams,
       repositories,
       workstreams,
-      executions,
       inputRequests,
-      intake,
+      issues,
       artifacts,
       decisions,
       dependencies,

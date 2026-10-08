@@ -9,9 +9,8 @@ import {
   DependencyEntity,
   DomainEventEntity,
   ENTITIES,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
   RepositoryEntity,
@@ -56,9 +55,8 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, TeamEntity, data.teams);
       await insert(m, RepositoryEntity, data.repositories);
       await insert(m, WorkstreamEntity, data.workstreams);
-      await insert(m, ExecutionEntity, data.executions);
       await insert(m, InputRequestEntity, data.inputRequests);
-      await insert(m, IntakeItemEntity, data.intake);
+      await insert(m, IssueEntity, data.issues);
       await insert(m, ArtifactEntity, data.artifacts);
       await insert(m, DecisionEntity, data.decisions);
       await insert(m, DependencyEntity, data.dependencies);

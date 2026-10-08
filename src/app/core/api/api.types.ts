@@ -11,16 +11,14 @@ import type {
   CriterionState,
   Decision,
   DependencyNodeType,
-  Execution,
   ExecutionProvider,
-  ExecutionState,
   GitProvider,
   ID,
   ISODate,
-  IntakeItem,
-  IntakeKind,
-  IntakeSource,
-  IntakeState,
+  Issue,
+  IssueKind,
+  IssueSource,
+  IssueStatus,
   Priority,
   ReviewState,
   Role,
@@ -122,8 +120,11 @@ export interface UpdateRepositoryInput {
 // ───── workstreams ─────
 export interface CreateWorkstreamInput {
   title: string;
+  description?: string;
   objective?: string;
   context?: string;
+  /** https link on delta.dev. Required. */
+  deltaThreadUrl: string;
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID;
@@ -136,8 +137,10 @@ export interface CreateWorkstreamInput {
 }
 export interface UpdateWorkstreamInput {
   title?: string;
+  description?: string | null;
   objective?: string;
   context?: string | null;
+  deltaThreadUrl?: string;
   ownerTeamId?: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID | null;
@@ -155,84 +158,51 @@ export interface CriterionInput {
 }
 export type CriterionPatch = Partial<CriterionInput>;
 
-// ───── executions / input requests ─────
-export interface CreateExecutionInput {
-  workstreamId: ID;
-  title: string;
-  description?: string;
-  parentExecutionId?: ID;
-  teamId?: ID;
-  repositoryIds?: ID[];
-  performers?: ActorRef[];
-  provider?: ExecutionProvider;
-  state?: ExecutionState;
-  dependsOnExecutionIds?: ID[];
-  sessionUrl?: string;
-  branch?: string;
-  progressNote?: string;
-}
-export interface UpdateExecutionInput {
-  title?: string;
-  description?: string | null;
-  teamId?: ID | null;
-  repositoryIds?: ID[];
-  performers?: ActorRef[];
-  provider?: ExecutionProvider;
-  state?: ExecutionState;
-  parentExecutionId?: ID | null;
-  dependsOnExecutionIds?: ID[];
-  sessionUrl?: string | null;
-  branch?: string | null;
-  progressNote?: string | null;
-}
-export interface ReportProgressInput {
-  note: string;
-  state?: ExecutionState;
-}
+// ───── input requests ─────
 export interface CreateInputRequestInput {
-  /** Optional when `executionId` is given. */
-  workstreamId?: ID;
-  executionId?: ID;
+  workstreamId: ID;
   question: string;
   options?: string[];
   assigneeUserId?: ID;
 }
 
-// ───── intake ─────
-export interface CreateIntakeInput {
-  kind: IntakeKind;
+// ───── issues ─────
+export interface CreateIssueInput {
+  kind: IssueKind;
   title: string;
   body?: string;
-  source?: IntakeSource;
+  source?: IssueSource;
   reporterName?: string;
+  assigneeId?: ID;
   teamId?: ID;
   priority?: Priority;
+  status?: IssueStatus;
   externalUrl?: string;
 }
-export interface UpdateIntakeInput {
+export interface UpdateIssueInput {
   title?: string;
   body?: string | null;
+  assigneeId?: ID | null;
   teamId?: ID | null;
   priority?: Priority;
+  status?: IssueStatus;
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
+  /** Id or key. `null` clears the duplicate relation. */
+  duplicateOfId?: ID | null;
 }
-export interface TriageIntakeInput {
-  state: Exclude<IntakeState, 'new'>;
+export interface LinkIssueInput {
   workstreamIds?: ID[];
-  /** Create a workstream from this item (title + ownerTeamId required). */
+  /** Create a workstream from this issue (title + ownerTeamId required). */
   createWorkstream?: CreateWorkstreamInput;
-  /** Id or key of the item this duplicates (required when state = duplicate). */
-  duplicateOfId?: ID;
-  teamId?: ID | null;
-  priority?: Priority;
+  /** Defaults to `in_progress` when the issue is `backlog` or `todo`. */
+  status?: IssueStatus;
 }
 
 // ───── artifacts ─────
 export interface CreateArtifactInput {
   workstreamId: ID;
-  executionId?: ID;
   repositoryId?: ID;
   kind: ArtifactKind;
   provider?: ArtifactProvider;
@@ -246,7 +216,6 @@ export interface CreateArtifactInput {
   environment?: string;
 }
 export interface UpdateArtifactInput {
-  executionId?: ID | null;
   repositoryId?: ID | null;
   title?: string;
   url?: string | null;
@@ -325,7 +294,7 @@ export interface UpdateViewInput {
 }
 
 // ───── graph / search ─────
-export type GraphNodeType = 'workstream' | 'execution' | 'artifact' | 'decision' | 'intake';
+export type GraphNodeType = 'workstream' | 'execution' | 'artifact' | 'decision' | 'issue';
 export interface GraphNode {
   id: ID;
   type: GraphNodeType;
@@ -353,9 +322,8 @@ export interface GraphResponse {
 }
 export interface SearchResults {
   workstreams: Workstream[];
-  intake: IntakeItem[];
+  issues: Issue[];
   decisions: Decision[];
-  executions: Execution[];
   artifacts: Artifact[];
 }
 

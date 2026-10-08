@@ -8,9 +8,8 @@ import {
   AttentionStateEntity,
   DecisionEntity,
   DependencyEntity,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   MembershipEntity,
   TeamEntity,
   UserEntity,
@@ -143,18 +142,17 @@ export class AttentionService {
   async compute(workspaceId: string): Promise<RawAttentionItem[]> {
     const where = { workspaceId };
     const db = this.ds;
-    const [teams, agents, memberships, workstreams, executions, inputRequests, artifacts, decisions, dependencies, intake, sinceRows] =
+    const [teams, agents, memberships, workstreams, inputRequests, artifacts, decisions, dependencies, issues, sinceRows] =
       await Promise.all([
         db.getRepository(TeamEntity).find({ where }),
         db.getRepository(AgentEntity).find({ where }),
         db.getRepository(MembershipEntity).find({ where }),
         db.getRepository(WorkstreamEntity).find({ where }),
-        db.getRepository(ExecutionEntity).find({ where }),
         db.getRepository(InputRequestEntity).find({ where: { workspaceId, state: 'open' } }),
         db.getRepository(ArtifactEntity).find({ where }),
         db.getRepository(DecisionEntity).find({ where: { workspaceId, status: 'proposed' } }),
         db.getRepository(DependencyEntity).find({ where }),
-        db.getRepository(IntakeItemEntity).find({ where: { workspaceId, state: 'new' } }),
+        db.getRepository(IssueEntity).find({ where: { workspaceId, status: 'backlog' } }),
         db.query<{ id: string; at: Date }[]>(SINCE_SQL, [workspaceId]),
       ]);
     const userRows = await db.getRepository(UserEntity).find({ where: { id: In(memberships.map((m) => m.userId)) } });
@@ -167,12 +165,11 @@ export class AttentionService {
       names,
       adminIds: memberships.filter((m) => m.role === 'admin' || m.role === 'owner').map((m) => m.userId),
       workstreams,
-      executions,
       inputRequests,
       artifacts,
       decisions,
       dependencies,
-      intake,
+      issues,
       since: new Map(sinceRows.map((r) => [r.id, new Date(r.at)])),
     };
     return computeAttention(data);

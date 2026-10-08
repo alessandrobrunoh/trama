@@ -5,7 +5,7 @@ import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
-import { DecisionEntity, ExecutionEntity } from '../database/entities/index.js';
+import { DecisionEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
@@ -15,7 +15,6 @@ export interface DecisionInput {
   rationale?: string | null;
   status?: DecisionStatus;
   originWorkstreamId?: string | null;
-  originExecutionId?: string | null;
   relatedWorkstreamIds?: string[];
   tags?: string[];
 }
@@ -56,8 +55,6 @@ export class DecisionsService {
 
   private async validate(workspaceId: string, input: DecisionInput) {
     await this.refs.workstreams(workspaceId, [...(input.relatedWorkstreamIds ?? []), ...(input.originWorkstreamId ? [input.originWorkstreamId] : [])]);
-    if (input.originExecutionId && !(await this.ds.getRepository(ExecutionEntity).existsBy({ id: input.originExecutionId, workspaceId })))
-      throw new BadRequestException(`Unknown execution "${input.originExecutionId}"`);
   }
 
   private requireHuman(actor: ActorRef): string {
@@ -83,7 +80,6 @@ export class DecisionsService {
           rationale: input.rationale ?? null,
           status,
           originWorkstreamId: input.originWorkstreamId ?? null,
-          originExecutionId: input.originExecutionId ?? null,
           relatedWorkstreamIds: unique(input.relatedWorkstreamIds),
           proposedBy: actor,
           decidedById,
@@ -117,7 +113,6 @@ export class DecisionsService {
     if (patch.statement !== undefined) row.statement = patch.statement;
     if (patch.rationale !== undefined) row.rationale = patch.rationale;
     if (patch.originWorkstreamId !== undefined) row.originWorkstreamId = patch.originWorkstreamId;
-    if (patch.originExecutionId !== undefined) row.originExecutionId = patch.originExecutionId;
     if (patch.relatedWorkstreamIds !== undefined) row.relatedWorkstreamIds = unique(patch.relatedWorkstreamIds);
     if (patch.tags !== undefined) row.tags = unique(patch.tags);
     row.updatedAt = new Date();

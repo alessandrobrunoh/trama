@@ -4,13 +4,12 @@ import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, InputRequestState } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { ExecutionEntity, InputRequestEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { InputRequestEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
 export interface InputRequestInput {
   workstreamId?: string;
-  executionId?: string | null;
   question?: string;
   options?: string[] | null;
   assigneeUserId?: string | null;
@@ -26,11 +25,10 @@ export class InputRequestsService {
     @InjectRepository(InputRequestEntity) private readonly repo: Repository<InputRequestEntity>,
   ) {}
 
-  list(workspaceId: string, f: { state?: InputRequestState; workstreamId?: string; executionId?: string; assigneeUserId?: string } = {}) {
+  list(workspaceId: string, f: { state?: InputRequestState; workstreamId?: string; assigneeUserId?: string } = {}) {
     const qb = this.repo.createQueryBuilder('r').where('r.workspaceId = :workspaceId', { workspaceId }).orderBy('r.createdAt', 'DESC');
     if (f.state) qb.andWhere('r.state = :s', { s: f.state });
     if (f.workstreamId) qb.andWhere('r.workstreamId = :w', { w: f.workstreamId });
-    if (f.executionId) qb.andWhere('r.executionId = :e', { e: f.executionId });
     if (f.assigneeUserId) qb.andWhere('r.assigneeUserId = :a', { a: f.assigneeUserId });
     return qb.getMany();
   }
@@ -41,16 +39,9 @@ export class InputRequestsService {
     return row;
   }
 
-  async create(workspaceId: string, actor: ActorRef, input: InputRequestInput & { question: string }) {
-    let workstreamId = input.workstreamId;
-    if (input.executionId) {
-      const ex = await this.ds.getRepository(ExecutionEntity).findOneBy({ id: input.executionId, workspaceId });
-      if (!ex) throw new BadRequestException(`Unknown execution "${input.executionId}"`);
-      if (workstreamId && workstreamId !== ex.workstreamId)
-        throw new BadRequestException('executionId belongs to a different workstream');
-      workstreamId = ex.workstreamId;
-    }
-    if (!workstreamId) throw new BadRequestException('workstreamId or executionId is required');
+  async create(workspaceId: string, actor: ActorRef, input: InputRequestInput & { question: string; workstreamId: string }) {
+    const workstreamId = input.workstreamId;
+    if (!workstreamId) throw new BadRequestException('workstreamId is required');
     if (!(await this.ds.getRepository(WorkstreamEntity).existsBy({ id: workstreamId, workspaceId })))
       throw new BadRequestException(`Unknown workstream "${workstreamId}"`);
     await this.refs.users(workspaceId, [input.assigneeUserId]);
@@ -59,7 +50,6 @@ export class InputRequestsService {
         id: uid('ir'),
         workspaceId,
         workstreamId,
-        executionId: input.executionId ?? null,
         question: input.question.trim(),
         options: input.options?.length ? input.options : null,
         requestedBy: actor,
@@ -72,7 +62,7 @@ export class InputRequestsService {
       type: 'input.requested',
       subject: { type: 'input_request', id: row.id },
       workstreamId,
-      data: { question: row.question, executionId: row.executionId, assigneeUserId: row.assigneeUserId },
+      data: { question: row.question, assigneeUserId: row.assigneeUserId },
     });
     await this.bus.touch(workspaceId, workstreamId, 'input.requested');
     return row;

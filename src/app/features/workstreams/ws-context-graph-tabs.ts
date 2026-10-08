@@ -26,7 +26,6 @@ export class WsGraphTab {
     buildExecutionGraph(
       {
         workstreams: this.store.workstreams(),
-        executions: this.store.executions(),
         artifacts: this.store.artifacts(),
         dependencies: this.store.dependencies(),
       },

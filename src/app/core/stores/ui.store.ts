@@ -9,8 +9,7 @@ export type ModalKind = 'command' | 'search' | 'shortcuts' | 'create' | 'confirm
 /** What the global "create" dialog creates. */
 export type CreateKind =
   | 'workstream'
-  | 'execution'
-  | 'intake'
+  | 'issue'
   | 'decision'
   | 'artifact'
   | 'view'

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-export const SEARCH_TYPES = ['workstream', 'intake', 'decision', 'execution', 'artifact', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['workstream', 'issue', 'decision', 'artifact', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -29,14 +29,14 @@ const SPECS: Spec[] = [
   {
     type: 'workstream',
     from: `"workstreams" x JOIN "teams" t ON t."id" = x."ownerTeamId"`,
-    select: `x."id" AS id, x."key" AS key, x."title" AS title, x."status" || ' · ' || t."name" AS subtitle, NULL AS "workstreamKey", x."objective" AS body`,
-    fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."objective"', 'body']],
+    select: `x."id" AS id, x."key" AS key, x."title" AS title, x."status" || ' · ' || t."name" AS subtitle, NULL AS "workstreamKey", COALESCE(x."description", x."objective") AS body`,
+    fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."description"', 'body'], ['x."objective"', 'body']],
     rank: 0,
   },
   {
-    type: 'intake',
-    from: `"intake_items" x`,
-    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."state" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
+    type: 'issue',
+    from: `"issues" x`,
+    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
     fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
     rank: 2,
   },
@@ -48,32 +48,25 @@ const SPECS: Spec[] = [
     rank: 1,
   },
   {
-    type: 'execution',
-    from: `"executions" x JOIN "workstreams" w ON w."id" = x."workstreamId"`,
-    select: `x."id", NULL AS key, x."title", x."state" || ' · ' || x."provider" AS subtitle, w."key" AS "workstreamKey", x."description" AS body`,
-    fields: [['x."title"', 'title'], ['x."description"', 'body']],
-    rank: 3,
-  },
-  {
     type: 'artifact',
     from: `"artifacts" x JOIN "workstreams" w ON w."id" = x."workstreamId"`,
     select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", x."url" AS body`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
-    rank: 4,
+    rank: 3,
   },
   {
     type: 'repository',
     from: `"repositories" x`,
     select: `x."id", NULL AS key, x."fullName" AS title, x."provider" AS subtitle, NULL AS "workstreamKey", NULL AS body`,
     fields: [['x."fullName"', 'title']],
-    rank: 5,
+    rank: 4,
   },
   {
     type: 'team',
     from: `"teams" x`,
     select: `x."id", x."key", x."name" AS title, 'Team' AS subtitle, NULL AS "workstreamKey", x."description" AS body`,
     fields: [['x."key"', 'key'], ['x."name"', 'title'], ['x."description"', 'body']],
-    rank: 6,
+    rank: 5,
   },
 ];
 

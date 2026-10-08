@@ -16,13 +16,13 @@ export interface NavItem {
   icon: LucideIcon;
   /** G-chord hint, e.g. "g o" */
   keys: string;
-  badge?: 'attention' | 'intake';
+  badge?: 'attention' | 'issues';
 }
 
 export const MAIN_NAV: NavItem[] = [
   { segment: 'overview', label: 'Overview', icon: LucideLayoutDashboard, keys: 'g o' },
   { segment: 'attention', label: 'My Attention', icon: LucideBellRing, keys: 'g a', badge: 'attention' },
-  { segment: 'intake', label: 'Intake', icon: LucideInbox, keys: 'g i', badge: 'intake' },
+  { segment: 'issues', label: 'Issues', icon: LucideInbox, keys: 'g i', badge: 'issues' },
   { segment: 'workstreams', label: 'Workstreams', icon: LucideWorkflow, keys: 'g w' },
   { segment: 'graph', label: 'Graph', icon: LucideNetwork, keys: 'g x' },
   { segment: 'decisions', label: 'Decisions', icon: LucideScale, keys: 'g d' },
@@ -33,9 +33,8 @@ export const MAIN_NAV: NavItem[] = [
 export const SECTION_LABELS: Record<string, string> = {
   overview: 'Overview',
   attention: 'My Attention',
-  intake: 'Intake',
+  issues: 'Issues',
   workstreams: 'Workstreams',
-  executions: 'Executions',
   graph: 'Graph',
   decisions: 'Decisions',
   repositories: 'Repositories',
@@ -47,7 +46,7 @@ export const SECTION_LABELS: Record<string, string> = {
 /** Sections that have a list page to link back to. */
 export const SECTIONS_WITH_LIST = new Set([
   'workstreams',
-  'intake',
+  'issues',
   'decisions',
   'repositories',
   'teams',

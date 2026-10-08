@@ -2,18 +2,16 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 @Component({
-  selector: 'app-intake-detail-page',
+  selector: 'app-issue-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   template: `
     <div data-placeholder style="padding: 16px">
-      <h1>Intake item</h1>
+      <h1>Issues</h1>
       <div>workspaceSlug: {{ workspaceSlug() }}</div>
-      <div>key: {{ key() }}</div>
     </div>
   `,
 })
-export class IntakeDetailPage {
+export class IssuePage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
-  readonly key = input<string>();
 }

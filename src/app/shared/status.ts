@@ -10,7 +10,6 @@ import {
   LucideCircleX,
   LucideGitMerge,
   LucideRocket,
-  LucideSquareSlash,
   type LucideIcon,
 } from '@lucide/angular';
 import { LucideDynamicIcon } from '@lucide/angular';
@@ -18,16 +17,14 @@ import type {
   ArtifactState,
   CiState,
   DecisionStatus,
-  ExecutionState,
-  IntakeState,
+  IssueStatus,
   WorkstreamStatus,
 } from '../core/contracts/domain';
 
 /** Every enum value that has a status visual. */
 export type AnyStatus =
   | WorkstreamStatus
-  | ExecutionState
-  | IntakeState
+  | IssueStatus
   | DecisionStatus
   | ArtifactState
   | CiState;
@@ -77,18 +74,13 @@ export const STATUS_VISUALS: Record<AnyStatus, StatusVisual> = {
   ready_to_land: v('Ready to land', 'ready', icon(LucideCircleArrowUp)),
   shipped: v('Shipped', 'done', icon(LucideCircleCheck)),
   canceled: v('Canceled', 'neutral', icon(LucideCircleX)),
-  // ExecutionState (shares working/needs_input/in_review/blocked/canceled)
-  queued: v('Queued', 'neutral', { kind: 'dashed' }),
-  running: v('Running', 'active', { kind: 'pie', fraction: 0.5 }),
-  failed: v('Failed', 'danger', icon(LucideCircleX)),
-  completed: v('Completed', 'done', icon(LucideCircleCheck)),
-  // IntakeState
-  new: v('New', 'active', icon(LucideCircleAlert)),
-  triaged: v('Triaged', 'review', { kind: 'pie', fraction: 0.5 }),
-  accepted: v('Accepted', 'done', icon(LucideCircleCheck)),
-  declined: v('Declined', 'neutral', icon(LucideCircleX)),
-  duplicate: v('Duplicate', 'neutral', icon(LucideSquareSlash)),
+  // IssueStatus (in_review and canceled are shared with workstreams)
+  backlog: v('Backlog', 'neutral', { kind: 'dashed' }),
+  todo: v('Todo', 'planned', icon(LucideCircle)),
+  in_progress: v('In progress', 'active', { kind: 'pie', fraction: 0.5 }),
+  done: v('Done', 'done', icon(LucideCircleCheck)),
   // DecisionStatus
+  accepted: v('Accepted', 'done', icon(LucideCircleCheck)),
   proposed: v('Proposed', 'input', { kind: 'dashed' }),
   superseded: v('Superseded', 'neutral', icon(LucideCircleMinus)),
   rejected: v('Rejected', 'danger', icon(LucideCircleX)),
@@ -97,6 +89,8 @@ export const STATUS_VISUALS: Record<AnyStatus, StatusVisual> = {
   merged: v('Merged', 'review', icon(LucideGitMerge)),
   closed: v('Closed', 'neutral', icon(LucideCircleX)),
   pending: v('Pending', 'input', { kind: 'dashed' }),
+  running: v('Running', 'active', { kind: 'pie', fraction: 0.5 }),
+  failed: v('Failed', 'danger', icon(LucideCircleX)),
   succeeded: v('Succeeded', 'done', icon(LucideCircleCheck)),
   healthy: v('Healthy', 'done', icon(LucideCircleCheck)),
   degraded: v('Degraded', 'input', icon(LucideCircleAlert)),

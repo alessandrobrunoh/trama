@@ -14,7 +14,6 @@ class CreateDecisionDto {
   /** `proposed` (default) or, for people only, `accepted` / `rejected`. */
   @IsOptional() @IsIn(['proposed', 'accepted', 'rejected']) status?: DecisionStatus;
   @IsOptional() @IsString() originWorkstreamId?: string;
-  @IsOptional() @IsString() originExecutionId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) relatedWorkstreamIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }
@@ -24,7 +23,6 @@ class UpdateDecisionDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(20000) statement?: string;
   @Clearable() @IsString() @MaxLength(20000) rationale?: string | null;
   @Clearable() @IsString() originWorkstreamId?: string | null;
-  @Clearable() @IsString() originExecutionId?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) relatedWorkstreamIds?: string[];
   @OptionalNotNull() @IsArray() @IsString({ each: true }) tags?: string[];
 }

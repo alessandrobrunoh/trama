@@ -12,7 +12,7 @@ import type {
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { ArtifactsService } from './artifacts.service.js';
 
-const KINDS: ArtifactKind[] = ['pull_request', 'merge_request', 'commit', 'branch', 'document', 'design', 'build', 'test_report', 'deployment', 'release'];
+const KINDS: ArtifactKind[] = ['pull_request', 'merge_request', 'commit', 'branch', 'document', 'design', 'image', 'file', 'build', 'test_report', 'deployment', 'release'];
 const PROVIDERS: ArtifactProvider[] = ['github', 'gitlab', 'delta', 'figma', 'docs', 'ci', 'other'];
 const STATES: ArtifactState[] = ['draft', 'open', 'merged', 'closed', 'pending', 'running', 'succeeded', 'failed', 'healthy', 'degraded', 'published'];
 const CI: CiState[] = ['pending', 'passing', 'failing'];
@@ -22,7 +22,6 @@ class CreateArtifactDto {
   @IsString() workstreamId: string;
   @IsIn(KINDS) kind: ArtifactKind;
   @IsString() @MinLength(1) @MaxLength(300) title: string;
-  @IsOptional() @IsString() executionId?: string;
   @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @IsOptional() @IsString() @MaxLength(1000) url?: string;
@@ -36,7 +35,6 @@ class CreateArtifactDto {
 
 class UpdateArtifactDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
-  @Clearable() @IsString() executionId?: string | null;
   @Clearable() @IsString() repositoryId?: string | null;
   @OptionalNotNull() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @Clearable() @IsString() @MaxLength(1000) url?: string | null;
@@ -50,7 +48,6 @@ class UpdateArtifactDto {
 
 class ListArtifactsQuery {
   @IsOptional() @IsString() workstreamId?: string;
-  @IsOptional() @IsString() executionId?: string;
   @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsIn(KINDS) kind?: ArtifactKind;
   @IsOptional() @IsIn(STATES) state?: ArtifactState;

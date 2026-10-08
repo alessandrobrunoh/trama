@@ -72,10 +72,6 @@ export class RepositoriesService {
       for (const w of streams)
         if (w.repositoryIds.includes(id))
           await m.update(WorkstreamEntity, { id: w.id }, { repositoryIds: w.repositoryIds.filter((r) => r !== id) });
-      await m.query(
-        `UPDATE "executions" SET "repositoryIds" = "repositoryIds" - $2::text WHERE "workspaceId" = $1 AND "repositoryIds" ? $2::text`,
-        [workspaceId, id],
-      );
       await m.delete(RepositoryEntity, { id });
     });
     await this.events.record({ workspaceId, actor, type: 'repository.deleted', subject: { type: 'repository', id }, data: { fullName: row.fullName } });

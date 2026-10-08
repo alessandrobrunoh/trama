@@ -33,14 +33,15 @@ export class RecentItems {
       switch (r.type) {
         case 'workstream': return this.store.workstreamById().has(r.id);
         case 'decision': return this.store.decisionById().has(r.id);
-        case 'intake': return this.store.intakeById().has(r.id);
-        case 'execution': return this.store.executionById().has(r.id);
+        case 'issue': return this.store.issueById().has(r.id);
         case 'repository': return this.store.repositoryById().has(r.id);
         case 'team': return this.store.teamById().has(r.id);
         default: return true;
       }
     };
-    return (this.all()[slug] ?? []).filter(exists);
+    return (this.all()[slug] ?? [])
+      .map((r) => ((r.type as string) === 'intake' ? { ...r, type: 'issue' as const } : r))
+      .filter(exists);
   }
 
   push(h: SearchHit): void {

@@ -18,9 +18,8 @@ import type {
   CreateArtifactInput,
   CreateDecisionInput,
   CreateDependencyInput,
-  CreateExecutionInput,
   CreateInputRequestInput,
-  CreateIntakeInput,
+  CreateIssueInput,
   CreateIntegrationInput,
   CreateRepositoryInput,
   CreateTeamInput,
@@ -31,13 +30,11 @@ import type {
   CriterionInput,
   CriterionPatch,
   EventsQuery,
-  ReportProgressInput,
-  TriageIntakeInput,
+  LinkIssueInput,
   UpdateAgentInput,
   UpdateArtifactInput,
   UpdateDecisionInput,
-  UpdateExecutionInput,
-  UpdateIntakeInput,
+  UpdateIssueInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -56,11 +53,10 @@ import type {
   Decision,
   Dependency,
   DomainEvent,
-  Execution,
   ExecutionProvider,
   ID,
   InputRequest,
-  IntakeItem,
+  Issue,
   IntegrationConnection,
   Membership,
   Repository,
@@ -97,11 +93,6 @@ export interface ResolvedActor {
   key?: string;
   provider?: Exclude<ExecutionProvider, 'human'>;
   known: boolean;
-}
-
-export interface ExecutionNode {
-  execution: Execution;
-  children: ExecutionNode[];
 }
 
 export interface MemberRow {
@@ -175,9 +166,8 @@ export class NablaStore {
   private readonly _teams = signal<readonly Team[]>([]);
   private readonly _repositories = signal<readonly Repository[]>([]);
   private readonly _workstreams = signal<readonly Workstream[]>([]);
-  private readonly _executions = signal<readonly Execution[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
-  private readonly _intake = signal<readonly IntakeItem[]>([]);
+  private readonly _issues = signal<readonly Issue[]>([]);
   private readonly _artifacts = signal<readonly Artifact[]>([]);
   private readonly _decisions = signal<readonly Decision[]>([]);
   private readonly _dependencies = signal<readonly Dependency[]>([]);
@@ -194,9 +184,8 @@ export class NablaStore {
   readonly teams = this._teams.asReadonly();
   readonly repositories = this._repositories.asReadonly();
   readonly workstreams = this._workstreams.asReadonly();
-  readonly executions = this._executions.asReadonly();
   readonly inputRequests = this._inputRequests.asReadonly();
-  readonly intake = this._intake.asReadonly();
+  readonly issues = this._issues.asReadonly();
   readonly artifacts = this._artifacts.asReadonly();
   readonly decisions = this._decisions.asReadonly();
   readonly dependencies = this._dependencies.asReadonly();
@@ -222,10 +211,9 @@ export class NablaStore {
   readonly workstreamByKey = computed(
     () => new Map(this._workstreams().map((w) => [w.key.toUpperCase(), w])),
   );
-  readonly executionById = computed(() => indexById(this._executions()));
   readonly inputRequestById = computed(() => indexById(this._inputRequests()));
-  readonly intakeById = computed(() => indexById(this._intake()));
-  readonly intakeByKey = computed(() => new Map(this._intake().map((i) => [i.key.toUpperCase(), i])));
+  readonly issueById = computed(() => indexById(this._issues()));
+  readonly issueByKey = computed(() => new Map(this._issues().map((i) => [i.key.toUpperCase(), i])));
   readonly artifactById = computed(() => indexById(this._artifacts()));
   readonly decisionById = computed(() => indexById(this._decisions()));
   readonly decisionByKey = computed(
@@ -248,39 +236,8 @@ export class NablaStore {
     return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
   });
 
-  /** Executions of a workstream (created order), by workstream id. */
-  readonly executionsByWorkstream = computed(() =>
-    groupBy(this._executions(), (e) => e.workstreamId),
-  );
-  /** Direct sub-executions, by parent execution id. */
-  readonly childExecutions = computed(() =>
-    groupBy(this._executions(), (e) => e.parentExecutionId),
-  );
-  /** Execution tree (roots with nested children), by workstream id. */
-  readonly executionTrees = computed(() => {
-    const children = this.childExecutions();
-    const build = (execution: Execution, seen: Set<string>): ExecutionNode => {
-      seen.add(execution.id);
-      return {
-        execution,
-        children: (children.get(execution.id) ?? [])
-          .filter((c) => !seen.has(c.id))
-          .map((c) => build(c, seen)),
-      };
-    };
-    const byId = this.executionById();
-    const trees = new Map<ID, ExecutionNode[]>();
-    for (const [wsId, list] of this.executionsByWorkstream()) {
-      const roots = list.filter((e) => !e.parentExecutionId || !byId.has(e.parentExecutionId));
-      trees.set(wsId, roots.map((r) => build(r, new Set())));
-    }
-    return trees;
-  });
   readonly inputRequestsByWorkstream = computed(() =>
     groupBy(this._inputRequests(), (r) => r.workstreamId),
-  );
-  readonly inputRequestsByExecution = computed(() =>
-    groupBy(this._inputRequests(), (r) => r.executionId),
   );
   /** Open input requests, newest first. */
   readonly openInputRequests = computed(() =>
@@ -291,7 +248,6 @@ export class NablaStore {
   readonly artifactsByWorkstream = computed(() =>
     groupBy(this._artifacts(), (a) => a.workstreamId),
   );
-  readonly artifactsByExecution = computed(() => groupBy(this._artifacts(), (a) => a.executionId));
   readonly artifactsByRepository = computed(() =>
     groupBy(this._artifacts(), (a) => a.repositoryId),
   );
@@ -303,10 +259,10 @@ export class NablaStore {
       return [...ids];
     }),
   );
-  readonly intakeByWorkstream = computed(() =>
-    groupBy(this._intake(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
+  readonly issuesByWorkstream = computed(() =>
+    groupBy(this._issues(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
   );
-  readonly intakeByTeam = computed(() => groupBy(this._intake(), (i) => i.teamId));
+  readonly issuesByTeam = computed(() => groupBy(this._issues(), (i) => i.teamId));
   /** Workstreams owned by a team (by team id). */
   readonly workstreamsByOwnerTeam = computed(() =>
     groupBy(this._workstreams(), (w) => w.ownerTeamId),
@@ -382,9 +338,9 @@ export class NablaStore {
   readonly highAttentionCount = computed(
     () => this.openAttention().filter((a) => a.severity === 'high').length,
   );
-  /** Intake items still in state `new`. */
-  readonly newIntake = computed(() => this._intake().filter((i) => i.state === 'new'));
-  readonly intakeNewCount = computed(() => this.newIntake().length);
+  /** Issues still in the backlog (unscheduled demand). */
+  readonly backlogIssues = computed(() => this._issues().filter((i) => i.status === 'backlog'));
+  readonly backlogIssueCount = computed(() => this.backlogIssues().length);
 
   // ─────────────────────────── actor resolution ───────────────────────────
 
@@ -431,13 +387,10 @@ export class NablaStore {
     if (!ref) return undefined;
     return this.workstreamById().get(ref) ?? this.workstreamByKey().get(ref.toUpperCase());
   }
-  getExecution(id: string | null | undefined): Execution | undefined {
-    return id ? this.executionById().get(id) : undefined;
-  }
   /** By id or key (`BUG-142`). */
-  getIntake(ref: string | null | undefined): IntakeItem | undefined {
+  getIssue(ref: string | null | undefined): Issue | undefined {
     if (!ref) return undefined;
-    return this.intakeById().get(ref) ?? this.intakeByKey().get(ref.toUpperCase());
+    return this.issueById().get(ref) ?? this.issueByKey().get(ref.toUpperCase());
   }
   /** By id or key (`ADR-7`). */
   getDecision(ref: string | null | undefined): Decision | undefined {
@@ -531,7 +484,7 @@ export class NablaStore {
     this._myRole.set(null);
     for (const c of [
       this._users, this._memberships, this._agents, this._teams, this._repositories,
-      this._workstreams, this._executions, this._inputRequests, this._intake, this._artifacts,
+      this._workstreams, this._inputRequests, this._issues, this._artifacts,
       this._decisions, this._dependencies, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
     ] as WritableSignal<readonly Row[]>[]) {
@@ -578,9 +531,8 @@ export class NablaStore {
     list(this._teams, s.teams);
     list(this._repositories, s.repositories);
     list(this._workstreams, s.workstreams);
-    list(this._executions, s.executions);
     list(this._inputRequests, s.inputRequests);
-    list(this._intake, s.intake);
+    list(this._issues, s.issues);
     list(this._artifacts, s.artifacts);
     list(this._decisions, s.decisions);
     list(this._dependencies, s.dependencies);
@@ -760,7 +712,6 @@ export class NablaStore {
     if (!ws) return false;
     const tx = this.tx();
     tx.remove(this._workstreams, ws.id);
-    for (const e of this._executions().filter((x) => x.workstreamId === ws.id)) tx.remove(this._executions, e.id);
     for (const a of this._artifacts().filter((x) => x.workstreamId === ws.id)) tx.remove(this._artifacts, a.id);
     for (const r of this._inputRequests().filter((x) => x.workstreamId === ws.id)) tx.remove(this._inputRequests, r.id);
     return this.ok('delete workstream', (s) => this.api.workstreams.remove(s, ws.id), { tx });
@@ -816,61 +767,7 @@ export class NablaStore {
     return this.ok('remove criterion', (s) => this.api.workstreams.removeCriterion(s, ws.id, criterionId), { tx });
   }
 
-  // ─────────────────────────── executions & input requests ───────────────────────────
-
-  async createExecution(input: CreateExecutionInput): Promise<Execution | undefined> {
-    return this.write('create execution', (s) => this.api.executions.create(s, input), {
-      onResult: (e) => this.upsert(this._executions, e),
-    });
-  }
-
-  async updateExecution(id: ID, patch: UpdateExecutionInput): Promise<boolean> {
-    if (!this.getExecution(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._executions, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update execution', (s) => this.api.executions.update(s, id, patch), {
-      tx,
-      onResult: (e) => this.upsert(this._executions, e),
-    }).then((r) => !!r);
-  }
-
-  async deleteExecution(id: ID): Promise<boolean> {
-    if (!this.getExecution(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._executions, id);
-    return this.ok('delete execution', (s) => this.api.executions.remove(s, id), { tx });
-  }
-
-  /** Post a progress note (and optionally move the execution to `state`). */
-  async reportProgress(id: ID, input: ReportProgressInput): Promise<boolean> {
-    if (!this.getExecution(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._executions, id, {
-      progressNote: input.note,
-      ...(input.state ? { state: input.state } : {}),
-      updatedAt: this.nowIso(),
-    });
-    return this.writeOk('report progress', (s) => this.api.executions.progress(s, id, input), {
-      tx,
-      onResult: (e) => e && this.upsert(this._executions, e),
-    });
-  }
-
-  async completeExecution(id: ID, note?: string): Promise<boolean> {
-    if (!this.getExecution(id)) return false;
-    const now = this.nowIso();
-    const tx = this.tx();
-    tx.patch(this._executions, id, {
-      state: 'completed',
-      completedAt: now,
-      updatedAt: now,
-      ...(note ? { progressNote: note } : {}),
-    });
-    return this.writeOk('complete execution', (s) => this.api.executions.complete(s, id, note), {
-      tx,
-      onResult: (e) => e && this.upsert(this._executions, e),
-    });
-  }
+  // ─────────────────────────── input requests ───────────────────────────
 
   async createInputRequest(input: CreateInputRequestInput): Promise<InputRequest | undefined> {
     return this.write('request input', (s) => this.api.inputRequests.create(s, input), {
@@ -911,57 +808,54 @@ export class NablaStore {
     for (const a of this._attention().filter(test)) tx.patch(this._attention, a.id, { state: 'dismissed' });
   }
 
-  // ─────────────────────────── intake ───────────────────────────
+  // ─────────────────────────── issues ───────────────────────────
 
-  async createIntake(input: CreateIntakeInput): Promise<IntakeItem | undefined> {
-    return this.write('create intake item', (s) => this.api.intake.create(s, input), {
-      onResult: (i) => this.upsert(this._intake, i),
+  async createIssue(input: CreateIssueInput): Promise<Issue | undefined> {
+    return this.write('create issue', (s) => this.api.issues.create(s, input), {
+      onResult: (i) => this.upsert(this._issues, i),
     });
   }
 
-  async updateIntake(id: ID, patch: UpdateIntakeInput): Promise<boolean> {
-    if (!this.intakeById().has(id)) return false;
+  async updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean> {
+    if (!this.issueById().has(id)) return false;
     const tx = this.tx();
-    tx.patch(this._intake, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update intake item', (s) => this.api.intake.update(s, id, patch), {
+    tx.patch(this._issues, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update issue', (s) => this.api.issues.update(s, id, patch), {
       tx,
-      onResult: (i) => this.upsert(this._intake, i),
+      onResult: (i) => this.upsert(this._issues, i),
     }).then((r) => !!r);
   }
 
-  async deleteIntake(id: ID): Promise<boolean> {
-    if (!this.intakeById().has(id)) return false;
+  async deleteIssue(id: ID): Promise<boolean> {
+    if (!this.issueById().has(id)) return false;
     const tx = this.tx();
-    tx.remove(this._intake, id);
-    return this.ok('delete intake item', (s) => this.api.intake.remove(s, id), { tx });
+    tx.remove(this._issues, id);
+    return this.ok('delete issue', (s) => this.api.issues.remove(s, id), { tx });
   }
 
   /**
-   * Triage into existing workstream(s), a new workstream (`createWorkstream`), or mark
-   * declined / duplicate. Resolves the updated item; a workstream created by the server
-   * shows up with the next refetch (`item.workstreamIds`).
+   * Attach the issue to existing workstreams and/or a new one (`createWorkstream`).
+   * Backlog and todo issues move to `in_progress` unless `status` is set. The created
+   * workstream arrives with the next refetch (`issue.workstreamIds`).
    */
-  async triageIntake(id: ID, input: TriageIntakeInput): Promise<IntakeItem | undefined> {
-    if (!this.intakeById().has(id)) return undefined;
+  async linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined> {
+    const current = this.issueById().get(id);
+    if (!current) return undefined;
     const tx = this.tx();
-    tx.patch(this._intake, id, {
-      state: input.state,
-      ...(input.workstreamIds ? { workstreamIds: input.workstreamIds } : {}),
-      ...(input.duplicateOfId ? { duplicateOfId: input.duplicateOfId } : {}),
+    const status = input.status ?? (current.status === 'backlog' || current.status === 'todo' ? 'in_progress' : current.status);
+    tx.patch(this._issues, id, {
+      status,
+      ...(input.workstreamIds ? { workstreamIds: [...new Set([...current.workstreamIds, ...input.workstreamIds])] } : {}),
     });
-    this.hideAttentionWhere(tx, (a) => a.intakeId === id);
-    return this.write('triage', (s) => this.api.intake.triage(s, id, input), {
+    this.hideAttentionWhere(tx, (a) => a.issueId === id);
+    return this.write('link issue', (s) => this.api.issues.link(s, id, input), {
       tx,
-      onResult: (res) => {
-        const r = res as Rec | null;
-        const item = (r && 'intake' in r ? r['intake'] : r) as IntakeItem | null;
-        if (item && typeof item.id === 'string') this.upsert(this._intake, item);
-        const ws = r && 'workstream' in r ? (r['workstream'] as Workstream | null) : null;
-        if (ws && typeof ws.id === 'string') this.upsert(this._workstreams, ws);
+      onResult: (item) => {
+        if (item) this.upsert(this._issues, item);
       },
     }).then((res) => {
       if (res === undefined) return undefined;
-      return this.intakeById().get(id);
+      return this.issueById().get(id);
     });
   }
 

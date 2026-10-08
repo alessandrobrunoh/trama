@@ -248,11 +248,6 @@ import { snoozePresets, type SnoozePreset } from './snooze';
         @if (item().workstreamId && wsKey(); as k) {
           <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'workstreams', k])">Open workstream</button>
         }
-        @if (item().executionId) {
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'executions', item().executionId])">
-            Open execution
-          </button>
-        }
         @if (artifactUrl(); as url) {
           <button hlmDropdownMenuItem (triggered)="openExternal(url)">Open pull request</button>
         }
@@ -324,14 +319,13 @@ export class AttentionRow {
         break;
       }
       case 'triage': {
-        const i = it.intakeId ? this.store.intakeById().get(it.intakeId) : undefined;
-        const q: Record<string, string> = { state: 'new' };
+        const i = it.issueId ? this.store.issueById().get(it.issueId) : undefined;
+        const q: Record<string, string> = { status: 'backlog' };
         if (i?.teamId) q['team'] = i.teamId;
-        return { commands: ['/', slug, 'intake'], query: q };
+        return { commands: ['/', slug, 'issues'], query: q };
       }
       case 'input_requested':
       case 'blocked':
-        if (it.executionId) return { commands: ['/', slug, 'executions', it.executionId] };
         break;
     }
     const k = this.wsKey();

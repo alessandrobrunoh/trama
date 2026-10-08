@@ -4,9 +4,8 @@ import type { SubjectRef } from '../contracts/domain.js';
 import {
   ArtifactEntity,
   DecisionEntity,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   MembershipEntity,
   RepositoryEntity,
   TeamEntity,
@@ -44,10 +43,6 @@ export class RefsService {
     return this.assertAll(WorkstreamEntity, workspaceId, ids, 'workstream');
   }
 
-  executions(workspaceId: string, ids?: readonly string[] | null) {
-    return this.assertAll(ExecutionEntity, workspaceId, ids, 'execution');
-  }
-
   /** Users must be members of the workspace. */
   async users(workspaceId: string, ids?: readonly (string | null | undefined)[] | null) {
     const unique = [...new Set((ids ?? []).filter((x): x is string => !!x))];
@@ -70,10 +65,6 @@ export class RefsService {
         const r = await db.getRepository(WorkstreamEntity).findOne({ where, select: { id: true } });
         return { exists: !!r, workstreamId: r?.id };
       }
-      case 'execution': {
-        const r = await db.getRepository(ExecutionEntity).findOne({ where, select: { id: true, workstreamId: true } });
-        return { exists: !!r, workstreamId: r?.workstreamId };
-      }
       case 'artifact': {
         const r = await db.getRepository(ArtifactEntity).findOne({ where, select: { id: true, workstreamId: true } });
         return { exists: !!r, workstreamId: r?.workstreamId };
@@ -86,8 +77,8 @@ export class RefsService {
         const r = await db.getRepository(DecisionEntity).findOne({ where });
         return { exists: !!r, workstreamId: r?.originWorkstreamId ?? undefined };
       }
-      case 'intake':
-        return { exists: await db.getRepository(IntakeItemEntity).existsBy(where) };
+      case 'issue':
+        return { exists: await db.getRepository(IssueEntity).existsBy(where) };
       case 'repository':
         return { exists: await db.getRepository(RepositoryEntity).existsBy(where) };
       case 'team':

@@ -12,7 +12,7 @@ src/
   auth/                           AuthService (users, sessions), TokensService, AuthController, request-context.ts (decorators)
   workspaces/                     AccessGuard (global), WorkspacesService + controllers (workspace, members, agents, tokens)
   events/                         EventsService (record + SSE), WorkstreamBus, EventsController (list + stream), request-store
-  teams repositories workstreams executions input-requests intake artifacts decisions dependencies comments views
+  teams repositories workstreams executions input-requests issues artifacts decisions dependencies comments views
   snapshot/ health/
   status/ attention/ graph/ search/ agent-context/   (backend-intelligence)
 ```
@@ -71,11 +71,11 @@ bus.touch(workspaceId, workstreamId, reason): Promise<void>        // awaits han
 bus.touchMany(workspaceId, workstreamIds, reason): Promise<void>
 ```
 
-Fired (and awaited, so the response is consistent) after any change to a workstream or its criteria, executions, input requests, artifacts, decisions (origin + related), dependencies (both ends) and linked intake. The status engine should subscribe in `onModuleInit`, recompute `status` / `derivedStatus` / `shippedAt` directly on `workstreams`, and on a change call `events.record({ type: 'workstream.status_changed', actor: { type: 'system' }, data: { key, from, to } })` and/or `events.publish(workspaceId, { type: 'updated', entity: 'workstream', id })`. Today `status`/`derivedStatus` are stored values; `WorkstreamsService.update` keeps `status = statusOverride ?? derivedStatus`.
+Fired (and awaited, so the response is consistent) after any change to a workstream or its criteria, executions, input requests, artifacts, decisions (origin + related), dependencies (both ends) and linked issues. The status engine should subscribe in `onModuleInit`, recompute `status` / `derivedStatus` / `shippedAt` directly on `workstreams`, and on a change call `events.record({ type: 'workstream.status_changed', actor: { type: 'system' }, data: { key, from, to } })` and/or `events.publish(workspaceId, { type: 'updated', entity: 'workstream', id })`. Today `status`/`derivedStatus` are stored values; `WorkstreamsService.update` keeps `status = statusOverride ?? derivedStatus`.
 
 ## Numbering
 
-`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `ws:<teamId>` (workstream numbers per owner team), `intake:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Changing a workstream's owner team keeps its key.
+`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `ws:<teamId>` (workstream numbers per owner team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Changing a workstream's owner team keeps its key.
 
 ## Database
 

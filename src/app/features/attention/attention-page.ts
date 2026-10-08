@@ -119,7 +119,7 @@ type Tab = 'open' | 'archived';
         >
           <div class="flex flex-wrap justify-center gap-2">
             <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'workstreams']">Workstreams</a>
-            <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'intake']">Intake</a>
+            <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'issues']">Issues</a>
           </div>
         </app-empty-state>
       }

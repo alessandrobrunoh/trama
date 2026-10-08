@@ -93,7 +93,7 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
         icon: LucidePlay,
         verb: 'started',
         text: str(d['title']),
-        link: e.subject.type === 'execution' ? ['/', slug, 'executions', e.subject.id] : wsLink,
+        link: wsLink,
         detail: [ws?.key, prov && prov !== 'human' ? `via ${prov.replace('_', ' ')}` : undefined].filter(Boolean).join(' · ') || undefined,
       };
     }
@@ -178,37 +178,38 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
         link: key ? ['/', slug, 'decisions', key] : undefined,
       };
     }
-    case 'intake.created': {
+    case 'issue.created': {
       const key = str(d['key']);
       return {
         icon: LucideInbox,
-        verb: 'reported',
+        verb: 'opened',
         key,
         text: str(d['title']),
-        link: key ? ['/', slug, 'intake', key] : undefined,
+        link: key ? ['/', slug, 'issues', key] : undefined,
       };
     }
-    case 'intake.triaged': {
+    case 'issue.status_changed':
+    case 'issue.linked': {
       const key = str(d['key']);
-      const state = str(d['state']);
+      const to = str(d['to']);
       return {
         icon: LucideFlag,
-        verb: `triaged as ${state ?? 'triaged'}:`,
+        verb: e.type === 'issue.linked' ? 'linked' : `moved to ${to?.replace(/_/g, ' ') ?? 'a new status'}:`,
         key,
-        text: key ? store.intakeByKey().get(key)?.title : undefined,
-        link: key ? ['/', slug, 'intake', key] : undefined,
+        text: key ? store.issueByKey().get(key)?.title : undefined,
+        link: key ? ['/', slug, 'issues', key] : undefined,
       };
     }
     case 'dependency.added':
       return { icon: LucideLink2, verb: 'added a dependency in', ...wsPart };
     case 'comment.created': {
-      const intake = e.subject.type === 'intake' ? store.intakeById().get(e.subject.id) : undefined;
+      const issue = e.subject.type === 'issue' ? store.issueById().get(e.subject.id) : undefined;
       return {
         icon: LucideMessageSquare,
         verb: 'commented on',
-        key: intake?.key ?? ws?.key,
-        text: intake?.title ?? ws?.title,
-        link: intake ? ['/', slug, 'intake', intake.key] : wsLink,
+        key: issue?.key ?? ws?.key,
+        text: issue?.title ?? ws?.title,
+        link: issue ? ['/', slug, 'issues', issue.key] : wsLink,
         detail: str(d['excerpt']),
       };
     }

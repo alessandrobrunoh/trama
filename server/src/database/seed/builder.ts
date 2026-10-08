@@ -1,4 +1,4 @@
-import { INTAKE_KEY_PREFIX, TERMINAL_EXECUTION_STATES } from '../../contracts/domain.js';
+import { ISSUE_KEY_PREFIX, isDeltaThreadUrl } from '../../contracts/domain.js';
 import type {
   AcceptanceCriterion,
   ActorRef,
@@ -8,11 +8,10 @@ import type {
   CiState,
   DecisionStatus,
   ExecutionProvider,
-  ExecutionState,
   GitProvider,
-  IntakeKind,
-  IntakeSource,
-  IntakeState,
+  IssueKind,
+  IssueSource,
+  IssueStatus,
   Priority,
   ReviewState,
   Role,
@@ -30,9 +29,8 @@ import type {
   DecisionEntity,
   DependencyEntity,
   DomainEventEntity,
-  ExecutionEntity,
   InputRequestEntity,
-  IntakeItemEntity,
+  IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
   RepositoryEntity,
@@ -56,9 +54,8 @@ export interface SeedData {
   teams: Rows<TeamEntity>;
   repositories: Rows<RepositoryEntity>;
   workstreams: Rows<WorkstreamEntity>;
-  executions: Rows<ExecutionEntity>;
   inputRequests: Rows<InputRequestEntity>;
-  intake: Rows<IntakeItemEntity>;
+  issues: Rows<IssueEntity>;
   artifacts: Rows<ArtifactEntity>;
   decisions: Rows<DecisionEntity>;
   dependencies: Rows<DependencyEntity>;
@@ -83,7 +80,7 @@ export interface ExecOpts {
   repos?: string[];
   performers: ActorRef[];
   provider: ExecutionProvider;
-  state: ExecutionState;
+  state: string;
   deps?: string[];
   session?: string;
   branch?: string;
@@ -111,7 +108,7 @@ export class SeedBuilder {
     this.workspaceId = workspaceId;
     this.data = {
       users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], workstreams: [],
-      executions: [], inputRequests: [], intake: [], artifacts: [], decisions: [], dependencies: [], comments: [],
+      inputRequests: [], issues: [], artifacts: [], decisions: [], dependencies: [], comments: [],
       events: [], views: [], integrations: [], counters: {},
     };
   }
@@ -188,8 +185,10 @@ export class SeedBuilder {
       key: o.key,
       number,
       title: o.title,
+      description: o.context ?? null,
       objective: o.objective,
       context: o.context ?? null,
+      deltaThreadUrl: `https://delta.dev/t/${o.key.toLowerCase()}`,
       ownerTeamId: o.owner,
       participatingTeamIds: o.participating ?? [],
       accountableUserId: o.accountable ?? null,
@@ -231,44 +230,17 @@ export class SeedBuilder {
     void key;
   }
 
+  /** Kept so older seed stories compile. A Delta session URL is stored on the workstream. */
   execution(workstreamId: string, o: ExecOpts): string {
-    const id = uid('ex');
-    const terminal = TERMINAL_EXECUTION_STATES.includes(o.state);
-    const startedDays = o.state === 'queued' ? undefined : (o.started ?? o.created);
-    this.data.executions.push({
-      id,
-      workspaceId: this.workspaceId,
-      workstreamId,
-      parentExecutionId: o.parent ?? null,
-      title: o.title,
-      description: o.description ?? null,
-      teamId: o.team ?? null,
-      repositoryIds: o.repos ?? [],
-      performers: o.performers,
-      provider: o.provider,
-      state: o.state,
-      sessionUrl: o.session ?? null,
-      branch: o.branch ?? null,
-      progressNote: o.note ?? null,
-      startedAt: startedDays !== undefined ? this.at(startedDays) : null,
-      completedAt: terminal ? this.at(o.done ?? 0.1) : null,
-      createdAt: this.at(o.created),
-      updatedAt: this.at(o.notes?.length ? Math.min(...o.notes.map(([d]) => d)) : (o.done ?? startedDays ?? o.created)),
-    });
-    const lead = o.performers[0] ?? SYSTEM;
-    const subj: SubjectRef = { type: 'execution', id };
-    this.event(this.at(o.created), lead.type === 'team' ? SYSTEM : lead, 'execution.created', subj, workstreamId, { title: o.title, provider: o.provider, state: 'queued' });
-    if (startedDays !== undefined)
-      this.event(this.at(startedDays), lead.type === 'team' ? SYSTEM : lead, 'execution.state_changed', subj, workstreamId, { title: o.title, from: 'queued', to: o.state === 'completed' || o.state === 'failed' || o.state === 'canceled' ? 'running' : o.state });
-    for (const [d, text] of o.notes ?? [])
-      this.event(this.at(d), lead.type === 'team' ? SYSTEM : lead, 'execution.progress', subj, workstreamId, { title: o.title, note: text });
-    if (terminal)
-      this.event(this.at(o.done ?? 0.1), lead.type === 'team' ? SYSTEM : lead, 'execution.state_changed', subj, workstreamId, { title: o.title, from: 'running', to: o.state });
-    for (const dep of o.deps ?? []) this.dependency('execution', dep, 'execution', id, workstreamId, o.created - 0.01);
-    return id;
+    if (o.session && isDeltaThreadUrl(o.session)) {
+      const ws = this.data.workstreams.find((w) => w.id === workstreamId);
+      if (ws) ws.deltaThreadUrl = o.session;
+    }
+    return uid('ex');
   }
 
   dependency(fromType: 'workstream' | 'execution', fromId: string, toType: 'workstream' | 'execution', toId: string, toWorkstreamId: string, daysAgo: number) {
+    if (fromType !== 'workstream' || toType !== 'workstream') return '';
     const id = uid('dp');
     this.data.dependencies.push({ id, workspaceId: this.workspaceId, fromType, fromId, toType, toId, createdAt: this.at(daysAgo) });
     this.event(this.at(daysAgo), SYSTEM, 'dependency.added', { type: toType, id: toId }, toWorkstreamId, { dependencyId: id, from: { type: fromType, id: fromId }, to: { type: toType, id: toId } });
@@ -286,12 +258,12 @@ export class SeedBuilder {
   }) {
     const id = uid('ir');
     this.data.inputRequests.push({
-      id, workspaceId: this.workspaceId, workstreamId, executionId: o.execution ?? null, question: o.question, options: o.options ?? null,
+      id, workspaceId: this.workspaceId, workstreamId, question: o.question, options: o.options ?? null,
       requestedBy: o.by, assigneeUserId: o.assignee ?? null, state: o.answer ? 'answered' : 'open', answer: o.answer?.text ?? null,
       answeredById: o.answer?.by ?? null, createdAt: this.at(o.created), answeredAt: o.answer ? this.at(o.answer.daysAgo) : null,
     });
     const subj: SubjectRef = { type: 'input_request', id };
-    this.event(this.at(o.created), o.by, 'input.requested', subj, workstreamId, { question: o.question, executionId: o.execution });
+    this.event(this.at(o.created), o.by, 'input.requested', subj, workstreamId, { question: o.question });
     if (o.answer) this.event(this.at(o.answer.daysAgo), user(o.answer.by), 'input.answered', subj, workstreamId, { question: o.question, answer: o.answer.text });
     return id;
   }
@@ -316,7 +288,7 @@ export class SeedBuilder {
     const id = uid('ar');
     const isPr = o.kind === 'pull_request' || o.kind === 'merge_request';
     this.data.artifacts.push({
-      id, workspaceId: this.workspaceId, workstreamId, executionId: o.execution ?? null, repositoryId: o.repo ?? null, kind: o.kind,
+      id, workspaceId: this.workspaceId, workstreamId, repositoryId: o.repo ?? null, kind: o.kind,
       provider: o.provider, title: o.title, url: o.url ?? null, externalId: o.externalId ?? null, state: o.state,
       ci: o.ci ?? null, review: o.review ?? (isPr ? 'none' : null), hasConflicts: o.conflicts ?? (isPr ? false : null), environment: o.env ?? null,
       authorRef: o.by, createdAt: this.at(o.created), updatedAt: this.at(o.updated ?? o.created),
@@ -350,7 +322,7 @@ export class SeedBuilder {
     this.bump('adr', o.number);
     this.data.decisions.push({
       id, workspaceId: this.workspaceId, key: `ADR-${o.number}`, number: o.number, title: o.title, statement: o.statement,
-      rationale: o.rationale ?? null, status: o.status, originWorkstreamId: o.origin ?? null, originExecutionId: o.originExecution ?? null,
+      rationale: o.rationale ?? null, status: o.status, originWorkstreamId: o.origin ?? null,
       relatedWorkstreamIds: o.related ?? [], supersededById: o.superseded ?? null, proposedBy: o.by,
       decidedById: o.decidedBy ?? null, decidedAt: o.decided !== undefined ? this.at(o.decided) : null, tags: o.tags ?? [],
       createdAt: this.at(o.created), updatedAt: this.at(o.decided ?? o.created),
@@ -369,51 +341,55 @@ export class SeedBuilder {
     this.event(this.at(daysAgo), user(by), 'decision.superseded', { type: 'decision', id: decisionId }, d.originWorkstreamId ?? null, { key: d.key, title: d.title, supersededBy: byKey });
   }
 
-  intake(o: {
-    kind: IntakeKind;
+  issue(o: {
+    kind: IssueKind;
     number: number;
     title: string;
     body?: string;
-    source?: IntakeSource;
+    source?: IssueSource;
     reporterName?: string;
     reporter?: string;
+    assignee?: string;
     team?: string;
     priority?: Priority;
-    state: IntakeState;
+    status: IssueStatus;
     workstreams?: string[];
     duplicateOf?: string;
     url?: string;
     created: number;
-    triaged?: number;
-    triagedBy?: string;
+    /** When the status left `backlog`. */
+    moved?: number;
+    movedBy?: string;
   }) {
     const id = uid('in');
-    const key = `${INTAKE_KEY_PREFIX[o.kind]}-${o.number}`;
-    this.bump(`intake:${o.kind}`, o.number);
-    this.data.intake.push({
+    const key = `${ISSUE_KEY_PREFIX[o.kind]}-${o.number}`;
+    this.bump(`issue:${o.kind}`, o.number);
+    this.data.issues.push({
       id, workspaceId: this.workspaceId, key, number: o.number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
-      reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', state: o.state,
+      reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', status: o.status,
       workstreamIds: o.workstreams ?? [], duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
-      createdAt: this.at(o.created), updatedAt: this.at(o.triaged ?? o.created),
+      createdAt: this.at(o.created), updatedAt: this.at(o.moved ?? o.created),
     });
-    const subj: SubjectRef = { type: 'intake', id };
-    this.event(this.at(o.created), o.reporter ? user(o.reporter) : SYSTEM, 'intake.created', subj, null, { key, kind: o.kind, title: o.title });
-    if (o.state !== 'new' && o.triaged !== undefined) {
+    const subj: SubjectRef = { type: 'issue', id };
+    this.event(this.at(o.created), o.reporter ? user(o.reporter) : SYSTEM, 'issue.created', subj, null, { key, kind: o.kind, title: o.title, status: 'backlog' });
+    if (o.status !== 'backlog' && o.moved !== undefined) {
       const targets = o.workstreams?.length ? o.workstreams : [null];
       for (const w of targets)
-        this.event(this.at(o.triaged), user(o.triagedBy!), 'intake.triaged', subj, w, { key, state: o.state, workstreamIds: o.workstreams ?? [] });
+        this.event(this.at(o.moved), user(o.movedBy!), 'issue.status_changed', subj, w, { key, from: 'backlog', to: o.status, workstreamIds: o.workstreams ?? [] });
     }
     return id;
   }
 
-  comment(subject: SubjectRef, workstreamId: string | null, author: ActorRef, body: string, daysAgo: number) {
+  comment(subject: SubjectRef | { type: 'execution'; id: string }, workstreamId: string | null, author: ActorRef, body: string, daysAgo: number) {
     const id = uid('cm');
-    this.data.comments.push({ id, workspaceId: this.workspaceId, subject, author, body, createdAt: this.at(daysAgo), updatedAt: this.at(daysAgo) });
-    this.event(this.at(daysAgo), author, 'comment.created', subject, workstreamId, { commentId: id, excerpt: body.slice(0, 200) });
+    const resolved: SubjectRef = subject.type === 'execution' && workstreamId ? { type: 'workstream', id: workstreamId } : (subject as SubjectRef);
+    this.data.comments.push({ id, workspaceId: this.workspaceId, subject: resolved, author, body, createdAt: this.at(daysAgo), updatedAt: this.at(daysAgo) });
+    this.event(this.at(daysAgo), author, 'comment.created', resolved, workstreamId, { commentId: id, excerpt: body.slice(0, 200) });
     return id;
   }
 
-  view(owner: string, name: string, entity: ViewEntity, o: { filters?: ViewFilter[]; sort?: { field: string; direction: 'asc' | 'desc' }; groupBy?: string; layout?: ViewLayout; shared: boolean; created: number }) {
+  view(owner: string, name: string, entity: ViewEntity | 'execution', o: { filters?: ViewFilter[]; sort?: { field: string; direction: 'asc' | 'desc' }; groupBy?: string; layout?: ViewLayout; shared: boolean; created: number }) {
+    if (entity === 'execution') return;
     this.data.views.push({
       id: uid('vw'), workspaceId: this.workspaceId, ownerId: owner, name, entity, filters: o.filters ?? [], sort: o.sort ?? null,
       groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, createdAt: this.at(o.created), updatedAt: this.at(o.created),

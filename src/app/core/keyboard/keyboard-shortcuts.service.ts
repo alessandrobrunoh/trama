@@ -82,7 +82,7 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
 const INTERACTIVE = 'button, a[href], [role="button"], [role="menuitem"], [role="option"], summary, [role="tab"]';
 
 /** Detail routes where Esc goes back to the list: /:slug/<area>/:id. */
-const ESC_UP = /^\/([^/]+)\/(workstreams|intake|decisions|repositories|teams|views)\/[^/?#]+/;
+const ESC_UP = /^\/([^/]+)\/(workstreams|issues|decisions|repositories|teams|views)\/[^/?#]+/;
 
 @Injectable({ providedIn: 'root' })
 export class KeyboardShortcuts {
@@ -145,18 +145,10 @@ export class KeyboardShortcuts {
     const key = id ? decodeURIComponent(id) : undefined;
     switch (area) {
       case 'attention':
-      case 'intake':
-        return { kind: 'intake', defaults: {} };
+      case 'issues':
+        return { kind: 'issue', defaults: {} };
       case 'workstreams':
-        return key
-          ? { kind: 'execution', defaults: { workstreamId: this.nabla.getWorkstream(key)?.id } }
-          : { kind: 'workstream', defaults: {} };
-      case 'executions': {
-        const ex = this.nabla.getExecution(key);
-        return ex
-          ? { kind: 'execution', defaults: { workstreamId: ex.workstreamId, parentExecutionId: ex.id } }
-          : { kind: 'execution', defaults: {} };
-      }
+        return { kind: 'workstream', defaults: key ? {} : {} };
       case 'decisions':
         return { kind: 'decision', defaults: {} };
       case 'views':

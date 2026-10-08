@@ -2,60 +2,63 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } fr
 import { Type } from 'class-transformer';
 import { IsArray, IsIn, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import type { ActorRef, IntakeKind, IntakeSource, IntakeState, Priority } from '../contracts/domain.js';
+import type { ActorRef, IssueKind, IssueSource, IssueStatus, Priority } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { CreateWorkstreamDto, PRIORITIES } from '../workstreams/workstreams.controller.js';
-import { IntakeService } from './intake.service.js';
+import { IssuesService } from './issues.service.js';
 
-const KINDS: IntakeKind[] = ['bug', 'feature', 'incident', 'tech_debt', 'feedback', 'idea', 'security'];
-const STATES: IntakeState[] = ['new', 'triaged', 'accepted', 'declined', 'duplicate'];
-const SOURCES: IntakeSource[] = ['manual', 'github', 'gitlab', 'email', 'api', 'agent'];
+const KINDS: IssueKind[] = ['bug', 'feature', 'incident', 'tech_debt', 'feedback', 'idea', 'security'];
+const STATUSES: IssueStatus[] = ['backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'];
+const SOURCES: IssueSource[] = ['manual', 'github', 'gitlab', 'email', 'api', 'agent'];
 
-class CreateIntakeDto {
-  @IsIn(KINDS) kind: IntakeKind;
+class CreateIssueDto {
+  @IsIn(KINDS) kind: IssueKind;
   @IsString() @MinLength(1) @MaxLength(300) title: string;
   @IsOptional() @IsString() @MaxLength(20000) body?: string;
-  @IsOptional() @IsIn(SOURCES) source?: IntakeSource;
+  @IsOptional() @IsIn(SOURCES) source?: IssueSource;
   @IsOptional() @IsString() @MaxLength(200) reporterName?: string;
+  @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
+  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
 }
 
-class UpdateIntakeDto {
+class UpdateIssueDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
+  @Clearable() @IsString() assigneeId?: string | null;
   @Clearable() @IsString() teamId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
+  @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) workstreamIds?: string[];
+  /** Id or key of the issue this duplicates. `null` clears it. */
+  @Clearable() @IsString() duplicateOfId?: string | null;
 }
 
-class TriageDto {
-  @IsIn(STATES) state: IntakeState;
+class LinkIssueDto {
   @IsOptional() @IsArray() @IsString({ each: true }) workstreamIds?: string[];
   @IsOptional() @ValidateNested() @Type(() => CreateWorkstreamDto) createWorkstream?: CreateWorkstreamDto;
-  /** Id or key of the item this duplicates (required when state = duplicate). */
-  @IsOptional() @IsString() duplicateOfId?: string;
-  @Clearable() @IsString() teamId?: string | null;
-  @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
+  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
 }
 
-class ListIntakeQuery {
-  @IsOptional() @IsIn(KINDS) kind?: IntakeKind;
-  @IsOptional() @IsIn(STATES) state?: IntakeState;
+class ListIssueQuery {
+  @IsOptional() @IsIn(KINDS) kind?: IssueKind;
+  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() teamId?: string;
+  @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() q?: string;
 }
 
-@Controller('w/:slug/intake')
-export class IntakeController {
-  constructor(private readonly service: IntakeService) {}
+@Controller('w/:slug/issues')
+export class IssuesController {
+  constructor(private readonly service: IssuesService) {}
 
   @Get()
-  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListIntakeQuery) {
+  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListIssueQuery) {
     return this.service.list(ctx.workspace.id, q);
   }
 
@@ -65,20 +68,20 @@ export class IntakeController {
   }
 
   @Post()
-  create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateIntakeDto) {
+  create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateIssueDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
 
   @Patch(':idOrKey')
-  update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: UpdateIntakeDto) {
+  update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: UpdateIssueDto) {
     return this.service.update(ctx.workspace.id, actor, idOrKey, dto);
   }
 
-  /** Triage: `{ state, workstreamIds?, createWorkstream?: { title, objective, ownerTeamId, … }, duplicateOfId? }`. */
-  @Post(':idOrKey/triage')
+  /** Link to existing workstreams and/or create one. Moves backlog/todo issues to `in_progress`. */
+  @Post(':idOrKey/link')
   @HttpCode(200)
-  triage(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: TriageDto) {
-    return this.service.triage(ctx.workspace.id, actor, idOrKey, dto);
+  link(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: LinkIssueDto) {
+    return this.service.link(ctx.workspace.id, actor, idOrKey, dto);
   }
 
   @Delete(':idOrKey')

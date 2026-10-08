@@ -52,6 +52,29 @@ export interface CreateWorkstreamDefaults {
             />
           </div>
           <div class="grid gap-1.5">
+            <label hlmLabel for="cw-desc">Description</label>
+            <textarea
+              hlmTextarea
+              id="cw-desc"
+              rows="3"
+              class="min-h-16 resize-y"
+              placeholder="What is this workstream about?"
+              [value]="description()"
+              (input)="description.set($any($event.target).value)"
+            ></textarea>
+          </div>
+          <div class="grid gap-1.5">
+            <label hlmLabel for="cw-delta">Delta thread</label>
+            <input
+              hlmInput
+              id="cw-delta"
+              placeholder="https://delta.dev/t/…"
+              autocomplete="off"
+              [value]="deltaUrl()"
+              (input)="deltaUrl.set($any($event.target).value)"
+            />
+          </div>
+          <div class="grid gap-1.5">
             <label hlmLabel for="cw-objective">Objective <span class="text-muted-foreground font-normal">(markdown)</span></label>
             <textarea
               hlmTextarea
@@ -147,6 +170,8 @@ export class CreateWorkstreamDialog {
   readonly defaults = input<CreateWorkstreamDefaults>({});
 
   protected readonly title = signal('');
+  protected readonly description = signal('');
+  protected readonly deltaUrl = signal('');
   protected readonly objective = signal('');
   protected readonly ownerTeamId = signal('');
   protected readonly participating = signal<string[]>([]);
@@ -163,7 +188,9 @@ export class CreateWorkstreamDialog {
   protected readonly participantOptions = computed(() =>
     this.teams().filter((t) => t.value !== this.ownerTeamId()),
   );
-  protected readonly canSubmit = computed(() => this.title().trim().length > 0 && !!this.ownerTeamId());
+  protected readonly canSubmit = computed(
+    () => this.title().trim().length > 0 && !!this.ownerTeamId() && /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim()),
+  );
 
   constructor() {
     effect(() => {
@@ -175,6 +202,8 @@ export class CreateWorkstreamDialog {
   private reset(): void {
     const d = this.defaults();
     this.title.set(d.title ?? '');
+    this.description.set('');
+    this.deltaUrl.set('');
     this.objective.set('');
     const mine = this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '';
     this.ownerTeamId.set(d.ownerTeamId ?? mine);
@@ -198,6 +227,8 @@ export class CreateWorkstreamDialog {
     const target = this.target();
     const ws = await this.store.createWorkstream({
       title: this.title().trim(),
+      description: this.description().trim() || undefined,
+      deltaThreadUrl: this.deltaUrl().trim(),
       objective: this.objective().trim() || undefined,
       ownerTeamId: this.ownerTeamId(),
       participatingTeamIds: this.participating(),

@@ -6,7 +6,7 @@ import type { SavedView, ViewEntity, ViewFilter, ViewLayout } from '../contracts
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { ViewsService } from './views.service.js';
 
-const ENTITIES: ViewEntity[] = ['workstream', 'intake', 'execution', 'decision'];
+const ENTITIES: ViewEntity[] = ['workstream', 'issue', 'decision'];
 const LAYOUTS: ViewLayout[] = ['list', 'board', 'graph'];
 const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after'];
 

@@ -10,9 +10,9 @@ import {
   LucideWrench,
   type LucideIcon,
 } from '@lucide/angular';
-import type { IntakeKind } from '../core/contracts/domain';
+import type { IssueKind } from '../core/contracts/domain';
 
-const KIND: Record<IntakeKind, { label: string; icon: LucideIcon; color: string }> = {
+const KIND: Record<IssueKind, { label: string; icon: LucideIcon; color: string }> = {
   bug: { label: 'Bug', icon: LucideBug, color: 'text-tone-red' },
   feature: { label: 'Feature', icon: LucideSparkles, color: 'text-tone-blue' },
   incident: { label: 'Incident', icon: LucideFlame, color: 'text-tone-orange' },
@@ -22,9 +22,9 @@ const KIND: Record<IntakeKind, { label: string; icon: LucideIcon; color: string 
   security: { label: 'Security', icon: LucideShieldAlert, color: 'text-tone-violet' },
 };
 
-/** Intake kind glyph (+ optional label). `<app-intake-kind [kind]="item.kind" showLabel />` */
+/** Issue kind glyph (+ optional label). `<app-issue-kind [kind]="item.kind" showLabel />` */
 @Component({
-  selector: 'app-intake-kind',
+  selector: 'app-issue-kind',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [LucideDynamicIcon],
   host: { class: 'inline-flex items-center gap-1.5 whitespace-nowrap' },
@@ -35,8 +35,8 @@ const KIND: Record<IntakeKind, { label: string; icon: LucideIcon; color: string 
     }
   `,
 })
-export class IntakeKindLabel {
-  readonly kind = input.required<IntakeKind>();
+export class IssueKindLabel {
+  readonly kind = input.required<IssueKind>();
   readonly size = input(14);
   readonly showLabel = input(false, { transform: booleanAttribute });
   protected readonly v = computed(() => KIND[this.kind()]);

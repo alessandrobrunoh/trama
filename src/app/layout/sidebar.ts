@@ -343,9 +343,9 @@ export class AppSidebar {
     return u ? ({ type: 'user', id: u.id } as const) : null;
   });
 
-  protected badge(kind: 'attention' | 'intake' | undefined): number {
+  protected badge(kind: 'attention' | 'issues' | undefined): number {
     if (kind === 'attention') return this.store.attentionCount();
-    if (kind === 'intake') return this.store.intakeNewCount();
+    if (kind === 'issues') return this.store.backlogIssueCount();
     return 0;
   }
 

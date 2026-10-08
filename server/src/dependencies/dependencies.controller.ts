@@ -4,7 +4,7 @@ import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, DependencyNodeType } from '../contracts/domain.js';
 import { DependenciesService } from './dependencies.service.js';
 
-const NODE_TYPES = ['workstream', 'execution'];
+const NODE_TYPES = ['workstream'];
 
 class CreateDependencyDto {
   @IsIn(NODE_TYPES) fromType: DependencyNodeType;
@@ -18,7 +18,7 @@ class ListDependenciesQuery {
   @IsOptional() @IsString() toId?: string;
 }
 
-/** `from` blocks `to` until `from` is shipped (workstream) / completed (execution). Cycles are rejected with 409. */
+/** `from` blocks `to` until `from` is shipped. Cycles are rejected with 409. */
 @Controller('w/:slug/dependencies')
 export class DependenciesController {
   constructor(private readonly service: DependenciesService) {}

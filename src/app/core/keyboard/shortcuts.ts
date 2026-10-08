@@ -5,7 +5,7 @@
 export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = {
   o: { segment: 'overview', label: 'Overview' },
   a: { segment: 'attention', label: 'My Attention' },
-  i: { segment: 'intake', label: 'Intake' },
+  i: { segment: 'issues', label: 'Issues' },
   w: { segment: 'workstreams', label: 'Workstreams' },
   d: { segment: 'decisions', label: 'Decisions' },
   r: { segment: 'repositories', label: 'Repositories' },

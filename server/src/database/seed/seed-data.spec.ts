@@ -11,10 +11,10 @@ describe('demo seed', () => {
   });
 
   it('has realistic volume and unique keys', () => {
-    expect(data.events!.length).toBeGreaterThanOrEqual(200);
+    expect(data.events!.length).toBeGreaterThanOrEqual(180);
     expect(data.decisions.length).toBeGreaterThanOrEqual(20);
-    expect(data.intake.length).toBeGreaterThanOrEqual(15);
-    for (const rows of [data.workstreams, data.intake, data.decisions]) {
+    expect(data.issues.length).toBeGreaterThanOrEqual(15);
+    for (const rows of [data.workstreams, data.issues, data.decisions]) {
       const keys = rows.map((r) => (r as { key: string }).key);
       expect(new Set(keys).size).toBe(keys.length);
     }
@@ -23,18 +23,15 @@ describe('demo seed', () => {
 
   it('has consistent references', () => {
     const ids = new Set<string>();
-    for (const rows of [data.workstreams, data.executions, data.artifacts, data.decisions, data.teams, data.repositories, data.users, data.agents, data.intake, data.inputRequests])
+    for (const rows of [data.workstreams, data.artifacts, data.decisions, data.teams, data.repositories, data.users, data.agents, data.issues, data.inputRequests])
       for (const r of rows) ids.add((r as { id: string }).id);
-    for (const e of data.executions) {
-      expect(ids.has(e.workstreamId!)).toBe(true);
-      if (e.parentExecutionId) expect(ids.has(e.parentExecutionId)).toBe(true);
-    }
+    for (const w of data.workstreams) expect(String(w.deltaThreadUrl)).toMatch(/^https:\/\/([a-z0-9-]+\.)*delta\.dev\//);
     for (const d of data.dependencies) {
       expect(ids.has(d.fromId!)).toBe(true);
       expect(ids.has(d.toId!)).toBe(true);
     }
     for (const d of data.decisions) if (d.supersededById) expect(ids.has(d.supersededById)).toBe(true);
-    for (const i of data.intake) for (const w of i.workstreamIds ?? []) expect(ids.has(w)).toBe(true);
+    for (const i of data.issues) for (const w of i.workstreamIds ?? []) expect(ids.has(w)).toBe(true);
     for (const w of data.workstreams) expect(ids.has(w.ownerTeamId!)).toBe(true);
   });
 

@@ -14,7 +14,6 @@ import {
   NablaStore,
   WORKSTREAM_STATUS_FLOW,
   isOverdue,
-  TERMINAL_EXECUTION_STATES,
   type ActorRef,
   type Team,
   type Workstream,
@@ -349,7 +348,6 @@ export class OverviewPage {
 
   protected readonly teamGroups = computed<TeamGroup[]>(() => {
     const store = this.store;
-    const execs = store.executionsByWorkstream();
     const flow = (s: WorkstreamStatus) => WORKSTREAM_STATUS_FLOW.indexOf(s);
     const urgency = (s: WorkstreamStatus) => BAR_ORDER.indexOf(s);
     const groups: TeamGroup[] = [];
@@ -359,21 +357,11 @@ export class OverviewPage {
       );
       if (!own.length) continue;
       const items = own
-        .map((ws) => {
-          const list = execs.get(ws.id) ?? [];
-          const live = list.filter((e) => !TERMINAL_EXECUTION_STATES.includes(e.state));
-          const seen = new Set<string>();
-          const performers: ActorRef[] = [];
-          for (const ex of live.length ? live : list) {
-            for (const p of ex.performers) {
-              const k = `${p.type}:${p.id}`;
-              if (seen.has(k)) continue;
-              seen.add(k);
-              performers.push(p);
-            }
-          }
-          return { ws, performers, overdue: isOverdue(ws.targetDate) };
-        })
+        .map((ws) => ({
+          ws,
+          performers: ws.accountableUserId ? [{ type: 'user' as const, id: ws.accountableUserId }] : [],
+          overdue: isOverdue(ws.targetDate),
+        }))
         .sort(
           (a, b) =>
             urgency(a.ws.status) - urgency(b.ws.status) ||

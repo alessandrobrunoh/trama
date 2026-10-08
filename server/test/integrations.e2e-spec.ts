@@ -60,7 +60,7 @@ describe('integrations: connections, repository linking and webhooks', () => {
     const member = await Client.signup(server, 'Mia');
     await owner.client.post(`/api/w/${slug}/members`, { email: member.email, role: 'member' }).expect(201);
     const team = (await owner.client.post(`/api/w/${slug}/teams`, { name: 'Auth', key: 'AUTH' }).expect(201)).body;
-    const workstream = (await owner.client.post(`/api/w/${slug}/workstreams`, { title: 'Refresh rotation', ownerTeamId: team.id }).expect(201)).body;
+    const workstream = (await owner.client.post(`/api/w/${slug}/workstreams`, { title: 'Refresh rotation', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201)).body;
     return { owner: owner.client, member: member.client, slug, team, key: workstream.key as string, workstream };
   }
 
@@ -217,15 +217,14 @@ describe('integrations: connections, repository linking and webhooks', () => {
       expect((await owner.get(`${base(slug)}`).expect(200)).body[0].lastWebhookAt).toBeTruthy();
     });
 
-    it('links by branch name (any case), attaches to the execution on that branch, and one PR can link several workstreams', async () => {
+    it('links by branch name (any case), and one PR can link several workstreams', async () => {
       const { owner, slug, team, key, workstream, send, pr } = await githubSetup();
-      const second = (await owner.post(`/api/w/${slug}/workstreams`, { title: 'Second', ownerTeamId: team.id }).expect(201)).body;
-      const exec = (await owner.post(`/api/w/${slug}/executions`, { workstreamId: workstream.id, title: 'Impl', branch: `${key.toLowerCase()}/rotation` }).expect(201)).body;
+      const second = (await owner.post(`/api/w/${slug}/workstreams`, { title: 'Second', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201)).body;
       const payload = pr({ title: 'Rotate tokens', body: `Also touches ${second.key}`, head: { sha: 'a'.repeat(40), ref: `${key.toLowerCase()}/rotation` } });
       const res = await send('pull_request', payload).expect(200);
       expect(res.body.artifactsCreated).toBe(2);
       const forFirst = await artifacts(owner, slug, `?workstreamId=${workstream.id}`);
-      expect(forFirst[0].executionId).toBe(exec.id);
+      expect(forFirst[0].workstreamId).toBe(workstream.id);
       expect(await artifacts(owner, slug, `?workstreamId=${second.id}`)).toHaveLength(1);
     });
 

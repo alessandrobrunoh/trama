@@ -8,8 +8,8 @@ import { authGuard, guestGuard, rootRedirectGuard, workspaceGuard } from './core
  * inherited (`paramsInheritanceStrategy: 'always'`), so any page can declare
  * `workspaceSlug = input<string>()`.
  *
- * Workstream detail tabs use the `tab` QUERY param (`?tab=executions`), not child routes:
- * overview (default) | executions | artifacts | decisions | graph | activity | context.
+ * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
+ * overview (default) | artifacts | decisions | graph | activity | context.
  *
  * Reserved top-level paths (cannot be workspace slugs): login, signup, new-workspace, 404.
  */
@@ -59,15 +59,15 @@ export const routes: Routes = [
           import('./features/attention/attention-page').then((m) => m.AttentionPage),
       },
       {
-        path: 'intake',
-        title: 'Intake · Nabla',
-        loadComponent: () => import('./features/intake/intake-page').then((m) => m.IntakePage),
+        path: 'issues',
+        title: 'Issues · Nabla',
+        loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
       },
       {
-        path: 'intake/:key',
-        title: 'Intake · Nabla',
+        path: 'issues/:key',
+        title: 'Issue · Nabla',
         loadComponent: () =>
-          import('./features/intake/intake-detail-page').then((m) => m.IntakeDetailPage),
+          import('./features/issues/issue-detail-page').then((m) => m.IssueDetailPage),
       },
       {
         path: 'workstreams',
@@ -81,14 +81,6 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/workstreams/workstream-detail-page').then(
             (m) => m.WorkstreamDetailPage,
-          ),
-      },
-      {
-        path: 'executions/:id',
-        title: 'Execution · Nabla',
-        loadComponent: () =>
-          import('./features/executions/execution-detail-page').then(
-            (m) => m.ExecutionDetailPage,
           ),
       },
       {

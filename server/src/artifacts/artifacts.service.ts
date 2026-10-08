@@ -11,13 +11,12 @@ import type {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { ArtifactEntity, ExecutionEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ArtifactEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
 export interface ArtifactInput {
   workstreamId?: string;
-  executionId?: string | null;
   repositoryId?: string | null;
   kind?: ArtifactKind;
   provider?: ArtifactProvider;
@@ -39,6 +38,8 @@ const DEFAULT_STATE: Record<ArtifactKind, ArtifactState> = {
   branch: 'open',
   document: 'published',
   design: 'published',
+  image: 'published',
+  file: 'published',
   build: 'pending',
   test_report: 'succeeded',
   deployment: 'pending',
@@ -55,10 +56,9 @@ export class ArtifactsService {
     @InjectRepository(ArtifactEntity) private readonly repo: Repository<ArtifactEntity>,
   ) {}
 
-  list(workspaceId: string, f: { workstreamId?: string; executionId?: string; repositoryId?: string; kind?: ArtifactKind; state?: ArtifactState } = {}) {
+  list(workspaceId: string, f: { workstreamId?: string; repositoryId?: string; kind?: ArtifactKind; state?: ArtifactState } = {}) {
     const qb = this.repo.createQueryBuilder('a').where('a.workspaceId = :workspaceId', { workspaceId }).orderBy('a.createdAt', 'DESC');
     if (f.workstreamId) qb.andWhere('a.workstreamId = :w', { w: f.workstreamId });
-    if (f.executionId) qb.andWhere('a.executionId = :e', { e: f.executionId });
     if (f.repositoryId) qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
@@ -71,27 +71,20 @@ export class ArtifactsService {
     return row;
   }
 
-  private async validate(workspaceId: string, workstreamId: string | undefined, input: ArtifactInput) {
+  private async validate(workspaceId: string, input: ArtifactInput) {
     if (input.repositoryId) await this.refs.repositories(workspaceId, [input.repositoryId]);
-    if (input.executionId) {
-      const ex = await this.ds.getRepository(ExecutionEntity).findOneBy({ id: input.executionId, workspaceId });
-      if (!ex) throw new BadRequestException(`Unknown execution "${input.executionId}"`);
-      if (workstreamId && ex.workstreamId !== workstreamId)
-        throw new BadRequestException('executionId belongs to a different workstream');
-    }
   }
 
   async create(workspaceId: string, actor: ActorRef, input: ArtifactInput & { workstreamId: string; kind: ArtifactKind; title: string }) {
     if (!(await this.ds.getRepository(WorkstreamEntity).existsBy({ id: input.workstreamId, workspaceId })))
       throw new BadRequestException(`Unknown workstream "${input.workstreamId}"`);
-    await this.validate(workspaceId, input.workstreamId, input);
+    await this.validate(workspaceId, input);
     const isPr = input.kind === 'pull_request' || input.kind === 'merge_request';
     const row = await this.repo.save(
       this.repo.create({
         id: uid('ar'),
         workspaceId,
         workstreamId: input.workstreamId,
-        executionId: input.executionId ?? null,
         repositoryId: input.repositoryId ?? null,
         kind: input.kind,
         provider: input.provider ?? (input.kind === 'merge_request' ? 'gitlab' : input.kind === 'pull_request' ? 'github' : 'other'),
@@ -135,7 +128,7 @@ export class ArtifactsService {
 
   async update(workspaceId: string, actor: ActorRef, id: string, patch: ArtifactInput) {
     const row = await this.get(workspaceId, id);
-    await this.validate(workspaceId, row.workstreamId, patch);
+    await this.validate(workspaceId, patch);
     const fields: string[] = [];
     const changes: Record<string, [unknown, unknown]> = {};
     const set = (k: keyof ArtifactEntity, v: unknown) => {
@@ -146,7 +139,7 @@ export class ArtifactsService {
       }
     };
     if (patch.title !== undefined) set('title', patch.title.trim());
-    for (const k of ['executionId', 'repositoryId', 'provider', 'url', 'externalId', 'state', 'ci', 'review', 'hasConflicts', 'environment'] as const)
+    for (const k of ['repositoryId', 'provider', 'url', 'externalId', 'state', 'ci', 'review', 'hasConflicts', 'environment'] as const)
       set(k, patch[k]);
     if (!fields.length) return row;
     row.updatedAt = new Date();

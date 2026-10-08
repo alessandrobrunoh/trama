@@ -11,4 +11,4 @@ export * from './property-row';
 export * from './pipes';
 export * from './markdown';
 export * from './artifact';
-export * from './intake';
+export * from './issue';

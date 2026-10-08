@@ -46,8 +46,8 @@ Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
 | `` | redirect -> `overview` | |
 | `overview` | `OverviewPage` overview/overview-page.ts | |
 | `attention` | `AttentionPage` attention/attention-page.ts | |
-| `intake` | `IntakePage` intake/intake-page.ts | |
-| `intake/:key` | `IntakeDetailPage` intake/intake-detail-page.ts | `key` (BUG-142 or id) |
+| `issues` | `IssuePage` issues/issue-page.ts | |
+| `issues/:key` | `IssueDetailPage` issues/issue-detail-page.ts | `key` (BUG-142 or id) |
 | `workstreams` | `WorkstreamListPage` workstreams/workstream-list-page.ts | |
 | `workstreams/:key` | `WorkstreamDetailPage` workstreams/workstream-detail-page.ts | `key` (AUTH-42 or id), `tab` (query) |
 | `executions/:id` | `ExecutionDetailPage` executions/execution-detail-page.ts | `id` |
@@ -102,7 +102,7 @@ api.workstreams.contextMarkdown(slug,idOrKey) -> string     api.workstreams.cont
 api.workstreams.graph(slug,idOrKey) -> GraphResponse
 api.executions.list|get|create|update|remove|progress(slug,id,{note,state?})|complete(slug,id,note?)
 api.inputRequests.list|create|answer(slug,id,answer)|dismiss(slug,id)
-api.intake.list|get|create|update|remove|triage(slug,idOrKey,{state,workstreamIds?,createWorkstream?,duplicateOfId?,teamId?,priority?})
+api.issues.list|get|create|update|remove|link(slug,idOrKey,{workstreamIds?,createWorkstream?,status?})
 api.artifacts.list|create|update|remove          api.decisions.list|get|create|update|remove|accept(slug,id)|reject(slug,id)|supersede(slug,id,byId)
 api.dependencies.list|create({fromType,fromId,toType,toId})|remove
 api.comments.list(slug,{type,id}?)|create({subject,body})|update(slug,id,body)|remove
@@ -149,18 +149,18 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 
 **Meta signals**: `workspace`, `me` (User), `myRole`.
 
-**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `workstreams`, `executions`, `inputRequests`, `intake`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
+**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `workstreams`, `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
 
 **Lookup computeds** (Maps; use `.get(...)` after calling the signal: `store.teamById().get(id)`):
-- by id: `userById`, `agentById`, `teamById`, `repositoryById`, `workstreamById`, `executionById`, `inputRequestById`, `intakeById`, `artifactById`, `decisionById`, `viewById`, `integrationById`
-- by key (UPPER-CASE keys): `workstreamByKey` (AUTH-42), `intakeByKey` (BUG-142), `decisionByKey` (ADR-7), `teamByKey` (AUTH); `membershipByUserId`
-- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `decisionsByWorkstream` (origin or related), `intakeByWorkstream`, `intakeByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
+- by id: `userById`, `agentById`, `teamById`, `repositoryById`, `workstreamById`, `executionById`, `inputRequestById`, `issueById`, `artifactById`, `decisionById`, `viewById`, `integrationById`
+- by key (UPPER-CASE keys): `workstreamByKey` (AUTH-42), `issueByKey` (BUG-142), `decisionByKey` (ADR-7), `teamByKey` (AUTH); `membershipByUserId`
+- grouped: `executionsByWorkstream`, `childExecutions` (by parent execution id), `executionTrees` (workstreamId -> `ExecutionNode[]` = `{execution, children}` roots with subthreads), `inputRequestsByWorkstream`, `inputRequestsByExecution`, `artifactsByWorkstream`, `artifactsByExecution`, `artifactsByRepository`, `decisionsByWorkstream` (origin or related), `issuesByWorkstream`, `issuesByTeam`, `workstreamsByOwnerTeam`, `workstreamsByParticipatingTeam`, `workstreamsByRepository`, `incomingDependencies` (node id -> deps pointing at it, i.e. what blocks it), `outgoingDependencies` (node id -> deps leaving it), `commentsBySubject` (key `"<type>:<id>"`, oldest first), `eventsByWorkstream`, `eventsBySubject` (key `"<type>:<id>"`, newest first)
 - lists: `members` (`{membership,user}[]`), `openInputRequests`, `myTeams`, `myTeamIds`, `myWorkstreams` (I am accountable), `actors` (`ResolvedActor[]`: all users+agents+teams, for pickers)
-- attention: `openAttention` (state open, severity then newest), `snoozedAttention`, `attentionByKind` (Map<AttentionKind, AttentionItem[]>), `attentionCounts` (`Record<AttentionKind, number>`, zeros included), `attentionCount` (total open; sidebar badge), `highAttentionCount`, `newIntake`, `intakeNewCount`
+- attention: `openAttention` (state open, severity then newest), `snoozedAttention`, `attentionByKind` (Map<AttentionKind, AttentionItem[]>), `attentionCounts` (`Record<AttentionKind, number>`, zeros included), `attentionCount` (total open; sidebar badge), `highAttentionCount`, `backlogIssues`, `backlogIssueCount`
 
 **Point lookups / helpers (methods)**:
 ```ts
-getWorkstream(idOrKey) getExecution(id) getIntake(idOrKey) getDecision(idOrKey) getTeam(idOrKey) getRepository(id) getUser(id) getArtifact(id) getView(id)
+getWorkstream(idOrKey) getExecution(id) getIssue(idOrKey) getDecision(idOrKey) getTeam(idOrKey) getRepository(id) getUser(id) getArtifact(id) getView(id)
 commentsFor(subject: SubjectRef): readonly Comment[]
 resolveActor(ref?: ActorRef): ResolvedActor   // { type, id?, name, hue? (user), color?/key? (team), provider? (agent), known }
 actorName(ref?: ActorRef): string             // 'Nabla' for system / missing
@@ -193,11 +193,11 @@ completeExecution(id: ID, note?: string): Promise<boolean>
 createInputRequest(input: CreateInputRequestInput): Promise<InputRequest | undefined>
 answerInput(id: ID, answer: string): Promise<boolean>        // also clears its attention item
 dismissInput(id: ID): Promise<boolean>
-// intake
-createIntake(input: CreateIntakeInput): Promise<IntakeItem | undefined>
-updateIntake(id: ID, patch: UpdateIntakeInput): Promise<boolean>
-deleteIntake(id: ID): Promise<boolean>
-triageIntake(id: ID, input: TriageIntakeInput): Promise<IntakeItem | undefined>   // {state, workstreamIds?, createWorkstream?, duplicateOfId?, teamId?, priority?}
+// issues
+createIssue(input: CreateIssueInput): Promise<Issue | undefined>
+updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean>
+deleteIssue(id: ID): Promise<boolean>
+linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined>   // {workstreamIds?, createWorkstream?, status?}
 // artifacts, decisions, dependencies
 attachArtifact(input: CreateArtifactInput): Promise<Artifact | undefined>
 updateArtifact(id: ID, patch: UpdateArtifactInput): Promise<boolean>
@@ -243,7 +243,7 @@ Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnec
 
 ## 6. Query utilities (`core/query`)
 
-Pure functions, drive list/board screens and saved views from `ViewFilter` / `SavedView` (contract). Entities: `'workstream' | 'intake' | 'execution' | 'decision'`.
+Pure functions, drive list/board screens and saved views from `ViewFilter` / `SavedView` (contract). Entities: `'workstream' | 'issue' | 'execution' | 'decision'`.
 
 ```ts
 FIELD_DEFS: Record<ViewEntity, FieldDef[]>    // { field, label, kind: 'enum'|'id'|'multi-id'|'tags'|'text'|'date', values?, refersTo?, sortable, groupable }
@@ -260,12 +260,12 @@ specFromView(view) -> QuerySpec
 setFilter(filters, field, op, value | null) | toggleFilterValue(filters, field, value) | filterValues(filters, field)   // filter-bar helpers
 enumOrder(entity, field, value)
 ```
-Filterable fields — workstream: `status`, `ownerTeamId`, `participatingTeamIds`, `teamId` (owner OR participating), `accountableUserId`, `priority`, `labels`, `repositoryIds`, `targetDate`, `title`, `createdAt`, `updatedAt`. intake: `kind`, `state`, `teamId`, `priority`, `source`, `title`, dates. execution: `state`, `provider`, `performers` (matches performer ids of any type), `teamId`, `workstreamId`, `repositoryIds`, `title`, dates. decision: `status`, `tags`, `originWorkstreamId`, `title`, `decidedAt`, dates. `ctx.workstreamById` is only needed for execution `ownerTeamId`.
+Filterable fields — workstream: `status`, `ownerTeamId`, `participatingTeamIds`, `teamId` (owner OR participating), `accountableUserId`, `priority`, `labels`, `repositoryIds`, `targetDate`, `title`, `createdAt`, `updatedAt`. issue: `kind`, `status`, `assigneeId`, `teamId`, `priority`, `source`, `title`, dates. execution: `state`, `provider`, `performers` (matches performer ids of any type), `teamId`, `workstreamId`, `repositoryIds`, `title`, dates. decision: `status`, `tags`, `originWorkstreamId`, `title`, `decidedAt`, dates. `ctx.workstreamById` is only needed for execution `ownerTeamId`.
 
 ```ts
 readonly rows = computed(() => queryGroups('workstream', this.store.workstreams(), { filters, sort, groupBy: 'status', search }, {}, WORKSTREAM_STATUS_FLOW));
 ```
-Enum display metadata (`meta.ts`): `WORKSTREAM_STATUS_META`, `WORKSTREAM_STATUS_FLOW` (board column order), `EXECUTION_STATE_META`, `PRIORITY_META`, `PROVIDER_META`, `INTAKE_KIND_META`, `INTAKE_STATE_META`, `ARTIFACT_KIND_META`, `DECISION_STATUS_META`, `CRITERION_STATE_META`, `ATTENTION_KIND_META` (label, groupTitle, order), `ROLE_META`; each `{ label, tone, order }` where `tone` is `neutral|muted|info|accent|success|warning|danger`; ordered key arrays `WORKSTREAM_STATUSES`, `EXECUTION_STATES`, `PRIORITIES`, `PROVIDERS`, `INTAKE_KINDS`, `INTAKE_STATES`, `ARTIFACT_KINDS`, `DECISION_STATUSES`, `ATTENTION_KINDS`, `ROLES`. `statusVar('needs_input')` -> `var(--status-needs-input)` (the conventional CSS token; check `src/styles` for the real names).
+Enum display metadata (`meta.ts`): `WORKSTREAM_STATUS_META`, `WORKSTREAM_STATUS_FLOW` (board column order), `EXECUTION_STATE_META`, `PRIORITY_META`, `PROVIDER_META`, `ISSUE_KIND_META`, `ISSUE_STATUS_META`, `ARTIFACT_KIND_META`, `DECISION_STATUS_META`, `CRITERION_STATE_META`, `ATTENTION_KIND_META` (label, groupTitle, order), `ROLE_META`; each `{ label, tone, order }` where `tone` is `neutral|muted|info|accent|success|warning|danger`; ordered key arrays `WORKSTREAM_STATUSES`, `EXECUTION_STATES`, `PRIORITIES`, `PROVIDERS`, `ISSUE_KINDS`, `ISSUE_STATUSES`, `ARTIFACT_KINDS`, `DECISION_STATUSES`, `ATTENTION_KINDS`, `ROLES`. `statusVar('needs_input')` -> `var(--status-needs-input)` (the conventional CSS token; check `src/styles` for the real names).
 
 ---
 
@@ -274,14 +274,14 @@ Enum display metadata (`meta.ts`): `WORKSTREAM_STATUS_META`, `WORKSTREAM_STATUS_
 ```ts
 sidebarCollapsed (persisted) mobileSidebarOpen modal: 'command'|'search'|'shortcuts'|'create'|'confirm-delete'|null
 openModal(m) closeModal() openCommandPalette() toggleCommandPalette() commandPaletteOpen
-openCreate(kind: CreateKind, defaults?: Record<string, unknown>)   // kind: workstream|execution|intake|decision|artifact|view|team|repository|input-request
+openCreate(kind: CreateKind, defaults?: Record<string, unknown>)   // kind: workstream|execution|issue|decision|artifact|view|team|repository|input-request
 createKind createDefaults                                          // read by the global create dialog
 setConfirmDelete({title, description, confirmLabel?, onConfirm}) / confirmDelete
 toggleSidebar() setSidebarCollapsed(b) setMobileSidebar(b)
 pendingG                                                           // "g" pressed, waiting for the second key
 focusedRowId selectedRowIds hasSelection selectedSet setFocusedRow(id) toggleSelected(id, range?) setSelected(ids) clearSelected()
 ```
-Create defaults used by the dialogs: `{ workstreamId, parentExecutionId, ownerTeamId, repositoryIds, kind (intake kind), ... }`; the keyboard service fills them from the current route (see below).
+Create defaults used by the dialogs: `{ workstreamId, parentExecutionId, ownerTeamId, repositoryIds, kind (issue kind), ... }`; the keyboard service fills them from the current route (see below).
 
 ## 8. Keyboard (`core/keyboard`)
 
@@ -296,9 +296,9 @@ Global bindings (single keys are ignored while typing in an input/textarea/conte
 | `⌘J` | toggle theme (`ThemeService.toggle()` from `core/theme`) |
 | `/` | search dialog (`ui.openModal('search')`) |
 | `?` | shortcuts dialog (`ui.openModal('shortcuts')`) |
-| `C` | create, context-aware: attention/intake -> intake; workstreams -> workstream; workstream detail -> execution (prefilled `workstreamId`); execution detail -> sub-execution (`workstreamId`, `parentExecutionId`); decisions -> decision; views -> view; teams list -> team; team detail -> workstream (`ownerTeamId`); repositories -> repository / workstream (`repositoryIds`); otherwise workstream. Opens `ui.openCreate(kind, defaults)`. |
-| `G` then `O` `A` `I` `W` `D` `R` `X` `S` (+ `T` teams, `V` views) | go to overview / attention / intake / workstreams / decisions / repositories / graph / settings / teams / views of the active workspace (`GO_TO_ROUTES`) |
-| `Esc` | page shortcut first, then: close modal -> close mobile sidebar -> clear selection -> on `/:slug/{workstreams,intake,decisions,repositories,teams,views}/:x` go back to the list |
+| `C` | create, context-aware: attention/issues -> issue; workstreams -> workstream; workstream detail -> execution (prefilled `workstreamId`); execution detail -> sub-execution (`workstreamId`, `parentExecutionId`); decisions -> decision; views -> view; teams list -> team; team detail -> workstream (`ownerTeamId`); repositories -> repository / workstream (`repositoryIds`); otherwise workstream. Opens `ui.openCreate(kind, defaults)`. |
+| `G` then `O` `A` `I` `W` `D` `R` `X` `S` (+ `T` teams, `V` views) | go to overview / attention / issues / workstreams / decisions / repositories / graph / settings / teams / views of the active workspace (`GO_TO_ROUTES`) |
+| `Esc` | page shortcut first, then: close modal -> close mobile sidebar -> clear selection -> on `/:slug/{workstreams,issues,decisions,repositories,teams,views}/:x` go back to the list |
 | `j` `k` / `↓` `↑` | move `ui.focusedRowId` through DOM elements carrying `data-row-id="<id>"` |
 | `Enter` | click the focused row (or its first `a[href]`) |
 | `Space` / `x` | toggle selection of the focused row (`ui.selectedRowIds`) |

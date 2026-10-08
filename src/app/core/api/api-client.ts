@@ -19,10 +19,9 @@ import type {
   Decision,
   Dependency,
   DomainEvent,
-  Execution,
   ID,
   InputRequest,
-  IntakeItem,
+  Issue,
   IntegrationConnection,
   Membership,
   Repository,
@@ -43,9 +42,8 @@ import type {
   CreateCommentInput,
   CreateDecisionInput,
   CreateDependencyInput,
-  CreateExecutionInput,
   CreateInputRequestInput,
-  CreateIntakeInput,
+  CreateIssueInput,
   CreateIntegrationInput,
   CreateRepositoryInput,
   CreateTeamInput,
@@ -60,15 +58,13 @@ import type {
   GraphResponse,
   LoginInput,
   MeResponse,
-  ReportProgressInput,
   SearchResults,
   SignupInput,
-  TriageIntakeInput,
+  LinkIssueInput,
   UpdateAgentInput,
   UpdateArtifactInput,
   UpdateDecisionInput,
-  UpdateExecutionInput,
-  UpdateIntakeInput,
+  UpdateIssueInput,
   UpdateMemberInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
@@ -269,20 +265,6 @@ export class ApiClient {
       ),
   };
 
-  readonly executions = {
-    list: (slug: string) => this.get<Execution[]>(`${this.w(slug)}/executions`),
-    get: (slug: string, id: ID) => this.get<Execution>(`${this.w(slug)}/executions/${id}`),
-    create: (slug: string, input: CreateExecutionInput) =>
-      this.post<Execution>(`${this.w(slug)}/executions`, input),
-    update: (slug: string, id: ID, input: UpdateExecutionInput) =>
-      this.patch<Execution>(`${this.w(slug)}/executions/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/executions/${id}`),
-    progress: (slug: string, id: ID, input: ReportProgressInput) =>
-      this.post<Execution>(`${this.w(slug)}/executions/${id}/progress`, input),
-    complete: (slug: string, id: ID, note?: string) =>
-      this.post<Execution>(`${this.w(slug)}/executions/${id}/complete`, note ? { note } : {}),
-  };
-
   readonly inputRequests = {
     list: (slug: string) => this.get<InputRequest[]>(`${this.w(slug)}/input-requests`),
     create: (slug: string, input: CreateInputRequestInput) =>
@@ -293,18 +275,18 @@ export class ApiClient {
       this.post<InputRequest>(`${this.w(slug)}/input-requests/${id}/dismiss`),
   };
 
-  readonly intake = {
-    list: (slug: string) => this.get<IntakeItem[]>(`${this.w(slug)}/intake`),
+  readonly issues = {
+    list: (slug: string) => this.get<Issue[]>(`${this.w(slug)}/issues`),
     get: (slug: string, idOrKey: string) =>
-      this.get<IntakeItem>(`${this.w(slug)}/intake/${encodeURIComponent(idOrKey)}`),
-    create: (slug: string, input: CreateIntakeInput) =>
-      this.post<IntakeItem>(`${this.w(slug)}/intake`, input),
-    update: (slug: string, id: ID, input: UpdateIntakeInput) =>
-      this.patch<IntakeItem>(`${this.w(slug)}/intake/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/intake/${id}`),
-    /** Returns the updated item (or `{ intake, workstream? }`). `id` may be an id or key. */
-    triage: (slug: string, id: ID, input: TriageIntakeInput) =>
-      this.post<unknown>(`${this.w(slug)}/intake/${id}/triage`, input),
+      this.get<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}`),
+    create: (slug: string, input: CreateIssueInput) =>
+      this.post<Issue>(`${this.w(slug)}/issues`, input),
+    update: (slug: string, id: ID, input: UpdateIssueInput) =>
+      this.patch<Issue>(`${this.w(slug)}/issues/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/issues/${id}`),
+    /** Attach workstreams (and optionally create one). `id` may be an id or key. */
+    link: (slug: string, id: ID, input: LinkIssueInput) =>
+      this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
   };
 
   readonly artifacts = {

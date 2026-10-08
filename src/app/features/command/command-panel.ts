@@ -62,8 +62,7 @@ interface Visual {
 const HIT_ICON: Record<HitType, LucideIcon> = {
   workstream: LucideWorkflow,
   decision: LucideScale,
-  intake: LucideInbox,
-  execution: LucideTerminal,
+  issue: LucideInbox,
   artifact: LucideGitPullRequest,
   repository: LucideFolderGit2,
   team: LucideUsers,
@@ -191,7 +190,7 @@ export function commandFilter(value: string, search: string): boolean {
         } @else if (!isSearching() && !recent().length) {
           <div class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm">
             <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-            <p>Search workstreams, intake, decisions, executions, artifacts and repositories.</p>
+            <p>Search workstreams, issues, decisions, artifacts and repositories.</p>
           </div>
         }
       </hlm-command-list>
@@ -227,7 +226,7 @@ export class CommandPanel {
   private gen = 0;
 
   protected readonly placeholder = computed(() =>
-    this.mode() === 'palette' ? 'Type a command or search…' : 'Search workstreams, intake, decisions…',
+    this.mode() === 'palette' ? 'Type a command or search…' : 'Search workstreams, issues, decisions…',
   );
   protected readonly isSearching = computed(() => this.query().trim().length > 0);
   protected readonly recent = computed<RecentItem[]>(() => this.recents.list().slice(0, 6));
@@ -287,8 +286,7 @@ export class CommandPanel {
     if (canWrite) {
       out.push(
         { id: 'new:workstream', label: 'Create workstream', icon: LucidePlus, keys: 'c', run: create('workstream') },
-        { id: 'new:intake', label: 'Create intake item', keywords: 'bug feature incident report', icon: LucidePlus, run: create('intake') },
-        { id: 'new:execution', label: 'Create execution', icon: LucidePlus, run: create('execution') },
+        { id: 'new:issue', label: 'Create issue', keywords: 'bug feature incident report', icon: LucidePlus, run: create('issue') },
         { id: 'new:decision', label: 'Create decision', keywords: 'adr', icon: LucidePlus, run: create('decision') },
       );
     }
@@ -366,14 +364,9 @@ export class CommandPanel {
         if (d) return { kind: 'status', status: d.status };
         break;
       }
-      case 'intake': {
-        const i = s.intakeById().get(h.id);
-        if (i) return { kind: 'status', status: i.state };
-        break;
-      }
-      case 'execution': {
-        const e = s.executionById().get(h.id);
-        if (e) return { kind: 'status', status: e.state };
+      case 'issue': {
+        const i = s.issueById().get(h.id);
+        if (i) return { kind: 'status', status: i.status };
         break;
       }
       case 'artifact': {

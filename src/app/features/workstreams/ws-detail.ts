@@ -5,7 +5,6 @@ import {
   LucideDynamicIcon,
   LucideEllipsis,
   LucideInfo,
-  LucidePlus,
   LucideRotateCcw,
   LucideTrash2,
   LucideWorkflow,
@@ -19,26 +18,22 @@ import { NablaStore, UiStore, WORKSTREAM_STATUS_META, usePageShortcuts } from '.
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
-import { Kbd } from '../../shared/kbd';
 import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusBadge, StatusIcon } from '../../shared/status';
-import { ExecutionDialogs, type ExecAction } from '../executions/execution-dialogs';
 import { InlineText } from './inline-edit';
 import { WsActivityTab } from './ws-activity-tab';
 import { WsArtifactsTab } from './ws-artifacts-tab';
 import { WsContextTab, WsGraphTab } from './ws-context-graph-tabs';
 import { WsDecisionsTab } from './ws-decisions-tab';
-import { WsExecutionsTab } from './ws-executions-tab';
 import { explainStatus } from './ws-model';
 import { WsOverviewTab } from './ws-overview-tab';
 import { CriteriaBar, TargetDate } from './ws-parts';
 
-const TABS = ['overview', 'executions', 'artifacts', 'decisions', 'graph', 'activity', 'context'] as const;
+const TABS = ['overview', 'artifacts', 'decisions', 'graph', 'activity', 'context'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
-  executions: 'Executions',
   artifacts: 'Artifacts',
   decisions: 'Decisions',
   graph: 'Graph',
@@ -60,7 +55,6 @@ const TAB_LABEL: Record<Tab, string> = {
     TopBarActions,
     ActorLabel,
     EmptyState,
-    Kbd,
     KeyChip,
     PriorityIcon,
     StatusBadge,
@@ -68,9 +62,7 @@ const TAB_LABEL: Record<Tab, string> = {
     InlineText,
     CriteriaBar,
     TargetDate,
-    ExecutionDialogs,
     WsOverviewTab,
-    WsExecutionsTab,
     WsArtifactsTab,
     WsDecisionsTab,
     WsGraphTab,
@@ -81,11 +73,10 @@ const TAB_LABEL: Record<Tab, string> = {
   template: `
     @if (ws(); as w) {
       <ng-template appTopBarActions>
-        @if (canEdit()) {
-          <button hlmBtn size="sm" (click)="newExecution()">
-            <svg [lucideIcon]="plus" [size]="14"></svg><span class="max-sm:hidden">New execution</span>
-            <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
-          </button>
+        @if (w.deltaThreadUrl) {
+          <a hlmBtn size="sm" variant="outline" [href]="w.deltaThreadUrl" target="_blank" rel="noopener noreferrer">
+            Open Delta thread
+          </a>
         }
       </ng-template>
 
@@ -133,7 +124,7 @@ const TAB_LABEL: Record<Tab, string> = {
                 }
               </ul>
               <p class="text-muted-foreground border-t pt-2 text-[11px] leading-relaxed">
-                Status is derived from executions, artifacts, input requests, decisions and dependencies — it can’t be dragged. Use the menu to mark it draft or canceled.
+                Status is derived from artifacts, input requests, decisions and dependencies. Use the menu to mark it draft or canceled.
               </p>
               @if (canEdit()) {
                 <div class="flex flex-wrap gap-1.5">
@@ -179,9 +170,6 @@ const TAB_LABEL: Record<Tab, string> = {
           @case ('overview') {
             <app-ws-overview-tab [ws]="w" />
           }
-          @case ('executions') {
-            <app-ws-executions-tab [ws]="w" />
-          }
           @case ('artifacts') {
             <app-ws-artifacts-tab [ws]="w" />
           }
@@ -214,8 +202,6 @@ const TAB_LABEL: Record<Tab, string> = {
           <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()"><svg [lucideIcon]="trash" [size]="14"></svg> Delete workstream</button>
         </hlm-dropdown-menu>
       </ng-template>
-
-      <app-execution-dialogs [(action)]="pageAction" />
     } @else {
       <app-empty-state [icon]="flow" title="Workstream not found" description="It may have been deleted, or the key is wrong.">
         <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'workstreams']">Back to workstreams</a>
@@ -235,7 +221,6 @@ export class WorkstreamDetailPage {
 
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
-  protected readonly plus = LucidePlus;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly info = LucideInfo;
   protected readonly reset = LucideRotateCcw;
@@ -243,7 +228,6 @@ export class WorkstreamDetailPage {
   protected readonly flow = LucideWorkflow;
   protected readonly help = LucideCircleHelp;
   protected readonly whyState = signal<'open' | 'closed'>('closed');
-  protected readonly pageAction = signal<ExecAction | null>(null);
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -266,7 +250,6 @@ export class WorkstreamDetailPage {
     const w = this.ws();
     if (!w) return {};
     return {
-      executions: this.store.executionsByWorkstream().get(w.id)?.length ?? 0,
       artifacts: this.store.artifactsByWorkstream().get(w.id)?.length ?? 0,
       decisions: this.store.decisionsByWorkstream().get(w.id)?.length ?? 0,
     };
@@ -278,7 +261,6 @@ export class WorkstreamDetailPage {
   ]);
 
   private readonly _keys = usePageShortcuts([
-    { keys: 'c', label: 'New execution', run: () => this.canEdit() && this.newExecution(), when: () => !!this.ws() },
     ...TABS.map((t, i) => ({
       keys: String(i + 1),
       label: `${TAB_LABEL[t]} tab`,
@@ -286,11 +268,6 @@ export class WorkstreamDetailPage {
       when: () => !!this.ws(),
     })),
   ]);
-
-  protected newExecution(): void {
-    const w = this.ws();
-    if (w) this.pageAction.set({ kind: 'create', workstreamId: w.id });
-  }
 
   protected setTab(t: string | null | undefined): void {
     if (!t) return;
@@ -313,7 +290,7 @@ export class WorkstreamDetailPage {
     if (!w) return;
     this.ui.setConfirmDelete({
       title: `Delete ${w.key}?`,
-      description: 'The workstream, its executions and acceptance criteria are deleted. This cannot be undone.',
+      description: 'The workstream, its artifacts, comments and acceptance criteria are deleted. This cannot be undone.',
       onConfirm: async () => {
         if (await this.store.deleteWorkstream(w.id)) void this.router.navigate(['/', this.slug(), 'workstreams']);
       },

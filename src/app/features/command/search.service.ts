@@ -3,7 +3,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'workstream' | 'intake' | 'decision' | 'execution' | 'artifact' | 'repository' | 'team';
+export type HitType = 'workstream' | 'issue' | 'decision' | 'artifact' | 'repository' | 'team';
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -16,12 +16,11 @@ export interface SearchHit {
   workstreamKey?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['workstream', 'decision', 'intake', 'execution', 'artifact', 'repository', 'team'];
+export const HIT_ORDER: HitType[] = ['workstream', 'decision', 'issue', 'artifact', 'repository', 'team'];
 export const HIT_LABEL: Record<HitType, string> = {
   workstream: 'Workstreams',
   decision: 'Decisions',
-  intake: 'Intake',
-  execution: 'Executions',
+  issue: 'Issues',
   artifact: 'Artifacts',
   repository: 'Repositories',
   team: 'Teams',
@@ -29,8 +28,7 @@ export const HIT_LABEL: Record<HitType, string> = {
 export const HIT_SINGULAR: Record<HitType, string> = {
   workstream: 'Workstream',
   decision: 'Decision',
-  intake: 'Intake',
-  execution: 'Execution',
+  issue: 'Issue',
   artifact: 'Artifact',
   repository: 'Repository',
   team: 'Team',
@@ -39,7 +37,7 @@ export const HIT_SINGULAR: Record<HitType, string> = {
 const TYPE_ALIASES: Record<string, HitType> = {
   workstreams: 'workstream',
   decisions: 'decision',
-  executions: 'execution',
+  issues: 'issue',
   artifacts: 'artifact',
   repositories: 'repository',
   teams: 'team',
@@ -91,9 +89,9 @@ export class SearchService {
           if (h) out.push(h);
         }
       } else {
-        // Grouped shape `{ workstreams: [...], intake: [...], ... }`.
+        // Grouped shape `{ workstreams: [...], issues: [...], ... }`.
         for (const [k, v] of Object.entries(o)) {
-          const type = TYPE_ALIASES[k] ?? ((HIT_ORDER as string[]).includes(k) ? (k as HitType) : k === 'intake' ? 'intake' : undefined);
+          const type = TYPE_ALIASES[k] ?? ((HIT_ORDER as string[]).includes(k) ? (k as HitType) : k === 'issues' || k === 'issue' ? 'issue' : undefined);
           if (!type || !Array.isArray(v)) continue;
           for (const r of v) {
             const h = asHit(r, type);
@@ -116,10 +114,8 @@ export class SearchService {
     };
     for (const w of s.workstreams()) push({ type: 'workstream', id: w.id, key: w.key, title: w.title }, `${w.key} ${w.title}`, w.objective);
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
-    for (const i of s.intake()) push({ type: 'intake', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
-    for (const e of s.executions())
-      push({ type: 'execution', id: e.id, title: e.title, workstreamKey: wsKey(e.workstreamId) }, e.title, e.description ?? '');
-    for (const a of s.artifacts())
+    for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
+      for (const a of s.artifacts())
       push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId, workstreamKey: wsKey(a.workstreamId) }, a.title, a.externalId ?? '');
     for (const r of s.repositories()) push({ type: 'repository', id: r.id, title: r.fullName }, r.fullName);
     for (const t of s.teams()) push({ type: 'team', id: t.id, key: t.key, title: t.name }, `${t.key} ${t.name}`);
@@ -142,10 +138,8 @@ export class SearchService {
         return ['workstreams', h.key ?? h.id];
       case 'decision':
         return ['decisions', h.key ?? h.id];
-      case 'intake':
-        return ['intake', h.key ?? h.id];
-      case 'execution':
-        return ['executions', h.id];
+      case 'issue':
+        return ['issues', h.key ?? h.id];
       case 'repository':
         return ['repositories', h.id];
       case 'team':
