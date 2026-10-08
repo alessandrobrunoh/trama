@@ -8,8 +8,6 @@ import {
   LucideMenu,
   LucideMessageSquare,
   LucideX,
-  LucideUsers,
-  LucideLayers,
   LucideSettings,
   LucideSearch,
 } from '@lucide/angular';
@@ -115,8 +113,6 @@ export class MobileNav {
     { ...PERSONAL_NAV[1], label: 'My issues' },
     { segment: 'activity', label: 'Pulse', icon: LucideActivity },
     ...MAIN_NAV.filter((item) => item.segment !== 'activity'),
-    { segment: 'teams', label: 'Teams', icon: LucideUsers },
-    { segment: 'views', label: 'Views', icon: LucideLayers },
     { segment: 'settings/profile', label: 'Settings', icon: LucideSettings },
   ];
   protected get accountName(): string {

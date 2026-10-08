@@ -6,11 +6,13 @@ import {
   LucideCircleDot,
   LucideFolderGit2,
   LucideHexagon,
+  LucideLayers,
   LucideLayoutDashboard,
   LucideMessageSquare,
   LucideNetwork,
   LucideScale,
   LucideUserRoundCheck,
+  LucideUsers,
   type LucideIcon,
 } from '@lucide/angular';
 
@@ -76,6 +78,8 @@ export const MAIN_NAV: NavItem[] = [
   { segment: 'timeline', label: 'Timeline', icon: LucideChartGantt, keys: 'g l', hint: 'Workstreams and milestones on a calendar' },
   { segment: 'decisions', label: 'Decisions', icon: LucideScale, keys: 'g d', hint: 'What was decided and why' },
   { segment: 'projects', label: 'Projects', icon: LucideFolderGit2, keys: 'g p', hint: 'Repositories and the work touching them' },
+  { segment: 'teams', label: 'Teams', icon: LucideUsers, keys: 'g t', hint: 'Who works on what, team by team' },
+  { segment: 'views', label: 'Views', icon: LucideLayers, keys: 'g v', hint: 'Saved filters for issues, workstreams and decisions' },
   { segment: 'activity', label: 'Activity', icon: LucideActivity, keys: 'g e', hint: 'Everything that happened, newest first' },
   { segment: 'graph', label: 'Graph', icon: LucideNetwork, keys: 'g x', hint: 'Dependencies between workstreams' },
   { segment: 'stats', label: 'Statistics', icon: LucideChartColumn, keys: 'g y', hint: 'Throughput, health and trends' },
