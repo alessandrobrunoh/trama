@@ -1,5 +1,5 @@
 // UiStore — app-level UI state shared by shell, keyboard service and overlays.
-// Persisted (localStorage 'nabla.ui.v1'): sidebarCollapsed only. Theme lives in core/theme.
+// Persisted (localStorage 'nabla.ui.v1'): sidebarCollapsed + folded sidebar sections. Theme lives in core/theme.
 import { Injectable, computed, effect, signal } from '@angular/core';
 import { readJson, writeJson } from './storage';
 
@@ -25,11 +25,15 @@ export interface ConfirmDeleteState {
   description: string;
   /** Label of the destructive button (default "Delete"). */
   confirmLabel?: string;
+  /** `false` renders the confirm button in the primary style (non-destructive confirmations). */
+  destructive?: boolean;
   onConfirm: () => Promise<void> | void;
 }
 
 interface PersistedUi {
   sidebarCollapsed: boolean;
+  /** Sidebar section / team ids the user folded away. */
+  foldedSections: string[];
 }
 
 export const UI_STORAGE_KEY = 'nabla.ui.v1';
@@ -40,6 +44,10 @@ export class UiStore {
 
   readonly sidebarCollapsed = signal<boolean>(
     typeof this.persisted?.sidebarCollapsed === 'boolean' ? this.persisted.sidebarCollapsed : false,
+  );
+  /** Folded sidebar groups ("teams", "views", "team:<id>"). Persisted. */
+  readonly foldedSections = signal<string[]>(
+    Array.isArray(this.persisted?.foldedSections) ? this.persisted.foldedSections.filter((x) => typeof x === 'string') : [],
   );
   readonly mobileSidebarOpen = signal(false);
   readonly modal = signal<ModalKind>(null);
@@ -59,7 +67,10 @@ export class UiStore {
 
   constructor() {
     effect(() => {
-      writeJson(UI_STORAGE_KEY, { sidebarCollapsed: this.sidebarCollapsed() } satisfies PersistedUi);
+      writeJson(UI_STORAGE_KEY, {
+        sidebarCollapsed: this.sidebarCollapsed(),
+        foldedSections: this.foldedSections(),
+      } satisfies PersistedUi);
     });
   }
 
@@ -69,6 +80,12 @@ export class UiStore {
   }
   toggleSidebar(): void {
     this.sidebarCollapsed.update((v) => !v);
+  }
+  isFolded(id: string): boolean {
+    return this.foldedSections().includes(id);
+  }
+  toggleFolded(id: string): void {
+    this.foldedSections.update((f) => (f.includes(id) ? f.filter((x) => x !== id) : [...f, id]));
   }
   setMobileSidebar(value: boolean): void {
     this.mobileSidebarOpen.set(value);

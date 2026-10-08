@@ -22,12 +22,14 @@ import type {
   ID,
   InputRequest,
   Issue,
-  IntegrationConnection,
   Membership,
+  Milestone,
+  OutgoingWebhook,
   Repository,
   SavedView,
   Team,
   User,
+  WebhookDeliveryLog,
   Workspace,
   WorkspaceSnapshot,
   Workstream,
@@ -43,8 +45,16 @@ import type {
   CreateDecisionInput,
   CreateDependencyInput,
   CreateInputRequestInput,
+  CreateMilestoneInput,
+  UpdateMilestoneInput,
+  UpdateInputRequestInput,
   CreateIssueInput,
   CreateIntegrationInput,
+  IntegrationDetail,
+  IntegrationWithWebhook,
+  LinkRepositoryInput,
+  RemoteRepositoryPage,
+  UpdateIntegrationInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -70,6 +80,10 @@ import type {
   UpdateTeamInput,
   UpdateViewInput,
   UpdateWorkspaceInput,
+  CreateWebhookInput,
+  UpdateWebhookInput,
+  UpdateWorkspaceSettingsInput,
+  WebhookWithSecret,
   UpdateWorkstreamInput,
 } from './api.types';
 
@@ -165,6 +179,9 @@ export class ApiClient {
     create: (input: CreateWorkspaceInput) => this.post<Workspace>('/workspaces', input),
     get: (slug: string) => this.get<Workspace>(this.w(slug)),
     update: (slug: string, input: UpdateWorkspaceInput) => this.patch<Workspace>(this.w(slug), input),
+    /** Customization + permission policy. Admin; changing `permissions` needs an owner. */
+    updateSettings: (slug: string, input: UpdateWorkspaceSettingsInput) =>
+      this.patch<Workspace>(`${this.w(slug)}/settings`, input),
     /** Owner only. */
     remove: (slug: string) => this.del(this.w(slug)),
     snapshot: (slug: string) => this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`),
@@ -273,6 +290,10 @@ export class ApiClient {
       this.post<InputRequest>(`${this.w(slug)}/input-requests/${id}/answer`, { answer }),
     dismiss: (slug: string, id: ID) =>
       this.post<InputRequest>(`${this.w(slug)}/input-requests/${id}/dismiss`),
+    /** Open requests only (`409` otherwise). */
+    update: (slug: string, id: ID, input: UpdateInputRequestInput) =>
+      this.patch<InputRequest>(`${this.w(slug)}/input-requests/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/input-requests/${id}`),
   };
 
   readonly issues = {
@@ -287,6 +308,17 @@ export class ApiClient {
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
+  };
+
+  readonly milestones = {
+    list: (slug: string, workstreamId?: ID) => this.get<Milestone[]>(`${this.w(slug)}/milestones`, { workstreamId }),
+    create: (slug: string, input: CreateMilestoneInput) => this.post<Milestone>(`${this.w(slug)}/milestones`, input),
+    update: (slug: string, id: ID, input: UpdateMilestoneInput) =>
+      this.patch<Milestone>(`${this.w(slug)}/milestones/${id}`, input),
+    /** Re-numbers sortOrder 0..n-1 following `ids`; returns the ordered milestones of the workstream. */
+    reorder: (slug: string, workstreamId: ID, ids: ID[]) =>
+      this.post<Milestone[]>(`${this.w(slug)}/milestones/reorder`, { workstreamId, ids }),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/milestones/${id}`),
   };
 
   readonly artifacts = {
@@ -365,12 +397,41 @@ export class ApiClient {
   search = (slug: string, q: string) => this.get<SearchResults>(`${this.w(slug)}/search`, { q });
 
   readonly integrations = {
-    list: (slug: string) => this.get<IntegrationConnection[]>(`${this.w(slug)}/integrations`),
+    /** Admin only. Includes webhookUrl, linked repository ids and lastWebhookAt. */
+    list: (slug: string, o?: RequestOptions) => this.get<IntegrationDetail[]>(`${this.w(slug)}/integrations`, undefined, o),
+    /** Returns the connection and, for GitHub/GitLab, the one-time webhook setup (secret shown once). */
     create: (slug: string, input: CreateIntegrationInput) =>
-      this.post<IntegrationConnection>(`${this.w(slug)}/integrations`, input),
+      this.post<IntegrationWithWebhook>(`${this.w(slug)}/integrations`, input),
+    /** Re-validates the token against the provider (refreshes account / status). */
+    update: (slug: string, id: ID, input: UpdateIntegrationInput) =>
+      this.patch<IntegrationDetail>(`${this.w(slug)}/integrations/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/integrations/${id}`),
-    sync: (slug: string, id: ID) =>
-      this.post<IntegrationConnection | void>(`${this.w(slug)}/integrations/${id}/sync`),
+    rotateWebhookSecret: (slug: string, id: ID) =>
+      this.post<IntegrationWithWebhook>(`${this.w(slug)}/integrations/${id}/rotate-webhook-secret`),
+    remoteRepositories: (slug: string, id: ID, page = 1, perPage = 30) =>
+      this.get<RemoteRepositoryPage>(`${this.w(slug)}/integrations/${id}/remote-repositories`, { page, perPage }),
+    /** Creates (201) or adopts (200) the Repository and attaches it to the connection. */
+    linkRepository: (slug: string, id: ID, input: LinkRepositoryInput) =>
+      this.post<Repository>(`${this.w(slug)}/integrations/${id}/link-repository`, input),
+    unlinkRepository: (slug: string, id: ID, repositoryId: ID) =>
+      this.del(`${this.w(slug)}/integrations/${id}/repositories/${repositoryId}`),
+  };
+
+  /** Custom integrations: signed JSON POSTs to your URL for domain events. Needs the manageIntegrations capability. */
+  readonly outgoingWebhooks = {
+    list: (slug: string, o?: RequestOptions) => this.get<OutgoingWebhook[]>(`${this.w(slug)}/outgoing-webhooks`, undefined, o),
+    /** The signing secret is returned once. */
+    create: (slug: string, input: CreateWebhookInput) =>
+      this.post<WebhookWithSecret>(`${this.w(slug)}/outgoing-webhooks`, input),
+    update: (slug: string, id: ID, input: UpdateWebhookInput) =>
+      this.patch<OutgoingWebhook>(`${this.w(slug)}/outgoing-webhooks/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/outgoing-webhooks/${id}`),
+    rotateSecret: (slug: string, id: ID) =>
+      this.post<WebhookWithSecret>(`${this.w(slug)}/outgoing-webhooks/${id}/rotate-secret`),
+    /** Sends a ping now; resolves the delivery result (a failed delivery is still a 200). */
+    test: (slug: string, id: ID) => this.post<WebhookDeliveryLog>(`${this.w(slug)}/outgoing-webhooks/${id}/test`),
+    deliveries: (slug: string, id: ID, limit = 20) =>
+      this.get<WebhookDeliveryLog[]>(`${this.w(slug)}/outgoing-webhooks/${id}/deliveries`, { limit }),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

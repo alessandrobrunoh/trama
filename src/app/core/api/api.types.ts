@@ -10,6 +10,12 @@ import type {
   CiState,
   CriterionState,
   Decision,
+  EstimateScale,
+  PermissionMap,
+  TeamEditPolicy,
+  TokenScope,
+  WeekStart,
+  OutgoingWebhook,
   DependencyNodeType,
   ExecutionProvider,
   GitProvider,
@@ -18,6 +24,7 @@ import type {
   Issue,
   IssueKind,
   IssueSource,
+  IntegrationConnection,
   IssueStatus,
   Priority,
   ReviewState,
@@ -58,6 +65,18 @@ export interface UpdateWorkspaceInput {
   name?: string;
   slug?: string;
 }
+/** `PATCH /w/:slug/settings` (admin; `permissions` is owner-only). `null` clears the optional fields. */
+export interface UpdateWorkspaceSettingsInput {
+  /** Partial: only the capabilities you send change. */
+  permissions?: Partial<PermissionMap>;
+  defaultTeamId?: ID | null;
+  estimateScale?: EstimateScale;
+  weekStart?: WeekStart;
+  /** IANA zone or `auto`. */
+  timeZone?: string;
+  iconColor?: string | null;
+  iconInitial?: string | null;
+}
 export interface AddMemberInput {
   /** The person must already have an account. */
   email: string;
@@ -74,6 +93,8 @@ export interface CreateAgentInput {
 }
 export interface CreateTokenInput {
   name: string;
+  /** Default `write`. `admin` needs an admin caller and cannot be used for agents. */
+  scope?: TokenScope;
   /** Omit: the token acts as you. Set (admin only): the token acts as this agent. */
   agentId?: ID;
   expiresAt?: ISODate;
@@ -97,6 +118,9 @@ export interface CreateTeamInput {
   color?: string;
   description?: string;
   memberIds?: ID[];
+  /** Subset of `memberIds`. */
+  leadIds?: ID[];
+  editPolicy?: TeamEditPolicy;
 }
 /** The team key is immutable (workstream keys depend on it). */
 export interface UpdateTeamInput {
@@ -104,6 +128,8 @@ export interface UpdateTeamInput {
   color?: string;
   description?: string | null;
   memberIds?: ID[];
+  leadIds?: ID[];
+  editPolicy?: TeamEditPolicy;
 }
 export interface CreateRepositoryInput {
   provider: GitProvider;
@@ -133,6 +159,7 @@ export interface CreateWorkstreamInput {
   acceptanceCriteria?: { text: string; state?: CriterionState }[];
   priority?: Priority;
   labels?: string[];
+  startDate?: ISODate;
   targetDate?: ISODate;
   statusOverride?: WorkstreamStatus;
 }
@@ -150,6 +177,7 @@ export interface UpdateWorkstreamInput {
   acceptanceCriteria?: { id?: ID; text: string; state?: CriterionState }[];
   priority?: Priority;
   labels?: string[];
+  startDate?: ISODate | null;
   targetDate?: ISODate | null;
   statusOverride?: WorkstreamStatus | null;
 }
@@ -166,6 +194,12 @@ export interface CreateInputRequestInput {
   options?: string[];
   assigneeUserId?: ID;
 }
+/** PATCH /input-requests/:id (open requests only). `null` clears. */
+export interface UpdateInputRequestInput {
+  question?: string;
+  options?: string[] | null;
+  assigneeUserId?: ID | null;
+}
 
 // ───── issues ─────
 export interface CreateIssueInput {
@@ -179,9 +213,14 @@ export interface CreateIssueInput {
   priority?: Priority;
   status?: IssueStatus;
   externalUrl?: string;
+  estimate?: number;
 }
 export interface UpdateIssueInput {
   title?: string;
+  /** Re-keys the issue (BUG-148 → FEAT-35); the old key stays valid as an alias. */
+  kind?: IssueKind;
+  /** Story points (non-negative). `null` clears. */
+  estimate?: number | null;
   body?: string | null;
   assigneeId?: ID | null;
   teamId?: ID | null;
@@ -190,6 +229,8 @@ export interface UpdateIssueInput {
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
+  /** At most one per linked workstream; only milestones of linked workstreams. */
+  milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
 }
@@ -199,6 +240,22 @@ export interface LinkIssueInput {
   createWorkstream?: CreateWorkstreamInput;
   /** Defaults to `in_progress` when the issue is `backlog` or `todo`. */
   status?: IssueStatus;
+}
+
+// ───── milestones ─────
+export interface CreateMilestoneInput {
+  workstreamId: ID;
+  name: string;
+  description?: string;
+  targetDate?: ISODate;
+  /** Defaults to last in the workstream. */
+  sortOrder?: number;
+}
+export interface UpdateMilestoneInput {
+  name?: string;
+  description?: string | null;
+  targetDate?: ISODate | null;
+  sortOrder?: number;
 }
 
 // ───── artifacts ─────
@@ -267,6 +324,8 @@ export interface EventsQuery {
   workstreamId?: ID;
   /** `type:id`, e.g. `execution:ex_1`. */
   subject?: string;
+  /** Event type prefix, e.g. `issue.` or `decision.accepted`. */
+  type?: string;
   /** ISO date cursor: events strictly older than this. */
   before?: ISODate;
   limit?: number;
@@ -329,11 +388,72 @@ export interface SearchResults {
 }
 
 // ───── integrations ─────
+/** `POST /integrations`. The account is read from the provider; Delta needs `baseUrl`. */
 export interface CreateIntegrationInput {
   provider: GitProvider | 'delta';
-  account?: string;
-  baseUrl?: string;
   /** PAT / app credential / Delta token. Stored server-side, never returned. */
+  token: string;
+  /** GitHub Enterprise / self-hosted GitLab / Delta base URL. */
+  baseUrl?: string;
+}
+/** `PATCH /integrations/:id` — re-validates against the provider and refreshes account/status. */
+export interface UpdateIntegrationInput {
   token?: string;
-  webhookSecret?: string;
+  baseUrl?: string | null;
+}
+/** What `GET /integrations` returns: the contract entity plus webhook / link details. */
+export type IntegrationDetail = IntegrationConnection & {
+  webhookUrl?: string;
+  repositoryIds: ID[];
+  lastWebhookAt?: ISODate;
+};
+/** One-time webhook setup (the secret is only returned on create and rotate). */
+export interface WebhookSetup {
+  url: string;
+  secret: string;
+  contentType: string;
+  events: string[];
+}
+export interface IntegrationWithWebhook {
+  connection: IntegrationDetail;
+  webhook?: WebhookSetup;
+}
+export interface RemoteRepository {
+  fullName: string;
+  url: string;
+  defaultBranch: string;
+  private?: boolean;
+  description?: string;
+  linked: boolean;
+  repositoryId?: ID;
+}
+export interface RemoteRepositoryPage {
+  items: RemoteRepository[];
+  page: number;
+  perPage: number;
+  hasMore: boolean;
+}
+export interface LinkRepositoryInput {
+  fullName: string;
+  teamIds?: ID[];
+}
+
+// ───── outgoing webhooks (custom integrations) ─────
+export interface CreateWebhookInput {
+  name: string;
+  url: string;
+  /** Event types, `entity.*` wildcards or `*`. */
+  events: string[];
+  enabled?: boolean;
+}
+export interface UpdateWebhookInput {
+  name?: string;
+  url?: string;
+  events?: string[];
+  enabled?: boolean;
+}
+/** Returned on create and on secret rotation: the signing secret is shown once. */
+export interface WebhookWithSecret {
+  webhook: OutgoingWebhook;
+  secret: string;
 }

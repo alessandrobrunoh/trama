@@ -2,7 +2,7 @@
 // the constructor attaches the document listener).
 //
 // Global bindings: ⌘K palette, ⌘B sidebar, ⌘J theme, `/` search, `?` shortcuts, `C` create
-// (context-aware), G-chords (G O/A/I/W/D/R/X/S/T/V), Esc (close overlay → up one level),
+// (context-aware), G-chords (G O/Y/A/I/W/D/R/X/S/T/V), Esc (close overlay → up one level),
 // list navigation over `[data-row-id]` rows (j/k/↑/↓, Enter, Space/x).
 // Pages add their own bindings with `usePageShortcuts([...])` / `registerPageShortcuts([...])`.
 import { DOCUMENT } from '@angular/common';
@@ -30,6 +30,8 @@ export interface PageShortcut {
   allowWhileTyping?: boolean;
   /** Section title in the shortcuts dialog (default "This page"). */
   group?: string;
+  /** Alias binding: works but is not listed in the shortcuts dialog. */
+  hidden?: boolean;
 }
 
 interface Combo {
@@ -74,9 +76,10 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
   if (combo.mod !== mod || combo.alt !== e.altKey) return false;
   const key = e.key.toLowerCase();
   if (key !== combo.key) return false;
-  // Letters/digits/named keys must match shift exactly; symbols (? / ] …) ignore it.
+  // Letters/digits/named keys must match shift exactly; symbols (? / ] …) ignore it, unless the combo
+  // asks for shift explicitly (`mod+shift+.` must not fire on plain `mod+.`).
   if (/^[a-z0-9]$/.test(combo.key) || combo.key.length > 1) return combo.shift === e.shiftKey;
-  return true;
+  return !combo.shift || e.shiftKey;
 }
 
 const INTERACTIVE = 'button, a[href], [role="button"], [role="menuitem"], [role="option"], summary, [role="tab"]';
@@ -145,10 +148,12 @@ export class KeyboardShortcuts {
     const key = id ? decodeURIComponent(id) : undefined;
     switch (area) {
       case 'attention':
-      case 'issues':
+      case 'my-work':
         return { kind: 'issue', defaults: {} };
+      case 'issues':
+        return { kind: 'issue', defaults: key ? {} : this.teamDefault() };
       case 'workstreams':
-        return { kind: 'workstream', defaults: key ? {} : {} };
+        return { kind: 'workstream', defaults: key ? {} : this.teamDefault() };
       case 'decisions':
         return { kind: 'decision', defaults: {} };
       case 'views':
@@ -165,6 +170,12 @@ export class KeyboardShortcuts {
       default:
         return { kind: 'workstream', defaults: {} };
     }
+  }
+
+  /** `?team=` of the current list → prefill the team of new items. */
+  private teamDefault(): Record<string, unknown> {
+    const team = new URLSearchParams(this.router.url.split('?')[1] ?? '').get('team');
+    return team ? { teamId: team, ownerTeamId: team } : {};
   }
 
   private goTo(segment: string): void {

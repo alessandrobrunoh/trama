@@ -106,16 +106,14 @@ export const ISSUE_STATUSES = sortedKeys(ISSUE_STATUS_META);
 export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: number }> = {
   pull_request: { label: 'Pull request', order: 0 },
   merge_request: { label: 'Merge request', order: 1 },
-  branch: { label: 'Branch', order: 2 },
-  commit: { label: 'Commit', order: 3 },
-  build: { label: 'Build', order: 4 },
-  test_report: { label: 'Test report', order: 5 },
-  deployment: { label: 'Deployment', order: 6 },
-  release: { label: 'Release', order: 7 },
-  document: { label: 'Document', order: 8 },
-  design: { label: 'Design', order: 9 },
-  image: { label: 'Image', order: 10 },
-  file: { label: 'File', order: 11 },
+  build: { label: 'Build', order: 2 },
+  test_report: { label: 'Test report', order: 3 },
+  deployment: { label: 'Deployment', order: 4 },
+  release: { label: 'Release', order: 5 },
+  document: { label: 'Document', order: 6 },
+  design: { label: 'Design', order: 7 },
+  image: { label: 'Image', order: 8 },
+  file: { label: 'File', order: 9 },
 };
 export const ARTIFACT_KINDS = sortedKeys(ARTIFACT_KIND_META);
 
@@ -159,6 +157,14 @@ export const ROLE_META: Record<Role, { label: string; rank: number; description:
   owner: { label: 'Owner', rank: 3, description: 'Everything, including deleting the workspace' },
 };
 export const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
+
+/** Longer role explanations for Settings → Members and Roles & permissions. */
+export const ROLE_DETAILS: Record<Role, string> = {
+  owner: 'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
+  admin: 'Manages people and structure: members, teams, projects, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
+  member: 'Does the everyday work: creates and edits workstreams, issues, decisions and comments. What else a member may do is set in Roles & permissions.',
+  viewer: 'Read-only. Can browse everything in the workspace but cannot change anything.',
+};
 
 function sortedKeys<K extends string>(meta: Record<K, { order: number }>): K[] {
   return (Object.keys(meta) as K[]).sort((a, b) => meta[a].order - meta[b].order);

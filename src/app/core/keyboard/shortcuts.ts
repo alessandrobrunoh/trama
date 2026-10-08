@@ -4,18 +4,22 @@
 /** `G` then <key> → route segment under /:workspaceSlug (within GO_CHORD_TIMEOUT ms). */
 export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = {
   o: { segment: 'overview', label: 'Overview' },
+  y: { segment: 'stats', label: 'Statistics' },
   a: { segment: 'attention', label: 'My Attention' },
+  m: { segment: 'my-work', label: 'My Work' },
   i: { segment: 'issues', label: 'Issues' },
   w: { segment: 'workstreams', label: 'Workstreams' },
+  l: { segment: 'timeline', label: 'Timeline' },
   d: { segment: 'decisions', label: 'Decisions' },
   p: { segment: 'projects', label: 'Projects' },
   x: { segment: 'graph', label: 'Graph' },
   s: { segment: 'settings/profile', label: 'Settings' },
   t: { segment: 'teams', label: 'Teams' },
   v: { segment: 'views', label: 'Views' },
+  e: { segment: 'activity', label: 'Activity' },
 };
 
-export const GO_CHORD_TIMEOUT = 800;
+export const GO_CHORD_TIMEOUT = 1500;
 
 export interface ShortcutEntry {
   label: string;

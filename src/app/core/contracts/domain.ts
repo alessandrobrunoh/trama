@@ -31,6 +31,8 @@ export interface Workspace {
   id: ID;
   name: string;
   slug: string;
+  /** Always fully resolved by the server (defaults filled in). */
+  settings: WorkspaceSettings;
   createdAt: ISODate;
 }
 
@@ -83,6 +85,10 @@ export interface Team {
   color: string;
   description?: string;
   memberIds: ID[];
+  /** Team leads (a subset of `memberIds`). Leads may edit their team in the workspace settings of the team. */
+  leadIds: ID[];
+  /** Who may edit the workstreams / issues owned by this team. Workspace admins and owners always can. */
+  editPolicy: TeamEditPolicy;
 }
 
 export type GitProvider = 'github' | 'gitlab';
@@ -155,11 +161,28 @@ export interface Workstream {
   /** The derived status, ignoring the override. Computed by the server. */
   derivedStatus: WorkstreamStatus;
   statusOverride?: WorkstreamStatus;
+  /** When work is planned to begin (timeline start). */
+  startDate?: ISODate;
   targetDate?: ISODate;
   createdById: ID;
   createdAt: ISODate;
   updatedAt: ISODate;
   shippedAt?: ISODate;
+}
+
+/** Linear-style milestone inside a workstream. An issue is in at most one milestone per workstream. */
+export interface Milestone {
+  /** `ms_…` */
+  id: ID;
+  workspaceId: ID;
+  workstreamId: ID;
+  name: string;
+  description?: string;
+  targetDate?: ISODate;
+  /** Ascending order inside the workstream (reorder by PATCHing it). */
+  sortOrder: number;
+  createdAt: ISODate;
+  updatedAt: ISODate;
 }
 
 // ───────────────────────────── Input requests ─────────────────────────
@@ -227,6 +250,19 @@ export interface Issue {
   status: IssueStatus;
   /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
   workstreamIds: ID[];
+  /**
+   * Milestones this issue is in: at most one per workstream, and only milestones of workstreams in
+   * `workstreamIds`. Unlinking a workstream drops its milestone.
+   */
+  milestoneIds: ID[];
+  /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
+  estimate?: number;
+  /** First time the status entered in_progress / in_review. Kept when moved back. */
+  startedAt?: ISODate;
+  /** Set when the status becomes done or canceled; cleared on reopen. */
+  completedAt?: ISODate;
+  /** Previous keys (changing `kind` re-keys the issue); lookups by key also match these. */
+  aliases: string[];
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
@@ -239,8 +275,6 @@ export interface Issue {
 export type ArtifactKind =
   | 'pull_request'
   | 'merge_request'
-  | 'commit'
-  | 'branch'
   | 'document'
   | 'design'
   | 'image'
@@ -343,7 +377,8 @@ export type SubjectType =
   | 'decision'
   | 'input_request'
   | 'repository'
-  | 'team';
+  | 'team'
+  | 'milestone';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -366,7 +401,7 @@ export interface Comment {
  * workstream.created, workstream.updated, workstream.status_changed,
  * criterion.updated, input.requested, input.answered, artifact.attached,
  * artifact.updated, decision.proposed, decision.accepted, issue.created,
- * issue.status_changed, issue.linked, dependency.added, comment.created, review.requested.
+ * issue.status_changed, issue.rekeyed, issue.linked, milestone.created, milestone.updated, milestone.deleted, dependency.added, comment.created, review.requested.
  */
 export interface DomainEvent {
   id: ID;
@@ -452,6 +487,8 @@ export interface ApiToken {
   prefix: string;
   /** Token acts as this actor (a user or an agent). */
   actor: ActorRef;
+  /** What the token may do: read = GET only, write = everyday work (member role), admin = everything the actor's role allows. */
+  scope: TokenScope;
   lastUsedAt?: ISODate;
   createdAt: ISODate;
   expiresAt?: ISODate;
@@ -475,6 +512,194 @@ export interface IntegrationConnection {
   createdAt: ISODate;
 }
 
+// ───────────────────────────── Permissions & workspace settings ─────────────────────────────
+
+export type TeamEditPolicy = 'workspace' | 'members';
+export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; description: string }> = {
+  workspace: { label: 'Everyone in the workspace', description: 'Any member (or above) can edit this team\'s workstreams and issues.' },
+  members: { label: 'Team members only', description: 'Only people on this team (and workspace admins) can edit its workstreams and issues.' },
+};
+
+export type TokenScope = 'read' | 'write' | 'admin';
+export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: string }> = {
+  read: { label: 'Read', description: 'Read-only: GET requests. Good for dashboards and reporting.' },
+  write: { label: 'Write', description: 'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.' },
+  admin: { label: 'Admin', description: 'Everything the acting user\'s role allows, including members, integrations and settings. Only admins can create one.' },
+};
+
+/** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
+export type Capability =
+  | 'createWorkstreams'
+  | 'deleteWorkstreams'
+  | 'createIssues'
+  | 'deleteIssues'
+  | 'acceptDecisions'
+  | 'manageSharedViews'
+  | 'createTeams'
+  | 'manageTeams'
+  | 'manageRepositories'
+  | 'inviteMembers'
+  | 'manageAgents'
+  | 'manageTokens'
+  | 'manageIntegrations';
+
+/** Minimum role per capability. */
+export type PermissionMap = Record<Capability, Role>;
+
+/** Roles a capability can be set to. Viewers are read-only, so `viewer` is never offered. */
+export const CAPABILITY_ROLES: Role[] = ['member', 'admin', 'owner'];
+
+export interface CapabilityMeta {
+  label: string;
+  description: string;
+  group: 'Work' | 'Organization' | 'Access & automation';
+}
+
+export const CAPABILITIES: Capability[] = [
+  'createWorkstreams',
+  'deleteWorkstreams',
+  'createIssues',
+  'deleteIssues',
+  'acceptDecisions',
+  'manageSharedViews',
+  'createTeams',
+  'manageTeams',
+  'manageRepositories',
+  'inviteMembers',
+  'manageAgents',
+  'manageTokens',
+  'manageIntegrations',
+];
+
+export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
+  createWorkstreams: { group: 'Work', label: 'Create workstreams', description: 'Start a new workstream.' },
+  deleteWorkstreams: { group: 'Work', label: 'Delete workstreams', description: 'Permanently delete a workstream with its input requests, artifacts and comments.' },
+  createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
+  deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
+  acceptDecisions: { group: 'Work', label: 'Accept and reject decisions', description: 'Accept, reject or supersede a proposed decision. Always needs a person, never an agent.' },
+  manageSharedViews: { group: 'Work', label: 'Share views', description: 'Create or publish saved views for the whole workspace.' },
+  createTeams: { group: 'Organization', label: 'Create teams', description: 'Add a team to the workspace.' },
+  manageTeams: { group: 'Organization', label: 'Edit and delete teams', description: 'Rename, re-colour, change members or delete a team. A team lead can always edit their own team.' },
+  manageRepositories: { group: 'Organization', label: 'Manage repositories', description: 'Add, edit and remove repositories.' },
+  inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. They can only be given a role up to your own.' },
+  manageAgents: { group: 'Access & automation', label: 'Manage agents', description: 'Register agents, edit them, and mint tokens that act as an agent.' },
+  manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). Admin-scope tokens always need an admin.' },
+  manageIntegrations: { group: 'Access & automation', label: 'Manage integrations', description: 'Connect GitHub, GitLab and Delta, and manage outgoing webhooks.' },
+};
+
+/** Today's behaviour: everyday work for members, structure and access for admins. */
+export const DEFAULT_PERMISSIONS: PermissionMap = {
+  createWorkstreams: 'member',
+  deleteWorkstreams: 'member',
+  createIssues: 'member',
+  deleteIssues: 'member',
+  acceptDecisions: 'member',
+  manageSharedViews: 'member',
+  createTeams: 'admin',
+  manageTeams: 'admin',
+  manageRepositories: 'admin',
+  inviteMembers: 'admin',
+  manageAgents: 'admin',
+  manageTokens: 'member',
+  manageIntegrations: 'admin',
+};
+
+export type EstimateScale = 'fibonacci' | 'linear' | 'exponential' | 'tshirt' | 'none';
+export const ESTIMATE_SCALES: EstimateScale[] = ['fibonacci', 'linear', 'exponential', 'tshirt', 'none'];
+export type WeekStart = 'monday' | 'sunday' | 'saturday';
+export const WEEK_STARTS: WeekStart[] = ['monday', 'sunday', 'saturday'];
+
+export interface WorkspaceSettings {
+  permissions: PermissionMap;
+  /** Team preselected when creating issues and workstreams. */
+  defaultTeamId?: ID;
+  /** Scale offered for issue estimates. Estimates are stored as numbers either way. */
+  estimateScale: EstimateScale;
+  weekStart: WeekStart;
+  /** IANA time zone used to display dates, or `auto` to follow each person's browser. */
+  timeZone: string;
+  /** Workspace icon background, `#rrggbb`. */
+  iconColor?: string;
+  /** 1-2 characters shown in the workspace icon (defaults to the name's initial). */
+  iconInitial?: string;
+}
+
+export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
+  permissions: DEFAULT_PERMISSIONS,
+  estimateScale: 'fibonacci',
+  weekStart: 'monday',
+  timeZone: 'auto',
+};
+
+/** Fills the gaps of a stored (partial) settings object with the defaults. */
+export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, 'permissions'>> & { permissions?: Partial<PermissionMap> } | null): WorkspaceSettings {
+  const r = raw ?? {};
+  return {
+    ...DEFAULT_WORKSPACE_SETTINGS,
+    ...r,
+    permissions: { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) },
+  } as WorkspaceSettings;
+}
+
+const ROLE_ORDER: Role[] = ['viewer', 'member', 'admin', 'owner'];
+/** True when `role` is at least `min`. */
+export function roleAtLeast(role: Role, min: Role): boolean {
+  return ROLE_ORDER.indexOf(role) >= ROLE_ORDER.indexOf(min);
+}
+
+// ───────────────────────────── Outgoing webhooks ─────────────────────────────
+
+/**
+ * A custom integration: Nabla POSTs a signed JSON body to `url` for every domain event that matches `events`.
+ * Body: `{ id, event, workspace, at, actor, subject, workstreamId?, data }`.
+ * Headers: `X-Nabla-Event`, `X-Nabla-Delivery`, `X-Nabla-Signature: sha256=<hex hmac of the raw body with the secret>`.
+ */
+export interface OutgoingWebhook {
+  id: ID;
+  workspaceId: ID;
+  name: string;
+  url: string;
+  /** Event types, `entity.*` wildcards (`issue.*`) or `*`. */
+  events: string[];
+  enabled: boolean;
+  createdAt: ISODate;
+  lastDeliveryAt?: ISODate;
+  /** HTTP status of the last delivery, or 0 when it failed before getting a response. */
+  lastStatus?: number;
+}
+
+export interface WebhookDeliveryLog {
+  id: ID;
+  webhookId: ID;
+  event: string;
+  /** 0 when there was no HTTP response (timeout, DNS, connection refused). */
+  status: number;
+  ok: boolean;
+  durationMs: number;
+  error?: string;
+  /** 1 or 2 (one retry at most). */
+  attempt: number;
+  at: ISODate;
+}
+
+/** Event types a webhook can subscribe to, grouped by entity (for pickers). */
+export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
+  { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
+  { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
+  { entity: 'decision', label: 'Decisions', events: ['decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
+  { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
+  { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
+  { entity: 'comment', label: 'Comments', events: ['comment.created'] },
+  { entity: 'dependency', label: 'Dependencies', events: ['dependency.added', 'dependency.removed'] },
+  { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
+  { entity: 'repository', label: 'Repositories', events: ['repository.created', 'repository.updated', 'repository.deleted'] },
+];
+
+/** Does a webhook subscription pattern (`*`, `issue.*`, `issue.created`) match an event type? */
+export function webhookEventMatches(patterns: readonly string[], type: string): boolean {
+  return patterns.some((p) => p === '*' || p === type || (p.endsWith('.*') && type.startsWith(p.slice(0, -1))));
+}
+
 // ───────────────────────────── Snapshot ─────────────────────────────
 
 /** GET /api/w/:slug/snapshot — everything the client needs to boot a workspace. */
@@ -488,6 +713,7 @@ export interface WorkspaceSnapshot {
   teams: Team[];
   repositories: Repository[];
   workstreams: Workstream[];
+  milestones: Milestone[];
   inputRequests: InputRequest[];
   issues: Issue[];
   artifacts: Artifact[];
@@ -504,7 +730,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'agent' | 'integration';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;
