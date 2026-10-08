@@ -1,9 +1,24 @@
 // Comment composer, single comment and a thread bound to a subject.
-import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  inject,
+  input,
+  output,
+  signal,
+} from '@angular/core';
 import { LucideDynamicIcon, LucidePencil, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, Preferences, UiStore, fullDate, type Comment, type SubjectRef } from '../../core';
+import {
+  NablaStore,
+  Preferences,
+  UiStore,
+  fullDate,
+  type Comment,
+  type SubjectRef,
+} from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
@@ -14,23 +29,40 @@ import { CommentInput } from './comment-input';
 @Component({
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, Kbd, ActorAvatar, CommentInput],
-  host: { class: 'flex min-w-0 gap-2.5' },
+  imports: [HlmButtonImports, Kbd, CommentInput],
+  host: { class: 'block min-w-0' },
   template: `
-    <app-actor-avatar [actor]="{ type: 'user', id: store.me()?.id }" [size]="24" class="mt-1" />
-    <div class="min-w-0 flex-1">
-      <app-comment-input [placeholder]="placeholder()" [(value)]="draft" (keyed)="onKeydown($event)" />
-      <div class="mt-1.5 flex items-center justify-between gap-2">
-        <span class="text-meta">Markdown supported · @ to mention, # to link{{ prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : '' }}</span>
-        <button hlmBtn size="sm" type="button" [disabled]="!draft().trim() || busy()" (click)="send()">
-          Comment <app-kbd [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'" class="opacity-70 max-sm:hidden" />
+    <div class="bg-card overflow-hidden rounded-lg border">
+      <app-comment-input
+        class="[&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
+        [placeholder]="placeholder()"
+        [(value)]="draft"
+        (keyed)="onKeydown($event)"
+      />
+      <div class="flex items-center justify-between gap-2 border-t px-3 py-2">
+        <span class="text-meta"
+          >Markdown · @ to mention, # to link{{
+            prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''
+          }}</span
+        >
+        <button
+          hlmBtn
+          size="sm"
+          type="button"
+          [disabled]="!draft().trim() || busy()"
+          (click)="send()"
+        >
+          Comment
+          <app-kbd
+            [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'"
+            class="opacity-70 max-sm:hidden"
+          />
         </button>
       </div>
     </div>
   `,
 })
 export class CommentComposer {
-  protected readonly store = inject(NablaStore);
   protected readonly prefs = inject(Preferences);
   readonly placeholder = input('Leave a comment…');
   readonly submitted = output<string>();
@@ -63,44 +95,85 @@ export class CommentComposer {
 @Component({
   selector: 'app-comment-item',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ActorAvatar, Markdown, RelativeTimePipe, HlmButtonImports, LucideDynamicIcon, HlmTooltip, CommentInput],
-  host: { class: 'flex min-w-0 gap-2.5', '[class.flex-row-reverse]': 'mine()' },
+  imports: [
+    ActorAvatar,
+    Markdown,
+    RelativeTimePipe,
+    HlmButtonImports,
+    LucideDynamicIcon,
+    HlmTooltip,
+    CommentInput,
+  ],
+  host: { class: 'group/comment block min-w-0' },
   template: `
-    <app-actor-avatar [actor]="comment().author" [size]="24" class="mt-0.5" />
-    <div
-      class="min-w-0 max-w-[min(100%,42rem)] rounded-2xl border px-3 py-2"
-      [class]="mine() ? 'bg-primary/10 border-primary/20 rounded-tr-sm' : 'bg-card rounded-tl-sm'"
-      [class.w-full]="editing()"
-    >
-      <div class="flex items-center gap-2 text-xs">
-        <span class="text-foreground text-sm font-medium">{{ store.actorName(comment().author) }}</span>
-        @if (comment().author.type === 'agent') {
-          <span class="text-primary bg-primary/10 rounded px-1 text-[10px] font-medium uppercase">agent</span>
-        }
-        <span class="text-muted-foreground">{{ comment().createdAt | relativeTime }}</span>
-        @if (modified()) {
-          <span class="text-muted-foreground" [hlmTooltip]="full(comment().updatedAt)">· modified {{ comment().updatedAt | relativeTime }}</span>
-        }
-        @if (mine() && !editing()) {
-          <span class="ml-auto flex items-center">
-            <button hlmBtn variant="ghost" size="icon-xs" aria-label="Edit comment" hlmTooltip="Edit" (click)="startEdit()">
-              <svg [lucideIcon]="pencil" [size]="12"></svg>
-            </button>
-            <button hlmBtn variant="ghost" size="icon-xs" aria-label="Delete comment" hlmTooltip="Delete" (click)="remove()">
-              <svg [lucideIcon]="trash" [size]="12"></svg>
-            </button>
-          </span>
+    <div class="flex min-w-0 gap-3">
+      <app-actor-avatar [actor]="comment().author" [size]="28" class="mt-0.5" />
+      <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 items-baseline gap-x-2 gap-y-0.5">
+          <span class="text-foreground truncate text-sm font-medium">{{
+            store.actorName(comment().author)
+          }}</span>
+          @if (comment().author.type === 'agent') {
+            <span
+              class="text-primary bg-primary/10 shrink-0 rounded px-1 text-[10px] font-medium uppercase"
+              >agent</span
+            >
+          }
+          <time
+            class="text-muted-foreground shrink-0 text-xs"
+            [attr.datetime]="comment().createdAt"
+            >{{ comment().createdAt | relativeTime }}</time
+          >
+          @if (modified()) {
+            <span
+              class="text-muted-foreground shrink-0 text-xs"
+              [hlmTooltip]="full(comment().updatedAt)"
+              >edited</span
+            >
+          }
+          @if (mine() && !editing()) {
+            <span
+              class="ml-auto flex shrink-0 items-center opacity-100 sm:opacity-0 sm:group-focus-within/comment:opacity-100 sm:group-hover/comment:opacity-100"
+            >
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Edit comment"
+                hlmTooltip="Edit"
+                (click)="startEdit()"
+              >
+                <svg [lucideIcon]="pencil" [size]="12"></svg>
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Delete comment"
+                hlmTooltip="Delete"
+                (click)="remove()"
+              >
+                <svg [lucideIcon]="trash" [size]="12"></svg>
+              </button>
+            </span>
+          }
+        </div>
+        @if (editing()) {
+          <app-comment-input
+            class="mt-2"
+            label="Edit comment"
+            [autofocus]="true"
+            [(value)]="draft"
+            (keyed)="onEditKey($event)"
+          />
+          <div class="mt-2 flex gap-2">
+            <button hlmBtn size="sm" (click)="saveEdit()">Save</button>
+            <button hlmBtn size="sm" variant="ghost" (click)="editing.set(false)">Cancel</button>
+          </div>
+        } @else {
+          <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-1 block" />
         }
       </div>
-      @if (editing()) {
-        <app-comment-input class="mt-1" label="Edit comment" [autofocus]="true" [(value)]="draft" (keyed)="onEditKey($event)" />
-        <div class="mt-1.5 flex gap-2">
-          <button hlmBtn size="sm" (click)="saveEdit()">Save</button>
-          <button hlmBtn size="sm" variant="ghost" (click)="editing.set(false)">Cancel</button>
-        </div>
-      } @else {
-        <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-0.5 block" />
-      }
     </div>
   `,
 })
@@ -160,14 +233,16 @@ export class CommentItem {
   imports: [CommentItem, CommentComposer],
   host: { class: 'block min-w-0' },
   template: `
-    <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-5">
       @if (canEdit()) {
         <app-comment-composer #composer (submitted)="send($event, composer)" />
       }
       @for (c of comments(); track c.id) {
         <app-comment-item [comment]="c" />
       } @empty {
-        <p class="text-muted-foreground text-sm">No comments yet.</p>
+        @if (!canEdit()) {
+          <p class="text-muted-foreground text-sm">No comments yet.</p>
+        }
       }
     </div>
   `,
@@ -177,7 +252,9 @@ export class CommentThread {
   readonly subject = input.required<SubjectRef>();
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly comments = computed(() =>
-    [...this.store.commentsFor(this.subject())].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0)),
+    [...this.store.commentsFor(this.subject())].sort((a, b) =>
+      a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0,
+    ),
   );
 
   protected async send(body: string, composer: CommentComposer): Promise<void> {

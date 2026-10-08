@@ -1,4 +1,10 @@
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnApplicationBootstrap,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import type { WorkstreamStatus } from '../contracts/domain.js';
 import {
@@ -6,10 +12,14 @@ import {
   DecisionEntity,
   DependencyEntity,
   InputRequestEntity,
+  IssueEntity,
   WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus, type WorkstreamTouched } from '../events/workstream-bus.js';
+import {
+  WorkstreamBus,
+  type WorkstreamTouched,
+} from '../events/workstream-bus.js';
 import { deriveStatus, type StatusDependency } from './derive-status.js';
 
 export interface StatusChange {
@@ -21,11 +31,13 @@ export interface StatusChange {
 
 /**
  * Keeps `status` / `derivedStatus` / `shippedAt` of workstreams in sync with their
- * input requests, artifacts, decisions and dependencies.
+ * issues, input requests, artifacts, decisions and dependencies.
  * Subscribed to {@link WorkstreamBus}; also re-derives dependents.
  */
 @Injectable()
-export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
+export class StatusService
+  implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy
+{
   private readonly logger = new Logger(StatusService.name);
   private unsubscribe?: () => void;
 
@@ -46,7 +58,10 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
   async onApplicationBootstrap(): Promise<void> {
     try {
       const changes = await this.recomputeAll();
-      if (changes.length) this.logger.log(`Boot recompute changed ${changes.length} workstream status(es)`);
+      if (changes.length)
+        this.logger.log(
+          `Boot recompute changed ${changes.length} workstream status(es)`,
+        );
     } catch (error) {
       this.logger.error(`Boot recompute failed: ${(error as Error).message}`);
     }
@@ -56,14 +71,21 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
     const changes: StatusChange[] = [];
     await this.recompute(e.workstreamId, changes, new Set(), true);
     // Cheap: any underlying change may alter someone's attention list.
-    this.events.publish(e.workspaceId, { type: 'attention', entity: 'workstream', id: e.workstreamId });
+    this.events.publish(e.workspaceId, {
+      type: 'attention',
+      entity: 'workstream',
+      id: e.workstreamId,
+    });
   }
 
   /** Recomputes every workstream (boot, after seed / admin reset). Returns the changes. */
   async recomputeAll(workspaceId?: string): Promise<StatusChange[]> {
     const rows = await this.ds
       .getRepository(WorkstreamEntity)
-      .find({ where: workspaceId ? { workspaceId } : {}, select: { id: true } });
+      .find({
+        where: workspaceId ? { workspaceId } : {},
+        select: { id: true },
+      });
     const changes: StatusChange[] = [];
     for (const r of rows) await this.recompute(r.id, changes, new Set(), false);
     return changes;
@@ -81,18 +103,46 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
   ): Promise<StatusChange | null> {
     if (visited.has(workstreamId)) return null;
     visited.add(workstreamId);
-    const ws = await this.ds.getRepository(WorkstreamEntity).findOneBy({ id: workstreamId });
+    const ws = await this.ds
+      .getRepository(WorkstreamEntity)
+      .findOneBy({ id: workstreamId });
     if (!ws) return null;
     const { workspaceId } = ws;
 
-    const [inputRequests, artifacts, decisions] = await Promise.all([
-      this.ds.getRepository(InputRequestEntity).find({ where: { workstreamId, state: 'open' } }),
+    const [inputRequests, artifacts, decisions, issues] = await Promise.all([
+      this.ds
+        .getRepository(InputRequestEntity)
+        .find({ where: { workstreamId, state: 'open' } }),
       this.ds.getRepository(ArtifactEntity).find({ where: { workstreamId } }),
-      this.ds.getRepository(DecisionEntity).find({ where: { workspaceId, originWorkstreamId: workstreamId, status: 'proposed' } }),
+      this.ds
+        .getRepository(DecisionEntity)
+        .find({
+          where: {
+            workspaceId,
+            originWorkstreamId: workstreamId,
+            status: 'proposed',
+          },
+        }),
+      this.ds
+        .getRepository(IssueEntity)
+        .createQueryBuilder('i')
+        .select(['i.id', 'i.status'])
+        .where('i.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('i.workstreamIds @> :w::jsonb', {
+          w: JSON.stringify([workstreamId]),
+        })
+        .getMany(),
     ]);
     const incomingDependencies = await this.incoming(workspaceId, ws.id);
 
-    const result = deriveStatus({ workstream: ws, inputRequests, artifacts, decisions, incomingDependencies });
+    const result = deriveStatus({
+      workstream: ws,
+      inputRequests,
+      artifacts,
+      decisions,
+      incomingDependencies,
+      issues,
+    });
 
     let change: StatusChange | null = null;
     const dirty =
@@ -101,10 +151,16 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
       (result.derivedStatus === 'shipped' && !ws.shippedAt);
     if (dirty) {
       const from = ws.status;
-      const patch: Partial<WorkstreamEntity> = { derivedStatus: result.derivedStatus, status: result.status };
-      if (result.derivedStatus === 'shipped' && !ws.shippedAt) patch.shippedAt = new Date();
+      const patch: Partial<WorkstreamEntity> = {
+        derivedStatus: result.derivedStatus,
+        status: result.status,
+      };
+      if (result.derivedStatus === 'shipped' && !ws.shippedAt)
+        patch.shippedAt = new Date();
       if (from !== result.status) patch.updatedAt = new Date();
-      await this.ds.getRepository(WorkstreamEntity).update({ id: ws.id }, patch);
+      await this.ds
+        .getRepository(WorkstreamEntity)
+        .update({ id: ws.id }, patch);
       if (from !== result.status) {
         change = { workstreamId: ws.id, key: ws.key, from, to: result.status };
         changes.push(change);
@@ -114,7 +170,13 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
           type: 'workstream.status_changed',
           subject: { type: 'workstream', id: ws.id },
           workstreamId: ws.id,
-          data: { key: ws.key, title: ws.title, from, to: result.status, derivedStatus: result.derivedStatus },
+          data: {
+            key: ws.key,
+            title: ws.title,
+            from,
+            to: result.status,
+            derivedStatus: result.derivedStatus,
+          },
         });
       }
     }
@@ -127,12 +189,26 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
   }
 
   /** Edges pointing into the workstream, with source statuses. */
-  private async incoming(workspaceId: string, workstreamId: string): Promise<StatusDependency[]> {
-    const edges = await this.ds.getRepository(DependencyEntity).find({ where: { workspaceId, toId: workstreamId, toType: 'workstream' } });
+  private async incoming(
+    workspaceId: string,
+    workstreamId: string,
+  ): Promise<StatusDependency[]> {
+    const edges = await this.ds
+      .getRepository(DependencyEntity)
+      .find({
+        where: { workspaceId, toId: workstreamId, toType: 'workstream' },
+      });
     if (!edges.length) return [];
-    const wsIds = edges.filter((e) => e.fromType === 'workstream').map((e) => e.fromId);
+    const wsIds = edges
+      .filter((e) => e.fromType === 'workstream')
+      .map((e) => e.fromId);
     const wss = wsIds.length
-      ? await this.ds.getRepository(WorkstreamEntity).find({ where: { id: In(wsIds) }, select: { id: true, status: true } })
+      ? await this.ds
+          .getRepository(WorkstreamEntity)
+          .find({
+            where: { id: In(wsIds) },
+            select: { id: true, status: true },
+          })
       : [];
     const wsStatus = new Map<string, string>(wss.map((w) => [w.id, w.status]));
     const out: StatusDependency[] = [];
@@ -145,9 +221,17 @@ export class StatusService implements OnModuleInit, OnApplicationBootstrap, OnMo
   }
 
   /** Workstreams that wait on this one. */
-  private async dependents(workspaceId: string, workstreamId: string): Promise<string[]> {
+  private async dependents(
+    workspaceId: string,
+    workstreamId: string,
+  ): Promise<string[]> {
     const edges = await this.ds.getRepository(DependencyEntity).find({
-      where: { workspaceId, fromId: workstreamId, fromType: 'workstream', toType: 'workstream' },
+      where: {
+        workspaceId,
+        fromId: workstreamId,
+        fromType: 'workstream',
+        toType: 'workstream',
+      },
     });
     return edges.map((e) => e.toId).filter((id) => id !== workstreamId);
   }

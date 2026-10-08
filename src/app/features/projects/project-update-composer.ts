@@ -2,7 +2,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NablaStore, type Project, type ProjectHealth } from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
@@ -16,65 +15,80 @@ import { ProjectHealthPicker } from './project-health';
   imports: [
     HlmButtonImports,
     Kbd,
-    ActorAvatar,
     Markdown,
     CommentInput,
     ProjectHealthPicker,
     ProjectAiDraftButton,
   ],
-  host: { class: 'flex min-w-0 gap-2.5 rounded-lg border p-3' },
+  host: { class: 'block min-w-0' },
   template: `
-    <app-actor-avatar [actor]="{ type: 'user', id: store.me()?.id }" [size]="24" class="mt-0.5" />
-    <div class="flex min-w-0 flex-1 flex-col gap-2.5">
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <app-project-health-picker [(value)]="health" [disabled]="busy()" />
+    <section class="flex flex-col gap-3" aria-label="New project update">
+      <div class="flex flex-wrap items-end justify-between gap-3">
+        <div class="min-w-0">
+          <h2 class="text-sm font-semibold">Post an update</h2>
+          <p class="text-meta mt-0.5">The latest one sets the health shown on the project.</p>
+        </div>
         <app-project-ai-draft-button [project]="project()" (draft)="applyDraft($event)" />
       </div>
 
-      <div class="flex items-center gap-1" role="group" aria-label="Editor mode">
-        <button
-          hlmBtn
-          type="button"
-          size="xs"
-          [variant]="preview() ? 'ghost' : 'secondary'"
-          [attr.aria-pressed]="!preview()"
-          (click)="preview.set(false)"
+      <app-project-health-picker [(value)]="health" [disabled]="busy()" />
+
+      <div class="bg-card overflow-hidden rounded-lg border">
+        <div
+          class="flex items-center gap-1 border-b px-2 py-1.5"
+          role="group"
+          aria-label="Editor mode"
         >
-          Write
-        </button>
-        <button
-          hlmBtn
-          type="button"
-          size="xs"
-          [variant]="preview() ? 'secondary' : 'ghost'"
-          [attr.aria-pressed]="preview()"
-          [disabled]="!body().trim()"
-          (click)="preview.set(true)"
-        >
-          Preview
-        </button>
+          <button
+            type="button"
+            class="rounded-md px-2 py-1 text-xs font-medium"
+            [class]="
+              preview()
+                ? 'text-muted-foreground hover:text-foreground'
+                : 'bg-accent text-foreground'
+            "
+            [attr.aria-pressed]="!preview()"
+            (click)="preview.set(false)"
+          >
+            Write
+          </button>
+          <button
+            type="button"
+            class="rounded-md px-2 py-1 text-xs font-medium"
+            [class]="
+              preview()
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            "
+            [attr.aria-pressed]="preview()"
+            [disabled]="!body().trim()"
+            (click)="preview.set(true)"
+          >
+            Preview
+          </button>
+        </div>
+        @if (preview() && body().trim()) {
+          <div class="min-h-32 px-3 py-3">
+            <app-markdown [source]="body()" [link]="refs.linker()" />
+          </div>
+        } @else {
+          <app-comment-input
+            class="[&_textarea]:min-h-32 [&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-3 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
+            label="Project update"
+            placeholder="What changed, what is blocked, and what is next."
+            [(value)]="body"
+            (keyed)="onKey($event)"
+          />
+        }
       </div>
 
-      @if (preview() && body().trim()) {
-        <div class="min-h-24 rounded-md border px-3 py-2">
-          <app-markdown [source]="body()" [link]="refs.linker()" />
-        </div>
-      } @else {
-        <app-comment-input
-          label="Project update"
-          placeholder="What happened since the last update? Progress, blockers, what is next… Markdown supported."
-          [(value)]="body"
-          (keyed)="onKey($event)"
-        />
-      }
-
       <div class="flex items-center justify-between gap-2">
-        <span class="text-meta">Markdown supported · @ to mention, # to link</span>
+        <span class="text-meta">Markdown · @ to mention, # to link</span>
         <button hlmBtn size="sm" type="button" [disabled]="!canPost() || busy()" (click)="post()">
           Post update <app-kbd keys="mod+enter" class="opacity-70 max-sm:hidden" />
         </button>
       </div>
-    </div>
+    </section>
   `,
 })
 export class ProjectUpdateComposer {
