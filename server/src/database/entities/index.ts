@@ -340,6 +340,8 @@ export class InputRequestEntity extends Wire {
 })
 @ForeignKey(() => TeamEntity, ['teamId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => UserEntity, ['assigneeId'], ['id'], { onDelete: 'SET NULL' })
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
+@Index('IDX_issues_project', ['projectId'])
 export class IssueEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
@@ -353,6 +355,7 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) reporterId: string | null;
   @Column({ type: 'varchar', nullable: true }) assigneeId: string | null;
   @Column({ type: 'varchar', nullable: true }) teamId: string | null;
+  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) workstreamIds: string[];

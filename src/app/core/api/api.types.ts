@@ -253,6 +253,8 @@ export interface CreateIssueInput {
   reporterName?: string;
   assigneeId?: ID;
   teamId?: ID;
+  /** Project the issue is planned under. */
+  projectId?: ID;
   priority?: Priority;
   status?: IssueStatus;
   externalUrl?: string;
@@ -267,12 +269,14 @@ export interface UpdateIssueInput {
   body?: string | null;
   assigneeId?: ID | null;
   teamId?: ID | null;
+  /** `null` clears it and drops that project's milestone. */
+  projectId?: ID | null;
   priority?: Priority;
   status?: IssueStatus;
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
-  /** At most one per project; only milestones of the projects of the linked workstreams. */
+  /** At most one per project; only milestones of the issue's project or of the projects of the linked workstreams. */
   milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;

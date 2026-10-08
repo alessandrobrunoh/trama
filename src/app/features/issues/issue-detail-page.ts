@@ -3,6 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, vi
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideActivity,
+  LucideBox,
   LucideChevronDown,
   LucideChevronUp,
   LucideCopy,
@@ -41,7 +42,7 @@ import { IssueMilestoneProp } from '../milestones/milestone-chips';
 import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { teamOptions } from '../workstreams/ws-model';
+import { projectOptions, teamOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
@@ -227,6 +228,9 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
               <app-property-row label="Team" [icon]="teamGlyph">
                 <app-picker variant="field" label="Team" placeholder="No team" [clearable]="true" clearLabel="No team" [disabled]="!canEdit()" [options]="teams()" [value]="i.teamId ? [i.teamId] : []" (valueChange)="store.updateIssue(i.id, { teamId: $event[0] ?? null })" />
               </app-property-row>
+              <app-property-row label="Project" [icon]="projectGlyph">
+                <app-picker variant="field" label="Project" placeholder="No project" [clearable]="true" clearLabel="Remove from project" [disabled]="!canEdit()" [options]="projects()" [value]="i.projectId ? [i.projectId] : []" (valueChange)="store.updateIssue(i.id, { projectId: $event[0] ?? null })" />
+              </app-property-row>
               @if (showEstimate()) {
                 <app-property-row label="Estimate" [icon]="gaugeGlyph">
                   <app-picker
@@ -388,6 +392,7 @@ export class IssueDetailPage {
     return i.reporterId ? (this.store.getUser(i.reporterId)?.name ?? i.reporterName ?? '') : (i.reporterName ?? '');
   });
   protected readonly teams = computed(() => teamOptions(this.store));
+  protected readonly projects = computed(() => projectOptions(this.store, this.issue()?.projectId));
   protected readonly kindOpts = issueKindOptions();
   /** Estimates are off in this workspace, but an issue that still has one keeps showing it. */
   protected readonly showEstimate = computed(() => this.store.estimateScale() !== 'none' || this.issue()?.estimate !== undefined);
@@ -419,6 +424,7 @@ export class IssueDetailPage {
   protected readonly flagGlyph = LucideFlag;
   protected readonly userGlyph = LucideUserRound;
   protected readonly teamGlyph = LucideUsers;
+  protected readonly projectGlyph = LucideBox;
   protected readonly gaugeGlyph = LucideGauge;
   protected readonly tagGlyph = LucideTag;
   protected readonly sourceGlyph = LucideRadio;

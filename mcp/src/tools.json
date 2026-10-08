@@ -721,6 +721,7 @@
    "limit": "query integer Newest first, at most this many (1-500)",
    "teamId": "query string Team",
    "assigneeId": "query string Assignee",
+   "projectId": "query string Project",
    "workstreamId": "query string Workstream",
    "milestoneId": "query string Milestone",
    "q": "query string Text filter"
@@ -748,6 +749,7 @@
    "reporterName": "body string Reporter name",
    "assigneeId": "body string Assignee user id",
    "teamId": "body string Team id",
+   "projectId": "body string Project id",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
@@ -769,13 +771,14 @@
    "reporterName": "body string Reporter name",
    "assigneeId": "body string Assignee user id",
    "teamId": "body string Team id",
+   "projectId": "body string Project id (null clears; drops that project's milestone)",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Kind (re-keys the issue)",
    "workstreamIds": "body string[] Linked workstream ids",
-   "milestoneIds": "body string[] Milestone ids (max one per workstream)",
+   "milestoneIds": "body string[] Milestone ids (max one per project; from the issue's project or its workstreams' projects)",
    "duplicateOfId": "body string Id or key of the original (null clears)"
   }
  },

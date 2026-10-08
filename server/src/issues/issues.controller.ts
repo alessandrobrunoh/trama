@@ -82,6 +82,7 @@ class CreateIssueDto {
   @IsOptional() @IsString() @MaxLength(200) reporterName?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() teamId?: string;
+  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
@@ -98,6 +99,8 @@ class UpdateIssueDto {
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;
   @Clearable() @IsString() teamId?: string | null;
+  /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
+  @Clearable() @IsString() projectId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
@@ -105,7 +108,7 @@ class UpdateIssueDto {
   @IsArray()
   @IsString({ each: true })
   workstreamIds?: string[];
-  /** At most one milestone per project of the linked workstreams. */
+  /** At most one milestone per project, from `projectId` or the linked workstreams' projects. */
   @OptionalNotNull()
   @IsArray()
   @IsString({ each: true })
@@ -128,6 +131,7 @@ class ListIssueQuery {
   @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() assigneeId?: string;
+  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() milestoneId?: string;
   @IsOptional() @IsString() q?: string;

@@ -48,8 +48,8 @@ export class NextMilestoneChip {
 const date = (iso: string): string => shortDate(iso);
 
 /**
- * Issue property: one milestone per project. Options are the milestones of the projects of the
- * workstreams the issue is in, labelled "Checkout v2 › M2 — Identity Ready"; picking a second one of
+ * Issue property: one milestone per project. Options are the milestones of the issue's own project
+ * and of the projects of the workstreams it is in, labelled "Checkout v2 › M2 — Identity Ready"; picking a second one of
  * the same project replaces the first.
  */
 @Component({
@@ -60,7 +60,7 @@ const date = (iso: string): string => shortDate(iso);
   template: `
     <app-property-row label="Milestone" [icon]="diamond">
       @if (!hasWorkstream()) {
-        <span class="text-muted-foreground px-1.5 text-[13px]" hlmTooltip="Milestones belong to a project. Add this issue to a workstream of a project (W) to pick a milestone.">Add to a project's workstream first</span>
+        <span class="text-muted-foreground px-1.5 text-[13px]" hlmTooltip="Milestones belong to a project. Set the issue's project, or add it to a workstream of a project (W), to pick a milestone.">Set a project first</span>
       } @else {
         <app-picker
           variant="field"
@@ -87,14 +87,15 @@ export class IssueMilestoneProp {
   protected readonly diamond = LucideDiamond;
 
   protected readonly canEdit = computed(() => this.store.canEditTeamWork(this.issue().teamId) && !this.issue().duplicateOfId);
-  /** The projects the issue's workstreams carry out. */
+  /** The issue's own project, then the projects its workstreams carry out. */
   private readonly linkedProjects = computed(() => {
     const seen = new Set<string>();
     const out: Project[] = [];
-    for (const wsId of this.issue().workstreamIds) {
-      const project = this.store.getProject(this.store.getWorkstream(wsId)?.projectId);
+    const add = (project: Project | undefined) => {
       if (project && !seen.has(project.id)) (seen.add(project.id), out.push(project));
-    }
+    };
+    add(this.store.getProject(this.issue().projectId));
+    for (const wsId of this.issue().workstreamIds) add(this.store.getProject(this.store.getWorkstream(wsId)?.projectId));
     return out;
   });
   protected readonly options = computed<PickOption[]>(() => {
