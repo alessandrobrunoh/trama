@@ -55,3 +55,4 @@ Thumbs.db
 .delta/
 .claude/
 .agents/plans/
+mcp/target/
