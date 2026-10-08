@@ -1,8 +1,8 @@
-# Contributing to Nabla
+# Contributing to Trama
 
-Thank you for your interest in contributing to Nabla.
+Thank you for your interest in contributing to Trama.
 
-Nabla is an early-stage open-source project exploring a different model for coordinating software work across humans, coding agents, teams, repositories, and delivery systems.
+Trama is an early-stage source-available project exploring a different model for coordinating software work across humans, coding agents, teams, repositories, and delivery systems.
 
 Because the architecture is still evolving, **design alignment matters as much as implementation quality**.
 
@@ -42,7 +42,7 @@ Contributions should generally reinforce these principles:
    Agent activity should be explicit and auditable.
 
 3. **Human attention is scarce**  
-   Nabla should surface where human judgment is needed.
+   Trama should surface where human judgment is needed.
 
 4. **Reality should drive status**  
    Git, CI, reviews, executions, and deployments should determine state whenever possible.
@@ -64,8 +64,8 @@ Contributions should generally reinforce these principles:
 Clone the repository:
 
 ```bash
-git clone https://github.com/alessandrobrunoh/nabla.git
-cd nabla
+git clone https://github.com/alessandrobrunoh/trama.git
+cd trama
 ```
 
 Install dependencies:
@@ -194,7 +194,7 @@ consider whether the relationship is actually:
 - derived rather than persisted;
 - provider-specific rather than domain-level.
 
-Nabla intentionally avoids reproducing traditional issue-tracker assumptions when they do not fit agentic engineering workflows.
+Trama intentionally avoids reproducing traditional issue-tracker assumptions when they do not fit agentic engineering workflows.
 
 ## Database changes
 
@@ -227,7 +227,7 @@ Use fake values in fixtures and examples.
 
 ## UI contributions
 
-Nabla should remain fast, compact, keyboard-friendly, and information-dense without becoming visually noisy.
+Trama should remain fast, compact, keyboard-friendly, and information-dense without becoming visually noisy.
 
 For significant UI changes:
 
@@ -249,7 +249,7 @@ Integration contributions should document:
 - webhook verification where applicable;
 - rate-limit behavior;
 - failure behavior;
-- what data leaves Nabla;
+- what data leaves Trama;
 - what credentials are stored.
 
 Provider-specific concepts should remain behind adapters whenever practical.
@@ -319,15 +319,21 @@ Understanding the problem helps us find a solution that fits the broader product
 
 By participating in this project, you agree to follow [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md).
 
-## License of contributions
+## License and Contributor License Agreement
 
-By submitting a contribution to Nabla, you agree that your contribution may be distributed under the project's [GNU Affero General Public License v3.0](./LICENSE).
+The project is source-available under the [PolyForm Shield License 1.0.0](./LICENSE). Anyone may use, modify and self-host it, but not to build a competing product or service.
 
-You confirm that you have the right to submit the contribution under those terms.
+Before a pull request can be merged, you must agree to the [Contributor License Agreement](./CLA.md). You keep the copyright on your contribution; the CLA gives the maintainer the rights needed to distribute it under the project's license, and to offer the project under other terms (for example a commercial license or a hosted service) in the future.
+
+To sign, comment on your pull request:
+
+> I have read the CLA Document and I hereby sign the CLA.
+
+You only need to do this once. You confirm that you have the right to submit the contribution, and that your employer (if any) does not claim rights over it.
 
 ## Questions
 
-If you are unsure whether an idea fits Nabla, open a GitHub Discussion or a small design issue before implementing it.
+If you are unsure whether an idea fits Trama, open a GitHub Discussion or a small design issue before implementing it.
 
 Thoughtful disagreement about architecture and product direction is welcome.
 

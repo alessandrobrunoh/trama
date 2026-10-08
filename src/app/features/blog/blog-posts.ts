@@ -129,7 +129,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
           'Pick <strong>Trello</strong> for simple, visual, mostly non-engineering work.',
           'Pick <strong>Jira</strong> for heavy process customisation at enterprise scale.',
           'Pick <strong>Linear</strong> for a fast hosted tracker where one issue maps to one change.',
-          'Pick <strong>Trama</strong> when several issues share one fix, when humans and agents work in the same context, and when you want the decisions and artifacts to stay attached to the outcome. Open source, on your own infrastructure.',
+          'Pick <strong>Trama</strong> when several issues share one fix, when humans and agents work in the same context, and when you want the decisions and artifacts to stay attached to the outcome. Source-available, on your own infrastructure.',
         ],
       },
     ],
@@ -138,14 +138,14 @@ export const BLOG_POSTS: readonly BlogPost[] = [
     slug: 'introducing-trama',
     title: 'Introducing Trama',
     description:
-      'Issues describe problems. Workstreams organise outcomes. Decisions and artifacts explain what was delivered. Meet the open-source coordination layer for humans and coding agents.',
+      'Issues describe problems. Workstreams organise outcomes. Decisions and artifacts explain what was delivered. Meet the source-available coordination layer for humans and coding agents.',
     date: '2026-10-06',
     readingMinutes: 6,
     tag: 'Announcement',
     blocks: [
       {
         type: 'p',
-        html: 'Today we are opening up <strong>Trama</strong>, an open-source coordination layer for software teams that work with coding agents. The name is Italian for <em>weft</em>: the thread that runs across a loom and turns separate strands into one fabric. That is what we want Trama to do for your work.',
+        html: 'Today we are opening up <strong>Trama</strong>, a source-available coordination layer for software teams that work with coding agents. The name is Italian for <em>weft</em>: the thread that runs across a loom and turns separate strands into one fabric. That is what we want Trama to do for your work.',
       },
       { type: 'h2', id: 'shape-of-work', text: 'The shape of work changed' },
       {
@@ -205,10 +205,10 @@ export const BLOG_POSTS: readonly BlogPost[] = [
         type: 'p',
         html: 'At the same time, nothing in Trama requires AI. The workstream model works just as well for a team of people, and it does not collapse if a provider changes.',
       },
-      { type: 'h2', id: 'open-source', text: 'Open source and self-hosted' },
+      { type: 'h2', id: 'open-source', text: 'Source-available and self-hosted' },
       {
         type: 'p',
-        html: 'Trama is licensed under the <strong>AGPL-3.0</strong>. It runs as an Angular web app and a NestJS API on top of PostgreSQL, with no infrastructure zoo required. The open-source edition is the real product, not a demo of it.',
+        html: 'Trama is licensed under the <strong>PolyForm Shield 1.0.0</strong>: free to use, modify and self-host, including inside your company, as long as you do not use it to build a competing product or service. It runs as an Angular web app and a NestJS API on top of PostgreSQL, with no infrastructure zoo required. The self-hosted edition is the real product, not a demo of it.',
       },
       { type: 'h2', id: 'next', text: 'What comes next' },
       {

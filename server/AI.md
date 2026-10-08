@@ -17,7 +17,7 @@ Use a model that follows JSON instructions for suggestions. No provider-specific
 SDK or dependency is required. Restart the API after changing its environment.
 Never put the key in Angular environment files or browser storage.
 
-All three settings are required. Without them, the rest of Nabla remains usable,
+All three settings are required. Without them, the rest of Trama remains usable,
 and Settings → AI & assistant explains how to enable the feature. “Configured”
 reports configuration presence, not a successful upstream connection.
 
@@ -72,7 +72,7 @@ unsupported login flow.
 
 For Grok Build, install the official CLI in the API runtime (`npm install -g
 @xai-official/grok`) and set `GROK_CLI_PATH` (usually `grok`) and
-`GROK_HOME_DIR` to a private persistent volume. Each Nabla account receives a
+`GROK_HOME_DIR` to a private persistent volume. Each Trama account receives a
 separate home directory beneath that path. Settings starts `grok login
 --device-auth`, shows the one-time device code, and polls for completion. When
 connected, that user's chat and suggestions use the official client; other

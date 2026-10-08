@@ -217,7 +217,7 @@ export class RoadmapPage {
         {
           area: 'Hosting',
           title: 'Managed cloud',
-          body: 'A hosted option for teams that prefer not to run Trama themselves, with the same open-source core.',
+          body: 'A hosted option for teams that prefer not to run Trama themselves, with the same core as the self-hosted edition.',
         },
       ],
     },

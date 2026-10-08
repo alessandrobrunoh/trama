@@ -1,12 +1,12 @@
 # Security Policy
 
-Security matters especially for Nabla because the project is designed to interact with source-code platforms, authentication systems, coding agents, and potentially sensitive organization data.
+Security matters especially for Trama because the project is designed to interact with source-code platforms, authentication systems, coding agents, and potentially sensitive organization data.
 
-Nabla is currently under active development and is **not yet considered production-ready**.
+Trama is currently under active development and is **not yet considered production-ready**.
 
 ## Supported versions
 
-Until Nabla reaches its first stable release, only the latest version of the `main` branch is actively maintained.
+Until Trama reaches its first stable release, only the latest version of the `main` branch is actively maintained.
 
 | Version | Supported |
 | --- | --- |
@@ -51,7 +51,7 @@ The maintainers will aim to:
 5. coordinate disclosure when appropriate;
 6. publish security guidance or an advisory if users need to take action.
 
-Response times are best-effort while Nabla remains an early-stage open-source project.
+Response times are best-effort while Trama remains an early-stage project.
 
 ## Scope
 
@@ -83,17 +83,17 @@ Security reports are especially welcome for issues involving:
 Unless they result in a meaningful security impact, the following are generally not treated as vulnerabilities:
 
 - issues that require an already-compromised administrator account;
-- social engineering without a Nabla vulnerability;
+- social engineering without a Trama vulnerability;
 - denial of service requiring unrealistic resources;
 - missing security headers without demonstrated impact;
 - clickjacking on pages that cannot perform sensitive actions;
 - self-XSS;
 - vulnerabilities in unsupported development snapshots already fixed on `main`;
-- vulnerabilities in third-party services with no Nabla-specific impact.
+- vulnerabilities in third-party services with no Trama-specific impact.
 
 ## Secrets and credentials
 
-Nabla is intended to keep all sensitive integration credentials in server-side storage.
+Trama is intended to keep all sensitive integration credentials in server-side storage.
 
 Contributors must never:
 
@@ -143,4 +143,4 @@ Please allow maintainers reasonable time to investigate and release a fix before
 
 Coordinated disclosure helps protect users while preserving credit for the researcher.
 
-Thank you for helping keep Nabla and its users safe.
+Thank you for helping keep Trama and its users safe.

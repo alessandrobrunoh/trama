@@ -53,11 +53,11 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trama: 'Contributors on a workstream, with scoped tokens and usage caps',
   },
   {
-    topic: 'Open source & self-hosting',
+    topic: 'Source access & self-hosting',
     trello: 'No',
     jira: 'Data Center only (paid, closed source)',
     linear: 'No',
-    trama: 'AGPL-3.0, runs on your own PostgreSQL',
+    trama: 'Source-available (PolyForm Shield), runs on your own PostgreSQL',
   },
 ];
 
