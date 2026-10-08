@@ -3,7 +3,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'workstream' | 'issue' | 'decision' | 'artifact' | 'repository' | 'team';
+export type HitType = 'workstream' | 'project' | 'issue' | 'decision' | 'artifact' | 'repository' | 'team';
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -16,33 +16,35 @@ export interface SearchHit {
   workstreamKey?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['workstream', 'decision', 'issue', 'artifact', 'repository', 'team'];
+export const HIT_ORDER: HitType[] = ['workstream', 'project', 'decision', 'issue', 'artifact', 'repository', 'team'];
 export const HIT_LABEL: Record<HitType, string> = {
   workstream: 'Workstreams',
+  project: 'Projects',
   decision: 'Decisions',
   issue: 'Issues',
   artifact: 'Artifacts',
-  repository: 'Projects',
+  repository: 'Repositories',
   team: 'Teams',
 };
 export const HIT_SINGULAR: Record<HitType, string> = {
   workstream: 'Workstream',
+  project: 'Project',
   decision: 'Decision',
   issue: 'Issue',
   artifact: 'Artifact',
-  repository: 'Project',
+  repository: 'Repository',
   team: 'Team',
 };
 
 const TYPE_ALIASES: Record<string, HitType> = {
   workstreams: 'workstream',
+  projects: 'project',
+  project: 'project',
   decisions: 'decision',
   issues: 'issue',
   artifacts: 'artifact',
   repositories: 'repository',
   repository: 'repository',
-  projects: 'repository',
-  project: 'repository',
   teams: 'team',
 };
 
@@ -117,6 +119,7 @@ export class SearchService {
       if (score > 0) scored.push({ hit, score });
     };
     for (const w of s.workstreams()) push({ type: 'workstream', id: w.id, key: w.key, title: w.title }, `${w.key} ${w.title}`, w.objective);
+    for (const p of s.projects()) push({ type: 'project', id: p.id, title: p.name }, p.name, p.summary ?? '');
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
     for (const a of s.artifacts())
@@ -144,8 +147,10 @@ export class SearchService {
         return ['decisions', h.key ?? h.id];
       case 'issue':
         return ['issues', h.key ?? h.id];
-      case 'repository':
+      case 'project':
         return ['projects', h.id];
+      case 'repository':
+        return ['repositories', h.id];
       case 'team':
         return ['teams', h.key ?? h.id];
       case 'artifact': {

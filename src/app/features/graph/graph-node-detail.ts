@@ -133,8 +133,8 @@ export interface DetailLink {
             <app-property-row label="Environment"><span class="font-mono text-xs">{{ a.environment }}</span></app-property-row>
           }
           @if (artifactRepo(); as r) {
-            <app-property-row label="Project">
-              <a class="inline-flex min-w-0 items-center gap-1.5 hover:underline" [routerLink]="['/', slug(), 'projects', r.id]">
+            <app-property-row label="Repository">
+              <a class="inline-flex min-w-0 items-center gap-1.5 hover:underline" [routerLink]="['/', slug(), 'repositories', r.id]">
                 <app-provider-icon [provider]="r.provider" [size]="13" />
                 <span class="truncate font-mono text-xs">{{ r.fullName }}</span>
               </a>

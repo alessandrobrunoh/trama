@@ -8,6 +8,7 @@ import {
   IssueEntity,
   MembershipEntity,
   MilestoneEntity,
+  ProjectEntity,
   RepositoryEntity,
   TeamEntity,
   WorkstreamEntity,
@@ -38,6 +39,25 @@ export class RefsService {
 
   repositories(workspaceId: string, ids?: readonly string[] | null) {
     return this.assertAll(RepositoryEntity, workspaceId, ids, 'repository');
+  }
+
+  projects(workspaceId: string, ids?: readonly string[] | null) {
+    return this.assertAll(ProjectEntity, workspaceId, ids, 'project');
+  }
+
+  /**
+   * A workstream of a project may only use the project's repositories: 400 listing the offenders.
+   * Resolves the project (and 400s when it does not exist) so callers can inherit its repositories.
+   */
+  async projectRepositories(workspaceId: string, projectId: string, repositoryIds: readonly string[]) {
+    const project = await this.ds.getRepository(ProjectEntity).findOneBy({ id: projectId, workspaceId });
+    if (!project) throw new BadRequestException(`Unknown project in: ${projectId}`);
+    const outside = [...new Set(repositoryIds)].filter((r) => !project.repositoryIds.includes(r));
+    if (outside.length)
+      throw new BadRequestException(
+        `Repositories not part of project "${project.name}": ${outside.join(', ')}. Add them to the project first.`,
+      );
+    return project;
   }
 
   workstreams(workspaceId: string, ids?: readonly string[] | null) {
@@ -79,8 +99,7 @@ export class RefsService {
         return { exists: !!r, workstreamId: r?.originWorkstreamId ?? undefined };
       }
       case 'milestone': {
-        const r = await db.getRepository(MilestoneEntity).findOne({ where, select: { id: true, workstreamId: true } });
-        return { exists: !!r, workstreamId: r?.workstreamId };
+        return { exists: await db.getRepository(MilestoneEntity).existsBy(where) };
       }
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };
@@ -88,6 +107,8 @@ export class RefsService {
         return { exists: await db.getRepository(RepositoryEntity).existsBy(where) };
       case 'team':
         return { exists: await db.getRepository(TeamEntity).existsBy(where) };
+      case 'project':
+        return { exists: await db.getRepository(ProjectEntity).existsBy(where) };
     }
   }
 }

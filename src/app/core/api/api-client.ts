@@ -33,6 +33,7 @@ import type {
   Membership,
   Milestone,
   OutgoingWebhook,
+  Project,
   Repository,
   Role,
   SavedView,
@@ -66,6 +67,7 @@ import type {
   LinkRepositoryInput,
   RemoteRepositoryPage,
   UpdateIntegrationInput,
+  CreateProjectInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -87,6 +89,7 @@ import type {
   UpdateDecisionInput,
   UpdateIssueInput,
   UpdateMemberInput,
+  UpdateProjectInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -287,6 +290,14 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/teams/${id}`),
   };
 
+  readonly projects = {
+    list: (slug: string) => this.get<Project[]>(`${this.w(slug)}/projects`),
+    get: (slug: string, id: ID) => this.get<Project>(`${this.w(slug)}/projects/${id}`),
+    create: (slug: string, input: CreateProjectInput) => this.post<Project>(`${this.w(slug)}/projects`, input),
+    update: (slug: string, id: ID, input: UpdateProjectInput) => this.patch<Project>(`${this.w(slug)}/projects/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/projects/${id}`),
+  };
+
   readonly repositories = {
     list: (slug: string) => this.get<Repository[]>(`${this.w(slug)}/repositories`),
     get: (slug: string, id: ID) => this.get<Repository>(`${this.w(slug)}/repositories/${id}`),
@@ -369,13 +380,13 @@ export class ApiClient {
   };
 
   readonly milestones = {
-    list: (slug: string, workstreamId?: ID) => this.get<Milestone[]>(`${this.w(slug)}/milestones`, { workstreamId }),
+    list: (slug: string, projectId?: ID) => this.get<Milestone[]>(`${this.w(slug)}/milestones`, { projectId }),
     create: (slug: string, input: CreateMilestoneInput) => this.post<Milestone>(`${this.w(slug)}/milestones`, input),
     update: (slug: string, id: ID, input: UpdateMilestoneInput) =>
       this.patch<Milestone>(`${this.w(slug)}/milestones/${id}`, input),
-    /** Re-numbers sortOrder 0..n-1 following `ids`; returns the ordered milestones of the workstream. */
-    reorder: (slug: string, workstreamId: ID, ids: ID[]) =>
-      this.post<Milestone[]>(`${this.w(slug)}/milestones/reorder`, { workstreamId, ids }),
+    /** Re-numbers sortOrder 0..n-1 following `ids`; returns the ordered milestones of the project. */
+    reorder: (slug: string, projectId: ID, ids: ID[]) =>
+      this.post<Milestone[]>(`${this.w(slug)}/milestones/reorder`, { projectId, ids }),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/milestones/${id}`),
   };
 

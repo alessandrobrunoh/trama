@@ -46,13 +46,13 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
         </button>
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span>New project</span>
+          <span>New repository</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
     </ng-template>
 
-    <app-page-header title="Projects" [description]="description()" />
+    <app-page-header title="Repositories" [description]="description()" />
 
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
       <div class="relative w-full sm:w-52">
@@ -60,8 +60,8 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
         <input
           hlmInput
           class="h-10 w-full pl-9 text-sm"
-          placeholder="Search projects…"
-          aria-label="Search projects"
+          placeholder="Search repositories…"
+          aria-label="Search repositories"
           [value]="search()"
           (input)="search.set($any($event.target).value)"
         />
@@ -78,14 +78,14 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
     </div>
 
     @if (total() === 0) {
-      <app-empty-state [icon]="folder" title="No projects yet" description="A project is a repository on GitHub, GitLab or Bitbucket that a workstream can land in. Import them from a connected account, or add one by hand.">
+      <app-empty-state [icon]="folder" title="No repositories yet" description="A repository on GitHub, GitLab or Bitbucket that a workstream can land in. Import them from a connected account, or add one by hand.">
         @if (canAdmin()) {
           <button hlmBtn size="sm" (click)="importOpen.set(true)"><svg [lucideIcon]="download" [size]="14"></svg>Import from a git host</button>
           <button hlmBtn size="sm" variant="outline" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>Add manually</button>
         }
       </app-empty-state>
     } @else if (shown().length === 0) {
-      <app-empty-state [icon]="searchIcon" title="No projects match" description="Try another name, provider or team.">
+      <app-empty-state [icon]="searchIcon" title="No repositories match" description="Try another name, provider or team.">
         <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
       </app-empty-state>
     } @else {
@@ -100,7 +100,7 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
         @for (row of rows(); track row.repo.id) {
           @let r = row.repo;
           <a
-            [routerLink]="['/', slug(), 'projects', r.id]"
+            [routerLink]="['/', slug(), 'repositories', r.id]"
             [attr.data-row-id]="r.id"
             role="listitem"
             class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
@@ -209,7 +209,7 @@ export class RepositoryListPage {
   protected readonly description = computed(() => {
     const n = this.total();
     const visible = this.shown().length;
-    const noun = n === 1 ? 'project' : 'projects';
+    const noun = n === 1 ? 'repository' : 'repositories';
     return this.hasFilters() ? `${visible} of ${n} ${noun}` : `${n} ${noun}`;
   });
 

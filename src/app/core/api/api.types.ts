@@ -29,6 +29,7 @@ import type {
   IntegrationConnection,
   IssueStatus,
   Priority,
+  ProjectStatus,
   ReviewState,
   Role,
   SubjectRef,
@@ -155,6 +156,34 @@ export interface UpdateRepositoryInput {
   teamIds?: ID[];
 }
 
+// ───── projects ─────
+export interface CreateProjectInput {
+  name: string;
+  summary?: string;
+  description?: string;
+  color?: string;
+  status?: ProjectStatus;
+  priority?: Priority;
+  leadId?: ID;
+  teamIds?: ID[];
+  repositoryIds?: ID[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+}
+export interface UpdateProjectInput {
+  name?: string;
+  summary?: string | null;
+  description?: string | null;
+  color?: string;
+  status?: ProjectStatus;
+  priority?: Priority;
+  leadId?: ID | null;
+  teamIds?: ID[];
+  repositoryIds?: ID[];
+  startDate?: ISODate | null;
+  targetDate?: ISODate | null;
+}
+
 // ───── workstreams ─────
 export interface CreateWorkstreamInput {
   title: string;
@@ -166,6 +195,8 @@ export interface CreateWorkstreamInput {
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID;
+  /** Repositories default to the project's when omitted; otherwise they must be a subset of them. */
+  projectId?: ID;
   repositoryIds?: ID[];
   acceptanceCriteria?: { text: string; state?: CriterionState }[];
   priority?: Priority;
@@ -183,6 +214,7 @@ export interface UpdateWorkstreamInput {
   ownerTeamId?: ID;
   participatingTeamIds?: ID[];
   accountableUserId?: ID | null;
+  projectId?: ID | null;
   repositoryIds?: ID[];
   /** Replace the whole checklist (prefer the criterion methods for single edits). */
   acceptanceCriteria?: { id?: ID; text: string; state?: CriterionState }[];
@@ -240,7 +272,7 @@ export interface UpdateIssueInput {
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
-  /** At most one per linked workstream; only milestones of linked workstreams. */
+  /** At most one per project; only milestones of the projects of the linked workstreams. */
   milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
@@ -255,11 +287,11 @@ export interface LinkIssueInput {
 
 // ───── milestones ─────
 export interface CreateMilestoneInput {
-  workstreamId: ID;
+  projectId: ID;
   name: string;
   description?: string;
   targetDate?: ISODate;
-  /** Defaults to last in the workstream. */
+  /** Defaults to last in the project. */
   sortOrder?: number;
 }
 export interface UpdateMilestoneInput {

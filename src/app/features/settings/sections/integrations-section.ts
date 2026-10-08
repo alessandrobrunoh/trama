@@ -190,7 +190,7 @@ type Row = IntegrationDetail & { detailed: boolean };
           </span>
           <div>
             <p class="text-[13px] font-medium">Nothing connected yet</p>
-            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import projects and see pull requests and CI on your workstreams.</p>
+            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import repositories and see pull requests and CI on your workstreams.</p>
           </div>
           @if (canAdmin()) {
             <button hlmBtn size="sm" (click)="openConnect()"><svg [lucideIcon]="plus" [size]="14"></svg> Connect</button>
@@ -290,7 +290,7 @@ type Row = IntegrationDetail & { detailed: boolean };
                   <div class="min-w-0">
                     <div class="text-[13px] font-medium">Repositories</div>
                     <div class="text-muted-foreground text-xs">
-                      {{ c.repositoryIds.length ? c.repositoryIds.length + ' linked. Events from other repositories are ignored.' : 'Link repositories to receive their events and import them as projects.' }}
+                      {{ c.repositoryIds.length ? c.repositoryIds.length + ' linked. Events from other repositories are ignored.' : 'Link repositories to receive their events and import them as repositories.' }}
                     </div>
                   </div>
                   @if (canAdmin()) {
@@ -306,12 +306,12 @@ type Row = IntegrationDetail & { detailed: boolean };
                       <li class="flex items-center gap-2 px-2.5 py-1.5">
                         <app-provider-icon [provider]="c.provider" [size]="13" />
                         @if (repo(id); as r) {
-                          <a class="min-w-0 flex-1 truncate font-mono text-xs hover:underline" [routerLink]="['/', slug(), 'projects', r.id]">{{ r.fullName }}</a>
+                          <a class="min-w-0 flex-1 truncate font-mono text-xs hover:underline" [routerLink]="['/', slug(), 'repositories', r.id]">{{ r.fullName }}</a>
                         } @else {
                           <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">{{ id }}</span>
                         }
                         @if (canAdmin()) {
-                          <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Unlink ' + (repo(id)?.fullName ?? id)" title="Unlink (the project stays)" (click)="unlink(c, id)">
+                          <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Unlink ' + (repo(id)?.fullName ?? id)" title="Unlink (the repository stays)" (click)="unlink(c, id)">
                             <svg [lucideIcon]="xIcon" [size]="13"></svg>
                           </button>
                         }
@@ -502,7 +502,7 @@ export class IntegrationsSection {
   protected disconnect(c: Row): void {
     this.ui.setConfirmDelete({
       title: `Disconnect ${c.account || PROVIDER_INFO[c.provider].label}?`,
-      description: 'Projects and artifacts stay. Webhook deliveries for this connection start failing.',
+      description: 'Repositories and artifacts stay. Webhook deliveries for this connection start failing.',
       confirmLabel: 'Disconnect',
       onConfirm: async () => {
         await this.store.deleteIntegration(c.id);
@@ -515,13 +515,13 @@ export class IntegrationsSection {
   }
 
   protected onLinked(fullName: string): void {
-    this.notify.success('Repository linked', { description: `${fullName} is now a project.` });
+    this.notify.success('Repository linked', { description: `${fullName} is now a repository.` });
   }
 
   protected unlink(c: Row, repositoryId: string): void {
     const name = this.repo(repositoryId)?.fullName ?? 'this repository';
     void this.store.unlinkRepository(c.id, repositoryId).then((ok) => {
-      if (ok) this.notify.success(`Unlinked ${name}`, { description: 'The project stays; its events are now ignored.' });
+      if (ok) this.notify.success(`Unlinked ${name}`, { description: 'The repository stays; its events are now ignored.' });
     });
   }
 

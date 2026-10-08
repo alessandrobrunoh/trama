@@ -37,6 +37,7 @@ export const ESTIMATE_VALUES: Record<string, readonly number[]> = {
 export interface MockWorkstream {
   id: string;
   key?: string;
+  projectId?: string | null;
   ownerTeamId: string;
   status: string;
 }
@@ -63,7 +64,7 @@ export interface MockContext {
   teamIds: readonly string[];
   workstreams: readonly MockWorkstream[];
   /** Milestones that already exist (they may receive some mock issues). */
-  milestones: readonly { id: string; workstreamId: string }[];
+  milestones: readonly { id: string; projectId: string }[];
   /** Last used issue number per kind. */
   issueCounters: Partial<Record<IssueKind, number>>;
   /** Real issues (not mock ones): they only get missing estimates / started / completed timestamps. */
@@ -412,17 +413,19 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
   const focusA = sorted.find((w) => w.status === 'working') ?? sorted[0];
   const focusB = sorted.find((w) => w.id !== focusA?.id && w.ownerTeamId !== focusA?.ownerTeamId) ?? sorted.find((w) => w.id !== focusA?.id);
   const mockMilestones: { id: string; workstreamId: string; target: number }[] = [];
+  // Milestones belong to a project, so only workstreams that carry out one can get them.
   const addMilestone = (n: number, ws: MockWorkstream, name: string, description: string, targetDays: number, createdDays: number) => {
+    if (!ws.projectId) return;
     const id = `${MOCK_MILESTONE_PREFIX}${n}`;
     const target = ago(-targetDays);
     mockMilestones.push({ id, workstreamId: ws.id, target });
     out.milestones.push({
-      id, workspaceId: ctx.workspaceId, workstreamId: ws.id, name, description, targetDate: roundTo10Utc(target), sortOrder: 100 + n,
+      id, workspaceId: ctx.workspaceId, projectId: ws.projectId, name, description, targetDate: roundTo10Utc(target), sortOrder: 100 + n,
       createdAt: ISO(ago(createdDays)), updatedAt: ISO(ago(createdDays)),
     });
     out.events.push({
       id: `${MOCK_EVENT_PREFIX}ms_${n}`, workspaceId: ctx.workspaceId, at: ISO(ago(createdDays)), actor: { type: 'user', id: ctx.userIds[0] },
-      type: 'milestone.created', subject: { type: 'milestone', id }, workstreamId: ws.id, data: { name },
+      type: 'milestone.created', subject: { type: 'milestone', id }, workstreamId: null, data: { name, projectId: ws.projectId },
     });
   };
   if (focusA) {
@@ -487,7 +490,8 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
         } else if (mine.length === 1) {
           if (rng.chance(0.85)) milestoneIds.push(mine[0].id);
         } else {
-          const existing = ctx.milestones.filter((m) => m.workstreamId === w);
+          const projectId = ctx.workstreams.find((x) => x.id === w)?.projectId;
+          const existing = projectId ? ctx.milestones.filter((m) => m.projectId === projectId) : [];
           if (existing.length && rng.chance(0.6)) milestoneIds.push(rng.pick(existing).id);
         }
       }
@@ -604,8 +608,8 @@ export function addMockHistoryToSeed(data: SeedData, now: number): void {
     estimateScale: resolveScale(data.workspace.settings?.estimateScale),
     userIds: data.users.map((u) => u.id as string).filter((id) => roleOf.get(id) !== 'viewer'),
     teamIds: data.teams.map((t) => t.id as string),
-    workstreams: data.workstreams.map((w) => ({ id: w.id as string, key: w.key, ownerTeamId: w.ownerTeamId as string, status: w.status as string })),
-    milestones: data.milestones.map((m) => ({ id: m.id as string, workstreamId: m.workstreamId as string })),
+    workstreams: data.workstreams.map((w) => ({ id: w.id as string, key: w.key, ownerTeamId: w.ownerTeamId as string, status: w.status as string, projectId: (w.projectId as string | null | undefined) ?? null })),
+    milestones: data.milestones.map((m) => ({ id: m.id as string, projectId: m.projectId as string })),
     issueCounters: counters,
     existingIssues: data.issues.map((i) => ({
       id: i.id as string,

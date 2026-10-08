@@ -163,6 +163,7 @@ export class KeyboardShortcuts {
           ? { kind: 'workstream', defaults: { ownerTeamId: this.nabla.getTeam(key)?.id } }
           : { kind: 'team', defaults: {} };
       case 'projects':
+        return key ? { kind: 'workstream', defaults: { projectId: key } } : { kind: 'project', defaults: {} };
       case 'repositories':
         return key
           ? { kind: 'workstream', defaults: { repositoryIds: [key] } }

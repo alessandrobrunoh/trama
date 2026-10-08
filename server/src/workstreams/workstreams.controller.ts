@@ -81,6 +81,7 @@ export class CreateWorkstreamDto {
   @IsString({ each: true })
   participatingTeamIds?: string[];
   @IsOptional() @IsString() accountableUserId?: string;
+  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) repositoryIds?: string[];
   @IsOptional()
   @IsArray()
@@ -111,6 +112,7 @@ class UpdateWorkstreamDto {
   @IsString({ each: true })
   participatingTeamIds?: string[];
   @Clearable() @IsString() accountableUserId?: string | null;
+  @Clearable() @IsString() projectId?: string | null;
   @OptionalNotNull()
   @IsArray()
   @IsString({ each: true })
@@ -135,6 +137,7 @@ class ListWorkstreamsQuery {
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() accountableUserId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
+  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsString() label?: string;
   @IsOptional() @IsString() q?: string;

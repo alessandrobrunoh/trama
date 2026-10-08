@@ -13,7 +13,7 @@ import { isoFromDate } from '../milestones/milestone-actions';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
-import { contributors, issueCounts, priorityOptions, repoOptions, statusOptions, teamOptions, userOptions } from './ws-model';
+import { contributors, issueCounts, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
 
 @Component({
@@ -97,8 +97,11 @@ import { IssueProgress, WsDatePicker } from './ws-parts';
           }
         </span>
       </app-property-row>
-      <app-property-row label="Projects">
-        <app-picker variant="field" label="Projects" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
+      <app-property-row label="Project">
+        <app-picker variant="field" label="Project" placeholder="No project" [clearable]="true" clearLabel="Remove from project" [disabled]="!canEdit()" [options]="projects()" [value]="w.projectId ? [w.projectId] : []" (valueChange)="setProject($event[0])" />
+      </app-property-row>
+      <app-property-row label="Repositories">
+        <app-picker variant="field" label="Repositories" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
       </app-property-row>
       <app-property-row label="Issues">
         <span class="px-1.5"><app-issue-progress [done]="counts().issuesDone" [active]="counts().issuesActive" [total]="counts().issuesTotal" /></span>
@@ -198,7 +201,8 @@ export class WsProperties {
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
-  protected readonly repos = computed(() => repoOptions(this.store));
+  protected readonly repos = computed(() => repoOptionsIn(this.store, this.ws().projectId));
+  protected readonly projects = computed(() => projectOptions(this.store, this.ws().projectId));
   protected readonly priorities = priorityOptions();
   protected readonly participantOptions = computed(() => this.teams().filter((t) => t.value !== this.ws().ownerTeamId));
   protected readonly xIcon = LucideX;
@@ -227,6 +231,14 @@ export class WsProperties {
 
   protected setPriority(p: string | undefined): void {
     if (p) this.update({ priority: p as Priority });
+  }
+
+  /** Joining a project keeps the repositories it also has, or adopts the project's when none were set. */
+  protected setProject(id: string | undefined): void {
+    const project = this.store.getProject(id);
+    if (!project) return this.update({ projectId: null });
+    const own = this.ws().repositoryIds.filter((r) => project.repositoryIds.includes(r));
+    this.update({ projectId: project.id, repositoryIds: own.length ? own : [...project.repositoryIds] });
   }
 
   protected setDate(d: Date | null): void {

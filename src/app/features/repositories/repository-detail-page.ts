@@ -23,7 +23,7 @@ import { StatusBadge } from '../../shared/status';
 import { EventLine } from '../overview/event-line';
 import { IssueRow } from '../issues/issue-items';
 import { StatsBoard } from '../stats/stats-board';
-import { projectStats } from '../stats/stats-model';
+import { repositoryStats } from '../stats/stats-model';
 import { CommentThread } from '../workstreams/comments';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
@@ -64,7 +64,7 @@ const ARTIFACT_CAP = 12;
             <svg [lucideIcon]="external" [size]="13"></svg> <span class="max-sm:hidden">Open in {{ providerName() }}</span>
           </a>
         }
-        <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="Project actions">
+        <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="Repository actions">
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
         </button>
         <ng-template #more>
@@ -79,7 +79,7 @@ const ARTIFACT_CAP = 12;
             </button>
             @if (canAdmin()) {
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
-                <svg [lucideIcon]="trash" [size]="14"></svg> Delete project
+                <svg [lucideIcon]="trash" [size]="14"></svg> Delete repository
               </button>
             }
           </hlm-dropdown-menu>
@@ -108,7 +108,7 @@ const ARTIFACT_CAP = 12;
 
       <div class="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
         <div class="flex min-w-0 flex-col gap-8">
-          <section aria-label="Project statistics">
+          <section aria-label="Repository statistics">
             <app-stats-board [model]="stats()" />
           </section>
 
@@ -125,7 +125,7 @@ const ARTIFACT_CAP = 12;
             } @else {
               <div class="text-muted-foreground flex items-center gap-2 rounded-md border border-dashed px-3 py-4 text-[13px]">
                 <svg [lucideIcon]="hexagon" [size]="15" [strokeWidth]="1.5"></svg>
-                No workstream lands in this project yet. Add it to a workstream's Projects property.
+                No workstream lands in this repository yet. Add it to a workstream's Repositories property.
               </div>
             }
           </section>
@@ -277,8 +277,8 @@ const ARTIFACT_CAP = 12;
         </aside>
       </div>
     } @else {
-      <app-empty-state [icon]="folder" title="Project not found" description="It may have been deleted.">
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'projects']">Back to projects</a>
+      <app-empty-state [icon]="folder" title="Repository not found" description="It may have been deleted.">
+        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'repositories']">Back to repositories</a>
       </app-empty-state>
     }
   `,
@@ -325,14 +325,14 @@ export class RepositoryDetailPage {
   protected readonly repoTeams = computed(() =>
     (this.repo()?.teamIds ?? []).map((id) => this.store.teamById().get(id)).filter((t) => !!t),
   );
-  /** The integration this project is linked to (admin only: details are not in the snapshot). */
+  /** The integration this repository is linked to (admin only: details are not in the snapshot). */
   protected readonly connection = computed(() => {
     const id = this.repo()?.id;
     return id ? this.store.integrationDetails().find((c) => c.repositoryIds.includes(id)) : undefined;
   });
   protected readonly stats = computed(() => {
     const id = this.repo()?.id;
-    return id ? projectStats(this.store, id) : { cards: [], distributions: [] };
+    return id ? repositoryStats(this.store, id) : { cards: [], distributions: [] };
   });
   protected readonly workstreams = computed(() => {
     const id = this.repo()?.id;
@@ -355,7 +355,7 @@ export class RepositoryDetailPage {
   protected readonly shownArtifacts = computed(() =>
     this.allArtifacts() ? this.artifacts() : this.artifacts().slice(0, ARTIFACT_CAP),
   );
-  /** Events on the project itself plus on its artifacts, newest first. */
+  /** Events on the repository itself plus on its artifacts, newest first. */
   protected readonly activity = computed(() => {
     const id = this.repo()?.id;
     if (!id) return [] as DomainEvent[];
@@ -369,7 +369,7 @@ export class RepositoryDetailPage {
   );
 
   private readonly _crumbs = usePageCrumbs(() => [
-    { label: 'Projects', link: ['/', this.slug(), 'projects'] },
+    { label: 'Repositories', link: ['/', this.slug(), 'repositories'] },
     { label: this.repo()?.fullName ?? this.id() ?? '', mono: true },
   ]);
 
@@ -415,10 +415,10 @@ export class RepositoryDetailPage {
     if (!repo) return;
     this.ui.setConfirmDelete({
       title: `Delete ${repo.fullName}?`,
-      description: 'Workstreams keep their history. They just stop pointing at this project.',
+      description: 'Workstreams keep their history. They just stop pointing at this repository.',
       onConfirm: async () => {
         const ok = await this.store.deleteRepository(repo.id);
-        if (ok) await this.router.navigate(['/', this.slug(), 'projects']);
+        if (ok) await this.router.navigate(['/', this.slug(), 'repositories']);
       },
     });
   }

@@ -14,6 +14,7 @@ import {
   IntegrationConnectionEntity,
   MembershipEntity,
   MilestoneEntity,
+  ProjectEntity,
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
@@ -55,6 +56,7 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, AgentEntity, data.agents);
       await insert(m, TeamEntity, data.teams);
       await insert(m, RepositoryEntity, data.repositories);
+      await insert(m, ProjectEntity, data.projects);
       await insert(m, WorkstreamEntity, data.workstreams);
       await insert(m, MilestoneEntity, data.milestones);
       await insert(m, InputRequestEntity, data.inputRequests);

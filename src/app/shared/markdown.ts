@@ -13,7 +13,7 @@ type Inline =
   | { t: 'em'; c: Inline[] }
   | { t: 'del'; c: Inline[] }
   | { t: 'link'; href: string; c: Inline[] }
-  /** A mention of a workspace record (key or project name) found by the optional `TextLinker`. */
+  /** A mention of a workspace record (key or repository name) found by the optional `TextLinker`. */
   | { t: 'ref'; v: string }
   /** `@Name` of a member or agent, found by the optional `TextLinker`. */
   | { t: 'mention'; v: string };

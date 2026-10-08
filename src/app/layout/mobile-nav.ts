@@ -4,7 +4,7 @@ import {
   LucideActivity,
   LucideCircleDot,
   LucideDynamicIcon,
-  LucideFolderGit2,
+  LucideBox,
   LucideMenu,
   LucideMessageSquare,
   LucideX,
@@ -101,7 +101,7 @@ export class MobileNav {
     { ...PERSONAL_NAV[0], label: 'Inbox' },
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
     { segment: 'activity', label: 'Activity', icon: LucideActivity },
-    { segment: 'projects', label: 'Projects', icon: LucideFolderGit2 },
+    { segment: 'projects', label: 'Projects', icon: LucideBox },
   ];
   protected readonly slug = inject(NablaStore).slug;
   protected readonly assistantIcon = LucideMessageSquare;

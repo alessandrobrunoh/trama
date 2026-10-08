@@ -78,6 +78,8 @@ export function valueLabel(store: NablaStore, entity: ViewEntity, field: string,
       return store.getUser(value)?.name ?? value;
     case 'repository':
       return store.getRepository(value)?.fullName ?? value;
+    case 'project':
+      return store.getProject(value)?.name ?? value;
     case 'workstream': {
       const w = store.getWorkstream(value);
       return w ? `${w.key} ${w.title}` : value;
@@ -130,6 +132,8 @@ export function fieldOptions(store: NablaStore, entity: ViewEntity, field: strin
       return [...none, ...store.users().map((u) => opt(u.id))];
     case 'repository':
       return [...none, ...store.repositories().map((r) => opt(r.id))];
+    case 'project':
+      return [...none, ...store.projects().map((p) => opt(p.id))];
     case 'workstream':
       return [...none, ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true }))];
   }

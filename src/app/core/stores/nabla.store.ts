@@ -28,6 +28,7 @@ import type {
   LinkRepositoryInput,
   RemoteRepositoryPage,
   UpdateIntegrationInput,
+  CreateProjectInput,
   CreateRepositoryInput,
   CreateTeamInput,
   CreateTokenInput,
@@ -47,6 +48,7 @@ import type {
   UpdateDecisionInput,
   UpdateInputRequestInput,
   UpdateIssueInput,
+  UpdateProjectInput,
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
@@ -74,6 +76,7 @@ import type {
   Membership,
   Milestone,
   OutgoingWebhook,
+  Project,
   Repository,
   Role,
   SavedView,
@@ -189,6 +192,7 @@ export class NablaStore {
   private readonly _agents = signal<readonly Agent[]>([]);
   private readonly _teams = signal<readonly Team[]>([]);
   private readonly _repositories = signal<readonly Repository[]>([]);
+  private readonly _projects = signal<readonly Project[]>([]);
   private readonly _workstreams = signal<readonly Workstream[]>([]);
   private readonly _milestones = signal<readonly Milestone[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
@@ -208,6 +212,7 @@ export class NablaStore {
   readonly agents = this._agents.asReadonly();
   readonly teams = this._teams.asReadonly();
   readonly repositories = this._repositories.asReadonly();
+  readonly projects = this._projects.asReadonly();
   readonly workstreams = this._workstreams.asReadonly();
   /** All milestones, ordered by workstream then `sortOrder`. */
   readonly milestones = this._milestones.asReadonly();
@@ -233,6 +238,7 @@ export class NablaStore {
   readonly teamById = computed(() => indexById(this._teams()));
   readonly teamByKey = computed(() => new Map(this._teams().map((t) => [t.key.toUpperCase(), t])));
   readonly repositoryById = computed(() => indexById(this._repositories()));
+  readonly projectById = computed(() => indexById(this._projects()));
   readonly workstreamById = computed(() => indexById(this._workstreams()));
   /** Keyed by upper-case key (`AUTH-42`). */
   readonly workstreamByKey = computed(
@@ -296,11 +302,33 @@ export class NablaStore {
   readonly issuesByWorkstream = computed(() =>
     groupBy(this._issues(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
   );
-  /** Milestones of a workstream (by workstream id), ordered by `sortOrder`. */
-  readonly milestonesByWorkstream = computed(() => {
-    const map = groupBy(this._milestones(), (m) => m.workstreamId);
+  /** Milestones of a project (by project id), ordered by `sortOrder`. */
+  readonly milestonesByProject = computed(() => {
+    const map = groupBy(this._milestones(), (m) => m.projectId);
     for (const list of map.values()) list.sort(bySortOrder);
     return map;
+  });
+  /** The milestones a workstream shares through its project (by workstream id). Workstreams without a project have none. */
+  readonly milestonesByWorkstream = computed(() => {
+    const byProject = this.milestonesByProject();
+    const map = new Map<string, Milestone[]>();
+    for (const w of this._workstreams()) {
+      const list = w.projectId ? byProject.get(w.projectId) : undefined;
+      if (list?.length) map.set(w.id, list);
+    }
+    return map;
+  });
+  /** Issues linked to any workstream of a project (by project id). */
+  readonly issuesByProject = computed(() => {
+    const projectOf = new Map(this._workstreams().map((w) => [w.id, w.projectId]));
+    return groupBy(this._issues(), (i) => {
+      const ids = new Set<string>();
+      for (const w of i.workstreamIds) {
+        const p = projectOf.get(w);
+        if (p) ids.add(p);
+      }
+      return ids.size ? [...ids] : undefined;
+    });
   });
   /** Issues in a milestone (by milestone id). */
   readonly issuesByMilestone = computed(() =>
@@ -314,6 +342,9 @@ export class NablaStore {
   /** Workstreams a team participates in, excluding ones it owns (by team id). */
   readonly workstreamsByParticipatingTeam = computed(() =>
     groupBy(this._workstreams(), (w) => w.participatingTeamIds),
+  );
+  readonly workstreamsByProject = computed(() =>
+    groupBy(this._workstreams(), (w) => w.projectId),
   );
   readonly workstreamsByRepository = computed(() =>
     groupBy(this._workstreams(), (w) => w.repositoryIds),
@@ -449,6 +480,10 @@ export class NablaStore {
     if (!ref) return undefined;
     return this.teamById().get(ref) ?? this.teamByKey().get(ref.toUpperCase());
   }
+  getProject(id: string | null | undefined): Project | undefined {
+    return id ? this.projectById().get(id) : undefined;
+  }
+
   getRepository(id: string | null | undefined): Repository | undefined {
     return id ? this.repositoryById().get(id) : undefined;
   }
@@ -570,7 +605,7 @@ export class NablaStore {
     this._me.set(null);
     this._myRole.set(null);
     for (const c of [
-      this._users, this._memberships, this._agents, this._teams, this._repositories,
+      this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
       this._workstreams, this._milestones, this._inputRequests, this._issues, this._artifacts,
       this._decisions, this._dependencies, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
@@ -620,6 +655,7 @@ export class NablaStore {
     list(this._agents, s.agents);
     list(this._teams, s.teams);
     list(this._repositories, s.repositories);
+    list(this._projects, s.projects ?? []);
     list(this._workstreams, s.workstreams);
     list(this._milestones, s.milestones ?? []);
     list(this._inputRequests, s.inputRequests);
@@ -804,7 +840,6 @@ export class NablaStore {
     const tx = this.tx();
     tx.remove(this._workstreams, ws.id);
     for (const a of this._artifacts().filter((x) => x.workstreamId === ws.id)) tx.remove(this._artifacts, a.id);
-    this.dropMilestones(tx, this._milestones().filter((m) => m.workstreamId === ws.id).map((m) => m.id));
     for (const r of this._inputRequests().filter((x) => x.workstreamId === ws.id)) tx.remove(this._inputRequests, r.id);
     return this.ok('delete workstream', (s) => this.api.workstreams.remove(s, ws.id), { tx });
   }
@@ -949,10 +984,12 @@ export class NablaStore {
     const { kind: _kind, ...local } = patch;
     const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
     if (patch.workstreamIds && patch.milestoneIds === undefined) {
-      const linked = new Set(patch.workstreamIds);
+      const projects = new Set(
+        patch.workstreamIds.map((w) => this.workstreamById().get(w)?.projectId).filter((p): p is string => !!p),
+      );
       optimistic['milestoneIds'] = (current.milestoneIds ?? []).filter((m) => {
         const ms = this._milestones().find((x) => x.id === m);
-        return !!ms && linked.has(ms.workstreamId);
+        return !!ms && projects.has(ms.projectId);
       });
     }
     const tx = this.tx();
@@ -1024,11 +1061,11 @@ export class NablaStore {
   }
 
   /**
-   * Put the milestones of a workstream in this order (`ids`; unlisted ones follow). Optimistic;
+   * Put the milestones of a project in this order (`ids`; unlisted ones follow). Optimistic;
    * the server re-numbers `sortOrder` to 0..n-1.
    */
-  async reorderMilestones(workstreamId: ID, ids: readonly ID[]): Promise<boolean> {
-    const current = this.milestonesByWorkstream().get(workstreamId) ?? [];
+  async reorderMilestones(projectId: ID, ids: readonly ID[]): Promise<boolean> {
+    const current = this.milestonesByProject().get(projectId) ?? [];
     const known = new Set(current.map((m) => m.id));
     const order = [...new Set(ids)].filter((id) => known.has(id));
     for (const m of current) if (!order.includes(m.id)) order.push(m.id);
@@ -1036,7 +1073,7 @@ export class NablaStore {
     order.forEach((id, i) => {
       if (this.milestoneById().get(id)?.sortOrder !== i) tx.patch(this._milestones, id, { sortOrder: i });
     });
-    return this.write('reorder milestones', (s) => this.api.milestones.reorder(s, workstreamId, order), {
+    return this.write('reorder milestones', (s) => this.api.milestones.reorder(s, projectId, order), {
       tx,
       onResult: (list) => {
         for (const m of list) this.upsert(this._milestones, m);
@@ -1250,7 +1287,7 @@ export class NablaStore {
   }
 
   async createRepository(input: CreateRepositoryInput): Promise<Repository | undefined> {
-    return this.write('add project', (s) => this.api.repositories.create(s, input), {
+    return this.write('add repository', (s) => this.api.repositories.create(s, input), {
       onResult: (r) => this.upsert(this._repositories, r),
     });
   }
@@ -1259,7 +1296,7 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.patch(this._repositories, id, patch);
-    return this.write('update project', (s) => this.api.repositories.update(s, id, patch), {
+    return this.write('update repository', (s) => this.api.repositories.update(s, id, patch), {
       tx,
       onResult: (r) => this.upsert(this._repositories, r),
     }).then((r) => !!r);
@@ -1269,7 +1306,35 @@ export class NablaStore {
     if (!this.repositoryById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._repositories, id);
-    return this.ok('remove project', (s) => this.api.repositories.remove(s, id), { tx });
+    return this.ok('remove repository', (s) => this.api.repositories.remove(s, id), { tx });
+  }
+
+  // ─────────────────────────── projects ───────────────────────────
+
+  async createProject(input: CreateProjectInput): Promise<Project | undefined> {
+    return this.write('create project', (s) => this.api.projects.create(s, input), {
+      onResult: (p) => this.upsert(this._projects, p),
+    });
+  }
+
+  async updateProject(id: ID, patch: UpdateProjectInput): Promise<boolean> {
+    if (!this.projectById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._projects, id, patch);
+    return this.write('update project', (s) => this.api.projects.update(s, id, patch), {
+      tx,
+      onResult: (p) => this.upsert(this._projects, p),
+    }).then((p) => !!p);
+  }
+
+  async deleteProject(id: ID): Promise<boolean> {
+    if (!this.projectById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._projects, id);
+    // its milestones go with it, and its workstreams are detached
+    this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
+    for (const w of this._workstreams().filter((x) => x.projectId === id)) tx.patch(this._workstreams, w.id, { projectId: undefined });
+    return this.ok('delete project', (s) => this.api.projects.remove(s, id), { tx });
   }
 
   // ─────────────────────────── admin: members, agents, tokens, integrations ───────────────────────────
@@ -1470,7 +1535,7 @@ export class NablaStore {
     return this.api.integrations.remoteRepositories(this.requireSlug(), id, page, perPage);
   }
 
-  /** Link a remote repository: creates (or adopts) the project and attaches it to the connection. */
+  /** Link a remote repository: creates (or adopts) the repository and attaches it to the connection. */
   async linkRepository(id: ID, input: LinkRepositoryInput): Promise<Repository | undefined> {
     return this.write('link repository', (s) => this.api.integrations.linkRepository(s, id, input), {
       onResult: (r) => {
@@ -1482,7 +1547,7 @@ export class NablaStore {
     });
   }
 
-  /** Detach a project from a connection (the project stays). Optimistic. */
+  /** Detach a repository from a connection (the repository stays). Optimistic. */
   async unlinkRepository(id: ID, repositoryId: ID): Promise<boolean> {
     const prev = this._integrationDetails();
     this._integrationDetails.update((list) =>

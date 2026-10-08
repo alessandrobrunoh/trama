@@ -9,10 +9,11 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { NablaStore, WORKSTREAM_STATUS_META, isDeltaThreadUrl, type Priority, type WorkstreamStatus } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
-import { priorityOptions, repoOptions, teamOptions, userOptions } from './ws-model';
+import { priorityOptions, projectOptions, repoOptionsIn, teamOptions, userOptions } from './ws-model';
 
 export interface CreateWorkstreamDefaults {
   ownerTeamId?: string;
+  projectId?: string;
   repositoryIds?: string[];
   title?: string;
   priority?: Priority;
@@ -149,10 +150,24 @@ export interface CreateWorkstreamDefaults {
               </hlm-date-picker>
             </div>
           </div>
+          @if (projects().length) {
+            <div class="grid gap-1.5">
+              <label hlmLabel>Project</label>
+              <app-picker
+                label="Project"
+                placeholder="No project"
+                [clearable]="true"
+                clearLabel="No project"
+                [options]="projects()"
+                [value]="projectId() ? [projectId()] : []"
+                (valueChange)="setProject($event[0])"
+              />
+            </div>
+          }
           <div class="grid gap-1.5">
-            <label hlmLabel>Projects</label>
+            <label hlmLabel>Repositories</label>
             <app-picker
-              label="Projects"
+              label="Repositories"
               placeholder="None"
               [multiple]="true"
               [options]="repos()"
@@ -195,7 +210,9 @@ export class CreateWorkstreamDialog {
 
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
-  protected readonly repos = computed(() => repoOptions(this.store));
+  protected readonly projectId = signal('');
+  protected readonly projects = computed(() => projectOptions(this.store));
+  protected readonly repos = computed(() => repoOptionsIn(this.store, this.projectId()));
   protected readonly priorities = priorityOptions();
   protected readonly participantOptions = computed(() =>
     this.teams().filter((t) => t.value !== this.ownerTeamId()),
@@ -225,12 +242,22 @@ export class CreateWorkstreamDialog {
     this.priority.set(d.priority ?? 'none');
     this.statusOverride.set(d.statusOverride);
     this.target.set(undefined);
+    this.projectId.set(this.store.getProject(d.projectId)?.id ?? '');
     this.repositories.set(d.repositoryIds ?? []);
     this.busy.set(false);
   }
 
   protected statusLabel(s: WorkstreamStatus): string {
     return WORKSTREAM_STATUS_META[s].label;
+  }
+
+  /** Picking a project narrows the repositories to its own (all of them when none were chosen yet). */
+  protected setProject(id: string | undefined): void {
+    this.projectId.set(id ?? '');
+    const project = this.store.getProject(id);
+    if (!project) return;
+    const own = this.repositories().filter((r) => project.repositoryIds.includes(r));
+    this.repositories.set(own.length ? own : [...project.repositoryIds]);
   }
 
   protected setOwner(id: string | undefined): void {
@@ -252,7 +279,8 @@ export class CreateWorkstreamDialog {
       participatingTeamIds: this.participating(),
       accountableUserId: this.accountable() || undefined,
       priority: this.priority(),
-      repositoryIds: this.repositories(),
+      projectId: this.projectId() || undefined,
+      repositoryIds: this.repositories().length ? this.repositories() : undefined,
       targetDate: target ? new Date(target.getFullYear(), target.getMonth(), target.getDate(), 12).toISOString() : undefined,
       statusOverride: this.statusOverride(),
     });

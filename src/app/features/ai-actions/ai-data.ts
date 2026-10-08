@@ -266,9 +266,9 @@ export function digestData(store: NablaStore, info: MilestoneInfo): PromptDigest
   const overdue: string[] = [];
   for (const m of store.milestones()) {
     if (info.states().get(m.id) !== 'overdue') continue;
-    const w = store.workstreamById().get(m.workstreamId);
-    if (!w || w.status === 'shipped' || w.status === 'canceled') continue;
-    overdue.push(`${w.key} ${oneLine(m.name, 60)}: ${info.stats().get(m.id)?.percent ?? 0}% done, due ${m.targetDate ? dayStr(m.targetDate) : '?'}`);
+    const p = store.getProject(m.projectId);
+    if (!p || p.status === 'completed' || p.status === 'canceled') continue;
+    overdue.push(`${oneLine(p.name, 40)} › ${oneLine(m.name, 60)}: ${info.stats().get(m.id)?.percent ?? 0}% done, due ${m.targetDate ? dayStr(m.targetDate) : '?'}`);
   }
 
   const waiting = issues

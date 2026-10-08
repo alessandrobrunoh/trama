@@ -4,7 +4,7 @@ import { DataSource, type Repository } from 'typeorm';
 import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
-import { RepositoryEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ProjectEntity, RepositoryEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
 export interface RepositoryInput {
@@ -72,6 +72,10 @@ export class RepositoriesService {
       for (const w of streams)
         if (w.repositoryIds.includes(id))
           await m.update(WorkstreamEntity, { id: w.id }, { repositoryIds: w.repositoryIds.filter((r) => r !== id) });
+      const projects = await m.getRepository(ProjectEntity).findBy({ workspaceId });
+      for (const p of projects)
+        if (p.repositoryIds.includes(id))
+          await m.update(ProjectEntity, { id: p.id }, { repositoryIds: p.repositoryIds.filter((r) => r !== id) });
       await m.delete(RepositoryEntity, { id });
     });
     await this.events.record({ workspaceId, actor, type: 'repository.deleted', subject: { type: 'repository', id }, data: { fullName: row.fullName } });

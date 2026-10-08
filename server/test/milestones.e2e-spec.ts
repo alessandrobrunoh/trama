@@ -7,8 +7,9 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   let slug: string;
   let team: { id: string };
   const base = () => `/api/w/${slug}`;
-  const mkWs = async (title: string) =>
-    (await c.post(`${base()}/workstreams`, { title, ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e' }).expect(201)).body;
+  const mkProject = async (name: string) => (await c.post(`${base()}/projects`, { name }).expect(201)).body;
+  const mkWs = async (title: string, projectId?: string) =>
+    (await c.post(`${base()}/workstreams`, { title, ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e', projectId }).expect(201)).body;
   const mkIssue = async (kind: string, title: string, extra: object = {}) =>
     (await c.post(`${base()}/issues`, { kind, title, ...extra }).expect(201)).body;
 
@@ -22,63 +23,86 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   afterAll(() => app.close());
 
   it('milestone CRUD, ordering, snapshot and events', async () => {
-    const ws = await mkWs('With milestones');
-    const m1 = (await c.post(`${base()}/milestones`, { workstreamId: ws.id, name: 'Alpha', targetDate: '2026-12-01T00:00:00.000Z' }).expect(201)).body;
-    const m2 = (await c.post(`${base()}/milestones`, { workstreamId: ws.id, name: 'Beta', description: 'second' }).expect(201)).body;
-    const m3 = (await c.post(`${base()}/milestones`, { workstreamId: ws.id, name: 'GA' }).expect(201)).body;
+    const project = await mkProject('With milestones');
+    const m1 = (await c.post(`${base()}/milestones`, { projectId: project.id, name: 'Alpha', targetDate: '2026-12-01T00:00:00.000Z' }).expect(201)).body;
+    const m2 = (await c.post(`${base()}/milestones`, { projectId: project.id, name: 'Beta', description: 'second' }).expect(201)).body;
+    const m3 = (await c.post(`${base()}/milestones`, { projectId: project.id, name: 'GA' }).expect(201)).body;
     expect(m1.id).toMatch(/^ms_/);
+    expect(m1.projectId).toBe(project.id);
     expect([m1.sortOrder, m2.sortOrder, m3.sortOrder]).toEqual([0, 1, 2]);
-    await c.post(`${base()}/milestones`, { workstreamId: 'wk_missing', name: 'x' }).expect(400);
+    await c.post(`${base()}/milestones`, { projectId: 'pj_missing', name: 'x' }).expect(400);
 
     const renamed = (await c.patch(`${base()}/milestones/${m2.id}`, { name: 'Beta 2', targetDate: '2026-12-15T00:00:00.000Z', description: null }).expect(200)).body;
     expect(renamed.name).toBe('Beta 2');
     expect(renamed.description).toBeUndefined();
 
-    const ordered = (await c.post(`${base()}/milestones/reorder`, { workstreamId: ws.id, ids: [m3.id, m1.id, m2.id] }).expect(200)).body;
+    const ordered = (await c.post(`${base()}/milestones/reorder`, { projectId: project.id, ids: [m3.id, m1.id, m2.id] }).expect(200)).body;
     expect(ordered.map((m: { id: string }) => m.id)).toEqual([m3.id, m1.id, m2.id]);
-    await c.post(`${base()}/milestones/reorder`, { workstreamId: ws.id, ids: [m3.id, 'ms_nope'] }).expect(400);
-    expect((await c.get(`${base()}/milestones?workstreamId=${ws.id}`).expect(200)).body.map((m: { id: string }) => m.id)).toEqual([m3.id, m1.id, m2.id]);
+    await c.post(`${base()}/milestones/reorder`, { projectId: project.id, ids: [m3.id, 'ms_nope'] }).expect(400);
+    expect((await c.get(`${base()}/milestones?projectId=${project.id}`).expect(200)).body.map((m: { id: string }) => m.id)).toEqual([m3.id, m1.id, m2.id]);
 
     const snap = (await c.get(`${base()}/snapshot`).expect(200)).body;
     expect(snap.milestones.map((m: { id: string }) => m.id)).toEqual(expect.arrayContaining([m1.id, m2.id, m3.id]));
 
     await c.delete(`${base()}/milestones/${m3.id}`).expect(204);
     await c.get(`${base()}/milestones/${m3.id}`).expect(404);
-    const types = ((await c.get(`${base()}/events?workstreamId=${ws.id}`).expect(200)).body as { type: string }[]).map((e) => e.type);
+    const types = ((await c.get(`${base()}/events`).expect(200)).body as { type: string }[]).map((e) => e.type);
     expect(types).toEqual(expect.arrayContaining(['milestone.created', 'milestone.updated', 'milestone.deleted']));
   });
 
-  it('issues: one milestone per linked workstream; unlinking drops it; deleting cleans issues', async () => {
-    const wsA = await mkWs('A');
-    const wsB = await mkWs('B');
-    const a1 = (await c.post(`${base()}/milestones`, { workstreamId: wsA.id, name: 'A1' }).expect(201)).body;
-    const a2 = (await c.post(`${base()}/milestones`, { workstreamId: wsA.id, name: 'A2' }).expect(201)).body;
-    const b1 = (await c.post(`${base()}/milestones`, { workstreamId: wsB.id, name: 'B1' }).expect(201)).body;
+  it('issues: one milestone per project of a linked workstream; unlinking and project changes drop it', async () => {
+    const pA = await mkProject('A');
+    const pB = await mkProject('B');
+    const wsA = await mkWs('A', pA.id);
+    const wsA2 = await mkWs('A two', pA.id);
+    const wsB = await mkWs('B', pB.id);
+    const loose = await mkWs('No project');
+    const a1 = (await c.post(`${base()}/milestones`, { projectId: pA.id, name: 'A1' }).expect(201)).body;
+    const a2 = (await c.post(`${base()}/milestones`, { projectId: pA.id, name: 'A2' }).expect(201)).body;
+    const b1 = (await c.post(`${base()}/milestones`, { projectId: pB.id, name: 'B1' }).expect(201)).body;
     const issue = await mkIssue('bug', 'Milestoned');
     expect(issue.milestoneIds).toEqual([]);
-    expect(issue.aliases).toEqual([]);
 
-    // not linked yet
+    // not linked to a workstream of the project yet
+    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(400);
+    // a workstream without a project gives no access to any milestone
+    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [loose.id] }).expect(200);
     await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(400);
     await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id, wsB.id] }).expect(200);
-    // two milestones of the same workstream
+    // two milestones of the same project
     await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id, a2.id] }).expect(400);
     await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: ['ms_missing'] }).expect(400);
     const set = (await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id, b1.id] }).expect(200)).body;
     expect(set.milestoneIds).toEqual([a1.id, b1.id]);
     expect((await c.get(`${base()}/issues?milestoneId=${a1.id}`).expect(200)).body).toHaveLength(1);
 
-    // unlinking workstream B removes B's milestone only
+    // unlinking the only workstream of project B removes B's milestone only
     const unlinked = (await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id] }).expect(200)).body;
     expect(unlinked.milestoneIds).toEqual([a1.id]);
 
+    // a second workstream of the same project keeps the milestone when the first one goes
+    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id, wsA2.id] }).expect(200);
+    expect((await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA2.id] }).expect(200)).body.milestoneIds).toEqual([a1.id]);
+
+    // a workstream leaving its project drops the milestone from its issues
+    await c.patch(`${base()}/workstreams/${wsA2.id}`, { projectId: null }).expect(200);
+    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
+    await c.patch(`${base()}/workstreams/${wsA2.id}`, { projectId: pA.id }).expect(200);
+
     // deleting the milestone removes it from the issue
+    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(200);
     await c.delete(`${base()}/milestones/${a1.id}`).expect(204);
     expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
 
-    // deleting the workstream cascades its milestones
+    // deleting the workstream drops the milestone from the issue when no other workstream carries the project
     await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a2.id] }).expect(200);
-    await c.delete(`${base()}/workstreams/${wsA.key}`).expect(204);
+    await c.delete(`${base()}/workstreams/${wsA2.key}`).expect(204);
+    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
+
+    // deleting the project cascades its milestones and cleans issues
+    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id] }).expect(200);
+    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a2.id] }).expect(200);
+    await c.delete(`${base()}/projects/${pA.id}`).expect(204);
     await c.get(`${base()}/milestones/${a2.id}`).expect(404);
     expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
   });

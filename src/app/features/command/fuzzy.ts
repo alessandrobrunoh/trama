@@ -12,7 +12,7 @@ export function fuzzyScore(text: string, query: string): number {
     const wordStart = idx === 0 || /[\s\-_/·]/.test(t[idx - 1]);
     return (wordStart ? 800 : 600) - idx;
   }
-  // Every query token present somewhere ("go proj" → "Go to projects").
+  // Every query token present somewhere ("go repo" → "Go to repositories").
   const tokens = q.split(/\s+/).filter(Boolean);
   if (tokens.length > 1 && tokens.every((tok) => t.includes(tok))) return 400;
   // Subsequence with gap penalty.

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-export const SEARCH_TYPES = ['workstream', 'issue', 'decision', 'artifact', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'decision', 'artifact', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -34,39 +34,46 @@ const SPECS: Spec[] = [
     rank: 0,
   },
   {
+    type: 'project',
+    from: `"projects" x`,
+    select: `x."id", NULL AS key, x."name" AS title, x."status" AS subtitle, NULL AS "workstreamKey", COALESCE(x."summary", x."description") AS body`,
+    fields: [['x."name"', 'title'], ['x."summary"', 'body'], ['x."description"', 'body']],
+    rank: 1,
+  },
+  {
     type: 'issue',
     from: `"issues" x`,
     select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
     fields: [['x."key"', 'key'], ['x."aliases"::text', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
-    rank: 2,
+    rank: 3,
   },
   {
     type: 'decision',
     from: `"decisions" x`,
     select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "workstreamKey", x."statement" AS body`,
     fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."statement"', 'body']],
-    rank: 1,
+    rank: 2,
   },
   {
     type: 'artifact',
     from: `"artifacts" x JOIN "workstreams" w ON w."id" = x."workstreamId"`,
     select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", x."url" AS body`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
-    rank: 3,
+    rank: 4,
   },
   {
     type: 'repository',
     from: `"repositories" x`,
     select: `x."id", NULL AS key, x."fullName" AS title, x."provider" AS subtitle, NULL AS "workstreamKey", NULL AS body`,
     fields: [['x."fullName"', 'title']],
-    rank: 4,
+    rank: 5,
   },
   {
     type: 'team',
     from: `"teams" x`,
     select: `x."id", x."key", x."name" AS title, 'Team' AS subtitle, NULL AS "workstreamKey", x."description" AS body`,
     fields: [['x."key"', 'key'], ['x."name"', 'title'], ['x."description"', 'body']],
-    rank: 5,
+    rank: 6,
   },
 ];
 

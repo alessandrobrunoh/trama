@@ -23,7 +23,7 @@ export type ResolvedRef =
   | { type: 'issue'; key: string; title: string; link: string[]; issue: Issue }
   | { type: 'workstream'; key: string; title: string; link: string[]; workstream: Workstream }
   | { type: 'decision'; key: string; title: string; link: string[]; decision: Decision }
-  | { type: 'project'; key: string; title: string; link: string[]; repository: Repository };
+  | { type: 'repository'; key: string; title: string; link: string[]; repository: Repository };
 
 const KEY_PATTERN = '\\b[A-Z][A-Z0-9]{1,7}-\\d+\\b';
 
@@ -33,7 +33,7 @@ function escapeRegExp(s: string): string {
 
 /**
  * Finds mentions of workspace records in plain text: issue / workstream / decision keys
- * (`BUG-142`, `AUTH-42`, `ADR-21`) and project names (`owner/name`). Only mentions that resolve to a
+ * (`BUG-142`, `AUTH-42`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
  * loaded record become interactive; everything else stays text.
  */
 @Injectable({ providedIn: 'root' })
@@ -72,16 +72,16 @@ export class EntityRefs {
     const repository = this.store.repositories().find((r) => r.fullName === token);
     if (repository)
       return {
-        type: 'project',
+        type: 'repository',
         key: repository.fullName,
         title: repository.fullName,
-        link: ['/', slug, 'projects', repository.id],
+        link: ['/', slug, 'repositories', repository.id],
         repository,
       };
     return null;
   }
 
-  /** Markdown text → text, `ref` and `mention` nodes. Rebuilt when projects, members or agents change. */
+  /** Markdown text → text, `ref` and `mention` nodes. Rebuilt when repositories, members or agents change. */
   readonly linker = computed<TextLinker>(() => {
     const names = this.store
       .repositories()
@@ -138,13 +138,13 @@ export class EntityRefs {
           @case ('workstream') {
             <app-status-icon [status]="r.workstream.status" entity="workstream" [size]="13" />
           }
-          @case ('project') {
+          @case ('repository') {
             <svg [lucideIcon]="gitIcon" [size]="13"></svg>
           }
         }
         {{ r.key }}
       </div>
-      @if (r.type !== 'project') {
+      @if (r.type !== 'repository') {
         <div class="text-[13px] leading-snug font-medium">{{ r.title }}</div>
       }
       <div class="border-t pt-2 text-xs">
@@ -201,7 +201,7 @@ export class EntityRefs {
               </p>
             }
           }
-          @case ('project') {
+          @case ('repository') {
             <div class="text-muted-foreground">
               {{ r.repository.provider }} · default branch
               <span class="text-foreground font-mono">{{
@@ -325,7 +325,7 @@ const norm = (s: string) =>
           } @else {
             <svg [lucideIcon]="gitIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
           }
-          <span class="min-w-0 flex-1 truncate">{{ r.type === 'project' ? '' : r.title }}</span>
+          <span class="min-w-0 flex-1 truncate">{{ r.type === 'repository' ? '' : r.title }}</span>
           @if (assignee(); as a) {
             <app-actor-avatar [actor]="{ type: 'user', id: a }" [size]="18" />
           }

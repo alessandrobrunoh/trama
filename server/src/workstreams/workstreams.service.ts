@@ -13,6 +13,7 @@ import {
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
+import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
 import { TeamEntity, WorkspaceEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
@@ -32,6 +33,7 @@ export interface WorkstreamInput {
   ownerTeamId?: string;
   participatingTeamIds?: string[];
   accountableUserId?: string | null;
+  projectId?: string | null;
   repositoryIds?: string[];
   acceptanceCriteria?: CriterionInput[];
   priority?: Priority;
@@ -47,6 +49,7 @@ export interface WorkstreamFilter {
   teamId?: string;
   accountableUserId?: string;
   priority?: Priority;
+  projectId?: string;
   repositoryId?: string;
   label?: string;
   q?: string;
@@ -93,6 +96,7 @@ export class WorkstreamsService {
     if (f.accountableUserId)
       qb.andWhere('w.accountableUserId = :au', { au: f.accountableUserId });
     if (f.priority) qb.andWhere('w.priority = :p', { p: f.priority });
+    if (f.projectId) qb.andWhere('w.projectId = :pid', { pid: f.projectId });
     if (f.repositoryId)
       qb.andWhere('w.repositoryIds @> :rid::jsonb', {
         rid: JSON.stringify([f.repositoryId]),
@@ -141,6 +145,12 @@ export class WorkstreamsService {
     ]);
     await this.refs.users(workspaceId, [input.accountableUserId]);
     await this.refs.repositories(workspaceId, input.repositoryIds);
+    // A workstream of a project works in the project's repositories: inherit them unless it names some.
+    let repositoryIds = unique(input.repositoryIds);
+    if (input.projectId) {
+      const project = await this.refs.projectRepositories(workspaceId, input.projectId, repositoryIds);
+      if (input.repositoryIds === undefined) repositoryIds = [...project.repositoryIds];
+    }
     const suppliedDeltaThreadUrl =
       typeof input.deltaThreadUrl === 'string'
         ? input.deltaThreadUrl.trim()
@@ -181,7 +191,8 @@ export class WorkstreamsService {
             (t) => t !== team.id,
           ),
           accountableUserId: input.accountableUserId ?? null,
-          repositoryIds: unique(input.repositoryIds),
+          projectId: input.projectId ?? null,
+          repositoryIds,
           acceptanceCriteria,
           priority: input.priority ?? 'none',
           labels: unique(input.labels),
@@ -228,6 +239,9 @@ export class WorkstreamsService {
     await this.refs.teams(workspaceId, patch.participatingTeamIds);
     await this.refs.users(workspaceId, [patch.accountableUserId]);
     await this.refs.repositories(workspaceId, patch.repositoryIds);
+    const projectId = patch.projectId !== undefined ? patch.projectId : ws.projectId;
+    if (projectId && (patch.projectId !== undefined || patch.repositoryIds !== undefined))
+      await this.refs.projectRepositories(workspaceId, projectId, patch.repositoryIds ?? ws.repositoryIds);
     const changed: string[] = [];
     const set = <K extends keyof WorkstreamEntity>(
       k: K,
@@ -254,6 +268,7 @@ export class WorkstreamsService {
       );
     if (patch.accountableUserId !== undefined)
       set('accountableUserId', patch.accountableUserId);
+    if (patch.projectId !== undefined) set('projectId', patch.projectId);
     if (patch.repositoryIds !== undefined)
       set('repositoryIds', unique(patch.repositoryIds));
     if (patch.acceptanceCriteria !== undefined)
@@ -271,6 +286,7 @@ export class WorkstreamsService {
     if (!changed.length) return ws;
     ws.updatedAt = new Date();
     await this.repo.save(ws);
+    if (changed.includes('projectId')) await this.dropStaleMilestones(workspaceId, ws.id);
     await this.events.record({
       workspaceId,
       actor,
@@ -285,6 +301,7 @@ export class WorkstreamsService {
 
   async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const ws = await this.get(workspaceId, idOrKey);
+    let linked: string[] = [];
     await this.ds.transaction(async (m) => {
       const ids = (
         await m.query<{ id: string }[]>(
@@ -294,20 +311,6 @@ export class WorkstreamsService {
         )
       ).map((r) => r.id);
       ids.push(ws.id);
-      const milestoneIds = (
-        await m.query<{ id: string }[]>(
-          `SELECT "id" FROM "milestones" WHERE "workstreamId" = $1`,
-          [ws.id],
-        )
-      ).map((r) => r.id);
-      if (milestoneIds.length) {
-        // milestones cascade with the workstream; drop their ids from issues and their comments
-        await m.query(
-          `UPDATE "issues" SET "milestoneIds" = COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements_text("milestoneIds") x WHERE x <> ALL($2)), '[]'::jsonb) WHERE "workspaceId" = $1 AND "milestoneIds" ?| $2`,
-          [workspaceId, milestoneIds],
-        );
-        ids.push(...milestoneIds);
-      }
       await m.query(
         `DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`,
         [workspaceId, ids],
@@ -316,10 +319,18 @@ export class WorkstreamsService {
         `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
         [workspaceId, ids],
       );
+      linked = (
+        await m.query<{ id: string }[]>(
+          `SELECT "id" FROM "issues" WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text`,
+          [workspaceId, ws.id],
+        )
+      ).map((r) => r.id);
       await m.query(
         `UPDATE "issues" SET "workstreamIds" = "workstreamIds" - $2::text WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text`,
         [workspaceId, ws.id],
       );
+      // The project's milestones only stay on issues that still have a workstream in that project.
+      await pruneIssueMilestones(m, workspaceId, linked);
       await m.query(
         `UPDATE "decisions" SET "relatedWorkstreamIds" = "relatedWorkstreamIds" - $2::text WHERE "workspaceId" = $1 AND "relatedWorkstreamIds" ? $2::text`,
         [workspaceId, ws.id],
@@ -333,6 +344,19 @@ export class WorkstreamsService {
       subject: { type: 'workstream', id: ws.id },
       data: { key: ws.key, title: ws.title },
     });
+    for (const id of linked.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id });
+  }
+
+  /** Leaving (or switching) a project drops its milestones from this workstream's issues that no longer qualify. */
+  private async dropStaleMilestones(workspaceId: string, workstreamId: string) {
+    const issues = await this.ds.query<{ id: string }[]>(
+      `SELECT "id" FROM "issues" WHERE "workspaceId" = $1 AND "workstreamIds" ? $2::text AND jsonb_array_length("milestoneIds") > 0`,
+      [workspaceId, workstreamId],
+    );
+    const changed = await this.ds.transaction((m) =>
+      pruneIssueMilestones(m, workspaceId, issues.map((r) => r.id)),
+    );
+    for (const id of changed.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id });
   }
 
   // ───────── acceptance criteria

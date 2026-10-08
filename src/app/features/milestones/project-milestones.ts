@@ -1,12 +1,12 @@
-// "Milestones" section of the workstream overview (Linear-style): the progress chart of the whole
-// workstream, then the milestone list — drag to reorder, "+" to add (name + optional date),
-// click a row to expand its issues and its own chart.
+// "Milestones" section of a project (Linear-style): the progress chart of the whole project, then
+// the milestone list — drag to reorder, "+" to add (name + optional date), click a row to expand its
+// issues and its own chart. `readonly` shows the same list without editing (workstream pages).
 import { CdkDrag, CdkDropList, moveItemInArray, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { LucideCalendar, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore, shortDate, type Workstream } from '../../core';
+import { NablaStore, shortDate, type Project } from '../../core';
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { MilestoneActions, isoFromDate } from './milestone-actions';
 import { MilestoneIcon } from './milestone-icon';
@@ -14,16 +14,16 @@ import { MilestoneRow } from './milestone-row';
 import { ProgressChart } from './progress-chart';
 
 @Component({
-  selector: 'app-ws-milestones',
+  selector: 'app-project-milestones',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [CdkDropList, CdkDrag, HlmButtonImports, HlmInputImports, LucideDynamicIcon, MilestoneIcon, MilestoneRow, ProgressChart, WsDatePicker],
   host: { class: 'block' },
   template: `
-    <section aria-labelledby="ws-milestones-title">
+    <section aria-labelledby="project-milestones-title">
       <header class="mb-2 flex items-center gap-2">
         <app-milestone-icon [size]="15" state="idle" />
-        <h2 id="ws-milestones-title" class="text-sm font-semibold">Milestones</h2>
-        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this outcome, each with its own issues and date</span>
+        <h2 id="project-milestones-title" class="text-sm font-semibold">Milestones</h2>
+        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this project, each with its own issues and date</span>
         @if (canEdit()) {
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground hover:text-foreground ml-auto" aria-label="Add milestone" (click)="startAdd()">
             <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -33,13 +33,13 @@ import { ProgressChart } from './progress-chart';
 
       @if (showChart() && hasIssues()) {
         <div class="bg-card mb-3 rounded-lg border border-border-strong px-3 pt-3 pb-2">
-          <app-progress-chart [ws]="ws()" [height]="190" />
+          <app-progress-chart [project]="project()" [height]="190" />
         </div>
       }
 
       <div class="bg-card overflow-hidden rounded-lg border border-border-strong" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
         @for (m of milestones(); track m.id; let i = $index) {
-          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-card border-b last:border-b-0" [ms]="m" [ws]="ws()" [index]="i" [count]="milestones().length" />
+          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-card border-b last:border-b-0" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
         }
         @if (adding()) {
           <div class="flex min-h-10 items-center gap-2 border-t px-2.5 first:border-t-0">
@@ -64,7 +64,7 @@ import { ProgressChart } from './progress-chart';
           </div>
         } @else if (!milestones().length) {
           <p class="text-muted-foreground px-3 py-3 text-sm">
-            Break this outcome into milestones. Each groups some of its issues and has its own target date.
+            Break this project into milestones. Each groups some of its issues and has its own target date.
             @if (canEdit()) {
               <button type="button" class="text-foreground underline-offset-2 hover:underline" (click)="startAdd()">Add the first milestone</button>
             }
@@ -74,11 +74,13 @@ import { ProgressChart } from './progress-chart';
     </section>
   `,
 })
-export class WsMilestones {
+export class ProjectMilestones {
   private readonly store = inject(NablaStore);
   private readonly actions = inject(MilestoneActions);
-  readonly ws = input.required<Workstream>();
-  /** Show the workstream progress chart above the list. */
+  readonly project = input.required<Project>();
+  /** List only: no adding, reordering or editing. */
+  readonly readonly = input(false);
+  /** Show the project progress chart above the list. */
   readonly showChart = input(true);
 
   protected readonly plus = LucidePlus;
@@ -90,9 +92,9 @@ export class WsMilestones {
   protected readonly dateLabel = computed(() => (this.date() ? shortDate(isoFromDate(this.date()!)) : ''));
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
 
-  protected readonly canEdit = computed(() => this.store.canEditTeamWork(this.ws().ownerTeamId));
-  protected readonly milestones = computed(() => this.store.milestonesByWorkstream().get(this.ws().id) ?? []);
-  protected readonly hasIssues = computed(() => (this.store.issuesByWorkstream().get(this.ws().id) ?? []).some((i) => i.status !== 'canceled'));
+  protected readonly canEdit = computed(() => !this.readonly() && this.store.allowed('manageProjects'));
+  protected readonly milestones = computed(() => this.store.milestonesByProject().get(this.project().id) ?? []);
+  protected readonly hasIssues = computed(() => (this.store.issuesByProject().get(this.project().id) ?? []).some((i) => i.status !== 'canceled'));
 
   constructor() {
     effect(() => {
@@ -118,7 +120,7 @@ export class WsMilestones {
     const d = this.date();
     this.draft.set('');
     this.date.set(null);
-    await this.actions.create(this.ws().id, name, d ? isoFromDate(d) : undefined);
+    await this.actions.create(this.project().id, name, d ? isoFromDate(d) : undefined);
     this.nameInput()?.nativeElement.focus();
   }
 
@@ -126,6 +128,6 @@ export class WsMilestones {
     if (e.previousIndex === e.currentIndex) return;
     const ids = this.milestones().map((m) => m.id);
     moveItemInArray(ids, e.previousIndex, e.currentIndex);
-    void this.store.reorderMilestones(this.ws().id, ids);
+    void this.store.reorderMilestones(this.project().id, ids);
   }
 }

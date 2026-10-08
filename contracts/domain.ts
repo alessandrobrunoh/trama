@@ -109,7 +109,7 @@ export interface NotificationList {
 }
 
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
-export const FAVORITE_TYPES = ['issue', 'workstream', 'decision', 'team', 'repository', 'view'] as const;
+export const FAVORITE_TYPES = ['issue', 'workstream', 'project', 'decision', 'team', 'repository', 'view'] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
 /** Most favorites one person can keep in a workspace. */
 export const MAX_FAVORITES = 100;
@@ -120,7 +120,7 @@ export interface Favorite {
   id: ID;
   workspaceId: ID;
   type: FavoriteType;
-  /** Id (not key) of the issue, workstream, decision, team, repository or view. */
+  /** Id (not key) of the issue, workstream, project, decision, team, repository or view. */
   subjectId: ID;
   createdAt: ISODate;
 }
@@ -238,6 +238,41 @@ export interface Repository {
   createdAt: ISODate;
 }
 
+// ───────────────────────────── Projects ─────────────────────────────
+
+/** Linear-style project lifecycle. Planning-level: independent of workstream status. */
+export type ProjectStatus = 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+export const PROJECT_STATUSES: ProjectStatus[] = ['backlog', 'planned', 'in_progress', 'paused', 'completed', 'canceled'];
+
+/**
+ * A planned outcome (Linear-style): what we want to achieve, by when, in which repositories.
+ * Workstreams are the execution of a project; milestones belong to the project.
+ */
+export interface Project {
+  /** `pj_…` */
+  id: ID;
+  workspaceId: ID;
+  name: string;
+  /** One-line summary shown in lists. */
+  summary?: string;
+  /** Longer description (markdown). */
+  description?: string;
+  color: string;
+  status: ProjectStatus;
+  priority: Priority;
+  leadId?: ID;
+  /** Teams involved. */
+  teamIds: ID[];
+  /** Where the work happens. A workstream of this project picks its repositories from this list. */
+  repositoryIds: ID[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Set when the status becomes completed or canceled; cleared on reopen. */
+  completedAt?: ISODate;
+}
+
 // ───────────────────────────── Workstreams ─────────────────────────────
 
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
@@ -285,6 +320,9 @@ export interface Workstream {
   ownerTeamId: ID;
   participatingTeamIds: ID[];
   accountableUserId?: ID;
+  /** The project this workstream carries out (at most one). */
+  projectId?: ID;
+  /** Always a subset of the project's `repositoryIds` when `projectId` is set. */
   repositoryIds: ID[];
   acceptanceCriteria: AcceptanceCriterion[];
   priority: Priority;
@@ -303,16 +341,16 @@ export interface Workstream {
   shippedAt?: ISODate;
 }
 
-/** Linear-style milestone inside a workstream. An issue is in at most one milestone per workstream. */
+/** Linear-style milestone inside a project. An issue is in at most one milestone per project. */
 export interface Milestone {
   /** `ms_…` */
   id: ID;
   workspaceId: ID;
-  workstreamId: ID;
+  projectId: ID;
   name: string;
   description?: string;
   targetDate?: ISODate;
-  /** Ascending order inside the workstream (reorder by PATCHing it). */
+  /** Ascending order inside the project (reorder by PATCHing it). */
   sortOrder: number;
   createdAt: ISODate;
   updatedAt: ISODate;
@@ -384,8 +422,8 @@ export interface Issue {
   /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
   workstreamIds: ID[];
   /**
-   * Milestones this issue is in: at most one per workstream, and only milestones of workstreams in
-   * `workstreamIds`. Unlinking a workstream drops its milestone.
+   * Milestones this issue is in: at most one per project, and only milestones of the projects of the
+   * workstreams in `workstreamIds`. Unlinking the last workstream of a project drops its milestone.
    */
   milestoneIds: ID[];
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
@@ -511,6 +549,7 @@ export type SubjectType =
   | 'input_request'
   | 'repository'
   | 'team'
+  | 'project'
   | 'milestone';
 
 export interface SubjectRef {
@@ -673,7 +712,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
   | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
@@ -686,6 +725,7 @@ export interface ApiResourceMeta {
 
 const RWD = ['read', 'write', 'delete'] as const;
 export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
+  projects: { label: 'Projects', group: 'Work', actions: RWD },
   workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
   issues: { label: 'Issues', group: 'Work', actions: RWD },
   decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
@@ -716,7 +756,7 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOUR
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
 export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
@@ -741,6 +781,7 @@ export const MAX_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 6000, writesPe
 
 /** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
 export type Capability =
+  | 'manageProjects'
   | 'createWorkstreams'
   | 'deleteWorkstreams'
   | 'createIssues'
@@ -768,6 +809,7 @@ export interface CapabilityMeta {
 }
 
 export const CAPABILITIES: Capability[] = [
+  'manageProjects',
   'createWorkstreams',
   'deleteWorkstreams',
   'createIssues',
@@ -784,6 +826,7 @@ export const CAPABILITIES: Capability[] = [
 ];
 
 export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
+  manageProjects: { group: 'Work', label: 'Manage projects', description: 'Create, edit and delete projects and their milestones.' },
   createWorkstreams: { group: 'Work', label: 'Create workstreams', description: 'Start a new workstream.' },
   deleteWorkstreams: { group: 'Work', label: 'Delete workstreams', description: 'Permanently delete a workstream with its input requests, artifacts and comments.' },
   createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
@@ -801,6 +844,7 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
 
 /** Today's behaviour: everyday work for members, structure and access for admins. */
 export const DEFAULT_PERMISSIONS: PermissionMap = {
+  manageProjects: 'member',
   createWorkstreams: 'member',
   deleteWorkstreams: 'member',
   createIssues: 'member',
@@ -902,6 +946,7 @@ export interface WebhookDeliveryLog {
 
 /** Event types a webhook can subscribe to, grouped by entity (for pickers). */
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
+  { entity: 'project', label: 'Projects', events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'] },
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
@@ -930,6 +975,7 @@ export interface WorkspaceSnapshot {
   agents: Agent[];
   teams: Team[];
   repositories: Repository[];
+  projects: Project[];
   workstreams: Workstream[];
   milestones: Milestone[];
   inputRequests: InputRequest[];

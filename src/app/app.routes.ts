@@ -1,4 +1,5 @@
-import { Routes } from '@angular/router';
+import { inject } from '@angular/core';
+import { Router, Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
 import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/session/guards';
 
@@ -179,18 +180,37 @@ export const routes: Routes = [
         path: 'projects',
         title: 'Projects · Trama',
         loadComponent: () =>
-          import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
+          import('./features/projects/project-list-page').then((m) => m.ProjectListPage),
       },
       {
         path: 'projects/:id',
         title: 'Project · Trama',
+        // Repositories used to live under /projects: send old links (`rp_…` ids) to /repositories.
+        canActivate: [
+          (route: ActivatedRouteSnapshot) => {
+            const id = route.paramMap.get('id') ?? '';
+            return id.startsWith('rp_')
+              ? inject(Router).createUrlTree(['/', route.paramMap.get('workspaceSlug') ?? '', 'repositories', id])
+              : true;
+          },
+        ],
+        loadComponent: () =>
+          import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
+      },
+      {
+        path: 'repositories',
+        title: 'Repositories · Trama',
+        loadComponent: () =>
+          import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
+      },
+      {
+        path: 'repositories/:id',
+        title: 'Repository · Trama',
         loadComponent: () =>
           import('./features/repositories/repository-detail-page').then(
             (m) => m.RepositoryDetailPage,
           ),
       },
-      { path: 'repositories', pathMatch: 'full', redirectTo: 'projects' },
-      { path: 'repositories/:id', redirectTo: 'projects/:id' },
       {
         path: 'teams',
         title: 'Teams · Trama',

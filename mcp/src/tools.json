@@ -31,10 +31,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across workstreams, issues, decisions, artifacts, repositories and teams.",
+  "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, repositories and teams.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: workstream,issue,decision,execution,artifact,repository,team",
+   "types": "query string Comma-separated: workstream,project,issue,decision,execution,artifact,repository,team",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -352,6 +352,7 @@
    "teamId": "query string Owner or participating team",
    "accountableUserId": "query string Accountable user",
    "priority": "query string(none|urgent|high|medium|low) Priority",
+   "projectId": "query string Project",
    "repositoryId": "query string Repository",
    "label": "query string Label",
    "q": "query string Text filter"
@@ -402,6 +403,7 @@
    "context": "body string Context",
    "participatingTeamIds": "body string[] Participating team ids",
    "accountableUserId": "body string Accountable user id",
+   "projectId": "body string Project id. The workstream then works in the project's repositories (inherited when repositoryIds is omitted)",
    "repositoryIds": "body string[] Repository ids",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "labels": "body string[] Labels",
@@ -427,6 +429,7 @@
    "context": "body string Context",
    "participatingTeamIds": "body string[] Participating team ids",
    "accountableUserId": "body string Accountable user id",
+   "projectId": "body string Project id (null detaches). repositoryIds must be a subset of the project's",
    "repositoryIds": "body string[] Repository ids",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "labels": "body string[] Labels",
@@ -482,13 +485,88 @@
   }
  },
  {
+  "name": "list_projects",
+  "method": "GET",
+  "path": "/projects",
+  "permission": "projects:read",
+  "description": "Projects: planned outcomes (Linear-style) that workstreams carry out.",
+  "params": {
+   "status": "query string(backlog|planned|in_progress|paused|completed|canceled) Status",
+   "teamId": "query string Team",
+   "leadId": "query string Lead user",
+   "repositoryId": "query string Repository",
+   "q": "query string Text filter"
+  }
+ },
+ {
+  "name": "get_project",
+  "method": "GET",
+  "path": "/projects/{id}",
+  "permission": "projects:read",
+  "description": "One project.",
+  "params": {
+   "id": "path string! Project id"
+  }
+ },
+ {
+  "name": "create_project",
+  "method": "POST",
+  "path": "/projects",
+  "permission": "projects:write",
+  "description": "Create a project (a planned outcome). Workstreams carry it out; milestones belong to it.",
+  "params": {
+   "name": "body string! Name",
+   "summary": "body string One-line summary",
+   "description": "body string Description (markdown)",
+   "color": "body string Hex colour, e.g. #6b7280",
+   "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status (default backlog)",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "leadId": "body string Lead user id",
+   "teamIds": "body string[] Team ids",
+   "repositoryIds": "body string[] Repository ids (where the work happens)",
+   "startDate": "body string ISO date",
+   "targetDate": "body string ISO date"
+  }
+ },
+ {
+  "name": "update_project",
+  "method": "PATCH",
+  "path": "/projects/{id}",
+  "permission": "projects:write",
+  "description": "Partially update a project; null clears optional fields. Removing a repository also removes it from the project's workstreams.",
+  "params": {
+   "id": "path string! Project id",
+   "name": "body string Name",
+   "summary": "body string Summary",
+   "description": "body string Description",
+   "color": "body string Hex colour",
+   "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status",
+   "priority": "body string(none|urgent|high|medium|low) Priority",
+   "leadId": "body string Lead user id (null clears)",
+   "teamIds": "body string[] Team ids",
+   "repositoryIds": "body string[] Repository ids",
+   "startDate": "body string ISO date (null clears)",
+   "targetDate": "body string ISO date (null clears)"
+  }
+ },
+ {
+  "name": "delete_project",
+  "method": "DELETE",
+  "path": "/projects/{id}",
+  "permission": "projects:delete",
+  "description": "Delete a project and its milestones. Its workstreams are kept, detached.",
+  "params": {
+   "id": "path string! Project id"
+  }
+ },
+ {
   "name": "list_milestones",
   "method": "GET",
   "path": "/milestones",
   "permission": "milestones:read",
-  "description": "Milestones, ordered.",
+  "description": "Milestones of projects, ordered.",
   "params": {
-   "workstreamId": "query string Workstream id"
+   "projectId": "query string Project id"
   }
  },
  {
@@ -506,9 +584,9 @@
   "method": "POST",
   "path": "/milestones",
   "permission": "milestones:write",
-  "description": "Create a milestone in a workstream.",
+  "description": "Create a milestone in a project.",
   "params": {
-   "workstreamId": "body string! Workstream id",
+   "projectId": "body string! Project id",
    "name": "body string! Name",
    "description": "body string Description",
    "targetDate": "body string ISO date",
@@ -534,9 +612,9 @@
   "method": "POST",
   "path": "/milestones/reorder",
   "permission": "milestones:write",
-  "description": "Set the order of a workstream's milestones.",
+  "description": "Set the order of a project's milestones.",
   "params": {
-   "workstreamId": "body string! Workstream id",
+   "projectId": "body string! Project id",
    "ids": "body string[]! Milestone ids in the new order"
   }
  },
@@ -952,7 +1030,7 @@
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team) Subject type",
+   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team|project) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -963,7 +1041,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team, id}",
+   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team|project, id}",
    "body": "body string! Comment (markdown)"
   }
  },

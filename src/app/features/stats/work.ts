@@ -24,9 +24,10 @@ export interface WorkRec {
 export interface MilestoneRec {
   id: string;
   name: string;
-  workstreamId: string;
-  workstreamKey: string;
-  workstreamTitle: string;
+  projectId: string;
+  projectName: string;
+  /** The project's workstreams inside the current filter. */
+  workstreamIds: string[];
   /** End of the target day, ms. */
   target?: number;
   sortOrder: number;
@@ -75,19 +76,20 @@ export function buildWork(store: NablaStore, issues: readonly Issue[], workstrea
       workstreamIds: i.workstreamIds,
     });
   }
-  const wsById = new Map(workstreams.map((w) => [w.id, w] as const));
   const byMilestone = store.issuesByMilestone();
+  // Milestones belong to projects: keep those of a project that has a workstream in the current filter.
+  const wsByProject = new Map<string, string[]>();
+  for (const w of workstreams) if (w.projectId) wsByProject.set(w.projectId, [...(wsByProject.get(w.projectId) ?? []), w.id]);
   const milestones: MilestoneRec[] = store
     .milestones()
-    .filter((m) => wsById.has(m.workstreamId))
+    .filter((m) => wsByProject.has(m.projectId))
     .map((m) => {
-      const ws = wsById.get(m.workstreamId)!;
       return {
         id: m.id,
         name: m.name,
-        workstreamId: ws.id,
-        workstreamKey: ws.key,
-        workstreamTitle: ws.title,
+        projectId: m.projectId,
+        projectName: store.getProject(m.projectId)?.name ?? 'Project',
+        workstreamIds: wsByProject.get(m.projectId) ?? [],
         target: endOfDay(m.targetDate),
         sortOrder: m.sortOrder,
         issueIds: (byMilestone.get(m.id) ?? []).map((i) => i.id),

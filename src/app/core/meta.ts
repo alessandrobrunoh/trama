@@ -184,7 +184,7 @@ export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medi
 export const ROLE_META: Record<Role, { label: string; rank: number; description: string }> = {
   viewer: { label: 'Viewer', rank: 0, description: 'Read only' },
   member: { label: 'Member', rank: 1, description: 'Create and update work' },
-  admin: { label: 'Admin', rank: 2, description: 'Manage teams, projects, agents and members' },
+  admin: { label: 'Admin', rank: 2, description: 'Manage teams, repositories, agents and members' },
   owner: { label: 'Owner', rank: 3, description: 'Everything, including deleting the workspace' },
 };
 export const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
@@ -194,7 +194,7 @@ export const ROLE_DETAILS: Record<Role, string> = {
   owner:
     'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
   admin:
-    'Manages people and structure: members, teams, projects, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
+    'Manages people and structure: members, teams, repositories, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
   member:
     'Does the everyday work: creates and edits workstreams, issues, decisions and comments. What else a member may do is set in Roles & permissions.',
   viewer: 'Read-only. Can browse everything in the workspace but cannot change anything.',

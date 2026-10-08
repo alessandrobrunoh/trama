@@ -13,6 +13,7 @@ import type {
   IssueSource,
   IssueStatus,
   Priority,
+  ProjectStatus,
   ReviewState,
   Role,
   SubjectRef,
@@ -34,6 +35,7 @@ import type {
   IntegrationConnectionEntity,
   MembershipEntity,
   MilestoneEntity,
+  ProjectEntity,
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
@@ -57,6 +59,7 @@ export interface SeedData {
   agents: Rows<AgentEntity>;
   teams: Rows<TeamEntity>;
   repositories: Rows<RepositoryEntity>;
+  projects: Rows<ProjectEntity>;
   workstreams: Rows<WorkstreamEntity>;
   milestones: Rows<MilestoneEntity>;
   inputRequests: Rows<InputRequestEntity>;
@@ -112,7 +115,7 @@ export class SeedBuilder {
   ) {
     this.workspaceId = workspaceId;
     this.data = {
-      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], workstreams: [], milestones: [],
+      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], projects: [], workstreams: [], milestones: [],
       inputRequests: [], issues: [], artifacts: [], decisions: [], dependencies: [], comments: [],
       events: [], views: [], integrations: [], counters: {},
     };
@@ -157,6 +160,42 @@ export class SeedBuilder {
     return id;
   }
 
+  /** Linear-style project. Its repositories are the union of its workstreams' (see `syncProjectRepos`). */
+  project(o: {
+    name: string;
+    summary?: string;
+    description?: string;
+    color?: string;
+    status: ProjectStatus;
+    priority?: Priority;
+    lead?: string;
+    teams: string[];
+    start?: number;
+    target?: number;
+    created: number;
+    createdBy: string;
+  }): string {
+    const id = uid('pj');
+    const createdAt = this.at(o.created);
+    this.data.projects.push({
+      id, workspaceId: this.workspaceId, name: o.name, summary: o.summary ?? null, description: o.description ?? null,
+      color: o.color ?? '#6b7280', status: o.status, priority: o.priority ?? 'medium', leadId: o.lead ?? null, teamIds: o.teams, repositoryIds: [],
+      startDate: o.start !== undefined ? this.at(o.start) : null, targetDate: o.target !== undefined ? this.at(-o.target) : null,
+      createdAt, updatedAt: createdAt, completedAt: o.status === 'completed' || o.status === 'canceled' ? createdAt : null,
+    });
+    this.event(createdAt, user(o.createdBy), 'project.created', { type: 'project', id }, null, { name: o.name });
+    return id;
+  }
+
+  /** A workstream of a project may only use the project's repositories: give each project the union of its workstreams'. */
+  syncProjectRepos() {
+    for (const p of this.data.projects) {
+      const repos = new Set<string>();
+      for (const w of this.data.workstreams) if (w.projectId === p.id) for (const r of (w.repositoryIds ?? []) as string[]) repos.add(r);
+      p.repositoryIds = [...repos];
+    }
+  }
+
   workstream(o: {
     key: string;
     title: string;
@@ -165,6 +204,7 @@ export class SeedBuilder {
     owner: string;
     participating?: string[];
     accountable?: string;
+    project?: string;
     repos?: string[];
     criteria?: [string, AcceptanceCriterion['state']][];
     priority?: Priority;
@@ -199,6 +239,7 @@ export class SeedBuilder {
       ownerTeamId: o.owner,
       participatingTeamIds: o.participating ?? [],
       accountableUserId: o.accountable ?? null,
+      projectId: o.project ?? null,
       repositoryIds: o.repos ?? [],
       acceptanceCriteria: (o.criteria ?? []).map(([text, state]) => ({ id: uid('ac'), text, state })),
       priority: o.priority ?? 'medium',
@@ -349,14 +390,14 @@ export class SeedBuilder {
     this.event(this.at(daysAgo), user(by), 'decision.superseded', { type: 'decision', id: decisionId }, d.originWorkstreamId ?? null, { key: d.key, title: d.title, supersededBy: byKey });
   }
 
-  /** Milestone of a workstream; `target` = days from now (negative = past). */
-  milestone(workstreamId: string, o: { name: string; description?: string; target?: number; sort: number; created: number }): string {
+  /** Milestone of a project; `target` = days from now (negative = past). */
+  milestone(projectId: string, o: { name: string; description?: string; target?: number; sort: number; created: number }): string {
     const id = uid('ms');
     this.data.milestones.push({
-      id, workspaceId: this.workspaceId, workstreamId, name: o.name, description: o.description ?? null,
+      id, workspaceId: this.workspaceId, projectId, name: o.name, description: o.description ?? null,
       targetDate: o.target !== undefined ? this.at(-o.target) : null, sortOrder: o.sort, createdAt: this.at(o.created), updatedAt: this.at(o.created),
     });
-    this.event(this.at(o.created), SYSTEM, 'milestone.created', { type: 'milestone', id }, workstreamId, { name: o.name });
+    this.event(this.at(o.created), SYSTEM, 'milestone.created', { type: 'milestone', id }, null, { name: o.name, projectId });
     return id;
   }
 

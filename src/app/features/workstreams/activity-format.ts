@@ -140,7 +140,7 @@ function fieldName(f: string): string {
     ownerTeamId: 'the owner team',
     participatingTeamIds: 'participating teams',
     accountableUserId: 'the accountable person',
-    repositoryIds: 'projects',
+    repositoryIds: 'repositories',
     targetDate: 'the target date',
     objective: 'the objective',
     context: 'the context',

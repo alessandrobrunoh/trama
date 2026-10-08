@@ -1,12 +1,12 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
 import { ArrayMaxSize, IsArray, IsISO8601, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from 'class-validator';
-import { Actor, Ctx, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { MilestonesService } from './milestones.service.js';
 
 class CreateMilestoneDto {
-  @IsString() workstreamId: string;
+  @IsString() projectId: string;
   @IsString() @MinLength(1) @MaxLength(200) name: string;
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @IsISO8601() targetDate?: string;
@@ -21,12 +21,12 @@ class UpdateMilestoneDto {
 }
 
 class ReorderMilestonesDto {
-  @IsString() workstreamId: string;
+  @IsString() projectId: string;
   @IsArray() @ArrayMaxSize(500) @IsString({ each: true }) ids: string[];
 }
 
 class ListMilestonesQuery {
-  @IsOptional() @IsString() workstreamId?: string;
+  @IsOptional() @IsString() projectId?: string;
 }
 
 @Controller('w/:slug/milestones')
@@ -44,23 +44,27 @@ export class MilestonesController {
   }
 
   @Post()
+  @Can('manageProjects')
   create(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: CreateMilestoneDto) {
     return this.service.create(ctx.workspace.id, actor, dto);
   }
 
-  /** Re-numbers sortOrder (0..n-1) of a workstream's milestones following `ids`. Returns the ordered list. */
+  /** Re-numbers sortOrder (0..n-1) of a project's milestones following `ids`. Returns the ordered list. */
   @Post('reorder')
+  @Can('manageProjects')
   @HttpCode(200)
   reorder(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Body() dto: ReorderMilestonesDto) {
-    return this.service.reorder(ctx.workspace.id, actor, dto.workstreamId, dto.ids);
+    return this.service.reorder(ctx.workspace.id, actor, dto.projectId, dto.ids);
   }
 
   @Patch(':id')
+  @Can('manageProjects')
   update(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('id') id: string, @Body() dto: UpdateMilestoneDto) {
     return this.service.update(ctx.workspace.id, actor, id, dto);
   }
 
   @Delete(':id')
+  @Can('manageProjects')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('id') id: string) {
     return this.service.remove(ctx.workspace.id, actor, id);

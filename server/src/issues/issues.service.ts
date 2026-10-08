@@ -12,7 +12,7 @@ import {
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
-import { IssueEntity, MilestoneEntity } from '../database/entities/index.js';
+import { IssueEntity, MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import {
@@ -150,8 +150,8 @@ export class IssuesService {
   }
 
   /**
-   * Milestones must exist, belong to a workstream the issue is linked to, and an issue may be in
-   * at most one milestone per workstream.
+   * Milestones must exist, belong to a project of a workstream the issue is linked to, and an
+   * issue may be in at most one milestone per project.
    */
   private async assertMilestones(
     workspaceId: string,
@@ -166,17 +166,21 @@ export class IssuesService {
       throw new BadRequestException(
         `Unknown milestone in: ${milestoneIds.join(', ')}`,
       );
+    const streams = workstreamIds.length
+      ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...workstreamIds]) })
+      : [];
+    const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
     const seen = new Set<string>();
     for (const m of rows) {
-      if (!workstreamIds.includes(m.workstreamId))
+      if (!projects.has(m.projectId))
         throw new BadRequestException(
-          `Milestone "${m.name}" belongs to a workstream this issue is not linked to`,
+          `Milestone "${m.name}" belongs to a project none of this issue's workstreams carries out`,
         );
-      if (seen.has(m.workstreamId))
+      if (seen.has(m.projectId))
         throw new BadRequestException(
-          'An issue can be in at most one milestone per workstream',
+          'An issue can be in at most one milestone per project',
         );
-      seen.add(m.workstreamId);
+      seen.add(m.projectId);
     }
   }
 
@@ -296,14 +300,18 @@ export class IssuesService {
         nextWorkstreamIds,
       );
     } else if (patch.workstreamIds !== undefined && row.milestoneIds.length) {
-      // Unlinking a workstream drops that workstream's milestone.
+      // Unlinking the last workstream of a project drops that project's milestone.
+      const streams = nextWorkstreamIds.length
+        ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...nextWorkstreamIds]) })
+        : [];
+      const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
       const kept = new Set(
         (
           await this.ds
             .getRepository(MilestoneEntity)
             .findBy({ workspaceId, id: In(row.milestoneIds) })
         )
-          .filter((m) => nextWorkstreamIds.includes(m.workstreamId))
+          .filter((m) => projects.has(m.projectId))
           .map((m) => m.id),
       );
       nextMilestoneIds = row.milestoneIds.filter((id) => kept.has(id));

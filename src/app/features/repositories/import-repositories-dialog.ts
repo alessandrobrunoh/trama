@@ -13,8 +13,8 @@ import { teamOptions } from '../workstreams/ws-model';
 import { RemoteRepoBrowser } from './remote-repo-browser';
 
 /**
- * "Import from a git host": pick a connection, optionally the teams for new projects, then link
- * repositories the token can see. Falls back to the manual "New project" form.
+ * "Import from a git host": pick a connection, optionally the teams for new repositories, then link
+ * repositories the token can see. Falls back to the manual "New repository" form.
  *   <app-import-repositories-dialog [open]="importOpen()" (closed)="importOpen.set(false)" />
  */
 @Component({
@@ -25,7 +25,7 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="closed.emit()">
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="flex max-h-[85svh] flex-col gap-4 sm:max-w-xl">
         <hlm-dialog-header>
-          <h2 hlmDialogTitle>Import projects</h2>
+          <h2 hlmDialogTitle>Import repositories</h2>
           <p hlmDialogDescription>Link repositories from a connected GitHub, GitLab or Bitbucket account. Pull requests and CI then flow in through the webhook.</p>
         </hlm-dialog-header>
 
@@ -56,7 +56,7 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
           </div>
 
           <div class="flex flex-wrap items-center gap-2">
-            <span class="text-muted-foreground text-xs font-medium">Assign new projects to</span>
+            <span class="text-muted-foreground text-xs font-medium">Assign new repositories to</span>
             <app-picker variant="chip" label="Teams" [multiple]="true" [options]="teams()" [value]="teamIds()" (valueChange)="teamIds.set($event)" />
           </div>
 
@@ -142,7 +142,7 @@ export class ImportRepositoriesDialog {
     this.linkedCount.update((n) => n + 1);
     const slug = this.slug();
     this.notifier.success(`Linked ${repo.fullName}`, {
-      action: { label: 'Open', run: () => void this.router.navigate(['/', slug, 'projects', repo.id]) },
+      action: { label: 'Open', run: () => void this.router.navigate(['/', slug, 'repositories', repo.id]) },
     });
   }
 

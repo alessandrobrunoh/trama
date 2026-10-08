@@ -236,6 +236,20 @@ export const repoOptions = (store: NablaStore): PickOption[] =>
     .repositories()
     .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
 
+/** Open projects (plus `currentId` even when closed), for the Project picker. */
+export const projectOptions = (store: NablaStore, currentId?: string | null): PickOption[] =>
+  store
+    .projects()
+    .filter((p) => (p.status !== 'completed' && p.status !== 'canceled') || p.id === currentId)
+    .map((p) => ({ value: p.id, label: p.name, kind: 'plain' }));
+
+/** Repositories a workstream of `projectId` may use: the project's own; everything when it has no project. */
+export const repoOptionsIn = (store: NablaStore, projectId?: string | null): PickOption[] => {
+  const project = store.getProject(projectId);
+  const all = repoOptions(store);
+  return project ? all.filter((o) => project.repositoryIds.includes(o.value)) : all;
+};
+
 export const labelOptions = (store: NablaStore): PickOption[] => {
   const set = new Set<string>();
   for (const w of store.workstreams()) for (const l of w.labels) set.add(l);

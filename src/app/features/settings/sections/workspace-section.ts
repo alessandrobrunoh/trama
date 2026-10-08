@@ -206,7 +206,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
     <app-settings-group title="Danger zone">
       <app-settings-row
         label="Delete workspace"
-        [description]="canOwner() ? 'Removes every workstream, issue, decision, project and its history. This cannot be undone.' : 'Only an owner can delete the workspace.'"
+        [description]="canOwner() ? 'Removes every workstream, issue, decision, repository and its history. This cannot be undone.' : 'Only an owner can delete the workspace.'"
       >
         <button hlmBtn variant="destructive" size="sm" [disabled]="!canOwner()" (click)="deleteWorkspace()">Delete workspace</button>
       </app-settings-row>
@@ -369,7 +369,7 @@ export class WorkspaceSection {
     const name = this.session.workspace()?.name ?? 'this workspace';
     this.ui.setConfirmDelete({
       title: `Delete ${name}?`,
-      description: 'Every workstream, issue, project and decision in it is removed. This cannot be undone.',
+      description: 'Every workstream, issue, repository and decision in it is removed. This cannot be undone.',
       confirmLabel: 'Delete workspace',
       onConfirm: async () => {
         await this.session.deleteWorkspace();

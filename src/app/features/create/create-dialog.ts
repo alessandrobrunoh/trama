@@ -16,6 +16,7 @@ import {
   LucideCalendar,
   LucideCircleUser,
   LucideDynamicIcon,
+  LucideBox,
   LucideFolderGit2,
   LucideLayers,
   LucideScale,
@@ -97,7 +98,8 @@ const SWITCHER: KindDef[] = [
 ];
 const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = {
   team: { label: 'Team', icon: LucideUsers },
-  repository: { label: 'Project', icon: LucideFolderGit2 },
+  repository: { label: 'Repository', icon: LucideFolderGit2 },
+  project: { label: 'Project', icon: LucideBox },
   view: { label: 'View', icon: LucideLayers },
 };
 
@@ -115,13 +117,13 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 /**
  * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues,
  * workstreams and decisions (title · description · property chips), plus compact forms for
- * team / project / view.
+ * team / repository / view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
  *   issue:      status, priority, teamId (or ownerTeamId), kind, assigneeId, workstreamIds[], title, body
  *               → workstreamIds are linked right after create (keeping the chosen status).
  *   workstream: status (sent as statusOverride unless 'planned' = derivable), title, description,
- *               ownerTeamId, repositoryIds[], issueIds[], priority, accountableUserId, deltaThreadUrl
+ *               ownerTeamId, projectId, repositoryIds[], issueIds[], priority, accountableUserId, deltaThreadUrl
  *               → issueIds are linked to the new workstream right after create.
  *   decision:   workstreamId (origin), title, statement, rationale, tags (string[] or "a, b")
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
@@ -418,10 +420,21 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     clearLabel="Nobody yet"
                     (valueChange)="accountableId.set($event[0] ?? '')"
                   />
+                  @if (projectOptions().length) {
+                    <app-picker
+                      variant="pill"
+                      label="Project"
+                      [options]="projectOptions()"
+                      [value]="opt(projectId())"
+                      [clearable]="true"
+                      clearLabel="No project"
+                      (valueChange)="onProject($event[0])"
+                    />
+                  }
                   @if (repoOptions().length) {
                     <app-picker
                       variant="pill"
-                      label="Projects"
+                      label="Repositories"
                       [multiple]="true"
                       [options]="repoOptions()"
                       [value]="repositoryIds()"
@@ -546,7 +559,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                         label="Provider"
                       />
                     </app-form-row>
-                    <app-form-row label="Project" [error]="err('title')">
+                    <app-form-row label="Repository" [error]="err('title')">
                       <input
                         hlmInput
                         class="font-mono"
@@ -555,7 +568,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                         name="fullName"
                         autocomplete="off"
                         autofocus
-                        aria-label="Project name"
+                        aria-label="Repository name"
                       />
                     </app-form-row>
                   </div>
@@ -570,6 +583,42 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Default branch"
                     />
                   </app-form-row>
+                }
+                @case ('project') {
+                  <app-form-row label="Name" [error]="err('title')">
+                    <input
+                      hlmInput
+                      placeholder="Checkout redesign"
+                      [(ngModel)]="title"
+                      name="projectName"
+                      autocomplete="off"
+                      autofocus
+                      aria-label="Project name"
+                    />
+                  </app-form-row>
+                  <app-form-row label="Summary" [optional]="true">
+                    <input
+                      hlmInput
+                      placeholder="What outcome is this project after?"
+                      [(ngModel)]="text"
+                      name="projectSummary"
+                      autocomplete="off"
+                      aria-label="Project summary"
+                    />
+                  </app-form-row>
+                  @if (repoOptions().length) {
+                    <app-form-row label="Repositories" [optional]="true">
+                      <app-picker
+                        variant="field"
+                        label="Repositories"
+                        placeholder="None"
+                        [multiple]="true"
+                        [options]="repoOptions()"
+                        [value]="repositoryIds()"
+                        (valueChange)="repositoryIds.set($event)"
+                      />
+                    </app-form-row>
+                  }
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -693,6 +742,7 @@ export class CreateDialog {
   protected readonly accountableId = signal('');
   protected readonly targetDate = signal<Date | undefined>(undefined);
   protected readonly repositoryIds = signal<string[]>([]);
+  protected readonly projectId = signal('');
   protected readonly issueIds = signal<string[]>([]);
   // decision
   protected readonly workstreamId = signal('');
@@ -759,10 +809,19 @@ export class CreateDialog {
       .users()
       .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
   );
-  protected readonly repoOptions = computed<PickOption[]>(() =>
-    this.store
+  /** The repositories offered: the chosen project's own, or all of them. */
+  protected readonly repoOptions = computed<PickOption[]>(() => {
+    const project = this.store.getProject(this.projectId());
+    return this.store
       .repositories()
-      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider })),
+      .filter((r) => !project || project.repositoryIds.includes(r.id))
+      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
+  });
+  protected readonly projectOptions = computed<PickOption[]>(() =>
+    this.store
+      .projects()
+      .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
+      .map((p) => ({ value: p.id, label: p.name, kind: 'plain' })),
   );
   /** Open workstreams first (hexagon glyphs). */
   protected readonly workstreamOptions = computed<PickOption[]>(() => {
@@ -862,6 +921,7 @@ export class CreateDialog {
       this.store.userById().has(asStr(d['accountableUserId'])) ? asStr(d['accountableUserId']) : '',
     );
     this.targetDate.set(undefined);
+    this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
     this.repositoryIds.set(
       asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
     );
@@ -955,6 +1015,15 @@ export class CreateDialog {
 
   protected onClosed(): void {
     if (this.ui.modal() === 'create') this.ui.closeModal();
+  }
+
+  /** Picking a project narrows the repositories to its own (all of them when none were chosen yet). */
+  protected onProject(id: string | undefined): void {
+    this.projectId.set(id ?? '');
+    const project = this.store.getProject(id);
+    if (!project) return;
+    const own = this.repositoryIds().filter((r) => project.repositoryIds.includes(r));
+    this.repositoryIds.set(own.length ? own : [...project.repositoryIds]);
   }
 
   protected onTeamName(v: string): void {
@@ -1093,6 +1162,7 @@ export class CreateDialog {
             ownerTeamId: this.ownerTeamId(),
             priority: this.priority() as Priority,
             accountableUserId: this.accountableId() || undefined,
+            projectId: this.projectId() || undefined,
             repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
             targetDate: this.targetDate()?.toISOString(),
             statusOverride: asDraft ? 'draft' : (this.wsStatus() as WorkstreamStatus) || undefined,
@@ -1136,7 +1206,16 @@ export class CreateDialog {
             fullName: title,
             defaultBranch: this.text().trim() || undefined,
           });
-          if (r) done = { label: `${r.fullName} added`, path: ['projects', r.id] };
+          if (r) done = { label: `${r.fullName} added`, path: ['repositories', r.id] };
+          break;
+        }
+        case 'project': {
+          const p = await this.store.createProject({
+            name: title,
+            summary: this.text().trim() || undefined,
+            repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
+          });
+          if (p) done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
           break;
         }
         case 'view': {
@@ -1159,7 +1238,7 @@ export class CreateDialog {
       // Linear behaviour: stay where you are, offer "Open" in the toast.
       // Views and teams are destinations of their own, so those still navigate.
       const navigate =
-        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository';
+        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository' || this.kind() === 'project';
       this.notifier.success(done.label, {
         description: navigate ? undefined : title,
         action: navigate

@@ -3,7 +3,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideDiamond } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, shortDate, type Issue } from '../../core';
+import { NablaStore, shortDate, type Issue, type Project } from '../../core';
 import { Notifier } from '../../core/notify/notifier';
 import { MilestoneActions } from './milestone-actions';
 import { PropertyRow } from '../../shared/property-row';
@@ -48,9 +48,9 @@ export class NextMilestoneChip {
 const date = (iso: string): string => shortDate(iso);
 
 /**
- * Issue property: one milestone per linked workstream. Options are the milestones of every
- * workstream the issue is in, labelled "AUTH-42 › M2 — Identity Ready"; picking a second one of the
- * same workstream replaces the first.
+ * Issue property: one milestone per project. Options are the milestones of the projects of the
+ * workstreams the issue is in, labelled "Checkout v2 › M2 — Identity Ready"; picking a second one of
+ * the same project replaces the first.
  */
 @Component({
   selector: 'app-issue-milestone-prop',
@@ -60,7 +60,7 @@ const date = (iso: string): string => shortDate(iso);
   template: `
     <app-property-row label="Milestone" [icon]="diamond">
       @if (!hasWorkstream()) {
-        <span class="text-muted-foreground px-1.5 text-[13px]" hlmTooltip="Milestones belong to a workstream. Add this issue to one (W) to pick a milestone.">Add to a workstream first</span>
+        <span class="text-muted-foreground px-1.5 text-[13px]" hlmTooltip="Milestones belong to a project. Add this issue to a workstream of a project (W) to pick a milestone.">Add to a project's workstream first</span>
       } @else {
         <app-picker
           variant="field"
@@ -87,51 +87,59 @@ export class IssueMilestoneProp {
   protected readonly diamond = LucideDiamond;
 
   protected readonly canEdit = computed(() => this.store.canEditTeamWork(this.issue().teamId) && !this.issue().duplicateOfId);
+  /** The projects the issue's workstreams carry out. */
+  private readonly linkedProjects = computed(() => {
+    const seen = new Set<string>();
+    const out: Project[] = [];
+    for (const wsId of this.issue().workstreamIds) {
+      const project = this.store.getProject(this.store.getWorkstream(wsId)?.projectId);
+      if (project && !seen.has(project.id)) (seen.add(project.id), out.push(project));
+    }
+    return out;
+  });
   protected readonly options = computed<PickOption[]>(() => {
     const out: PickOption[] = [];
-    for (const wsId of this.issue().workstreamIds) {
-      const ws = this.store.getWorkstream(wsId);
-      if (!ws) continue;
-      (this.store.milestonesByWorkstream().get(wsId) ?? []).forEach((m, i) =>
+    for (const project of this.linkedProjects()) {
+      (this.store.milestonesByProject().get(project.id) ?? []).forEach((m, i) =>
         out.push({
           value: m.id,
-          label: `${ws.key} › M${i + 1} — ${m.name}`,
+          label: `${project.name} › M${i + 1} — ${m.name}`,
           hint: m.targetDate ? shortDate(m.targetDate) : undefined,
-          search: `${ws.key} M${i + 1} ${m.name}`,
+          search: `${project.name} M${i + 1} ${m.name}`,
         }),
       );
     }
     return out;
   });
-  protected readonly hasWorkstream = computed(() => this.issue().workstreamIds.length > 0);
+  protected readonly hasWorkstream = computed(() => this.linkedProjects().length > 0);
   protected readonly selected = computed(() => {
     const ids = new Set(this.issue().milestoneIds ?? []);
     return this.options().filter((o) => ids.has(o.value)).map((o) => o.value);
   });
 
-  /** Creates "Milestone N" in the first linked workstream that has no milestone for this issue yet, and puts the issue in it. */
+  /** Creates "Milestone N" in the first linked project that has no milestone for this issue yet, and puts the issue in it. */
   protected async createMilestone(): Promise<void> {
     const issue = this.issue();
-    const have = new Set((issue.milestoneIds ?? []).map((id) => this.store.getMilestone(id)?.workstreamId));
-    const wsId = issue.workstreamIds.find((id) => !have.has(id)) ?? issue.workstreamIds[0];
-    const ws = this.store.getWorkstream(wsId);
-    if (!ws) return;
-    const n = (this.store.milestonesByWorkstream().get(ws.id) ?? []).length + 1;
-    const ms = await this.actions.create(ws.id, `Milestone ${n}`);
+    const have = new Set((issue.milestoneIds ?? []).map((id) => this.store.getMilestone(id)?.projectId));
+    const projects = this.linkedProjects();
+    const project = projects.find((p) => !have.has(p.id)) ?? projects[0];
+    if (!project) return;
+    const n = (this.store.milestonesByProject().get(project.id) ?? []).length + 1;
+    const ms = await this.actions.create(project.id, `Milestone ${n}`);
     if (!ms) return;
-    this.actions.assign(this.issue(), ws.id, ms.id);
-    this.notify.success(`Created “${ms.name}” in ${ws.key}`, { description: 'Rename it from the workstream page.' });
+    this.actions.assign(this.issue(), project.id, ms.id);
+    this.notify.success(`Created “${ms.name}” in ${project.name}`, { description: 'Rename it from the project page.' });
   }
 
   protected change(next: string[]): void {
     const issue = this.issue();
     const before = new Set(this.selected());
     const added = next.filter((id) => !before.has(id));
-    // keep one per workstream: a newly picked milestone replaces that workstream's previous one
+    // keep one per project: a newly picked milestone replaces that project's previous one
     const byWs = new Map<string, string>();
     for (const id of next) {
-      const wsId = this.store.getMilestone(id)?.workstreamId;
-      if (wsId && (!byWs.has(wsId) || added.includes(id))) byWs.set(wsId, id);
+      const projectId = this.store.getMilestone(id)?.projectId;
+      if (projectId && (!byWs.has(projectId) || added.includes(id))) byWs.set(projectId, id);
     }
     const kept = (issue.milestoneIds ?? []).filter((id) => !this.options().some((o) => o.value === id));
     const milestoneIds = [...kept, ...byWs.values()];

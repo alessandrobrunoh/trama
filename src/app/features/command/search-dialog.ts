@@ -11,7 +11,7 @@ import { CommandPanel } from './command-panel';
   template: `
     <hlm-command-dialog
       title="Search"
-      description="Search workstreams, issues, decisions, executions, artifacts, projects and teams."
+      description="Search workstreams, issues, decisions, executions, artifacts, repositories and teams."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
       dialogContentClass="w-[calc(100%-1rem)] max-w-none sm:w-[44rem] top-[10%] sm:top-[14%] translate-y-0 rounded-xl"
