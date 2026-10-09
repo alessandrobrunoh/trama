@@ -42,6 +42,8 @@ that are a subset of its own permissions.
 Every API token has caps (`limits`, defaults `requestsPerMinute` 600, `writesPerMinute` 60, `writesPerDay` 2000; configurable up to 6000 / 600 / 20000).
 Per-minute counters are per API process; the daily write counter is stored in Postgres. Over a cap: `429` with a message naming the cap.
 
+On top of that, every client IP is rate limited before authentication (in memory, per API process): 1200 requests/minute on `/api` overall, and stricter on `POST /auth/login` (10 per 15 min), `POST /auth/signup` (10/hour), `/invites/:token` (30 per 15 min), `GET /public/views/:token` (30/minute) and credential creation `POST /w/:slug/tokens|agents` (30/hour). Over a limit: `429` with a `Retry-After` header (seconds). Tunable through `TRAMA_RATE_LIMIT_*`, off when `NODE_ENV=test` or `TRAMA_RATE_LIMIT_ENABLED=false`; behind a reverse proxy set `TRAMA_TRUST_PROXY` so the real client address is used (see `.env.example`).
+
 ## Roles (RBAC)
 
 `viewer` < `member` < `admin` < `owner`. Default: GET needs `viewer`, every write on domain entities needs `member`.

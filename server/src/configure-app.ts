@@ -1,5 +1,6 @@
 import { BadRequestException, ValidationPipe, type ArgumentMetadata, type INestApplication, type PipeTransform } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { parseTrustProxy, rateLimitMiddleware } from './common/rate-limit.js';
 import { captureWebhookRawBody } from './webhooks/raw-body.js';
 
 /** Angular dev server (`ng serve`, port 4300; 4301 = a second QA instance). */
@@ -51,6 +52,9 @@ export class RejectUnsafeInputPipe implements PipeTransform {
 /** Shared by main.ts and the e2e tests. */
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
+  // Behind a reverse proxy set TRAMA_TRUST_PROXY (e.g. 1), or every client shares the proxy's address
+  const trustProxy = parseTrustProxy(process.env.TRAMA_TRUST_PROXY);
+  if (trustProxy !== undefined) (app as NestExpressApplication).set('trust proxy', trustProxy);
   (app as NestExpressApplication).useBodyParser('json', {
     limit: JSON_BODY_LIMIT,
     // keeps the raw bytes of /api/webhooks/* requests for HMAC verification
@@ -80,5 +84,7 @@ export function configureApp(app: INestApplication): void {
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+  // after CORS, so a 429 still carries the CORS headers the browser needs to read it
+  app.use(rateLimitMiddleware());
   app.enableShutdownHooks();
 }
