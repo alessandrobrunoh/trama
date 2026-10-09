@@ -52,6 +52,7 @@ export class LiveSync {
     const onVisible = () => {
       if (this.document.visibilityState === 'visible' && this.slug) {
         this.nabla.scheduleRefetch(0);
+        this.nabla.refreshLoadedComments(0);
         if (this.state() === 'reconnecting') this.retryNow();
       }
     };
@@ -106,7 +107,11 @@ export class LiveSync {
     this.source = source;
 
     source.onopen = () => {
-      if (this.hadConnection) this.nabla.scheduleRefetch(0); // catch up on missed events
+      if (this.hadConnection) {
+        // catch up on missed events
+        this.nabla.scheduleRefetch(0);
+        this.nabla.refreshLoadedComments(0);
+      }
       this.hadConnection = true;
       this.attempt = 0;
       this.status.live.set('open');

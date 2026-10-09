@@ -8,7 +8,7 @@ import { NablaStore, fullDate, shortDate, type Comment, type DomainEvent, type W
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { describeEvent, type EventLine } from './activity-format';
-import { CommentComposer, CommentItem } from './comments';
+import { CommentComposer, CommentItem, CommentsLoader } from './comments';
 
 type Entry =
   | { kind: 'event'; at: string; id: string; ev: DomainEvent; line: EventLine }
@@ -24,7 +24,7 @@ const PAGE = 30;
 @Component({
   selector: 'app-ws-activity-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmTooltip, LucideDynamicIcon, ActorAvatar, CommentComposer, CommentItem, RelativeTimePipe],
+  imports: [RouterLink, HlmButtonImports, HlmTooltip, LucideDynamicIcon, ActorAvatar, CommentComposer, CommentItem, CommentsLoader, RelativeTimePipe],
   host: { class: 'block' },
   template: `
     <div class="mx-auto max-w-3xl px-4 py-5 sm:px-6">
@@ -70,6 +70,8 @@ const PAGE = 30;
         <p class="text-muted-foreground py-6 text-center text-sm">No activity yet.</p>
       }
 
+      <app-comments-loader [subject]="subject()" class="mt-4" />
+
       @if (hasMore()) {
         <div class="mt-4 flex justify-center">
           <button hlmBtn variant="outline" size="sm" [disabled]="loading()" (click)="more()">{{ loading() ? 'Loading…' : 'Load older' }}</button>
@@ -85,6 +87,7 @@ export class WsActivityTab {
   protected readonly loading = signal(false);
   protected readonly exhausted = signal(false);
   protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly subject = computed(() => ({ type: 'workstream' as const, id: this.ws().id }));
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly full = fullDate;
 

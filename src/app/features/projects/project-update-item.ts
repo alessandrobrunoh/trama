@@ -192,7 +192,7 @@ export class ProjectUpdateItem {
     return mine || this.store.allowed('manageProjects');
   });
   protected readonly commentCount = computed(
-    () => this.store.commentsFor({ type: 'project_update', id: this.update().id }).length,
+    () => this.store.commentCountFor({ type: 'project_update', id: this.update().id }),
   );
   protected readonly posted = computed(() => fullDateTime(this.update().createdAt));
   protected readonly edited = computed(() =>

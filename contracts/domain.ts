@@ -767,6 +767,28 @@ export interface Comment {
   updatedAt: ISODate;
 }
 
+/** Page size of GET /comments/page: `limit` defaults to `default` and may not exceed `max`. */
+export const COMMENT_PAGE_SIZE = { default: 50, max: 100 } as const;
+
+/**
+ * GET /api/w/:slug/comments/page — one page of the comments of a single subject, newest first.
+ * `nextCursor` is opaque; pass it back as `cursor` to get the next (older) page, `null` on the last page.
+ */
+export interface CommentPage {
+  items: Comment[];
+  nextCursor: string | null;
+}
+
+/**
+ * Compact comment summary the slim snapshot carries instead of the comments themselves: how many comments
+ * each author left on each subject. Enough for counts and "who contributed" without loading any body.
+ */
+export interface CommentIndexEntry {
+  subject: SubjectRef;
+  author: ActorRef;
+  count: number;
+}
+
 /**
  * Append-only activity log (event-based activity model). Written by the server
  * on every mutation and by integrations/agents. `type` examples:
@@ -1275,6 +1297,13 @@ export function webhookEventMatches(patterns: readonly string[], type: string): 
 
 // ───────────────────────────── Snapshot ─────────────────────────────
 
+/**
+ * `?comments=` on GET /snapshot. `full` (default, kept for MCP/CLI consumers) inlines every comment;
+ * `index` returns `comments: []` plus `commentIndex`, and the client loads threads via GET /comments/page.
+ */
+export type SnapshotCommentsMode = 'full' | 'index';
+export const SNAPSHOT_COMMENTS_MODES: readonly SnapshotCommentsMode[] = ['full', 'index'];
+
 /** GET /api/w/:slug/snapshot — everything the client needs to boot a workspace. */
 export interface WorkspaceSnapshot {
   workspace: Workspace;
@@ -1297,7 +1326,10 @@ export interface WorkspaceSnapshot {
   artifacts: Artifact[];
   decisions: Decision[];
   dependencies: Dependency[];
+  /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
+  /** Present only in `index` mode. */
+  commentIndex?: CommentIndexEntry[];
   /** Most recent events (e.g. last 500); older ones via GET /events?before=. */
   events: DomainEvent[];
   attention: AttentionItem[];

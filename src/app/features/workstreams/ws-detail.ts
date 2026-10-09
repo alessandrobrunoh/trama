@@ -503,7 +503,7 @@ export class WorkstreamDetailPage {
         ).length +
         (this.store.outgoingDependencies().get(w.id) ?? []).filter((d) => d.toType === 'workstream')
           .length,
-      activity: events.length + this.store.commentsFor({ type: 'workstream', id: w.id }).length,
+      activity: events.length + this.store.commentCountFor({ type: 'workstream', id: w.id }),
     };
   });
 

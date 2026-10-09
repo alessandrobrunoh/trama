@@ -238,14 +238,14 @@ export class AgentDetail {
   protected readonly contributions = computed(() => {
     const id = this.agentId();
     const counts = new Map<string, number>();
-    const bump = (wsId: string | undefined | null) => {
-      if (wsId) counts.set(wsId, (counts.get(wsId) ?? 0) + 1);
+    const bump = (wsId: string | undefined | null, n = 1) => {
+      if (wsId) counts.set(wsId, (counts.get(wsId) ?? 0) + n);
     };
     const isMe = (a: { type: string; id?: string } | undefined) => a?.type === 'agent' && a.id === id;
     for (const e of this.mine()) bump(e.workstreamId);
     for (const a of this.store.artifacts()) if (isMe(a.authorRef)) bump(a.workstreamId);
     for (const r of this.store.inputRequests()) if (isMe(r.requestedBy)) bump(r.workstreamId);
-    for (const c of this.store.comments()) if (isMe(c.author) && c.subject.type === 'workstream') bump(c.subject.id);
+    for (const c of this.store.commentIndex()) if (isMe(c.author) && c.subject.type === 'workstream') bump(c.subject.id, c.count);
     for (const d of this.store.decisions()) if (isMe(d.proposedBy)) bump(d.originWorkstreamId);
     const byId = this.store.workstreamById();
     return [...counts]
