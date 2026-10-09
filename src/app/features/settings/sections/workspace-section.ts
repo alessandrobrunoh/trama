@@ -535,13 +535,16 @@ export class WorkspaceSection {
   }
 
   protected deleteWorkspace(): void {
-    const name = this.session.workspace()?.name ?? 'this workspace';
+    const ws = this.session.workspace();
+    if (!ws) return;
     this.ui.setConfirmDelete({
-      title: `Delete ${name}?`,
-      description: 'Every workstream, issue, repository and decision in it is removed. This cannot be undone.',
+      title: `Delete ${ws.name}?`,
+      description:
+        'Every workstream, issue, repository and decision in it is removed for everyone. This cannot be undone.',
       confirmLabel: 'Delete workspace',
-      onConfirm: async () => {
-        await this.session.deleteWorkspace();
+      requireText: { accept: [ws.name, ws.slug], label: `Type ${ws.name} to confirm` },
+      onConfirm: async (typed) => {
+        await this.session.deleteWorkspace(typed);
       },
     });
   }
