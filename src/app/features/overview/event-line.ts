@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import {
   LucideActivity,
   LucideBot,
+  LucideBuilding2,
   LucideCircleCheck,
   LucideCircleHelp,
   LucideCircleX,
@@ -225,6 +226,27 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
         detail: verb === 'updated' ? fieldsText(d) : undefined,
       };
     }
+    case 'customer.created':
+    case 'customer.updated':
+    case 'customer.archived':
+    case 'customer.restored':
+    case 'customer.deleted': {
+      const verb = e.type === 'customer.archived' ? 'archived' : e.type === 'customer.restored' ? 'restored' : e.type.split('.')[1];
+      return {
+        icon: LucideBuilding2,
+        verb: `${verb} customer`,
+        text: str(d['name']) ?? store.getCustomer(e.subject.id)?.name,
+        link: e.type !== 'customer.deleted' ? ['/', slug, 'customers', e.subject.id] : undefined,
+      };
+    }
+    case 'customer_request.linked':
+    case 'customer_request.unlinked':
+      return {
+        icon: LucideLink2,
+        verb: e.type === 'customer_request.linked' ? 'linked customer feedback to' : 'unlinked customer feedback from',
+        subject: str(d['issueId']) ? { type: 'issue', ref: str(d['issueId'])! } : undefined,
+        detail: str(d['customer']),
+      };
     case 'issue.created':
       return { icon: LucideInbox, verb: 'reported', subject: issueRef() };
     case 'issue.updated':

@@ -22,7 +22,9 @@ import type {
   CreateDecisionInput,
   CreateDependencyInput,
   CreateInputRequestInput,
+  CreateCustomerInput,
   CreateIssueInput,
+  LinkCustomerInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
   CreateIntegrationInput,
@@ -52,6 +54,7 @@ import type {
   UpdateArtifactInput,
   UpdateDecisionInput,
   UpdateInputRequestInput,
+  UpdateCustomerInput,
   UpdateIssueInput,
   UpdateProjectInput,
   UpdateRepositoryInput,
@@ -69,6 +72,8 @@ import type {
   AttentionItem,
   AttentionKind,
   Comment,
+  Customer,
+  CustomerRequest,
   Decision,
   Dependency,
   DomainEvent,
@@ -242,6 +247,8 @@ export class NablaStore {
   private readonly _milestones = signal<readonly Milestone[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
   private readonly _issues = signal<readonly Issue[]>([]);
+  private readonly _customers = signal<readonly Customer[]>([]);
+  private readonly _customerRequests = signal<readonly CustomerRequest[]>([]);
   private readonly _artifacts = signal<readonly Artifact[]>([]);
   private readonly _decisions = signal<readonly Decision[]>([]);
   private readonly _dependencies = signal<readonly Dependency[]>([]);
@@ -263,6 +270,8 @@ export class NablaStore {
   readonly milestones = this._milestones.asReadonly();
   readonly inputRequests = this._inputRequests.asReadonly();
   readonly issues = this._issues.asReadonly();
+  readonly customers = this._customers.asReadonly();
+  readonly customerRequests = this._customerRequests.asReadonly();
   readonly artifacts = this._artifacts.asReadonly();
   readonly decisions = this._decisions.asReadonly();
   readonly dependencies = this._dependencies.asReadonly();
@@ -291,6 +300,7 @@ export class NablaStore {
   );
   readonly inputRequestById = computed(() => indexById(this._inputRequests()));
   readonly issueById = computed(() => indexById(this._issues()));
+  readonly customerById = computed(() => indexById(this._customers()));
   /** Upper-case current key (`BUG-142`) or alias (an old key from before a kind change) → issue. */
   readonly issueByKey = computed(() => {
     const map = new Map<string, Issue>();
@@ -576,6 +586,9 @@ export class NablaStore {
     if (!ref) return undefined;
     return this.issueById().get(ref) ?? this.issueByKey().get(ref.toUpperCase());
   }
+  getCustomer(id: string | null | undefined): Customer | undefined {
+    return id ? this.customerById().get(id) : undefined;
+  }
   getMilestone(id: string | null | undefined): Milestone | undefined {
     return id ? this.milestoneById().get(id) : undefined;
   }
@@ -715,7 +728,8 @@ export class NablaStore {
     this._myRole.set(null);
     for (const c of [
       this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
-      this._workstreams, this._milestones, this._inputRequests, this._issues, this._artifacts,
+      this._workstreams, this._milestones, this._inputRequests, this._issues, this._customers,
+      this._customerRequests, this._artifacts,
       this._decisions, this._dependencies, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
     ] as WritableSignal<readonly Row[]>[]) {
@@ -770,6 +784,8 @@ export class NablaStore {
     list(this._milestones, s.milestones ?? []);
     list(this._inputRequests, s.inputRequests);
     list(this._issues, s.issues);
+    list(this._customers, s.customers ?? []);
+    list(this._customerRequests, s.customerRequests ?? []);
     list(this._artifacts, s.artifacts);
     list(this._decisions, s.decisions);
     list(this._dependencies, s.dependencies);
@@ -1120,6 +1136,7 @@ export class NablaStore {
     const tx = this.tx();
     tx.remove(this._issues, id);
     for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId && !x.workstreamId)) tx.remove(this._artifacts, a.id);
+    for (const link of this._customerRequests().filter((r) => r.issueId === id)) tx.remove(this._customerRequests, link.id);
     return this.ok('delete issue', (s) => this.api.issues.remove(s, id), { tx });
   }
 
@@ -1147,6 +1164,50 @@ export class NablaStore {
       if (res === undefined) return undefined;
       return this.issueById().get(id);
     });
+  }
+
+  // ─────────────────────────── customers ───────────────────────────
+
+  async createCustomer(input: CreateCustomerInput): Promise<Customer | undefined> {
+    return this.write('create customer', (s) => this.api.customers.create(s, input), {
+      onResult: (c) => this.upsert(this._customers, c),
+    });
+  }
+
+  async updateCustomer(id: ID, patch: UpdateCustomerInput): Promise<boolean> {
+    if (!this.customerById().has(id)) return false;
+    const tx = this.tx();
+    const optimistic: Record<string, unknown> = { ...patch, updatedAt: this.nowIso() };
+    if (patch.archived === true) optimistic['archivedAt'] = this.nowIso();
+    if (patch.archived === false) optimistic['archivedAt'] = null;
+    delete optimistic['archived'];
+    tx.patch(this._customers, id, optimistic);
+    return this.write('update customer', (s) => this.api.customers.update(s, id, patch), {
+      tx,
+      onResult: (c) => this.upsert(this._customers, c),
+    }).then((r) => !!r);
+  }
+
+  /** Deletes the customer and its links. Issues stay. */
+  async deleteCustomer(id: ID): Promise<boolean> {
+    if (!this.customerById().has(id)) return false;
+    const tx = this.tx();
+    tx.remove(this._customers, id);
+    for (const link of this._customerRequests().filter((r) => r.customerId === id)) tx.remove(this._customerRequests, link.id);
+    return this.ok('delete customer', (s) => this.api.customers.remove(s, id), { tx });
+  }
+
+  async linkCustomer(customerId: ID, input: LinkCustomerInput): Promise<CustomerRequest | undefined> {
+    if (!this.customerById().has(customerId)) return undefined;
+    return this.write('link customer', (s) => this.api.customers.link(s, customerId, input), {
+      onResult: (r) => this.upsert(this._customerRequests, r),
+    });
+  }
+
+  async unlinkCustomer(customerId: ID, requestId: ID): Promise<boolean> {
+    const tx = this.tx();
+    tx.remove(this._customerRequests, requestId);
+    return this.ok('unlink customer', (s) => this.api.customers.unlink(s, customerId, requestId), { tx });
   }
 
   // ─────────────────────────── milestones ───────────────────────────

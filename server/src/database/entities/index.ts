@@ -397,6 +397,44 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+  /** Filled on read. Not a column. */
+  customerCount?: number;
+}
+
+// ───────────────────────────── customers ─────────────────────────────
+
+@Entity('customers')
+@Index('UQ_customers_workspace_domain', ['workspaceId', 'domain'], { unique: true })
+@Index('IDX_customers_workspace', ['workspaceId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+export class CustomerEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) name: string;
+  /** Normalized hostname, unique per workspace. */
+  @Column({ type: 'varchar' }) domain: string;
+  @Column({ type: 'jsonb' }) createdBy: ActorRef;
+  @Column({ type: 'timestamptz', nullable: true }) archivedAt: Date | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+}
+
+/** One customer linked to one issue. The pair is unique; either side's deletion removes the row. */
+@Entity('customer_requests')
+@Index('UQ_customer_requests_pair', ['workspaceId', 'customerId', 'issueId'], { unique: true })
+@Index('IDX_customer_requests_issue', ['issueId'])
+@Index('IDX_customer_requests_customer', ['customerId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'CASCADE' })
+export class CustomerRequestEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) customerId: string;
+  @Column({ type: 'varchar' }) issueId: string;
+  @Column({ type: 'text', nullable: true }) body: string | null;
+  @Column({ type: 'jsonb' }) createdBy: ActorRef;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 }
 
 // ───────────────────────────── artifacts / decisions / dependencies ─────────────────────────────
@@ -774,6 +812,8 @@ export const ENTITIES = [
   MilestoneEntity,
   InputRequestEntity,
   IssueEntity,
+  CustomerEntity,
+  CustomerRequestEntity,
   ArtifactEntity,
   DecisionEntity,
   DependencyEntity,

@@ -141,6 +141,18 @@ export const routes: Routes = [
           import('./features/issues/issue-detail-page').then((m) => m.IssueDetailPage),
       },
       {
+        path: 'customers',
+        title: 'Customers · Trama',
+        loadComponent: () =>
+          import('./features/customers/customer-list-page').then((m) => m.CustomerListPage),
+      },
+      {
+        path: 'customers/:id',
+        title: 'Customer · Trama',
+        loadComponent: () =>
+          import('./features/customers/customer-detail-page').then((m) => m.CustomerDetailPage),
+      },
+      {
         path: 'workstreams',
         title: 'Workstreams · Trama',
         loadComponent: () =>

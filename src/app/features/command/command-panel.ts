@@ -177,6 +177,7 @@ const HIT_ICON: Record<ItemType, LucideIcon> = {
   project: LucideBox,
   decision: LucideScale,
   issue: LucideInbox,
+  customer: LucideBuilding2,
   artifact: LucideGitPullRequest,
   repository: LucideFolderGit2,
   team: LucideUsers,
@@ -1189,6 +1190,8 @@ export class CommandPanel {
         if (i) return { kind: 'status', status: i.status, entity: 'issue' };
         break;
       }
+      case 'customer':
+        break;
       case 'artifact': {
         const a = s.artifactById().get(h.id);
         if (a) return { kind: 'artifact', status: a.state, artifactKind: a.kind };

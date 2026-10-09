@@ -3,7 +3,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'workstream' | 'project' | 'issue' | 'decision' | 'artifact' | 'repository' | 'team';
+export type HitType = 'workstream' | 'project' | 'issue' | 'customer' | 'decision' | 'artifact' | 'repository' | 'team';
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -16,12 +16,13 @@ export interface SearchHit {
   workstreamKey?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['workstream', 'project', 'decision', 'issue', 'artifact', 'repository', 'team'];
+export const HIT_ORDER: HitType[] = ['workstream', 'project', 'decision', 'issue', 'customer', 'artifact', 'repository', 'team'];
 export const HIT_LABEL: Record<HitType, string> = {
   workstream: 'Workstreams',
   project: 'Projects',
   decision: 'Decisions',
   issue: 'Issues',
+  customer: 'Customers',
   artifact: 'Artifacts',
   repository: 'Repositories',
   team: 'Teams',
@@ -31,6 +32,7 @@ export const HIT_SINGULAR: Record<HitType, string> = {
   project: 'Project',
   decision: 'Decision',
   issue: 'Issue',
+  customer: 'Customer',
   artifact: 'Artifact',
   repository: 'Repository',
   team: 'Team',
@@ -46,6 +48,8 @@ const TYPE_ALIASES: Record<string, HitType> = {
   repositories: 'repository',
   repository: 'repository',
   teams: 'team',
+  customer: 'customer',
+  customers: 'customer',
 };
 
 function asHit(raw: unknown, forcedType?: HitType): SearchHit | null {
@@ -122,6 +126,7 @@ export class SearchService {
     for (const p of s.projects()) push({ type: 'project', id: p.id, title: p.name }, p.name, p.summary ?? '');
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
+    for (const c of s.customers()) push({ type: 'customer', id: c.id, title: c.name, subtitle: c.domain }, `${c.name} ${c.domain}`);
     for (const a of s.artifacts())
       push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId, workstreamKey: wsKey(a.workstreamId) }, a.title, a.externalId ?? '');
     for (const r of s.repositories()) push({ type: 'repository', id: r.id, title: r.fullName }, r.fullName);
@@ -147,6 +152,8 @@ export class SearchService {
         return ['decisions', h.key ?? h.id];
       case 'issue':
         return ['issues', h.key ?? h.id];
+      case 'customer':
+        return ['customers', h.id];
       case 'project':
         return ['projects', h.id];
       case 'repository':

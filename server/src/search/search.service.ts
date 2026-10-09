@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'decision', 'artifact', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'customer', 'decision', 'artifact', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -45,6 +45,13 @@ const SPECS: Spec[] = [
     from: `"issues" x`,
     select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
     fields: [['x."key"', 'key'], ['x."aliases"::text', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
+    rank: 3,
+  },
+  {
+    type: 'customer',
+    from: `"customers" x`,
+    select: `x."id", NULL AS key, x."name" AS title, x."domain" AS subtitle, NULL AS "workstreamKey", NULL AS body`,
+    fields: [['x."name"', 'title'], ['x."domain"', 'title']],
     rank: 3,
   },
   {

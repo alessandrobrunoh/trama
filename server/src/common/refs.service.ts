@@ -3,6 +3,8 @@ import { DataSource, In } from 'typeorm';
 import type { SubjectRef } from '../contracts/domain.js';
 import {
   ArtifactEntity,
+  CustomerEntity,
+  CustomerRequestEntity,
   DecisionEntity,
   InputRequestEntity,
   IssueEntity,
@@ -104,6 +106,10 @@ export class RefsService {
       }
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };
+      case 'customer':
+        return { exists: await db.getRepository(CustomerEntity).existsBy(where) };
+      case 'customer_request':
+        return { exists: await db.getRepository(CustomerRequestEntity).existsBy(where) };
       case 'repository':
         return { exists: await db.getRepository(RepositoryEntity).existsBy(where) };
       case 'team':

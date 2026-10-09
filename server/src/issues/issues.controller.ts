@@ -46,6 +46,7 @@ import {
   CreateWorkstreamDto,
   PRIORITIES,
 } from '../workstreams/workstreams.controller.js';
+import { CustomersService } from '../customers/customers.service.js';
 import { IssuesService } from './issues.service.js';
 
 const KINDS: IssueKind[] = [
@@ -139,6 +140,9 @@ class ListIssueQuery {
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() milestoneId?: string;
+  @IsOptional() @IsString() customerId?: string;
+  /** At least this many distinct linked customers. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) minCustomers?: number;
   @IsOptional() @IsString() q?: string;
   /** Comma-separated priorities, e.g. `high,urgent`. */
   @IsOptional()
@@ -158,42 +162,45 @@ class ListIssueQuery {
 @Controller('w/:slug/issues')
 @EditsTeamWork('issue')
 export class IssuesController {
-  constructor(private readonly service: IssuesService) {}
+  constructor(
+    private readonly service: IssuesService,
+    private readonly customers: CustomersService,
+  ) {}
 
   @Get()
-  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListIssueQuery) {
-    return this.service.list(ctx.workspace.id, q);
+  async list(@Ctx() ctx: WorkspaceContext, @Query() q: ListIssueQuery) {
+    return this.withCounts(ctx, await this.service.list(ctx.workspace.id, q));
   }
 
   @Get(':idOrKey')
-  get(@Ctx() ctx: WorkspaceContext, @Param('idOrKey') idOrKey: string) {
-    return this.service.get(ctx.workspace.id, idOrKey);
+  async get(@Ctx() ctx: WorkspaceContext, @Param('idOrKey') idOrKey: string) {
+    return this.withCounts(ctx, await this.service.get(ctx.workspace.id, idOrKey));
   }
 
   @Post()
   @Can('createIssues')
-  create(
+  async create(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,
     @Body() dto: CreateIssueDto,
   ) {
-    return this.service.create(ctx.workspace.id, actor, dto);
+    return this.withCounts(ctx, await this.service.create(ctx.workspace.id, actor, dto));
   }
 
   @Patch(':idOrKey')
-  update(
+  async update(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,
     @Param('idOrKey') idOrKey: string,
     @Body() dto: UpdateIssueDto,
   ) {
-    return this.service.update(ctx.workspace.id, actor, idOrKey, dto);
+    return this.withCounts(ctx, await this.service.update(ctx.workspace.id, actor, idOrKey, dto));
   }
 
   /** Link to existing workstreams and/or create one. Moves backlog/todo issues to `in_progress`. */
   @Post(':idOrKey/link')
   @HttpCode(200)
-  link(
+  async link(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,
     @Param('idOrKey') idOrKey: string,
@@ -201,7 +208,7 @@ export class IssuesController {
   ) {
     if (dto.createWorkstream && !canDo(ctx, 'createWorkstreams'))
       throw new ForbiddenException('You are not allowed to create workstreams');
-    return this.service.link(ctx.workspace.id, actor, idOrKey, dto);
+    return this.withCounts(ctx, await this.service.link(ctx.workspace.id, actor, idOrKey, dto));
   }
 
   @Delete(':idOrKey')
@@ -213,5 +220,12 @@ export class IssuesController {
     @Param('idOrKey') idOrKey: string,
   ) {
     return this.service.remove(ctx.workspace.id, actor, idOrKey);
+  }
+
+  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T): Promise<T>;
+  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T[]): Promise<T[]>;
+  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T | T[]) {
+    await this.customers.attachCounts(ctx.workspace.id, Array.isArray(rows) ? rows : [rows]);
+    return rows;
   }
 }

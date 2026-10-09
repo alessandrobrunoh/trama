@@ -3,6 +3,7 @@ import {
   LucideBell,
   LucideBellRing,
   LucideBox,
+  LucideBuilding2,
   LucideChartColumn,
   LucideCircleDot,
   LucideFolderGit2,
@@ -78,6 +79,13 @@ export const MAIN_NAV: NavItem[] = [
     hint: 'Demand — bugs, requests, incidents: what problems exist',
   },
   {
+    segment: 'customers',
+    label: 'Customers',
+    icon: LucideBuilding2,
+    keys: 'g c',
+    hint: 'Companies whose feedback is linked to issues',
+  },
+  {
     segment: 'workstreams',
     label: 'Workstreams',
     icon: LucideHexagon,
@@ -115,6 +123,7 @@ export const SECTION_LABELS: Record<string, string> = {
   assistant: 'Assistant',
   notifications: 'Notifications',
   issues: 'Issues',
+  customers: 'Customers',
   workstreams: 'Workstreams',
   graph: 'Graph',
   decisions: 'Decisions',
@@ -130,6 +139,7 @@ export const SECTION_LABELS: Record<string, string> = {
 export const SECTIONS_WITH_LIST = new Set([
   'workstreams',
   'issues',
+  'customers',
   'decisions',
   'projects',
   'repositories',

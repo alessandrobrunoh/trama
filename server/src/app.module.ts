@@ -5,6 +5,7 @@ import { ArtifactsModule } from './artifacts/artifacts.module.js';
 import { AttentionModule } from './attention/attention.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { CommentsModule } from './comments/comments.module.js';
+import { CustomersModule } from './customers/customers.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DecisionsModule } from './decisions/decisions.module.js';
@@ -52,6 +53,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     WorkstreamsModule,
     InputRequestsModule,
     IssuesModule,
+    CustomersModule,
     MilestonesModule,
     ArtifactsModule,
     DecisionsModule,
