@@ -8,6 +8,8 @@ describe('requiredPermission', () => {
     expect(requiredPermission('POST', '/api/w/:slug/issues')).toBe('issues:write');
     expect(requiredPermission('PATCH', '/api/w/:slug/issues/:idOrKey')).toBe('issues:write');
     expect(requiredPermission('DELETE', '/api/w/:slug/issues/:idOrKey')).toBe('issues:delete');
+    expect(requiredPermission('POST', '/api/w/:slug/issues/bulk')).toBe('issues:write');
+    expect(requiredPermission('POST', '/api/w/:slug/issues/bulk-delete')).toBe('issues:delete');
     expect(requiredPermission('GET', '/api/w/:slug/workstreams/:idOrKey/graph')).toBe('workstreams:read');
     expect(requiredPermission('POST', '/api/w/:slug/workstreams/:idOrKey/criteria')).toBe('workstreams:write');
     expect(requiredPermission('GET', '/api/w/:slug/outgoing-webhooks/:id/deliveries')).toBe('outgoing-webhooks:read');
