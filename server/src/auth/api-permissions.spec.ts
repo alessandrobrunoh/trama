@@ -13,6 +13,11 @@ describe('requiredPermission', () => {
     expect(requiredPermission('GET', '/api/w/:slug/outgoing-webhooks/:id/deliveries')).toBe('outgoing-webhooks:read');
   });
 
+  it('maps insights, including the per-signal drill-down, to insights:read', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/insights')).toBe('insights:read');
+    expect(requiredPermission('GET', '/api/w/:slug/insights/signals/:id')).toBe('insights:read');
+  });
+
   it('maps the workspace itself and its settings', () => {
     expect(requiredPermission('GET', '/api/w/:slug')).toBe('workspace:read');
     expect(requiredPermission('PATCH', '/api/w/:slug')).toBe('workspace:write');
