@@ -17,6 +17,17 @@ export interface RuleContext {
   /** The event's workstream, or the subject itself when the event is about a workstream. */
   workstream?: { id: string; key: string; title: string; accountableUserId?: string | null };
   decision?: { id: string; key: string; title: string };
+  /** The customer a `customer_request.*` event is about, with the people following it. */
+  customer?: { id: string; name: string; subscriberIds: readonly string[] };
+  /**
+   * What an issue or project that just got delivered (issue done, project completed) was asked for:
+   * the customers behind its requests, who follows them, and who recorded the requests.
+   */
+  delivery?: {
+    target: { type: 'issue' | 'project'; id: string; label: string; link: string };
+    customers: readonly { id: string; name: string; subscriberIds: readonly string[] }[];
+    requesterIds: readonly string[];
+  };
 }
 
 /** One message for one person, before settings and delivery are applied. */
@@ -49,6 +60,7 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
   const add = (userId: string | null | undefined, draft: Omit<NotificationDraft, 'userId'>) => {
     if (userId) drafts.push({ userId, ...draft });
   };
+  const { customer, delivery } = ctx;
   const wsLink = workstream ? `workstreams/${workstream.key}` : undefined;
   const accountable = workstream?.accountableUserId;
 
@@ -150,6 +162,42 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
       });
       break;
     }
+    case 'customer_request.linked':
+    case 'customer_request.updated': {
+      if (!customer) break;
+      const created = event.type === 'customer_request.linked';
+      if (!created && !(asStrings(event.data['fields']).includes('important') && event.data['important'] === true)) break;
+      const target = asString(event.data['issueKey']) ?? asString(event.data['project']) ?? 'a request';
+      const important = event.data['important'] === true;
+      const draft = {
+        // Added already flagged: one message, the stronger one.
+        kind: important ? ('customer_important' as const) : ('customer_request' as const),
+        title: created
+          ? `${actorName} added ${important ? 'an important ' : 'a '}request from ${customer.name}: ${target}`
+          : `${actorName} flagged a request from ${customer.name} as important: ${target}`,
+        body: asString(event.data['excerpt']),
+        link: `customers/${customer.id}`,
+        subject: { type: 'customer' as const, id: customer.id },
+      };
+      for (const userId of customer.subscriberIds) add(userId, draft);
+      break;
+    }
+    case 'issue.status_changed':
+    case 'project.status_changed': {
+      if (!delivery || !delivery.customers.length) break;
+      const names = delivery.customers.map((c) => c.name);
+      const who =
+        names.length <= 2 ? names.join(' and ') : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+      const draft = {
+        kind: 'customer_delivered' as const,
+        title: `${delivery.target.label} was delivered: ${who} asked for it`,
+        link: delivery.target.link,
+        subject: { type: delivery.target.type, id: delivery.target.id },
+      };
+      for (const c of delivery.customers) for (const userId of c.subscriberIds) add(userId, draft);
+      for (const userId of delivery.requesterIds) add(userId, draft);
+      break;
+    }
   }
 
   // The actor never hears about their own action; one message per person and kind.
@@ -162,6 +210,8 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
     return true;
   });
 }
+
+const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
 
 function assigned(issue: RuleContext['issue'], actorName: string): Omit<NotificationDraft, 'userId'> {
   return {

@@ -9,7 +9,7 @@ import { MAX_GRANTS, ViewsService } from './views.service.js';
 
 const ENTITIES = [...VIEW_ENTITIES];
 const LAYOUTS = [...VIEW_LAYOUTS];
-const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after'];
+const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after', 'gte', 'lte'];
 
 class FilterDto {
   @IsString() @MaxLength(100) field: string;

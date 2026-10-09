@@ -34,6 +34,7 @@ import {
   canDo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
+import { CUSTOMER_REVENUE_MAX } from '../contracts/domain.js';
 import type {
   ActorRef,
   IssueKind,
@@ -143,6 +144,17 @@ class ListIssueQuery {
   @IsOptional() @IsString() customerId?: string;
   /** At least this many distinct linked customers. */
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) minCustomers?: number;
+  /** At least this many customer requests. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) minRequests?: number;
+  /** Only issues a customer of this tier asked for. */
+  @IsOptional() @IsString() @MaxLength(100) tierId?: string;
+  /** The requesting customers' revenue adds up to at least this. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(CUSTOMER_REVENUE_MAX) minRevenue?: number;
+  /** `true`: only issues with at least one request flagged important. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  important?: boolean;
   @IsOptional() @IsString() q?: string;
   /** Comma-separated priorities, e.g. `high,urgent`. */
   @IsOptional()

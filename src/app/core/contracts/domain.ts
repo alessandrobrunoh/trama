@@ -55,6 +55,9 @@ export const NOTIFICATION_KINDS = [
   'ci_failed',
   'comment',
   'workstream_update',
+  'customer_request',
+  'customer_important',
+  'customer_delivered',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
@@ -66,6 +69,9 @@ export const NOTIFICATION_KIND_META: Record<NotificationKind, { label: string; d
   ci_failed: { label: 'Failing checks', description: 'CI fails on a workstream you are accountable for.' },
   comment: { label: 'Comments', description: 'New comments on issues you are assigned or reported, and on workstreams you are accountable for.' },
   workstream_update: { label: 'Workstream updates', description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.' },
+  customer_request: { label: 'Customer requests', description: 'A request is added for a customer you follow.' },
+  customer_important: { label: 'Important customer requests', description: 'A request of a customer you follow is flagged as important.' },
+  customer_delivered: { label: 'Delivered to customers', description: 'The issue or project behind a request is done, for a customer you follow or a request you recorded.' },
 };
 
 export type NotificationChannel = 'inApp' | 'email' | 'push';
@@ -113,7 +119,7 @@ export interface NotificationList {
 }
 
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
-export const FAVORITE_TYPES = ['issue', 'workstream', 'project', 'decision', 'team', 'repository', 'view'] as const;
+export const FAVORITE_TYPES = ['issue', 'workstream', 'project', 'decision', 'team', 'repository', 'view', 'customer'] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
 /** Most favorites one person can keep in a workspace. */
 export const MAX_FAVORITES = 100;
@@ -285,6 +291,16 @@ export interface Project {
   updatedAt: ISODate;
   /** Set when the status becomes completed or canceled; cleared on reopen. */
   completedAt?: ISODate;
+  /**
+   * Distinct customers with a request on this project or on its issues. Set on project reads and in the snapshot;
+   * `0` when nobody asked. Not stored on the project row.
+   */
+  customerCount?: number;
+}
+
+/** A project is delivered to the customers who asked for it once it is completed (canceled is not delivery). */
+export function isProjectDelivered(status: string): boolean {
+  return status === 'completed';
 }
 
 /** Linear-style project health, set by whoever posts a project update. */
@@ -574,6 +590,11 @@ export interface Issue {
   updatedAt: ISODate;
 }
 
+/** An issue is delivered to the customers who asked for it once it is done (canceled is not delivery). */
+export function isIssueDelivered(status: string): boolean {
+  return status === 'done';
+}
+
 // ───────────────────────────── Customers ─────────────────────────────
 
 export type CustomerStatus = 'prospect' | 'active' | 'churned';
@@ -666,6 +687,18 @@ export interface CustomerRequest {
   updatedAt: ISODate;
 }
 
+/**
+ * A person following a customer (the bell on its page): they are told when a request is added, flagged as
+ * important, or delivered. Private to the person; others never see it. Unique per person and customer.
+ */
+export interface CustomerSubscription {
+  /** `csub_…` */
+  id: ID;
+  workspaceId: ID;
+  customerId: ID;
+  createdAt: ISODate;
+}
+
 const CUSTOMER_DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
 
 /**
@@ -696,6 +729,123 @@ export function normalizeCustomerDomains(inputs: readonly string[]): { domains: 
     else if (!domains.includes(domain)) domains.push(domain);
   }
   return { domains, invalid };
+}
+
+/**
+ * How much customers want something: the requests on one issue or project (or, rolled up, on a whole
+ * workstream), seen through the customers who made them. Derived, never stored.
+ */
+export interface Demand {
+  /** Distinct customers who asked, in the order of their first request. */
+  customerIds: ID[];
+  customerCount: number;
+  requestCount: number;
+  /** Requests flagged important. */
+  importantCount: number;
+  /** Distinct tiers of those customers (customers without a tier add nothing). */
+  tierIds: ID[];
+  /** Annual revenue of the customers, each counted once. Customers without revenue add 0. */
+  revenue: number;
+  /** Size of the largest customer, 0 when unknown. */
+  size: number;
+}
+
+export const NO_DEMAND: Demand = Object.freeze({
+  customerIds: [] as ID[],
+  customerCount: 0,
+  requestCount: 0,
+  importantCount: 0,
+  tierIds: [] as ID[],
+  revenue: 0,
+  size: 0,
+}) as Demand;
+
+/** Demand made of requests (any mix of targets) and the customers behind them. Requests of unknown customers are ignored. */
+export function demandOf(
+  requests: readonly Pick<CustomerRequest, 'customerId' | 'important'>[],
+  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
+): Demand {
+  const customerIds: ID[] = [];
+  let requestCount = 0;
+  let importantCount = 0;
+  for (const r of requests) {
+    if (!customers.has(r.customerId)) continue;
+    requestCount += 1;
+    if (r.important) importantCount += 1;
+    if (!customerIds.includes(r.customerId)) customerIds.push(r.customerId);
+  }
+  return finishDemand(customerIds, requestCount, importantCount, customers);
+}
+
+function finishDemand(
+  customerIds: ID[],
+  requestCount: number,
+  importantCount: number,
+  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
+): Demand {
+  if (!customerIds.length) return NO_DEMAND;
+  const tierIds: ID[] = [];
+  let revenue = 0;
+  let size = 0;
+  for (const id of customerIds) {
+    const c = customers.get(id);
+    if (!c) continue;
+    if (c.tierId && !tierIds.includes(c.tierId)) tierIds.push(c.tierId);
+    revenue += c.revenue ?? 0;
+    size = Math.max(size, c.size ?? 0);
+  }
+  return { customerIds, customerCount: customerIds.length, requestCount, importantCount, tierIds, revenue, size };
+}
+
+/** Demand per issue and per project id (their ids never collide). Targets nobody asked for are absent. */
+export function buildDemandIndex(
+  requests: readonly CustomerRequest[],
+  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
+): Map<ID, Demand> {
+  const byTarget = new Map<ID, CustomerRequest[]>();
+  for (const r of requests) {
+    const target = r.issueId ?? r.projectId;
+    if (!target) continue;
+    const list = byTarget.get(target);
+    if (list) list.push(r);
+    else byTarget.set(target, [r]);
+  }
+  const out = new Map<ID, Demand>();
+  for (const [target, list] of byTarget) {
+    const demand = demandOf(list, customers);
+    if (demand.requestCount) out.set(target, demand);
+  }
+  return out;
+}
+
+/** Several demands as one: a customer who asked for two of the parts counts once, requests add up. */
+export function mergeDemand(
+  parts: readonly Demand[],
+  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
+): Demand {
+  const customerIds: ID[] = [];
+  let requestCount = 0;
+  let importantCount = 0;
+  for (const part of parts) {
+    requestCount += part.requestCount;
+    importantCount += part.importantCount;
+    for (const id of part.customerIds) if (!customerIds.includes(id)) customerIds.push(id);
+  }
+  return finishDemand(customerIds, requestCount, importantCount, customers);
+}
+
+/** A request is delivered once the issue or project it sits on is. */
+export function isRequestDelivered(
+  request: Pick<CustomerRequest, 'issueId' | 'projectId'>,
+  issues: ReadonlyMap<ID, Pick<Issue, 'status'>>,
+  projects: ReadonlyMap<ID, Pick<Project, 'status'>>,
+): boolean {
+  if (request.issueId) {
+    const issue = issues.get(request.issueId);
+    return !!issue && isIssueDelivered(issue.status);
+  }
+  const project = request.projectId ? projects.get(request.projectId) : undefined;
+  return !!project && isProjectDelivered(project.status);
 }
 
 /** The URL when it is a plain `http(s)` URL of at most 2000 characters, otherwise `null`. Never `javascript:` or `data:`. */
@@ -937,7 +1087,8 @@ export type ViewLayout = 'list' | 'board' | 'graph' | 'timeline';
 
 export interface ViewFilter {
   field: string;
-  op: 'is' | 'is_not' | 'in' | 'not_in' | 'contains' | 'before' | 'after';
+  /** `gte` / `lte` compare numeric fields (customer demand such as request count or revenue). */
+  op: 'is' | 'is_not' | 'in' | 'not_in' | 'contains' | 'before' | 'after' | 'gte' | 'lte';
   value: string | string[];
 }
 
@@ -1502,7 +1653,7 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'notification' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'customer_subscription' | 'notification' | 'agent' | 'integration' | 'workspace' | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;

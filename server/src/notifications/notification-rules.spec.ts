@@ -85,4 +85,61 @@ describe('planNotifications', () => {
     const none = planNotifications(ctx({ type: 'input.requested', workstream: { ...ws, accountableUserId: null }, data: { question: 'Who?' } }));
     expect(none).toEqual([]);
   });
+  describe('customers', () => {
+    const acme = { id: 'cus_1', name: 'Acme', subscriberIds: ['usr_a', 'usr_b', 'usr_actor'] };
+    const event = (type: string, data: Record<string, unknown>): RuleContext['event'] => ({
+      type,
+      actor: { type: 'user', id: 'usr_actor' },
+      subject: { type: 'customer_request', id: 'crq_1' },
+      data: { customerId: 'cus_1', issueKey: 'BUG-142', ...data },
+    });
+    const request = (type: string, data: Record<string, unknown>): RuleContext => ({ event: event(type, data), actorName: 'Maya', customer: acme });
+
+    it('tells followers about a new request, never the author', () => {
+      const drafts = planNotifications(request('customer_request.linked', { important: false, excerpt: 'We need SSO' }));
+      expect(drafts.map((d) => [d.userId, d.kind])).toEqual([['usr_a', 'customer_request'], ['usr_b', 'customer_request']]);
+      expect(drafts[0]).toMatchObject({ link: 'customers/cus_1', body: 'We need SSO', subject: { type: 'customer', id: 'cus_1' } });
+      expect(drafts[0].title).toBe('Maya added a request from Acme: BUG-142');
+    });
+
+    it('uses the stronger kind when a request is added already important', () => {
+      const drafts = planNotifications(request('customer_request.linked', { important: true }));
+      expect(drafts.map((d) => d.kind)).toEqual(['customer_important', 'customer_important']);
+    });
+
+    it('notifies when a request is flagged important, and only then', () => {
+      const flagged = planNotifications(request('customer_request.updated', { fields: ['important'], important: true }));
+      expect(flagged.map((d) => d.kind)).toEqual(['customer_important', 'customer_important']);
+      expect(planNotifications(request('customer_request.updated', { fields: ['important'], important: false }))).toEqual([]);
+      expect(planNotifications(request('customer_request.updated', { fields: ['body'], important: true }))).toEqual([]);
+    });
+
+    it('closes the loop: followers and whoever recorded the requests hear about the delivery once', () => {
+      const drafts = planNotifications({
+        event: { type: 'issue.status_changed', actor: { type: 'user', id: 'usr_actor' }, subject: { type: 'issue', id: 'iss_1' }, data: { to: 'done' } },
+        actorName: 'Maya',
+        delivery: {
+          target: { type: 'issue', id: 'iss_1', label: 'BUG-142: Session expires', link: 'issues/BUG-142' },
+          customers: [
+            { id: 'cus_1', name: 'Acme', subscriberIds: ['usr_a'] },
+            { id: 'cus_2', name: 'Beta', subscriberIds: ['usr_a', 'usr_c'] },
+            { id: 'cus_3', name: 'Gamma', subscriberIds: [] },
+          ],
+          requesterIds: ['usr_c', 'usr_d', 'usr_actor'],
+        },
+      });
+      expect(drafts.map((d) => d.userId).sort()).toEqual(['usr_a', 'usr_c', 'usr_d']);
+      expect(drafts.every((d) => d.kind === 'customer_delivered' && d.link === 'issues/BUG-142')).toBe(true);
+      expect(drafts[0].title).toBe('BUG-142: Session expires was delivered: Acme, Beta and 1 more asked for it');
+      expect(drafts[0].subject).toEqual({ type: 'issue', id: 'iss_1' });
+    });
+
+    it('says nothing without a customer behind the work', () => {
+      const none = planNotifications({
+        event: { type: 'project.status_changed', actor: { type: 'user', id: 'usr_actor' }, subject: { type: 'project', id: 'pj_1' }, data: { to: 'completed' } },
+        actorName: 'Maya',
+      });
+      expect(none).toEqual([]);
+    });
+  });
 });

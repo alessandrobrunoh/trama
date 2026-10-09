@@ -3,6 +3,7 @@ import { DataSource, In, type EntityManager, type EntityTarget } from 'typeorm';
 import { uid } from '../common/util.js';
 import { FAVORITE_TYPES, MAX_FAVORITES, type FavoriteType } from '../contracts/domain.js';
 import {
+  CustomerEntity,
   DecisionEntity,
   FavoriteEntity,
   IssueEntity,
@@ -22,6 +23,7 @@ const TABLES: Record<FavoriteType, EntityTarget<{ id: string; workspaceId: strin
   team: TeamEntity,
   repository: RepositoryEntity,
   view: SavedViewEntity,
+  customer: CustomerEntity,
 };
 
 @Injectable()
