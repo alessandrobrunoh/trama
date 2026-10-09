@@ -60,6 +60,7 @@ import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } fro
 import { projectWorkState } from '../customers/customer-model';
 import { CustomerRequests } from '../customers/customer-requests';
 import { DemandSummary } from '../customers/demand-summary';
+import { ProjectDocumentsTab } from '../documents/project-documents-tab';
 import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectHealthBadge } from './project-health';
@@ -68,12 +69,13 @@ import { ProjectStatsTab } from './project-stats-tab';
 import { ProjectUpdatesTab } from './project-updates-tab';
 import { LabelPicker } from '../../shared/label-picker';
 
-const TABS = ['overview', 'updates', 'issues', 'context', 'stats'] as const;
+const TABS = ['overview', 'updates', 'issues', 'documents', 'context', 'stats'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
   updates: 'Updates',
   issues: 'Issues',
+  documents: 'Documents',
   context: 'Context',
   stats: 'Stats',
 };
@@ -114,6 +116,7 @@ const ACTIVITY_CAP = 20;
     ProjectIssueSuggestions,
     ProjectRisksCard,
     ProjectContextTab,
+    ProjectDocumentsTab,
     ProjectGlyphPicker,
     ProjectHealthBadge,
     ProjectStatsTab,
@@ -261,6 +264,11 @@ const ACTIVITY_CAP = 20;
                 }
               </app-empty-state>
             }
+          </div>
+        }
+        @case ('documents') {
+          <div class="min-w-0 flex-1 px-4 py-5 sm:px-6">
+            <app-project-documents-tab [project]="p" />
           </div>
         }
         @case ('context') {
@@ -671,6 +679,7 @@ export class ProjectDetailPage {
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
     updates: this.updatesState() === 'ready' ? this.updates().length : 0,
     issues: this.issues().length,
+    documents: (this.store.artifactsByProject().get(this.project()?.id ?? '') ?? []).filter((a) => a.documentId).length,
   }));
   protected readonly canCreateWorkstream = computed(() => this.store.allowed('createWorkstreams'));
   protected readonly workstreams = computed(() => {

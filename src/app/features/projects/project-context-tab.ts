@@ -45,6 +45,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { Markdown } from '../../shared/markdown';
 import { StatusIcon } from '../../shared/status';
 import { ArtifactIcon } from '../../shared/artifact';
+import { DocumentActions } from '../documents/document-attach';
 import { ProjectArtifactDialog } from './project-artifact-dialog';
 import {
   ProjectArtifactRow,
@@ -103,6 +104,7 @@ type TreeRow =
     Markdown,
     StatusIcon,
     ProjectArtifactDialog,
+    DocumentActions,
     ProjectArtifactRow,
   ],
   host: { class: 'block' },
@@ -162,6 +164,7 @@ type TreeRow =
             <svg [lucideIcon]="fileIcon" [size]="14"></svg>Open as markdown
           </button>
           @if (canEdit()) {
+            <app-document-actions variant="outline" [owner]="{ projectId: project().id }" />
             <button hlmBtn size="sm" (click)="openAdd()">
               <svg [lucideIcon]="plusIcon" [size]="14"></svg>Add document / link
             </button>

@@ -5,20 +5,22 @@
 export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = {
   o: { segment: 'overview', label: 'Overview' },
   y: { segment: 'stats', label: 'Statistics' },
-  a: { segment: 'attention', label: 'My Attention' },
-  m: { segment: 'my-work', label: 'My Work' },
-  n: { segment: 'notifications', label: 'Notifications' },
+  a: { segment: 'inbox?tab=needs-you', label: 'Inbox' },
+  m: { segment: 'my-work', label: 'My work' },
+  n: { segment: 'inbox?tab=updates', label: 'Inbox: updates' },
   i: { segment: 'issues', label: 'Issues' },
   c: { segment: 'customers', label: 'Customers' },
   w: { segment: 'workstreams', label: 'Workstreams' },
   d: { segment: 'decisions', label: 'Decisions' },
   p: { segment: 'projects', label: 'Projects' },
+  u: { segment: 'documents', label: 'Documents' },
   r: { segment: 'repositories', label: 'Repositories' },
   x: { segment: 'graph', label: 'Graph' },
   s: { segment: 'settings/profile', label: 'Settings' },
   t: { segment: 'teams', label: 'Teams' },
   v: { segment: 'views', label: 'Views' },
   e: { segment: 'activity', label: 'Activity' },
+  k: { segment: 'connect', label: 'Connect your agent' },
 };
 
 export const GO_CHORD_TIMEOUT = 1500;

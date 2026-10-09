@@ -35,6 +35,8 @@ People may say "workspace" for the thread. Do not create extra Trama workspaces.
 
 A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. To understand a whole project in one read, call `get_context { id: "pj_…" }` (markdown "mega context"); to report on it, post a project update (`report_progress` with `projectUpdate`, see `trama-report-progress`).
 
+**Documents** are Markdown pages that live in Trama (specs, plans and notes that belong in no repository), attached to projects, workstreams and issues as `document` artifacts. They are not in the core tool profile: find them with `list_capabilities`, then call `list_documents`, `get_document`, `create_document` or `update_document` through `run_tool`. `update_document` needs the `baseVersion` you read; a stale one answers 409 with the current text (merge, retry). Do not copy into a document what already lives in a repository or an issue.
+
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.
 
 ## Issues of this checkout

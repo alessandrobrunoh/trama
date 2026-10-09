@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
+import { RouterLink } from '@angular/router';
+import { SlugCounter, plainHeading } from './heading-slug';
 import { EntityRefChip, EntityRow } from './entity-ref';
 import { PriorityIcon } from './priority-icon';
 import { STATUS_VISUALS, StatusLabel } from './status';
@@ -30,7 +32,7 @@ interface ListItem {
 }
 
 type Block =
-  | { t: 'heading'; level: 1 | 2 | 3 | 4; inline: Inline[] }
+  | { t: 'heading'; level: 1 | 2 | 3 | 4; inline: Inline[]; raw: string; /** Set when `headingIds` is on. */ id?: string }
   | { t: 'p'; inline: Inline[] }
   | {
       t: 'ul';
@@ -45,7 +47,8 @@ type Block =
 
 type Align = 'left' | 'center' | 'right';
 
-const SAFE_HREF = /^(https?:\/\/|mailto:|\/|#)/i;
+/** `//host` (protocol-relative) is not an in-app path, so it is not accepted. */
+const SAFE_HREF = /^(https?:\/\/|mailto:|\/(?!\/)|#)/i;
 
 /** Parse inline markup: `code`, **bold**, *em* / _em_, ~~del~~, [text](url), bare URLs. */
 export function parseInline(src: string, link?: TextLinker): Inline[] {
@@ -78,8 +81,10 @@ export function parseInline(src: string, link?: TextLinker): Inline[] {
       flush();
       out.push({ t: 'em', c: parseInline(m[1], link) });
       i += m[0].length;
-    } else if ((m = rest.match(/^\[([^\]]+)\]\(([^)\s]+)\)/))) {
+    } else if ((m = rest.match(/^!?\[([^\]]*)\]\(([^)\s]+)\)/))) {
       flush();
+      // Images are shown as links (nothing is loaded from a remote address); `![alt](url)` reads as its alt text.
+      if (!m[1]) m[1] = m[2];
       if (SAFE_HREF.test(m[2])) out.push({ t: 'link', href: m[2], c: parseInline(m[1], link) });
       else out.push({ t: 'text', v: m[1] });
       i += m[0].length;
@@ -182,6 +187,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
         t: 'heading',
         level: Math.min(m[1].length, 4) as 1 | 2 | 3 | 4,
         inline: parseInline(m[2], link),
+        raw: m[2],
       });
       i++;
       continue;
@@ -282,7 +288,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
 @Component({
   selector: 'app-markdown',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, EntityRefChip, EntityRow, PriorityIcon, StatusLabel],
+  imports: [NgTemplateOutlet, RouterLink, EntityRefChip, EntityRow, PriorityIcon, StatusLabel],
   host: {
     class: 'block text-sm leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0 break-words',
   },
@@ -316,13 +322,28 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
             /></del>
           }
           @case ('link') {
-            <a
-              class="text-primary underline underline-offset-2 hover:opacity-80"
-              [attr.href]="n.href"
-              target="_blank"
-              rel="noopener noreferrer nofollow"
-              ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
-            /></a>
+            @if (n.href[0] === '/') {
+              <a
+                class="text-primary underline underline-offset-2 hover:opacity-80"
+                [routerLink]="n.href"
+                ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
+              /></a>
+            } @else if (n.href[0] === '#') {
+              <a
+                class="text-primary underline underline-offset-2 hover:opacity-80"
+                [attr.href]="n.href"
+                (click)="jump($event, n.href)"
+                ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
+              /></a>
+            } @else {
+              <a
+                class="text-primary underline underline-offset-2 hover:opacity-80"
+                [attr.href]="n.href"
+                target="_blank"
+                rel="noopener noreferrer nofollow"
+                ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
+              /></a>
+            }
           }
         }
       }
@@ -334,17 +355,17 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           @case ('heading') {
             @switch (b.level) {
               @case (1) {
-                <h2 class="mt-5 mb-2 text-lg font-semibold tracking-tight">
+                <h2 class="mt-5 mb-2 scroll-mt-16 text-lg font-semibold tracking-tight" [attr.id]="b.id">
                   <ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" />
                 </h2>
               }
               @case (2) {
-                <h3 class="mt-4 mb-1.5 text-base font-semibold tracking-tight">
+                <h3 class="mt-4 mb-1.5 scroll-mt-16 text-base font-semibold tracking-tight" [attr.id]="b.id">
                   <ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" />
                 </h3>
               }
               @default {
-                <h4 class="mt-3 mb-1 text-sm font-semibold">
+                <h4 class="mt-3 mb-1 scroll-mt-16 text-sm font-semibold" [attr.id]="b.id">
                   <ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" />
                 </h4>
               }
@@ -483,7 +504,25 @@ export class Markdown {
   readonly source = input<string | null | undefined>('');
   /** Turns mentions of workspace records into interactive chips (and lists of them into cards). */
   readonly link = input<TextLinker>();
-  protected readonly blocks = computed(() => parseMarkdown(this.source() ?? '', this.link()));
+  /** Give top-level headings ids (the slugs of the document outline) so `#anchor` links and the outline can jump to them. */
+  readonly headingIds = input(false);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  protected readonly blocks = computed(() => {
+    const blocks = parseMarkdown(this.source() ?? '', this.link());
+    if (this.headingIds()) {
+      const slugs = new SlugCounter();
+      for (const b of blocks) if (b.t === 'heading') b.id = slugs.next(plainHeading(b.raw));
+    }
+    return blocks;
+  });
+
+  /** `#anchor` link: scroll to the heading inside this document instead of navigating the app. */
+  protected jump(ev: Event, href: string): void {
+    ev.preventDefault();
+    const id = decodeURIComponent(href.slice(1));
+    const target = Array.from(this.host.nativeElement.querySelectorAll('[id]')).find((e) => e.id === id);
+    target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
   /** A table cell that is exactly a status or priority word shows the app's own glyph and label. */
   protected special(cell: Inline[]): { k: 'status' | 'priority'; v: string } | null {
     if (cell.length !== 1 || cell[0].t !== 'text') return null;

@@ -8,6 +8,7 @@ import {
   LucideCircleHelp,
   LucideCircleX,
   LucideDynamicIcon,
+  LucideFileText,
   LucideFlag,
   LucideBox,
   LucideDiamond,
@@ -64,6 +65,7 @@ export function eventCategory(e: DomainEvent): EventCategory {
     case 'decision':
       return 'decision';
     case 'artifact':
+    case 'document':
     case 'review':
       return 'artifact';
     case 'comment':
@@ -224,6 +226,25 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
         joiner: wsRef && verb === 'proposed' ? 'in' : undefined,
         target: verb === 'proposed' ? wsRef : undefined,
         detail: verb === 'updated' ? fieldsText(d) : undefined,
+      };
+    }
+    case 'document.created':
+    case 'document.updated':
+    case 'document.archived':
+    case 'document.restored':
+    case 'document.deleted': {
+      const verbs: Record<string, string> = {
+        created: 'created document',
+        updated: 'edited document',
+        archived: 'archived document',
+        restored: 'restored document',
+        deleted: 'deleted document',
+      };
+      return {
+        icon: LucideFileText,
+        verb: verbs[e.type.split('.')[1]],
+        text: str(d['title']),
+        link: e.type !== 'document.deleted' ? ['/', slug, 'documents', e.subject.id] : undefined,
       };
     }
     case 'customer.created':

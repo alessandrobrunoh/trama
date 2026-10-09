@@ -28,6 +28,7 @@ import {
   LucideGitPullRequest,
   LucideHash,
   LucideInbox,
+  LucideListChecks,
   LucideKeyRound,
   LucideKeyboard,
   LucideLayers,
@@ -37,6 +38,8 @@ import {
   LucideMoon,
   LucidePanelLeft,
   LucidePlug,
+  LucideFilePlus,
+  LucideFileText,
   LucidePlus,
   LucideScale,
   LucideBell,
@@ -71,6 +74,7 @@ import {
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
+import { Documents } from '../documents/documents.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
 import { CustomerSubscriptionsStore } from '../../core/stores/customer-subscriptions.store';
@@ -78,7 +82,8 @@ import { FavoritesStore } from '../../core/stores/favorites.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { ThemeService } from '../../core/theme';
-import { MAIN_NAV, PERSONAL_NAV } from '../../layout/nav';
+import { ALL_NAV } from '../../layout/nav';
+import { OnboardingStore } from '../../core/stores/onboarding.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { ArtifactIcon } from '../../shared/artifact';
 import { Kbd } from '../../shared/kbd';
@@ -579,6 +584,7 @@ export class CommandPanel {
   private readonly customerSubs = inject(CustomerSubscriptionsStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
+  private readonly documents = inject(Documents);
   private readonly theme = inject(ThemeService);
   private readonly searchSvc = inject(SearchService);
   private readonly recents = inject(RecentItems);
@@ -586,6 +592,7 @@ export class CommandPanel {
   private readonly ai = inject(AiActions);
   private readonly assistant = inject(AssistantStore);
   private readonly branches = inject(BranchNames);
+  private readonly onboarding = inject(OnboardingStore);
   private readonly document = inject(DOCUMENT);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly command = viewChild(BrnCommand);
@@ -928,15 +935,31 @@ export class CommandPanel {
       (...path: string[]) =>
       () =>
         void this.router.navigate(['/', slug, ...path]);
-    const nav = [...PERSONAL_NAV, ...MAIN_NAV];
+    const nav = ALL_NAV;
     const out: Cmd[] = nav.map((n) => ({
       id: 'nav:' + n.segment,
       label: n.label,
-      keywords: n.segment === 'repositories' ? 'go to repository repositories repo git' : 'go to',
+      keywords:
+        'go to ' + (n.segment === 'repositories' ? 'repository repositories repo git ' : '') + (n.keywords ?? ''),
       icon: n.icon,
       keys: n.keys,
       run: go(n.segment),
     }));
+    // Inbox tabs, and the old names of the two pages it replaced.
+    const inboxTabs: [string, string, string, string][] = [
+      ['needs-you', 'Inbox: needs you', 'attention questions reviews blockers', 'g a'],
+      ['updates', 'Inbox: updates', 'notifications unread mentions comments assigned', 'g n'],
+      ['later', 'Inbox: snoozed and dismissed', 'attention snoozed dismissed later', ''],
+    ];
+    for (const [tab, label, keywords, keys] of inboxTabs)
+      out.push({
+        id: 'nav:inbox:' + tab,
+        label,
+        keywords: 'go to ' + keywords,
+        icon: LucideInbox,
+        keys,
+        run: () => void this.router.navigate(['/', slug, 'inbox'], { queryParams: { tab } }),
+      });
     const extra: [string, string, LucideIcon, string][] = [
       ['teams', 'Teams', LucideUsers, 'g t'],
       ['views', 'Views', LucideLayers, 'g v'],
@@ -1005,6 +1028,21 @@ export class CommandPanel {
         icon: LucidePlus,
         run: create('decision'),
       });
+    if (this.store.can('member'))
+      out.push({
+        id: 'new:document',
+        label: 'Create document',
+        keywords: 'new doc write note spec plan markdown page',
+        icon: LucideFilePlus,
+        run: () => void this.documents.createAndOpen(),
+      });
+    out.push({
+      id: 'docs:search',
+      label: 'Search documents',
+      keywords: 'find docs notes specs plans text',
+      icon: LucideFileText,
+      run: () => void this.router.navigate(['/', this.slug(), 'documents'], { queryParams: { focus: 'search' } }),
+    });
     if (this.store.allowed('manageCustomers')) {
       const here = this.favorites.current();
       out.push(
@@ -1122,6 +1160,16 @@ export class CommandPanel {
       });
     }
     out.push(
+      {
+        id: 'onboarding:show',
+        label: 'Show setup checklist',
+        keywords: 'get started onboarding first steps guide',
+        icon: LucideListChecks,
+        run: () => {
+          this.onboarding.restore();
+          void this.router.navigate(['/', this.slug(), 'overview']);
+        },
+      },
       {
         id: 'ws:new',
         label: 'Create workspace',

@@ -13,7 +13,6 @@ import { LucideCheckCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCalendar } from '@spartan-ng/helm/calendar';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
-import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { toast } from '@spartan-ng/brain/sonner';
 import {
@@ -26,7 +25,7 @@ import {
   usePageShortcuts,
   type AttentionItem,
 } from '../../core';
-import { EmptyState, Kbd, PageHeader } from '../../shared';
+import { EmptyState, Kbd } from '../../shared';
 import { ATTENTION_SECTIONS } from './attention-kinds';
 import { AttentionRow } from './attention-row';
 import { morningOf, snoozePresets } from './snooze';
@@ -35,7 +34,8 @@ type Scope = 'mine' | 'all';
 type Tab = 'open' | 'archived';
 
 /**
- * My Attention: "where is my attention actually required?" Grouped by kind in a fixed order,
+ * The attention queue inside the Inbox ("Needs you" and "Snoozed & dismissed" tabs): "where is my attention
+ * actually required?" Grouped by kind in a fixed order,
  * severity-sorted, with inline actions. Keyboard: J/K move, Enter open, E dismiss, H snooze, A answer,
  * Shift+E dismiss the question itself (input requests).
  */
@@ -48,19 +48,18 @@ type Tab = 'open' | 'archived';
     HlmButtonImports,
     HlmCalendar,
     HlmDialogImports,
-    HlmTabsImports,
     HlmToggleGroupImports,
-    PageHeader,
     EmptyState,
     Kbd,
     AttentionRow,
   ],
-  host: { class: 'flex min-h-full flex-col' },
+  host: { class: 'flex flex-1 flex-col' },
   template: `
-    <app-page-header title="My Attention" [description]="description()">
+    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 sm:px-6">
+      <p class="text-meta" aria-live="polite">{{ description() }}</p>
+      <span class="flex-1"></span>
       @if (canSeeAll()) {
         <hlm-toggle-group
-          actions
           type="single"
           variant="outline"
           size="sm"
@@ -72,21 +71,7 @@ type Tab = 'open' | 'archived';
           <button hlmToggleGroupItem value="all" class="max-sm:h-9">Everyone</button>
         </hlm-toggle-group>
       }
-      <div class="px-4 sm:px-6">
-        <hlm-tabs [tab]="tab()" (tabActivated)="setTab($event)">
-          <hlm-tabs-list variant="line" class="-mb-px h-9 p-0">
-            <button hlmTabsTrigger="open" class="px-2">
-              Open
-              <span class="text-muted-foreground ms-1.5 text-xs tabular-nums">{{ open().length }}</span>
-            </button>
-            <button hlmTabsTrigger="archived" class="px-2">
-              Snoozed &amp; dismissed
-              <span class="text-muted-foreground ms-1.5 text-xs tabular-nums">{{ archived().length }}</span>
-            </button>
-          </hlm-tabs-list>
-        </hlm-tabs>
-      </div>
-    </app-page-header>
+    </div>
 
     @if (scope() === 'all' && loadingAll()) {
       <p class="text-meta px-4 py-6 sm:px-6">Loading everyone's attention…</p>
@@ -123,6 +108,9 @@ type Tab = 'open' | 'archived';
           <div class="flex flex-wrap justify-center gap-2">
             <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'workstreams']">Workstreams</a>
             <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'issues']">Issues</a>
+            @if (!store.agents().length) {
+              <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'connect']">Connect your agent</a>
+            }
           </div>
         </app-empty-state>
       }
@@ -192,6 +180,8 @@ type Tab = 'open' | 'archived';
 export class AttentionPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
+  /** Which list the Inbox shows: what is open, or what was snoozed or dismissed. */
+  readonly tab = input<Tab>('open');
 
   protected readonly store = inject(NablaStore);
   private readonly listState = inject(ListStateStore);
@@ -201,8 +191,7 @@ export class AttentionPage {
   protected readonly checkIcon = LucideCheckCheck;
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
 
-  // Tab and scope survive navigation inside the app (see ListStateStore).
-  protected readonly tab = this.listState.remember<Tab>('attention.tab', 'open');
+  // Scope survives navigation inside the app (see ListStateStore).
   protected readonly scope = this.listState.remember<Scope>('attention.scope', 'mine');
   protected readonly canSeeAll = computed(() => this.store.can('admin'));
   protected readonly answeringId = signal<string | null>(null);
@@ -272,6 +261,14 @@ export class AttentionPage {
 
   constructor() {
     this.ui.setFocusedRow(null);
+    // Switching tab starts with no row focused and no answer box open.
+    effect(() => {
+      this.tab();
+      untracked(() => {
+        this.ui.setFocusedRow(null);
+        this.answeringId.set(null);
+      });
+    });
     usePageShortcuts([
       {
         keys: 'e',
@@ -342,12 +339,6 @@ export class AttentionPage {
     if (next === this.scope()) return;
     this.allItems.set(null);
     this.scope.set(next);
-  }
-
-  protected setTab(v: unknown): void {
-    this.tab.set(v === 'archived' ? 'archived' : 'open');
-    this.ui.setFocusedRow(null);
-    this.answeringId.set(null);
   }
 
   /** Move keyboard focus to the neighbour before `id` disappears from the list. */

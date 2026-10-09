@@ -104,7 +104,7 @@ over every selection.
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `issue` `workstream` `criterion` `decision` `artifact` `input-request` `comment` `project`
+Resources: `issue` `workstream` `criterion` `decision` `artifact` `document` `input-request` `comment` `project`
 `project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
 `outgoing-webhook` `graph` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
 plus actions (`issue link`, `decision accept`, `input-request answer`, `workstream context`, `project context`, `project artifacts`, …).

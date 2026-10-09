@@ -15,7 +15,7 @@ import {
   type SidebarSection,
   type SidebarVisibility,
 } from '../core/stores/ui.store';
-import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
 const SELECT_CLASS =
   'text-muted-foreground hover:text-foreground h-7 cursor-pointer rounded-md border-0 bg-transparent px-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -134,8 +134,9 @@ export class CustomizeSidebarDialog {
   >(() => {
     const order = this.ui.sidebarOrder();
     return [
-      { section: 'personal', title: 'Personal', items: orderNav(PERSONAL_NAV, order.personal) },
-      { section: 'workspace', title: 'Workspace', items: orderNav(MAIN_NAV, order.workspace) },
+      // The stored section ids predate the Inbox: `personal` is the main list, `workspace` is "More".
+      { section: 'personal', title: 'Main', items: orderNav(PRIMARY_NAV, order.personal) },
+      { section: 'workspace', title: 'More', items: orderNav(MORE_NAV, order.workspace) },
     ];
   });
 

@@ -660,6 +660,42 @@ export interface WebhookWithSecret {
   secret: string;
 }
 
+// ───── documents ─────
+export interface CreateDocumentInput {
+  title: string;
+  body?: string;
+  icon?: string | null;
+  /** Attach on creation (project id, workstream id or key, issue id or key). */
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+export interface UpdateDocumentInput {
+  /** The `version` this change is based on; a stale one is refused with 409. */
+  baseVersion: number;
+  title?: string;
+  body?: string;
+  icon?: string | null;
+}
+export interface DocumentsQuery {
+  q?: string;
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+  attached?: boolean;
+  archived?: 'false' | 'only' | 'all';
+  authorId?: string;
+  sort?: 'updated' | 'created' | 'title';
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+export interface DocumentOwnerInput {
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+
 // ───── customer intake (inbound customer requests) ─────
 export interface CreateIntakeSourceInput {
   provider: IntakeProvider;

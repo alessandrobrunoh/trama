@@ -11,6 +11,7 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
+  DocumentEntity,
   ProjectUpdateEntity,
   RepositoryEntity,
   TeamEntity,
@@ -120,6 +121,8 @@ export class RefsService {
         return { exists: await db.getRepository(ProjectUpdateEntity).existsBy(where) };
       case 'import':
         return { exists: (await db.query(`SELECT 1 FROM "import_jobs" WHERE "id" = $1 AND "workspaceId" = $2`, [subject.id, workspaceId])).length > 0 };
+      case 'document':
+        return { exists: await db.getRepository(DocumentEntity).existsBy(where) };
     }
   }
 }
