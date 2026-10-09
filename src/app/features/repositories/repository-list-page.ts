@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideDownload, LucideDynamicIcon, LucideFolderGit2, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { GIT_PROVIDERS, GIT_PROVIDER_META } from '../../core/contracts/domain';
@@ -16,6 +15,7 @@ import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { ImportRepositoriesDialog } from './import-repositories-dialog';
 import { teamOptions } from '../workstreams/ws-model';
+import { SearchInput } from '../../shared/search-input';
 
 const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label, kind: 'provider', provider: p }));
 
@@ -23,9 +23,9 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
   selector: 'app-repository-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
     RouterLink,
     HlmButtonImports,
-    HlmInputImports,
     LucideDynamicIcon,
     PageHeader,
     Picker,
@@ -56,17 +56,7 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
     <app-page-header title="Repositories" [description]="description()" />
 
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          hlmInput
-          class="h-10 w-full pl-9 text-sm"
-          placeholder="Search repositories…"
-          aria-label="Search repositories"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-        />
-      </div>
+      <app-search-input noun="repositories" [(value)]="search" />
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full">
         <app-picker variant="chip" label="Provider" [multiple]="true" [searchable]="false" [options]="providers" [value]="providerFilter()" (valueChange)="providerFilter.set($event)" />
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="teamFilter()" (valueChange)="teamFilter.set($event)" />
@@ -104,7 +94,7 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
             [routerLink]="['/', slug(), 'repositories', r.id]"
             [attr.data-row-id]="r.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
             [class.bg-muted]="ui.focusedRowId() === r.id"
           >
             <span class="flex min-w-0 flex-1 items-center gap-2.5">

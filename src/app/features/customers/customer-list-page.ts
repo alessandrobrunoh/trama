@@ -11,7 +11,6 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { CUSTOMER_STATUSES, CustomerSubscriptionsStore, ListStateStore, NablaStore, UiStore, usePageShortcuts, type CustomerStatus } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
@@ -30,6 +29,7 @@ import {
   type CustomerGroup,
   type CustomerSort,
 } from './customer-model';
+import { SearchInput } from '../../shared/search-input';
 
 const DISPLAY_KEY = 'nabla.customers.display.v1';
 const SORTS: readonly CustomerSort[] = ['name', 'tier', 'revenue', 'size', 'requests', 'important', 'open', 'last'];
@@ -67,9 +67,9 @@ const COLUMNS: { sort: CustomerSort; label: string; width: string; hideBelow?: '
   selector: 'app-customer-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
     RouterLink,
     HlmButtonImports,
-    HlmInputImports,
     HlmTooltip,
     LucideDynamicIcon,
     PageHeader,
@@ -106,19 +106,7 @@ const COLUMNS: { sort: CustomerSort; label: string; width: string; hideBelow?: '
     }
 
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6">
-      <div class="relative w-full sm:w-56">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          #searchBox
-          hlmInput
-          class="h-7 w-full pl-8 text-xs"
-          placeholder="Search name or domain…"
-          aria-label="Search customers"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-          (keydown.escape)="search.set(''); searchBox.blur()"
-        />
-      </div>
+      <app-search-input noun="customers" placeholder="Search name or domain…" [(value)]="search" />
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statusOptions" [value]="statusFilter()" (valueChange)="statusFilter.set($any($event))" />
         @if (tierOptions().length) {
@@ -146,14 +134,16 @@ const COLUMNS: { sort: CustomerSort; label: string; width: string; hideBelow?: '
         }
       </div>
       <div class="ml-auto flex shrink-0 items-center gap-2 text-xs">
-        <label class="text-muted-foreground flex items-center gap-1.5">
-          Group
-          <select class="border-input bg-background text-foreground h-7 rounded-md border px-1.5 text-xs" aria-label="Group customers" [value]="d().group" (change)="patch({ group: $any($event.target).value })">
-            <option value="none">None</option>
-            <option value="tier">Tier</option>
-            <option value="status">Status</option>
-          </select>
-        </label>
+        <app-picker
+          variant="chip"
+          label="Group"
+          [searchable]="false"
+          [clearable]="d().group !== 'none'"
+          clearLabel="No grouping"
+          [options]="groupOptions"
+          [value]="d().group === 'none' ? [] : [d().group]"
+          (valueChange)="patch({ group: $any($event[0] ?? 'none') })"
+        />
       </div>
     </div>
 
@@ -253,6 +243,10 @@ export class CustomerListPage {
   protected readonly down = LucideArrowDown;
   protected readonly columns = COLUMNS;
   protected readonly compact = compactNumber;
+  protected readonly groupOptions: PickOption[] = [
+    { value: 'tier', label: 'Tier' },
+    { value: 'status', label: 'Status' },
+  ];
   protected readonly statusOptions: PickOption[] = CUSTOMER_STATUSES.map((s) => ({ value: s, label: s[0].toUpperCase() + s.slice(1) }));
 
   // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
