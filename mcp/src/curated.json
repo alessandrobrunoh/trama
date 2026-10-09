@@ -1,0 +1,376 @@
+[
+  {
+    "name": "get_context",
+    "summary": "Read everything about one workstream, issue, project, decision or input request by key or id",
+    "kind": "composite",
+    "readOnly": true,
+    "visibleIf": ["issues:read", "workstreams:read", "projects:read", "decisions:read", "input-requests:read", "artifacts:read"],
+    "uses": ["get_issue", "get_workstream", "get_workstream_context", "get_project_context", "get_decision", "get_input_request", "get_artifact", "list_issue_artifacts", "list_comments"],
+    "description": "Read everything about ONE thing before you act on it. Pass any key or id; the kind is inferred. Workstream (AUTH-42, wk_…): markdown briefing with objective, criteria, decisions, artifacts, open questions, progress. Project (pj_…): markdown mega-context. Issue (BUG-142, in_…): the issue plus its workstreams and artifacts (comments:true adds the thread). Decision (ADR-21), input request (ir_…), artifact (ar_…): the record itself. Use ask_human's ir_… id here to see whether a person answered. Example: {\"id\":\"AUTH-42\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Key or id: AUTH-42, BUG-142, ADR-21, wk_…, in_…, pj_…, ir_…, ar_…." },
+        "type": { "type": "string", "enum": ["issue", "workstream", "project", "decision", "input_request", "artifact"], "description": "Only when the kind cannot be inferred from the id." },
+        "comments": { "type": "boolean", "description": "Issues only: include the comment thread (last 20)." }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "find_work",
+    "summary": "Find issues, workstreams, input requests or decisions with filters (assignee `me`, status, project…)",
+    "kind": "composite",
+    "readOnly": true,
+    "visibleIf": ["issues:read", "workstreams:read", "input-requests:read", "decisions:read"],
+    "uses": ["list_issues", "list_workstreams", "list_input_requests", "list_decisions"],
+    "description": "Find what to work on, or what already exists, in one call. scope: all (default: issues + workstreams), issues, workstreams, input_requests (default state open), decisions. Filters: q (text), assignee ('me' = the user behind this key, or a user id), status (issue status for issues, workstream status for workstreams), priority, kind (issues), projectId, teamId, repositoryId (workstreams), open (default true: hides done/canceled/shipped), limit (default 20). Returns compact rows; call get_context for detail. For free-text lookup across every type use search. Example: {\"assignee\":\"me\"} or {\"scope\":\"issues\",\"kind\":\"bug\",\"priority\":\"high\",\"projectId\":\"pj_…\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": { "type": "string", "enum": ["all", "issues", "workstreams", "input_requests", "decisions"] },
+        "q": { "type": "string", "description": "Text filter." },
+        "assignee": { "type": "string", "description": "'me' or a user id (accountable user for workstreams, assignee for issues and input requests)." },
+        "status": { "type": "string", "description": "One status of the scope: draft|backlog|todo|in_progress|in_review|done|canceled for issues; draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled for workstreams; open|answered|dismissed for input requests; draft|proposed|accepted|superseded|rejected for decisions." },
+        "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low", "none"] },
+        "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"], "description": "Issues only." },
+        "projectId": { "type": "string" },
+        "teamId": { "type": "string" },
+        "repositoryId": { "type": "string", "description": "Workstreams only." },
+        "open": { "type": "boolean", "description": "Default true." },
+        "limit": { "type": "integer", "description": "Per section, 1-100, default 20." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search",
+    "summary": "Full-text search across every object type; run it before creating anything",
+    "kind": "catalog",
+    "description": "Full-text search across workstreams, issues, projects, decisions, artifacts, repositories, teams and customers. Run it BEFORE creating anything so you reuse what exists. `types` narrows (comma-separated: workstream,issue,decision,project,artifact,repository,team,customer). Returns type, id, key, title, subtitle. Example: {\"q\":\"refresh token\",\"types\":\"issue,workstream\",\"limit\":10}."
+  },
+  {
+    "name": "get_insights",
+    "summary": "Where the problems are: blocked or stale work, bottlenecks, stuck PRs, flow metrics, agent failures",
+    "kind": "catalog",
+    "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle and lead time, throughput, WIP) and agent failure signals, each with counts and its top items. Use it to decide what needs attention before picking work, or to answer 'what is stuck?'. Narrow with projectId or teamId; days is 7, 30 or 90. The full list behind one signal: run_tool {name:'get_insight_signal', arguments:{id:'<signal>'}}."
+  },
+  {
+    "name": "get_workspace",
+    "summary": "Workspace settings: label ids, estimate scale",
+    "kind": "catalog",
+    "description": "The workspace and its settings: label catalog (ids to pass as `labels`), estimateScale (none, fibonacci, linear, exponential, tshirt), customer tiers. Read it once before filing issues so you assign real label ids and a valid estimate. Takes no arguments."
+  },
+  {
+    "name": "list_repositories",
+    "summary": "Registered git repositories (maps a checkout to its project)",
+    "kind": "catalog",
+    "description": "Registered git repositories (id, provider, fullName, url). To find the project of a git checkout, match its remote's owner/name to `fullName` (case-insensitive, after following any rename), then use the id with list_projects. No match means the checkout is not registered: say so, do not guess."
+  },
+  {
+    "name": "list_projects",
+    "summary": "Projects; filter by repository to find the project of a checkout",
+    "kind": "catalog",
+    "description": "Projects (planning above workstreams). Filter by repositoryId to find the project of this checkout, or by q, status, teamId, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its issues and get_context {id:'pj_…'} reads it whole. Example: {\"repositoryId\":\"rp_…\"}."
+  },
+  {
+    "name": "create_issue",
+    "summary": "File an issue (duplicate-checked, optionally grouped into a workstream)",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["issues:write"],
+    "uses": ["search", "create_issue", "link_issue", "get_workstream"],
+    "description": "File ONE issue (a problem or request; the unit of demand). Checks for an open issue with the same title first and returns it instead of creating a duplicate (force:true overrides); lists similar open issues after creating. source defaults to 'agent'. Optional: workstream (key or id of an existing workstream) or createWorkstream {title, ownerTeamId, objective, deltaThreadUrl?} to group it in the same call. kind picks the key prefix (bug BUG, feature FEAT, incident INC, tech_debt DEBT, feedback FB, idea IDEA, security SEC) and is hard to change later. Labels are ids from get_workspace settings.labels, never names. Example: {\"kind\":\"bug\",\"title\":\"Logout leaves a stale cookie\",\"body\":\"## Steps\\n…\",\"priority\":\"medium\",\"projectId\":\"pj_…\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"] },
+        "title": { "type": "string", "description": "The symptom or request in plain words, under ~80 chars." },
+        "body": { "type": "string", "description": "Markdown: steps, expected vs actual, where you saw it." },
+        "priority": { "type": "string", "enum": ["none", "urgent", "high", "medium", "low"] },
+        "status": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Default backlog." },
+        "projectId": { "type": "string" },
+        "teamId": { "type": "string" },
+        "assigneeId": { "type": "string", "description": "Leave empty for backlog issues." },
+        "labels": { "type": "array", "items": { "type": "string" }, "description": "Workspace label ids." },
+        "estimate": { "type": "number", "description": "Only when the size is clear and the workspace uses estimates." },
+        "externalUrl": { "type": "string" },
+        "reporterName": { "type": "string" },
+        "source": { "type": "string", "enum": ["manual", "github", "gitlab", "email", "api", "agent"], "description": "Default agent." },
+        "workstream": { "type": "string", "description": "Existing workstream (key or id) this issue serves." },
+        "createWorkstream": { "type": "object", "description": "New workstream to create and link atomically: {title, ownerTeamId, objective?, deltaThreadUrl?}." },
+        "force": { "type": "boolean", "description": "Create even if an open issue has the same title." }
+      },
+      "required": ["kind", "title"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "update_issue",
+    "summary": "Change an issue's status, priority, assignee, labels, duplicate marker…",
+    "kind": "catalog",
+    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, kind (re-keys it), duplicateOfId (marks a duplicate of another issue). null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"BUG-142\",\"status\":\"in_review\"}."
+  },
+  {
+    "name": "link_issue",
+    "summary": "Group an issue under existing or new workstreams",
+    "kind": "catalog",
+    "description": "Group an issue under a workstream: workstreamIds (existing ones) and/or createWorkstream {title, ownerTeamId, objective, deltaThreadUrl?} to start one atomically. Group by shared outcome or root cause, never by convenience; search workstreams first. Linking does not change the issue's status. Example: {\"idOrKey\":\"BUG-148\",\"workstreamIds\":[\"wk_…\"]}."
+  },
+  {
+    "name": "start_work",
+    "summary": "Pick up a workstream or issue: briefing, safety checks, marks the start",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["workstreams:read", "issues:read"],
+    "uses": ["get_issue", "get_workstream", "get_workstream_context", "list_input_requests", "list_decisions", "add_criterion", "update_criterion", "update_issue", "create_comment"],
+    "description": "Pick up a workstream or an issue: loads the briefing, checks you should proceed, and marks the start. Pass the key of either. It stops WITHOUT writing (ready:false) when the workstream is blocked, shipped or canceled, or the issue is done/canceled. Otherwise it reports cautions (open questions, proposed decisions, missing criteria), sets the criteria you target to in_progress (default: the first one not met), moves the issue to in_progress, adds addCriteria, and leaves your `plan` as a comment. Read the cautions before coding: an open input request or proposed decision may change the approach. Example: {\"key\":\"AUTH-42\",\"plan\":\"Rotate refresh tokens; targeting criteria 1 and 2.\",\"criteria\":[\"1\",\"2\"]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "description": "Workstream or issue key/id." },
+        "workstream": { "type": "string", "description": "When the issue is on several workstreams: the one you work for." },
+        "criteria": { "type": "array", "items": { "type": "string" }, "description": "Criteria to mark in_progress: id, 1-based position ('2') or a unique text fragment. Default: first one not met." },
+        "addCriteria": { "type": "array", "items": { "type": "string" }, "description": "New observable criteria to add (when the list is empty or vague)." },
+        "plan": { "type": "string", "description": "One comment: what you will do." }
+      },
+      "required": ["key"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "report_progress",
+    "summary": "Record criteria, PR/build artifacts, issue status, project update and a comment in one call",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["workstreams:write", "artifacts:write", "comments:write", "issues:write"],
+    "uses": ["get_issue", "get_workstream", "get_project", "add_criterion", "update_criterion", "list_artifacts", "list_issue_artifacts", "list_project_artifacts", "create_artifact", "update_artifact", "update_issue", "create_project_update", "create_comment"],
+    "description": "Record facts about your work in one call. Any combination of: criteria (mark each {criterion, state}; criterion = id, 1-based position or unique text; met ONLY when demonstrably true), addCriteria, artifact (PR/build/doc: created once, then updated in place, matched by externalId or url), issueStatus (for `issue`), projectUpdate {health, body} (for `project`; only after a meaningful milestone), comment (one factual line). Never sets workstream status: Trama derives it from these facts, and the reply shows the resulting status. Never claim ci 'passing' or state 'merged' unless you saw it. Example: {\"workstream\":\"AUTH-42\",\"criteria\":[{\"criterion\":\"1\",\"state\":\"met\"}],\"artifact\":{\"kind\":\"pull_request\",\"title\":\"Rotate refresh tokens\",\"url\":\"https://github.com/o/r/pull/318\",\"externalId\":\"318\",\"state\":\"open\",\"ci\":\"pending\"},\"comment\":\"PR #318 open; criterion 1 met.\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workstream": { "type": "string", "description": "Workstream key or id the work belongs to." },
+        "issue": { "type": "string", "description": "Issue key or id (for issueStatus, artifacts and comments)." },
+        "project": { "type": "string", "description": "Project id (for projectUpdate, artifacts and comments)." },
+        "criteria": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "criterion": { "type": "string", "description": "Criterion id, 1-based position or unique text fragment." },
+              "state": { "type": "string", "enum": ["pending", "in_progress", "met"] }
+            },
+            "required": ["criterion", "state"],
+            "additionalProperties": false
+          }
+        },
+        "addCriteria": { "type": "array", "items": { "type": "string" }, "description": "New acceptance criteria texts." },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "kind": { "type": "string", "enum": ["pull_request", "merge_request", "document", "link", "design", "image", "file", "build", "test_report", "deployment", "release"] },
+            "title": { "type": "string" },
+            "url": { "type": "string" },
+            "externalId": { "type": "string", "description": "PR number, sha, build id: used to find the existing artifact." },
+            "provider": { "type": "string" },
+            "state": { "type": "string", "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)." },
+            "ci": { "type": "string", "enum": ["pending", "passing", "failing"] },
+            "review": { "type": "string", "enum": ["none", "requested", "approved", "changes_requested"] },
+            "hasConflicts": { "type": "boolean" },
+            "environment": { "type": "string" },
+            "repositoryId": { "type": "string" },
+            "description": { "type": "string", "description": "Only used when the artifact is created." }
+          },
+          "required": ["kind", "title"],
+          "additionalProperties": false
+        },
+        "issueStatus": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "New status of `issue`. in_review while its PR is open; done only once merged." },
+        "projectUpdate": {
+          "type": "object",
+          "properties": {
+            "health": { "type": "string", "enum": ["on_track", "at_risk", "off_track"] },
+            "body": { "type": "string", "description": "Markdown: shipped, next, risks." }
+          },
+          "required": ["health", "body"],
+          "additionalProperties": false
+        },
+        "comment": { "type": "string", "description": "One factual comment on the workstream (else the issue, else the project)." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "ask_human",
+    "summary": "Ask a person one question (an input request), once",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["input-requests:write"],
+    "uses": ["get_workstream", "list_input_requests", "create_input_request"],
+    "description": "Ask a person ONE question you cannot answer yourself (scope, product intent, a trade-off, a credential, an approval) instead of guessing or stalling. Asks once: if the same question is already open on the workstream it returns that one. The workstream shows as needs_input and appears in the team's attention list. Put the cost of each option in the question; options are 2-4 short choices. Keep working on anything the answer does not affect; later read the answer with get_context {id:'ir_…'}. Do not answer it yourself. Example: {\"workstream\":\"AUTH-42\",\"question\":\"Drop Safari 16 or keep the polyfill (+40 kB)?\",\"options\":[\"Drop it\",\"Keep the polyfill\"]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workstream": { "type": "string", "description": "Workstream key or id the question blocks." },
+        "question": { "type": "string" },
+        "options": { "type": "array", "items": { "type": "string" } },
+        "assignee": { "type": "string", "description": "User id who should answer." }
+      },
+      "required": ["workstream", "question"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "record_decision",
+    "summary": "Propose a lasting decision (a person accepts it)",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["decisions:write"],
+    "uses": ["get_workstream", "list_decisions", "create_decision", "update_decision"],
+    "description": "Propose a decision that should outlive this chat (architecture or data-model choice, security trade-off, a rejected alternative people will propose again). Not for small reversible choices: put those in the PR. statement = the rule now true; rationale = why, including rejected alternatives. Created as proposed (or draft); a PERSON accepts, rejects or supersedes it, and until then the workstream shows needs_input, so tell the user the ADR key. Returns the existing decision instead of duplicating one with the same title. To fix content of a decision you proposed, pass decision:'ADR-23' with the changed fields. Example: {\"title\":\"Keep the previous refresh token valid for 30 s\",\"statement\":\"After rotation the old token stays valid 30 s.\",\"rationale\":\"Concurrent requests may carry the old token.\",\"workstream\":\"AUTH-42\",\"tags\":[\"auth\"]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "statement": { "type": "string" },
+        "rationale": { "type": "string" },
+        "workstream": { "type": "string", "description": "Origin workstream (key or id)." },
+        "related": { "type": "array", "items": { "type": "string" }, "description": "Other workstreams it touches (keys or ids)." },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": "string", "enum": ["draft", "proposed"], "description": "Default proposed." },
+        "decision": { "type": "string", "description": "Existing decision key/id to edit instead of creating." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "attach_artifact",
+    "summary": "Attach or update a PR, build, document or link on a workstream, issue or project",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["artifacts:write"],
+    "uses": ["get_issue", "get_workstream", "get_project", "list_artifacts", "list_issue_artifacts", "list_project_artifacts", "create_artifact", "update_artifact"],
+    "description": "Attach proof of work or a reference to a workstream, issue and/or project: a pull request, build, test report, deployment, design, document or plain link. Idempotent: an artifact with the same externalId (or url) and kind is updated instead of duplicated, so call it again when CI, review or state change. Attach where it belongs (a project already sees its workstreams' artifacts); PR ci/review only drive a workstream's status when attached to that workstream. Example: {\"workstream\":\"AUTH-42\",\"kind\":\"pull_request\",\"title\":\"Rotate refresh tokens\",\"url\":\"…\",\"externalId\":\"318\",\"state\":\"open\",\"ci\":\"passing\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "workstream": { "type": "string", "description": "Workstream key or id." },
+        "issue": { "type": "string", "description": "Issue key or id." },
+        "project": { "type": "string", "description": "Project id." },
+        "kind": { "type": "string", "enum": ["pull_request", "merge_request", "document", "link", "design", "image", "file", "build", "test_report", "deployment", "release"] },
+        "title": { "type": "string" },
+        "url": { "type": "string" },
+        "externalId": { "type": "string", "description": "PR number, sha, build id: used to find the existing artifact." },
+        "description": { "type": "string", "description": "What it is / why attached (only used on create)." },
+        "provider": { "type": "string" },
+        "state": { "type": "string", "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)." },
+        "ci": { "type": "string", "enum": ["pending", "passing", "failing"] },
+        "review": { "type": "string", "enum": ["none", "requested", "approved", "changes_requested"] },
+        "hasConflicts": { "type": "boolean" },
+        "environment": { "type": "string" },
+        "repositoryId": { "type": "string" }
+      },
+      "required": ["kind", "title"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "add_comment",
+    "summary": "Comment on any object by key or id",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["comments:write"],
+    "uses": ["get_issue", "get_workstream", "get_decision", "create_comment"],
+    "description": "Comment on a workstream, issue, decision, input request, project or artifact by key or id. Use for a factual note after a meaningful step or to answer something on an existing issue instead of filing a duplicate. Skip trivial steps: the activity log records every change. Markdown. Example: {\"on\":\"BUG-142\",\"body\":\"Reproduced on main; fix in PR #318.\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "on": { "type": "string", "description": "Key or id of what you comment on." },
+        "type": { "type": "string", "enum": ["issue", "workstream", "project", "decision", "input_request", "artifact"], "description": "Only when the kind cannot be inferred." },
+        "body": { "type": "string" }
+      },
+      "required": ["on", "body"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "triage_issues",
+    "summary": "Triage up to 25 issues in one call (priority, duplicates, grouping)",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": ["issues:write"],
+    "uses": ["get_issue", "get_workstream", "update_issue", "link_issue", "create_comment"],
+    "description": "Triage up to 25 issues in one call. Each item names an `issue` and any of: priority, kind, status, labels, assigneeId, teamId, projectId, estimate, title, duplicateOf (key of the original: marks it a duplicate), workstream (existing key/id to link to) or createWorkstream (new; do it once, then link the others with `workstream`), comment. Items run in order and fail independently; the reply lists what was applied per issue. Propose bulk changes to the user before applying them, and do not change other people's assignees or priorities unasked. Example: {\"items\":[{\"issue\":\"BUG-150\",\"duplicateOf\":\"BUG-142\"},{\"issue\":\"BUG-151\",\"priority\":\"high\",\"workstream\":\"AUTH-42\"}]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 25,
+          "items": {
+            "type": "object",
+            "properties": {
+              "issue": { "type": "string", "description": "Issue key or id." },
+              "priority": { "type": "string", "enum": ["none", "urgent", "high", "medium", "low"] },
+              "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"] },
+              "status": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
+              "labels": { "type": "array", "items": { "type": "string" } },
+              "assigneeId": { "type": "string" },
+              "teamId": { "type": "string" },
+              "projectId": { "type": "string" },
+              "estimate": { "type": "number" },
+              "title": { "type": "string" },
+              "duplicateOf": { "type": "string", "description": "Key or id of the original issue." },
+              "workstream": { "type": "string", "description": "Existing workstream (key or id) to link to." },
+              "createWorkstream": { "type": "object", "description": "{title, ownerTeamId, objective?, deltaThreadUrl?}" },
+              "comment": { "type": "string" }
+            },
+            "required": ["issue"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "list_capabilities",
+    "summary": "Discover the full catalog: search it, get a tool's schema and how to call it",
+    "kind": "composite",
+    "readOnly": true,
+    "local": true,
+    "visibleIf": [],
+    "uses": [],
+    "description": "Discover the long tail beyond this tool list: every Trama operation your key may use (about a hundred: teams, projects, milestones, customers, views, webhooks, members…). No arguments: groups with counts. q or group: matching tools with a one-line summary. tool:'<name>': full detail with the exact input schema and how to call it. Then run it with run_tool. Use it when none of the task tools above fits, instead of guessing names. Example: {\"q\":\"milestone\"} then {\"tool\":\"create_milestone\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "q": { "type": "string", "description": "Words that must all appear in a tool's name, description or route." },
+        "group": { "type": "string", "description": "Resource group, e.g. issues, workstreams, projects, milestones, teams, customers." },
+        "tool": { "type": "string", "description": "Exact tool name: returns its schema and call example." },
+        "all": { "type": "boolean", "description": "Also list tools your key cannot use (marked unavailable)." }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "run_tool",
+    "summary": "Run any catalog operation by name, with the usual validation and permissions",
+    "kind": "composite",
+    "readOnly": false,
+    "local": true,
+    "visibleIf": [],
+    "uses": [],
+    "description": "Run any operation found with list_capabilities by its name, with that tool's own arguments. Arguments are validated against the tool's schema and the API checks your key's permissions on every call, exactly as if the tool were listed. Example: {\"name\":\"create_milestone\",\"arguments\":{\"projectId\":\"pj_…\",\"name\":\"Beta\"}}. For a route no tool covers use api_request.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Tool name from list_capabilities." },
+        "arguments": { "type": "object", "description": "That tool's arguments (see list_capabilities {tool})." }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  }
+]

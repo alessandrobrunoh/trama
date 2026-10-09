@@ -251,7 +251,12 @@ impl Tool {
     }
 
     pub fn listing(&self) -> Value {
-        let mut desc = self.description.clone();
+        self.listing_with(&self.description)
+    }
+
+    /// The listing with another description (the curated profile writes sharper ones).
+    pub fn listing_with(&self, description: &str) -> Value {
+        let mut desc = description.to_string();
         if self.method != Method::Get {
             desc.push_str(" [requires permission ");
             desc.push_str(&self.permission);

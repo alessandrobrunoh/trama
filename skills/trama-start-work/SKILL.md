@@ -11,53 +11,50 @@ Goal: understand the outcome, confirm there is something to do, and leave a clea
 
 ```
 whoami
-get_workstream_context { idOrKey: "AUTH-42" }
+get_context { id: "AUTH-42" }
 ```
 
-The briefing contains the objective, acceptance criteria, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below, including the briefing; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, call `get_issue` and check its `workstreamIds`; then load the briefing of the workstream it belongs to.
+`get_context` returns the briefing: objective, acceptance criteria, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. Use it alone when the user only asks what is left or what the state is.
 
-If the user hands you a **project** (or you need the big picture across several workstreams), call `get_project_context { id }` instead: one markdown "mega context" with the project's updates, milestones, workstreams, issues, artifacts, decisions and open questions, each traceable to where it is attached. Then pick a workstream and load its own briefing.
+If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, `get_context` returns the issue with the workstreams it belongs to; `start_work` below loads the briefing of the workstream for you.
 
-If the user only describes the work, `search { q, types: "workstream,issue,decision" }` first. Do not create a second workstream for something that exists.
+If the user hands you a **project** (or you need the big picture across several workstreams), call `get_context { id: "pj_…" }`: one markdown "mega context" with the project's updates, milestones, workstreams, issues, artifacts, decisions and open questions, each traceable to where it is attached. Then pick a workstream.
 
-## 2. Check you should proceed
+If the user only describes the work, `search { q, types: "workstream,issue,decision" }` first (or `find_work { q }`). Do not create a second workstream for something that exists.
 
-Stop and report instead of working when any of these is true:
+## 2. Check you should proceed, and mark the start
 
-- The workstream is `blocked` (a dependency has not shipped) or `shipped` / `canceled`.
-- There is an **open input request** whose answer changes the approach. Mention it to the user.
+When you decide to begin, one call does the checks and the writes:
+
+```
+start_work { key: "AUTH-42", plan: "Rotating refresh tokens; targeting criteria 1 and 2.", criteria: ["1", "2"] }
+```
+
+`key` is a workstream or an issue. `start_work` stops **without writing** (`ready: false`, with `stopBecause`) when the workstream is `blocked`, `shipped` or `canceled`, or the issue is `done`/`canceled`. Report that to the user instead of working.
+
+When it proceeds it returns `cautions`. Read them; stop and tell the user when:
+
+- There is an **open input request** whose answer changes the approach.
 - A **proposed decision** touches the area you are about to change. Wait for a person to accept it, or ask.
-- Acceptance criteria are empty or vague. Propose concrete criteria (`add_criterion`) and confirm with the user before relying on them.
+- Acceptance criteria are empty or vague. Propose concrete, observable ones with `addCriteria` (`start_work { key, addCriteria: ["OAuth login passes on Safari 18"] }`) and confirm them with the user before relying on them.
 
 ## 3. Respect what is already decided
 
 Accepted decisions are binding unless the user says otherwise; follow them, and cite the key (`ADR-21`) in your commit or PR text. `superseded` and `rejected` decisions are history, not instructions.
 
-## 4. Mark that you started
+## 4. What the start records
 
-Set the first criterion you are tackling to `in_progress`:
+`start_work` sets the criteria you target (default: the first one not met) to `in_progress`. That is the signal Trama uses to show the workstream as `working`. Do not touch `statusOverride`.
 
-```
-update_criterion { idOrKey, criterionId, state: "in_progress" }
-```
+When the work is an issue, it also sets that issue to `in_progress` if it is not already. If the issue has no assignee and `whoami.actor.type` is `user`, the server sets `assigneeId` to that user on the status change (an `agent` actor is not assigned; an existing assignee is never replaced). Filing an issue you are not starting leaves the assignee empty.
 
-That is the signal Trama uses to show the workstream as `working`. Do not touch `statusOverride`.
-
-When the work is an issue and you are actually starting it, set that issue to `in_progress` if it is not already. If it has no assignee and `whoami.actor.type` is `user`, set `assigneeId` to that id. The server does this on the status change (and on `link_issue` only when you pass `status: in_progress`; linking alone never changes the status). An `agent` actor is not assigned. Do not replace an assignee who is already set. Filing an issue you are not starting leaves the assignee empty.
+The `plan` you pass becomes one comment on the workstream (the issue when it has no workstream): what you will do and which criteria you target. Skip it when you have nothing to add.
 
 ## 5. Work where the code lives
 
 Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` (empty when the workspace does not use Delta threads) and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.
 
 The thread is the execution context, not the boundary of the work. If a workstream already exists for this outcome, continue it, whether or not its `deltaThreadUrl` is this thread. If this thread later takes on an unrelated outcome, use or create another workstream for it (search first); do not widen the current one. Subagents you spawn stay inside Delta; point them at the issues they serve.
-
-## 6. Leave a short trail
-
-Add one comment when you begin, saying what you will do and which criteria you target:
-
-```
-create_comment { subject: { type: "workstream", id }, body: "Starting on …; targeting criteria 1 and 2." }
-```
 
 Then continue with `trama-report-progress` as you make progress.
 
@@ -68,3 +65,4 @@ Then continue with `trama-report-progress` as you make progress.
 - Changing `deltaThreadUrl`, owner team or accountable user. Those are the team's decisions.
 - Creating one workstream per subagent, or per trivial issue. Group issues that serve the same outcome.
 - Adding an unrelated issue to the current workstream because it came up in the same thread. A workstream is an outcome, not a Delta thread.
+- Starting anyway after `ready: false`. The call refused for a reason; say so to the user.
