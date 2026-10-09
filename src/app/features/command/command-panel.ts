@@ -216,11 +216,11 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
   a.updatedAt < b.updatedAt ? 1 : -1;
 
 /**
- * Floating command surface. Width stays a bar (30rem), pinned near the top.
+ * Floating command surface. It stays compact on phones and opens up to 42rem on desktop.
  * Height comes from the panel, which grows with its rows up to a cap.
  */
 export const COMMAND_DIALOG_CLASS =
-  'w-[min(30rem,calc(100%-1.5rem))] max-w-none top-[min(14vh,5.5rem)] translate-y-0 overflow-hidden rounded-xl p-0';
+  'w-[min(30rem,calc(100%-1.5rem))] sm:w-[min(42rem,calc(100%-2rem))] max-w-none top-[min(14vh,5.5rem)] translate-y-0 overflow-hidden rounded-xl p-0';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog (Linear-style).
@@ -278,7 +278,13 @@ export const COMMAND_DIALOG_CLASS =
 
     <hlm-command class="h-auto max-h-[min(28rem,70svh)]" [filter]="filter" [(search)]="query">
       <div class="shrink-0 border-b">
-        <div class="flex items-center gap-2 px-3 py-2.5">
+        <div class="flex items-center gap-3 px-4 py-3">
+          <svg
+            [lucideIcon]="searchIcon"
+            [size]="16"
+            aria-hidden="true"
+            class="text-muted-foreground shrink-0"
+          ></svg>
           <input
             brnCommandInput
             data-slot="command-input"
@@ -353,7 +359,7 @@ export const COMMAND_DIALOG_CLASS =
       </div>
 
       <hlm-command-list
-        class="max-h-[min(18rem,calc(70svh-6.5rem))] px-1 py-1 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-2 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-xs"
+        class="max-h-[min(18rem,calc(70svh-6.5rem))] px-1 py-1 sm:[&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-2 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-xs"
       >
         @if (page() === 'status') {
           <hlm-command-group>
