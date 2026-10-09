@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** Header carrying the signature of an outgoing webhook delivery. */
-export const SIGNATURE_HEADER = 'X-Nabla-Signature';
+export const SIGNATURE_HEADER = 'X-Trama-Signature';
 
 /** `sha256=<hex hmac-sha256 of the raw request body>` — verify it on the receiving side with the webhook secret. */
 export function signBody(secret: string, body: string): string {

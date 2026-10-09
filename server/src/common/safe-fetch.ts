@@ -2,6 +2,7 @@ import dns from 'node:dns';
 import http from 'node:http';
 import https from 'node:https';
 import { isIP } from 'node:net';
+import { envWithLegacy } from './env.js';
 
 /**
  * The one outbound HTTP path for requests to URLs that a user (not the operator) can choose:
@@ -37,8 +38,8 @@ export interface OutboundPolicy {
 export function outboundPolicyFromEnv(env: NodeJS.ProcessEnv = process.env): OutboundPolicy {
   const flag = (v: string | undefined) => v?.trim().toLowerCase() === 'true';
   return {
-    // NABLA_ALLOW_PRIVATE_WEBHOOKS is the old name of the flag, kept as an alias.
-    allowPrivate: flag(env.TRAMA_OUTBOUND_ALLOW_PRIVATE) || flag(env.NABLA_ALLOW_PRIVATE_WEBHOOKS),
+    // NABLA_ALLOW_PRIVATE_WEBHOOKS is the old name of the flag, kept as a deprecated alias.
+    allowPrivate: flag(envWithLegacy('TRAMA_OUTBOUND_ALLOW_PRIVATE', 'NABLA_ALLOW_PRIVATE_WEBHOOKS', env)),
     allowedHosts: (env.TRAMA_OUTBOUND_ALLOWED_HOSTS ?? '')
       .split(',')
       .map((h) => h.trim().toLowerCase().replace(/^\[|\]$/g, ''))

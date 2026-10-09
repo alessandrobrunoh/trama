@@ -16,7 +16,7 @@ export interface AuthInfo {
   actor: ActorRef;
   /** Present for browser sessions and user-actor API tokens; absent for agent tokens. */
   user?: UserEntity;
-  /** Present when authenticated with `Authorization: Bearer nbl_…`. */
+  /** Present when authenticated with `Authorization: Bearer trm_…` (or a legacy `nbl_…` token). */
   token?: ApiTokenEntity;
   method: 'session' | 'token';
   /** sha256 id of the cookie session (method = session). */

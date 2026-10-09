@@ -4,6 +4,7 @@ import type { Subscription } from 'rxjs';
 import { In, type Repository } from 'typeorm';
 import { webhookEventMatches } from '../contracts/domain.js';
 import type { WebhookDeliveryLog } from '../contracts/domain.js';
+import { envWithLegacy } from '../common/env.js';
 import { notFound, uid } from '../common/util.js';
 import {
   DomainEventEntity,
@@ -38,7 +39,7 @@ export class OutgoingWebhooksService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(OutgoingWebhooksService.name);
   private sub?: Subscription;
   /** Delay before the single retry (tests lower it). */
-  retryDelayMs = Number(process.env.NABLA_WEBHOOK_RETRY_MS ?? 2000);
+  retryDelayMs = Number(envWithLegacy('TRAMA_WEBHOOK_RETRY_MS', 'NABLA_WEBHOOK_RETRY_MS') ?? 2000);
   private readonly cache = new Map<string, { at: number; rows: OutgoingWebhookEntity[] }>();
   /** Deliveries of one webhook run one after the other, so receivers see events in order. */
   private readonly dispatching = new Set<Promise<void>>();
@@ -214,6 +215,7 @@ export class OutgoingWebhooksService implements OnModuleInit, OnModuleDestroy {
     try {
       const body = JSON.stringify(payload);
       const secret = this.secrets.decrypt(hook.secret, aad(hook.id));
+      const signature = signBody(secret, body);
       const res = await this.http.request({
         method: 'POST',
         url: hook.url,
@@ -222,10 +224,14 @@ export class OutgoingWebhooksService implements OnModuleInit, OnModuleDestroy {
         maxBytes: 64 * 1024,
         truncate: true,
         headers: {
-          'User-Agent': 'Nabla-Webhooks/1',
+          'User-Agent': 'Trama-Webhooks/1',
+          'X-Trama-Event': payload.event,
+          'X-Trama-Delivery': payload.id,
+          'X-Trama-Signature': signature,
+          // Pre-rename headers, still sent so existing receivers keep verifying deliveries.
           'X-Nabla-Event': payload.event,
           'X-Nabla-Delivery': payload.id,
-          'X-Nabla-Signature': signBody(secret, body),
+          'X-Nabla-Signature': signature,
         },
       });
       status = res.status;

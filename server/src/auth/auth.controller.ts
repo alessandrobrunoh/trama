@@ -14,7 +14,7 @@ import type { Response } from 'express';
 import type { Repository } from 'typeorm';
 import { API_PERMISSIONS } from '../contracts/domain.js';
 import { WorkspaceEntity } from '../database/entities/index.js';
-import { AuthService, SESSION_COOKIE, SESSION_TTL_MS } from './auth.service.js';
+import { AuthService, LEGACY_SESSION_COOKIE, SESSION_COOKIE, SESSION_TTL_MS } from './auth.service.js';
 import {
   AllowCustomToken,
   Auth,
@@ -47,10 +47,12 @@ function sessionCookieFlags() {
 
 export function setSessionCookie(res: Response, raw: string): void {
   res.cookie(SESSION_COOKIE, raw, { ...sessionCookieFlags(), maxAge: SESSION_TTL_MS });
+  res.clearCookie(LEGACY_SESSION_COOKIE, sessionCookieFlags());
 }
 
 export function clearSessionCookie(res: Response): void {
   res.clearCookie(SESSION_COOKIE, sessionCookieFlags());
+  res.clearCookie(LEGACY_SESSION_COOKIE, sessionCookieFlags());
 }
 
 @Controller('auth')
