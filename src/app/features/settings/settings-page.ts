@@ -3,6 +3,7 @@ import { RouterLink } from '@angular/router';
 import {
   LucideBot,
   LucideBuilding2,
+  LucideInbox,
   LucideDynamicIcon,
   LucideKeyRound,
   LucideBell,
@@ -24,6 +25,7 @@ import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
 import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
+import { CustomerRequestsSection } from './sections/customer-requests-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { LabelsSection } from './sections/labels-section';
 import { MembersSection } from './sections/members-section';
@@ -68,6 +70,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'agents', label: 'Agents', icon: LucideBot },
       { id: 'tokens', label: 'API tokens', icon: LucideKeyRound },
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
+      { id: 'customer-requests', label: 'Customer requests', icon: LucideInbox },
     ],
   },
 ];
@@ -101,6 +104,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     TokensSection,
     IntegrationsSection,
     LabelsSection,
+    CustomerRequestsSection,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -170,6 +174,9 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             }
             @case ('labels') {
               <app-labels-section />
+            }
+            @case ('customer-requests') {
+              <app-customer-requests-section />
             }
             @default {
               <app-empty-state [icon]="warn" title="Unknown settings section" description="Pick a section from the list on the left." />

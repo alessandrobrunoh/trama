@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { PROJECT_HEALTH_META, NablaStore, UiStore, applyFilters, sortItems, type Project, type ViewFilter } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
@@ -27,6 +26,7 @@ import {
 } from './project-model';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
+import { SearchInput } from '../../shared/search-input';
 
 const NO_UPDATES = 'none';
 
@@ -35,10 +35,12 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
 @Component({
   selector: 'app-project-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LabelPicker, LabelChips, 
+  imports: [
+    SearchInput,
+    LabelPicker,
+    LabelChips,
     RouterLink,
     HlmButtonImports,
-    HlmInputImports,
     LucideDynamicIcon,
     PageHeader,
     Picker,
@@ -67,21 +69,7 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
     <app-page-header title="Projects" [description]="description()" />
 
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg
-          [lucideIcon]="searchIcon"
-          [size]="14"
-          class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
-        ></svg>
-        <input
-          hlmInput
-          class="h-10 w-full pl-9 text-sm"
-          placeholder="Search projects…"
-          aria-label="Search projects"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-        />
-      </div>
+      <app-search-input noun="projects" [(value)]="search" />
       <div
         class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
       >
@@ -185,7 +173,7 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
             [routerLink]="['/', slug(), 'projects', p.id]"
             [attr.data-row-id]="p.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
             [class.bg-muted]="ui.focusedRowId() === p.id"
           >
             <span class="flex min-w-0 flex-1 items-center gap-2.5">

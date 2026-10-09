@@ -163,7 +163,7 @@ const ARTIFACT_CAP = 12;
                       <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ a.externalId }}</span>
                     }
                     <span class="text-muted-foreground w-20 shrink-0 text-right font-mono text-xs max-sm:hidden">{{ workstreamKey(a.workstreamId) }}</span>
-                    <span class="text-muted-foreground w-16 shrink-0 text-right text-xs max-sm:hidden">{{ a.updatedAt | relativeTime }}</span>
+                    <span class="text-muted-foreground w-24 shrink-0 text-right text-xs whitespace-nowrap max-sm:hidden">{{ a.updatedAt | relativeTime }}</span>
                   </a>
                 }
               </div>

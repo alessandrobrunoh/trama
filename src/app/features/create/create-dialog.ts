@@ -252,7 +252,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           </div>
         </hlm-dialog-header>
 
-        <form (submit)="submit($event)" novalidate class="flex flex-col">
+        <form (submit)="submit($event)" novalidate class="flex flex-col" [class]="composer() ? '' : 'sm:min-w-md'">
           @if (composer()) {
             <!-- title + description -->
             <div class="flex flex-col gap-1 px-5 pt-3">
@@ -1226,7 +1226,7 @@ export class CreateDialog {
           });
           if (d)
             done = {
-              label: asDraft ? `${d.key} saved as draft` : `${d.key} recorded`,
+              label: asDraft ? `${d.key} saved as draft` : `${d.key} created`,
               path: ['decisions', d.key],
             };
           break;

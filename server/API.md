@@ -42,7 +42,7 @@ that are a subset of its own permissions.
 Every API token has caps (`limits`, defaults `requestsPerMinute` 600, `writesPerMinute` 60, `writesPerDay` 2000; configurable up to 6000 / 600 / 20000).
 Per-minute counters are per API process; the daily write counter is stored in Postgres. Over a cap: `429` with a message naming the cap.
 
-On top of that, every client IP is rate limited before authentication (in memory, per API process): 1200 requests/minute on `/api` overall, and stricter on `POST /auth/login` (10 per 15 min), `POST /auth/signup` (10/hour), `/invites/:token` (30 per 15 min), `GET /public/views/:token` (30/minute) and credential creation `POST /w/:slug/tokens|agents` (30/hour). Over a limit: `429` with a `Retry-After` header (seconds). Tunable through `TRAMA_RATE_LIMIT_*`, off when `NODE_ENV=test` or `TRAMA_RATE_LIMIT_ENABLED=false`; behind a reverse proxy set `TRAMA_TRUST_PROXY` so the real client address is used (see `.env.example`).
+On top of that, every client IP is rate limited before authentication (in memory, per API process): 1200 requests/minute on `/api` overall, and stricter on `POST /auth/login` (10 per 15 min), `POST /auth/signup` (10/hour), `/invites/:token` (30 per 15 min), `GET /public/views/:token` (30/minute), inbound customer-request webhooks `POST /webhooks/intake/:sourceId` (300/minute) and credential creation `POST /w/:slug/tokens|agents` (30/hour). Over a limit: `429` with a `Retry-After` header (seconds). Tunable through `TRAMA_RATE_LIMIT_*`, off when `NODE_ENV=test` or `TRAMA_RATE_LIMIT_ENABLED=false`; behind a reverse proxy set `TRAMA_TRUST_PROXY` so the real client address is used (see `.env.example`).
 
 ## Roles (RBAC)
 
@@ -60,11 +60,12 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `POST /workspaces` | user | `{ name, slug? }`. Creator becomes `owner`. Slug auto-derived from the name (unique; reserved: `login`, `signup`, `new-workspace`, `settings`, …). `409` if an explicit slug is taken. |
 | `GET /w/:slug` | viewer | `Workspace & { role }` |
 | `PATCH /w/:slug` | admin | `{ name?, slug? }` |
-| `DELETE /w/:slug` | owner | `204`, cascades everything |
+| `DELETE /w/:slug` | owner | `{ confirm }`: the exact slug or name of the workspace (`400` when missing or different, nothing is deleted). `204`, cascades everything and cannot be undone. A token needs `workspace:delete`; neither the MCP server nor the CLI has a command for it, use `trama api DELETE /w/<slug> -d '{"confirm":"<slug>"}'`. |
 | `GET /w/:slug/members` | viewer | `Array<Membership & { user: User }>` |
 | `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
-| `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Last owner cannot be demoted (`409`). |
-| `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
+| `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Only owners can grant `owner`. Demoting an owner is treated like removing them, see *Owners* below (`403`/`409`). |
+| `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Removing an owner follows the *Owners* rules below (`403`/`409`). |
+| `POST /w/:slug/transfer-ownership` | owner (session only) | `{ membershipId }`: the primary owner hands the workspace to another member, who becomes `owner` and the new `primaryOwnerId`; the caller stays an owner and may then leave. Not available to API tokens. `403` unless you are the primary owner, `409` if the target already is. |
 | `GET /w/:slug/invites` | `inviteMembers` | Pending invitations (`WorkspaceInvite[]`), expired ones included so they can be resent. |
 | `POST /w/:slug/invites` | `inviteMembers` | `{ email, role }` → `{ invite, url, emailed }`. The person does not need an account yet. Same address again refreshes the invite (new link and expiry, the old link stops working). Already a member → `409`; a role above your own → `403`. `url` is the only time the secret link is returned (only its hash is stored). |
 | `POST /w/:slug/invites/:id/resend` | `inviteMembers` | New link and expiry, emailed again. Same response as create. |
@@ -79,6 +80,13 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `PUT /me/push/subscription`, `DELETE /me/push/subscription` | user | `PUT` a browser `PushSubscription` (`{ endpoint (https), keys: { p256dh, auth } }`), idempotent per endpoint; `400` when push is off. `DELETE { endpoint }` → `204`, unknown endpoints are fine. |
 | `GET /invites/:token` | public | `InvitePreview` (`workspaceName`, `role`, `email`, `invitedByName`, `expiresAt`). `404` when unknown, used, revoked or expired. |
 | `POST /invites/:token/accept` | signed-in user | Joins the workspace; the account email must equal the invited one (`403` otherwise). → `{ workspace: { slug, name }, role }`. Single use; an existing member keeps their role. |
+
+**Owners.** `Workspace.primaryOwnerId` is the workspace owner: its creator until ownership is transferred. Rules, enforced on `PATCH`/`DELETE /members/:id` and `POST /transfer-ownership`:
+
+- Nobody else can remove or demote the primary owner (`403`). To leave or step down they must transfer ownership first (`409`).
+- Only the primary owner can remove or demote other owners (`403` for other owners and for admins). Any owner can leave or step down on their own, unless they are the primary owner.
+- A workspace always keeps at least one owner (`409`).
+- Workspaces created before this rule get their longest-standing owner as primary owner; one without a primary owner falls back to "any owner may act on owners".
 
 Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP_URL`; without it `emailed` is `false` and the UI shows the link to share by hand. Not exposed to API tokens with custom permissions.
 | `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |
@@ -154,7 +162,7 @@ A company, not a contact. `Customer { id: cus_…, workspaceId, name, domain, do
 - `DELETE /:id` (`204`) removes the customer and its requests. Issues and projects stay.
 
 #### Customer requests
-`CustomerRequest { id: crq_…, workspaceId, customerId, issueId? | projectId?, body?, important, sourceUrl?, createdBy, createdAt, updatedAt }` is what a customer asked for. It lives on **exactly one** issue or project (`400` if neither or both; `404` if the target is not in this workspace). `body` is markdown (≤ 20000 chars), `important` a flag (default `false`), `sourceUrl` an `http(s)` link to the ticket/thread. A customer can have several requests on the same issue. In the snapshot as `customerRequests`; deleting the customer, the issue or the project removes only its requests.
+`CustomerRequest { id: crq_…, workspaceId, customerId, issueId? | projectId?, body?, important, sourceUrl?, source?, externalId?, requesterEmail?, requesterName?, createdBy, createdAt, updatedAt }` (`source` … `requesterName` are set only for requests that came in through a source, see Customer request intake) is what a customer asked for. It lives on **exactly one** issue or project (`400` if neither or both; `404` if the target is not in this workspace). `body` is markdown (≤ 20000 chars), `important` a flag (default `false`), `sourceUrl` an `http(s)` link to the ticket/thread. A customer can have several requests on the same issue. In the snapshot as `customerRequests`; deleting the customer, the issue or the project removes only its requests.
 - `GET /customers/:id/requests` — newest first, each with `issue: { id, key, title, status, updatedAt }` or `project: { id, name, status, updatedAt }`.
 - `GET /customer-requests?customerId&issueId&projectId&important=true|false` — across customers (`customers:read`), same shape.
 - `POST /customers/:id/requests { issueId | projectId, body?, important?, sourceUrl? }`
@@ -164,6 +172,34 @@ A company, not a contact. `Customer { id: cus_…, workspaceId, name, domain, do
 
 #### Following a customer — `/customer-subscriptions` (user, agent tokens → `403`; viewers may follow)
 The bell on a customer page. `CustomerSubscription { id: csub_…, workspaceId, customerId, createdAt }` is private to the person. `GET` lists the caller's, `POST { customerId }` follows (idempotent, `404` for a customer of another workspace), `DELETE /:customerId` unfollows (idempotent, `204`). Followers get notifications `customer_request` (a request is added), `customer_important` (one is flagged important, or added already flagged) and `customer_delivered` (the issue is `done` or the project `completed`; whoever recorded a request hears about its delivery too, followers or not). Canceled work is never a delivery.
+
+#### Customer request intake — `/intake-sources` (admin), `/customer-intake` (inbox), `POST /webhooks/intake/:sourceId` (public)
+Brings requests in from Intercom, Zendesk, Front, Slack, email and any signed JSON webhook. Provider-agnostic: every delivery is reduced to `{ externalId, externalUrl?, requesterEmail?, requesterName?, subject?, body }`, matched to a customer, and either attached to a project or left in the triage inbox. A request created from an inbound item carries its provenance on `CustomerRequest`: `source` (`intercom|zendesk|front|slack|email|generic`), `externalId`, `requesterEmail?`, `requesterName?`, and `sourceUrl` is the link to the ticket. Salesforce and Attio (CRM sync) are not connected; that is a follow-up.
+
+**Sources** (`manageIntegrations`; custom tokens need `integrations:*`). `IntakeSource { id: isrc_…, provider, name, enabled, hasSecret, autoCreateCustomers, targetProjectId?, subdomain?, webhookUrl, lastReceivedAt?, createdAt, updatedAt }`. The secret is AES-GCM encrypted like other integration secrets (aad `<id>:intake`) and never returned except where Trama generates it, once.
+- `GET /intake-sources`, `GET /intake-sources/:id`.
+- `POST /intake-sources { provider, name, autoCreateCustomers? (default true), targetProjectId?, subdomain? (Zendesk), secret? (providers that issue their own), enabled? }` → `{ source, secret? }`. `email` and `generic` sources get a generated `whsec_…` secret (in the response once); Intercom, Zendesk, Front and Slack use the secret the provider issues: send it now or later with `PATCH`. Deliveries are refused (`401`) until a secret exists.
+- `PATCH /intake-sources/:id { name?, enabled?, autoCreateCustomers?, targetProjectId? (null clears), subdomain? (null clears), secret? }`; `DELETE` (`204`; its still-pending inbox items go with it, linked requests stay).
+- `POST /intake-sources/:id/rotate-secret` (email / generic only) → `{ source, secret }`.
+- `POST /intake-sources/:id/test` is a dry run: a sample delivery signed with the stored secret passes the real verification, parsing and customer matching, and the result says what would happen (`request`, `customer` or `wouldCreate`, `inbox`). Nothing is saved.
+
+**Webhook** `POST /api/webhooks/intake/:sourceId` (public; raw body kept for the HMAC; `x-www-form-urlencoded` accepted for Slack). The workspace is the source's; a `workspaceId` in the payload is ignored. Signature per provider, timing-safe:
+| Source | Header(s) | Signed |
+|---|---|---|
+| Intercom | `X-Hub-Signature: sha1=<hex>` | HMAC-SHA1 of the body, key = app client secret. Topic `conversation.user.created` (or `.contact.created`); `ping` answers pong |
+| Zendesk | `X-Zendesk-Webhook-Signature` + `…-Timestamp` | base64 HMAC-SHA256 of `timestamp + body`, within 10 minutes. Trigger body template: `{"ticket_id":"{{ticket.id}}","subject":"{{ticket.title}}","description":"{{ticket.description}}","requester_email":"{{ticket.requester.email}}","requester_name":"{{ticket.requester.name}}"}`; event-style payloads (`zen:event-type:ticket.created`) work but carry no email, so they wait in the inbox |
+| Front | `X-Front-Signature` + `X-Front-Request-Timestamp` | base64 HMAC-SHA256 of `timestamp:body` (ms), within 10 minutes. `inbound_received`; keyed by the conversation id |
+| Slack | `X-Slack-Signature: v0=<hex>` + `X-Slack-Request-Timestamp` | HMAC-SHA256 of `v0:timestamp:body`, within 5 minutes. Slash command `/customer-request [email] text`; answers an ephemeral message |
+| Email forward | `X-Trama-Signature`, `Authorization: Bearer <secret>`, or HTTP Basic with the secret as password (Postmark inbound URL credentials) | Parsed-email JSON: Postmark's `From`, `FromName`, `FromFull`, `Subject`, `TextBody`/`HtmlBody`, `MessageID`, or `from`, `fromName`, `subject`, `text`, `html`, `messageId` |
+| Signed webhook | same as email | `{ externalId, body, subject?, externalUrl?, requesterEmail?, requesterName?, issueKey? }`; `issueKey` (e.g. `BUG-42`, resolved in the source's workspace) attaches straight to that issue |
+`X-Trama-Signature` is `sha256=<hex HMAC-SHA256 of the raw body with the secret>`. Results: `200 { status: 'processed', itemId, linked, customerId? }`, `200 { status: 'duplicate' }`, `200 { status: 'pong' }`, `202 { status: 'ignored', reason }` (other topic, disabled source), `400` malformed payload, `401` missing / wrong signature or no secret, `404` unknown source, `429` rate limit.
+
+**Matching and idempotency.** The sender's email domain is matched against `Customer.domains` of that workspace only (exact, then parent domains: `jane@eu.acme.com` reaches `acme.com`). Mailbox providers (gmail.com, outlook.com…) never match and never create a customer. With `autoCreateCustomers` and no match, a `prospect` customer named after the company domain is created (by the system actor); a concurrent creation of the same domain falls back to the match. `(sourceId, externalId)` is unique, so the same ticket twice (a redelivery, a second message of a Front conversation) records once. A request from a known customer is attached to the source's `targetProjectId`, or to `issueKey`, as a customer request created by the system actor (event `customer_request.linked`, followers are notified); everything else is `pending` in the inbox.
+
+**Inbox** (`/customer-intake`; read for members, writes need `manageCustomers`). `IntakeItem { id: cin_…, sourceId, provider, externalId, externalUrl?, requesterEmail?, requesterName?, subject?, body, status: pending|linked|dismissed, customerId?, issueId?, projectId?, customerRequestId?, receivedAt, resolvedAt? }`.
+- `GET /customer-intake?status=pending|linked|dismissed|all&limit` (default `pending`, newest first), `GET /customer-intake/count` → `{ pending }`.
+- `POST /customer-intake/:id/link { issueId | projectId, customerId?, createCustomer?, customerName?, important? }` creates the customer request (with provenance and `sourceUrl`) and marks the item `linked`. Without a matched customer send `customerId` or `createCustomer` (from the sender's company domain; `400` for mailbox providers). `409` when the item is no longer pending (two people linking at once create one request).
+- `POST /customer-intake/:id/dismiss`, `POST /customer-intake/:id/restore`.
 
 #### Demand in saved views
 Issue and project views can filter and sort on `customerId`, `customerTierId` (ids, `in`/`is`/…) and the numbers `customerCount`, `requestCount`, `importantCount`, `customerRevenue`, `customerSize` with the operators `gte` and `lte` (a number as the value). They are derived from customer requests, never stored. A public (link) view can filter and sort on them but never groups by them, and nothing about a customer is returned.

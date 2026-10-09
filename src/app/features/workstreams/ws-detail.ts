@@ -1,7 +1,7 @@
 // `/:slug/workstreams/:key` — one outcome: hexagon status, key, editable title, quick property
 // chips, the "why this status" popover and tabs (overview, issues, artifacts, decisions, graph,
 // activity, agent context, statistics). Keyboard: s p a t (properties), i / ⇧I (link / new issue),
-// d (dependency), q (question), e (title), ⌘. ⌘⇧C ⇧O ⌘⌫ (copy key / link, Delta, delete), 1-8 tabs.
+// d (dependency), q (question), e (title), ⌘. ⌘⇧L ⇧O ⌘⌫ (copy key / link, Delta, delete), 1-8 tabs.
 import { ProviderIcon } from '../../shared/provider-icon';
 import {
   ChangeDetectionStrategy,
@@ -137,7 +137,7 @@ const TAB_LABEL: Record<Tab, string> = {
           variant="ghost"
           class="text-muted-foreground"
           aria-label="Copy link"
-          hlmTooltip="Copy link (⌘⇧C)"
+          hlmTooltip="Copy link (⌘⇧L)"
           position="bottom"
           (click)="actions.copyLink([w])"
         >
@@ -578,7 +578,7 @@ export class WorkstreamDetailPage {
       run: () => this.actions.copyKey([this.ws()!]),
     },
     {
-      keys: 'mod+shift+c',
+      keys: 'mod+shift+l',
       label: 'Copy link',
       when: this.has,
       run: () => this.actions.copyLink([this.ws()!]),
