@@ -427,10 +427,40 @@ export type WorkstreamStatus =
 export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
+
+/**
+ * Why a workstream is not (yet) a finished outcome. Computed by the server; clients show it and
+ * never re-derive it. `shipped` (derived) means no gaps.
+ * - `no_criteria`: nothing defines "done" yet (add at least one acceptance criterion).
+ * - `criteria_pending`: some criterion is not `met`.
+ * - `blocked`: a failing/conflicting open PR or an unresolved dependency.
+ * - `needs_input`: an open input request or a proposed decision waits on a person.
+ * - `no_delivery`: no merged/released/deployed work and not every linked issue is done.
+ */
+export type CompletionGap = 'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
+export interface WorkstreamCompletion {
+  /** True when the outcome is achieved by the facts (ignores any manual `statusOverride`). */
+  achieved: boolean;
+  gaps: CompletionGap[];
+}
+/** Proof attached to a criterion. Artifacts must belong to the same workstream. */
+export interface CriterionEvidence {
+  artifactIds: ID[];
+  /** Short free-text verification (e.g. "checked manually on staging"). */
+  note?: string;
+}
 export interface AcceptanceCriterion {
   id: ID;
   text: string;
   state: CriterionState;
+  /**
+   * Optional proof. Signalled, never required: a `met` criterion without evidence is shown as
+   * "no proof", not rejected. Linking an artifact (a PR, say) never changes `state`.
+   */
+  evidence?: CriterionEvidence;
+  /** Who set the criterion to `met` (user or agent). Set by the server, cleared when it leaves `met`. */
+  verifiedBy?: ActorRef;
+  verifiedAt?: ISODate;
 }
 
 export interface Workstream {
@@ -471,6 +501,14 @@ export interface Workstream {
    * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
    */
   delivery: DeliveryState;
+  /** Whether the outcome is achieved and what is missing, computed from the facts (not from the override). */
+  completion: WorkstreamCompletion;
+  /**
+   * Set once by a migration on workstreams that were already `shipped` with no acceptance criteria
+   * when "no criteria never ships" was introduced. They keep shipping; everything else needs a criterion.
+   */
+  legacyShipped?: boolean;
+  /** A manual pin. When set, `status` is this value and `derivedStatus` is what the facts say. */
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;

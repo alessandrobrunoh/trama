@@ -320,7 +320,10 @@ export interface CriterionInput {
   text: string;
   state?: CriterionState;
 }
-export type CriterionPatch = Partial<CriterionInput>;
+export interface CriterionPatch extends Partial<CriterionInput> {
+  /** Proof for the criterion; `null` clears it. Never changes the state. */
+  evidence?: { artifactIds?: ID[]; note?: string | null } | null;
+}
 
 // ───── input requests ─────
 export interface CreateInputRequestInput {

@@ -230,6 +230,28 @@ function definedOnly<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
 }
 
+/** Optimistic view of a criterion edit; mirrors the server rules (verification and proof follow the state and text). */
+function previewCriterion(c: AcceptanceCriterion, patch: CriterionPatch): AcceptanceCriterion {
+  const { evidence, ...rest } = patch;
+  const next: AcceptanceCriterion = { ...c, ...rest };
+  if (rest.text !== undefined) next.text = rest.text.trim();
+  if (next.text !== c.text && c.state === 'met' && rest.state === undefined) {
+    next.state = 'pending';
+    delete next.evidence;
+  }
+  if (next.state !== 'met') {
+    delete next.verifiedBy;
+    delete next.verifiedAt;
+  }
+  if (evidence !== undefined) {
+    const ids = [...new Set(evidence?.artifactIds ?? [])];
+    const note = evidence?.note?.trim();
+    if (ids.length || note) next.evidence = { artifactIds: ids, ...(note ? { note } : {}) };
+    else delete next.evidence;
+  }
+  return next;
+}
+
 @Injectable({ providedIn: 'root' })
 export class NablaStore {
   private readonly api = inject(ApiClient);
@@ -1093,9 +1115,16 @@ export class NablaStore {
     if (!ws) return false;
     const tx = this.tx();
     tx.patch(this._workstreams, ws.id, {
-      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? { ...c, ...patch } : c)),
+      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? previewCriterion(c, patch) : c)),
     });
-    return this.ok('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), { tx });
+    // The server stamps who verified a `met` criterion, so take its answer back.
+    return this.write('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), {
+      tx,
+      onResult: (res) => {
+        const r = res as Rec | null;
+        if (r && Array.isArray(r['acceptanceCriteria'])) this.upsert(this._workstreams, r as unknown as Workstream);
+      },
+    }).then((r) => r !== undefined);
   }
 
   async removeCriterion(ref: string, criterionId: ID): Promise<boolean> {

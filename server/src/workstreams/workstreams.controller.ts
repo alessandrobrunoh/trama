@@ -63,9 +63,17 @@ export class CriterionDto {
   @IsOptional() @IsIn(CRITERION_STATES) state?: CriterionState;
 }
 
+class CriterionEvidenceDto {
+  /** Artifacts of this workstream that prove the criterion (checked in the service). */
+  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) artifactIds?: string[];
+  @Clearable() @IsString() @MaxLength(500) note?: string | null;
+}
+
 class UpdateCriterionDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(500) text?: string;
   @OptionalNotNull() @IsIn(CRITERION_STATES) state?: CriterionState;
+  /** Proof for the criterion; `null` clears it. Never changes `state`. */
+  @Clearable() @ValidateNested() @Type(() => CriterionEvidenceDto) evidence?: CriterionEvidenceDto | null;
 }
 
 export class CreateWorkstreamDto {
