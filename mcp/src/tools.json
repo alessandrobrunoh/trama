@@ -929,11 +929,14 @@
   "method": "GET",
   "path": "/customers",
   "permission": "customers:read",
-  "description": "Companies whose feedback is linked to issues. Archived customers are hidden unless archived=true or archived=all.",
+  "description": "Companies that asked for things (customers), with domains, logo, revenue, size, tier and status. Archived customers are hidden unless archived=true or archived=all.",
   "params": {
    "archived": "query string(true|false|all) true = only archived, all = both, otherwise active",
-   "issueId": "query string Only customers linked to this issue",
-   "q": "query string Name or domain"
+   "issueId": "query string Only customers with a request on this issue",
+   "projectId": "query string Only customers with a request on this project",
+   "tierId": "query string Only customers of this tier (workspace.settings.customerTiers id)",
+   "status": "query string(prospect|active|churned) Customer status",
+   "q": "query string Name or any domain"
   }
  },
  {
@@ -941,7 +944,7 @@
   "method": "GET",
   "path": "/customers/{id}",
   "permission": "customers:read",
-  "description": "One customer, archived or not.",
+  "description": "One customer (company), archived or not.",
   "params": {
    "id": "path string! Customer id"
   }
@@ -951,10 +954,16 @@
   "method": "POST",
   "path": "/customers",
   "permission": "customers:write",
-  "description": "Create a customer. Domain is normalized (lower-case, no scheme or www) and unique in the workspace.",
+  "description": "Create a customer (a company). Domains are normalized (lower-case, no scheme or www), the first is the primary, and none may belong to another customer of the workspace (409). Send domains or domain. tierId must be a tier from get_workspace settings.customerTiers.",
   "params": {
    "name": "body string! Customer name",
-   "domain": "body string! Domain, e.g. acme.com or https://www.acme.com"
+   "domains": "body string[] Domains, primary first (1-20), e.g. [\"acme.com\",\"acme.io\"]",
+   "domain": "body string Single domain; use domains for several",
+   "logoUrl": "body string http(s) URL of the logo",
+   "revenue": "body integer Annual revenue, whole number >= 0 (workspace currency)",
+   "size": "body integer Company size in people, whole number >= 0",
+   "tierId": "body string Customer tier id (settings.customerTiers)",
+   "status": "body string(prospect|active|churned) Default active"
   }
  },
  {
@@ -962,11 +971,17 @@
   "method": "PATCH",
   "path": "/customers/{id}",
   "permission": "customers:write",
-  "description": "Rename, change the domain, or archive/restore a customer. Archiving keeps the links and the issues.",
+  "description": "Edit a customer: name, domains (replaces the list), domain (replaces only the primary), logoUrl, revenue, size, tierId, status, or archive/restore it. null clears logoUrl, revenue, size and tierId. Archiving keeps requests and issues.",
   "params": {
    "id": "path string! Customer id",
    "name": "body string Name",
-   "domain": "body string Domain",
+   "domains": "body string[] Replaces all domains, primary first (1-20)",
+   "domain": "body string Replaces the primary domain, keeps the others",
+   "logoUrl": "body string http(s) logo URL, null clears",
+   "revenue": "body integer Annual revenue >= 0, null clears",
+   "size": "body integer Company size >= 0, null clears",
+   "tierId": "body string Customer tier id, null clears",
+   "status": "body string(prospect|active|churned) Status",
    "archived": "body boolean true archives, false restores"
   }
  },
@@ -975,7 +990,7 @@
   "method": "DELETE",
   "path": "/customers/{id}",
   "permission": "customers:delete",
-  "description": "Delete a customer and its links. Issues are kept.",
+  "description": "Delete a customer and its requests. Issues and projects are kept.",
   "params": {
    "id": "path string! Customer id"
   }
@@ -985,7 +1000,7 @@
   "method": "GET",
   "path": "/customers/{id}/requests",
   "permission": "customers:read",
-  "description": "Feedback linking this customer to issues, newest first, with each issue's key, title and status.",
+  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl), each with its issue (key, title, status) or project (name, status).",
   "params": {
    "id": "path string! Customer id"
   }
@@ -995,11 +1010,41 @@
   "method": "POST",
   "path": "/customers/{id}/requests",
   "permission": "customers:write",
-  "description": "Link a customer to an existing issue. The same pair cannot be linked twice (409).",
+  "description": "Record what a customer asked for, on exactly one issue (issueId) or one project (projectId). body is markdown, sourceUrl an http(s) link to the ticket or thread. A customer can have several requests on one issue.",
   "params": {
    "id": "path string! Customer id",
-   "issueId": "body string! Issue id",
-   "body": "body string Optional note"
+   "issueId": "body string Issue id (exactly one of issueId / projectId)",
+   "projectId": "body string Project id (exactly one of issueId / projectId)",
+   "body": "body string Markdown: what the customer asked for",
+   "important": "body boolean Flag the request as important (default false)",
+   "sourceUrl": "body string http(s) URL of the source ticket, email thread or call notes"
+  }
+ },
+ {
+  "name": "update_customer_request",
+  "method": "PATCH",
+  "path": "/customers/{id}/requests/{requestId}",
+  "permission": "customers:write",
+  "description": "Edit a customer request: markdown body, important flag, sourceUrl. null clears body and sourceUrl.",
+  "params": {
+   "id": "path string! Customer id",
+   "requestId": "path string! Customer request id",
+   "body": "body string Markdown body, null clears",
+   "important": "body boolean Important flag",
+   "sourceUrl": "body string http(s) source URL, null clears"
+  }
+ },
+ {
+  "name": "find_customer_requests",
+  "method": "GET",
+  "path": "/customer-requests",
+  "permission": "customers:read",
+  "description": "Customer requests across customers, newest first, in full. Filter by customer, issue, project or importance to see what is asked on an issue or project.",
+  "params": {
+   "customerId": "query string Only this customer",
+   "issueId": "query string Only requests on this issue",
+   "projectId": "query string Only requests on this project",
+   "important": "query string(true|false) Only important (true) or not (false)"
   }
  },
  {
@@ -1007,7 +1052,7 @@
   "method": "POST",
   "path": "/customers/{id}/requests/{requestId}/unlink",
   "permission": "customers:write",
-  "description": "Unlink a customer from an issue. The issue is kept.",
+  "description": "Delete a customer request. The issue or project is kept.",
   "params": {
    "id": "path string! Customer id",
    "requestId": "path string! Customer request id"

@@ -13,6 +13,8 @@ import {
   WorkstreamEntity,
 } from '../database/entities/index.js';
 import { AccessGuard } from './access.guard.js';
+import { CustomerTiersController } from './customer-tiers.controller.js';
+import { CustomerTiersService } from './customer-tiers.service.js';
 import { LabelsController } from './labels.controller.js';
 import { LabelsService } from './labels.service.js';
 import { PermissionsService } from './permissions.service.js';
@@ -47,10 +49,12 @@ import { WorkspacesService } from './workspaces.service.js';
     AgentsController,
     TokensController,
     LabelsController,
+    CustomerTiersController,
   ],
   providers: [
     WorkspacesService,
     LabelsService,
+    CustomerTiersService,
     PermissionsService,
     { provide: APP_GUARD, useClass: AccessGuard },
   ],

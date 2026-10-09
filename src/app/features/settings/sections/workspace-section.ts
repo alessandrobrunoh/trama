@@ -3,7 +3,7 @@ import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
-import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type WorkspaceLabel } from '../../../core/contracts/domain';
+import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type WorkspaceLabel, type CustomerTier } from '../../../core/contracts/domain';
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
@@ -247,6 +247,48 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       }
     </app-settings-group>
 
+    <app-settings-group title="Customer tiers" description="Tiers you use to rank customers, for example Enterprise, Growth or Free. Assign one on each customer. Removing a tier leaves its customers without one.">
+      @for (tier of tiers(); track tier.id) {
+        <div class="flex items-center gap-2 border-t px-4 py-2 first:border-t-0">
+          <span class="flex items-center gap-1" role="radiogroup" [attr.aria-label]="tier.name + ' color'">
+            @for (swatch of swatchList; track swatch) {
+              <button
+                type="button"
+                role="radio"
+                class="size-4 rounded-full border-2 disabled:opacity-50"
+                [style.background]="swatch"
+                [class]="tier.color === swatch ? 'border-foreground' : 'border-transparent'"
+                [attr.aria-checked]="tier.color === swatch"
+                [attr.aria-label]="swatch"
+                [disabled]="!canAdmin() || savingTier()"
+                (click)="recolorTier(tier, swatch)"
+              ></button>
+            }
+          </span>
+          <input
+            hlmInput
+            class="h-8 min-w-0 flex-1 text-[13px]"
+            maxlength="40"
+            [value]="tier.name"
+            [disabled]="!canAdmin() || savingTier()"
+            [attr.aria-label]="'Rename ' + tier.name"
+            (change)="renameTier(tier, $any($event.target).value)"
+          />
+          <button type="button" class="text-muted-foreground hover:text-destructive text-xs" [disabled]="!canAdmin() || savingTier()" (click)="removeTier(tier)">Remove</button>
+        </div>
+      } @empty {
+        <div class="text-muted-foreground px-4 py-2 text-xs">No tiers yet.</div>
+      }
+      @if (canAdmin()) {
+        <form class="flex items-center gap-2 border-t px-4 py-2" (submit)="addTier($event)">
+          <input hlmInput class="h-8 min-w-0 flex-1 text-[13px]" maxlength="40" placeholder="New tier" aria-label="New customer tier" [value]="newTier()" [disabled]="savingTier()" (input)="newTier.set($any($event.target).value)" />
+          <button hlmBtn type="submit" size="sm" [disabled]="!newTier().trim() || savingTier()">Add</button>
+        </form>
+      } @else {
+        <div class="text-muted-foreground border-t px-4 py-2 text-xs">Only admins and owners can change customer tiers.</div>
+      }
+    </app-settings-group>
+
     <app-settings-group title="Danger zone">
       <app-settings-row
         label="Delete workspace"
@@ -285,6 +327,9 @@ export class WorkspaceSection {
   protected readonly savingFeature = signal(false);
   protected readonly savingLabel = signal(false);
   protected readonly newLabel = signal('');
+  protected readonly savingTier = signal(false);
+  protected readonly newTier = signal('');
+  protected readonly tiers = computed(() => this.store.settings().customerTiers);
   protected readonly swatchList = LABEL_SWATCHES;
   protected readonly catalog = computed(() => this.store.settings().labels);
   protected readonly scale = computed(() => this.store.estimateScale());
@@ -448,6 +493,44 @@ export class WorkspaceSection {
     if (ok) {
       this.newLabel.set('');
       this.notify.success('Label added');
+    }
+  }
+
+  protected async recolorTier(tier: CustomerTier, color: string): Promise<void> {
+    if (!this.canAdmin() || tier.color === color || this.savingTier()) return;
+    this.savingTier.set(true);
+    const ok = await this.store.updateCustomerTier(tier.id, { color });
+    this.savingTier.set(false);
+    if (ok) this.notify.success('Tier updated');
+  }
+
+  protected async renameTier(tier: CustomerTier, value: string): Promise<void> {
+    const name = value.trim();
+    if (!this.canAdmin() || !name || name === tier.name || this.savingTier()) return;
+    this.savingTier.set(true);
+    const ok = await this.store.updateCustomerTier(tier.id, { name });
+    this.savingTier.set(false);
+    if (ok) this.notify.success('Tier updated');
+  }
+
+  protected async removeTier(tier: CustomerTier): Promise<void> {
+    if (!this.canAdmin() || this.savingTier()) return;
+    this.savingTier.set(true);
+    const ok = await this.store.deleteCustomerTier(tier.id);
+    this.savingTier.set(false);
+    if (ok) this.notify.success('Tier removed');
+  }
+
+  protected async addTier(event: Event): Promise<void> {
+    event.preventDefault();
+    const name = this.newTier().trim();
+    if (!this.canAdmin() || !name || this.savingTier()) return;
+    this.savingTier.set(true);
+    const ok = await this.store.createCustomerTier({ name });
+    this.savingTier.set(false);
+    if (ok) {
+      this.newTier.set('');
+      this.notify.success('Tier added');
     }
   }
 

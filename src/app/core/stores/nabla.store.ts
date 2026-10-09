@@ -24,7 +24,10 @@ import type {
   CreateInputRequestInput,
   CreateCustomerInput,
   CreateIssueInput,
-  LinkCustomerInput,
+  CreateCustomerRequestInput,
+  CreateCustomerTierInput,
+  UpdateCustomerRequestInput,
+  UpdateCustomerTierInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
   CreateIntegrationInput,
@@ -1253,17 +1256,30 @@ export class NablaStore {
     return this.ok('delete customer', (s) => this.api.customers.remove(s, id), { tx });
   }
 
-  async linkCustomer(customerId: ID, input: LinkCustomerInput): Promise<CustomerRequest | undefined> {
+  /** Records what a customer asked for, on one issue or one project. */
+  async createCustomerRequest(customerId: ID, input: CreateCustomerRequestInput): Promise<CustomerRequest | undefined> {
     if (!this.customerById().has(customerId)) return undefined;
-    return this.write('link customer', (s) => this.api.customers.link(s, customerId, input), {
+    return this.write('add customer request', (s) => this.api.customers.createRequest(s, customerId, input), {
       onResult: (r) => this.upsert(this._customerRequests, r),
     });
   }
 
-  async unlinkCustomer(customerId: ID, requestId: ID): Promise<boolean> {
+  /** Edits the body / source or toggles `important`; the change shows at once and rolls back on failure. */
+  async updateCustomerRequest(customerId: ID, requestId: ID, patch: UpdateCustomerRequestInput): Promise<boolean> {
+    const current = this._customerRequests().find((r) => r.id === requestId);
+    if (!current) return false;
+    const tx = this.tx();
+    tx.patch(this._customerRequests, requestId, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update customer request', (s) => this.api.customers.updateRequest(s, customerId, requestId, patch), {
+      tx,
+      onResult: (r) => this.upsert(this._customerRequests, r),
+    }).then((r) => !!r);
+  }
+
+  async deleteCustomerRequest(customerId: ID, requestId: ID): Promise<boolean> {
     const tx = this.tx();
     tx.remove(this._customerRequests, requestId);
-    return this.ok('unlink customer', (s) => this.api.customers.unlink(s, customerId, requestId), { tx });
+    return this.ok('delete customer request', (s) => this.api.customers.removeRequest(s, customerId, requestId), { tx });
   }
 
   // ─────────────────────────── milestones ───────────────────────────
@@ -1698,6 +1714,7 @@ export class NablaStore {
     const tx = this.tx();
     tx.remove(this._projects, id);
     for (const a of this._artifacts().filter((x) => x.projectId === id && !x.workstreamId && !x.issueId)) tx.remove(this._artifacts, a.id);
+    for (const r of this._customerRequests().filter((x) => x.projectId === id)) tx.remove(this._customerRequests, r.id);
     this.dropProjectData(id);
     // its milestones go with it, and its workstreams are detached
     this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
@@ -2069,6 +2086,30 @@ export class NablaStore {
   /** Remove a custom label and every assignment of it (admin). */
   async deleteLabel(id: ID): Promise<boolean> {
     return this.write('remove label', (s) => this.api.workspaces.deleteLabel(s, id), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Add a customer tier (admin). */
+  async createCustomerTier(input: CreateCustomerTierInput): Promise<boolean> {
+    return this.write('add customer tier', (s) => this.api.workspaces.createCustomerTier(s, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Rename or recolor a customer tier (admin). */
+  async updateCustomerTier(id: ID, input: UpdateCustomerTierInput): Promise<boolean> {
+    return this.write('update customer tier', (s) => this.api.workspaces.updateCustomerTier(s, id, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Remove a customer tier; customers that had it are left without one (admin). */
+  async deleteCustomerTier(id: ID): Promise<boolean> {
+    const tx = this.tx();
+    for (const c of this._customers().filter((x) => x.tierId === id)) tx.patch(this._customers, c.id, { tierId: undefined });
+    return this.write('remove customer tier', (s) => this.api.workspaces.deleteCustomerTier(s, id), {
+      tx,
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }

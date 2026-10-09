@@ -72,7 +72,10 @@ import type {
   UpdateInputRequestInput,
   CreateCustomerInput,
   CreateIssueInput,
-  LinkCustomerInput,
+  CreateCustomerRequestInput,
+  CreateCustomerTierInput,
+  UpdateCustomerRequestInput,
+  UpdateCustomerTierInput,
   CreateIntegrationInput,
   IntegrationDetail,
   IntegrationWithWebhook,
@@ -220,6 +223,11 @@ export class ApiClient {
     createLabel: (slug: string, input: CreateLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels`, input),
     updateLabel: (slug: string, id: ID, input: UpdateLabelInput) => this.patch<Workspace>(`${this.w(slug)}/labels/${id}`, input),
     deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
+    createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
+      this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),
+    updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
+      this.patch<Workspace>(`${this.w(slug)}/customer-tiers/${id}`, input),
+    deleteCustomerTier: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
     /** Owner only. */
     remove: (slug: string) => this.del(this.w(slug)),
     /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
@@ -335,9 +343,11 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/customers/${id}`),
     requests: (slug: string, id: ID) =>
       this.get<CustomerRequest[]>(`${this.w(slug)}/customers/${id}/requests`),
-    link: (slug: string, id: ID, input: LinkCustomerInput) =>
+    createRequest: (slug: string, id: ID, input: CreateCustomerRequestInput) =>
       this.post<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests`, input),
-    unlink: (slug: string, id: ID, requestId: ID) =>
+    updateRequest: (slug: string, id: ID, requestId: ID, input: UpdateCustomerRequestInput) =>
+      this.patch<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests/${requestId}`, input),
+    removeRequest: (slug: string, id: ID, requestId: ID) =>
       this.post<void>(`${this.w(slug)}/customers/${id}/requests/${requestId}/unlink`),
   };
 
