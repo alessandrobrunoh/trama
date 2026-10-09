@@ -162,3 +162,19 @@ describe('workstreams without criteria (completion rule)', () => {
     expect(ws['B'].status).toBe('shipped');
   });
 });
+
+describe('linking delivery never touches criteria', () => {
+  it('a merged PR leaves every criterion (state, verification, evidence) as it was', async () => {
+    const { ws, svc } = setup(['A'], [], 'working');
+    const criteria = [
+      { id: 'c1', text: 'a', state: 'pending' },
+      { id: 'c2', text: 'b', state: 'met', verifiedBy: { type: 'agent', id: 'agt_1' }, verifiedAt: '2026-01-01T00:00:00.000Z' },
+    ];
+    ws['A'].acceptanceCriteria = structuredClone(criteria);
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].delivery).toBe('merged');
+    expect(ws['A'].acceptanceCriteria).toEqual(criteria);
+    expect(ws['A'].status).toBe('working');
+    expect(ws['A'].completion).toEqual({ achieved: false, gaps: ['criteria_pending'] });
+  });
+});

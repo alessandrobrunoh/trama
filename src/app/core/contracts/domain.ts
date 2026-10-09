@@ -439,10 +439,24 @@ export interface WorkstreamCompletion {
   achieved: boolean;
   gaps: CompletionGap[];
 }
+/** Proof attached to a criterion. Artifacts must belong to the same workstream. */
+export interface CriterionEvidence {
+  artifactIds: ID[];
+  /** Short free-text verification (e.g. "checked manually on staging"). */
+  note?: string;
+}
 export interface AcceptanceCriterion {
   id: ID;
   text: string;
   state: CriterionState;
+  /**
+   * Optional proof. Signalled, never required: a `met` criterion without evidence is shown as
+   * "no proof", not rejected. Linking an artifact (a PR, say) never changes `state`.
+   */
+  evidence?: CriterionEvidence;
+  /** Who set the criterion to `met` (user or agent). Set by the server, cleared when it leaves `met`. */
+  verifiedBy?: ActorRef;
+  verifiedAt?: ISODate;
 }
 
 export interface Workstream {

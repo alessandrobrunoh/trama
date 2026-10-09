@@ -26,7 +26,24 @@ export const GAP_TEXT: Record<CompletionGap, string> = {
   needs_input: 'waiting on a person (open input request or proposed decision)',
   no_delivery: 'no delivery yet (merged PR, release or deployment, or every issue done)',
 };
+/** " _(declared by Claude (agent) on 2026-10-09; proof: PR #12; note)_" or " _(met without proof)_". */
+function criterionProof(a: AgentCriterion): string {
+  const proof = (a.evidenceArtifacts ?? []).map((e) => `${e.kind.replace('_', ' ')}${e.externalId ? ` ${e.externalId}` : ''} ${e.title}`);
+  if (a.evidence?.note) proof.push(a.evidence.note);
+  const isUser = a.verifiedBy?.type === 'user';
+  const by = a.verifiedBy
+    ? `${isUser ? 'verified' : 'declared'} by ${a.verifiedByName ?? a.verifiedBy.type}${isUser ? '' : ` (${a.verifiedBy.type})`}${a.verifiedAt ? ` on ${a.verifiedAt.slice(0, 10)}` : ''}`
+    : '';
+  if (!proof.length) return ` _(${[by, 'met without proof'].filter(Boolean).join('; ')})_`;
+  return ` _(${[by, `proof: ${proof.join('; ')}`].filter(Boolean).join('; ')})_`;
+}
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v));
+
+/** A criterion as the briefing shows it: who vouched for `met`, and the proof, resolved to names. */
+export type AgentCriterion = AcceptanceCriterion & {
+  verifiedByName?: string;
+  evidenceArtifacts?: { kind: ArtifactKind; title: string; externalId?: string }[];
+};
 
 export interface AgentContext {
   key: string;
@@ -48,7 +65,7 @@ export interface AgentContext {
   objective: string;
   context?: string;
   deltaThreadUrl: string;
-  acceptanceCriteria: AcceptanceCriterion[];
+  acceptanceCriteria: AgentCriterion[];
   accountable?: string;
   teams: { owner: { key: string; name: string }; participating: { key: string; name: string }[] };
   repositories: { fullName: string; url: string; defaultBranch: string; provider: string }[];
@@ -174,7 +191,18 @@ export class AgentContextService {
       ...(ws.description ? { description: ws.description } : {}),
       deltaThreadUrl: ws.deltaThreadUrl,
       ...(ws.context ? { context: ws.context } : {}),
-      acceptanceCriteria: ws.acceptanceCriteria,
+      acceptanceCriteria: ws.acceptanceCriteria.map((c) => ({
+        ...c,
+        ...(c.verifiedBy ? { verifiedByName: nameOf(c.verifiedBy) } : {}),
+        ...(c.evidence?.artifactIds.length
+          ? {
+              evidenceArtifacts: c.evidence.artifactIds.flatMap((id) => {
+                const a = artifacts.find((x) => x.id === id);
+                return a ? [{ kind: a.kind, title: a.title, ...(a.externalId ? { externalId: a.externalId } : {}) }] : [];
+              }),
+            }
+          : {}),
+      })),
       ...(ws.accountableUserId && names.get(ws.accountableUserId) ? { accountable: names.get(ws.accountableUserId) } : {}),
       teams: {
         owner: { key: owner?.key ?? '', name: owner?.name ?? '' },
@@ -230,7 +258,7 @@ export class AgentContextService {
     section('Objective', [c.objective.trim() || '_No objective written yet._']);
     section(
       'Acceptance Criteria',
-      c.acceptanceCriteria.map((a) => `- [${a.state === 'met' ? 'x' : ' '}] ${a.text}${a.state === 'in_progress' ? ' _(in progress)_' : ''}`),
+      c.acceptanceCriteria.map((a) => `- [${a.state === 'met' ? 'x' : ' '}] ${a.text}${a.state === 'in_progress' ? ' _(in progress)_' : ''}${a.state === 'met' ? criterionProof(a) : ''}`),
     );
     if (c.context?.trim()) section('Context', [c.context.trim()]);
     section('Repositories', c.repositories.map((r) => `- ${r.fullName} — ${r.url} (default branch: ${r.defaultBranch})`));

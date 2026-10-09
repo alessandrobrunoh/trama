@@ -41,4 +41,26 @@ describe('agent briefing completion', () => {
     const md = AgentContextService.toMarkdown(ctx({ status: 'shipped', statusOverride: 'shipped', derivedStatus: 'working' }));
     expect(md).toContain('Outcome status: shipped (pinned manually; the facts say working)');
   });
+
+  it('shows who vouched for a met criterion and its proof, or that it has none', () => {
+    const md = AgentContextService.toMarkdown(
+      ctx({
+        acceptanceCriteria: [
+          {
+            id: 'a1', text: 'Login works', state: 'met',
+            verifiedBy: { type: 'agent', id: 'agt_1' }, verifiedByName: 'Claude', verifiedAt: '2026-10-09T10:00:00.000Z',
+            evidence: { artifactIds: ['art_1'], note: 'tested on staging' },
+            evidenceArtifacts: [{ kind: 'pull_request', title: 'Fix login', externalId: '#12' }],
+          },
+          { id: 'a2', text: 'Logout works', state: 'met', verifiedBy: { type: 'user', id: 'usr_1' }, verifiedByName: 'Ann' },
+          { id: 'a3', text: 'Legacy', state: 'met' },
+          { id: 'a4', text: 'Open', state: 'pending' },
+        ],
+      }),
+    );
+    expect(md).toContain('- [x] Login works _(declared by Claude (agent) on 2026-10-09; proof: pull request #12 Fix login; tested on staging)_');
+    expect(md).toContain('- [x] Logout works _(verified by Ann; met without proof)_');
+    expect(md).toContain('- [x] Legacy _(met without proof)_');
+    expect(md).toContain('- [ ] Open\n');
+  });
 });

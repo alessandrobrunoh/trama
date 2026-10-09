@@ -500,12 +500,13 @@
   "method": "PATCH",
   "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
   "permission": "workstreams:write",
-  "description": "Update an acceptance criterion.",
+  "description": "Update an acceptance criterion: text, state, and the evidence that proves it.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
    "criterionId": "path string! Criterion id",
-   "text": "body string Text",
-   "state": "body string(pending|in_progress|met) State"
+   "text": "body string Text (editing a met criterion resets it to pending)",
+   "state": "body string(pending|in_progress|met) State (met records who verified it; a person or an agent)",
+   "evidence": "body object {artifactIds?: [artifact ids of this workstream], note?: string} Proof for the criterion (null clears). Does not change state"
   }
  },
  {
