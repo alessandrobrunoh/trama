@@ -299,24 +299,25 @@
   --card-foreground: #1b1c1f;
   --popover: #ffffff;
   --popover-foreground: #1b1c1f;
-  --primary: #b5583a;
+  --primary: #ad5235; /* white text on it: 5.2:1 */
+  --primary-text: #ad5235;
   --primary-foreground: #ffffff;
   --secondary: #f3f3f5;
   --secondary-foreground: #26272b;
   --muted: #f5f5f7;
-  --muted-foreground: #6c6e75;
+  --muted-foreground: #62646b; /* 5.4:1 on the sidebar, 5.2:1 on accent: AA for small text everywhere */
   --accent: #efeff2;
   --accent-foreground: #1b1c1f;
-  --destructive: #d93f3f;
+  --destructive: #c93535;
   --border: #e8e8ec;
-  --border-strong: #dcdce1;
-  --input: #dddde2;
-  --ring: #b5583a;
+  --border-strong: #d6d6dc;
+  --input: #cfcfd6;
+  --ring: #ad5235;
   /* Faint row hover / selected fills */
   --hover: rgb(18 19 24 / 0.035);
   --selected: color-mix(in oklab, var(--primary) 8%, transparent);
 
-  --chart-1: #b5583a;
+  --chart-1: #ad5235;
   --chart-2: #2d9d8f;
   --chart-3: #d19a2a;
   --chart-4: #8a63d2;
@@ -324,27 +325,27 @@
 
   --sidebar: #f4f4f6;
   --sidebar-foreground: #3a3b40;
-  --sidebar-primary: #b5583a;
+  --sidebar-primary: #ad5235;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #e8e8ec;
   --sidebar-accent-foreground: #1b1c1f;
   --sidebar-border: #e3e3e8;
-  --sidebar-ring: #b5583a;
+  --sidebar-ring: #ad5235;
 
   --entity-workstream: #7c5cc4;
   --entity-decision: #b7791f;
-  --entity-issue: #6c6e75;
+  --entity-issue: #62646b;
 
   /* tones (the palette behind every status) */
-  --tone-neutral: #8b8d94;
-  --tone-slate: #6b7686;
-  --tone-blue: #4e7be8;
-  --tone-amber: #b7791f;
-  --tone-orange: #d0652f;
+  --tone-neutral: #747780;
+  --tone-slate: #5f6a7a;
+  --tone-blue: #3f6bd6;
+  --tone-amber: #9c6712;
+  --tone-orange: #bd5320;
   --tone-violet: #7c5cc4;
-  --tone-red: #d13f3f;
-  --tone-teal: #14867a;
-  --tone-green: #2f8a4f;
+  --tone-red: #c93535;
+  --tone-teal: #0f7a6f;
+  --tone-green: #28793f;
 
   --shadow-menu: 0 0 0 1px rgb(0 0 0 / 0.06), 0 8px 24px -4px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
   --shadow-panel: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04);
@@ -360,7 +361,8 @@
   --card-foreground: #e9eaee;
   --popover: #17181b;
   --popover-foreground: #e9eaee;
-  --primary: #c8643f;
+  --primary: #b95a3a; /* fill: white text 4.6:1 */
+  --primary-text: #e0845e; /* same hue as text and icons on dark surfaces: 6.4:1 */
   --primary-foreground: #ffffff;
   --secondary: #18191c;
   --secondary-foreground: #e9eaee;
@@ -369,14 +371,14 @@
   --accent: #1c1d21;
   --accent-foreground: #f4f5f7;
   --destructive: #eb5757;
-  --border: #1e1f23;
-  --border-strong: #2a2b30;
-  --input: #2a2b30;
-  --ring: #c8643f;
+  --border: #222327;
+  --border-strong: #2f3035;
+  --input: #34363c;
+  --ring: #d9714a;
   --hover: rgb(255 255 255 / 0.03);
   --selected: color-mix(in oklab, var(--primary) 12%, transparent);
 
-  --chart-1: #c8643f;
+  --chart-1: #d9714a;
   --chart-2: #46b8a8;
   --chart-3: #e0b04a;
   --chart-4: #a389e6;
@@ -384,18 +386,18 @@
 
   --sidebar: #08090a;
   --sidebar-foreground: #c9cbd1;
-  --sidebar-primary: #c8643f;
+  --sidebar-primary: #b95a3a;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #17181b;
   --sidebar-accent-foreground: #f4f5f7;
-  --sidebar-border: #17181b;
-  --sidebar-ring: #c8643f;
+  --sidebar-border: #1a1b1f;
+  --sidebar-ring: #d9714a;
 
   --entity-workstream: #a38bea;
   --entity-decision: #e0b04a;
   --entity-issue: #8a8f98;
 
-  --tone-neutral: #7d828b;
+  --tone-neutral: #868b94;
   --tone-slate: #8a9bb3;
   --tone-blue: #6b93f7;
   --tone-amber: #e0b04a;
@@ -466,6 +468,12 @@
 
   --shadow-md: var(--shadow-menu);
   --shadow-panel: var(--shadow-panel);
+
+  /* Motion: every `transition-*` utility shares one short, decelerating curve (Linear / Raycast feel). */
+  --default-transition-duration: 140ms;
+  --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
+  --ease-out: cubic-bezier(0.2, 0, 0, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
   --color-border-strong: var(--border-strong);
   --color-hover: var(--hover);
@@ -562,9 +570,23 @@
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklab, var(--muted-foreground) 35%, transparent) transparent;
   }
+  /* One focus ring for everything without its own (links, chips, rows, summary…): 2px accent,
+     offset so it never merges with the control's border. Components that draw a ring with
+     `outline-none` + `ring-*` keep theirs (utilities beat this base rule). */
   :focus-visible {
-    outline-color: color-mix(in oklab, var(--ring) 60%, transparent);
+    outline: 2px solid color-mix(in oklab, var(--ring) 75%, transparent);
+    outline-offset: 2px;
   }
+  /* Mouse and touch focus never shows a ring; only keyboard focus does. */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+}
+
+/* The accent as a fill needs white text (AA); as text on dark surfaces it needs a lighter shade.
+   Unlayered on purpose: it must win over the `text-primary` utility. */
+:root.dark .text-primary {
+  color: var(--primary-text);
 }
 
 /* Utilities available to every feature */
