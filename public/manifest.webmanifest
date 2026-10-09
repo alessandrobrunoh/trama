@@ -1,11 +1,79 @@
 {
-  "name": "Trama — Work for humans and agents",
+  "id": "/",
+  "name": "Trama \u2014 Work for humans and agents",
   "short_name": "Trama",
+  "description": "Issues, workstreams and decisions for teams of people and coding agents.",
+  "lang": "en",
+  "dir": "ltr",
   "display": "standalone",
-  "background_color": "#0e0f11",
-  "theme_color": "#08090b",
-  "scope": "./",
-  "start_url": "./",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "scope": "/",
+  "start_url": "/a/launch?source=pwa",
+  "categories": [
+    "productivity",
+    "business"
+  ],
+  "prefer_related_applications": false,
+  "shortcuts": [
+    {
+      "name": "My attention",
+      "short_name": "Attention",
+      "description": "Reviews, questions and blockers waiting on you",
+      "url": "/a/launch?go=attention&source=shortcut",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "My work",
+      "short_name": "My work",
+      "description": "Issues and workstreams assigned to you",
+      "url": "/a/launch?go=my-work&source=shortcut",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "New issue",
+      "short_name": "New issue",
+      "description": "Report a bug, request or incident",
+      "url": "/a/launch?go=new-issue&source=shortcut",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "Search",
+      "short_name": "Search",
+      "description": "Search the workspace",
+      "url": "/a/launch?go=search&source=shortcut",
+      "icons": [
+        {
+          "src": "icons/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
   "icons": [
     {
       "src": "icons/icon-72x72.png",

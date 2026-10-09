@@ -3,6 +3,7 @@ import { RouterOutlet } from '@angular/router';
 import { HlmToasterImports } from '@spartan-ng/helm/sonner';
 import { Preferences } from './core/preferences';
 import { AccentService, ThemeService } from './core/theme';
+import { Viewport } from './core/viewport';
 
 @Component({
   selector: 'app-root',
@@ -20,4 +21,6 @@ export class App {
   protected readonly preferences = inject(Preferences);
   // Instantiate early so the workspace colour becomes the accent colour.
   protected readonly accent = inject(AccentService);
+  // Instantiate early: touch/keyboard state and the browser theme colour.
+  protected readonly viewport = inject(Viewport);
 }

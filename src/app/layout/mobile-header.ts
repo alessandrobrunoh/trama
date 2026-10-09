@@ -17,7 +17,7 @@ import { FavoritesStore } from '../core/stores/favorites.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
-import { haptic } from '../core/viewport';
+import { Viewport, haptic } from '../core/viewport';
 import { FavoriteButton } from '../shared/favorite-button';
 import { SECTION_LABELS } from './nav';
 import { PageChrome } from './page-chrome';
@@ -80,6 +80,9 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
         <p class="mobile-header__large-title">{{ title() }}</p>
       </div>
     }
+    @if (!viewport.online()) {
+      <div class="mobile-offline" role="status">You are offline. Showing the last data that synced.</div>
+    }
     @if (fab(); as label) {
       <button type="button" class="mobile-fab" [attr.aria-label]="label" (click)="create()">
         <svg [lucideIcon]="plusIcon" [size]="26" aria-hidden="true"></svg>
@@ -88,6 +91,7 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
   `,
 })
 export class MobileHeader {
+  protected readonly viewport = inject(Viewport);
   protected readonly chrome = inject(PageChrome);
   protected readonly sync = inject(SyncStatus);
   protected readonly ui = inject(UiStore);

@@ -473,6 +473,14 @@ app-shell:has(.mobile-fab) #main-content [class*='overflow-y-auto']::after {
   block-size: 5.5rem;
 }
 
+.mobile-offline {
+  padding: 0.375rem 1rem;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: 0.8125rem;
+  text-align: center;
+}
+
 /* Pull-to-refresh indicator (layout/mobile-pull-to-refresh.ts) */
 .ptr {
   position: relative;
@@ -1340,6 +1348,40 @@ html {
     padding-inline: 0.75rem;
     font-size: 0.875rem;
   }
+}
+
+/* Tablets with a finger (>= md, coarse pointer): same hit areas as phones, desktop layout. */
+@media (pointer: coarse) and (min-width: 48rem) {
+  [data-slot='button']:not([data-size^='icon']) {
+    min-block-size: 2.5rem;
+  }
+  [data-slot='button'][data-size^='icon'] {
+    min-block-size: 2.5rem;
+    min-inline-size: 2.5rem;
+  }
+  :is(
+    [data-slot='dropdown-menu-item'],
+    [data-slot='dropdown-menu-checkbox-item'],
+    [data-slot='dropdown-menu-radio-item'],
+    [data-slot='command-item'],
+    [data-slot='select-item'],
+    [data-slot='combobox-item']
+  ) {
+    min-block-size: 2.75rem;
+  }
+  [data-sidebar='menu-button'] {
+    min-block-size: 2.5rem;
+  }
+}
+
+/* App chrome is not text to select or call out on long press. */
+.mobile-tabbar,
+.mobile-header,
+.mobile-menu,
+.mobile-fab,
+.swipe-row__actions {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* ───────────────────── Detail pages on phones ───────────────────── */

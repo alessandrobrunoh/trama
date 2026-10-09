@@ -50,6 +50,19 @@ export class Viewport {
     listen(coarse, 'change', syncMedia);
     listen(standalone, 'change', syncMedia);
 
+    // Browser / status bar colour follows the theme the app shows (it can differ from the OS setting).
+    const syncThemeColor = (): void => {
+      const color = getComputedStyle(document.documentElement).getPropertyValue('--background').trim();
+      if (!color) return;
+      document
+        .querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')
+        .forEach((meta) => (meta.content = color));
+    };
+    syncThemeColor();
+    const themeObserver = new MutationObserver(syncThemeColor);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    cleanups.push(() => themeObserver.disconnect());
+
     this.online.set(navigator.onLine);
     listen(window, 'online', () => this.online.set(true));
     listen(window, 'offline', () => this.online.set(false));
