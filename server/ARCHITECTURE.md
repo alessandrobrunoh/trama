@@ -88,7 +88,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Seed
 
-`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it. Stored statuses follow PLAN.md §2. Keep the seed valid when you add columns (there is a unit test).
+`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it (only with `TRAMA_ENABLE_ADMIN_RESET=true`, never in production). Stored statuses follow PLAN.md §2. Keep the seed valid when you add columns (there is a unit test).
 
 ## How to add a domain module
 

@@ -70,9 +70,17 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
             </span>
             <div>
               <p class="text-[13px] font-medium">No git host connected</p>
-              <p class="text-muted-foreground mt-1 text-xs">Connect an account with a token to browse and import its repositories.</p>
+              <p class="text-muted-foreground mt-1 text-xs">
+                @if (canConnect()) {
+                  Connect an account with a token to browse and import its repositories.
+                } @else {
+                  Only people who can manage integrations see git host connections. Ask an admin to connect one, or add repositories manually.
+                }
+              </p>
             </div>
-            <a hlmBtn size="sm" [routerLink]="['/', slug(), 'settings', 'integrations']" (click)="closed.emit()">Connect a git host</a>
+            @if (canConnect()) {
+              <a hlmBtn size="sm" [routerLink]="['/', slug(), 'settings', 'integrations']" (click)="closed.emit()">Connect a git host</a>
+            }
           </div>
         }
 
@@ -106,6 +114,8 @@ export class ImportRepositoriesDialog {
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly teams = computed(() => teamOptions(this.store));
+  /** The snapshot only lists git connections to people allowed to manage integrations. */
+  protected readonly canConnect = computed(() => this.store.allowed('manageIntegrations'));
   protected readonly connections = computed(() =>
     this.store.integrations().filter((c) => c.provider !== 'delta'),
   );

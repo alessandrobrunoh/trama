@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
-import type { WorkspaceContext } from '../auth/request-context.js';
+import { canDo, type WorkspaceContext } from '../auth/request-context.js';
 import type { Role, SnapshotCommentsMode } from '../contracts/domain.js';
 import { CommentsService } from '../comments/comments.service.js';
 import { AttentionService } from '../attention/attention.service.js';
@@ -66,7 +66,11 @@ export class SnapshotService {
         slimComments ? this.comments.index(workspaceId) : Promise.resolve(undefined),
         this.ds.getRepository(DomainEventEntity).find({ where, order: { at: 'DESC', id: 'DESC' }, take: SNAPSHOT_EVENTS }),
         this.views.list(ctx),
-        this.ds.getRepository(IntegrationConnectionEntity).find({ where, order: { createdAt: 'ASC' } }),
+        // account, baseUrl, status and lastError of the git connections are for whoever manages them
+        // (same gate as GET /integrations); everyone else gets an empty list
+        canDo(ctx, 'manageIntegrations')
+          ? this.ds.getRepository(IntegrationConnectionEntity).find({ where, order: { createdAt: 'ASC' } })
+          : Promise.resolve([]),
         this.attention.forUser(ctx),
       ]);
     return {

@@ -42,6 +42,8 @@ that are a subset of its own permissions.
 Every API token has caps (`limits`, defaults `requestsPerMinute` 600, `writesPerMinute` 60, `writesPerDay` 2000; configurable up to 6000 / 600 / 20000).
 Per-minute counters are per API process; the daily write counter is stored in Postgres. Over a cap: `429` with a message naming the cap.
 
+On top of that, every client IP is rate limited before authentication (in memory, per API process): 1200 requests/minute on `/api` overall, and stricter on `POST /auth/login` (10 per 15 min), `POST /auth/signup` (10/hour), `/invites/:token` (30 per 15 min), `GET /public/views/:token` (30/minute) and credential creation `POST /w/:slug/tokens|agents` (30/hour). Over a limit: `429` with a `Retry-After` header (seconds). Tunable through `TRAMA_RATE_LIMIT_*`, off when `NODE_ENV=test` or `TRAMA_RATE_LIMIT_ENABLED=false`; behind a reverse proxy set `TRAMA_TRUST_PROXY` so the real client address is used (see `.env.example`).
+
 ## Roles (RBAC)
 
 `viewer` < `member` < `admin` < `owner`. Default: GET needs `viewer`, every write on domain entities needs `member`.
@@ -87,7 +89,7 @@ Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP
 
 ## Workspace snapshot
 
-`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
+`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. `integrations` is empty unless the caller has the `manageIntegrations` capability (same gate as `/integrations`). Needs a user principal (not an agent token).
 
 ## Domain routes (all under `/w/:slug`)
 
@@ -246,11 +248,11 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 ## Events (activity log + live updates)
 
 - `GET /events?workstreamId&subject=<type>:<id>&type=<prefix>&before=<ISO>&limit(≤500, default 100)` → `DomainEvent[]`, newest first. Written by the server on every mutation (`workstream.created|updated|status_changed|deleted`, `criterion.updated`, `execution.created|updated|state_changed|progress|deleted`, `input.requested|answered|dismissed|updated|deleted`, `artifact.attached|updated|deleted`, `review.requested`, `decision.proposed|accepted|rejected|superseded|updated|deleted`, `issue.created|status_changed|rekeyed|linked|updated|deleted`, `milestone.created|updated|deleted`, `dependency.added|removed`, `comment.created`, `team.*`, `repository.*`). `actor` is the user or agent that made the change (`system` for derived changes).
-- `GET /events/stream` — **Server-Sent Events**, one `LiveEvent` JSON per message (`{ type: created|updated|deleted|attention, entity, id, clientId?, at }`), plus a named `ping` event every 25 s. `clientId` echoes the `X-Client-Id` header of the request that caused the change, so a tab can ignore its own echoes. Use `new EventSource(url, { withCredentials: true })` (cookie auth; EventSource cannot send headers).
+- `GET /events/stream` — **Server-Sent Events**, one `LiveEvent` JSON per message (`{ type: created|updated|deleted|attention, entity, id, clientId?, at }`), plus a named `ping` event every 25 s. `clientId` echoes the `X-Client-Id` header of the request that caused the change, so a tab can ignore its own echoes. Use `new EventSource(url, { withCredentials: true })` (cookie auth; EventSource cannot send headers). The server re-checks the credential every 30 s (`TRAMA_SSE_RECHECK_MS`) and ends the stream once the session or API token is revoked or expired, or the member was removed from the workspace (the reconnect then gets 401/404).
 
 ## Dev utilities
 
-`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
+`POST /api/admin/reset` (unauthenticated, **disabled unless `TRAMA_ENABLE_ADMIN_RESET=true`, and never available when `NODE_ENV=production`**; it answers 404 otherwise) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
 
 ## Configuration
 
