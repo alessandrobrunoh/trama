@@ -21,6 +21,7 @@ import {
   LucideExternalLink,
   LucideKeyboard,
   LucideKeyRound,
+  LucideListChecks,
   LucideMap,
   LucidePlug,
   LucideDynamicIcon,
@@ -53,7 +54,7 @@ import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { CustomerAvatar } from '../features/customers/customer-avatar';
 import { ProjectGlyph } from '../features/projects/project-glyph';
-import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
 /**
  * Sidebar content (workspace switcher, search, navigation, teams, views, user menu).
@@ -142,10 +143,34 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
     <div hlmSidebarContent class="gap-0 px-2 pb-2">
       <ul hlmSidebarMenu class="gap-px">
-        @for (item of personal(); track item.segment) {
+        @for (item of primary(); track item.segment) {
           <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
       </ul>
+
+      <!-- More: everything that is not one of the five places above. Folded by default, open on its own pages. -->
+      @if (moreItems().length) {
+        <div class="mt-1">
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex h-7 w-full items-center gap-2 rounded-md px-2 text-[13px] outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11 max-md:text-[15px]"
+            (click)="ui.toggleFolded('open:more')"
+            [attr.aria-expanded]="moreOpen()"
+            aria-controls="sidebar-more"
+          >
+            <svg [lucideIcon]="more" [size]="15"></svg>
+            <span class="flex-1 text-start">More</span>
+            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!moreOpen()" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
+          </button>
+          @if (moreOpen()) {
+            <ul hlmSidebarMenu id="sidebar-more" class="gap-px">
+              @for (item of moreItems(); track item.segment) {
+                <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
+              }
+            </ul>
+          }
+        </div>
+      }
 
       <!-- Favorites: only once something is pinned -->
       @if (favorites.entries().length) {
@@ -201,21 +226,6 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
           }
         </div>
       }
-
-      <!-- Workspace -->
-      <div class="mt-4 max-md:mt-2">
-        <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('workspace')" [attr.aria-expanded]="!ui.isFolded('workspace')">
-          Workspace
-          <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('workspace')" [class.opacity-0]="!ui.isFolded('workspace')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
-        </button>
-        @if (!ui.isFolded('workspace')) {
-          <ul hlmSidebarMenu class="gap-px">
-            @for (item of nav(); track item.segment) {
-              <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
-            }
-          </ul>
-        }
-      </div>
 
       <!-- Teams -->
       <div class="mt-4 max-md:mt-3">
@@ -409,11 +419,11 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
             @if (ui.sidebarBadgeStyle() === 'dot') {
               <span
                 class="size-1.5 shrink-0 rounded-full"
-                [class.bg-primary]="item.badge === 'attention' || item.badge === 'notifications'"
-                [class.bg-muted-foreground]="item.badge !== 'attention'"
+                [class.bg-primary]="item.badge === 'inbox'"
+                [class.bg-muted-foreground]="item.badge !== 'inbox'"
                 [attr.aria-label]="n + ' pending'"
               ></span>
-            } @else if (item.badge === 'attention' || item.badge === 'notifications') {
+            } @else if (item.badge === 'inbox') {
               <span class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ n }}</span>
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
@@ -516,9 +526,18 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
             Command palette
             <hlm-dropdown-menu-shortcut><app-kbd keys="mod+k" /></hlm-dropdown-menu-shortcut>
           </button>
+          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
+            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
+            Connect your agent
+            <hlm-dropdown-menu-shortcut><app-kbd keys="g k" /></hlm-dropdown-menu-shortcut>
+          </button>
           <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'tokens'])">
             <svg [lucideIcon]="keyIcon" [size]="14"></svg>
-            API tokens &amp; MCP
+            API tokens
+          </button>
+          <button hlmDropdownMenuItem (triggered)="showChecklist()">
+            <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
+            Setup checklist
           </button>
           <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'integrations'])">
             <svg [lucideIcon]="plugIcon" [size]="14"></svg>
@@ -625,12 +644,18 @@ export class AppSidebar {
 
   protected readonly sidebarIcon = LucidePanelLeft;
   /** Entries the user chose to show, in their order. "Only when badged" entries drop out while their badge is empty. */
-  protected readonly personal = computed(() =>
-    this.visible(orderNav(PERSONAL_NAV, this.ui.sidebarOrder().personal)),
+  protected readonly primary = computed(() =>
+    this.visible(orderNav(PRIMARY_NAV, this.ui.sidebarOrder().personal)),
   );
-  protected readonly nav = computed(() =>
-    this.visible(orderNav(MAIN_NAV, this.ui.sidebarOrder().workspace)),
+  protected readonly moreItems = computed(() =>
+    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace)),
   );
+  /** Open by choice, or because the page you are on lives under More. */
+  protected readonly moreOpen = computed(() => {
+    if (this.ui.isFolded('open:more')) return true;
+    const section = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
+    return this.moreItems().some((n) => n.segment === section);
+  });
   protected readonly chevronDown = LucideChevronDown;
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
@@ -703,6 +728,7 @@ export class AppSidebar {
   protected readonly keyIcon = LucideKeyRound;
   protected readonly plugIcon = LucidePlug;
   protected readonly mapIcon = LucideMap;
+  protected readonly checklistIcon = LucideListChecks;
   protected readonly bookIcon = LucideBookOpen;
   protected readonly externalIcon = LucideExternalLink;
   protected readonly latestChanges = CHANGELOG.slice(0, 3);
@@ -731,14 +757,18 @@ export class AppSidebar {
   }
 
   protected badge(kind: NavItem['badge']): number {
-    if (kind === 'attention') return this.store.attentionCount();
+    if (kind === 'inbox') return this.store.attentionCount() + this.notifications.updatesUnread();
     if (kind === 'issues') return this.store.backlogIssueCount();
-    if (kind === 'notifications') return this.notifications.unread();
     return 0;
   }
 
   protected openPublic(path: string): void {
     window.open(path, '_blank', 'noopener');
+  }
+
+  protected showChecklist(): void {
+    this.ui.requestChecklist();
+    this.go(['/', this.slug(), 'overview']);
   }
 
   protected go(commands: string[]): void {

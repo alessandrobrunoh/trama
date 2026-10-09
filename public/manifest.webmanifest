@@ -22,10 +22,10 @@
   "prefer_related_applications": false,
   "shortcuts": [
     {
-      "name": "My attention",
-      "short_name": "Attention",
-      "description": "Reviews, questions and blockers waiting on you",
-      "url": "/a/launch?go=attention&source=shortcut",
+      "name": "Inbox",
+      "short_name": "Inbox",
+      "description": "Everything waiting on you",
+      "url": "/a/launch?go=inbox&source=shortcut",
       "icons": [
         {
           "src": "icons/icon-96x96.png",

@@ -147,7 +147,7 @@ export class KeyboardShortcuts {
     const [, , area, id] = path.split('/'); // ['', slug, area, id?]
     const key = id ? decodeURIComponent(id) : undefined;
     switch (area) {
-      case 'attention':
+      case 'inbox':
       case 'my-work':
         return { kind: 'issue', defaults: {} };
       case 'issues':

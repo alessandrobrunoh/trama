@@ -1,7 +1,22 @@
 import { inject } from '@angular/core';
-import { Router, Routes, type ActivatedRouteSnapshot } from '@angular/router';
+import { Router, type Route, type Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
 import { authGuard, guestGuard, launchGuard, workspaceGuard } from './core/session/guards';
+
+/** `/:workspace/<old path>` → `/:workspace/inbox?tab=<tab>`; other query params are dropped. */
+function redirectInbox(path: string, tab: string): Route {
+  return {
+    path,
+    pathMatch: 'full',
+    canActivate: [
+      (route: ActivatedRouteSnapshot) =>
+        inject(Router).createUrlTree(['/', route.paramMap.get('workspaceSlug') ?? '', 'inbox'], {
+          queryParams: { tab },
+        }),
+    ],
+    children: [],
+  };
+}
 
 /**
  * Routes per PLAN.md §5. Every page is a lazy standalone component; route params and query
@@ -110,21 +125,23 @@ export const routes: Routes = [
         loadComponent: () => import('./features/ai/assistant-page').then((m) => m.AssistantPage),
       },
       {
-        path: 'notifications',
-        title: 'Notifications · Trama',
+        path: 'inbox',
+        title: 'Inbox · Trama',
+        loadComponent: () => import('./features/inbox/inbox-page').then((m) => m.InboxPage),
+      },
+      // My Attention and Notifications became tabs of the Inbox; old links keep working.
+      redirectInbox('attention', 'needs-you'),
+      redirectInbox('notifications', 'updates'),
+      {
+        path: 'connect',
+        title: 'Connect your agent · Trama',
         loadComponent: () =>
-          import('./features/notifications/notifications-page').then((m) => m.NotificationsPage),
+          import('./features/onboarding/connect-agent-page').then((m) => m.ConnectAgentPage),
       },
       {
         path: 'stats',
         title: 'Statistics · Trama',
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
-      },
-      {
-        path: 'attention',
-        title: 'My Attention · Trama',
-        loadComponent: () =>
-          import('./features/attention/attention-page').then((m) => m.AttentionPage),
       },
       {
         path: 'my-work',

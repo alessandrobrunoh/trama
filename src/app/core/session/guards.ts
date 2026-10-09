@@ -61,10 +61,10 @@ export function roleGuard(minRole: import('../contracts/domain').Role): CanActiv
 }
 
 /** Where an installed app opens (`start_url`) and where its home-screen shortcuts point. */
-const LAUNCH_SECTIONS = new Set(['attention', 'my-work', 'issues', 'notifications', 'overview']);
+const LAUNCH_SECTIONS = new Set(['inbox', 'my-work', 'issues', 'workstreams', 'projects', 'overview']);
 
 /**
- * `/a/launch?go=attention|my-work|issues|new-issue|search`: the PWA entry point. Signed in, it opens the last
+ * `/a/launch?go=inbox|my-work|issues|new-issue|search`: the PWA entry point. Signed in, it opens the last
  * workspace (on `go`, when given); signed out, it asks to sign in first. The landing page at `/` is for the
  * web, not for the installed app. (`a` is too short to be a workspace slug, so this path cannot collide.)
  */

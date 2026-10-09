@@ -1,16 +1,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
-  LucideBellRing,
   LucideCheck,
-  LucideCircleDot,
   LucideDynamicIcon,
   LucideEllipsis,
   LucideMessageSquare,
   LucidePlus,
   LucideSearch,
   LucideSettings,
-  LucideUserRoundCheck,
   LucideX,
 } from '@lucide/angular';
 import { AssistantStore } from '../core/ai/assistant.store';
@@ -19,7 +16,7 @@ import { NotificationsStore } from '../core/stores/notifications.store';
 import { SessionStore } from '../core/session/session.store';
 import { UiStore } from '../core/stores/ui.store';
 import { haptic } from '../core/viewport';
-import { MAIN_NAV, PERSONAL_NAV, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, type NavItem } from './nav';
 
 interface SheetGroup {
   title: string;
@@ -27,7 +24,7 @@ interface SheetGroup {
 }
 
 /**
- * Phone navigation (< md): a docked tab bar (Attention, My work, Issues, Search, More) with badges and
+ * Phone navigation (< md): a docked tab bar (Inbox, My work, Issues, Search, More) with badges and
  * a "More" sheet that carries every other section, the workspace switcher and the assistant.
  * Everything here is `md:hidden`; the desktop sidebar is untouched.
  */
@@ -132,12 +129,12 @@ interface SheetGroup {
         >
           <span class="mobile-tab__icon">
             <svg [lucideIcon]="tab.icon" [size]="24" aria-hidden="true"></svg>
-            @if (tab.segment === 'attention' && attention(); as n) {
+            @if (tab.badge === 'inbox' && inbox(); as n) {
               <span class="mobile-badge" aria-hidden="true">{{ n > 99 ? '99+' : n }}</span>
             }
           </span>
           <span class="mobile-tab__label">{{ tab.label }}</span>
-          @if (tab.segment === 'attention' && attention(); as n) {
+          @if (tab.badge === 'inbox' && inbox(); as n) {
             <span class="sr-only">, {{ n }} waiting on you</span>
           }
         </a>
@@ -156,14 +153,8 @@ interface SheetGroup {
       >
         <span class="mobile-tab__icon">
           <svg [lucideIcon]="moreIcon" [size]="24" aria-hidden="true"></svg>
-          @if (unread() > 0) {
-            <span class="mobile-badge mobile-badge--dot" aria-hidden="true"></span>
-          }
         </span>
         <span class="mobile-tab__label">More</span>
-        @if (unread() > 0) {
-          <span class="sr-only">, {{ unread() }} unread notifications</span>
-        }
       </button>
     </nav>
   `,
@@ -176,21 +167,18 @@ export class MobileNav {
   private readonly notifications = inject(NotificationsStore);
 
   protected readonly slug = this.store.slug;
-  protected readonly attention = this.store.attentionCount;
-  protected readonly unread = this.notifications.unread;
+  /** Inbox = what waits on you (attention) plus unread updates. */
+  protected readonly inbox = computed(() => this.store.attentionCount() + this.notifications.updatesUnread());
 
-  protected readonly tabs = [
-    { segment: 'attention', label: 'Attention', icon: LucideBellRing },
-    { segment: 'my-work', label: 'My work', icon: LucideUserRoundCheck },
-    { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
-  ];
+  /** The first three primary places live in the bar; Workstreams and Projects open from More. */
+  protected readonly tabs = PRIMARY_NAV.slice(0, 3);
   /** Tabs live in the bar; the sheet lists everything else. */
-  private static readonly IN_BAR = new Set(['attention', 'my-work', 'issues', 'assistant', 'settings']);
+  private static readonly IN_BAR = new Set(['inbox', 'my-work', 'issues', 'assistant', 'settings']);
   protected readonly groups = computed<SheetGroup[]>(() => {
     const rest = (items: NavItem[]) => items.filter((n) => !MobileNav.IN_BAR.has(n.segment));
     return [
-      { title: 'You', items: rest(PERSONAL_NAV) },
-      { title: 'Workspace', items: rest(MAIN_NAV) },
+      { title: 'Work', items: rest(PRIMARY_NAV) },
+      { title: 'Workspace', items: rest(MORE_NAV) },
     ].filter((g) => g.items.length > 0);
   });
 
@@ -217,7 +205,7 @@ export class MobileNav {
   private dragState: { id: number; startY: number; startT: number } | null = null;
 
   protected menuBadge(item: NavItem): number {
-    return item.badge === 'notifications' ? this.notifications.unread() : 0;
+    return item.badge === 'inbox' ? this.inbox() : 0;
   }
 
   protected tapped(): void {
