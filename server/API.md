@@ -250,7 +250,7 @@ Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools ov
 
 ## Dev utilities
 
-`POST /api/admin/reset` (unauthenticated, **disabled when `NODE_ENV=production`**) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
+`POST /api/admin/reset` (unauthenticated, **disabled unless `TRAMA_ENABLE_ADMIN_RESET=true`, and never available when `NODE_ENV=production`**; it answers 404 otherwise) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
 
 ## Configuration
 

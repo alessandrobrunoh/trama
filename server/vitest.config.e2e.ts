@@ -20,6 +20,8 @@ export default defineConfig({
       DATABASE_URL: TEST_DATABASE_URL,
       SEED_DEMO: 'false',
       NODE_ENV: 'test',
+      // e2e specs may call POST /api/admin/reset
+      TRAMA_ENABLE_ADMIN_RESET: 'true',
     },
   },
 });
