@@ -6,7 +6,7 @@ Architecture and extension points: [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 > **Stale parts:** the `Execution` concept was removed (migration `DropExecutions`; there is no `executions` module or route). Mentions of executions (`ex_…` ids, `executionId`, `execution` graph nodes and dependency types) below are leftovers and need a pass against `contracts/domain.ts` and the controllers.
 
-Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after first boot: **demo@nabla.dev / nabla-demo** (workspace slug `acme`).
+Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after first boot: **demo@trama.dev / trama-demo** (workspace slug `acme`).
 
 ## Conventions
 
@@ -20,8 +20,8 @@ Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after fir
 
 Two ways, accepted on every route except the public ones (`/health`, `/auth/signup`, `/auth/login`):
 
-1. **Cookie session** (browser). `POST /auth/login` or `/auth/signup` set an httpOnly `nabla_session` cookie (`SameSite=Lax`, `Secure` in production, 30 days; stored in Postgres as a sha256). The SPA must send credentials (`withCredentials: true`) and, on every **mutating** request (POST/PUT/PATCH/DELETE), a custom header **`X-Client-Id`** (or `X-Requested-With`) — requests without it get `403`. Bodies must be `application/json` (`415` otherwise). CORS allows `http://localhost:4300` and `:4301` (and `CORS_ORIGIN`) with credentials.
-2. **API token**: `Authorization: Bearer nbl_…`. Tokens belong to one workspace and act either as a **user** (same role as that user) or as an **agent** (role `member`). No CSRF header needed. Tokens are created via `POST /w/:slug/tokens`; the secret is returned once, only its sha256 and a display prefix are stored.
+1. **Cookie session** (browser). `POST /auth/login` or `/auth/signup` set an httpOnly `trama_session` cookie (sessions started under the old name `nabla_session` stay valid) (`SameSite=Lax`, `Secure` in production, 30 days; stored in Postgres as a sha256). The SPA must send credentials (`withCredentials: true`) and, on every **mutating** request (POST/PUT/PATCH/DELETE), a custom header **`X-Client-Id`** (or `X-Requested-With`) — requests without it get `403`. Bodies must be `application/json` (`415` otherwise). CORS allows `http://localhost:4300` and `:4301` (and `CORS_ORIGIN`) with credentials.
+2. **API token**: `Authorization: Bearer trm_…`. Tokens minted before the rename to Trama start with `nbl_` and keep working. Tokens belong to one workspace and act either as a **user** (same role as that user) or as an **agent** (role `member`). No CSRF header needed. Tokens are created via `POST /w/:slug/tokens`; the secret is returned once, only its sha256 and a display prefix are stored.
 
 | Route | Body | Result |
 |---|---|---|
@@ -293,7 +293,7 @@ Edge semantics: `contains` team → workstream, workstream → top-level executi
 Viewer+ and agent tokens. `text/markdown` by default; JSON with `Accept: application/json` or `?format=json`. Markdown sections: `# KEY — title`, status line, Objective, Acceptance Criteria (`- [x]` met, `- [ ]` pending, `- [ ] … _(in progress)_`), Context, Repositories (fullName — url, default branch), Teams, Dependencies (what it waits on with resolution state, what it blocks), Decisions (accepted with rationale one-liners; proposed flagged; superseded marked "do not follow"), Related issues, Artifacts (state, CI, review, conflicts), Executions, Open input requests, Recent progress (last 10 progress notes / state changes / answers). Empty sections are omitted. The JSON mirrors the same data (`AgentContext` in `src/agent-context/agent-context.service.ts`).
 
 ### MCP
-Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](../mcp/README.md): it forwards each client's `Bearer nbl_…` key to this REST API, which stays the only authority. The `trama` CLI in [`cli/`](../cli/README.md) offers the same commands.
+Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](../mcp/README.md): it forwards each client's `Bearer trm_…` key to this REST API, which stays the only authority. The `trama` CLI in [`cli/`](../cli/README.md) offers the same commands.
 
 ## Derived workstream status
 
@@ -306,11 +306,11 @@ Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](.
 
 ## Dev utilities
 
-`POST /api/admin/reset` (unauthenticated, **disabled unless `TRAMA_ENABLE_ADMIN_RESET=true`, and never available when `NODE_ENV=production`**; it answers 404 otherwise) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `nabla-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
+`POST /api/admin/reset` (unauthenticated, **disabled unless `TRAMA_ENABLE_ADMIN_RESET=true`, and never available when `NODE_ENV=production`**; it answers 404 otherwise) wipes the database and re-seeds the demo workspace. The same seed runs automatically on boot when the `users` table is empty (`SEED_DEMO=false` disables it): workspace **Acme** (`acme`), 6 users (all with password `trama-demo`; roles: Alessandro owner, Maya admin, Jonas/Priya/Tomas member, Elena viewer), 7 teams, 4 agents, 6 repositories, 14 workstreams covering every status, ~36 executions, artifacts, ADR-1…23, 18 issues, comments, 6 saved views (two of them timelines) and ~300 events over the last 6 weeks.
 
 ## Configuration
 
-`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/nabla`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
+`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/trama`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
 
 ## Integrations — `/w/:slug/integrations` (admin and above)
 
@@ -404,7 +404,7 @@ Idempotency: `X-GitHub-Delivery` / `X-Gitlab-Event-UUID` ids are stored in `webh
 
 `OutgoingWebhook { id, name, url, events[], enabled, createdAt, lastDeliveryAt?, lastStatus? }`. `events`: event types (`issue.created`), entity wildcards (`issue.*`) or `*`. `GET`, `GET /:id`, `POST { name, url, events, enabled? }` → `{ webhook, secret }` (the `whsec_…` secret is shown once), `PATCH /:id`, `DELETE /:id`, `POST /:id/rotate-secret` → `{ webhook, secret }`, `POST /:id/test` → sends a `ping` now and answers the delivery result, `GET /:id/deliveries?limit` → last deliveries (newest first; the latest 50 are kept).
 
-Every `DomainEvent` (see *Events*) is delivered asynchronously (per webhook in order, 5 s timeout, one retry after ~2 s on a network error, 429 or 5xx): `POST url` with `Content-Type: application/json`, headers `X-Nabla-Event`, `X-Nabla-Delivery` (= event id), `X-Nabla-Signature: sha256=<hex HMAC-SHA256 of the raw body with the secret>`, body `{ id, event, workspaceId, at, actor, subject, workstreamId?, data }`. URLs must be http(s) without credentials (https only in production). The host is resolved at delivery time and refused (400 when saving, a failed delivery otherwise) if any address is loopback, private, link-local, CGNAT, multicast, IPv4-mapped IPv6 or a cloud metadata address; the connection is pinned to the checked address and redirects are not followed. To reach internal targets set `TRAMA_OUTBOUND_ALLOW_PRIVATE=true` or list hosts in `TRAMA_OUTBOUND_ALLOWED_HOSTS` (see `.env.example`). At most 20 webhooks per workspace. Limits: delivery is in-process (no durable queue), events emitted inside a transaction that later rolls back are still delivered.
+Every `DomainEvent` (see *Events*) is delivered asynchronously (per webhook in order, 5 s timeout, one retry after ~2 s on a network error, 429 or 5xx): `POST url` with `Content-Type: application/json`, headers `X-Trama-Event`, `X-Trama-Delivery` (= event id), `X-Trama-Signature: sha256=<hex HMAC-SHA256 of the raw body with the secret>` (the pre-rename `X-Nabla-Event`, `X-Nabla-Delivery` and `X-Nabla-Signature` headers are still sent with the same values), body `{ id, event, workspaceId, at, actor, subject, workstreamId?, data }`. URLs must be http(s) without credentials (https only in production). The host is resolved at delivery time and refused (400 when saving, a failed delivery otherwise) if any address is loopback, private, link-local, CGNAT, multicast, IPv4-mapped IPv6 or a cloud metadata address; the connection is pinned to the checked address and redirects are not followed. To reach internal targets set `TRAMA_OUTBOUND_ALLOW_PRIVATE=true` or list hosts in `TRAMA_OUTBOUND_ALLOWED_HOSTS` (see `.env.example`). At most 20 webhooks per workspace. Limits: delivery is in-process (no durable queue), events emitted inside a transaction that later rolls back are still delivered.
 
 ## Notifications
 

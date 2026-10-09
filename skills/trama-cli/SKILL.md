@@ -17,7 +17,7 @@ trama doctor            # if something fails: config, connectivity, key
 If `whoami` says you are not signed in, ask the user to run `trama login` (they pick a method). If the user works in more than one workspace, ask them to add each key with `trama account add` and then read with `--account <name>` (or `--all-workspaces`). Or use environment variables:
 
 ```bash
-export TRAMA_API_KEY=nbl_…            # a key from Settings → API tokens
+export TRAMA_API_KEY=trm_…            # a key from Settings → API tokens
 export TRAMA_API_URL=https://<host>   # site or API URL
 ```
 

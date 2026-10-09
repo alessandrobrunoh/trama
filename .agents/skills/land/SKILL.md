@@ -1,7 +1,7 @@
 ---
 name: land
 description: >-
-  Land the current changes in the nabla repository (github.com/alessandrobrunoh/nabla)
+  Land the current changes in the trama repository (github.com/alessandrobrunoh/trama)
   by committing them, opening a pull request against main, and merging that pull
   request with a merge commit after the applicable checks pass. Invoke this skill
   only when the user has explicitly requested landing, such as the Land Changes
@@ -12,13 +12,13 @@ metadata:
   delta-action: land
 ---
 
-# Land changes in nabla
+# Land changes in trama
 
 Landing means the requested change is on `origin/main` via a merged pull request. Pushing a branch, opening a pull request, or starting checks is not completion. If a blocker stops the workflow, say that the changes have not landed and name the blocker.
 
 An explicit landing request (Land Changes or `/land`) is the instruction to carry out this workflow. Do not ask again whether to merge. Do not answer `/land` by saying you are waiting for an explicit landing request. Stop only for a real blocker: unrelated work, ambiguous scope, a conflict, a failing or unverifiable check, or a merge that would overwrite work that is not part of this landing.
 
-Use `gh` against `origin` (`https://github.com/alessandrobrunoh/nabla.git`). The default branch is `main`. Do not push directly to `main`. Do not force-push. Do not squash or rebase. Do not delete the remote head branch (`delete_branch_on_merge` is off). Commands that might open an editor must be non-interactive: pass the message or body on the command line, and prefix any Git command that might still open an editor with `GIT_EDITOR=true`.
+Use `gh` against `origin` (`https://github.com/alessandrobrunoh/trama.git`). The default branch is `main`. Do not push directly to `main`. Do not force-push. Do not squash or rebase. Do not delete the remote head branch (`delete_branch_on_merge` is off). Commands that might open an editor must be non-interactive: pass the message or body on the command line, and prefix any Git command that might still open an editor with `GIT_EDITOR=true`.
 
 ## 1. See what is being landed
 
@@ -52,7 +52,7 @@ If the hook fails, or the branch cannot be created without mixing in unrelated c
 Run a command only when the diff touches that area. Skipping a command because the diff does not touch its area is success for that command, not a missing check. Do not run the root `npm run typecheck`, `npm run lint`, or `npm test` commands listed in `CONTRIBUTING.md`: the root `package.json` defines no `typecheck` or `lint` script, and `angular.json` defines no `test` target, so `npm test` (`ng test`) is not a usable check.
 
 - Frontend (`src/`, `public/`, `angular.json`, root `package.json`, or other files the root Angular build compiles): `npm run build`. This is `ng build` (`package.json` script `build`; `angular.json` target `delta:build`).
-- API (`server/`): from `server/`, `npm test`, then `npm run lint`, then `npm run build`. Those are `vitest run`, `oxlint --type-aware src/ test/`, and `nest build` (`server/package.json`). Do not run `npm run test:e2e` unless the change is specifically to the end-to-end suite; that command recreates the `nabla_core_test` database.
+- API (`server/`): from `server/`, `npm test`, then `npm run lint`, then `npm run build`. Those are `vitest run`, `oxlint --type-aware src/ test/`, and `nest build` (`server/package.json`). Do not run `npm run test:e2e` unless the change is specifically to the end-to-end suite; that command recreates the `trama_core_test` database.
 - CLI, MCP sources, or the CLI skill (`cli/`, `mcp/src/`, `skills/trama-cli/`): from `cli/`, `cargo test --locked` and `cargo build --locked` (`.github/workflows/cli-ci.yml`).
 
 If a command you did run fails, stop. Do not weaken or disable the check. The changes have not landed.
@@ -74,7 +74,7 @@ The body must say what problem the change solves, why it is needed, the approach
 
 > I have read the CLA Document and I hereby sign the CLA.
 
-Resolve the authenticated login with `gh api user --jq .login`. Search existing issue and pull-request comments in `alessandrobrunoh/nabla` for that exact sentence from that login. If it is already there, do not comment again. If it is not, post that sentence unchanged on this pull request:
+Resolve the authenticated login with `gh api user --jq .login`. Search existing issue and pull-request comments in `alessandrobrunoh/trama` for that exact sentence from that login. If it is already there, do not comment again. If it is not, post that sentence unchanged on this pull request:
 
 ```bash
 gh pr comment <number> --body "I have read the CLA Document and I hereby sign the CLA."

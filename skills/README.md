@@ -29,8 +29,8 @@ Connect the MCP server too (the skills assume its tools exist). It lists a short
 
 ```bash
 claude mcp add --transport http trama https://<your-trama-host>/mcp \
-  --header "Authorization: Bearer nbl_…"
-# several workspaces, one key each: Bearer nbl_one,nbl_two
+  --header "Authorization: Bearer trm_…"
+# several workspaces, one key each: Bearer trm_one,trm_two
 ```
 
 Create the key in Trama under Settings → API tokens. Give agents the narrowest permissions that do the job
