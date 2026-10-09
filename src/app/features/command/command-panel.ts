@@ -217,14 +217,14 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
   a.updatedAt < b.updatedAt ? 1 : -1;
 
 /**
- * Floating command surface. It stays compact on phones and opens up to 42rem on desktop.
+ * Floating command surface. Compact on phones; desktop uses the app's popover width and surfaces.
  * Height comes from the panel, which grows with its rows up to a cap.
  */
 export const COMMAND_DIALOG_CLASS =
-  'w-[min(30rem,calc(100%-1.5rem))] sm:w-[min(42rem,calc(100%-2rem))] max-w-none top-[min(14vh,5.5rem)] translate-y-0 overflow-hidden rounded-xl p-0';
+  'w-[min(30rem,calc(100%-1.5rem))] sm:w-[min(42rem,calc(100%-2rem))] max-w-none sm:max-w-none top-[min(14vh,5.5rem)] translate-y-0 overflow-hidden rounded-md border border-border-strong p-0';
 
 /**
- * Shared body of the ⌘K palette and the `/` search dialog (Linear-style).
+ * Shared body of the ⌘K palette and the `/` search dialog.
  *  - scope chips (All · Issues · Workstreams · Decisions · Repositories · People · Teams); Tab cycles,
  *    prefixes like `issue:` / `@` switch scope, Backspace on an empty query goes back to All
  *  - `palette`: context actions for the open issue/workstream, recent items, Go to, Actions, live results
@@ -278,11 +278,13 @@ export const COMMAND_DIALOG_CLASS =
     </ng-template>
 
     <hlm-command class="h-auto max-h-[min(28rem,70svh)]" [filter]="filter" [(search)]="query">
-      <div class="shrink-0 border-b">
-        <div class="flex items-center gap-3 px-4 py-3">
+      <div class="shrink-0 border-b border-border-strong">
+        <div
+          class="focus-within:border-ring/60 mx-3 mt-3 flex h-10 items-center gap-2.5 rounded-md border border-input bg-background px-3 transition-colors"
+        >
           <svg
             [lucideIcon]="searchIcon"
-            [size]="16"
+            [size]="15"
             aria-hidden="true"
             class="text-muted-foreground shrink-0"
           ></svg>
@@ -298,7 +300,7 @@ export const COMMAND_DIALOG_CLASS =
           @if (canAsk()) {
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground flex shrink-0 items-center gap-1.5 text-xs max-sm:hidden"
+              class="text-muted-foreground hover:bg-hover hover:text-primary flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors max-sm:hidden"
               (mousedown)="$event.preventDefault()"
               (click)="askAssistant()"
             >
@@ -309,21 +311,21 @@ export const COMMAND_DIALOG_CLASS =
 
         @if (showScopes()) {
           <div
-            class="scrollbar-none flex items-center gap-1 overflow-x-auto px-2.5 pb-2"
+            class="scrollbar-none flex items-center gap-1 overflow-x-auto px-3 pb-2.5 pt-2"
             role="tablist"
             aria-label="Search scope"
           >
             @if (page() === 'status' && context(); as ctx) {
               <button
                 type="button"
-                class="text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1 rounded-md border px-2 text-xs"
+                class="text-muted-foreground hover:bg-hover hover:text-foreground flex h-7 shrink-0 items-center gap-1 rounded-md border border-border-strong px-2 text-xs transition-colors"
                 (click)="backToRoot()"
               >
                 <span class="font-mono">{{ ctx.key }}</span>
               </button>
               <svg [lucideIcon]="chevron" [size]="12" class="text-muted-foreground shrink-0"></svg>
               <span
-                class="bg-accent flex h-6 shrink-0 items-center rounded-md px-2 text-xs font-medium"
+                class="bg-selected text-foreground flex h-7 shrink-0 items-center rounded-md border border-primary/25 px-2 text-xs font-medium"
                 >Change status</span
               >
             } @else {
@@ -331,11 +333,11 @@ export const COMMAND_DIALOG_CLASS =
                 <button
                   type="button"
                   role="tab"
-                  class="flex h-6 shrink-0 items-center rounded-md border px-2 text-xs transition-colors"
+                  class="flex h-7 shrink-0 items-center rounded-md border px-2.5 text-xs transition-colors"
                   [class]="
                     scope() === s.id
-                      ? 'bg-accent text-foreground border-border-strong'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-accent/60 border-transparent'
+                      ? 'bg-selected text-foreground border-primary/25 font-medium'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-hover border-transparent'
                   "
                   [attr.aria-selected]="scope() === s.id"
                   (mousedown)="$event.preventDefault()"
@@ -360,7 +362,7 @@ export const COMMAND_DIALOG_CLASS =
       </div>
 
       <hlm-command-list
-        class="max-h-[min(18rem,calc(70svh-6.5rem))] px-1 py-1 sm:[&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-2 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-xs"
+        class="max-h-[min(18rem,calc(70svh-6.5rem))] px-2 py-1.5 sm:[&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-2 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-xs"
       >
         @if (page() === 'status') {
           <hlm-command-group>
@@ -516,7 +518,7 @@ export const COMMAND_DIALOG_CLASS =
       </hlm-command-list>
 
       <div
-        class="text-muted-foreground flex h-8 shrink-0 items-center gap-3 border-t px-2.5 text-xs max-sm:hidden"
+        class="bg-muted/30 text-muted-foreground flex h-9 shrink-0 items-center gap-3 border-t border-border-strong px-3 text-xs max-sm:hidden"
       >
         <span class="flex items-center gap-1"><app-kbd keys="up down" /> navigate</span>
         <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
