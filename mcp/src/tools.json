@@ -23,7 +23,7 @@
   "method": "POST",
   "path": "/labels",
   "permission": "workspace:write",
-  "description": "Add a custom workspace label (admin). Templates Bug, Feature, Improvement and Documentation already exist. Returns the workspace.",
+  "description": "Add a custom workspace label (member or above). Templates Bug, Feature, Improvement and Documentation already exist. Reuse an existing label when one fits. Returns the workspace.",
   "params": {
    "name": "body string! Label name",
    "color": "body string #rrggbb"
@@ -34,11 +34,23 @@
   "method": "PATCH",
   "path": "/labels/{id}",
   "permission": "workspace:write",
-  "description": "Rename or recolor a workspace label (admin). Templates can be recolored but not renamed.",
+  "description": "Rename, recolor, archive or restore a workspace label (admin). Templates can be recolored but not renamed or archived. An archived label stays on what carries it but is no longer offered when assigning.",
   "params": {
    "id": "path string! Label id",
    "name": "body string New name (custom labels only)",
-   "color": "body string #rrggbb"
+   "color": "body string #rrggbb",
+   "archived": "body boolean true archives the label, false restores it"
+  }
+ },
+ {
+  "name": "merge_label",
+  "method": "POST",
+  "path": "/labels/{id}/merge",
+  "permission": "workspace:write",
+  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories, workstreams, saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
+  "params": {
+   "id": "path string! Label id to merge away",
+   "into": "body string! Label id that takes over"
   }
  },
  {
