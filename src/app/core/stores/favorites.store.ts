@@ -26,6 +26,8 @@ export interface FavoriteEntry {
   status?: string;
   /** Team color. */
   color?: string;
+  /** Customer logo URL. */
+  logoUrl?: string;
 }
 
 const keyOf = (type: FavoriteType, id: ID): string => `${type}:${id}`;
@@ -47,7 +49,7 @@ export class FavoritesStore {
     { initialValue: this.router.url },
   );
 
-  /** The entity the current page is about (an issue, workstream, project, decision, team, repository or view), if any. */
+  /** The entity the current page is about (an issue, workstream, project, decision, team, repository, view or customer), if any. */
   readonly current = computed<{ type: FavoriteType; id: ID } | null>(() => {
     const [path] = this.url().split(/[?#]/);
     const [, section, ref, ...more] = path.split('/').filter(Boolean);
@@ -63,6 +65,7 @@ export class FavoritesStore {
       case 'teams': return found('team', n.getTeam(key)?.id);
       case 'repositories': return found('repository', n.getRepository(key)?.id);
       case 'views': return found('view', n.getView(key)?.id);
+      case 'customers': return found('customer', n.getCustomer(key)?.id);
       default: return null;
     }
   });
@@ -167,6 +170,10 @@ export class FavoritesStore {
       case 'view': {
         const v = this.nabla.getView(favorite.subjectId);
         return v ? { ...base, label: v.name, link: ['views', v.id] } : null;
+      }
+      case 'customer': {
+        const c = this.nabla.getCustomer(favorite.subjectId);
+        return c ? { ...base, label: c.name, link: ['customers', c.id], ...(c.logoUrl ? { logoUrl: c.logoUrl } : {}) } : null;
       }
     }
   }

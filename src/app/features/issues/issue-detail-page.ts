@@ -49,7 +49,9 @@ import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from '.
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AiIssueSection } from '../ai-actions/ai-issue-cards';
+import { issueWorkState } from '../customers/customer-model';
 import { CustomerRequests } from '../customers/customer-requests';
+import { DemandSummary } from '../customers/demand-summary';
 import { IssueSideWorkstreams, IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 
@@ -81,6 +83,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
     IssueCommandDialog,
     IssueSideWorkstreams,
     CustomerRequests,
+    DemandSummary,
     IssueTimeCard,
     AiIssueSection,
   ],
@@ -202,6 +205,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
 
             <app-issue-workstreams [issue]="i" />
 
+            <app-demand-summary [demand]="store.demand().get(i.id)" [state]="workState(i.status)" />
             <app-customer-requests [issueId]="i.id" [readonly]="!!i.duplicateOfId" />
 
             <app-issue-artifacts [issue]="i" />
@@ -369,6 +373,7 @@ export class IssueDetailPage {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   protected readonly store = inject(NablaStore);
+  protected readonly workState = issueWorkState;
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
 

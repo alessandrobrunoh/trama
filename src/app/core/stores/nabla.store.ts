@@ -112,7 +112,8 @@ import type {
   Workstream,
 } from '../contracts/domain';
 import type { Capability, ShareLevel } from '../contracts/domain';
-import { resolveWorkspaceSettings, roleAtLeast } from '../contracts/domain';
+import { buildDemandIndex, mergeDemand, resolveWorkspaceSettings, roleAtLeast } from '../contracts/domain';
+import type { Demand } from '../contracts/domain';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
 import { Notifier } from '../notify/notifier';
@@ -408,6 +409,29 @@ export class NablaStore {
       }
       return ids.size ? [...ids] : undefined;
     });
+  });
+  /**
+   * Customer demand by issue, project and workstream id (they never collide). An issue counts its own requests;
+   * a project its own plus those on its issues; a workstream those on its issues. A customer counts once per row.
+   * Rows nobody asked for are absent.
+   */
+  readonly demand = computed<ReadonlyMap<string, Demand>>(() => {
+    const customers = this.customerById();
+    const own = buildDemandIndex(this._customerRequests(), customers);
+    const out = new Map(own);
+    const issuesByProject = this.issuesByProject();
+    for (const project of this._projects()) {
+      const parts = [own.get(project.id), ...(issuesByProject.get(project.id) ?? []).map((i) => own.get(i.id))].filter(
+        (d): d is Demand => !!d,
+      );
+      if (parts.length) out.set(project.id, mergeDemand(parts, customers));
+    }
+    const issuesByWorkstream = this.issuesByWorkstream();
+    for (const ws of this._workstreams()) {
+      const parts = (issuesByWorkstream.get(ws.id) ?? []).map((i) => own.get(i.id)).filter((d): d is Demand => !!d);
+      if (parts.length) out.set(ws.id, mergeDemand(parts, customers));
+    }
+    return out;
   });
   /** Issues in a milestone (by milestone id). */
   readonly issuesByMilestone = computed(() =>

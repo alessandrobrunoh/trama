@@ -1,5 +1,8 @@
 import {
+  LucideBuilding2,
+  LucideCircleCheck,
   LucideCircleX,
+  LucideStar,
   LucideGitPullRequest,
   LucideHexagon,
   LucideMessageCircleQuestion,
@@ -19,4 +22,7 @@ export const NOTIFICATION_KIND_VISUAL: Record<NotificationKind, { icon: LucideIc
   ci_failed: { icon: LucideCircleX, tint: 'bg-tone-red/12 text-tone-red' },
   comment: { icon: LucideMessageSquare, tint: 'bg-muted text-muted-foreground' },
   workstream_update: { icon: LucideHexagon, tint: 'bg-entity-workstream/12 text-entity-workstream' },
+  customer_request: { icon: LucideBuilding2, tint: 'bg-tone-blue/12 text-tone-blue' },
+  customer_important: { icon: LucideStar, tint: 'bg-tone-amber/12 text-tone-amber' },
+  customer_delivered: { icon: LucideCircleCheck, tint: 'bg-tone-green/12 text-tone-green' },
 };

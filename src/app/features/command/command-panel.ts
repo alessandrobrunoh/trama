@@ -73,6 +73,7 @@ import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
+import { CustomerSubscriptionsStore } from '../../core/stores/customer-subscriptions.store';
 import { FavoritesStore } from '../../core/stores/favorites.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
@@ -575,6 +576,7 @@ export class CommandPanel {
   private readonly ui = inject(UiStore);
   private readonly store = inject(NablaStore);
   private readonly favorites = inject(FavoritesStore);
+  private readonly customerSubs = inject(CustomerSubscriptionsStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
   private readonly theme = inject(ThemeService);
@@ -999,7 +1001,42 @@ export class CommandPanel {
         icon: LucidePlus,
         run: create('decision'),
       });
+    if (this.store.allowed('manageCustomers')) {
+      const here = this.favorites.current();
+      out.push(
+        {
+          id: 'new:customer',
+          label: 'Create customer',
+          keywords: 'new company account add',
+          icon: LucideBuilding2,
+          run: () => this.ui.openCustomerDialog({ kind: 'customer' }),
+        },
+        {
+          id: 'new:customer-request',
+          label: here?.type === 'issue' ? 'Add customer request to this issue' : here?.type === 'project' ? 'Add customer request to this project' : 'Add customer request',
+          keywords: 'new customer asked feedback need demand',
+          icon: LucideBuilding2,
+          run: () =>
+            this.ui.openCustomerDialog({
+              kind: 'request',
+              ...(here?.type === 'issue' ? { issueId: here.id } : {}),
+              ...(here?.type === 'project' ? { projectId: here.id } : {}),
+              ...(here?.type === 'customer' ? { customerId: here.id } : {}),
+            }),
+        },
+      );
+    }
     const page = this.favorites.current();
+    if (page?.type === 'customer') {
+      const following = this.customerSubs.isFollowing(page.id);
+      out.push({
+        id: 'customer:follow',
+        label: following ? 'Stop following this customer' : 'Follow this customer',
+        keywords: 'subscribe notifications bell',
+        icon: LucideBell,
+        run: () => void this.customerSubs.toggle(page.id),
+      });
+    }
     if (page) {
       const pinned = this.favorites.has(page.type, page.id);
       out.push({

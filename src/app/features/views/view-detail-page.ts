@@ -69,6 +69,7 @@ import {
   fieldOptions,
   filterableFields,
   isEditableFilter,
+  isNumberField,
   valueColor,
   valueGlyph,
   valueLabel,
@@ -185,7 +186,32 @@ type PageLayout = 'list' | 'board' | 'timeline';
         <!-- filter / sort / group row -->
         <div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 sm:px-6">
           @for (f of activeFilters(); track f.field) {
-            @if (f.editable) {
+            @if (f.numeric) {
+              <span class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs">
+                <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
+                <span class="text-muted-foreground flex items-center px-2">at least</span>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  class="bg-transparent w-20 px-2 text-xs tabular-nums outline-none"
+                  [attr.aria-label]="f.label + ' minimum'"
+                  [value]="f.min"
+                  [disabled]="!canEdit()"
+                  (change)="setMin(f.field, $any($event.target).value)"
+                />
+                @if (canEdit()) {
+                  <button
+                    type="button"
+                    class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex w-7 items-center justify-center"
+                    [attr.aria-label]="'Remove ' + f.label + ' filter'"
+                    (click)="removeFilter(f.field)"
+                  >
+                    <svg [lucideIcon]="xIcon" [size]="12"></svg>
+                  </button>
+                }
+              </span>
+            } @else if (f.editable) {
               <!-- Linear-style chip: field · operator · value · × -->
               <span class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs">
                 <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
@@ -494,7 +520,7 @@ export class ViewDetailPage {
 
   // ── query ──
   /** An issue's project filter / grouping also counts the projects of its workstreams. */
-  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById() }));
+  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById(), demand: this.store.demand() }));
   protected readonly rows = computed<Queryable[]>(() => {
     const v = this.view();
     if (!v) return [];
@@ -595,10 +621,13 @@ export class ViewDetailPage {
   }
 
   private chip(v: SavedView, field: string, f: ViewFilter | undefined) {
-    const editable = !f || isEditableFilter(f);
+    const numeric = isNumberField(v.entity, field);
+    const editable = !numeric && (!f || isEditableFilter(f));
     return {
       field,
       label: fieldLabel(v.entity, field),
+      numeric,
+      min: numeric && f?.op === 'gte' ? String(f.value) : '',
       editable,
       options: editable ? fieldOptions(this.store, v.entity, field) : [],
       values: f ? filterValues(v.filters, field) : [],
@@ -641,7 +670,7 @@ export class ViewDetailPage {
     if (!v) return;
     if (!field) return this.patch({ sort: null });
     const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
-    const direction = v.sort?.field === field ? v.sort.direction : def?.kind === 'date' ? 'desc' : 'asc';
+    const direction = v.sort?.field === field ? v.sort.direction : def?.kind === 'date' || def?.kind === 'number' ? 'desc' : 'asc';
     this.patch({ sort: { field, direction } });
   }
   protected flipDirection(): void {
@@ -656,6 +685,14 @@ export class ViewDetailPage {
     if (!v) return;
     this.patch({ filters: setFilter(v.filters, field, 'in', values) });
     if (!values.length) this.pending.update((p) => p.filter((x) => x !== field));
+  }
+  /** "At least N" on a numeric (customer demand) field; empty or invalid removes the filter. */
+  protected setMin(field: string, raw: string): void {
+    const v = this.view();
+    if (!v) return;
+    const n = Number(raw);
+    if (!raw.trim() || !Number.isFinite(n) || n < 0) return this.removeFilter(field);
+    this.patch({ filters: setFilter(v.filters, field, 'gte', String(Math.floor(n))) });
   }
   protected removeFilter(field: string): void {
     const v = this.view();

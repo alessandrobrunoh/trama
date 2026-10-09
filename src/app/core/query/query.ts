@@ -81,6 +81,14 @@ export function matchesFilter<E extends ViewEntity>(
       return values.length > 0 && values[0] < want[0];
     case 'after':
       return values.length > 0 && values[0] > want[0];
+    case 'gte':
+    case 'lte': {
+      // Numeric fields compare as numbers (a string compare would put "9" after "10").
+      const have = Number(values[0]);
+      const limit = Number(want[0]);
+      if (values.length === 0 || Number.isNaN(have) || Number.isNaN(limit)) return false;
+      return filter.op === 'gte' ? have >= limit : have <= limit;
+    }
     default:
       return true;
   }

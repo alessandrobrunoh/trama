@@ -11,7 +11,7 @@ import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue } from './issue-model';
-import { customerCounts } from '../customers/customer-model';
+import { describeDemand } from '../customers/customer-model';
 import { IssueProp } from './issue-prop';
 
 /** Shared bits of row + card. */
@@ -35,7 +35,12 @@ abstract class IssueItemBase {
   protected readonly check = LucideCheck;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly quiet = computed(() => isClosedIssue(this.issue()));
-  protected readonly customerCount = computed(() => customerCounts(this.store.customerRequests()).get(this.issue().id) ?? 0);
+  protected readonly demand = computed(() => this.store.demand().get(this.issue().id));
+  protected readonly customerCount = computed(() => this.demand()?.customerCount ?? 0);
+  protected readonly demandText = computed(() => {
+    const d = this.demand();
+    return d ? describeDemand(d) : '';
+  });
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
     return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
@@ -132,9 +137,10 @@ abstract class IssueItemBase {
       </span>
       @if (customerCount()) {
         <span
-          class="text-muted-foreground relative hidden shrink-0 text-xs tabular-nums sm:inline"
-          [hlmTooltip]="customerCount() === 1 ? '1 customer' : customerCount() + ' customers'"
-          [attr.aria-label]="customerCount() + ' customers'"
+          class="relative hidden shrink-0 text-xs tabular-nums sm:inline"
+          [class]="demand()?.importantCount ? 'text-tone-amber' : 'text-muted-foreground'"
+          [hlmTooltip]="demandText()"
+          [attr.aria-label]="demandText()"
         >{{ customerCount() }}</span>
       }
 

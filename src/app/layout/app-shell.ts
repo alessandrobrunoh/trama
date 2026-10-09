@@ -6,6 +6,7 @@ import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
 import { UiStore } from '../core/stores/ui.store';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
+import { CustomerDialogs } from '../features/customers/customer-dialogs';
 import { SearchDialog } from '../features/command/search-dialog';
 import { ConfirmDialog } from './confirm-dialog';
 import { AppSidebar } from './sidebar';
@@ -35,6 +36,7 @@ import { MobileNav } from './mobile-nav';
     CustomizeSidebarDialog,
     ConfirmDialog,
     CreateDialog,
+    CustomerDialogs,
     SearchDialog,
     AssistantOverlay,
     MobileNav,
@@ -93,6 +95,7 @@ import { MobileNav } from './mobile-nav';
       <app-shortcuts-dialog />
       <app-customize-sidebar-dialog />
       <app-create-dialog />
+      <app-customer-dialogs />
       <app-search-dialog />
     }
     <app-confirm-dialog />

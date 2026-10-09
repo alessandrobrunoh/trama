@@ -23,6 +23,7 @@ import type {
   Dependency,
   DomainEvent,
   Favorite,
+  CustomerSubscription,
   FavoriteType,
   ID,
   InputRequest,
@@ -349,6 +350,14 @@ export class ApiClient {
       this.patch<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests/${requestId}`, input),
     removeRequest: (slug: string, id: ID, requestId: ID) =>
       this.post<void>(`${this.w(slug)}/customers/${id}/requests/${requestId}/unlink`),
+  };
+
+  /** The signed-in user's customer subscriptions in a workspace (private to them). `remove` is idempotent. */
+  readonly customerSubscriptions = {
+    list: (slug: string) => this.get<CustomerSubscription[]>(`${this.w(slug)}/customer-subscriptions`, undefined, { quiet: true }),
+    add: (slug: string, customerId: ID) =>
+      this.post<CustomerSubscription>(`${this.w(slug)}/customer-subscriptions`, { customerId }),
+    remove: (slug: string, customerId: ID) => this.del(`${this.w(slug)}/customer-subscriptions/${encodeURIComponent(customerId)}`),
   };
 
   readonly projects = {

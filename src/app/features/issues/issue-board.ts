@@ -58,6 +58,7 @@ import { StatusIcon } from '../../shared/status';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { priorityOptions, projectFilterOptions, teamOptions, userOptions } from '../workstreams/ws-model';
+import { DemandFilters } from '../customers/demand-filters';
 import { IssueActions } from './issue-actions';
 import { IssueCard, IssueRow } from './issue-items';
 import {
@@ -101,6 +102,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     HlmTooltip,
     LucideDynamicIcon,
     Picker,
+    DemandFilters,
     EmptyState,
     StatusIcon,
     PriorityIcon,
@@ -145,6 +147,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         @if (milestoneFilter().length) {
           <app-picker variant="chip" label="Milestone" [multiple]="true" [options]="milestoneFilter()" [value]="fv('milestoneIds')" (valueChange)="setF('milestoneIds', $event)" />
         }
+        <app-demand-filters [filters]="filters()" (filtersChange)="filters.set($event)" />
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -576,7 +579,7 @@ export class IssueBoard {
   protected readonly projectFilter = computed(() => projectFilterOptions(this.store));
   protected readonly milestoneFilter = computed(() => milestoneFilterOptions(this.store));
   /** An issue counts under its own project and the projects of its workstreams. */
-  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById() }));
+  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById(), demand: this.store.demand() }));
   protected readonly groups = GROUPS;
   protected readonly sorts = SORTS;
   protected readonly props = PROPS;

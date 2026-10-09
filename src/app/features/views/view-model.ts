@@ -64,9 +64,16 @@ const SOURCE_LABEL: Record<string, string> = {
   agent: 'Agent',
 };
 
-/** Fields offered as filter chips (value-set fields only). */
+/** Fields offered as filter chips: value sets, and numbers (customer demand) as "at least N". */
 export function filterableFields(entity: ViewEntity): FieldDef[] {
-  return FIELD_DEFS[entity].filter((f) => f.kind === 'enum' || f.kind === 'id' || f.kind === 'multi-id' || f.kind === 'tags');
+  return FIELD_DEFS[entity].filter(
+    (f) => f.kind === 'enum' || f.kind === 'id' || f.kind === 'multi-id' || f.kind === 'tags' || f.kind === 'number',
+  );
+}
+
+/** Is the field a number (compared with at least / at most)? */
+export function isNumberField(entity: ViewEntity, field: string): boolean {
+  return FIELD_DEFS[entity].find((f) => f.field === field)?.kind === 'number';
 }
 
 export function fieldLabel(entity: ViewEntity, field: string): string {
@@ -110,6 +117,10 @@ export function valueLabel(store: NablaStore, entity: ViewEntity, field: string,
       const m = store.getMilestone(value);
       return m ? m.name : value;
     }
+    case 'customer':
+      return store.getCustomer(value)?.name ?? value;
+    case 'customerTier':
+      return store.settings().customerTiers.find((t) => t.id === value)?.name ?? value;
     case 'workstream': {
       const w = store.getWorkstream(value);
       return w ? `${w.key} ${w.title}` : value;
@@ -193,6 +204,10 @@ export function fieldOptions(store: NablaStore, entity: ViewEntity, field: strin
       return [...none, ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true }))];
     case 'milestone':
       return store.milestones().map((m) => opt(m.id, { hint: store.getProject(m.projectId)?.name }));
+    case 'customer':
+      return store.customers().filter((c) => !c.archivedAt).map((c) => opt(c.id, { hint: c.domain }));
+    case 'customerTier':
+      return store.settings().customerTiers.map((t) => opt(t.id));
   }
   return none;
 }
@@ -210,6 +225,8 @@ const OP_LABEL: Record<ViewFilter['op'], string> = {
   contains: 'contains',
   before: 'before',
   after: 'after',
+  gte: 'at least',
+  lte: 'at most',
 };
 
 export function describeFilter(store: NablaStore, entity: ViewEntity, f: ViewFilter): string {

@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import type { Customer, CustomerRequest, CustomerTier, Issue, Project } from '../contracts/domain.js';
+import type { Customer, CustomerRequest, CustomerTier, DomainEvent, Issue, Project } from '../contracts/domain.js';
 import {
+  customerActivity,
   customerStats,
   describeRequestStates,
   groupCustomerStats,
+  groupWork,
   requestState,
   sortCustomerStats,
+  sortWork,
+  workRows,
 } from '../../../src/app/features/customers/customer-model.ts';
 
 const gold: CustomerTier = { id: 'ct_gold', name: 'Gold', color: '#eab308' };
@@ -79,6 +83,76 @@ describe('customerStats', () => {
     const churned = customerStats([customer('x', 'Xeno', { status: 'churned' }), customer('y', 'Yard')], [], issues, projects, []);
     expect(groupCustomerStats(churned, 'status', []).map((b) => b.label)).toEqual(['Active', 'Churned']);
     expect(groupCustomerStats(churned, 'none', [])).toHaveLength(1);
+  });
+});
+
+describe('workRows', () => {
+  const work = new Map<string, Issue>([
+    ['in_open', { id: 'in_open', key: 'BUG-1', title: 'Open one', status: 'in_progress', priority: 'high', teamId: 'tm_1' } as Issue],
+    ['in_done', { id: 'in_done', key: 'BUG-2', title: 'Done one', status: 'done', priority: 'low' } as Issue],
+  ]);
+  const projs = new Map<string, Project>([['pj_open', { id: 'pj_open', name: 'Onboarding', status: 'planned', priority: 'urgent', teamIds: ['tm_2'] } as Project]]);
+  const requests = [
+    request('1', 'a', { issueId: 'in_open' }, { createdAt: '2026-01-01T00:00:00.000Z' }),
+    request('2', 'a', { issueId: 'in_open' }, { important: true, createdAt: '2026-02-01T00:00:00.000Z' }),
+    request('3', 'a', { issueId: 'in_done' }),
+    request('4', 'a', { projectId: 'pj_open' }),
+    request('5', 'a', { issueId: 'in_gone' }),
+    request('6', 'b', { issueId: 'in_open' }),
+  ];
+  const rows = workRows('a', requests, work, projs);
+
+  it("rolls a customer's requests up per issue or project and skips missing targets", () => {
+    expect(rows).toHaveLength(3);
+    expect(rows.find((r) => r.id === 'in_open')).toMatchObject({ kind: 'issue', key: 'BUG-1', requests: 2, important: 1, state: 'open', teamId: 'tm_1', lastRequestAt: '2026-02-01T00:00:00.000Z' });
+    expect(rows.find((r) => r.id === 'pj_open')).toMatchObject({ kind: 'project', title: 'Onboarding', teamId: 'tm_2', state: 'open' });
+    expect(rows.find((r) => r.id === 'in_done')).toMatchObject({ state: 'delivered' });
+  });
+
+  it('puts important and most requested first', () => {
+    expect(sortWork(rows).map((r) => r.id)).toEqual(['in_open', 'in_done', 'pj_open']);
+  });
+
+  it('groups by state, priority, team and kind in a stable order', () => {
+    expect(groupWork(sortWork(rows), 'state').map((g) => [g.key, g.rows.length])).toEqual([['open', 2], ['delivered', 1]]);
+    expect(groupWork(rows, 'priority').map((g) => g.key)).toEqual(['urgent', 'high', 'low']);
+    expect(groupWork(rows, 'team').map((g) => g.key)).toEqual(['tm_1', 'tm_2', '']);
+    expect(groupWork(rows, 'kind').map((g) => g.key)).toEqual(['issue', 'project']);
+  });
+});
+
+describe('customerActivity', () => {
+  const ev = (id: string, at: string, type: string, subjectId: string, data: Record<string, unknown>): DomainEvent =>
+    ({ id, at, type, data, workspaceId: 'ws_1', actor: { type: 'user', id: 'u_1' }, subject: { type: type.startsWith('customer_request') ? 'customer_request' : 'customer', id: subjectId } }) as DomainEvent;
+  const work = new Map<string, Issue>([
+    ['in_1', { id: 'in_1', key: 'BUG-1', status: 'done', completedAt: '2026-04-01T00:00:00.000Z', updatedAt: '2026-04-01T00:00:00.000Z' } as Issue],
+    ['in_2', { id: 'in_2', key: 'BUG-2', status: 'todo', updatedAt: '2026-01-01T00:00:00.000Z' } as Issue],
+  ]);
+  const events = [
+    ev('e1', '2026-01-01T00:00:00.000Z', 'customer.created', 'a', {}),
+    ev('e2', '2026-02-01T00:00:00.000Z', 'customer_request.linked', 'crq_1', { customerId: 'a', issueId: 'in_1', important: true }),
+    ev('e3', '2026-03-01T00:00:00.000Z', 'customer_request.updated', 'crq_1', { customerId: 'a', issueId: 'in_1', fields: ['important'], important: false }),
+    ev('e4', '2026-03-02T00:00:00.000Z', 'customer.updated', 'a', { fields: ['tierId', 'revenue'] }),
+    ev('e5', '2026-03-03T00:00:00.000Z', 'customer_request.linked', 'crq_9', { customerId: 'other', issueId: 'in_2' }),
+    ev('e6', '2026-03-04T00:00:00.000Z', 'issue.updated', 'in_2', {}),
+  ];
+  const requests = [request('crq_1', 'a', { issueId: 'in_1' }), request('crq_2', 'a', { issueId: 'in_2' })];
+  const items = customerActivity('a', events, requests, work, new Map());
+
+  it('lists this customer\'s events newest first, with delivery derived from the work', () => {
+    expect(items.map((i) => i.text)).toEqual([
+      'BUG-1 was delivered',
+      'Updated tier, revenue',
+      'Removed the important flag on BUG-1',
+      'Recorded an important request on BUG-1',
+      'Added the customer',
+    ]);
+  });
+
+  it('links to the work and leaves delivery without an actor', () => {
+    expect(items[0]).toMatchObject({ link: ['issues', 'BUG-1'] });
+    expect(items[0].actor).toBeUndefined();
+    expect(items[3].link).toEqual(['issues', 'BUG-1']);
   });
 });
 
