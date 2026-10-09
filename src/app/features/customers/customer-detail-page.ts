@@ -30,7 +30,6 @@ import {
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
-import { FavoriteButton } from '../../shared/favorite-button';
 import { Markdown } from '../../shared/markdown';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -86,7 +85,6 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
     PriorityIcon,
     TopBarActions,
     CustomerAvatar,
-    FavoriteButton,
     Markdown,
     ActorAvatar,
     RelativeTimePipe,
@@ -105,15 +103,14 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
           (click)="subs.toggle(c.id)"
         >
           <svg [lucideIcon]="following() ? bellRing : bell" [size]="14"></svg>
-          {{ following() ? 'Following' : 'Follow' }}
+          <span class="max-sm:hidden">{{ following() ? 'Following' : 'Follow' }}</span>
         </button>
-        <app-favorite-button type="customer" [subjectId]="c.id" />
         @if (canManage()) {
-          <button hlmBtn size="sm" variant="outline" (click)="addRequest()"><svg [lucideIcon]="plus" [size]="14"></svg>Add request</button>
-          <button hlmBtn size="sm" variant="outline" (click)="archive()">{{ c.archivedAt ? 'Restore' : 'Archive' }}</button>
+          <button hlmBtn size="sm" variant="outline" (click)="addRequest()"><svg [lucideIcon]="plus" [size]="14"></svg><span class="max-sm:hidden">Add request</span></button>
+          <button hlmBtn size="sm" variant="outline" class="max-sm:hidden" (click)="archive()">{{ c.archivedAt ? 'Restore' : 'Archive' }}</button>
         }
         @if (canDelete()) {
-          <button hlmBtn size="sm" variant="outline" (click)="remove()"><svg [lucideIcon]="trash" [size]="14"></svg>Delete</button>
+          <button hlmBtn size="sm" variant="outline" class="max-sm:hidden" (click)="remove()"><svg [lucideIcon]="trash" [size]="14"></svg>Delete</button>
         }
       </ng-template>
 
@@ -322,7 +319,7 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
                       <svg [lucideIcon]="done" [size]="18" class="text-tone-green mt-0.5 shrink-0"></svg>
                     }
                     <p class="min-w-0 flex-1 text-sm">
-                      @if (a.actor) { <span class="font-medium">{{ store.actorName(a.actor) }}</span> }
+                      @if (a.actor) { <span class="font-medium">{{ store.actorName(a.actor) }}</span>{{ ' ' }} }
                       @if (a.link; as link) {
                         <a [routerLink]="['/', slug(), ...link]" class="hover:underline">{{ a.actor ? lower(a.text) : a.text }}</a>
                       } @else {
@@ -378,6 +375,8 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
                 </label>
                 <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
                   <button hlmBtn size="sm" type="submit">Save</button>
+                  <button hlmBtn size="sm" variant="outline" type="button" class="sm:hidden" (click)="archive()">{{ c.archivedAt ? 'Restore' : 'Archive' }}</button>
+                  @if (canDelete()) { <button hlmBtn size="sm" variant="outline" type="button" class="sm:hidden" (click)="remove()">Delete</button> }
                   @if (formError()) { <p class="text-destructive text-xs">{{ formError() }}</p> }
                 </div>
               </form>

@@ -2,7 +2,7 @@
 // property glyphs sit above it and open inline pickers.
 import { ChangeDetectionStrategy, Component, Directive, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
+import { LucideBuilding2, LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { NablaStore, fullDate, issueProjectIds, shortDate, type Issue } from '../../core';
 import { EntityChip } from '../../shared/entity-chip';
@@ -33,6 +33,7 @@ abstract class IssueItemBase {
   readonly toggleSelect = output<MouseEvent>();
 
   protected readonly check = LucideCheck;
+  protected readonly buildingIcon = LucideBuilding2;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly quiet = computed(() => isClosedIssue(this.issue()));
   protected readonly demand = computed(() => this.store.demand().get(this.issue().id));
@@ -137,11 +138,11 @@ abstract class IssueItemBase {
       </span>
       @if (customerCount()) {
         <span
-          class="relative hidden shrink-0 text-xs tabular-nums sm:inline"
+          class="relative hidden shrink-0 items-center gap-0.5 text-xs tabular-nums sm:inline-flex"
           [class]="demand()?.importantCount ? 'text-tone-amber' : 'text-muted-foreground'"
           [hlmTooltip]="demandText()"
           [attr.aria-label]="demandText()"
-        >{{ customerCount() }}</span>
+        ><svg [lucideIcon]="buildingIcon" [size]="11"></svg>{{ customerCount() }}</span>
       }
 
       @if (hasEstimate()) {
