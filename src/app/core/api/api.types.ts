@@ -93,6 +93,12 @@ export interface CreateLabelInput {
 export interface UpdateLabelInput {
   name?: string;
   color?: string;
+  /** `true` archives (hidden from pickers, kept where used), `false` restores. */
+  archived?: boolean;
+}
+export interface MergeLabelInput {
+  /** Label id that takes over everything labelled with the one being merged away. */
+  into: ID;
 }
 export interface CreateInviteInput {
   email: string;

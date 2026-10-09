@@ -263,12 +263,6 @@ export const repoOptionsIn = (store: NablaStore, projectId?: string | null): Pic
   return project ? all.filter((o) => project.repositoryIds.includes(o.value)) : all;
 };
 
-export const labelOptions = (store: NablaStore): PickOption[] =>
-  store.settings().labels.map((label) => ({ value: label.id, label: label.name, kind: 'label' as const, color: label.color }));
-
-export const labelName = (store: NablaStore, id: string): string =>
-  store.settings().labels.find((label) => label.id === id)?.name ?? id;
-
 /** Users + agents + teams as performer options (`type:id` values). */
 export const performerOptions = (store: NablaStore): PickOption[] => [
   ...store

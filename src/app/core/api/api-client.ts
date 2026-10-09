@@ -118,6 +118,7 @@ import type {
   CreateLabelInput,
   CreateWebhookInput,
   UpdateLabelInput,
+  MergeLabelInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -223,6 +224,7 @@ export class ApiClient {
       this.patch<Workspace>(`${this.w(slug)}/settings`, input),
     createLabel: (slug: string, input: CreateLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels`, input),
     updateLabel: (slug: string, id: ID, input: UpdateLabelInput) => this.patch<Workspace>(`${this.w(slug)}/labels/${id}`, input),
+    mergeLabel: (slug: string, id: ID, input: MergeLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels/${id}/merge`, input),
     deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
     createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
       this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),

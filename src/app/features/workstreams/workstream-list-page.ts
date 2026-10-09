@@ -60,7 +60,6 @@ import { WsBulkBar } from './ws-bulk-bar';
 import {
   WS_VIEW_TABS,
   buildSummary,
-  labelOptions,
   priorityOptions,
   projectFilterOptions,
   repoOptions,
@@ -71,6 +70,7 @@ import {
   type WsViewTab,
 } from './ws-model';
 import { DEFAULT_ROW_PROPS, ROW_PROP_LABELS, WorkstreamCard, WorkstreamRow, type WsRowProps } from './workstream-items';
+import { LabelPicker } from '../../shared/label-picker';
 
 type Layout = 'list' | 'board';
 type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
@@ -145,7 +145,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
 @Component({
   selector: 'app-workstream-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [LabelPicker, 
     HlmButtonImports,
     HlmInputImports,
     HlmPopoverImports,
@@ -290,9 +290,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
           <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
         }
         <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
-        @if (labels().length) {
-          <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
-        }
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -449,7 +447,6 @@ export class WorkstreamListPage {
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repos = computed(() => repoOptions(this.store));
   protected readonly projects = computed(() => projectFilterOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
 
   protected readonly plus = LucidePlus;
   protected readonly listIcon = LucideLayoutList;

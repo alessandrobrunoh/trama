@@ -108,6 +108,7 @@ import type {
   WebhookDeliveryLog,
   Workspace,
   WorkspaceSettings,
+  WorkspaceLabel,
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
@@ -2093,16 +2094,25 @@ export class NablaStore {
     this._workspace.update((cur) => (cur ? { ...cur, settings: ws.settings } : cur));
   }
 
-  /** Add a custom workspace label (admin). */
-  async createLabel(input: CreateLabelInput): Promise<boolean> {
-    return this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+  /** Add a custom workspace label (members and above). Resolves the new label, or `undefined` when the API refused. */
+  async createLabel(input: CreateLabelInput): Promise<WorkspaceLabel | undefined> {
+    const ws = await this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+      onResult: (w) => this.applyWorkspace(w),
+    });
+    const name = input.name.trim().toLowerCase();
+    return ws?.settings.labels.find((label) => label.name.toLowerCase() === name);
+  }
+
+  /** Rename, recolor, archive or restore a workspace label (admin). Templates can only be recolored. */
+  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
+    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
 
-  /** Rename or recolor a workspace label (admin). Templates can only be recolored. */
-  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
-    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
+  /** Move everything labelled `id` onto `into` and remove `id` (admin). */
+  async mergeLabel(id: ID, into: ID): Promise<boolean> {
+    return this.write('merge label', (s) => this.api.workspaces.mergeLabel(s, id, { into }), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
