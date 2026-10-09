@@ -21,3 +21,4 @@ export * from './stores/notifications.store';
 export * from './sync';
 export * from './query';
 export * from './keyboard';
+export * from './viewport';

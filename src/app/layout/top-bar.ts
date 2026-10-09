@@ -9,6 +9,7 @@ import { FavoritesStore } from '../core/stores/favorites.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { FavoriteButton } from '../shared/favorite-button';
 import { SyncStatus } from '../core/sync/sync-status';
+import { Viewport } from '../core/viewport';
 import { PageChrome, type Crumb } from './page-chrome';
 import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 
@@ -19,9 +20,10 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
   imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger, FavoriteButton],
   host: {
     class:
-      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 md:rounded-t-lg',
+      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 max-md:hidden md:rounded-t-lg',
   },
   template: `
+    @if (!viewport.isMobile()) {
     <button hlmSidebarTrigger class="-ml-1 hidden size-7 md:inline-flex" srOnlyText="Toggle sidebar (⌘B)"></button>
 
     <nav aria-label="Breadcrumb" class="flex min-w-0 flex-1 items-center gap-1.5">
@@ -74,9 +76,12 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
         <ng-container *ngTemplateOutlet="tpl" />
       }
     </div>
+    }
   `,
 })
 export class TopBar {
+  /** Phones render <app-mobile-header> instead; the desktop bar stays empty there. */
+  protected readonly viewport = inject(Viewport);
   protected readonly chrome = inject(PageChrome);
   protected readonly sync = inject(SyncStatus);
   private readonly router = inject(Router);

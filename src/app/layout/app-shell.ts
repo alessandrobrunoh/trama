@@ -14,7 +14,9 @@ import { ShortcutsDialog } from './shortcuts-dialog';
 import { CustomizeSidebarDialog } from './customize-sidebar-dialog';
 import { TopBar } from './top-bar';
 import { AssistantOverlay } from '../features/ai/assistant-overlay';
+import { MobileHeader } from './mobile-header';
 import { MobileNav } from './mobile-nav';
+import { Viewport } from '../core/viewport';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
@@ -40,6 +42,7 @@ import { MobileNav } from './mobile-nav';
     SearchDialog,
     AssistantOverlay,
     MobileNav,
+    MobileHeader,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
@@ -57,12 +60,15 @@ import { MobileNav } from './mobile-nav';
       class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-1.5 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >Skip to content</a
     >
-    <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden">
+    <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden max-md:h-dvh">
       <hlm-sidebar collapsible="offcanvas" variant="inset" mobileSide="bottom" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
         <app-sidebar />
       </hlm-sidebar>
-      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden md:h-[calc(100svh-1rem)]">
+      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh md:h-[calc(100svh-1rem)]">
         <app-top-bar />
+        @if (viewport.isMobile()) {
+          <app-mobile-header />
+        }
         <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
         </div>
@@ -104,6 +110,7 @@ import { MobileNav } from './mobile-nav';
 })
 export class AppShell {
   protected readonly ui = inject(UiStore);
+  protected readonly viewport = inject(Viewport);
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */

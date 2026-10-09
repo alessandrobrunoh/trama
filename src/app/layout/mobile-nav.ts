@@ -1,24 +1,36 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
-  LucideActivity,
+  LucideBellRing,
+  LucideCheck,
   LucideCircleDot,
   LucideDynamicIcon,
-  LucideBox,
-  LucideCheck,
-  LucideMenu,
+  LucideEllipsis,
   LucideMessageSquare,
   LucidePlus,
-  LucideX,
-  LucideSettings,
   LucideSearch,
+  LucideSettings,
+  LucideUserRoundCheck,
+  LucideX,
 } from '@lucide/angular';
 import { AssistantStore } from '../core/ai/assistant.store';
 import { NablaStore } from '../core/stores/nabla.store';
-import { MAIN_NAV, PERSONAL_NAV } from './nav';
-import { UiStore } from '../core/stores/ui.store';
+import { NotificationsStore } from '../core/stores/notifications.store';
 import { SessionStore } from '../core/session/session.store';
+import { UiStore } from '../core/stores/ui.store';
+import { haptic } from '../core/viewport';
+import { MAIN_NAV, PERSONAL_NAV, type NavItem } from './nav';
 
+interface SheetGroup {
+  title: string;
+  items: NavItem[];
+}
+
+/**
+ * Phone navigation (< md): a docked tab bar (Attention, My work, Issues, Search, More) with badges and
+ * a "More" sheet that carries every other section, the workspace switcher and the assistant.
+ * Everything here is `md:hidden`; the desktop sidebar is untouched.
+ */
 @Component({
   selector: 'app-mobile-nav',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,19 +38,33 @@ import { SessionStore } from '../core/session/session.store';
   host: { class: 'mobile-nav md:hidden' },
   template: `
     @if (ui.mobileSidebarOpen()) {
-      <button class="mobile-menu__backdrop" type="button" aria-label="Close navigation menu" (click)="closeMenu()"></button>
-      <section class="mobile-menu" role="dialog" aria-modal="true" aria-label="Navigation menu">
+      <button class="mobile-menu__backdrop" type="button" aria-label="Close menu" (click)="closeMenu()"></button>
+      <section
+        class="mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="More"
+        (keydown.escape)="closeMenu()"
+      >
+        <span
+          class="mobile-menu__grabber"
+          aria-hidden="true"
+          (pointerdown)="dragStart($event)"
+          (pointermove)="dragMove($event)"
+          (pointerup)="dragEnd($event)"
+          (pointercancel)="dragEnd($event)"
+        ></span>
         <header class="mobile-menu__header">
           <div class="mobile-menu__identity">
-            <span class="mobile-menu__avatar" aria-hidden="true">{{ initials }}</span>
-            <span class="mobile-menu__account">{{ accountName }}</span>
+            <span class="mobile-menu__avatar" aria-hidden="true">{{ initials() }}</span>
+            <span class="mobile-menu__account">{{ accountName() }}</span>
           </div>
-          <button class="mobile-menu__close" type="button" aria-label="Close navigation menu" (click)="closeMenu()">
-            <svg [lucideIcon]="closeIcon" [size]="22" aria-hidden="true"></svg>
+          <button class="mobile-menu__close" type="button" aria-label="Close menu" (click)="closeMenu()">
+            <svg [lucideIcon]="closeIcon" [size]="20" aria-hidden="true"></svg>
           </button>
         </header>
         <nav class="mobile-menu__links" aria-label="All sections">
-          <div class="mobile-menu__workspaces" role="group" aria-label="Workspaces">
+          <div class="mobile-menu__group" role="group" aria-label="Workspaces">
             <p class="mobile-menu__label">Workspaces</p>
             @for (w of session.workspaces(); track w.id) {
               <button
@@ -56,62 +82,88 @@ import { SessionStore } from '../core/session/session.store';
               </button>
             }
             <a class="mobile-menu__link" routerLink="/new-workspace" (click)="closeMenu()">
-              <svg [lucideIcon]="plusIcon" [size]="21" aria-hidden="true"></svg><span>Create workspace</span>
+              <svg [lucideIcon]="plusIcon" [size]="20" aria-hidden="true"></svg><span>Create workspace</span>
             </a>
           </div>
-          @for (item of menuItems; track item.segment) {
-            <a [routerLink]="['/', slug(), item.segment]" routerLinkActive="mobile-menu__link--active"
-              [routerLinkActiveOptions]="{ exact: false }" ariaCurrentWhenActive="page"
-              class="mobile-menu__link" (click)="closeMenu()">
-              <svg [lucideIcon]="item.icon" [size]="21" aria-hidden="true"></svg><span>{{ item.label }}</span>
-            </a>
+          @for (group of groups(); track group.title) {
+            <div class="mobile-menu__group" role="group" [attr.aria-label]="group.title">
+              <p class="mobile-menu__label">{{ group.title }}</p>
+              @for (item of group.items; track item.segment) {
+                <a
+                  [routerLink]="['/', slug(), item.segment]"
+                  routerLinkActive="mobile-menu__link--active"
+                  ariaCurrentWhenActive="page"
+                  class="mobile-menu__link"
+                  (click)="closeMenu()"
+                >
+                  <svg [lucideIcon]="item.icon" [size]="20" aria-hidden="true"></svg>
+                  <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
+                  @if (menuBadge(item); as n) {
+                    <span class="mobile-badge mobile-badge--inline">{{ n > 99 ? '99+' : n }}</span>
+                  }
+                </a>
+              }
+            </div>
           }
-          <button class="mobile-menu__link" type="button" (click)="openSearch()">
-            <svg [lucideIcon]="searchIcon" [size]="21" aria-hidden="true"></svg><span>Search</span>
-          </button>
+          <div class="mobile-menu__group" role="group" aria-label="Trama">
+            <button class="mobile-menu__link" type="button" (click)="openAssistant()">
+              <svg [lucideIcon]="assistantIcon" [size]="20" aria-hidden="true"></svg><span>Assistant</span>
+            </button>
+            <a
+              [routerLink]="['/', slug(), 'settings']"
+              routerLinkActive="mobile-menu__link--active"
+              class="mobile-menu__link"
+              (click)="closeMenu()"
+            >
+              <svg [lucideIcon]="settingsIcon" [size]="20" aria-hidden="true"></svg><span>Settings</span>
+            </a>
+          </div>
         </nav>
       </section>
     }
-    <nav aria-label="Main navigation" class="mobile-nav__items">
-      @for (item of items; track item.segment) {
+    <nav aria-label="Main navigation" class="mobile-tabbar">
+      @for (tab of tabs; track tab.segment) {
         <a
-          [routerLink]="['/', slug(), item.segment]"
-          routerLinkActive="mobile-nav__link--active"
-          [routerLinkActiveOptions]="{ exact: false }"
+          [routerLink]="['/', slug(), tab.segment]"
+          routerLinkActive="mobile-tab--active"
           ariaCurrentWhenActive="page"
-          class="mobile-nav__link"
-          [attr.aria-label]="item.label"
-          [attr.title]="item.label"
+          class="mobile-tab"
+          (click)="tapped()"
         >
-          <svg [lucideIcon]="item.icon" [size]="22" aria-hidden="true"></svg>
-          <span class="sr-only">{{ item.label }}</span>
+          <span class="mobile-tab__icon">
+            <svg [lucideIcon]="tab.icon" [size]="24" aria-hidden="true"></svg>
+            @if (tab.segment === 'attention' && attention(); as n) {
+              <span class="mobile-badge" aria-hidden="true">{{ n > 99 ? '99+' : n }}</span>
+            }
+          </span>
+          <span class="mobile-tab__label">{{ tab.label }}</span>
+          @if (tab.segment === 'attention' && attention(); as n) {
+            <span class="sr-only">, {{ n }} waiting on you</span>
+          }
         </a>
       }
-      <button
-        type="button"
-        class="mobile-nav__link"
-        [class.mobile-nav__link--active]="ui.mobileSidebarOpen()"
-        aria-label="Open navigation menu"
-        title="Navigation menu"
-        [attr.aria-expanded]="ui.mobileSidebarOpen()"
-        (click)="ui.setMobileSidebar(!ui.mobileSidebarOpen())"
-      >
-        <svg [lucideIcon]="menuIcon" [size]="22" aria-hidden="true"></svg>
-        <span class="sr-only">More sections</span>
+      <button type="button" class="mobile-tab" aria-haspopup="dialog" (click)="openSearch()">
+        <span class="mobile-tab__icon"><svg [lucideIcon]="searchIcon" [size]="24" aria-hidden="true"></svg></span>
+        <span class="mobile-tab__label">Search</span>
       </button>
       <button
-        id="mobile-assistant-launcher"
         type="button"
-        class="mobile-nav__link"
-        [class.mobile-nav__link--active]="assistant.open()"
-        aria-label="Open Trama assistant"
-        title="Trama assistant"
-        aria-controls="nabla-assistant"
-        [attr.aria-expanded]="assistant.open()"
-        (click)="toggleAssistant()"
+        class="mobile-tab"
+        [class.mobile-tab--active]="ui.mobileSidebarOpen()"
+        aria-haspopup="dialog"
+        [attr.aria-expanded]="ui.mobileSidebarOpen()"
+        (click)="toggleMenu()"
       >
-        <svg [lucideIcon]="assistantIcon" [size]="22" aria-hidden="true"></svg>
-        <span class="sr-only">Assistant</span>
+        <span class="mobile-tab__icon">
+          <svg [lucideIcon]="moreIcon" [size]="24" aria-hidden="true"></svg>
+          @if (unread() > 0) {
+            <span class="mobile-badge mobile-badge--dot" aria-hidden="true"></span>
+          }
+        </span>
+        <span class="mobile-tab__label">More</span>
+        @if (unread() > 0) {
+          <span class="sr-only">, {{ unread() }} unread notifications</span>
+        }
       </button>
     </nav>
   `,
@@ -120,31 +172,62 @@ export class MobileNav {
   protected readonly assistant = inject(AssistantStore);
   protected readonly ui = inject(UiStore);
   protected readonly session = inject(SessionStore);
-  protected readonly items = [
-    { ...PERSONAL_NAV[0], label: 'Inbox' },
+  private readonly store = inject(NablaStore);
+  private readonly notifications = inject(NotificationsStore);
+
+  protected readonly slug = this.store.slug;
+  protected readonly attention = this.store.attentionCount;
+  protected readonly unread = this.notifications.unread;
+
+  protected readonly tabs = [
+    { segment: 'attention', label: 'Attention', icon: LucideBellRing },
+    { segment: 'my-work', label: 'My work', icon: LucideUserRoundCheck },
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
-    { segment: 'activity', label: 'Activity', icon: LucideActivity },
-    { segment: 'projects', label: 'Projects', icon: LucideBox },
   ];
-  protected readonly slug = inject(NablaStore).slug;
+  /** Tabs live in the bar; the sheet lists everything else. */
+  private static readonly IN_BAR = new Set(['attention', 'my-work', 'issues', 'assistant', 'settings']);
+  protected readonly groups = computed<SheetGroup[]>(() => {
+    const rest = (items: NavItem[]) => items.filter((n) => !MobileNav.IN_BAR.has(n.segment));
+    return [
+      { title: 'You', items: rest(PERSONAL_NAV) },
+      { title: 'Workspace', items: rest(MAIN_NAV) },
+    ].filter((g) => g.items.length > 0);
+  });
+
   protected readonly assistantIcon = LucideMessageSquare;
-  protected readonly menuIcon = LucideMenu;
+  protected readonly moreIcon = LucideEllipsis;
   protected readonly closeIcon = LucideX;
   protected readonly searchIcon = LucideSearch;
   protected readonly checkIcon = LucideCheck;
   protected readonly plusIcon = LucidePlus;
-  protected readonly menuItems = [
-    { ...PERSONAL_NAV[0], label: 'Inbox' },
-    { ...PERSONAL_NAV[1], label: 'My issues' },
-    { segment: 'activity', label: 'Pulse', icon: LucideActivity },
-    ...MAIN_NAV.filter((item) => item.segment !== 'activity'),
-    { segment: 'settings', label: 'Settings', icon: LucideSettings },
-  ];
-  protected get accountName(): string {
-    return this.session.user()?.name ?? 'Account';
+  protected readonly settingsIcon = LucideSettings;
+
+  protected readonly accountName = computed(() => this.session.user()?.name ?? 'Account');
+  protected readonly initials = computed(() =>
+    this.accountName()
+      .split(/\s+/)
+      .map((part) => part[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase(),
+  );
+
+  // Swipe-down on the grabber to dismiss, like the dialog sheets.
+  protected drag = 0;
+  private dragState: { id: number; startY: number; startT: number } | null = null;
+
+  protected menuBadge(item: NavItem): number {
+    return item.badge === 'notifications' ? this.notifications.unread() : 0;
   }
-  protected get initials(): string {
-    return this.accountName.split(/\s+/).map((part) => part[0]).slice(0, 2).join('').toUpperCase();
+
+  protected tapped(): void {
+    haptic('tap');
+    this.ui.setMobileSidebar(false);
+  }
+
+  protected toggleMenu(): void {
+    haptic('tap');
+    this.ui.setMobileSidebar(!this.ui.mobileSidebarOpen());
   }
 
   protected closeMenu(): void {
@@ -157,11 +240,35 @@ export class MobileNav {
   }
 
   protected openSearch(): void {
-    this.closeMenu();
-    this.ui.openCommandPalette();
+    haptic('tap');
+    this.ui.openModal('search');
   }
 
-  protected toggleAssistant(): void {
-    this.assistant.open.update((open) => !open);
+  protected openAssistant(): void {
+    this.closeMenu();
+    this.assistant.open.set(true);
+  }
+
+  protected dragStart(ev: PointerEvent): void {
+    this.dragState = { id: ev.pointerId, startY: ev.clientY, startT: ev.timeStamp };
+    (ev.currentTarget as HTMLElement).setPointerCapture(ev.pointerId);
+  }
+
+  protected dragMove(ev: PointerEvent): void {
+    const d = this.dragState;
+    if (!d || d.id !== ev.pointerId) return;
+    this.drag = Math.max(0, ev.clientY - d.startY);
+    (ev.currentTarget as HTMLElement).parentElement?.style.setProperty('--sheet-drag', `${this.drag}px`);
+  }
+
+  protected dragEnd(ev: PointerEvent): void {
+    const d = this.dragState;
+    if (!d || d.id !== ev.pointerId) return;
+    this.dragState = null;
+    const fast = this.drag / Math.max(1, ev.timeStamp - d.startT) > 0.5;
+    const close = this.drag > 96 || (fast && this.drag > 24);
+    this.drag = 0;
+    (ev.currentTarget as HTMLElement).parentElement?.style.removeProperty('--sheet-drag');
+    if (close) this.closeMenu();
   }
 }

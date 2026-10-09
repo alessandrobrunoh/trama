@@ -1,15 +1,112 @@
 @import 'tailwindcss';
 @import '@spartan-ng/brain/hlm-tailwind-preset.css';
 
+/* ───────────────────────── Phone shell (< md) ─────────────────────────
+   Docked tab bar + "More" sheet (layout/mobile-nav.ts). Safe-area insets are respected on every edge. */
 .mobile-nav {
   position: relative;
   z-index: 50;
+  flex: none;
+}
+
+.mobile-tabbar {
   display: flex;
+  align-items: stretch;
+  padding: 0 0.25rem env(safe-area-inset-bottom);
+  border-top: 1px solid var(--border);
+  background: color-mix(in oklab, var(--background) 90%, transparent);
+  -webkit-backdrop-filter: saturate(1.6) blur(20px);
+  backdrop-filter: saturate(1.6) blur(20px);
+}
+
+.mobile-tab {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  min-inline-size: 0;
+  min-block-size: 3.0625rem;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 0.625rem;
-  flex: none;
-  padding: 0.5rem 1rem max(0.625rem, env(safe-area-inset-bottom));
+  gap: 0.125rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted-foreground);
+  font: inherit;
+  text-decoration: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-tab__icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mobile-tab__label {
+  max-inline-size: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.1;
+}
+
+.mobile-tab--active {
+  color: var(--primary);
+}
+
+.mobile-tab--active .mobile-tab__label {
+  font-weight: 600;
+}
+
+.mobile-tab:active .mobile-tab__icon {
+  transform: scale(0.86);
+}
+
+.mobile-tab:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -4px;
+  border-radius: 0.75rem;
+}
+
+.mobile-badge {
+  position: absolute;
+  inset-block-start: -0.3125rem;
+  inset-inline-start: 55%;
+  display: grid;
+  min-inline-size: 1.125rem;
+  block-size: 1.125rem;
+  place-items: center;
+  padding-inline: 0.3125rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 2px var(--background);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.mobile-badge--dot {
+  min-inline-size: 0;
+  inline-size: 0.5625rem;
+  block-size: 0.5625rem;
+  padding: 0;
+}
+
+.mobile-badge--inline {
+  position: static;
+  box-shadow: none;
+}
+
+/* The keyboard owns the bottom edge while typing. */
+html[data-keyboard='open'] .mobile-tabbar {
+  display: none;
 }
 
 .mobile-menu__backdrop {
@@ -17,56 +114,78 @@
   z-index: 40;
   inset: 0;
   border: 0;
-  background: rgb(0 0 0 / 0.28);
-  backdrop-filter: blur(3px);
+  background: rgb(0 0 0 / 0.4);
+  animation: sheet-fade 200ms ease-out;
 }
 
 .mobile-menu {
   position: fixed;
   z-index: 45;
-  inset-inline: 1rem;
-  bottom: calc(5.5rem + env(safe-area-inset-bottom));
+  inset-inline: 0;
+  bottom: 0;
   display: flex;
-  max-height: min(76dvh, 42rem);
+  max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - 1rem));
   flex-direction: column;
   overflow: hidden;
-  border: 1px solid color-mix(in oklab, var(--border-strong) 72%, transparent);
-  border-radius: 1.75rem;
-  background: color-mix(in oklab, var(--popover) 94%, transparent);
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: var(--popover);
   color: var(--popover-foreground);
-  box-shadow: 0 18px 60px rgb(0 0 0 / 0.28);
-  backdrop-filter: blur(24px);
+  box-shadow: 0 -12px 48px rgb(0 0 0 / 0.3);
+  transform: translateY(var(--sheet-drag, 0px));
+  animation: sheet-in 280ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mobile-menu__grabber {
+  position: relative;
+  flex: none;
+  block-size: 1.5rem;
+  cursor: grab;
+  touch-action: none;
+}
+
+.mobile-menu__grabber::after {
+  content: '';
+  position: absolute;
+  inset-block-start: 0.5rem;
+  inset-inline-start: 50%;
+  inline-size: 2.25rem;
+  block-size: 0.25rem;
+  border-radius: 999px;
+  background: var(--muted-foreground);
+  opacity: 0.4;
+  transform: translateX(-50%);
 }
 
 .mobile-menu__header {
   display: flex;
-  min-height: 4.5rem;
+  min-block-size: 3.5rem;
+  flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  margin-inline: 1rem;
+  padding-inline: 1rem;
   border-bottom: 1px solid var(--border);
 }
 
 .mobile-menu__identity {
   display: flex;
-  min-width: 0;
+  min-inline-size: 0;
   align-items: center;
   gap: 0.75rem;
-  font-size: 1rem;
+  font-size: 1.0625rem;
   font-weight: 600;
 }
 
 .mobile-menu__avatar {
   display: grid;
-  inline-size: 2.5rem;
-  block-size: 2.5rem;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
   flex: none;
   place-items: center;
   border-radius: 999px;
   background: var(--primary);
   color: var(--primary-foreground);
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
 }
 
 .mobile-menu__account {
@@ -89,22 +208,25 @@
 
 .mobile-menu__links {
   overflow: auto;
-  padding: 0.625rem 0.75rem max(0.75rem, env(safe-area-inset-bottom));
+  padding: 0.5rem 0.75rem max(1rem, env(safe-area-inset-bottom));
   overscroll-behavior: contain;
 }
 
-.mobile-menu__workspaces {
-  margin-bottom: 0.375rem;
-  padding-bottom: 0.375rem;
-  border-bottom: 1px solid var(--border);
+.mobile-menu__group {
+  padding-block: 0.25rem 0.5rem;
+}
+
+.mobile-menu__group + .mobile-menu__group {
+  border-top: 1px solid var(--border);
 }
 
 .mobile-menu__label {
-  margin: 0.25rem 0.875rem 0.125rem;
+  margin: 0.25rem 0.75rem 0.125rem;
   color: var(--muted-foreground);
   font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.02em;
+  text-transform: uppercase;
 }
 
 .mobile-menu__mark {
@@ -122,18 +244,20 @@
 
 .mobile-menu__link {
   display: flex;
-  min-height: 3.25rem;
+  inline-size: 100%;
+  min-block-size: 3rem;
   align-items: center;
   gap: 0.875rem;
-  padding: 0 0.875rem;
+  padding: 0 0.75rem;
   border: 0;
-  border-radius: 1rem;
+  border-radius: 0.75rem;
   background: transparent;
   color: var(--foreground);
   font: inherit;
   font-size: 1rem;
   text-align: start;
   text-decoration: none;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -142,59 +266,232 @@
   color: var(--muted-foreground);
 }
 
+.mobile-menu__link:active {
+  background: var(--accent);
+}
+
 .mobile-menu__link--active {
-  background: color-mix(in oklab, var(--foreground) 9%, transparent);
+  background: color-mix(in oklab, var(--primary) 9%, transparent);
+  font-weight: 600;
 }
 
-.mobile-nav__items {
-  display: flex;
+/* ───────────────────────── Phone header + floating action button ─────────────────────────
+   layout/mobile-header.ts: back button + folding large title; the page's "New …" action is the FAB. */
+.mobile-header {
+  position: relative;
+  z-index: 10;
+  display: block;
   flex: none;
-  align-items: center;
-  gap: 0.125rem;
-  padding: 0.3125rem;
-  border: 1px solid color-mix(in oklab, var(--border-strong) 80%, transparent);
-  border-radius: 999px;
-  background: color-mix(in oklab, var(--popover) 88%, transparent);
-  box-shadow: var(--shadow-menu);
-  backdrop-filter: blur(18px);
+  padding-top: env(safe-area-inset-top);
+  padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+  background: var(--background);
+  transition: box-shadow 160ms ease-out;
 }
 
-.mobile-nav__link {
+.mobile-header:not(:has(.mobile-header__large)),
+.mobile-header--collapsed {
+  box-shadow: 0 1px 0 var(--border);
+}
+
+.mobile-header__bar {
   display: grid;
-  inline-size: clamp(2.625rem, 12vw, 3rem);
-  block-size: clamp(2.625rem, 12vw, 3rem);
-  place-items: center;
+  min-block-size: 2.75rem;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding-inline: 0.25rem;
+}
+
+.mobile-header__lead {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+}
+
+.mobile-header__back {
+  display: inline-flex;
+  min-block-size: 2.75rem;
+  max-inline-size: 11rem;
+  align-items: center;
+  padding-inline-end: 0.5rem;
   border: 0;
-  border-radius: 999px;
   background: transparent;
-  color: var(--muted-foreground);
+  color: var(--primary);
   font: inherit;
-  text-decoration: none;
+  font-size: 1.0625rem;
+  touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
 
-.mobile-nav__link--active {
-  background: color-mix(in oklab, var(--foreground) 8%, var(--popover));
-  color: var(--foreground);
-  box-shadow: 0 1px 2px rgb(0 0 0 / 0.14);
+.mobile-header__back:active {
+  opacity: 0.5;
 }
 
-.mobile-nav__link:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
+.mobile-header__back-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.mobile-nav__link:active {
-  transform: scale(0.96);
+.mobile-header__avatar {
+  display: grid;
+  inline-size: 2.75rem;
+  block-size: 2.75rem;
+  place-items: center;
+  padding: 0.3125rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--foreground);
+  background-clip: content-box;
+  color: var(--background);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-header__title {
+  max-inline-size: 52vw;
+  margin: 0;
+  overflow: hidden;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.mobile-header__title--shown {
+  opacity: 1;
+}
+
+.mobile-header__end {
+  display: flex;
+  min-inline-size: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+
+.mobile-header__sync {
+  display: grid;
+  inline-size: 1.5rem;
+  block-size: 2.75rem;
+  place-items: center;
+}
+
+.mobile-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* "New …" actions are the floating button on phones. */
+.mobile-header__actions [data-slot='button']:has(app-kbd) {
+  display: none;
+}
+
+.mobile-header__end [data-slot='button'],
+.mobile-header__end app-favorite-button button {
+  min-block-size: 2.75rem;
+}
+
+.mobile-header__end [data-slot='button'][aria-label],
+.mobile-header__end app-favorite-button button {
+  min-inline-size: 2.75rem;
+}
+
+/* Keyboard-style stepping between neighbours (J/K) is clutter on a phone header. */
+.mobile-header__actions [aria-label='Previous issue'],
+.mobile-header__actions [aria-label='Next issue'] {
+  display: none;
+}
+
+.mobile-header__large {
+  display: grid;
+  grid-template-rows: 1fr;
+  overflow: hidden;
+  transition:
+    grid-template-rows 240ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms ease-out;
+}
+
+.mobile-header--collapsed .mobile-header__large {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.mobile-header__large-title {
+  min-block-size: 0;
+  margin: 0;
+  overflow: hidden;
+  padding-inline: 1rem;
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mobile-fab {
+  position: fixed;
+  z-index: 30;
+  inset-inline-end: max(1rem, env(safe-area-inset-right));
+  bottom: calc(3.0625rem + env(safe-area-inset-bottom) + 1rem);
+  display: grid;
+  inline-size: 3.5rem;
+  block-size: 3.5rem;
+  place-items: center;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow:
+    0 6px 16px rgb(0 0 0 / 0.22),
+    0 1px 3px rgb(0 0 0 / 0.2);
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 160ms cubic-bezier(0.32, 0.72, 0, 1);
+  animation: fab-in 240ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.mobile-fab:active {
+  transform: scale(0.92);
+}
+
+/* Keep the last rows of a list reachable above the floating button. */
+app-shell:has(.mobile-fab) #main-content > [class*='min-h-full'] {
+  padding-bottom: 5.5rem;
+}
+app-shell:has(.mobile-fab) #main-content [class*='overflow-y-auto']::after {
+  content: '';
+  display: block;
+  flex: none;
+  block-size: 5.5rem;
+}
+
+html[data-keyboard='open'] .mobile-fab {
+  display: none;
+}
+
+@keyframes fab-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@keyframes sheet-fade {
+  from {
+    opacity: 0;
+  }
 }
 
 @media (min-width: 48rem) {
   .mobile-nav {
-    display: none;
-  }
-
-  .mobile-menu,
-  .mobile-menu__backdrop {
     display: none;
   }
 }
@@ -695,6 +992,190 @@
     background: var(--muted-foreground);
     opacity: 0.4;
     transform: translateX(-50%);
+  }
+}
+
+/* ───────────────────── Phone touch UI (< md, and tablets with a finger) ─────────────────────
+   Menus, popovers and pickers become bottom sheets; the command palette and the create composer go
+   full screen; inputs are 16px so iOS never zooms; touch targets are 44px; rows have no hover-only UI. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (pointer: coarse) {
+  html {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+  /* 16px or larger: below that iOS Safari zooms the page when a field is focused. */
+  :is(
+      input:not([type='checkbox'], [type='radio'], [type='range'], [type='file'], [type='color']),
+      textarea,
+      select
+    ) {
+    font-size: max(1rem, 16px);
+  }
+  button,
+  [role='button'],
+  a {
+    -webkit-touch-callout: none;
+  }
+}
+
+@media (max-width: 47.999rem) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
+  /* Connected overlays (popover, dropdown, select, combobox) dock to the bottom as a sheet. */
+  .cdk-overlay-connected-position-bounding-box:has(
+      > .cdk-overlay-pane
+        > :is(
+          hlm-popover-content,
+          hlm-dropdown-menu,
+          hlm-select-content,
+          hlm-combobox-content,
+          hlm-autocomplete-content,
+          [hlmPopoverContent],
+          [hlmDropdownMenu]
+        )
+    ) {
+    position: fixed !important;
+    inset: 0 !important;
+    inline-size: 100% !important;
+    block-size: 100% !important;
+    /* the CDK bounding box is a flex column: justify = vertical */
+    flex-direction: column;
+    align-items: stretch !important;
+    justify-content: flex-end !important;
+    background: rgb(0 0 0 / 0.4);
+    pointer-events: auto;
+    animation: sheet-fade 200ms ease-out;
+  }
+  .cdk-overlay-connected-position-bounding-box
+    > .cdk-overlay-pane:has(
+      > :is(
+        hlm-popover-content,
+        hlm-dropdown-menu,
+        hlm-select-content,
+        hlm-combobox-content,
+        hlm-autocomplete-content,
+        [hlmPopoverContent],
+        [hlmDropdownMenu]
+      )
+    ) {
+    position: static !important;
+    inline-size: 100%;
+    max-inline-size: 100%;
+    transform: none !important;
+  }
+  :is(
+    hlm-popover-content,
+    hlm-dropdown-menu,
+    hlm-select-content,
+    hlm-combobox-content,
+    hlm-autocomplete-content,
+    [hlmPopoverContent],
+    [hlmDropdownMenu]
+  ) {
+    inline-size: 100% !important;
+    max-inline-size: none !important;
+    max-block-size: min(72dvh, 36rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 0;
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding-block-end: max(0.5rem, env(safe-area-inset-bottom));
+    box-shadow: 0 -12px 48px rgb(0 0 0 / 0.3);
+    animation: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  :is(hlm-popover-content, hlm-dropdown-menu, hlm-select-content, hlm-combobox-content)::before {
+    content: '';
+    display: block;
+    flex: none;
+    inline-size: 2.25rem;
+    block-size: 0.25rem;
+    margin: 0.5rem auto 0.25rem;
+    border-radius: 999px;
+    background: var(--muted-foreground);
+    opacity: 0.4;
+  }
+  /* The lists inside already scroll: let the sheet height follow them. */
+  :is(hlm-popover-content, hlm-select-content, hlm-combobox-content) :is([data-slot='command-list'], [data-slot='combobox-list']) {
+    max-block-size: 50dvh;
+  }
+  :is(
+    [data-slot='dropdown-menu-item'],
+    [data-slot='dropdown-menu-checkbox-item'],
+    [data-slot='dropdown-menu-radio-item'],
+    [data-slot='dropdown-menu-sub-trigger'],
+    [data-slot='command-item'],
+    [data-slot='select-item'],
+    [data-slot='combobox-item'],
+    [data-slot='autocomplete-item']
+  ) {
+    min-block-size: 2.75rem;
+    font-size: 1rem;
+  }
+  [data-slot='command-input-wrapper'] {
+    min-block-size: 3rem;
+  }
+
+  /* Command palette / search: a full-screen search page. */
+  .cdk-global-overlay-wrapper:has(hlm-dialog-content[data-variant='palette']) {
+    align-items: stretch !important;
+    justify-content: stretch !important;
+  }
+  .cdk-overlay-pane:has(hlm-dialog-content[data-variant='palette']) {
+    inline-size: 100%;
+    max-inline-size: 100%;
+    block-size: 100%;
+  }
+  hlm-dialog-content[data-variant='palette'] {
+    inset: 0 !important;
+    inline-size: 100% !important;
+    max-inline-size: none !important;
+    block-size: 100%;
+    max-block-size: none !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding-top: env(safe-area-inset-top);
+    grid-template-columns: minmax(0, 1fr);
+    overflow: hidden;
+    transform: none !important;
+    animation: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1) !important;
+  }
+  hlm-dialog-content[data-variant='palette'] [data-slot='command'] {
+    block-size: 100%;
+    max-block-size: none;
+  }
+  hlm-dialog-content[data-variant='palette'] [data-slot='command-list'] {
+    max-block-size: none;
+    flex: 1 1 auto;
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  /* Create composer: full screen, header and footer pinned, form scrolls. */
+  .cdk-global-overlay-wrapper:has(hlm-dialog-content[data-variant='fullscreen']) {
+    align-items: stretch !important;
+  }
+  .cdk-overlay-pane:has(hlm-dialog-content[data-variant='fullscreen']) {
+    block-size: 100%;
+  }
+  hlm-dialog-content[data-variant='fullscreen'] {
+    block-size: 100%;
+    max-block-size: none !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: 0 !important;
+    overflow-y: auto;
+  }
+  hlm-dialog-content[data-variant='fullscreen'] > .sheet-handle {
+    display: none;
   }
 }
 
