@@ -111,7 +111,8 @@ export function fieldValues(entity: ViewEntity, item: Row, field: string, ctx: Q
 
 export function matchesFilter(entity: ViewEntity, item: Row, filter: ViewFilter, ctx: QueryContext = {}): boolean {
   const values = fieldValues(entity, item, filter.field, ctx);
-  const want = asArray(filter.value);
+  // Rows saved before the DTO validated `value` may hold numbers or null: never throw on them.
+  const want = asArray(filter.value).map((w) => (typeof w === 'string' ? w : w == null ? '' : String(w)));
   switch (filter.op) {
     case 'is':
       return want[0] === '' ? values.length === 0 : values.includes(want[0]);

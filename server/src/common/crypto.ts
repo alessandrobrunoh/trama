@@ -5,12 +5,22 @@ import {
   randomBytes,
 } from 'node:crypto';
 
+import { SecretsService } from '../integrations/secrets.service.js';
+
 /**
- * AES-256-GCM helpers for integration secrets at rest. The key derives from
- * `SECRETS_KEY` (falls back to a dev-only constant; set it in production).
+ * AES-256-GCM helpers for secrets at rest (public view links). The key is the same one the
+ * integrations use: `TRAMA_ENCRYPTION_KEY` (then `NABLA_ENCRYPTION_KEY`, `SECRETS_KEY`); a fixed
+ * dev key without one, and boot fails in production (see `SecretsService`).
  * Format: `v1:<iv>:<tag>:<ciphertext>` (base64url).
  */
 function key(): Buffer {
+  return SecretsService.resolveKey(
+    process.env.TRAMA_ENCRYPTION_KEY ?? process.env.NABLA_ENCRYPTION_KEY ?? process.env.SECRETS_KEY,
+  );
+}
+
+/** Key this module used before it shared the integrations key: still tried when decrypting old rows. */
+function legacyKey(): Buffer {
   return createHash('sha256')
     .update(process.env.SECRETS_KEY ?? 'nabla-dev-only-secrets-key')
     .digest();
@@ -28,20 +38,26 @@ export function encryptSecret(plain: string): string {
   ].join(':');
 }
 
+function decryptWith(k: Buffer, iv: string, tag: string, data: string): string {
+  const decipher = createDecipheriv('aes-256-gcm', k, Buffer.from(iv, 'base64url'));
+  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
+  return Buffer.concat([decipher.update(Buffer.from(data, 'base64url')), decipher.final()]).toString('utf8');
+}
+
 export function decryptSecret(payload: string): string {
   const [version, iv, tag, data] = payload.split(':');
   if (version !== 'v1' || !iv || !tag || !data)
     throw new Error('Unsupported secret format');
-  const decipher = createDecipheriv(
-    'aes-256-gcm',
-    key(),
-    Buffer.from(iv, 'base64url'),
-  );
-  decipher.setAuthTag(Buffer.from(tag, 'base64url'));
-  return Buffer.concat([
-    decipher.update(Buffer.from(data, 'base64url')),
-    decipher.final(),
-  ]).toString('utf8');
+  try {
+    return decryptWith(key(), iv, tag, data);
+  } catch (error) {
+    // Rows written before the key was shared with the integrations.
+    try {
+      return decryptWith(legacyKey(), iv, tag, data);
+    } catch {
+      throw error;
+    }
+  }
 }
 
 export function sha256(value: string): string {

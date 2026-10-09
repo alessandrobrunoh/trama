@@ -118,7 +118,6 @@ export class EntityRefs {
   selector: 'app-entity-preview',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    ActorAvatar,
     ActorLabel,
     FullDatePipe,
     IssueKindLabel,

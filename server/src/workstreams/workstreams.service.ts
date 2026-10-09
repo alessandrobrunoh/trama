@@ -292,6 +292,7 @@ export class WorkstreamsService {
   async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const ws = await this.get(workspaceId, idOrKey);
     let linked: string[] = [];
+    let waiting: string[] = [];
     await this.ds.transaction(async (m) => {
       const ids = (
         await m.query<{ id: string }[]>(
@@ -301,6 +302,15 @@ export class WorkstreamsService {
         )
       ).map((r) => r.id);
       ids.push(ws.id);
+      // Workstreams that waited on this one (or on its artifacts / input requests) must be re-derived.
+      waiting = (
+        await m.query<{ toId: string }[]>(
+          `SELECT DISTINCT "toId" FROM "dependencies" WHERE "workspaceId" = $1 AND "toType" = 'workstream' AND "fromId" = ANY($2)`,
+          [workspaceId, ids],
+        )
+      )
+        .map((r) => r.toId)
+        .filter((id) => id !== ws.id);
       await m.query(
         `DELETE FROM "dependencies" WHERE "workspaceId" = $1 AND ("fromId" = ANY($2) OR "toId" = ANY($2))`,
         [workspaceId, ids],
@@ -335,6 +345,7 @@ export class WorkstreamsService {
       data: { key: ws.key, title: ws.title },
     });
     for (const id of linked.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id });
+    if (waiting.length) await this.bus.touchMany(workspaceId, waiting, 'workstream.deleted');
   }
 
   /** Leaving (or switching) a project drops its milestones from this workstream's issues that no longer qualify. */

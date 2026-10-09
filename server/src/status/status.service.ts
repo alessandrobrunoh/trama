@@ -101,8 +101,23 @@ export class StatusService
     visited: Set<string> = new Set(),
     forceDependents = false,
   ): Promise<StatusChange | null> {
+    // `visited` is the current cascade path (cycle guard), not a global memo: in a diamond
+    // A->B, A->C, B->D, C->D the node D must be re-derived once C has settled too.
     if (visited.has(workstreamId)) return null;
     visited.add(workstreamId);
+    try {
+      return await this.recomputeOne(workstreamId, changes, visited, forceDependents);
+    } finally {
+      visited.delete(workstreamId);
+    }
+  }
+
+  private async recomputeOne(
+    workstreamId: string,
+    changes: StatusChange[],
+    visited: Set<string>,
+    forceDependents: boolean,
+  ): Promise<StatusChange | null> {
     const ws = await this.ds
       .getRepository(WorkstreamEntity)
       .findOneBy({ id: workstreamId });

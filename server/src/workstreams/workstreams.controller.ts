@@ -97,13 +97,10 @@ export class CreateWorkstreamDto {
   @IsOptional() @IsISO8601() targetDate?: string;
 }
 
-class UpdateWorkstreamDto {
+export class UpdateWorkstreamDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(200) title?: string;
-  @OptionalNotNull()
-  @IsString()
-  @MinLength(1)
-  @MaxLength(500)
-  deltaThreadUrl?: string;
+  // Empty is valid: it removes the thread (the service stores '' for "no thread").
+  @OptionalNotNull() @IsString() @MaxLength(500) deltaThreadUrl?: string;
   @Clearable() @IsString() @MaxLength(20000) description?: string | null;
   @OptionalNotNull() @IsString() @MaxLength(20000) objective?: string;
   @Clearable() @IsString() @MaxLength(20000) context?: string | null;

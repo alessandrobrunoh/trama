@@ -258,6 +258,10 @@ export class TokensController {
       if (scope !== 'custom' || permissions!.some((p) => !own.has(p)))
         throw new ForbiddenException('A custom token can only create custom tokens with a subset of its own permissions');
     }
+    // A write token is capped at member; custom tokens are not capped by role, so minting one
+    // from a write token would hand out the user's full role (and any permission) to the new secret.
+    if (auth.token?.scope === 'write' && scope !== 'write' && scope !== 'read')
+      throw new ForbiddenException('A write-scoped token can only create read or write tokens');
     if (scope === 'admin' && ctx.role !== 'admin' && ctx.role !== 'owner')
       throw new ForbiddenException('Only admins can create admin-scoped tokens');
     let actor = ctx.actor;

@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Headers, HttpCode, Patch, Post, Put, Query } from '@nestjs/common';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { BadRequestException } from '@nestjs/common';
 import { Ctx, RequireUser, Roles, Auth, type AuthInfo, type WorkspaceContext } from '../auth/request-context.js';
@@ -7,9 +7,10 @@ import { NOTIFICATION_KINDS, type NotificationChannels, type NotificationKind } 
 import { NotificationsService } from './notifications.service.js';
 import { PushService } from './push.service.js';
 
-class ListQuery {
+export class ListQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(200) limit?: number;
-  @IsOptional() @Type(() => Boolean) @IsBoolean() unread?: boolean;
+  // `Type(() => Boolean)` would turn the string "false" into true.
+  @IsOptional() @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value)) @IsBoolean() unread?: boolean;
 }
 
 class MarkReadDto {

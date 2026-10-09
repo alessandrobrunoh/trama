@@ -171,8 +171,11 @@ export class IntegrationsService {
     const row = await this.getRow(workspaceId, id);
     if (patch.baseUrl !== undefined) {
       const base = this.baseUrlOf(row.provider, patch.baseUrl);
-      if (row.provider !== 'delta' && !base) row.baseUrl = null;
-      else row.baseUrl = base;
+      const next = row.provider !== 'delta' && !base ? null : base;
+      // The stored token would be sent to the new host to validate it: never without the owner supplying it again.
+      if (row.provider !== 'delta' && next !== (row.baseUrl ?? null) && patch.token === undefined)
+        throw new BadRequestException('Enter the access token again when you change the base URL');
+      row.baseUrl = next;
     }
     if (patch.token !== undefined || patch.baseUrl !== undefined) {
       if (row.provider !== 'delta') {

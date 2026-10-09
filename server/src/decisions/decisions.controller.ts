@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -20,8 +21,11 @@ import {
 } from 'class-validator';
 import {
   Actor,
+  Auth,
   Can,
   Ctx,
+  canDo,
+  type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
@@ -103,8 +107,16 @@ export class DecisionsController {
   create(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,
+    @Auth() auth: AuthInfo,
     @Body() dto: CreateDecisionDto,
   ) {
+    // Creating an already decided record is an accept/reject: same capability as /accept and /reject.
+    if (dto.status === 'accepted' || dto.status === 'rejected') {
+      if (!canDo(ctx, 'acceptDecisions'))
+        throw new ForbiddenException('You are not allowed to accept or reject decisions');
+      if (auth.token?.scope === 'custom' && !auth.token.permissions?.includes('decisions:accept'))
+        throw new ForbiddenException('This API token lacks the "decisions:accept" permission');
+    }
     return this.service.create(ctx.workspace.id, actor, dto);
   }
 
