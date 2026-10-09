@@ -11,10 +11,10 @@ An issue describes **one** problem or request. A workstream is the coordinated e
 
 ```
 search { q: "refresh token logout", types: "issue,workstream,decision", limit: 10 }
-list_issues { open: true, q: "…" }
+find_work { scope: "issues", q: "…" }
 ```
 
-If a matching open issue exists, **comment on it** or update it instead of creating another. If you find a true duplicate, mark it: `update_issue { idOrKey, duplicateOfId: "<original>" }`.
+If a matching open issue exists, **comment on it** (`add_comment`) or update it instead of creating another. If you find a true duplicate, mark it: `update_issue { idOrKey, duplicateOfId: "<original>" }`. `create_issue` also refuses to create an issue whose title equals an open one (it returns it as `existing`; `force: true` overrides) and lists similar open issues after creating.
 
 ## Create the issue
 
@@ -47,11 +47,12 @@ Group when several issues **share a root cause or need the same change**. Do not
 
 A Delta thread does not change this. The thread is the execution context, not a reason to group: issues requested in one thread but serving different outcomes go to different workstreams (or stay plain issues). One thread may touch several workstreams. Only when the user says the issues are one effort do you link them together without asking. Spawn one subagent per issue; a subagent does not get its own workstream. If a slice has no issue yet, create an issue on the workstream it serves.
 
-1. Check there is not already a workstream for it (`search`, `list_workstreams`).
+1. Check there is not already a workstream for it (`search`, `find_work { scope: "workstreams" }`).
 2. To attach to an existing one:
    ```
    link_issue { idOrKey: "BUG-148", workstreamIds: ["<workstream id>"] }
    ```
+   or, when creating the issue, `create_issue { …, workstream: "AUTH-42" }`.
 3. To start a new one in the same call:
    ```
    link_issue {
@@ -70,9 +71,12 @@ An issue can belong to several workstreams, but only if it truly contributes to 
 
 ## Triaging a backlog
 
-1. `list_issues { status: "backlog", open: true }`, newest first.
+1. `find_work { scope: "issues", status: "backlog" }`, newest first.
 2. For each: duplicate? already fixed? missing information? Propose changes in a table to the user rather than editing dozens of issues silently.
-3. Apply the agreed changes with `update_issue`. Prefer fewer, deliberate writes; there are daily write caps.
+3. Apply the agreed changes in one call with `triage_issues`; each item names an `issue` and any of `priority`, `kind`, `status`, `labels`, `duplicateOf`, `workstream` / `createWorkstream`, `comment` (up to 25, applied independently, the reply says what each did). Prefer fewer, deliberate writes; there are daily write caps.
+   ```
+   triage_issues { items: [{ issue: "BUG-150", duplicateOf: "BUG-142" }, { issue: "BUG-151", priority: "high", workstream: "AUTH-42" }] }
+   ```
 4. Group clusters of related issues and propose the workstream (title, objective, criteria) before creating it.
 
 ## Don'ts

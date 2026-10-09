@@ -2,16 +2,19 @@
 //! API key (Settings → API tokens). Streamable HTTP (stateless) by default, `--stdio` for local use.
 
 mod catalog;
+mod composite;
 mod generic;
+mod profile;
 mod protocol;
 mod upstream;
 
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Bytes;
-use axum::extract::{DefaultBodyLimit, State};
+use axum::extract::{DefaultBodyLimit, Query, State};
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
@@ -19,6 +22,7 @@ use axum::{Json, Router};
 use serde_json::{Value, json};
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
+use profile::Profile;
 use protocol::{Account, Server};
 use upstream::{AuthError, Upstream};
 
@@ -30,6 +34,8 @@ struct Config {
     allowed_origins: Vec<String>,
     max_output: usize,
     timeout: Duration,
+    /// Tool profile when a request does not ask for one (`TRAMA_MCP_PROFILE`, then `--profile`).
+    profile: Profile,
 }
 
 fn env(name: &str) -> Option<String> {
@@ -62,8 +68,34 @@ impl Config {
                 .unwrap_or_default(),
             max_output: number("MCP_MAX_OUTPUT_BYTES", 200_000)? as usize,
             timeout: Duration::from_secs(number("MCP_UPSTREAM_TIMEOUT_SECS", 30)?),
+            profile: profile_arg()?.map_or_else(Profile::from_env, Ok)?,
         })
     }
+}
+
+/// `--profile core|full` (or `--profile=full`) on the command line.
+fn profile_arg() -> Result<Option<Profile>, String> {
+    let args: Vec<String> = std::env::args().collect();
+    let value = args.iter().enumerate().find_map(|(i, a)| match a.strip_prefix("--profile=") {
+        Some(v) => Some(v.to_string()),
+        None if a == "--profile" => args.get(i + 1).cloned(),
+        None => None,
+    });
+    match value {
+        None => Ok(None),
+        Some(v) => Profile::parse(&v).map(Some).ok_or_else(|| format!("--profile must be 'core' or 'full' (got '{v}')")),
+    }
+}
+
+/// The profile one HTTP request asks for: `?profile=` on the URL, else the `X-Trama-Profile`
+/// header, else the server default. Anything unrecognised falls back to the default.
+fn request_profile(default: Profile, headers: &HeaderMap, query: &HashMap<String, String>) -> Profile {
+    query
+        .get("profile")
+        .map(String::as_str)
+        .or_else(|| headers.get("x-trama-profile").and_then(|v| v.to_str().ok()))
+        .and_then(Profile::parse)
+        .unwrap_or(default)
 }
 
 struct App {
@@ -113,7 +145,7 @@ fn valid_key(key: &str) -> bool {
     key.starts_with("nbl_") && key.len() <= 256 && !key.contains(char::is_whitespace)
 }
 
-async fn mcp_post(State(app): State<Arc<App>>, headers: HeaderMap, body: Bytes) -> Response {
+async fn mcp_post(State(app): State<Arc<App>>, Query(query): Query<HashMap<String, String>>, headers: HeaderMap, body: Bytes) -> Response {
     // Browsers always send Origin; MCP clients don't. Reject unless explicitly allowed (DNS rebinding).
     if let Some(origin) = headers.get(header::ORIGIN) {
         let allowed = origin
@@ -139,18 +171,19 @@ async fn mcp_post(State(app): State<Arc<App>>, headers: HeaderMap, body: Bytes) 
             return (StatusCode::BAD_REQUEST, Json(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32700, "message": "Parse error" } }))).into_response();
         }
     };
+    let profile = request_profile(app.server.profile(), &headers, &query);
     let reply = match message {
         Value::Array(items) if !items.is_empty() => {
             let mut replies = Vec::new();
             for item in items {
-                replies.extend(app.server.handle(&accounts, item).await);
+                replies.extend(app.server.handle_with(profile, &accounts, item).await);
             }
             (!replies.is_empty()).then(|| Value::Array(replies))
         }
         Value::Array(_) => Some(
             json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32600, "message": "Invalid Request" } }),
         ),
-        other => app.server.handle(&accounts, other).await,
+        other => app.server.handle_with(profile, &accounts, other).await,
     };
     match reply {
         Some(r) => Json(r).into_response(),
@@ -339,8 +372,15 @@ async fn start() -> Result<(), String> {
     let cfg = Config::from_env()?;
     let upstream =
         Upstream::new(&cfg.api_url, cfg.timeout, cfg.max_output).map_err(|e| e.to_string())?;
-    let server = Server::new(upstream)?;
-    tracing::info!(tools = server.tool_count(), api = %cfg.api_url, "trama-mcp {}", env!("CARGO_PKG_VERSION"));
+    let server = Server::new(upstream)?.with_profile(cfg.profile);
+    tracing::info!(
+        profile = cfg.profile.as_str(),
+        listed = server.listed_count(cfg.profile),
+        catalog = server.tool_count(),
+        api = %cfg.api_url,
+        "trama-mcp {}",
+        env!("CARGO_PKG_VERSION")
+    );
     let app = Arc::new(App {
         server,
         allowed_origins: cfg.allowed_origins,
