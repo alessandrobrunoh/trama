@@ -14,11 +14,9 @@ import {
   LucideLink2,
   LucideList,
   LucideListFilter,
-  LucideLock,
   LucidePlus,
   LucideRows3,
   LucideTrash2,
-  LucideUsers,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -59,6 +57,8 @@ import { InlineText } from '../workstreams/inline-edit';
 import { buildSummary, type WsSummary } from '../workstreams/ws-model';
 import { WorkstreamCard, WorkstreamRow } from '../workstreams/workstream-items';
 import { OptionMenu } from './option-controls';
+import { canEditSavedView, canManageViewSharing } from './view-access';
+import { ViewShare } from './view-share';
 import { ViewProjectCard, ViewProjectRow } from './view-project-items';
 import {
   ENTITY_ICON,
@@ -103,6 +103,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
     RelativeTimePipe,
     InlineText,
     OptionMenu,
+    ViewShare,
     WorkstreamRow,
     WorkstreamCard,
     IssueRow,
@@ -133,7 +134,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
             <button hlmDropdownMenuItem (triggered)="copyLink()">
               <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy link
             </button>
-            @if (canEdit()) {
+            @if (canManage()) {
               <hlm-dropdown-menu-separator />
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
                 <svg [lucideIcon]="trash" [size]="14"></svg> Delete view
@@ -157,19 +158,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
           <span class="text-meta shrink-0">{{ entityLabel() }}</span>
         </span>
         <span actions class="flex items-center gap-1.5">
-          <button
-            hlmBtn
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
-            [disabled]="!canEdit() || (!v.shared && !canShare())"
-            [hlmTooltip]="v.shared ? 'Visible to the whole workspace. Click to make private.' : canShare() ? 'Only you can see it. Click to share.' : 'Your role cannot share views with the workspace.'"
-            position="bottom"
-            (click)="toggleShared()"
-          >
-            <svg [lucideIcon]="v.shared ? usersIcon : lockIcon" [size]="13"></svg>
-            {{ v.shared ? 'Shared' : 'Private' }}
-          </button>
+          <app-view-share [view]="v" />
           <hlm-toggle-group
             type="single"
             variant="outline"
@@ -453,7 +442,6 @@ export class ViewDetailPage {
   readonly id = input<string>();
 
   private readonly store = inject(NablaStore);
-  protected readonly canShare = computed(() => this.store.allowed('manageSharedViews'));
   protected readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
@@ -464,8 +452,6 @@ export class ViewDetailPage {
   protected readonly moreIcon = LucideEllipsis;
   protected readonly copyIcon = LucideCopy;
   protected readonly linkIcon = LucideLink2;
-  protected readonly usersIcon = LucideUsers;
-  protected readonly lockIcon = LucideLock;
   protected readonly listIcon = LucideList;
   protected readonly boardIcon = LucideKanban;
   protected readonly timelineIcon = LucideChartGantt;
@@ -481,9 +467,12 @@ export class ViewDetailPage {
   protected readonly view = computed(() => this.store.getView(this.id()));
   protected readonly canEdit = computed(() => {
     const v = this.view();
-    const me = this.store.me()?.id;
-    if (!v || !me || !this.store.can('member')) return false;
-    return v.ownerId === me || (v.shared && this.store.can('admin'));
+    return !!v && canEditSavedView(v, this.store.me()?.id, this.store.myRole());
+  });
+  /** Delete the view / change who has access. */
+  protected readonly canManage = computed(() => {
+    const v = this.view();
+    return !!v && canManageViewSharing(v, this.store.me()?.id, this.store.myRole());
   });
 
   protected readonly entityIcon = computed(() => ENTITY_ICON[this.view()?.entity ?? 'workstream']);
@@ -588,7 +577,8 @@ export class ViewDetailPage {
     const v = this.view();
     if (!v) return '';
     const n = this.rows().length;
-    return `${v.shared ? 'Shared' : 'Private'} view · ${n} ${ENTITY_LABEL[v.entity].toLowerCase()}`;
+    const access = { private: 'Private', workspace: 'Shared', link: 'Public' }[v.sharing.visibility];
+    return `${access} view · ${n} ${ENTITY_LABEL[v.entity].toLowerCase()}`;
   });
 
   private readonly _crumbs = usePageCrumbs(() => [
@@ -637,12 +627,6 @@ export class ViewDetailPage {
   }
   protected rename(name: string): void {
     if (name.trim()) this.patch({ name: name.trim() });
-  }
-  protected toggleShared(): void {
-    const v = this.view();
-    if (!v) return;
-    this.patch({ shared: !v.shared });
-    this.notifier.success(v.shared ? 'View is now private' : 'View shared with the workspace');
   }
   protected setLayout(value: unknown): void {
     const next: ViewLayout = value === 'board' ? 'board' : value === 'timeline' && this.supportsTimeline() ? 'timeline' : 'list';

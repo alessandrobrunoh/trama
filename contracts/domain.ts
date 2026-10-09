@@ -867,10 +867,84 @@ export interface SavedView {
   sort?: { field: string; direction: 'asc' | 'desc' };
   groupBy?: string;
   layout: ViewLayout;
-  /** Visible to the whole workspace vs. only the owner. */
+  /**
+   * Visible beyond the owner (`sharing.visibility` is `workspace` or `link`). Kept for older clients;
+   * `sharing` is the source of truth.
+   */
   shared: boolean;
+  /** Who can see and edit this view. */
+  sharing: SharingSettings;
+  /**
+   * Secret token of the public link (`/shared/<token>`). Only sent to people who can manage the
+   * view's sharing, and only while `sharing.visibility` is `link`.
+   */
+  publicToken?: string;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+/** Who may open a shareable object: only the invited, every workspace member, or anyone holding the link. */
+export type ShareVisibility = 'private' | 'workspace' | 'link';
+/** What an invited person may do. The owner always has full control. */
+export type ShareLevel = 'view' | 'edit';
+
+export interface ShareGrant {
+  /** A member of the workspace. */
+  userId: ID;
+  level: ShareLevel;
+}
+
+/**
+ * Generic permission settings for a shareable object (saved views today). `private` = owner and
+ * `grants` only; `workspace` = every workspace member can view, `grants` may add edit rights;
+ * `link` = like `workspace`, and anyone with the public link can read it (read-only, no login).
+ */
+export interface SharingSettings {
+  visibility: ShareVisibility;
+  grants: ShareGrant[];
+}
+
+/**
+ * One row of a publicly shared view. A deliberately small projection: only what a list row shows,
+ * never descriptions, bodies, emails, ids of other objects or anything the view does not display.
+ */
+export interface PublicViewItem {
+  id: ID;
+  key?: string;
+  title: string;
+  kind?: string;
+  status?: string;
+  priority?: Priority;
+  health?: string;
+  team?: string;
+  assignee?: string;
+  project?: string;
+  labels?: string[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface PublicViewGroup {
+  /** Raw group value (`''` = no value). */
+  key: string;
+  /** Display name (resolved server-side for teams, people and projects). */
+  label: string;
+  items: PublicViewItem[];
+}
+
+/** `GET /api/public/views/:token`: the fixed result of a view shared by link. Read-only. */
+export interface PublicView {
+  name: string;
+  entity: ViewEntity;
+  layout: ViewLayout;
+  groupBy?: string;
+  workspaceName: string;
+  groups: PublicViewGroup[];
+  total: number;
+  /** True when more rows matched than are returned. */
+  truncated: boolean;
+  generatedAt: ISODate;
 }
 
 /** API token (for agents, MCP clients, scripts). The secret is only returned once on creation. */

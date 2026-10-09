@@ -45,6 +45,7 @@ import type {
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
   CreateViewInput,
+  SharingInput,
   CreateWorkstreamInput,
   CriterionInput,
   CriterionPatch,
@@ -107,7 +108,7 @@ import type {
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
-import type { Capability } from '../contracts/domain';
+import type { Capability, ShareLevel } from '../contracts/domain';
 import { resolveWorkspaceSettings, roleAtLeast } from '../contracts/domain';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
@@ -1593,6 +1594,30 @@ export class NablaStore {
       tx,
       onResult: (v) => this.upsert(this._views, v),
     }).then((r) => !!r);
+  }
+
+  /** Change who can open a view (visibility and/or invited people). Not optimistic: the server owns the link token. */
+  async shareView(id: ID, sharing: SharingInput): Promise<boolean> {
+    if (!this.viewById().has(id)) return false;
+    return this.writeOk('share view', (s) => this.api.views.update(s, id, { sharing }), {
+      onResult: (v) => this.upsert(this._views, v),
+    });
+  }
+
+  /** Grant existing workspace members access by email; resolves with the server's complaint-free success flag. */
+  async inviteToView(id: ID, emails: string[], level: ShareLevel = 'view'): Promise<boolean> {
+    if (!this.viewById().has(id)) return false;
+    return this.writeOk('invite to view', (s) => this.api.views.invite(s, id, { emails, level }), {
+      onResult: (v) => this.upsert(this._views, v),
+    });
+  }
+
+  /** Replace the public link of a view. */
+  async rotateViewLink(id: ID): Promise<boolean> {
+    if (!this.viewById().has(id)) return false;
+    return this.writeOk('new view link', (s) => this.api.views.rotateLink(s, id), {
+      onResult: (v) => this.upsert(this._views, v),
+    });
   }
 
   async deleteView(id: ID): Promise<boolean> {

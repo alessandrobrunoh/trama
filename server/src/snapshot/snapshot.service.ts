@@ -65,7 +65,7 @@ export class SnapshotService {
         slimComments ? Promise.resolve([]) : this.comments.listAll(workspaceId),
         slimComments ? this.comments.index(workspaceId) : Promise.resolve(undefined),
         this.ds.getRepository(DomainEventEntity).find({ where, order: { at: 'DESC', id: 'DESC' }, take: SNAPSHOT_EVENTS }),
-        this.views.list(workspaceId, ctx.userId),
+        this.views.list(ctx),
         this.ds.getRepository(IntegrationConnectionEntity).find({ where, order: { createdAt: 'ASC' } }),
         this.attention.forUser(ctx),
       ]);

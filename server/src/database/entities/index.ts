@@ -29,6 +29,7 @@ import type {
   ReviewState,
   Role,
   SavedView,
+  SharingSettings,
   SubjectRef,
   TeamEditPolicy,
   TokenScope,
@@ -581,6 +582,7 @@ export class DomainEventEntity extends Wire {
 
 @Entity('saved_views')
 @Index('IDX_views_workspace', ['workspaceId'])
+@Index('UQ_views_public_token', ['publicTokenHash'], { unique: true })
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
@@ -595,9 +597,19 @@ export class SavedViewEntity extends Wire {
   @Column({ type: 'jsonb', nullable: true }) sort: SavedView['sort'] | null;
   @Column({ type: 'varchar', nullable: true }) groupBy: string | null;
   @Column({ type: 'varchar', default: 'list' }) layout: ViewLayout;
+  /** Mirror of `sharing.visibility !== 'private'` (legacy flag); `sharing` is the source of truth. */
   @Column({ type: 'boolean', default: false }) shared: boolean;
+  @Column({ type: 'jsonb', default: () => `'{"visibility":"private","grants":[]}'` }) sharing: SharingSettings;
+  /** sha256 (hex) of the public link token: the only thing the public endpoint looks up by. */
+  @Column({ type: 'varchar', nullable: true }) publicTokenHash: string | null;
+  /** The token itself, encrypted at rest, so managers can copy the link again. */
+  @Column({ type: 'text', nullable: true }) publicTokenEnc: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+
+  protected override hidden() {
+    return ['publicTokenHash', 'publicTokenEnc'];
+  }
 }
 
 /** Only the sha256 of the secret is stored; `prefix` is for display. */
