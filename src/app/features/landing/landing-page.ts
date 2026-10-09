@@ -21,7 +21,7 @@ import { ComparisonTable } from './comparison-table';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
-/** Public landing page at `/` for signed-out visitors (signed-in users are redirected by landingGuard). */
+/** Public landing page at `/`, available to signed-out and signed-in visitors. */
 @Component({
   selector: 'app-landing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,

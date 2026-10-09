@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
-import { authGuard, guestGuard, landingGuard, workspaceGuard } from './core/session/guards';
+import { authGuard, guestGuard, workspaceGuard } from './core/session/guards';
 
 /**
  * Routes per PLAN.md §5. Every page is a lazy standalone component; route params and query
@@ -45,7 +45,8 @@ export const routes: Routes = [
     path: 'blog/:slug',
     title: (route) =>
       import('./features/blog/blog-posts').then(
-        (m) => `${m.findPost(route.paramMap.get('slug') ?? '')?.title ?? 'Post not found'} · Trama Blog`,
+        (m) =>
+          `${m.findPost(route.paramMap.get('slug') ?? '')?.title ?? 'Post not found'} · Trama Blog`,
       ),
     loadComponent: () => import('./features/blog/blog-post-page').then((m) => m.BlogPostPage),
   },
@@ -74,15 +75,13 @@ export const routes: Routes = [
   {
     path: '404',
     title: 'Not found · Trama',
-    loadComponent: () =>
-      import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
+    loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },
-  // `/` → landing page when signed out; else last used (or first) workspace, /new-workspace if none.
+  // `/` is always the public landing page, regardless of session state.
   {
     path: '',
     pathMatch: 'full',
     title: 'Trama · Coordination for humans and coding agents',
-    canActivate: [landingGuard],
     loadComponent: () => import('./features/landing/landing-page').then((m) => m.LandingPage),
   },
   {
@@ -94,13 +93,13 @@ export const routes: Routes = [
       {
         path: 'overview',
         title: 'Overview · Trama',
-        loadComponent: () => import('./features/overview/overview-page').then((m) => m.OverviewPage),
+        loadComponent: () =>
+          import('./features/overview/overview-page').then((m) => m.OverviewPage),
       },
       {
         path: 'assistant',
         title: 'Assistant · Trama',
-        loadComponent: () =>
-          import('./features/ai/assistant-page').then((m) => m.AssistantPage),
+        loadComponent: () => import('./features/ai/assistant-page').then((m) => m.AssistantPage),
       },
       {
         path: 'notifications',
@@ -127,7 +126,8 @@ export const routes: Routes = [
       {
         path: 'activity',
         title: 'Activity · Trama',
-        loadComponent: () => import('./features/activity/activity-page').then((m) => m.ActivityPage),
+        loadComponent: () =>
+          import('./features/activity/activity-page').then((m) => m.ActivityPage),
       },
       {
         path: 'issues',
@@ -199,7 +199,12 @@ export const routes: Routes = [
           (route: ActivatedRouteSnapshot) => {
             const id = route.paramMap.get('id') ?? '';
             return id.startsWith('rp_')
-              ? inject(Router).createUrlTree(['/', route.paramMap.get('workspaceSlug') ?? '', 'repositories', id])
+              ? inject(Router).createUrlTree([
+                  '/',
+                  route.paramMap.get('workspaceSlug') ?? '',
+                  'repositories',
+                  id,
+                ])
               : true;
           },
         ],
@@ -260,7 +265,6 @@ export const routes: Routes = [
   {
     path: '**',
     title: 'Not found · Trama',
-    loadComponent: () =>
-      import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
+    loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },
 ];
