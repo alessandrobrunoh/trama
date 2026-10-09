@@ -517,7 +517,10 @@ export interface Issue {
   /** Free-text reporter (customer, email…) when not a workspace user. */
   reporterName?: string;
   reporterId?: ID;
-  /** Person responsible for this issue. Distinct from workstream accountability. */
+  /**
+   * Person responsible for this issue. Distinct from workstream accountability.
+   * When a user moves an unassigned issue to `in_progress`, the server sets this to that user.
+   */
   assigneeId?: ID;
   teamId?: ID;
   priority: Priority;
