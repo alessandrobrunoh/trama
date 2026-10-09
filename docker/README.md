@@ -16,6 +16,10 @@ docker build -f mcp/Dockerfile -t ghcr.io/alessandrobrunoh/trama-mcp:latest .
 # optional: --build-arg VERSION=1.2.3 sets the org.opencontainers.image.version label
 ```
 
+**Self-hosting?** Use `docker-compose.selfhost.yml` and read [docs/self-hosting.md](../docs/self-hosting.md): no Traefik, no fixed domain,
+no default passwords, pinned image versions, upgrade/backup/rollback. The rest of this page describes the author's own
+deployment.
+
 Production stack: `server/docker-compose.yml` (frontend, app, mcp, postgres) behind Traefik. Routing on
 `trama.alessandrobrunoh.it`: `/api` → app, `/mcp` → mcp, everything else → frontend. Copy
 `server/.env.production.example` to `server/.env.production` and fill in the `CHANGE_ME` values, then
@@ -69,4 +73,4 @@ New packages on GitHub are **private**. Until the deploy host can read them, `do
   `FROM ghcr.io/alessandrobrunoh/trama-server` and `npm install -g @xai-official/grok` if you need it.
 - The Angular initial-bundle budget was raised to 1.75 MB (warning) / 2 MB (error): the app is now at ~1.6 MB raw
   (~265 kB gzipped), mostly the icon library (`@lucide/angular`, ~620 kB raw). Trimming it is a follow-up.
-- Images are not published by any workflow yet; build and push them by hand or add a CI job.
+- Images are published by `.github/workflows/release-images.yml` when a `vX.Y.Z` tag is pushed (multi-arch, tags `X.Y.Z`, `X.Y`, `latest`). Before the first release, or for a fork, build and push them by hand as above.
