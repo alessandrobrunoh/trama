@@ -77,6 +77,11 @@ export class CommentComposer {
     this.busy.set(false);
   }
 
+  /** The write failed (the store already toasted): keep the draft so it can be sent again. */
+  fail(): void {
+    this.busy.set(false);
+  }
+
   /** ⌘/Ctrl + Enter always sends; plain Enter sends only when the user prefers it (Shift + Enter adds a line). */
   protected onKeydown(ev: KeyboardEvent): void {
     if (ev.key !== 'Enter' || ev.isComposing) return;
@@ -311,7 +316,8 @@ export class CommentThread {
   );
 
   protected async send(body: string, composer: CommentComposer): Promise<void> {
-    await this.store.addComment(this.subject(), body);
-    composer.reset();
+    const posted = await this.store.addComment(this.subject(), body);
+    if (posted) composer.reset();
+    else composer.fail();
   }
 }

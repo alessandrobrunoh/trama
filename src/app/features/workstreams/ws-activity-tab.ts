@@ -131,7 +131,8 @@ export class WsActivityTab {
   }
 
   protected async send(body: string, composer: CommentComposer): Promise<void> {
-    await this.store.addComment({ type: 'workstream', id: this.ws().id }, body);
-    composer.reset();
+    const posted = await this.store.addComment({ type: 'workstream', id: this.ws().id }, body);
+    if (posted) composer.reset();
+    else composer.fail();
   }
 }

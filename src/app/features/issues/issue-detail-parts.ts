@@ -491,7 +491,8 @@ export class IssueActivity {
   }
 
   protected async send(body: string, composer: CommentComposer): Promise<void> {
-    await this.store.addComment({ type: 'issue', id: this.issue().id }, body);
-    composer.reset();
+    const posted = await this.store.addComment({ type: 'issue', id: this.issue().id }, body);
+    if (posted) composer.reset();
+    else composer.fail();
   }
 }
