@@ -14,7 +14,7 @@ whoami
 get_workstream_context { idOrKey: "AUTH-42" }
 ```
 
-The briefing contains the objective, acceptance criteria, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below, including the briefing; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, call `get_issue` and check its `workstreamIds`; then load the briefing of the workstream it belongs to.
+The briefing contains the outcome status and what is still missing (`completion.gaps`), the objective, acceptance criteria (with who declared each `met` and its proof), decisions, dependencies, artifacts, open questions and recent progress. Read all of it. If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below, including the briefing; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, call `get_issue` and check its `workstreamIds`; then load the briefing of the workstream it belongs to.
 
 If the user hands you a **project** (or you need the big picture across several workstreams), call `get_project_context { id }` instead: one markdown "mega context" with the project's updates, milestones, workstreams, issues, artifacts, decisions and open questions, each traceable to where it is attached. Then pick a workstream and load its own briefing.
 
@@ -24,10 +24,10 @@ If the user only describes the work, `search { q, types: "workstream,issue,decis
 
 Stop and report instead of working when any of these is true:
 
-- The workstream is `blocked` (a dependency has not shipped) or `shipped` / `canceled`.
+- The briefing says `blocked` (gap `blocked`), or the workstream is `shipped` / `canceled`. A `statusOverride` is a pin by a person, not a fact: read `completion` for what is really missing.
 - There is an **open input request** whose answer changes the approach. Mention it to the user.
 - A **proposed decision** touches the area you are about to change. Wait for a person to accept it, or ask.
-- Acceptance criteria are empty or vague. Propose concrete criteria (`add_criterion`) and confirm with the user before relying on them.
+- The gap `no_criteria` is present, or the criteria are vague. A workstream with no criteria cannot ship. Propose concrete criteria (`add_criterion`) and confirm with the user before relying on them.
 
 ## 3. Respect what is already decided
 
