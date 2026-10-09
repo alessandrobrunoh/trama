@@ -380,7 +380,9 @@ export type ProjectAiResult = ProjectAiUpdateDraft | ProjectAiSummary | ProjectA
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
 /**
- * Derived from artifacts / input requests / decisions / dependencies.
+ * Outcome status, derived from artifacts / input requests / decisions / dependencies / criteria.
+ * `shipped` means the outcome is achieved (criteria met, no blockers, nothing waiting on a person),
+ * not merely that code landed: see {@link DeliveryState} for that.
  * Any status can be pinned manually via `statusOverride` (the board does this). `null` clears it.
  */
 export type WorkstreamStatus =
@@ -393,6 +395,15 @@ export type WorkstreamStatus =
   | 'ready_to_land'
   | 'shipped'
   | 'canceled';
+
+/**
+ * How far the code got, derived from artifacts only (highest evidence wins):
+ * `deployed` (healthy deployment) > `released` (published release) > `merged` (every live PR
+ * merged) > `in_review` (an open PR) > `none`. This is delivery evidence, not the outcome:
+ * a merged PR never makes a workstream `shipped` unless its criteria are met and nothing
+ * blocks it or waits on a person.
+ */
+export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
 export interface AcceptanceCriterion {
@@ -434,6 +445,11 @@ export interface Workstream {
   status: WorkstreamStatus;
   /** The derived status, ignoring the override. Computed by the server. */
   derivedStatus: WorkstreamStatus;
+  /**
+   * Delivery state (PR / release / deployment evidence), separate from the outcome `status`.
+   * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
+   */
+  delivery: DeliveryState;
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;

@@ -17,6 +17,7 @@ import {
   type Issue,
   type IssueStatus,
   type NablaStore,
+  type DeliveryState,
   type Workstream,
   type WorkstreamStatus,
 } from '../../core';
@@ -283,6 +284,18 @@ export const performerOptions = (store: NablaStore): PickOption[] => [
 
 // ───────────────────────── derived-status explanation ─────────────────────────
 
+export const isDeliveredState = (d: DeliveryState): boolean =>
+  d === 'merged' || d === 'released' || d === 'deployed';
+
+function deliveryReason(d: DeliveryState, prs: Artifact[]): string {
+  if (d === 'deployed') return 'A healthy deployment is live';
+  if (d === 'released') return 'A release is published';
+  const merged = prs.filter((p) => p.state === 'merged');
+  return merged.length === 1
+    ? `${prLabel(merged[0])} is merged`
+    : `${merged.length} pull requests are merged`;
+}
+
 const prLabel = (a: Artifact): string => (a.externalId ? `${a.externalId}` : a.title);
 
 /**
@@ -323,6 +336,8 @@ export function explainStatus(
             : `All ${linked.length} linked issues are done.`,
         );
       else reasons.push('Every pull request is merged.');
+      if (ws.acceptanceCriteria.length)
+        reasons.push('All acceptance criteria are met, with no blockers or open questions.');
       break;
     }
     case 'blocked': {
@@ -369,6 +384,17 @@ export function explainStatus(
       break;
     }
     case 'working':
+      if (isDeliveredState(ws.delivery)) {
+        reasons.push(`${deliveryReason(ws.delivery, prs)}, but the outcome is not achieved yet.`);
+        const unmet = ws.acceptanceCriteria.filter((c) => c.state !== 'met').length;
+        if (unmet)
+          reasons.push(
+            `${unmet} acceptance criteri${unmet === 1 ? 'on is' : 'a are'} not met.`,
+          );
+        const open = linked.filter((i) => i.status !== 'done').length;
+        if (open) reasons.push(`${open} linked issue${open === 1 ? ' is' : 's are'} not done.`);
+        break;
+      }
       reasons.push(
         linked.some((i) => i.status === 'in_progress')
           ? 'An issue is in progress.'
@@ -385,6 +411,13 @@ export function explainStatus(
       break;
     default:
       break;
+  }
+  // Delivery evidence is shown separately; it never reads as "done" while the outcome is open.
+  if (s !== 'shipped' && s !== 'working' && isDeliveredState(ws.delivery)) {
+    const unmet = ws.acceptanceCriteria.filter((c) => c.state !== 'met').length;
+    reasons.push(
+      `${deliveryReason(ws.delivery, prs)}; the outcome is not achieved${unmet ? ` (${unmet} acceptance criteri${unmet === 1 ? 'on' : 'a'} not met)` : ''}.`,
+    );
   }
   if (!reasons.length)
     reasons.push(

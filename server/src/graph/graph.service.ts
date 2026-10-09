@@ -73,6 +73,7 @@ export class GraphService {
           title: w.title,
           priority: w.priority,
           derivedStatus: w.derivedStatus,
+          delivery: w.delivery,
           ownerTeamId: w.ownerTeamId,
           participatingTeamIds: w.participatingTeamIds,
           accountableUserId: w.accountableUserId ?? undefined,

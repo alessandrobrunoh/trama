@@ -7,6 +7,7 @@ import type {
   AttentionSeverity,
   CriterionState,
   DecisionStatus,
+  DeliveryState,
   ExecutionProvider,
   IssueKind,
   IssueStatus,
@@ -46,6 +47,18 @@ export const WORKSTREAM_STATUS_META: Record<WorkstreamStatus, Meta> = {
   canceled: { label: 'Canceled', tone: 'muted', order: 8 },
 };
 export const WORKSTREAM_STATUSES = sortedKeys(WORKSTREAM_STATUS_META);
+
+/**
+ * Delivery evidence (PR / release / deployment), shown beside, never instead of, the outcome status.
+ * `merged` etc. mean the code landed; only `status === 'shipped'` means the outcome is achieved.
+ */
+export const DELIVERY_STATE_META: Record<DeliveryState, Meta> = {
+  none: { label: 'Nothing delivered', tone: 'muted', order: 0 },
+  in_review: { label: 'PR in review', tone: 'accent', order: 1 },
+  merged: { label: 'PR merged', tone: 'info', order: 2 },
+  released: { label: 'Released', tone: 'info', order: 3 },
+  deployed: { label: 'Deployed', tone: 'success', order: 4 },
+};
 /** Board / overview column order (flow order rather than urgency order). */
 export const WORKSTREAM_STATUS_FLOW: WorkstreamStatus[] = [
   'draft',

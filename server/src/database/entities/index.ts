@@ -38,6 +38,7 @@ import type {
   ViewFilter,
   ViewLayout,
   WorkspaceSettings,
+  DeliveryState,
   WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
@@ -298,6 +299,8 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'varchar', default: 'draft' }) status: WorkstreamStatus;
   @Column({ type: 'varchar', default: 'draft' })
   derivedStatus: WorkstreamStatus;
+  /** Delivery evidence (PR / release / deployment); separate from the outcome `status`. */
+  @Column({ type: 'varchar', default: 'none' }) delivery: DeliveryState;
   @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
   @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
