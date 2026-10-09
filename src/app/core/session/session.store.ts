@@ -10,6 +10,7 @@ import { ROLE_META } from '../meta';
 import { Notifier } from '../notify/notifier';
 import { Preferences } from '../preferences';
 import { readJson, writeJson } from '../stores/storage';
+import { ListStateStore } from '../stores/list-state.store';
 import { NablaStore } from '../stores/nabla.store';
 
 const LAST_WORKSPACE_KEY = 'nabla.session.v1';
@@ -20,6 +21,7 @@ export type EnterResult = 'ok' | 'not-found' | 'error';
 export class SessionStore {
   private readonly api = inject(ApiClient);
   private readonly nabla = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
   private readonly preferences = inject(Preferences);
@@ -214,6 +216,7 @@ export class SessionStore {
     this._workspace.set(null);
     this._role.set(null);
     this.nabla.reset();
+    this.listState.clear();
     this.initPromise = Promise.resolve();
     this._ready.set(true);
   }
