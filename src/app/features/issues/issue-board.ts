@@ -53,6 +53,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { IssueKindLabel } from '../../shared/issue';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
+import { PeekPanel } from '../../shared/peek-panel';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -117,6 +118,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     KanbanItemDirective,
     KanbanLabelDirective,
     Kbd,
+    PeekPanel,
   ],
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
@@ -494,6 +496,8 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         </hlm-dropdown-menu-sub>
       </ng-template>
     </ng-template>
+
+    <app-peek-panel />
 
     <!-- Bulk action bar -->
     @if (selection().length) {

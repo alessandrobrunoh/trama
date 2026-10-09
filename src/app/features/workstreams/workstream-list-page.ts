@@ -49,6 +49,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { Kbd } from '../../shared/kbd';
+import { PeekPanel } from '../../shared/peek-panel';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -168,8 +169,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     CreateWorkstreamDialog,
     TopBarActions,
     WsBulkBar,
+    PeekPanel,
   ],
-  host: { class: 'flex h-full min-h-0 flex-col' },
+  host: { class: 'relative flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (canCreate()) {
@@ -407,6 +409,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       </app-kanban>
     }
 
+    <app-peek-panel />
     <app-ws-bulk-bar />
     <app-create-workstream-dialog [(open)]="createOpen" [defaults]="createDefaults()" />
   `,
