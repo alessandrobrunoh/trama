@@ -43,7 +43,7 @@ Otherwise:
 - One issue, no workstream, and the work is a real outcome to pursue: create one the same way. A typo, a one-line fix, or a question is not an outcome. Leave it as an issue and work the issue; do not invent a workstream to have somewhere to write.
 - The user described work but named nothing: search first. Create an issue (`trama-triage-issues`) only when nothing matches, then decide as above.
 
-If the workspace uses Delta threads, `deltaThreadUrl` is required. Ask for it. Do not invent one.
+`deltaThreadUrl` is optional: a workstream can exist before its Delta thread. If you are the parent of a Delta thread, set it to this thread's URL. Otherwise omit it; do not invent one. A supplied URL must be an https link on delta.dev.
 
 Document the outcome on the workstream, not on the issue: an objective in one sentence, and criteria that are observable ("OAuth login passes on Safari 18"), not tasks ("fix OAuth").
 

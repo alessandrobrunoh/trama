@@ -432,7 +432,7 @@
   "params": {
    "title": "body string! Title",
    "ownerTeamId": "body string! Owner team id",
-   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Required unless status is draft or the workspace turned Delta threads off",
+   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Optional: a workstream can exist before its thread; omit it rather than invent one. A supplied URL is validated",
    "description": "body string Description",
    "objective": "body string Objective",
    "context": "body string Context",

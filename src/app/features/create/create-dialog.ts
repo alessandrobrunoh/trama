@@ -304,7 +304,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   ></svg>
                   <input
                     class="placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-xs outline-none"
-                    placeholder="Delta thread · https://delta.dev/t/…"
+                    placeholder="Delta thread (optional) · https://delta.dev/t/…"
                     [(ngModel)]="deltaUrl"
                     name="delta"
                     autocomplete="off"
@@ -1083,7 +1083,7 @@ export class CreateDialog {
 
   protected err(field: 'title' | 'team' | 'statement' | 'key' | 'delta'): string | null {
     if (!this.submitted()) return null;
-    if (this.draftAttempt() && (field === 'delta' || field === 'statement')) return null;
+    if (this.draftAttempt() && field === 'statement') return null;
     const k = this.kind();
     switch (field) {
       case 'title':
@@ -1094,9 +1094,10 @@ export class CreateDialog {
             : 'Required.';
       case 'delta':
         if (k !== 'workstream' || !this.deltaEnabled()) return null;
+        if (!this.deltaUrl().trim()) return null;
         return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim())
           ? null
-          : 'Link the Delta thread: an https link on delta.dev.';
+          : 'The Delta thread must be an https link on delta.dev.';
       case 'team':
         if (k !== 'workstream') return null;
         return this.ownerTeamId() ? null : 'Pick the owner team.';
@@ -1154,7 +1155,10 @@ export class CreateDialog {
     ev.stopPropagation();
     if (this.busy()) return;
     if (asDraft) {
-      if (!this.title().trim() || (this.kind() === 'workstream' && !this.ownerTeamId())) {
+      if (
+        !this.title().trim() ||
+        (this.kind() === 'workstream' && (!this.ownerTeamId() || !!this.err('delta')))
+      ) {
         this.submitted.set(true);
         return;
       }
@@ -1195,7 +1199,7 @@ export class CreateDialog {
           const w = await this.store.createWorkstream({
             title,
             description: this.text().trim() || undefined,
-            deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() : undefined,
+            deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() || undefined : undefined,
             ownerTeamId: this.ownerTeamId(),
             priority: this.priority() as Priority,
             accountableUserId: this.accountableId() || undefined,
