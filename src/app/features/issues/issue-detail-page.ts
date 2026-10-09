@@ -49,7 +49,7 @@ import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from '.
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AiIssueSection } from '../ai-actions/ai-issue-cards';
-import { IssueCustomers } from '../customers/issue-customers';
+import { CustomerRequests } from '../customers/customer-requests';
 import { IssueSideWorkstreams, IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 
@@ -80,7 +80,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
     IssueActivity,
     IssueCommandDialog,
     IssueSideWorkstreams,
-    IssueCustomers,
+    CustomerRequests,
     IssueTimeCard,
     AiIssueSection,
   ],
@@ -202,6 +202,8 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
 
             <app-issue-workstreams [issue]="i" />
 
+            <app-customer-requests [issueId]="i.id" [readonly]="!!i.duplicateOfId" />
+
             <app-issue-artifacts [issue]="i" />
 
             <div class="border-t pt-6">
@@ -267,8 +269,6 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
           </section>
 
           <app-issue-side-workstreams [issue]="i" />
-
-          <app-issue-customers [issue]="i" />
 
           <app-issue-time-card [issue]="i" />
 

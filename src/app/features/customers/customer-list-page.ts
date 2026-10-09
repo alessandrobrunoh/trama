@@ -3,17 +3,19 @@ import { RouterLink } from '@angular/router';
 import { LucideBuilding2, LucideDynamicIcon, LucidePlus, LucideSearch } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore, normalizeCustomerDomain, usePageShortcuts } from '../../core';
+import { NablaStore, normalizeCustomerDomains, usePageShortcuts } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
+import { CustomerAvatar } from './customer-avatar';
+import { compactNumber, splitDomains } from './customer-model';
 
 
 @Component({
   selector: 'app-customer-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, PageHeader, Kbd, EmptyState, TopBarActions],
+  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, PageHeader, Kbd, EmptyState, TopBarActions, CustomerAvatar],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
@@ -45,8 +47,8 @@ import { PageHeader } from '../../shared/page-header';
           <input hlmInput name="name" required maxlength="200" class="h-9" placeholder="Acme" />
         </label>
         <label class="flex min-w-40 flex-1 flex-col gap-1 text-xs">
-          Domain
-          <input hlmInput name="domain" required maxlength="300" class="h-9" placeholder="acme.com" />
+          Domains
+          <input hlmInput name="domains" required maxlength="2000" class="h-9" placeholder="acme.com, acme.io" />
         </label>
         <button hlmBtn size="sm" type="submit" [disabled]="saving()">Create</button>
         <button hlmBtn size="sm" variant="ghost" type="button" (click)="open.set(false)">Cancel</button>
@@ -57,7 +59,7 @@ import { PageHeader } from '../../shared/page-header';
     }
 
     @if (total() === 0) {
-      <app-empty-state [icon]="building" title="No customers yet" description="A customer is a company, not a contact. Add one when feedback should be tied to the issues it produced.">
+      <app-empty-state [icon]="building" title="No customers yet" description="A customer is a company, not a contact. Add one when requests should be tied to the issues and projects they produced.">
         @if (canManage()) {
           <button hlmBtn size="sm" (click)="open.set(true)"><svg [lucideIcon]="plus" [size]="14"></svg>New customer</button>
         }
@@ -68,7 +70,10 @@ import { PageHeader } from '../../shared/page-header';
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
         <div class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex">
           <span class="flex-1">Customer</span>
-          <span class="w-28 text-right">Issues</span>
+          <span class="w-24">Tier</span>
+          <span class="w-20 text-right">Revenue</span>
+          <span class="w-16 text-right">Size</span>
+          <span class="w-20 text-right">Requests</span>
         </div>
         @for (r of shown(); track r.customer.id) {
           <a
@@ -76,19 +81,27 @@ import { PageHeader } from '../../shared/page-header';
             role="listitem"
             class="hover:bg-muted/60 flex min-h-14 items-center gap-3 border-b px-4 py-3 sm:px-6"
           >
-            <span class="bg-muted text-muted-foreground flex size-8 shrink-0 items-center justify-center rounded-md">
-              <svg [lucideIcon]="building" [size]="15"></svg>
-            </span>
+            <app-customer-avatar [customer]="r.customer" [size]="32" />
             <span class="min-w-0 flex-1">
               <span class="flex min-w-0 items-center gap-2">
                 <span class="truncate text-sm font-medium">{{ r.customer.name }}</span>
                 @if (r.customer.archivedAt) {
                   <span class="text-muted-foreground rounded border px-1.5 text-[11px]">Archived</span>
                 }
+                @if (r.customer.status !== 'active') {
+                  <span class="text-muted-foreground rounded border px-1.5 text-[11px] capitalize">{{ r.customer.status }}</span>
+                }
               </span>
-              <span class="text-muted-foreground block truncate font-mono text-xs">{{ r.customer.domain }}</span>
+              <span class="text-muted-foreground block truncate font-mono text-xs">{{ r.customer.domains.join(', ') }}</span>
             </span>
-            <span class="text-muted-foreground w-28 shrink-0 text-right text-sm tabular-nums">{{ r.issues }}</span>
+            <span class="hidden w-24 shrink-0 md:block">
+              @if (r.tier; as tier) {
+                <span class="rounded border px-1.5 text-[11px]" [style.color]="tier.color" [style.border-color]="tier.color">{{ tier.name }}</span>
+              }
+            </span>
+            <span class="text-muted-foreground hidden w-20 shrink-0 text-right text-sm tabular-nums md:block">{{ r.customer.revenue === undefined ? '' : compact(r.customer.revenue) }}</span>
+            <span class="text-muted-foreground hidden w-16 shrink-0 text-right text-sm tabular-nums md:block">{{ r.customer.size === undefined ? '' : compact(r.customer.size) }}</span>
+            <span class="text-muted-foreground w-20 shrink-0 text-right text-sm tabular-nums">{{ r.requests }}</span>
           </a>
         }
       </div>
@@ -110,29 +123,27 @@ export class CustomerListPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canManage = computed(() => this.store.allowed('manageCustomers'));
 
-  private readonly issueCounts = computed(() => {
-    const sets = new Map<string, Set<string>>();
-    for (const request of this.store.customerRequests()) {
-      let set = sets.get(request.customerId);
-      if (!set) sets.set(request.customerId, (set = new Set()));
-      set.add(request.issueId);
-    }
-    return sets;
+  protected readonly compact = compactNumber;
+  private readonly requestCounts = computed(() => {
+    const counts = new Map<string, number>();
+    for (const request of this.store.customerRequests()) counts.set(request.customerId, (counts.get(request.customerId) ?? 0) + 1);
+    return counts;
   });
   protected readonly total = computed(() => this.store.customers().filter((c) => this.showArchived() || !c.archivedAt).length);
   protected readonly shown = computed(() => {
     const q = this.search().trim().toLowerCase();
-    const counts = this.issueCounts();
+    const counts = this.requestCounts();
+    const tiers = new Map(this.store.settings().customerTiers.map((t) => [t.id, t]));
     return this.store
       .customers()
-      .filter((c) => (this.showArchived() || !c.archivedAt) && (!q || `${c.name} ${c.domain}`.toLowerCase().includes(q)))
+      .filter((c) => (this.showArchived() || !c.archivedAt) && (!q || `${c.name} ${c.domains.join(' ')}`.toLowerCase().includes(q)))
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
-      .map((customer) => ({ customer, issues: counts.get(customer.id)?.size ?? 0 }));
+      .map((customer) => ({ customer, requests: counts.get(customer.id) ?? 0, tier: customer.tierId ? tiers.get(customer.tierId) : undefined }));
   });
   protected readonly description = computed(() => {
     const n = this.store.customers().filter((c) => !c.archivedAt).length;
-    return n === 1 ? '1 customer · feedback linked to issues' : `${n} customers · feedback linked to issues`;
+    return n === 1 ? '1 customer · requests on issues and projects' : `${n} customers · requests on issues and projects`;
   });
 
   private readonly _keys = usePageShortcuts([
@@ -143,14 +154,14 @@ export class CustomerListPage {
     event.preventDefault();
     const data = new FormData(event.target as HTMLFormElement);
     const name = String(data.get('name') ?? '').trim();
-    const domain = String(data.get('domain') ?? '').trim();
-    if (!normalizeCustomerDomain(domain)) {
-      this.formError.set('Use a domain like acme.com.');
+    const { domains, invalid } = normalizeCustomerDomains(splitDomains(String(data.get('domains') ?? '')));
+    if (invalid.length || domains.length === 0) {
+      this.formError.set(invalid.length ? `"${invalid[0]}" is not a domain. Use domains like acme.com.` : 'Add at least one domain like acme.com.');
       return;
     }
     this.formError.set('');
     this.saving.set(true);
-    const created = await this.store.createCustomer({ name, domain });
+    const created = await this.store.createCustomer({ name, domains });
     this.saving.set(false);
     if (created) {
       this.open.set(false);

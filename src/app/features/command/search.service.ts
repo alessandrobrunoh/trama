@@ -126,7 +126,7 @@ export class SearchService {
     for (const p of s.projects()) push({ type: 'project', id: p.id, title: p.name }, p.name, p.summary ?? '');
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
-    for (const c of s.customers()) push({ type: 'customer', id: c.id, title: c.name, subtitle: c.domain }, `${c.name} ${c.domain}`);
+    for (const c of s.customers()) push({ type: 'customer', id: c.id, title: c.name, subtitle: c.domains.join(', ') }, `${c.name} ${c.domains.join(' ')}`);
     for (const a of s.artifacts())
       push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId, workstreamKey: wsKey(a.workstreamId) }, a.title, a.externalId ?? '');
     for (const r of s.repositories()) push({ type: 'repository', id: r.id, title: r.fullName }, r.fullName);

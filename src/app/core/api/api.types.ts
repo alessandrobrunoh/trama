@@ -9,6 +9,7 @@ import type {
   ApiToken,
   CiState,
   CriterionState,
+  CustomerStatus,
   Decision,
   EstimateScale,
   PermissionMap,
@@ -172,18 +173,51 @@ export interface UpdateRepositoryInput {
 // ───── customers ─────
 export interface CreateCustomerInput {
   name: string;
-  /** Raw domain. The server stores it normalized. */
-  domain: string;
+  /** Raw domains, primary first. The server stores them normalized. */
+  domains: string[];
+  logoUrl?: string;
+  /** Whole number >= 0. */
+  revenue?: number;
+  /** Whole number >= 0. */
+  size?: number;
+  tierId?: ID;
+  status?: CustomerStatus;
 }
 export interface UpdateCustomerInput {
   name?: string;
-  domain?: string;
-  /** `true` archives, `false` restores. Links stay. */
+  /** Replaces the whole list; the first one is the primary. */
+  domains?: string[];
+  /** `null` clears. */
+  logoUrl?: string | null;
+  revenue?: number | null;
+  size?: number | null;
+  tierId?: ID | null;
+  status?: CustomerStatus;
+  /** `true` archives, `false` restores. Requests stay. */
   archived?: boolean;
 }
-export interface LinkCustomerInput {
-  issueId: ID;
+/** Exactly one of `issueId` / `projectId`. */
+export interface CreateCustomerRequestInput {
+  issueId?: ID;
+  projectId?: ID;
+  /** Markdown. */
   body?: string;
+  important?: boolean;
+  sourceUrl?: string;
+}
+export interface UpdateCustomerRequestInput {
+  /** `null` clears. */
+  body?: string | null;
+  important?: boolean;
+  sourceUrl?: string | null;
+}
+export interface CreateCustomerTierInput {
+  name: string;
+  color?: string;
+}
+export interface UpdateCustomerTierInput {
+  name?: string;
+  color?: string;
 }
 
 // ───── projects ─────

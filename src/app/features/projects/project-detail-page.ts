@@ -55,6 +55,7 @@ import { labelOptions, priorityOptions, repoOptions, teamOptions, userOptions } 
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
+import { CustomerRequests } from '../customers/customer-requests';
 import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectHealthBadge } from './project-health';
@@ -90,6 +91,7 @@ const ACTIVITY_CAP = 20;
     RelativeTimePipe,
     CommentThread,
     EditableMarkdown,
+    CustomerRequests,
     InlineText,
     Picker,
     WsDatePicker,
@@ -337,6 +339,8 @@ const ACTIVITY_CAP = 20;
                 <app-project-risks-card [project]="p" />
                 <app-project-issue-suggestions [project]="p" />
               }
+
+              <app-customer-requests [projectId]="p.id" />
 
               <app-project-milestones [project]="p" />
 

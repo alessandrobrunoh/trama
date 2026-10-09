@@ -142,7 +142,7 @@ export class IssuePage {
     const id = this.customerRef()?.id;
     if (!this.customer()) return this.store.issues();
     if (!id) return [];
-    const ids = new Set(this.store.customerRequests().filter((r) => r.customerId === id).map((r) => r.issueId));
+    const ids = new Set(this.store.customerRequests().filter((r) => r.customerId === id && r.issueId).map((r) => r.issueId));
     return this.store.issues().filter((i) => ids.has(i.id));
   });
   protected readonly title = computed(() =>
