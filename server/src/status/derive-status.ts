@@ -2,6 +2,7 @@ import type {
   ArtifactKind,
   ArtifactState,
   CiState,
+  DeliveryState,
   ReviewState,
   WorkstreamStatus,
 } from '../contracts/domain.js';
@@ -59,6 +60,11 @@ export interface DerivedStatus {
   derivedStatus: WorkstreamStatus;
   /** The matched rule (1–9). */
   rule: number;
+  /**
+   * Delivery evidence (PR / release / deployment), independent of the outcome `status`.
+   * A merged PR is `merged` here but never makes the workstream `shipped` by itself.
+   */
+  delivery: DeliveryState;
 }
 
 const isPr = (a: StatusArtifact): boolean =>
@@ -82,16 +88,46 @@ export function blockers(
   return out;
 }
 
+/**
+ * How far the code got, from artifacts only. Highest evidence wins:
+ * deployed > released > merged (every live PR merged) > in_review (an open PR) > none.
+ * This is delivery, not outcome: it says nothing about criteria, blockers or decisions.
+ */
+export function deriveDelivery(
+  input: Pick<StatusInput, 'artifacts'>,
+): DeliveryState {
+  const { artifacts } = input;
+  if (artifacts.some((a) => a.kind === 'deployment' && a.state === 'healthy'))
+    return 'deployed';
+  if (artifacts.some((a) => a.kind === 'release' && a.state === 'published'))
+    return 'released';
+  const live = artifacts.filter(isPr).filter((a) => a.state !== 'closed');
+  if (live.length > 0 && live.every((a) => a.state === 'merged'))
+    return 'merged';
+  if (artifacts.some(isOpenPr)) return 'in_review';
+  return 'none';
+}
+
+const isDelivered = (d: DeliveryState): boolean =>
+  d === 'merged' || d === 'released' || d === 'deployed';
+
 /** First matching rule wins. */
 export function deriveStatus(input: StatusInput): DerivedStatus {
   const override = input.workstream.statusOverride ?? null;
   const derived = deriveWithoutOverride(input);
+  const delivery = deriveDelivery(input);
   if (override)
-    return { status: override, derivedStatus: derived.status, rule: 1 };
+    return {
+      status: override,
+      derivedStatus: derived.status,
+      rule: 1,
+      delivery,
+    };
   return {
     status: derived.status,
     derivedStatus: derived.status,
     rule: derived.rule,
+    delivery,
   };
 }
 
@@ -105,28 +141,32 @@ function deriveWithoutOverride(input: StatusInput): {
   rule: number;
 } {
   const { artifacts } = input;
-  const prs = artifacts.filter(isPr);
   const issues = openIssues(input);
   const allIssuesDone =
     issues.length > 0 && issues.every((i) => i.status === 'done');
 
-  const deployed = artifacts.some(
-    (a) =>
-      (a.kind === 'deployment' && a.state === 'healthy') ||
-      (a.kind === 'release' && a.state === 'published'),
-  );
-  const live = prs.filter((a) => a.state !== 'closed');
-  const merged = live.length > 0 && live.every((a) => a.state === 'merged');
-  if (deployed || merged || allIssuesDone)
+  // Delivery evidence (merged / released / deployed, or every linked issue done) is only a
+  // precondition of the outcome. It never ships the workstream on its own: criteria,
+  // blockers, input requests and undecided decisions come first.
+  const delivery = deriveDelivery(input);
+  const delivered = isDelivered(delivery);
+  const hasBlockers = blockers(input).length > 0;
+  const waitingOnPeople =
+    input.inputRequests.some((r) => r.state === 'open') ||
+    input.decisions.some((d) => d.status === 'proposed');
+  const criteria = input.workstream.acceptanceCriteria;
+  const criteriaMet = criteria.every((c) => c.state === 'met');
+  if (
+    (delivered || allIssuesDone) &&
+    criteriaMet &&
+    !hasBlockers &&
+    !waitingOnPeople
+  )
     return { status: 'shipped', rule: 2 };
 
-  if (blockers(input).length) return { status: 'blocked', rule: 3 };
+  if (hasBlockers) return { status: 'blocked', rule: 3 };
 
-  if (
-    input.inputRequests.some((r) => r.state === 'open') ||
-    input.decisions.some((d) => d.status === 'proposed')
-  )
-    return { status: 'needs_input', rule: 4 };
+  if (waitingOnPeople) return { status: 'needs_input', rule: 4 };
 
   if (
     artifacts.some(
@@ -147,8 +187,10 @@ function deriveWithoutOverride(input: StatusInput): {
   )
     return { status: 'in_review', rule: 6 };
 
+  // Delivered but not complete (criteria pending, issues open): the outcome is still being worked.
   const active =
     anyInProgress ||
+    delivered ||
     input.workstream.acceptanceCriteria.some(
       (c) => c.state === 'in_progress',
     ) ||

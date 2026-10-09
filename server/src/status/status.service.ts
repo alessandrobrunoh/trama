@@ -30,7 +30,7 @@ export interface StatusChange {
 }
 
 /**
- * Keeps `status` / `derivedStatus` / `shippedAt` of workstreams in sync with their
+ * Keeps `status` / `derivedStatus` / `delivery` / `shippedAt` of workstreams in sync with their
  * issues, input requests, artifacts, decisions and dependencies.
  * Subscribed to {@link WorkstreamBus}; also re-derives dependents.
  */
@@ -147,12 +147,14 @@ export class StatusService
     let change: StatusChange | null = null;
     const dirty =
       ws.derivedStatus !== result.derivedStatus ||
+      ws.delivery !== result.delivery ||
       ws.status !== result.status ||
       (result.derivedStatus === 'shipped' && !ws.shippedAt);
     if (dirty) {
       const from = ws.status;
       const patch: Partial<WorkstreamEntity> = {
         derivedStatus: result.derivedStatus,
+        delivery: result.delivery,
         status: result.status,
       };
       if (result.derivedStatus === 'shipped' && !ws.shippedAt)
@@ -176,6 +178,7 @@ export class StatusService
             from,
             to: result.status,
             derivedStatus: result.derivedStatus,
+            delivery: result.delivery,
           },
         });
       }
