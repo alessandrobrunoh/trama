@@ -7,7 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { type DataSource, type Repository } from 'typeorm';
+import { DataSource, type Repository } from 'typeorm';
 import {
   CUSTOMER_REQUEST_BODY_MAX,
   INTAKE_PROVIDER_META,
