@@ -1,9 +1,10 @@
 import { demandConditions, type DemandFilter } from '../customers/demand-filter.js';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
 import {
   ISSUE_KEY_PREFIX,
+  type ExternalRef,
   type ActorRef,
   type IssueKind,
   type IssueSource,
@@ -12,7 +13,7 @@ import {
 } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
-import { notFound, uid, unique } from '../common/util.js';
+import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
 import { IssueEntity, MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
@@ -547,6 +548,50 @@ export class IssuesService {
       [...previous, ...row.workstreamIds],
       'issue.linked',
     );
+    return row;
+  }
+
+  /**
+   * Attach (or, with `null`, detach) the external tracker issue this one mirrors. The pointer is a read-only
+   * mirror: it never changes the status. One external issue belongs to one Trama issue (409 otherwise).
+   */
+  async setExternalRef(workspaceId: string, actor: ActorRef, idOrKey: string, ref: ExternalRef | null) {
+    const row = await this.get(workspaceId, idOrKey);
+    const previous = row.externalRef;
+    row.externalRef = ref;
+    if (ref && !row.externalUrl) row.externalUrl = ref.url;
+    if (!ref && previous && row.externalUrl === previous.url) row.externalUrl = null;
+    row.updatedAt = new Date();
+    try {
+      await this.repo.save(row);
+    } catch (e) {
+      if (isUniqueViolation(e) && ref) {
+        const other = await this.ds
+          .getRepository(IssueEntity)
+          .createQueryBuilder('i')
+          .where(`i.workspaceId = :workspaceId AND i.externalRef->>'provider' = :p AND i.externalRef->>'id' = :id`, { workspaceId, p: ref.provider, id: ref.id })
+          .getOne();
+        throw new ConflictException(`${ref.key ?? ref.id} is already ${other ? `linked to ${other.key}` : 'linked to another issue'}`);
+      }
+      throw e;
+    }
+    await this.events.record({
+      workspaceId,
+      actor,
+      type: 'issue.updated',
+      subject: { type: 'issue', id: row.id },
+      data: { key: row.key, fields: ['externalRef'], external: ref ? { provider: ref.provider, key: ref.key, origin: ref.origin } : null },
+    });
+    return row;
+  }
+
+  /** Stores a freshly read external status. Quiet on purpose (no domain event): it is a mirror, not a change of the work. */
+  async refreshExternalRef(workspaceId: string, idOrKey: string, patch: Pick<ExternalRef, 'state' | 'stateType' | 'syncedAt' | 'key' | 'url'>) {
+    const row = await this.get(workspaceId, idOrKey);
+    if (!row.externalRef) throw new BadRequestException('This issue is not linked to an external issue');
+    row.externalRef = { ...row.externalRef, ...patch };
+    await this.repo.save(row);
+    this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id: row.id });
     return row;
   }
 

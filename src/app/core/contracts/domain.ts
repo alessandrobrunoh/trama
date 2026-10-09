@@ -536,7 +536,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
  * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
 export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
-export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
+export type IssueSource = 'manual' | 'github' | 'gitlab' | 'linear' | 'email' | 'api' | 'agent';
 
 /**
  * A unit of demand: one bug, request, incident, or task.
@@ -586,6 +586,8 @@ export interface Issue {
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
+  /** The issue this one was imported from or is linked to in an external tracker (read-only mirror of its status). */
+  externalRef?: ExternalRef;
   /**
    * Distinct customers linked to this issue. Set on issue reads and in the snapshot.
    * `0` when nobody is linked. Not stored on the issue row.
@@ -1077,7 +1079,8 @@ export type SubjectType =
   | 'team'
   | 'project'
   | 'project_update'
-  | 'milestone';
+  | 'milestone'
+  | 'import';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -1694,6 +1697,7 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   { entity: 'dependency', label: 'Dependencies', events: ['dependency.added', 'dependency.removed'] },
   { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
   { entity: 'repository', label: 'Repositories', events: ['repository.created', 'repository.updated', 'repository.deleted'] },
+  { entity: 'import', label: 'Imports', events: ['import.started', 'import.completed', 'import.failed', 'import.canceled'] },
 ];
 
 /** Does a webhook subscription pattern (`*`, `issue.*`, `issue.created`) match an event type? */
@@ -1751,4 +1755,190 @@ export interface LiveEvent {
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;
   at: ISODate;
+}
+
+// ───────────────────────────── External trackers: import and link ─────────────────────────────
+
+/** Trackers Trama can import from or link to. Trama stays usable next to them: nothing is written back. */
+export type ExternalProvider = 'github' | 'linear';
+export const EXTERNAL_PROVIDERS: ExternalProvider[] = ['github', 'linear'];
+export const EXTERNAL_PROVIDER_META: Record<ExternalProvider, { label: string }> = {
+  github: { label: 'GitHub Issues' },
+  linear: { label: 'Linear' },
+};
+
+/** The external status, normalized so a badge can colour it without knowing the tracker. */
+export type ExternalStateType = 'open' | 'in_progress' | 'done' | 'canceled';
+
+/**
+ * Pointer from a Trama issue to an issue in another tracker. Unique per workspace: one external issue
+ * is one Trama issue, which is what makes an import idempotent. `state` and `syncedAt` are a read-only
+ * mirror refreshed on demand; they never change the Trama status.
+ */
+export interface ExternalRef {
+  provider: ExternalProvider;
+  /** Stable id in the tracker: `owner/repo#12` (lower-case) for GitHub, the issue uuid for Linear. */
+  id: string;
+  url: string;
+  /** What people call it: `#12` or `ENG-123`. */
+  key?: string;
+  /** The tracker's own state name (`open`, `In Progress`). */
+  state?: string;
+  stateType?: ExternalStateType;
+  /** Last time `state` was read from the tracker. */
+  syncedAt?: ISODate;
+  /** `import` when Trama created the issue from it, `link` when a person attached it. */
+  origin: 'import' | 'link';
+}
+
+export type ImportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
+export const IMPORT_STATUSES: ImportStatus[] = ['queued', 'running', 'completed', 'failed', 'canceled'];
+export const IMPORT_ACTIVE_STATUSES: ImportStatus[] = ['queued', 'running'];
+export type ImportPhase = 'setup' | 'issues' | 'comments' | 'done';
+
+/** A tracker credential kept (encrypted) on the server so an import can resume and a link can refresh. Never returns the token. */
+export interface ImportCredential {
+  /** `tcr_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: ExternalProvider;
+  /** The account the token belongs to (GitHub login, Linear user). */
+  account: string;
+  /** Self-hosted GitHub Enterprise only. */
+  baseUrl?: string;
+  createdAt: ISODate;
+  lastUsedAt?: ISODate;
+}
+
+/** What to read. GitHub: one repository. Linear: one or more teams (empty = every team). */
+export interface ImportSource {
+  /** `owner/name` (GitHub). */
+  repository?: string;
+  /** Linear team ids. */
+  teamIds?: string[];
+}
+
+export interface ImportCredentialRef {
+  /** A saved tracker credential. */
+  credentialId?: ID;
+  /** A GitHub integration connection of the workspace (its token is reused). GitHub only. */
+  connectionId?: ID;
+}
+
+export type ImportTarget = { action: 'map'; id: ID } | { action: 'create' } | { action: 'skip' };
+
+/** The editable mapping from the tracker's entities to Trama's. Keys are the preview's ids. */
+export interface ImportMapping {
+  teams: Record<string, ImportTarget>;
+  projects: Record<string, ImportTarget>;
+  labels: Record<string, ImportTarget>;
+  /** Tracker user id → Trama user id; `null` leaves the issue unassigned. */
+  users: Record<string, ID | null>;
+  /** Tracker state id → Trama status. */
+  statuses: Record<string, IssueStatus>;
+}
+
+export interface ImportOptions {
+  includeComments: boolean;
+  /** Import closed / completed / canceled issues too. */
+  includeClosed: boolean;
+  /** Kind for issues no label points at (bug, security…). */
+  defaultKind: IssueKind;
+}
+export const DEFAULT_IMPORT_OPTIONS: ImportOptions = { includeComments: false, includeClosed: true, defaultKind: 'feature' };
+
+export interface ImportPreviewEntity {
+  id: string;
+  name: string;
+  key?: string;
+  color?: string;
+  /** Issues using it, when the tracker tells cheaply. */
+  count?: number;
+  suggested: ImportTarget;
+}
+
+export interface ImportPreviewUser {
+  id: string;
+  name?: string;
+  login?: string;
+  email?: string;
+  /** Trama member matched by email, then by login or name. */
+  suggestedUserId: ID | null;
+}
+
+export interface ImportPreviewStatus {
+  id: string;
+  name: string;
+  /** The tracker's own category (`started`, `closed`, `not_planned`…). */
+  type: string;
+  count?: number;
+  suggested: IssueStatus;
+}
+
+export interface ImportPreview {
+  provider: ExternalProvider;
+  account: string;
+  /** `owner/name` or the Linear workspace. */
+  sourceLabel: string;
+  sourceUrl?: string;
+  counts: {
+    /** `null` when the tracker cannot count without reading everything. */
+    issues: number | null;
+    open: number | null;
+    closed: number | null;
+    projects: number;
+    milestones: number;
+    labels: number;
+    users: number;
+  };
+  teams: ImportPreviewEntity[];
+  projects: ImportPreviewEntity[];
+  labels: ImportPreviewEntity[];
+  milestones: { id: string; name: string; projectId?: string; dueOn?: string }[];
+  users: ImportPreviewUser[];
+  statuses: ImportPreviewStatus[];
+  sample: { key: string; title: string; state: string }[];
+  warnings: string[];
+}
+
+export interface ImportProgress {
+  phase: ImportPhase;
+  /** Issues the tracker says there are, when known. */
+  total?: number;
+  processed: number;
+  created: number;
+  /** Already imported earlier (their mirrored status is refreshed). */
+  skipped: number;
+  failed: number;
+  comments: number;
+}
+
+export interface ImportErrorEntry {
+  /** External key or id the failure belongs to. */
+  ref: string;
+  message: string;
+}
+
+export interface ImportJob {
+  /** `imp_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: ExternalProvider;
+  status: ImportStatus;
+  /** Human label of what is imported (`acme/api`, `Linear: ENG, WEB`). */
+  sourceLabel: string;
+  source: ImportSource;
+  options: ImportOptions;
+  mapping: ImportMapping;
+  progress: ImportProgress;
+  /** First errors only (capped); `progress.failed` has the real count. */
+  errors: ImportErrorEntry[];
+  /** Set while the tracker's rate limit is being waited out. */
+  waitingUntil?: ISODate;
+  cancelRequested: boolean;
+  lastError?: string;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+  startedAt?: ISODate;
+  finishedAt?: ISODate;
 }
