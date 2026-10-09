@@ -935,6 +935,27 @@
   }
  },
  {
+  "name": "bulk_update_issues",
+  "method": "POST",
+  "path": "/issues/bulk",
+  "permission": "issues:write",
+  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels and workstreams are added/removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)",
+   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?, addWorkstreamIds?, removeWorkstreamIds?}"
+  }
+ },
+ {
+  "name": "bulk_delete_issues",
+  "method": "POST",
+  "path": "/issues/bulk-delete",
+  "permission": "issues:delete",
+  "description": "Delete up to 100 issues in one transaction (their comments go too). Returns the deleted ids.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)"
+  }
+ },
+ {
   "name": "list_customers",
   "method": "GET",
   "path": "/customers",

@@ -11,6 +11,7 @@ import {
   Notifier,
   PRIORITY_META,
   UiStore,
+  type BulkIssuePatch,
   type Issue,
   type IssueKind,
   type IssueStatus,
@@ -19,14 +20,13 @@ import {
 } from '../../core';
 
 /** What the keyboard / bulk command dialog edits. */
-export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'team' | 'workstream' | 'duplicate';
+export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'team' | 'project' | 'label' | 'workstream' | 'duplicate';
 
 export interface IssuePrompt {
   field: IssuePromptField;
   ids: string[];
 }
 
-type Snapshot = Pick<Issue, 'id' | 'status' | 'priority' | 'assigneeId' | 'teamId' | 'workstreamIds'>;
 
 @Injectable({ providedIn: 'root' })
 export class IssueActions {
@@ -94,6 +94,23 @@ export class IssueActions {
     this.patchMany(ids, (i) => ((i.teamId ?? null) === teamId ? null : { teamId }), name ? `Moved to ${name}` : 'Team cleared');
   }
 
+  setProject(ids: readonly string[], projectId: string | null): void {
+    const name = projectId ? (this.store.getProject(projectId)?.name ?? 'project') : null;
+    this.patchMany(ids, (i) => ((i.projectId ?? null) === projectId ? null : { projectId }), name ? `Moved to project ${name}` : 'Project cleared');
+  }
+
+  /** Add the label when not every issue has it yet, otherwise remove it from all. */
+  toggleLabel(ids: readonly string[], labelId: string): void {
+    const list = this.issues(ids);
+    if (!list.length) return;
+    const name = this.store.settings().labels.find((l) => l.id === labelId)?.name ?? 'label';
+    if (list.every((i) => i.labels.includes(labelId))) {
+      this.patchMany(ids, (i) => (i.labels.includes(labelId) ? { removeLabels: [labelId] } : null), `Label ${name} removed`);
+    } else {
+      this.patchMany(ids, (i) => (i.labels.includes(labelId) ? null : { addLabels: [labelId] }), `Label ${name} added`);
+    }
+  }
+
   // ───────────────────────── workstreams ─────────────────────────
 
   /** Add when not every issue is linked yet, otherwise remove the link from all. */
@@ -118,14 +135,11 @@ export class IssueActions {
       if (dupes.length) this.notifier.error('Duplicates can’t be linked', { description: 'Clear “duplicate of” first.' });
       return;
     }
-    const before = list.map((i) => this.snap(i));
-    for (const i of list) {
-      if (i.status === 'canceled') void this.store.updateIssue(i.id, { workstreamIds: [...i.workstreamIds, ws.id] });
-      else void this.store.linkIssue(i.id, { workstreamIds: [ws.id] });
-    }
-    this.notifier.success(`${this.subject(list.map((i) => i.id))} added to ${ws.key}`, {
+    const done = list.map((i) => i.id);
+    void this.run(done, { addWorkstreamIds: [ws.id] });
+    this.notifier.success(`${this.subject(done)} added to ${ws.key}`, {
       description: ws.title,
-      action: { label: 'Undo', run: () => this.restore(before) },
+      action: { label: 'Undo', run: () => void this.run(done, { removeWorkstreamIds: [ws.id] }) },
     });
   }
 
@@ -133,10 +147,10 @@ export class IssueActions {
     const ws = this.store.getWorkstream(workstreamId);
     const list = this.issues(ids).filter((i) => i.workstreamIds.includes(workstreamId));
     if (!list.length) return;
-    const before = list.map((i) => this.snap(i));
-    for (const i of list) void this.store.updateIssue(i.id, { workstreamIds: i.workstreamIds.filter((x) => x !== workstreamId) });
-    this.notifier.success(`${this.subject(list.map((i) => i.id))} removed from ${ws?.key ?? 'workstream'}`, {
-      action: { label: 'Undo', run: () => this.restore(before) },
+    const done = list.map((i) => i.id);
+    void this.run(done, { removeWorkstreamIds: [workstreamId] });
+    this.notifier.success(`${this.subject(done)} removed from ${ws?.key ?? 'workstream'}`, {
+      action: { label: 'Undo', run: () => void this.run(done, { addWorkstreamIds: [workstreamId] }) },
     });
   }
 
@@ -160,13 +174,13 @@ export class IssueActions {
     const issue = this.store.getIssue(id);
     const target = this.store.getIssue(targetId);
     if (!issue || !target || issue.id === target.id) return;
-    const before = this.snap(issue);
+    const beforeStatus = issue.status;
     void this.store.updateIssue(issue.id, { duplicateOfId: target.id, status: 'canceled' });
     this.notifier.success(`${issue.key} marked as duplicate of ${target.key}`, {
       description: 'It is canceled; follow the original instead.',
       action: {
         label: 'Undo',
-        run: () => void this.store.updateIssue(issue.id, { duplicateOfId: null, status: before.status }),
+        run: () => void this.store.updateIssue(issue.id, { duplicateOfId: null, status: beforeStatus }),
       },
     });
   }
@@ -236,64 +250,86 @@ export class IssueActions {
     for (const i of this.issues(ids)) if (i.estimate !== (estimate ?? undefined)) void this.store.updateIssue(i.id, { estimate });
   }
 
-  /** Confirm, then delete. `after` runs once the deletes succeeded (e.g. navigate back). */
+  /**
+   * Delete right away from the UI and on the server after a short grace period, with an Undo toast
+   * (one atomic request for the whole selection). `after` runs once the issues are gone from the UI.
+   */
   remove(ids: readonly string[], after?: () => void): void {
     const list = this.issues(ids);
     if (!list.length || !this.store.allowed('deleteIssues')) return;
-    const one = list.length === 1;
-    this.ui.setConfirmDelete({
-      title: one ? `Delete ${list[0].key}?` : `Delete ${list.length} issues?`,
-      description: one
-        ? `“${list[0].title}” and its comments are deleted. Linked workstreams are not affected. This cannot be undone.`
-        : 'These issues and their comments are deleted. Linked workstreams are not affected. This cannot be undone.',
-      confirmLabel: one ? 'Delete issue' : `Delete ${list.length} issues`,
-      onConfirm: async () => {
-        const results = await Promise.all(list.map((i) => this.store.deleteIssue(i.id)));
-        const gone = new Set(list.filter((_, n) => results[n]).map((i) => i.id));
-        this.ui.setSelected(this.ui.selectedRowIds().filter((id) => !gone.has(id)));
-        if (gone.size) this.notifier.success(one ? `${list[0].key} deleted` : `${gone.size} issues deleted`);
-        if (gone.size === list.length) after?.();
-      },
+    const staged = this.store.stageIssueDelete(list.map((i) => i.id));
+    if (!staged) return;
+    const gone = new Set(list.map((i) => i.id));
+    this.ui.setSelected(this.ui.selectedRowIds().filter((id) => !gone.has(id)));
+    after?.();
+    const label = list.length === 1 ? `${list[0].key} deleted` : `${list.length} issues deleted`;
+    this.notifier.success(label, {
+      description: list.length === 1 ? list[0].title : undefined,
+      duration: 6000,
+      action: { label: 'Undo', run: () => staged.cancel() },
     });
   }
 
   // ───────────────────────── internals ─────────────────────────
 
-  private snap(i: Issue): Snapshot {
-    return { id: i.id, status: i.status, priority: i.priority, assigneeId: i.assigneeId, teamId: i.teamId, workstreamIds: [...i.workstreamIds] };
+  /** One atomic bulk request. */
+  private run(ids: readonly string[], patch: BulkIssuePatch): Promise<boolean> {
+    return this.store.bulkUpdateIssues(ids, patch);
   }
 
-  /** Apply `patch(issue)` (null = unchanged) to each issue; bulk changes offer Undo. */
-  private patchMany(ids: readonly string[], patch: (i: Issue) => UpdateIssueInput | null, title: string): void {
-    const changed: { issue: Issue; patch: UpdateIssueInput }[] = [];
+  /**
+   * Apply `patch(issue)` (null = unchanged) to each issue with ONE atomic request per distinct patch;
+   * bulk changes offer Undo, which puts every issue back to what it had.
+   */
+  private patchMany(ids: readonly string[], patch: (i: Issue) => BulkIssuePatch | null, title: string): void {
+    const changed: { issue: Issue; patch: BulkIssuePatch }[] = [];
     for (const issue of this.issues(ids)) {
       const p = patch(issue);
       if (p) changed.push({ issue, patch: p });
     }
     if (!changed.length) return;
-    const before = changed.map((c) => this.snap(c.issue));
-    for (const c of changed) void this.store.updateIssue(c.issue.id, c.patch);
+    // The patch is the same for every issue by construction; group defensively by its JSON.
+    const groups = new Map<string, { ids: string[]; patch: BulkIssuePatch }>();
+    for (const c of changed) {
+      const k = JSON.stringify(c.patch);
+      const g = groups.get(k) ?? { ids: [], patch: c.patch };
+      g.ids.push(c.issue.id);
+      groups.set(k, g);
+    }
+    const before = changed.map((c) => c.issue);
+    for (const g of groups.values()) void this.run(g.ids, g.patch);
     // Single inline edits are visible in place; bulk edits get a toast with Undo.
     if (changed.length === 1) return;
     this.notifier.success(title, {
       description: this.subject(changed.map((c) => c.issue.id)),
       duration: 4000,
-      action: { label: 'Undo', run: () => this.restore(before, Object.keys(changed[0].patch) as (keyof Snapshot)[]) },
+      action: { label: 'Undo', run: () => void this.undo(before, changed[0].patch) },
     });
   }
 
-  /** Put back snapshot fields (all restorable fields by default). */
-  private restore(list: readonly Snapshot[], fields: readonly (keyof Snapshot)[] = ['status', 'workstreamIds']): void {
-    for (const s of list) {
-      const current = this.store.issueById().get(s.id);
-      if (!current) continue;
-      const patch: UpdateIssueInput = {};
-      if (fields.includes('status') && current.status !== s.status) patch.status = s.status;
-      if (fields.includes('priority') && current.priority !== s.priority) patch.priority = s.priority;
-      if (fields.includes('assigneeId') && current.assigneeId !== s.assigneeId) patch.assigneeId = s.assigneeId ?? null;
-      if (fields.includes('teamId') && current.teamId !== s.teamId) patch.teamId = s.teamId ?? null;
-      if (fields.includes('workstreamIds') && current.workstreamIds.join() !== s.workstreamIds.join()) patch.workstreamIds = s.workstreamIds;
-      if (Object.keys(patch).length) void this.store.updateIssue(s.id, patch);
+  /** Inverse of `patch` for the issues as they were `before`: scalar fields grouped by their old value. */
+  private async undo(before: readonly Issue[], patch: BulkIssuePatch): Promise<void> {
+    const scalars = ['status', 'priority', 'assigneeId', 'teamId', 'projectId'] as const;
+    for (const field of scalars) {
+      if (patch[field] === undefined) continue;
+      const groups = new Map<string, string[]>();
+      for (const i of before) {
+        const old = (i[field] ?? null) as string | null;
+        const k = old ?? '\0null';
+        groups.set(k, [...(groups.get(k) ?? []), i.id]);
+      }
+      for (const [k, ids] of groups) await this.store.bulkUpdateIssues(ids, { [field]: k === '\0null' ? null : k });
+    }
+    const inverse: [keyof BulkIssuePatch, keyof BulkIssuePatch][] = [
+      ['addLabels', 'removeLabels'],
+      ['removeLabels', 'addLabels'],
+    ];
+    for (const [from, to] of inverse) {
+      for (const l of patch[from] ?? []) {
+        const had = from === 'removeLabels';
+        const ids = before.filter((i) => i.labels.includes(l) === had).map((i) => i.id);
+        if (ids.length) await this.store.bulkUpdateIssues(ids, { [to]: [l] });
+      }
     }
   }
 }

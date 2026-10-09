@@ -377,6 +377,18 @@ export interface UpdateIssueInput {
   /** Workspace label ids. Replaces the whole list. */
   labels?: ID[];
 }
+/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+export interface BulkIssuePatch {
+  status?: IssueStatus;
+  priority?: Priority;
+  assigneeId?: ID | null;
+  teamId?: ID | null;
+  projectId?: ID | null;
+  addLabels?: ID[];
+  removeLabels?: ID[];
+  addWorkstreamIds?: ID[];
+  removeWorkstreamIds?: ID[];
+}
 export interface LinkIssueInput {
   workstreamIds?: ID[];
   /** Create a workstream from this issue (title + ownerTeamId required). */

@@ -1,7 +1,7 @@
 import { demandConditions, type DemandFilter } from '../customers/demand-filter.js';
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, type Repository } from 'typeorm';
+import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import {
   ISSUE_KEY_PREFIX,
   type ActorRef,
@@ -42,6 +42,33 @@ export interface IssueInput {
   labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
+}
+
+/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+export interface BulkIssuePatch {
+  status?: IssueStatus;
+  priority?: Priority;
+  assigneeId?: string | null;
+  teamId?: string | null;
+  projectId?: string | null;
+  addLabels?: string[];
+  removeLabels?: string[];
+  addWorkstreamIds?: string[];
+  removeWorkstreamIds?: string[];
+}
+
+/** An update validated and applied to the row in memory, waiting to be persisted and announced. */
+interface PreparedUpdate {
+  row: IssueEntity;
+  patch: IssueInput;
+  before: Set<string>;
+  from: IssueStatus;
+  fromKey: string;
+  fromKind: IssueKind;
+  previousAssigneeId: string | null;
+  rekey: boolean;
+  /** Bulk requests also announce `issue.linked` on every workstream the issue was added to. */
+  announceLinks?: boolean;
 }
 
 export interface LinkIssueInput {
@@ -297,19 +324,113 @@ export class IssuesService {
     patch: IssueInput,
   ) {
     const row = await this.get(workspaceId, idOrKey);
-    const previousAssigneeId = row.assigneeId;
-    await this.refs.teams(
-      workspaceId,
-      [patch.teamId].filter((x): x is string => !!x),
-    );
+    const prepared = await this.prepareUpdate(workspaceId, actor, row, patch);
+    await this.ds.transaction(async (m) => {
+      await this.rekey(m, workspaceId, prepared);
+      await m.save(row);
+    });
+    await this.recordUpdate(workspaceId, actor, prepared);
+    return row;
+  }
+
+  /**
+   * Resolve ids / keys / aliases to issue rows of this workspace (input order, duplicates folded).
+   * 404 naming every reference that does not exist, so nothing is half-applied.
+   */
+  async getMany(workspaceId: string, refs: readonly string[]): Promise<IssueEntity[]> {
+    const wanted = unique(refs);
+    const rows: IssueEntity[] = [];
+    const missing: string[] = [];
+    for (const ref of wanted) {
+      try {
+        rows.push(await this.get(workspaceId, ref));
+      } catch (err) {
+        if (!(err instanceof NotFoundException)) throw err;
+        missing.push(ref);
+      }
+    }
+    if (missing.length) throw new NotFoundException(`Issue not found: ${missing.join(', ')}`);
+    return unique(rows.map((r) => r.id)).map((id) => rows.find((r) => r.id === id)!);
+  }
+
+  /**
+   * Apply one patch to many issues all-or-nothing: every issue is validated first, the writes
+   * happen in one transaction, and the events are recorded once it committed (a failure leaves
+   * nothing behind). Labels and workstreams are added / removed, not replaced.
+   */
+  async updateMany(
+    workspaceId: string,
+    actor: ActorRef,
+    rows: readonly IssueEntity[],
+    patch: BulkIssuePatch,
+  ): Promise<IssueEntity[]> {
+    const touchesAnything = Object.values(patch).some((v) => v !== undefined);
+    if (!touchesAnything) throw new BadRequestException('patch must change at least one field');
+    const add = unique(patch.addWorkstreamIds);
+    const remove = unique(patch.removeWorkstreamIds);
+    if (add.some((id) => remove.includes(id)))
+      throw new BadRequestException('A workstream cannot be both added and removed');
+    const addLabels = unique(patch.addLabels);
+    const removeLabels = unique(patch.removeLabels);
+    if (addLabels.some((id) => removeLabels.includes(id)))
+      throw new BadRequestException('A label cannot be both added and removed');
+    if (add.length) {
+      const dupes = rows.filter((r) => r.duplicateOfId).map((r) => r.key);
+      if (dupes.length)
+        throw new BadRequestException(
+          `Duplicates cannot be linked to a workstream: ${dupes.join(', ')}`,
+        );
+    }
+    // One lookup per reference for the whole batch instead of one per issue.
+    await this.refs.teams(workspaceId, [patch.teamId].filter((x): x is string => !!x));
     await this.refs.users(workspaceId, [patch.assigneeId]);
     await this.refs.projects(workspaceId, [patch.projectId].filter((x): x is string => !!x));
-    await this.refs.workstreams(workspaceId, patch.workstreamIds);
+    await this.refs.workstreams(workspaceId, add);
+    await this.labels.assign(workspaceId, [...addLabels, ...removeLabels]);
+
+    const prepared: PreparedUpdate[] = [];
+    for (const row of rows) {
+      const next: IssueInput = {};
+      if (patch.status !== undefined) next.status = patch.status;
+      if (patch.priority !== undefined) next.priority = patch.priority;
+      if (patch.assigneeId !== undefined) next.assigneeId = patch.assigneeId;
+      if (patch.teamId !== undefined) next.teamId = patch.teamId;
+      if (patch.projectId !== undefined) next.projectId = patch.projectId;
+      if (addLabels.length || removeLabels.length)
+        next.labels = unique([...row.labels, ...addLabels]).filter((l) => !removeLabels.includes(l));
+      if (add.length || remove.length)
+        next.workstreamIds = unique([...row.workstreamIds, ...add]).filter((w) => !remove.includes(w));
+      prepared.push({ ...(await this.prepareUpdate(workspaceId, actor, row, next, true)), announceLinks: true });
+    }
+    await this.ds.transaction(async (m) => {
+      await m.save(rows.map((r) => r));
+    });
+    for (const p of prepared) await this.recordUpdate(workspaceId, actor, p);
+    return [...rows];
+  }
+
+  /** Validates the patch and applies it to `row` in memory; nothing is persisted yet. */
+  private async prepareUpdate(
+    workspaceId: string,
+    actor: ActorRef,
+    row: IssueEntity,
+    patch: IssueInput,
+    refsChecked = false,
+  ): Promise<PreparedUpdate> {
+    const previousAssigneeId = row.assigneeId;
+    if (!refsChecked) {
+      await this.refs.teams(
+        workspaceId,
+        [patch.teamId].filter((x): x is string => !!x),
+      );
+      await this.refs.users(workspaceId, [patch.assigneeId]);
+      await this.refs.projects(workspaceId, [patch.projectId].filter((x): x is string => !!x));
+      await this.refs.workstreams(workspaceId, patch.workstreamIds);
+    }
     const before = new Set(row.workstreamIds);
     const from = row.status;
     const fromKey = row.key;
     const fromKind = row.kind;
-
     let duplicateOfId = row.duplicateOfId;
     if (patch.duplicateOfId !== undefined) {
       if (patch.duplicateOfId === null) {
@@ -389,28 +510,36 @@ export class IssuesService {
     }
     row.duplicateOfId = duplicateOfId;
     row.updatedAt = new Date();
-    const rekey = patch.kind !== undefined && patch.kind !== fromKind;
-    await this.ds.transaction(async (m) => {
-      if (rekey) {
-        // The key prefix follows the kind: take the next number of the new kind, keep the old key as an alias.
-        const number = await this.counters.next(
-          m,
-          workspaceId,
-          `issue:${patch.kind}`,
-        );
-        row.aliases = unique([...row.aliases, fromKey]);
-        row.kind = patch.kind!;
-        row.number = number;
-        row.key = `${ISSUE_KEY_PREFIX[row.kind]}-${number}`;
-      }
-      await m.save(row);
-    });
+    return {
+      row,
+      patch,
+      before,
+      from,
+      fromKey,
+      fromKind,
+      previousAssigneeId,
+      rekey: patch.kind !== undefined && patch.kind !== fromKind,
+    };
+  }
 
+  /** The key prefix follows the kind: take the next number of the new kind, keep the old key as an alias. */
+  private async rekey(m: EntityManager, workspaceId: string, p: PreparedUpdate) {
+    if (!p.rekey) return;
+    const { row, patch } = p;
+    const number = await this.counters.next(m, workspaceId, `issue:${patch.kind}`);
+    row.aliases = unique([...row.aliases, p.fromKey]);
+    row.kind = patch.kind!;
+    row.number = number;
+    row.key = `${ISSUE_KEY_PREFIX[row.kind]}-${number}`;
+  }
+
+  private async recordUpdate(workspaceId: string, actor: ActorRef, p: PreparedUpdate) {
+    const { row, patch, from, fromKey, fromKind, previousAssigneeId } = p;
     const fields = Object.keys(patch)
       .filter((k) => (patch as Record<string, unknown>)[k] !== undefined)
       .filter((k) => k !== 'status' && k !== 'kind');
     if (row.assigneeId !== previousAssigneeId && !fields.includes('assigneeId')) fields.push('assigneeId');
-    if (rekey)
+    if (p.rekey)
       await this.events.record({
         workspaceId,
         actor,
@@ -447,9 +576,18 @@ export class IssuesService {
         workstreamId: row.workstreamIds[0] ?? null,
         data: { key: row.key, from, to: row.status },
       });
-    const touched = new Set([...before, ...row.workstreamIds]);
+    if (p.announceLinks)
+      for (const workstreamId of row.workstreamIds.filter((w) => !p.before.has(w)))
+        await this.events.record({
+          workspaceId,
+          actor,
+          type: 'issue.linked',
+          subject: { type: 'issue', id: row.id },
+          workstreamId,
+          data: { key: row.key, workstreamIds: row.workstreamIds },
+        });
+    const touched = new Set([...p.before, ...row.workstreamIds]);
     await this.bus.touchMany(workspaceId, touched, 'issue.updated');
-    return row;
   }
 
   /**
@@ -569,5 +707,31 @@ export class IssuesService {
       data: { key: row.key, title: row.title },
     });
     await this.bus.touchMany(workspaceId, row.workstreamIds, 'issue.deleted');
+  }
+
+  /** Delete many issues in one transaction; events and workstream refreshes follow the commit. */
+  async removeMany(workspaceId: string, actor: ActorRef, rows: readonly IssueEntity[]) {
+    const ids = rows.map((r) => r.id);
+    if (!ids.length) return;
+    await this.ds.transaction(async (m) => {
+      await m.query(
+        `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
+        [workspaceId, ids],
+      );
+      await m.query(
+        `UPDATE "issues" SET "duplicateOfId" = NULL WHERE "workspaceId" = $1 AND "duplicateOfId" = ANY($2)`,
+        [workspaceId, ids],
+      );
+      await m.delete(IssueEntity, { workspaceId, id: In(ids) });
+    });
+    for (const row of rows)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.deleted',
+        subject: { type: 'issue', id: row.id },
+        data: { key: row.key, title: row.title },
+      });
+    await this.bus.touchMany(workspaceId, rows.flatMap((r) => r.workstreamIds), 'issue.deleted');
   }
 }

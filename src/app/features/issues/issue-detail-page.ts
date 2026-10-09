@@ -43,7 +43,7 @@ import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
 import { labelOptions, projectOptions, teamOptions } from '../workstreams/ws-model';
-import { IssueActions } from './issue-actions';
+import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
@@ -467,6 +467,8 @@ export class IssueDetailPage {
   private readonly _keys = usePageShortcuts([
     { keys: 's', label: 'Change status', group: 'Issue', when: () => this.editable(), run: () => this.prompt('status') },
     { keys: 'p', label: 'Set priority', group: 'Issue', when: () => this.editable(), run: () => this.prompt('priority') },
+    { keys: 'l', label: 'Toggle labels…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('label') },
+    { keys: 'shift+p', label: 'Move to project…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('project') },
     { keys: 'a', label: 'Assign to…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('assignee') },
     { keys: 'i', label: 'Assign to me', group: 'Issue', when: () => this.editable(), run: () => this.ids().length && this.actions.toggleAssignMe(this.ids()) },
     { keys: 'w', label: 'Add to workstream', group: 'Issue', when: () => this.editable() && !this.issue()?.duplicateOfId, run: () => this.prompt('workstream') },
@@ -503,7 +505,7 @@ export class IssueDetailPage {
     return isTypingTarget(this.document.activeElement);
   }
 
-  private prompt(field: 'status' | 'priority' | 'assignee' | 'workstream' | 'duplicate'): void {
+  private prompt(field: IssuePromptField): void {
     this.actions.openPrompt(field, this.ids());
   }
 
