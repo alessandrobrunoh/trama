@@ -2,12 +2,13 @@ import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/com
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
-import type { SubjectRef } from '../contracts/domain.js';
+import type { ActorRef, CommentIndexEntry, CommentPage, SubjectRef, SubjectType } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
 import { CommentEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
+import { decodeCommentCursor, encodeCommentCursor, parseCommentLimit } from './comment-cursor.js';
 
 @Injectable()
 export class CommentsService {
@@ -23,6 +24,67 @@ export class CommentsService {
     if (f.subjectId) qb.andWhere("c.subject->>'id' = :sid", { sid: f.subjectId });
     if (f.subjectType) qb.andWhere("c.subject->>'type' = :st", { st: f.subjectType });
     return qb.getMany();
+  }
+
+  /** Every comment of the workspace, oldest first (the default snapshot). */
+  listAll(workspaceId: string) {
+    return this.repo.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+  }
+
+  /**
+   * One page of the comments of a single subject, newest first, keyset-paginated on (createdAt, id).
+   * Always scoped to the workspace *and* the subject. `createdAt` is compared at millisecond precision
+   * (the precision of the cursor) so rows written with the database `now()` default are never skipped.
+   */
+  async page(
+    workspaceId: string,
+    f: { subjectType: SubjectType; subjectId: string; limit?: number; cursor?: string },
+  ): Promise<{ items: CommentEntity[]; nextCursor: CommentPage['nextCursor'] }> {
+    const limit = parseCommentLimit(f.limit);
+    const rows = await this.pageQuery(workspaceId, f, limit).getMany();
+    const items = rows.slice(0, limit);
+    const last = items[items.length - 1];
+    const nextCursor = rows.length > limit && last ? encodeCommentCursor({ at: last.createdAt, id: last.id }) : null;
+    return { items, nextCursor };
+  }
+
+  /** The page query (fetches `limit + 1` rows to learn whether another page exists). Exposed for tests. */
+  pageQuery(workspaceId: string, f: { subjectType: SubjectType; subjectId: string; cursor?: string }, limit: number) {
+    const cursor = f.cursor ? decodeCommentCursor(f.cursor) : undefined;
+    const ts = "date_trunc('milliseconds', c.createdAt)";
+    const qb = this.repo
+      .createQueryBuilder('c')
+      .addSelect(ts, 'c_ts')
+      .where('c.workspaceId = :workspaceId', { workspaceId })
+      .andWhere("c.subject->>'type' = :st", { st: f.subjectType })
+      .andWhere("c.subject->>'id' = :sid", { sid: f.subjectId })
+      .orderBy('c_ts', 'DESC')
+      .addOrderBy('c.id', 'DESC')
+      .limit(limit + 1);
+    if (cursor) qb.andWhere(`(${ts} < :cat OR (${ts} = :cat AND c.id < :cid))`, { cat: cursor.at, cid: cursor.id });
+    return qb;
+  }
+
+  /** Per (subject, author) comment counts of the whole workspace: the slim snapshot's stand-in for the comments. */
+  async index(workspaceId: string): Promise<CommentIndexEntry[]> {
+    const rows = await this.repo
+      .createQueryBuilder('c')
+      .select("c.subject->>'type'", 'st')
+      .addSelect("c.subject->>'id'", 'sid')
+      .addSelect("c.author->>'type'", 'at')
+      .addSelect("c.author->>'id'", 'aid')
+      .addSelect('COUNT(*)', 'n')
+      .where('c.workspaceId = :workspaceId', { workspaceId })
+      .groupBy("c.subject->>'type'")
+      .addGroupBy("c.subject->>'id'")
+      .addGroupBy("c.author->>'type'")
+      .addGroupBy("c.author->>'id'")
+      .getRawMany<{ st: SubjectType; sid: string; at: ActorRef['type']; aid: string | null; n: string }>();
+    return rows.map((r) => ({
+      subject: { type: r.st, id: r.sid },
+      author: r.aid ? { type: r.at, id: r.aid } : { type: r.at },
+      count: Number(r.n),
+    }));
   }
 
   async get(workspaceId: string, id: string) {

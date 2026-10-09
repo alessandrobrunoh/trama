@@ -137,7 +137,7 @@ export function contributors(store: NablaStore, ws: Workstream): ActorRef[] {
     if (a.authorRef) out.push(a.authorRef);
   for (const i of store.issuesByWorkstream().get(ws.id) ?? [])
     if (i.assigneeId) out.push({ type: 'user', id: i.assigneeId });
-  for (const c of store.commentsFor({ type: 'workstream', id: ws.id })) out.push(c.author);
+  out.push(...store.commentAuthorsFor({ type: 'workstream', id: ws.id }));
   for (const r of store.inputRequestsByWorkstream().get(ws.id) ?? []) {
     out.push(r.requestedBy);
     if (r.answeredById) out.push({ type: 'user', id: r.answeredById });

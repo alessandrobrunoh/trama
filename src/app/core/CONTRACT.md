@@ -95,7 +95,7 @@ Surface (`slug` = workspace slug; `idOrKey` = id or key like `AUTH-42`; everythi
 api.health()
 api.auth.login({email,password}) -> User          api.auth.signup({name,email,password}) -> User
 api.auth.logout()                                  api.auth.me() -> { user, workspaces? }
-api.workspaces.list() | create({name,slug?}) | get(slug) | update(slug,{name?,slug?}) | remove(slug) | snapshot(slug)
+api.workspaces.list() | create({name,slug?}) | get(slug) | update(slug,{name?,slug?}) | remove(slug) | snapshot(slug, comments?: 'full'|'index')
 api.members.list|add(slug,{email,role})|update(slug,membershipId,{role})|remove(slug,membershipId)
 api.agents.list|create(slug,{name,provider,description?,ownerUserId?})|update|remove
 api.tokens.list|create(slug,{name,agentId?,expiresAt?}) -> { token, secret }|remove
@@ -117,7 +117,7 @@ api.projects.artifacts.list(slug,projectId) | create(slug,projectId,CreateOwnedA
 api.issues.artifacts.list(slug,idOrKey) | create(slug,idOrKey,CreateOwnedArtifactInput)              // artifacts attached to an issue
 api.artifacts.list|create({workstreamId,…})|update|remove          api.decisions.list|get|create|update|remove|accept(slug,id)|reject(slug,id)|supersede(slug,id,byId)
 api.dependencies.list|create({fromType,fromId,toType,toId})|remove
-api.comments.list(slug,{type,id}?)|create({subject,body})|update(slug,id,body)|remove
+api.comments.list(slug,{type,id}?)|page(slug,{type,id},{cursor?,limit?}) -> CommentPage {items newest first,nextCursor}|create({subject,body})|update(slug,id,body)|remove
 api.events.list(slug,{workstreamId?,subject?,before?,limit?}) -> DomainEvent[]
 api.attention.list(slug,{scope?:'mine'|'all'}) | dismiss(slug,attentionId) | snooze(slug,attentionId,untilIso)
 api.views.list|create|update|remove      api.graph(slug) -> GraphResponse      api.search(slug,q) -> SearchResults
@@ -161,7 +161,7 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 
 **Meta signals**: `workspace`, `me` (User), `myRole`.
 
-**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `projects`, `workstreams`, `milestones` (by workstream then `sortOrder`), `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments`, `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
+**Collections** (`Signal<readonly T[]>`, server order): `users`, `memberships`, `agents`, `teams`, `repositories`, `projects`, `workstreams`, `milestones` (by workstream then `sortOrder`), `executions`, `inputRequests`, `issues`, `artifacts`, `decisions`, `dependencies`, `comments` (only the threads loaded so far), `events` (newest first), `attention` (all states), `views`, `integrations`, plus `tokens` (empty until `loadTokens()`).
 
 **Lookup computeds** (Maps; use `.get(...)` after calling the signal: `store.teamById().get(id)`):
 - by id: `userById`, `agentById`, `teamById`, `repositoryById`, `workstreamById`, `executionById`, `inputRequestById`, `issueById`, `artifactById`, `decisionById`, `viewById`, `integrationById`
@@ -174,7 +174,11 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 **Point lookups / helpers (methods)**:
 ```ts
 getWorkstream(idOrKey) getExecution(id) getIssue(idOrKey) getDecision(idOrKey) getTeam(idOrKey) getRepository(id) getUser(id) getArtifact(id) getView(id)
-commentsFor(subject: SubjectRef): readonly Comment[]
+commentsFor(subject: SubjectRef): readonly Comment[]      // loaded part of the thread, oldest first
+commentCountFor(subject): number                          // from the snapshot's comment index, exact once fully loaded
+commentAuthorsFor(subject): readonly ActorRef[]
+loadComments(subject, {force?,quiet?}): Promise<void>     // newest page; call when a detail view opens (<app-comments-loader>)
+loadMoreComments(subject): Promise<void>                  // next (older) page; commentThread(subject) -> {state,nextCursor,loadingMore}
 resolveActor(ref?: ActorRef): ResolvedActor   // { type, id?, name, hue? (user), color?/key? (team), provider? (agent), known }
 actorName(ref?: ActorRef): string             // 'Nabla' for system / missing
 userRef(id): ActorRef
@@ -287,7 +291,7 @@ Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnec
 
 ## 5. LiveSync (`core/sync`)
 
-`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `NablaStore.handleLiveEvent(event)`, which refreshes the on-demand project data (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
+`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `NablaStore.handleLiveEvent(event)`, which refreshes the on-demand project data and reloads the newest page of every opened comment thread on `comment` events (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
 
 ---
 

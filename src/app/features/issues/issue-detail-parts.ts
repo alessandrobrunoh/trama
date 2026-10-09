@@ -32,7 +32,7 @@ import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { StatusIcon } from '../../shared/status';
-import { CommentComposer, CommentItem } from '../workstreams/comments';
+import { CommentComposer, CommentItem, CommentsLoader } from '../workstreams/comments';
 import { buildSummary } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
 
@@ -393,7 +393,7 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
 @Component({
   selector: 'app-issue-activity',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ActorAvatar, LucideDynamicIcon, StatusIcon, EntityChip, RelativeTimePipe, CommentItem, CommentComposer, HlmTooltip],
+  imports: [ActorAvatar, LucideDynamicIcon, StatusIcon, EntityChip, RelativeTimePipe, CommentItem, CommentComposer, CommentsLoader, HlmTooltip],
   host: { class: 'block' },
   template: `
     <h2 class="mb-3 text-sm font-semibold">Activity</h2>
@@ -445,6 +445,7 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
         Show {{ hiddenCount() }} older {{ hiddenCount() === 1 ? 'event' : 'events' }}
       </button>
     }
+    <app-comments-loader [subject]="subject()" class="mt-3" />
   `,
 })
 export class IssueActivity {
@@ -453,6 +454,7 @@ export class IssueActivity {
   protected readonly all = signal(false);
   protected readonly arrow = LucideArrowRight;
   protected readonly canEdit = computed(() => this.store.can('member'));
+  protected readonly subject = computed(() => ({ type: 'issue' as const, id: this.issue().id }));
 
   private readonly feed = computed<FeedItem[]>(() => {
     const i = this.issue();

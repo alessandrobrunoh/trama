@@ -159,7 +159,7 @@ export function issuesStrip(store: NablaStore, now = new Date()): StatsModel {
 export function issueFacts(store: NablaStore, issueId: string, now = new Date()): StatFact[] {
   const issue = store.issues().find((i) => i.id === issueId);
   if (!issue) return [];
-  const comments = store.commentsFor({ type: 'issue', id: issue.id }).length;
+  const comments = store.commentCountFor({ type: 'issue', id: issue.id });
   const events = store.eventsBySubject().get(`issue:${issue.id}`) ?? [];
   const statusChanges = events.filter((e) => e.type === 'issue.status_changed');
   const doneAt = [...statusChanges].reverse().find((e) => eventTo(e) === 'done')?.at;
