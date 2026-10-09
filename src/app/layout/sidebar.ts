@@ -44,7 +44,6 @@ import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { FavoritesStore } from '../core/stores/favorites.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
-import { OnboardingStore } from '../core/stores/onboarding.store';
 import { NablaStore } from '../core/stores/nabla.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
@@ -642,7 +641,6 @@ export class AppSidebar {
   protected readonly theme = inject(ThemeService);
   private readonly router = inject(Router);
   private readonly sidebar = inject(HlmSidebarService);
-  private readonly onboarding = inject(OnboardingStore);
 
   protected readonly sidebarIcon = LucidePanelLeft;
   /** Entries the user chose to show, in their order. "Only when badged" entries drop out while their badge is empty. */
@@ -769,7 +767,7 @@ export class AppSidebar {
   }
 
   protected showChecklist(): void {
-    this.onboarding.restore();
+    this.ui.requestChecklist();
     this.go(['/', this.slug(), 'overview']);
   }
 

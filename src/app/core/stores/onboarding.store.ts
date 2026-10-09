@@ -147,6 +147,10 @@ export class OnboardingStore {
     effect(() => {
       if (this.ui.modal() === 'command') untracked(() => this.patch({ commandBar: true }));
     });
+    // "Setup checklist" in the help menu.
+    effect(() => {
+      if (this.ui.checklistRequests() > 0) untracked(() => this.patch({ dismissed: false }));
+    });
     effect(() => writeJson(ONBOARDING_STORAGE_KEY, this.remembered()));
   }
 
