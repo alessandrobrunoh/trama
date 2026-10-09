@@ -34,6 +34,7 @@ const PARENT_OWNED = new Set<string>(['graph']);
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> = {
   decisions: { accept: 'decisions:accept', reject: 'decisions:accept', supersede: 'decisions:accept' },
+  issues: { 'bulk-delete': 'issues:delete' },
 };
 
 function actionFor(method: string): ApiAction {

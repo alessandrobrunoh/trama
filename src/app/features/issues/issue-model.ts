@@ -168,7 +168,7 @@ export type IssueSort =
   | 'requestCount'
   | 'customerRevenue';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'workstreams' | 'project' | 'team' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'workstreams' | 'project' | 'labels' | 'team' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -203,7 +203,7 @@ export const SORTS: readonly IssueSort[] = [
   'requestCount',
   'customerRevenue',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'project', 'team', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'project', 'labels', 'team', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
@@ -232,6 +232,7 @@ export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
   workstreams: 'Workstreams',
   project: 'Project',
+  labels: 'Labels',
   team: 'Team',
   assignee: 'Assignee',
   date: 'Date',

@@ -62,6 +62,11 @@ impl Upstream {
         })
     }
 
+    /// Applies the output cap to text a composite tool assembled itself.
+    pub fn clip(&self, text: String) -> String {
+        truncate(text, self.max_output)
+    }
+
     /// Resolves a key to its workspace and permissions (cached for 30 s).
     pub async fn whoami(&self, api_key: &str) -> Result<Arc<Whoami>, AuthError> {
         let ck = cache_key(api_key);

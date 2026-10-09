@@ -1,0 +1,45 @@
+name: Contracts
+
+# contracts/domain.ts is the source of truth; scripts/sync-contracts.mjs copies it into the server and the
+# client. A hand edit of a copy, or a change to the source without a sync, fails here.
+on:
+  pull_request:
+    paths:
+      - 'contracts/**'
+      - 'server/src/contracts/**'
+      - 'src/app/core/contracts/**'
+      - 'scripts/sync-contracts.mjs'
+      - '.github/workflows/contracts-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'contracts/**'
+      - 'server/src/contracts/**'
+      - 'src/app/core/contracts/**'
+      - 'scripts/sync-contracts.mjs'
+      - '.github/workflows/contracts-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: contracts-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    name: copies are in sync
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/sync-contracts.mjs
+      - name: Fail if the sync changed anything
+        run: |
+          if ! git diff --exit-code -- server/src/contracts src/app/core/contracts; then
+            echo "::error::Contract copies are out of date. Run 'node scripts/sync-contracts.mjs' and commit the result."
+            exit 1
+          fi

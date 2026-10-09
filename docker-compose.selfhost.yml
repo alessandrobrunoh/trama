@@ -1,0 +1,133 @@
+# Trama, self-hosted: one command, no Traefik, no external network, no domain baked in.
+#
+#   cp docker/selfhost.env.example .env      # then fill in the three required values (see the file)
+#   docker compose -f docker-compose.selfhost.yml up -d
+#
+# Services: proxy (Caddy: TLS + routing), web (static Angular app), api (NestJS), mcp (MCP server), postgres.
+# Only the proxy publishes ports. Postgres, the API and the MCP server are reachable on the compose network only.
+#
+# This file is separate from server/docker-compose.yml, which is the author's own deployment (Traefik, fixed
+# domain, `proxy` network). See docs/self-hosting.md for the differences, upgrades, backups and rollback.
+#
+# Required (compose refuses to start without them, and says which):
+#   TRAMA_PUBLIC_URL        public origin users type in the browser, e.g. https://trama.example.com
+#   POSTGRES_PASSWORD       there is no default password; generate one: openssl rand -hex 24
+#   TRAMA_ENCRYPTION_KEY    encrypts integration tokens at rest, never change it afterwards: openssl rand -base64 32
+name: trama
+
+x-hardened: &hardened
+  restart: unless-stopped
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+
+services:
+  proxy:
+    <<: *hardened
+    image: caddy:2-alpine
+    # Binding ports below 1024 needs this one capability back.
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    tmpfs: [/tmp]
+    ports:
+      # The container listens on the same port number it is published on, so that a TRAMA_PUBLIC_URL with a
+      # port (http://localhost:8080 + TRAMA_HTTP_PORT=8080) works. Defaults are the standard ports.
+      - '${TRAMA_HTTP_PORT:-80}:${TRAMA_HTTP_PORT:-80}'
+      - '${TRAMA_HTTPS_PORT:-443}:${TRAMA_HTTPS_PORT:-443}'
+      - '${TRAMA_HTTPS_PORT:-443}:${TRAMA_HTTPS_PORT:-443}/udp'
+    environment:
+      TRAMA_PUBLIC_URL: "${TRAMA_PUBLIC_URL:?Set TRAMA_PUBLIC_URL in .env, e.g. https://trama.example.com (or http://localhost for a local trial)}"
+    volumes:
+      - ./docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-q', '-O', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  web:
+    <<: *hardened
+    image: ${TRAMA_REGISTRY:-ghcr.io/alessandrobrunoh}/trama-frontend:${TRAMA_VERSION:-latest}
+    read_only: true
+    tmpfs: [/tmp]
+    # healthcheck: defined in the image (GET /healthz)
+
+  api:
+    <<: *hardened
+    image: ${TRAMA_REGISTRY:-ghcr.io/alessandrobrunoh}/trama-server:${TRAMA_VERSION:-latest}
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      SEED_DEMO: 'false'
+      # Pending migrations run when the API boots (TypeORM migrationsRun), so an upgrade is: new tag, up -d.
+      DATABASE_URL: "postgres://trama:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (generate one with: openssl rand -hex 24)}@postgres:5432/trama"
+      TRAMA_ENCRYPTION_KEY: "${TRAMA_ENCRYPTION_KEY:?Set TRAMA_ENCRYPTION_KEY in .env (generate one with: openssl rand -base64 32) and never change it afterwards}"
+      # One origin serves the app, the API and MCP, so these are all the same address.
+      CORS_ORIGIN: "${TRAMA_PUBLIC_URL:?Set TRAMA_PUBLIC_URL in .env, e.g. https://trama.example.com}"
+      APP_URL: ${TRAMA_PUBLIC_URL}
+      PUBLIC_URL: ${TRAMA_PUBLIC_URL}
+      # The proxy in this stack is one hop in front of the API. Raise it if you put another proxy or load
+      # balancer in front of the stack, or every client shares one address for rate limiting.
+      TRAMA_TRUST_PROXY: ${TRAMA_TRUST_PROXY:-1}
+      # Invitation emails. Empty = not sent (the invite link is shown in the UI).
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      # Optional AI suggestions and assistant (any OpenAI-compatible API). Empty = AI features are off.
+      AI_API_URL: ${AI_API_URL:-}
+      AI_API_KEY: ${AI_API_KEY:-}
+      AI_MODEL: ${AI_MODEL:-}
+      MCP_URL: http://mcp:8080/mcp
+      # Optional browser push notifications (npx web-push generate-vapid-keys). Empty = off.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    # healthcheck: defined in the image (GET /api/health)
+
+  # MCP server: talks to the API only, authenticated per client by the API key (Settings, API tokens).
+  # Reachable at ${TRAMA_PUBLIC_URL}/mcp.
+  mcp:
+    <<: *hardened
+    image: ${TRAMA_REGISTRY:-ghcr.io/alessandrobrunoh}/trama-mcp:${TRAMA_VERSION:-latest}
+    read_only: true
+    environment:
+      TRAMA_API_URL: http://api:3000/api
+      MCP_BIND: 0.0.0.0:8080
+    depends_on:
+      api:
+        condition: service_healthy
+    # healthcheck: defined in the image (trama-mcp --healthcheck)
+
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    environment:
+      POSTGRES_USER: trama
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (generate one with: openssl rand -hex 24)}"
+      POSTGRES_DB: trama
+    # PG 18+ stores the cluster in a versioned directory under /var/lib/postgresql.
+    volumes:
+      - trama-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U trama -d trama']
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  trama-pgdata:
+  caddy-data:
+  caddy-config:

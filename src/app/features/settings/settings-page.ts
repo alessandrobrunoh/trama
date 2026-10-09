@@ -13,6 +13,7 @@ import {
   LucidePlug,
   LucideSlidersHorizontal,
   LucideSunMoon,
+  LucideTag,
   LucideTriangleAlert,
   LucideUserRound,
   LucideUsers,
@@ -28,6 +29,7 @@ import { AppearanceSection } from './sections/appearance-section';
 import { CustomerRequestsSection } from './sections/customer-requests-section';
 import { ImportSection } from './sections/import-section';
 import { IntegrationsSection } from './sections/integrations-section';
+import { LabelsSection } from './sections/labels-section';
 import { MembersSection } from './sections/members-section';
 import { NotificationsSection } from './sections/notifications-section';
 import { PreferencesSection } from './sections/preferences-section';
@@ -66,6 +68,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'members', label: 'Members', icon: LucideUsers },
       { id: 'roles', label: 'Roles & permissions', icon: LucideShieldCheck },
       { id: 'teams', label: 'Teams', icon: LucideUsersRound },
+      { id: 'labels', label: 'Labels', icon: LucideTag },
       { id: 'agents', label: 'Agents', icon: LucideBot },
       { id: 'tokens', label: 'API tokens', icon: LucideKeyRound },
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
@@ -103,6 +106,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     AiSection,
     TokensSection,
     IntegrationsSection,
+    LabelsSection,
     CustomerRequestsSection,
     ImportSection,
   ],
@@ -171,6 +175,9 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             }
             @case ('integrations') {
               <app-integrations-section />
+            }
+            @case ('labels') {
+              <app-labels-section />
             }
             @case ('customer-requests') {
               <app-customer-requests-section />

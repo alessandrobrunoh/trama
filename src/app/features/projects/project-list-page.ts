@@ -24,6 +24,8 @@ import {
   isUpdateOverdue,
   projectStatusOptions,
 } from './project-model';
+import { LabelPicker } from '../../shared/label-picker';
+import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
 
 const NO_UPDATES = 'none';
@@ -35,6 +37,8 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
+    LabelPicker,
+    LabelChips,
     RouterLink,
     HlmButtonImports,
     LucideDynamicIcon,
@@ -95,6 +99,7 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
           [value]="teamFilter()"
           (valueChange)="teamFilter.set($event)"
         />
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="labelFilter()" (valueChange)="labelFilter.set($event)" />
         <app-demand-filters [filters]="demandFilters()" (filtersChange)="demandFilters.set($event)" />
         @if (hasFilters()) {
           <button
@@ -178,6 +183,9 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
                 @if (p.summary) {
                   <span class="text-muted-foreground block truncate text-xs">{{ p.summary }}</span>
                 }
+                @if (p.labels.length) {
+                  <app-label-chips class="mt-1" [ids]="p.labels" />
+                }
               </span>
             </span>
             <span
@@ -255,6 +263,7 @@ export class ProjectListPage {
   protected readonly statusFilter = this.listState.remember<string[]>('projects.status', []);
   protected readonly healthFilter = this.listState.remember<string[]>('projects.health', []);
   protected readonly teamFilter = this.listState.remember<string[]>('projects.team', []);
+  protected readonly labelFilter = this.listState.remember<string[]>('projects.labels', []);
   protected readonly demandFilters = this.listState.remember<ViewFilter[]>('projects.demand', []);
   protected readonly sort = this.listState.remember<ProjectSort>('projects.sort', 'name');
   protected readonly sorts: { value: ProjectSort; label: string }[] = [
@@ -277,6 +286,7 @@ export class ProjectListPage {
       this.statusFilter().length > 0 ||
       this.healthFilter().length > 0 ||
       this.teamFilter().length > 0 ||
+      this.labelFilter().length > 0 ||
       this.demandFilters().length > 0,
   );
 
@@ -285,6 +295,7 @@ export class ProjectListPage {
     const statuses = new Set(this.statusFilter());
     const teams = new Set(this.teamFilter());
     const healths = new Set(this.healthFilter());
+    const labels = this.labelFilter();
     const users = this.store.userById();
     const demand = this.store.demand();
     const ctx = { demand };
@@ -299,6 +310,7 @@ export class ProjectListPage {
           if (statuses.size && !statuses.has(p.status)) return false;
           if (healths.size && !healths.has(p.health ?? NO_UPDATES)) return false;
           if (teams.size && !p.teamIds.some((id) => teams.has(id))) return false;
+          if (labels.length && !labels.some((id) => p.labels.includes(id))) return false;
           return !q || `${p.name} ${p.summary ?? ''}`.toLowerCase().includes(q);
         })
         .slice()
@@ -331,6 +343,7 @@ export class ProjectListPage {
     this.statusFilter.set([]);
     this.healthFilter.set([]);
     this.teamFilter.set([]);
+    this.labelFilter.set([]);
     this.demandFilters.set([]);
   }
 }

@@ -1,6 +1,6 @@
 // Options + glyphs for the issue property popovers and the "Change status…" command dialog.
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { LucideCircleDashed, LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
+import { LucideBox, LucideCircleDashed, LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
@@ -10,6 +10,7 @@ import {
   type IssueStatus,
   type NablaStore,
   type Priority,
+  type WorkspaceLabel,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -21,7 +22,9 @@ export interface IssueOption {
   /** '' = none (unassign, no team). */
   value: string;
   label: string;
-  glyph: 'status' | 'priority' | 'user' | 'team' | 'workstream' | 'issue' | 'none';
+  glyph: 'status' | 'priority' | 'user' | 'team' | 'workstream' | 'issue' | 'project' | 'label' | 'none';
+  /** Swatch of a label. */
+  color?: string;
   status?: string;
   hint?: string;
   search: string;
@@ -32,11 +35,14 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
   priority: 'Set priority…',
   assignee: 'Assign to…',
   team: 'Move to team…',
+  project: 'Move to project…',
+  label: 'Toggle label…',
   workstream: 'Add to workstream…',
   duplicate: 'Mark as duplicate of…',
 };
 
-export function promptOptions(store: NablaStore, field: IssuePromptField, issues: readonly Issue[]): IssueOption[] {
+/** `labels` is the already ordered label list (see `LabelCatalog.arrange`); without it the catalog order is used. */
+export function promptOptions(store: NablaStore, field: IssuePromptField, issues: readonly Issue[], labels?: readonly WorkspaceLabel[]): IssueOption[] {
   switch (field) {
     case 'status':
       return ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, glyph: 'status', status: s, search: ISSUE_STATUS_META[s].label }));
@@ -60,6 +66,13 @@ export function promptOptions(store: NablaStore, field: IssuePromptField, issues
         { value: '', label: 'No team', glyph: 'none', search: 'no team' },
         ...store.teams().map((t) => ({ value: t.id, label: t.name, glyph: 'team' as const, hint: t.key, search: `${t.name} ${t.key}` })),
       ];
+    case 'project':
+      return [
+        { value: '', label: 'No project', glyph: 'none', search: 'no project' },
+        ...store.projects().map((p) => ({ value: p.id, label: p.name, glyph: 'project' as const, search: p.name })),
+      ];
+    case 'label':
+      return (labels ?? store.settings().labels.filter((l) => !l.archived)).map((l) => ({ value: l.id, label: l.name, glyph: 'label' as const, color: l.color, search: l.name }));
     case 'workstream': {
       const linked = new Set(issues.flatMap((i) => i.workstreamIds));
       return store
@@ -94,6 +107,10 @@ export function currentValues(field: IssuePromptField, issues: readonly Issue[])
         return [i.assigneeId ?? ''];
       case 'team':
         return [i.teamId ?? ''];
+      case 'project':
+        return [i.projectId ?? ''];
+      case 'label':
+        return i.labels;
       case 'workstream':
         return i.workstreamIds;
       case 'duplicate':
@@ -119,6 +136,13 @@ export function applyOption(actions: IssueActions, field: IssuePromptField, ids:
     case 'team':
       actions.setTeam(ids, value || null);
       return true;
+    case 'project':
+      actions.setProject(ids, value || null);
+      return true;
+    case 'label':
+      actions.toggleLabel(ids, value);
+      // Labels are a multi-select: the list stays open to toggle more.
+      return false;
     case 'workstream':
       actions.toggleWorkstream(ids, value);
       return true;
@@ -152,6 +176,12 @@ export function applyOption(actions: IssueActions, field: IssuePromptField, ids:
       @case ('user') {
         <app-actor-avatar [actor]="{ type: 'user', id: o.value }" [size]="16" />
       }
+      @case ('project') {
+        <svg [lucideIcon]="projectIcon" [size]="15" class="text-muted-foreground"></svg>
+      }
+      @case ('label') {
+        <span class="size-2.5 rounded-full" [style.background]="o.color"></span>
+      }
       @case ('team') {
         <app-actor-avatar [actor]="{ type: 'team', id: o.value }" [size]="16" />
       }
@@ -165,6 +195,7 @@ export class IssueOptionGlyph {
   readonly option = input.required<IssueOption>();
   protected readonly userIcon = LucideCircleUserRound;
   protected readonly noneIcon = LucideCircleDashed;
+  protected readonly projectIcon = LucideBox;
   protected asStatus = (v: string | undefined) => (v ?? 'backlog') as AnyStatus;
   protected asPriority = (v: string) => v as Priority;
 }

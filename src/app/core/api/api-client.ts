@@ -38,6 +38,9 @@ import type {
   InvitePreview,
   Customer,
   CustomerRequest,
+  InsightSignal,
+  InsightSignalId,
+  InsightsReport,
   IntakeItem,
   IntakeItemStatus,
   IntakeSource,
@@ -81,6 +84,7 @@ import type {
   UpdateMilestoneInput,
   UpdateInputRequestInput,
   CreateCustomerInput,
+  BulkIssuePatch,
   CreateIssueInput,
   CreateCustomerRequestInput,
   CreateCustomerTierInput,
@@ -112,6 +116,7 @@ import type {
   CriterionPatch,
   EventsQuery,
   GraphResponse,
+  InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
@@ -132,6 +137,7 @@ import type {
   CreateLabelInput,
   CreateWebhookInput,
   UpdateLabelInput,
+  MergeLabelInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -237,6 +243,7 @@ export class ApiClient {
       this.patch<Workspace>(`${this.w(slug)}/settings`, input),
     createLabel: (slug: string, input: CreateLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels`, input),
     updateLabel: (slug: string, id: ID, input: UpdateLabelInput) => this.patch<Workspace>(`${this.w(slug)}/labels/${id}`, input),
+    mergeLabel: (slug: string, id: ID, input: MergeLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels/${id}/merge`, input),
     deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
     createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
       this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),
@@ -492,6 +499,11 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
       this.patch<Issue>(`${this.w(slug)}/issues/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/issues/${id}`),
+    /** One patch for many issues, all or nothing. */
+    bulkUpdate: (slug: string, ids: ID[], patch: BulkIssuePatch) =>
+      this.post<Issue[]>(`${this.w(slug)}/issues/bulk`, { ids, patch }),
+    bulkRemove: (slug: string, ids: ID[]) =>
+      this.post<{ deleted: ID[] }>(`${this.w(slug)}/issues/bulk-delete`, { ids }),
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
@@ -578,6 +590,15 @@ export class ApiClient {
   readonly events = {
     list: (slug: string, query: EventsQuery = {}) =>
       this.get<DomainEvent[]>(`${this.w(slug)}/events`, { ...query }),
+  };
+
+  readonly insights = {
+    /** Health signals, flow metrics and agent failure signals (GET /insights). */
+    report: (slug: string, query: InsightsQuery = {}) =>
+      this.get<InsightsReport>(`${this.w(slug)}/insights`, { ...query }),
+    /** One signal with up to `limit` items: what a health tile drills into. */
+    signal: (slug: string, id: InsightSignalId, query: InsightsQuery = {}) =>
+      this.get<InsightSignal>(`${this.w(slug)}/insights/signals/${id}`, { ...query }),
   };
 
   readonly attention = {

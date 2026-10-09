@@ -1,6 +1,6 @@
 # Server architecture (backend core)
 
-NestJS 12 (ESM), TypeORM 1 + Postgres 17, class-validator DTOs, vitest + supertest. No ORM relations: entities are flat rows with explicit foreign keys in the baseline migration; services validate cross-references through `RefsService`.
+NestJS 12 (ESM), TypeORM 1 + Postgres 18, class-validator DTOs, vitest + supertest. No ORM relations: entities are flat rows with explicit foreign keys in the baseline migration; services validate cross-references through `RefsService`.
 
 ```
 src/
@@ -12,7 +12,7 @@ src/
   auth/                           AuthService (users, sessions), TokensService, AuthController, request-context.ts (decorators)
   workspaces/                     AccessGuard (global), WorkspacesService + controllers (workspace, members, agents, tokens)
   events/                         EventsService (record + SSE), WorkstreamBus, EventsController (list + stream), request-store
-  teams repositories workstreams milestones executions input-requests issues artifacts decisions dependencies comments views
+  teams repositories workstreams milestones input-requests issues artifacts decisions dependencies comments views
   snapshot/ health/
   status/ attention/ graph/ search/ agent-context/   (backend-intelligence)
 ```
@@ -39,13 +39,13 @@ src/
 
 Helpers: `hasRole(role, min)`, `ROLE_RANK`, types `AppRequest`, `WorkspaceContext`, `AuthInfo`.
 
-Routes are declared as `@Controller('w/:slug/<things>')`; every query must be scoped by `ctx.workspace.id` (all domain rows carry `workspaceId`; it is hidden from the wire on executions/input requests/artifacts because the contract has no such field).
+Routes are declared as `@Controller('w/:slug/<things>')`; every query must be scoped by `ctx.workspace.id` (all domain rows carry `workspaceId`; it is hidden from the wire on input requests/artifacts because the contract has no such field).
 
 Agent tokens: `actor = { type: 'agent', id }`, role `member`, `ctx.userId` undefined (guard user-only logic with `@RequireUser()` or check `ctx.userId`). User tokens act as the user with that user's membership role.
 
 ## Serialization
 
-Entities extend `Wire` (`database/entities/wire.ts`): `toJSON()` drops `null`/`undefined` (the contract uses optional fields) and the keys returned by `hidden()` (`passwordHash`, `tokenHash`, integration `secret`/`webhookSecret`/`config`, internal `workspaceId`). Services return entities directly. `ExecutionEntity.dependsOnExecutionIds` is not a column: `ExecutionsService.attach()` fills it from the `dependencies` table (call it on any executions you return).
+Entities extend `Wire` (`database/entities/wire.ts`): `toJSON()` drops `null`/`undefined` (the contract uses optional fields) and the keys returned by `hidden()` (`passwordHash`, `tokenHash`, integration `secret`/`webhookSecret`/`config`, internal `workspaceId`). Services return entities directly. (The `Execution` concept was removed by migration `DropExecutions`; the domain no longer has an execution entity or service.)
 
 ## Events
 
@@ -71,7 +71,7 @@ bus.touch(workspaceId, workstreamId, reason): Promise<void>        // awaits han
 bus.touchMany(workspaceId, workstreamIds, reason): Promise<void>
 ```
 
-Fired (and awaited, so the response is consistent) after any change to a workstream or its criteria, executions, input requests, artifacts, decisions (origin + related), dependencies (both ends) and linked issues. The status engine should subscribe in `onModuleInit`, recompute `status` / `derivedStatus` / `shippedAt` directly on `workstreams`, and on a change call `events.record({ type: 'workstream.status_changed', actor: { type: 'system' }, data: { key, from, to } })` and/or `events.publish(workspaceId, { type: 'updated', entity: 'workstream', id })`. Today `status`/`derivedStatus` are stored values; `WorkstreamsService.update` keeps `status = statusOverride ?? derivedStatus`.
+Fired (and awaited, so the response is consistent) after any change to a workstream or its criteria, input requests, artifacts, decisions (origin + related), dependencies (both ends) and linked issues. The status engine (`status/status.service.ts`) subscribes in `onModuleInit`, recomputes `status` / `derivedStatus` / `shippedAt` on `workstreams`, and on a change records `workstream.status_changed` (system actor) and publishes a live event; see "Intelligence modules" below. `status = statusOverride ?? derivedStatus`.
 
 ## Numbering
 
@@ -88,7 +88,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Seed
 
-`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it (only with `TRAMA_ENABLE_ADMIN_RESET=true`, never in production). Stored statuses follow PLAN.md §2. Keep the seed valid when you add columns (there is a unit test).
+`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it (only with `TRAMA_ENABLE_ADMIN_RESET=true`, never in production). Stored statuses follow the rules in `status/derive-status.ts`. Keep the seed valid when you add columns (there is a unit test).
 
 ## How to add a domain module
 
@@ -99,7 +99,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 5. After persisting: `events.record(...)`, and `await bus.touch(workspaceId, workstreamId, reason)` if the change affects a workstream.
 6. e2e test in `test/` (helpers `Client`, `TokenClient`, `createTestApp` in `test/app.ts`).
 
-Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` belong to backend-intelligence (MCP is not implemented yet), `server/src/{integrations,webhooks}` to backend-integrations. Webhook routes should be `@Public()` and verify signatures themselves; integration routes under `/w/:slug/integrations` should use `@Roles('admin')`.
+Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` belong to backend-intelligence (the MCP server is the separate Rust crate in `mcp/`), `server/src/{integrations,webhooks}` to backend-integrations. Webhook routes should be `@Public()` and verify signatures themselves; integration routes under `/w/:slug/integrations` should use `@Roles('admin')`.
 
 ## Testing
 
@@ -112,7 +112,7 @@ integrations/  secrets.service (AES-256-GCM, TRAMA_ENCRYPTION_KEY, AAD = connect
                http-client (abstract HttpClient DI token; FetchHttpClient; tests override it, nothing hits the network)
                providers (GithubClient / GitlabClient: currentUser, listRepositories, getRepository; rate-limit aware errors)
                integrations.service/controller (connections CRUD, rotate secret, remote repos, link repository)
-               artifact-linker.service (candidate -> Artifacts via ArtifactsService; keys, execution-by-branch, CI by sha)
+               artifact-linker.service (candidate -> Artifacts via ArtifactsService; keys from branch names, titles and descriptions, CI by sha)
                keys.ts (workstream key extraction), candidates.ts (normalized PR/MR + CI patch), entities.ts
 webhooks/      controller (@Public), service (verify -> dedupe -> parse -> apply), events.ts (pure payload mapping),
                signatures.ts, raw-body.ts (JSON-parser `verify` hook, /api/webhooks/* only), fixtures.ts (test payloads)
@@ -125,7 +125,7 @@ webhooks/      controller (@Public), service (verify -> dedupe -> parse -> apply
 
 ## Intelligence modules
 
-**Status engine flow** (`status/`): a domain service persists a change and `await bus.touch(workspaceId, workstreamId, reason)` → `StatusService.onTouched` loads the workstream's executions, open input requests, artifacts, proposed decisions that originate from it and the incoming dependencies (with the sources' current status/state) → pure `deriveStatus()` (`derive-status.ts`, PLAN.md §2, returns `{ status, derivedStatus, rule, delivery }`; `delivery` (none / in_review / merged / released / deployed) is evidence from artifacts and is stored in `workstreams.delivery`, separate from the outcome: `shipped` additionally requires met criteria and no blockers, open input requests or proposed decisions) → if `derivedStatus`/`status` changed, update the row (+ `shippedAt` the first time), record `workstream.status_changed` (system actor) → re-derive dependents (workstreams with edges *from* this workstream or its executions; cascades while statuses change, cycle-safe) → publish a `LiveEvent` of type `attention`. `onApplicationBootstrap` re-derives all workstreams; `SeedService.reset()` touches every seeded workstream through the bus (an additive hook). `blockers()` in `derive-status.ts` is shared with attention.
+**Status engine flow** (`status/`): a domain service persists a change and `await bus.touch(workspaceId, workstreamId, reason)` → `StatusService.onTouched` loads the workstream's open input requests, artifacts, proposed decisions that originate from it and the incoming dependencies (with the sources' current status/state) → pure `deriveStatus()` (`derive-status.ts`, first matching rule wins, returns `{ status, derivedStatus, rule, delivery }`; `delivery` (none / in_review / merged / released / deployed) is evidence from artifacts and is stored in `workstreams.delivery`, separate from the outcome: `shipped` additionally requires met criteria and no blockers, open input requests or proposed decisions) → if `derivedStatus`/`status` changed, update the row (+ `shippedAt` the first time), record `workstream.status_changed` (system actor) → re-derive dependents (workstreams with edges *from* this workstream; cascades while statuses change, cycle-safe) → publish a `LiveEvent` of type `attention`. `onApplicationBootstrap` re-derives all workstreams; `SeedService.reset()` touches every seeded workstream through the bus (an additive hook). `blockers()` in `derive-status.ts` is shared with attention.
 
 **Attention** (`attention/`): `attention-rules.ts` is a pure function (`computeAttention(data)`) from workspace rows to items with an *audience* (user ids); `AttentionService` loads the rows, adds event-log `since` timestamps (one SQL), filters by audience and merges per-user `attention_state`. Nothing is stored for items themselves. **Graph / search / agent-context** are read-only services over the same tables (raw ILIKE SQL for search).
 

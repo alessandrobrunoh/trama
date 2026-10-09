@@ -49,6 +49,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { Kbd } from '../../shared/kbd';
+import { PeekPanel } from '../../shared/peek-panel';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -60,7 +61,6 @@ import { WsBulkBar } from './ws-bulk-bar';
 import {
   WS_VIEW_TABS,
   buildSummary,
-  labelOptions,
   priorityOptions,
   projectFilterOptions,
   repoOptions,
@@ -71,6 +71,7 @@ import {
   type WsViewTab,
 } from './ws-model';
 import { DEFAULT_ROW_PROPS, ROW_PROP_LABELS, WorkstreamCard, WorkstreamRow, type WsRowProps } from './workstream-items';
+import { LabelPicker } from '../../shared/label-picker';
 import { SearchInput } from '../../shared/search-input';
 
 type Layout = 'list' | 'board';
@@ -148,6 +149,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
+    LabelPicker,
     HlmButtonImports,
     HlmInputImports,
     HlmPopoverImports,
@@ -170,8 +172,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     CreateWorkstreamDialog,
     TopBarActions,
     WsBulkBar,
+    PeekPanel,
   ],
-  host: { class: 'flex h-full min-h-0 flex-col' },
+  host: { class: 'relative flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (canCreate()) {
@@ -280,9 +283,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
           <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
         }
         <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
-        @if (labels().length) {
-          <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
-        }
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -397,6 +398,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       </app-kanban>
     }
 
+    <app-peek-panel />
     <app-ws-bulk-bar />
     <app-create-workstream-dialog [(open)]="createOpen" [defaults]="createDefaults()" />
   `,
@@ -439,7 +441,6 @@ export class WorkstreamListPage {
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repos = computed(() => repoOptions(this.store));
   protected readonly projects = computed(() => projectFilterOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
 
   protected readonly plus = LucidePlus;
   protected readonly listIcon = LucideLayoutList;

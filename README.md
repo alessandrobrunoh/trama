@@ -10,17 +10,18 @@
 ### Issues describe problems. Workstreams deliver outcomes.
 
 **Trama is the source-available coordination layer for software teams that work with coding agents.**<br>
-Keep your issues. Add the missing layer: workstreams, decisions and artifacts, shared by humans and agents.
+Issues are the demand, workstreams are the outcome, decisions and artifacts are the proof, and humans are pulled in only where they are needed.
 
 [![License: PolyForm Shield](https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-1348dc?style=flat-square)](LICENSE)
 [![Angular](https://img.shields.io/badge/Angular-22-dd0031?style=flat-square&logo=angular&logoColor=white)](https://angular.dev)
 [![NestJS](https://img.shields.io/badge/NestJS-12-e0234e?style=flat-square&logo=nestjs&logoColor=white)](https://nestjs.com)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17+-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-18-336791?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![Rust MCP](https://img.shields.io/badge/MCP-Rust-000000?style=flat-square&logo=rust&logoColor=white)](mcp/README.md)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-2b7fff?style=flat-square)](CONTRIBUTING.md)
 
 [**Live instance**](https://trama.alessandrobrunoh.it) ·
 [Vision](VISION.md) ·
+[Non-goals](NON-GOALS.md) ·
 [API reference](server/API.md) ·
 [MCP server](mcp/README.md) ·
 [Agent skills](skills/README.md) ·
@@ -41,7 +42,7 @@ Trello, Jira and Linear treat every ticket as a unit of work. That held up while
 
 > **Issues are excellent units of demand. They are not always the best units of execution.**
 
-Trama doesn't replace issues, it keeps them first-class. It adds the layer between "someone reported a problem" and "we shipped the fix".
+Trama doesn't replace issues, it keeps them first-class, and it does not copy what your execution tools already hold (transcripts, prompts, file edits): it links to them. It adds the layer between "someone reported a problem" and "we shipped the fix".
 
 ```text
   Issues          "What problems or requests exist?"
@@ -57,7 +58,9 @@ Trama doesn't replace issues, it keeps them first-class. It adds the layer betwe
   Outcome         "What did we deliver?"
 ```
 
-The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the full thesis in [VISION.md](VISION.md).
+The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the thesis in [VISION.md](VISION.md) (two pages) and what Trama deliberately does not do in [NON-GOALS.md](NON-GOALS.md). The original long-form write-up is kept as background in [docs/vision-detailed.md](docs/vision-detailed.md).
+
+> **Status:** early-stage and not yet considered production-ready (see [SECURITY.md](SECURITY.md)). The scope is under review: [NON-GOALS.md](NON-GOALS.md) proposes which surfaces are core and which are frozen.
 
 ## Core ideas
 
@@ -69,24 +72,31 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 | **Artifact** | Proof of delivery: pull/merge requests, builds, test reports, designs, deployments, releases, with live CI and review state. |
 | **Input request** | An agent that is blocked asks a human a question and waits, instead of guessing. |
 | **Attention** | A queue of what needs *human* judgment right now: reviews, decisions, failing CI, conflicts, triage. Human attention is the scarce resource. |
-| **Project** | A planning entity above workstreams, separate from repositories. |
+| **Project** | A planning entity above workstreams (goals, milestones, updates), separate from repositories. Supporting, not core. |
 
 **Reality drives status.** A workstream's state (`draft → planned → working → needs_input → in_review → blocked → ready_to_land → shipped`) is derived from facts (issues resolved, PRs merged, criteria met, open questions, dependencies) and not from someone dragging a card. You can still pin it manually when you need to.
 
 ## Features
 
-- **Workstreams** with acceptance criteria, contributors, milestones, a dependency graph, and list / board / graph views.
-- **Humans and agents as equal actors.** Agents are first-class members with scoped tokens, usage caps, and an auditable activity trail.
-- **Decisions and artifacts** traced back to the issues they came from.
-- **Attention inbox** that surfaces where a person is actually needed.
+**Core**
+
+- **Workstreams** with acceptance criteria, contributors, a dependency graph, and list / board / graph views. Status is derived from facts.
+- **Humans and agents as actors.** Agents are first-class members with scoped tokens, usage caps and an auditable activity trail. Accountability stays with a human.
+- **Decisions and artifacts** traced back to the issues they came from. Agents propose decisions; humans accept them.
+- **Input requests and an attention inbox** that surface where a person is actually needed.
 - **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Import repositories, link PRs, receive webhooks.
-- **MCP server** (Rust) exposing ~90 tools so Claude, Cursor, VS Code or any MCP client can read and change the workspace.
+- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->21 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
 - **Agent skills** that teach a coding agent how to pick up work, report progress, ask for input and triage.
-- **Built-in assistant** and "suggest improvements" for any OpenAI-compatible model. Optional, off by default, keys stay on the server.
-- **Live updates** over SSE, a command palette, full keyboard shortcuts, saved views, notifications (in-app and email), outgoing webhooks, roadmap, timeline and stats.
-- **Granular permissions**: roles (`owner`, `admin`, `member`, `viewer`), a resource × action permission matrix, and API tokens with narrow scopes.
-- **Installable PWA** with light and dark themes.
+- **Live updates** over SSE, a command palette, keyboard shortcuts, search, roles and API tokens with narrow scopes.
 - **Self-hosting first**: one PostgreSQL, three small images, no large infrastructure stack.
+
+**Supporting (scope under review, see [NON-GOALS.md](NON-GOALS.md))**
+
+- Projects with milestones and updates, teams, repositories, saved views, customers and customer feedback linked to issues, outgoing webhooks, notifications (in-app and email), an installable PWA.
+- An optional built-in assistant and "suggest improvements" for any OpenAI-compatible model. Off by default; keys stay on the server.
+- Statistics, a timeline, a roadmap page and marketing pages exist in the app today and are proposed for removal or merging.
+
+**Not built yet:** importing or linking issues from an existing tracker (GitHub Issues, Linear, Jira), and guided onboarding.
 
 ## How it fits together
 
@@ -172,7 +182,7 @@ cp server/.env.production.example server/.env.production   # fill in the CHANGE_
 docker compose -f server/docker-compose.yml up -d
 ```
 
-All containers run as non-root with `cap_drop: ALL`, `no-new-privileges` and a read-only filesystem. In production the API refuses to boot without `DATABASE_URL` and `TRAMA_ENCRYPTION_KEY` (integration secrets are encrypted at rest with AES-256). See [docker/README.md](docker/README.md) for the full deployment guide, and [server/AI.md](server/AI.md) to enable the optional AI features.
+All containers run as non-root with `cap_drop: ALL`, `no-new-privileges` and a read-only filesystem. In production the API refuses to boot without `DATABASE_URL` and `TRAMA_ENCRYPTION_KEY` (integration secrets are encrypted at rest with AES-256). To run it yourself without Traefik or a fixed domain, follow [docs/self-hosting.md](docs/self-hosting.md) (`docker-compose.selfhost.yml`). See [docker/README.md](docker/README.md) for the images and the author's own deployment, and [server/AI.md](server/AI.md) to enable the optional AI features.
 
 ## Tech stack
 
@@ -218,13 +228,16 @@ npm run lint && npm run build
 
 | | |
 |---|---|
-| [VISION.md](VISION.md) | The thesis, the model, and where Trama is going |
+| [VISION.md](VISION.md) | The thesis and the core model (authoritative, two pages) |
+| [NON-GOALS.md](NON-GOALS.md) | What Trama will not do, and the proposed scope freeze |
+| [docs/vision-detailed.md](docs/vision-detailed.md) | The original long-form vision, kept as background |
 | [server/API.md](server/API.md) | Every route, auth modes, conventions |
 | [server/ARCHITECTURE.md](server/ARCHITECTURE.md) | Request pipeline, modules, extension points |
 | [server/AI.md](server/AI.md) | Configuring the assistant and AI suggestions |
 | [mcp/README.md](mcp/README.md) | MCP tools, configuration, security notes |
 | [cli/README.md](cli/README.md) | The `trama` command line: install, connect, agent mode |
 | [skills/README.md](skills/README.md) | Agent skills and how to install them |
+| [docs/self-hosting.md](docs/self-hosting.md) | Self-hosting: install, configure, upgrade, backup, rollback |
 | [docker/README.md](docker/README.md) | Images, production stack, registry |
 | [DESIGN.md](DESIGN.md) | Design language and tokens |
 

@@ -100,6 +100,12 @@ export interface CreateLabelInput {
 export interface UpdateLabelInput {
   name?: string;
   color?: string;
+  /** `true` archives (hidden from pickers, kept where used), `false` restores. */
+  archived?: boolean;
+}
+export interface MergeLabelInput {
+  /** Label id that takes over everything labelled with the one being merged away. */
+  into: ID;
 }
 export interface CreateInviteInput {
   email: string;
@@ -325,7 +331,10 @@ export interface CriterionInput {
   text: string;
   state?: CriterionState;
 }
-export type CriterionPatch = Partial<CriterionInput>;
+export interface CriterionPatch extends Partial<CriterionInput> {
+  /** Proof for the criterion; `null` clears it. Never changes the state. */
+  evidence?: { artifactIds?: ID[]; note?: string | null } | null;
+}
 
 // ───── input requests ─────
 export interface CreateInputRequestInput {
@@ -381,6 +390,18 @@ export interface UpdateIssueInput {
   duplicateOfId?: ID | null;
   /** Workspace label ids. Replaces the whole list. */
   labels?: ID[];
+}
+/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+export interface BulkIssuePatch {
+  status?: IssueStatus;
+  priority?: Priority;
+  assigneeId?: ID | null;
+  teamId?: ID | null;
+  projectId?: ID | null;
+  addLabels?: ID[];
+  removeLabels?: ID[];
+  addWorkstreamIds?: ID[];
+  removeWorkstreamIds?: ID[];
 }
 export interface LinkIssueInput {
   workstreamIds?: ID[];
@@ -487,6 +508,16 @@ export interface EventsQuery {
   type?: string;
   /** ISO date cursor: events strictly older than this. */
   before?: ISODate;
+  limit?: number;
+}
+export interface InsightsQuery {
+  /** 7, 30 or 90 (default 30). */
+  days?: number;
+  teamId?: ID;
+  projectId?: ID;
+  /** Days without activity before in-flight work is stale (default 7). */
+  staleDays?: number;
+  /** Items kept per signal (counts always cover everything). */
   limit?: number;
 }
 export interface AttentionQuery {

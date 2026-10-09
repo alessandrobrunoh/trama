@@ -1,0 +1,55 @@
+name: Docker
+
+# The compose files and Caddy config must stay valid, and the self-host stack must refuse to start without
+# its secrets (there are no default passwords).
+on:
+  pull_request:
+    paths:
+      - 'docker-compose.selfhost.yml'
+      - 'docker/**'
+      - 'server/docker-compose*.yml'
+      - '.github/workflows/docker-ci.yml'
+      - '.github/workflows/release-images.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'docker-compose.selfhost.yml'
+      - 'docker/**'
+      - 'server/docker-compose*.yml'
+      - '.github/workflows/docker-ci.yml'
+      - '.github/workflows/release-images.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  compose:
+    name: compose config
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Self-host file is valid with its secrets set
+        env:
+          TRAMA_PUBLIC_URL: https://trama.example.com
+          POSTGRES_PASSWORD: ci-password
+          TRAMA_ENCRYPTION_KEY: ci-key
+        run: docker compose -f docker-compose.selfhost.yml config --quiet
+      - name: Self-host file refuses to start without secrets
+        run: |
+          if docker compose -f docker-compose.selfhost.yml config --quiet 2>err.txt; then
+            echo "::error::docker-compose.selfhost.yml accepted a configuration without secrets"
+            exit 1
+          fi
+          grep -q "required variable" err.txt
+      - name: Caddyfile is valid
+        run: |
+          docker run --rm -e TRAMA_PUBLIC_URL=https://trama.example.com \
+            -v "$PWD/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
+      - name: Author's deployment file is still valid
+        run: docker compose -f server/docker-compose.yml config --quiet
