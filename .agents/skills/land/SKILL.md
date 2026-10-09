@@ -51,7 +51,7 @@ If the hook fails, or the branch cannot be created without mixing in unrelated c
 
 Run a command only when the diff touches that area. Skipping a command because the diff does not touch its area is success for that command, not a missing check. Do not run the root `npm run typecheck`, `npm run lint`, or `npm test` commands listed in `CONTRIBUTING.md`: the root `package.json` defines no `typecheck` or `lint` script, and `angular.json` defines no `test` target, so `npm test` (`ng test`) is not a usable check.
 
-- Frontend (`src/`, `public/`, `angular.json`, root `package.json`, or other files the root Angular build compiles): `npm run build`. This is `ng build` (`package.json` script `build`; `angular.json` target `delta:build`).
+- Frontend (`src/`, `public/`, `angular.json`, root `package.json`, or other files the root Angular build compiles): `npm run build`. This is `ng build` (`package.json` script `build`; `angular.json` target `trama:build`).
 - API (`server/`): from `server/`, `npm test`, then `npm run lint`, then `npm run build`. Those are `vitest run`, `oxlint --type-aware src/ test/`, and `nest build` (`server/package.json`). Do not run `npm run test:e2e` unless the change is specifically to the end-to-end suite; that command recreates the `trama_core_test` database.
 - CLI, MCP sources, or the CLI skill (`cli/`, `mcp/src/`, `skills/trama-cli/`): from `cli/`, `cargo test --locked` and `cargo build --locked` (`.github/workflows/cli-ci.yml`).
 

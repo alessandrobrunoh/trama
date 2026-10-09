@@ -7,7 +7,7 @@
   },
   "newProjectRoot": "projects",
   "projects": {
-    "delta": {
+    "trama": {
       "projectType": "application",
       "schematics": {
         "@schematics/angular:component": {
@@ -84,10 +84,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "delta:build:production"
+              "buildTarget": "trama:build:production"
             },
             "development": {
-              "buildTarget": "delta:build:development"
+              "buildTarget": "trama:build:development"
             }
           },
           "defaultConfiguration": "development",
