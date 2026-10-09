@@ -3,7 +3,7 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 
 const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
-  'postgres://delta:delta@localhost:5434/nabla_core_test';
+  'postgres://delta:delta@localhost:5434/trama_core_test';
 
 export default defineConfig({
   plugins: [tsconfigPaths()],

@@ -6,7 +6,7 @@ import { INTEGRATION_ENTITIES } from '../integrations/entities.js';
 import { MIGRATIONS } from './migrations/index.js';
 
 export const DEFAULT_DATABASE_URL =
-  'postgres://delta:delta@localhost:5434/nabla';
+  'postgres://delta:delta@localhost:5434/trama';
 
 export function databaseUrl(url = process.env.DATABASE_URL): string {
   return url?.trim() || DEFAULT_DATABASE_URL;

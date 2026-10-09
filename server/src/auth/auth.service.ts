@@ -110,4 +110,4 @@ export class AuthService {
 }
 
 /** Real argon2 hash used to equalize timing for unknown emails. */
-const DUMMY_HASH = argon2.hash('nabla-timing-equalizer');
+const DUMMY_HASH = argon2.hash('trama-timing-equalizer');

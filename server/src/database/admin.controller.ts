@@ -8,7 +8,7 @@ import { SeedService } from './seed/seed.service.js';
 export class AdminController {
   constructor(private readonly seed: SeedService) {}
 
-  /** Wipes ALL data and re-seeds the demo workspace ("Acme", demo@nabla.dev / nabla-demo). */
+  /** Wipes ALL data and re-seeds the demo workspace ("Acme", demo@trama.dev / trama-demo). */
   @Public()
   @Post('reset')
   @HttpCode(200)
