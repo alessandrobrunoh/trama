@@ -53,7 +53,7 @@ function setup(ids: string[], edges: [string, string][], initial: string) {
   };
   const events = { record: async () => undefined, publish: () => undefined };
   const svc = new StatusService({ getRepository: repo } as never, events as never, {} as never);
-  return { ws, svc };
+  return { ws, svc, arts };
 }
 
 describe('status cascade over dependencies', () => {
@@ -71,5 +71,60 @@ describe('status cascade over dependencies', () => {
     const { ws, svc } = setup(['A', 'B', 'C'], [['A', 'B'], ['B', 'C'], ['C', 'A']], 'working');
     await svc.recompute('A', [], new Set(), true);
     expect(Object.keys(ws)).toHaveLength(3);
+  });
+});
+
+describe('shippedAt follows the effective shipped status', () => {
+  const OLD = new Date('2026-01-01T00:00:00Z');
+
+  it('sets shippedAt when the derived status becomes shipped', async () => {
+    const { ws, svc } = setup(['A'], [], 'working');
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].status).toBe('shipped');
+    expect(ws['A'].shippedAt).toBeInstanceOf(Date);
+  });
+
+  it('keeps the timestamp stable while it stays shipped', async () => {
+    const { ws, svc } = setup(['A'], [], 'shipped');
+    ws['A'].shippedAt = OLD;
+    await svc.recompute('A', [], new Set(), true);
+    expect(ws['A'].shippedAt).toBe(OLD);
+  });
+
+  it('clears shippedAt when the workstream leaves shipped', async () => {
+    const { ws, svc, arts } = setup(['A'], [], 'shipped');
+    ws['A'].shippedAt = OLD;
+    arts.push({ id: 'pr2', workstreamId: 'A', kind: 'pull_request', state: 'open' });
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].status).toBe('in_review');
+    expect(ws['A'].shippedAt).toBeNull();
+  });
+
+  it('sets shippedAt when statusOverride pins shipped, and clears it when the pin is removed', async () => {
+    const { ws, svc, arts } = setup(['A'], [], 'working');
+    arts.length = 0; // nothing delivered: derived status is not shipped
+    ws['A'].acceptanceCriteria = [{ id: 'c', text: 't', state: 'pending' }];
+    ws['A'].statusOverride = 'shipped';
+    ws['A'].status = 'shipped'; // as WorkstreamsService.update does before touching the bus
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].derivedStatus).not.toBe('shipped');
+    expect(ws['A'].shippedAt).toBeInstanceOf(Date);
+
+    ws['A'].statusOverride = null;
+    ws['A'].status = ws['A'].derivedStatus;
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].status).not.toBe('shipped');
+    expect(ws['A'].shippedAt).toBeNull();
+  });
+
+  it('clears shippedAt when an override moves a derived-shipped workstream elsewhere', async () => {
+    const { ws, svc } = setup(['A'], [], 'shipped');
+    ws['A'].shippedAt = OLD;
+    ws['A'].statusOverride = 'working';
+    ws['A'].status = 'working';
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].derivedStatus).toBe('shipped');
+    expect(ws['A'].status).toBe('working');
+    expect(ws['A'].shippedAt).toBeNull();
   });
 });

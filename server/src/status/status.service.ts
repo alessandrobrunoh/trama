@@ -20,7 +20,7 @@ import {
   WorkstreamBus,
   type WorkstreamTouched,
 } from '../events/workstream-bus.js';
-import { deriveStatus, type StatusDependency } from './derive-status.js';
+import { deriveStatus, nextShippedAt, type StatusDependency } from './derive-status.js';
 
 export interface StatusChange {
   workstreamId: string;
@@ -160,11 +160,13 @@ export class StatusService
     });
 
     let change: StatusChange | null = null;
+    // Same reference as `ws.shippedAt` while it stays shipped, so the timestamp is never bumped.
+    const shippedAt = nextShippedAt(result.status, ws.shippedAt);
     const dirty =
       ws.derivedStatus !== result.derivedStatus ||
       ws.delivery !== result.delivery ||
       ws.status !== result.status ||
-      (result.derivedStatus === 'shipped' && !ws.shippedAt);
+      (ws.shippedAt ?? null) !== shippedAt;
     if (dirty) {
       const from = ws.status;
       const patch: Partial<WorkstreamEntity> = {
@@ -172,8 +174,7 @@ export class StatusService
         delivery: result.delivery,
         status: result.status,
       };
-      if (result.derivedStatus === 'shipped' && !ws.shippedAt)
-        patch.shippedAt = new Date();
+      patch.shippedAt = shippedAt;
       if (from !== result.status) patch.updatedAt = new Date();
       await this.ds
         .getRepository(WorkstreamEntity)
