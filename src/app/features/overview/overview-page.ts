@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { NablaStore, UiStore, usePageShortcuts } from '../../core';
 import { PageHeader } from '../../shared/page-header';
+import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
 import { OverviewFlow } from './overview-flow';
 import { OverviewGreeting } from './overview-greeting';
 import { OverviewHealth } from './overview-health';
@@ -18,7 +19,7 @@ import { OverviewUpcoming } from './overview-upcoming';
 @Component({
   selector: 'app-overview-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, OverviewGreeting, OverviewKpis, OverviewNeedsYou, OverviewUpcoming, OverviewHealth, OverviewFlow, OverviewRail],
+  imports: [PageHeader, OnboardingChecklist, OverviewGreeting, OverviewKpis, OverviewNeedsYou, OverviewUpcoming, OverviewHealth, OverviewFlow, OverviewRail],
   providers: [OverviewModel],
   host: { class: 'block min-h-full' },
   template: `
@@ -37,6 +38,7 @@ import { OverviewUpcoming } from './overview-upcoming';
         </div>
       } @else {
         <app-overview-greeting />
+        <app-onboarding-checklist />
         <app-overview-kpis />
 
         <div class="grid items-start gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">

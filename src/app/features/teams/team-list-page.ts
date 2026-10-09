@@ -43,6 +43,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
         @if (canAdmin()) {
           <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New team</button>
         }
+        <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', slug(), 'settings', 'members']">Invite a teammate</a>
       </app-empty-state>
     } @else if (shown().length === 0) {
       <app-empty-state [icon]="searchIcon" title="No teams match" description="Try another name or key." />
