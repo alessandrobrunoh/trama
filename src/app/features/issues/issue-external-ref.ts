@@ -40,8 +40,10 @@ const DOT: Record<ExternalStateType, string> = {
           [hlmTooltip]="tooltip(r)"
         >
           @if (r.provider === 'github') { <app-provider-icon provider="github" /> }
-          <span class="shrink-0 font-medium">{{ providerLabel(r) }}</span>
-          <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ r.key }}</span>
+          @if (r.provider !== 'github') {
+            <span class="shrink-0 font-medium">{{ providerLabel(r) }}</span>
+          }
+          <span class="shrink-0 font-mono text-xs">{{ r.key }}</span>
           @if (r.state) {
             <span class="flex min-w-0 items-center gap-1 text-xs">
               <span class="size-1.5 shrink-0 rounded-full" [class]="dot(r)"></span>

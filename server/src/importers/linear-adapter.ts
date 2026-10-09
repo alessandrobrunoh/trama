@@ -32,7 +32,7 @@ const ISSUE_FIELDS = `
   team { id }
   project { id }
   projectMilestone { id name description targetDate project { id } }
-  labels { nodes { id name color } }
+  labels(first: 25) { nodes { id name color } }
 `;
 
 function linearUser(raw: unknown): ExternalUser | undefined {

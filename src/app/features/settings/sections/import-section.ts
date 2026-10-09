@@ -124,14 +124,14 @@ const POLL_MS = 2000;
             <div class="flex items-center gap-2">
               <select [class]="select" aria-label="Credential" [value]="credential()" (change)="credential.set($any($event.target).value); resetPreview()">
                 @if (provider() === 'github') {
-                  <option value="">Public repository (no token)</option>
+                  <option value="" [selected]="credential() === ''">Public repository (no token)</option>
                 }
                 @for (c of credentialsOf(provider()); track c.id) {
-                  <option [value]="'c:' + c.id">{{ c.account }}{{ c.baseUrl ? ' · ' + c.baseUrl : '' }}</option>
+                  <option [value]="'c:' + c.id" [selected]="credential() === ('c:' + c.id)">{{ c.account }}{{ c.baseUrl ? ' · ' + c.baseUrl : '' }}</option>
                 }
                 @if (provider() === 'github') {
                   @for (c of githubConnections(); track c.id) {
-                    <option [value]="'n:' + c.id">GitHub integration · {{ c.account }}</option>
+                    <option [value]="'n:' + c.id" [selected]="credential() === ('n:' + c.id)">GitHub integration · {{ c.account }}</option>
                   }
                 }
               </select>
@@ -241,10 +241,10 @@ const POLL_MS = 2000;
                   <div class="flex items-center gap-2">
                     <input type="checkbox" class="size-4" [checked]="!excludedTeams().has(t.id)" [attr.aria-label]="'Include ' + t.name" (change)="toggleTeam(t.id, $any($event.target).checked)" />
                     <select [class]="select" [attr.aria-label]="'Trama team for ' + t.name" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                      <option value="create">Create team “{{ t.key ?? t.name }}”</option>
-                      <option value="skip">No team</option>
+                      <option value="create" [selected]="draft().teams[t.id] === 'create'">Create team “{{ t.key ?? t.name }}”</option>
+                      <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
                       @for (x of teams(); track x.id) {
-                        <option [value]="'map:' + x.id">{{ x.name }}</option>
+                        <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
                       }
                     </select>
                   </div>
@@ -261,10 +261,10 @@ const POLL_MS = 2000;
               @for (t of p.teams; track t.id) {
                 <app-settings-row [label]="t.name" wide>
                   <select [class]="select" aria-label="Trama team" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                    <option value="skip">No team</option>
-                    <option value="create">Create a team</option>
+                    <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
+                    <option value="create" [selected]="draft().teams[t.id] === 'create'">Create a team</option>
                     @for (x of teams(); track x.id) {
-                      <option [value]="'map:' + x.id">{{ x.name }}</option>
+                      <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
                     }
                   </select>
                 </app-settings-row>
@@ -279,10 +279,10 @@ const POLL_MS = 2000;
             @for (x of p.projects; track x.id) {
               <app-settings-row [label]="x.name" wide>
                 <select [class]="select" [attr.aria-label]="'Trama project for ' + x.name" [value]="draft().projects[x.id]" (change)="setTarget('projects', x.id, $any($event.target).value)">
-                  <option value="create">Create project</option>
-                  <option value="skip">No project</option>
+                  <option value="create" [selected]="draft().projects[x.id] === 'create'">Create project</option>
+                  <option value="skip" [selected]="draft().projects[x.id] === 'skip'">No project</option>
                   @for (pr of projects(); track pr.id) {
-                    <option [value]="'map:' + pr.id">{{ pr.name }}</option>
+                    <option [value]="'map:' + pr.id" [selected]="draft().projects[x.id] === ('map:' + pr.id)">{{ pr.name }}</option>
                   }
                 </select>
               </app-settings-row>
@@ -296,7 +296,7 @@ const POLL_MS = 2000;
               <app-settings-row [label]="s.name" [description]="s.type + (s.count !== undefined ? ' · ' + s.count + ' issues' : '')" wide>
                 <select [class]="select" [attr.aria-label]="'Trama status for ' + s.name" [value]="draft().statuses[s.id]" (change)="setStatus(s.id, $any($event.target).value)">
                   @for (st of statuses; track st) {
-                    <option [value]="st">{{ statusLabel(st) }}</option>
+                    <option [value]="st" [selected]="draft().statuses[s.id] === (st)">{{ statusLabel(st) }}</option>
                   }
                 </select>
               </app-settings-row>
@@ -310,10 +310,10 @@ const POLL_MS = 2000;
                 @for (l of p.labels; track l.id) {
                   <app-settings-row [label]="l.name" wide>
                     <select [class]="select" [attr.aria-label]="'Trama label for ' + l.name" [value]="draft().labels[l.id]" (change)="setTarget('labels', l.id, $any($event.target).value)">
-                      <option value="create">Create label</option>
-                      <option value="skip">Drop it</option>
+                      <option value="create" [selected]="draft().labels[l.id] === 'create'">Create label</option>
+                      <option value="skip" [selected]="draft().labels[l.id] === 'skip'">Drop it</option>
                       @for (x of labels(); track x.id) {
-                        <option [value]="'map:' + x.id">{{ x.name }}</option>
+                        <option [value]="'map:' + x.id" [selected]="draft().labels[l.id] === ('map:' + x.id)">{{ x.name }}</option>
                       }
                     </select>
                   </app-settings-row>
@@ -331,9 +331,9 @@ const POLL_MS = 2000;
                 @for (u of p.users; track u.id) {
                   <app-settings-row [label]="u.name || u.login || u.id" [description]="u.email || (u.login ? '@' + u.login : '')" wide>
                     <select [class]="select" [attr.aria-label]="'Trama member for ' + (u.name || u.login || u.id)" [value]="draft().users[u.id]" (change)="setUser(u.id, $any($event.target).value)">
-                      <option value="">Unassigned</option>
+                      <option value="" [selected]="draft().users[u.id] === ''">Unassigned</option>
                       @for (m of members(); track m.id) {
-                        <option [value]="m.id">{{ m.name }}</option>
+                        <option [value]="m.id" [selected]="draft().users[u.id] === (m.id)">{{ m.name }}</option>
                       }
                     </select>
                   </app-settings-row>
@@ -354,7 +354,7 @@ const POLL_MS = 2000;
             <app-settings-row label="Default kind" description="For issues with no label that says bug, feature, incident…" wide>
               <select [class]="select" aria-label="Default kind" [value]="options().defaultKind" (change)="setOption({ defaultKind: $any($event.target).value })">
                 @for (k of kinds; track k) {
-                  <option [value]="k">{{ kindLabel(k) }}</option>
+                  <option [value]="k" [selected]="options().defaultKind === (k)">{{ kindLabel(k) }}</option>
                 }
               </select>
             </app-settings-row>

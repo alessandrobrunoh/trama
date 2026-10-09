@@ -20,7 +20,13 @@ const SWEEP_EVERY_MS = 30_000;
 const MAX_INLINE_WAIT_MS = 10 * 60_000;
 const WAIT_SLICE_MS = 5_000;
 
-const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref?.());
+/** The rows of an `UPDATE ... RETURNING` result whatever shape the driver gave it (`rows` or `[rows, count]`). */
+export function claimedRows(result: unknown): unknown[] {
+  if (!Array.isArray(result)) return [];
+  return Array.isArray(result[0]) ? (result[0] as unknown[]) : result;
+}
+
+const sleep =(ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref?.());
 
 /**
  * Runs import jobs in the background of the API process. Jobs are rows: a restart (or a second instance)
@@ -68,7 +74,8 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
   /** Claims the job (atomically, so two instances never run it) and runs it in the background. */
   async kick(id: string): Promise<boolean> {
     if (this.active.has(id) || this.stopping) return false;
-    const claimed = await this.ds.query<{ id: string }[]>(
+    // An UPDATE ... RETURNING comes back from TypeORM as `[rows, affectedCount]`, not as the rows.
+    const result = await this.ds.query<unknown>(
       `UPDATE "import_jobs" SET "status" = 'running', "heartbeatAt" = now(), "startedAt" = COALESCE("startedAt", now())
        WHERE "id" = $1 AND (
          ("status" = 'queued' AND ("waitingUntil" IS NULL OR "waitingUntil" <= now()))
@@ -76,7 +83,7 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
        ) RETURNING "id"`,
       [id, STALE_AFTER_SECONDS],
     );
-    if (!claimed.length) return false;
+    if (!claimedRows(result).length) return false;
     this.active.add(id);
     void this.execute(id)
       .catch((e: unknown) => this.log.error(`Import ${id} crashed: ${redactSecrets(e instanceof Error ? e.message : String(e))}`))
