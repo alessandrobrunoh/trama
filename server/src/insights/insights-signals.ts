@@ -344,6 +344,7 @@ export function computeSignalItems(d: SignalData): Record<InsightSignalId, Insig
         item: {
           type: 'milestone',
           id: m.id,
+          projectId: m.projectId,
           title: `${m.projectName}: ${m.name}`,
           since: due.toISOString(),
           ageDays: days,
@@ -504,6 +505,7 @@ export function computeSignalItems(d: SignalData): Record<InsightSignalId, Insig
         item: {
           type: first.targetType,
           id: first.targetId,
+          ...(first.targetType === 'project' ? { projectId: first.targetId } : {}),
           key: first.targetKey,
           title: first.targetTitle,
           since: oldest.toISOString(),

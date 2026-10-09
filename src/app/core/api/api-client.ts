@@ -35,6 +35,9 @@ import type {
   InvitePreview,
   Customer,
   CustomerRequest,
+  InsightSignal,
+  InsightSignalId,
+  InsightsReport,
   Issue,
   Membership,
   Milestone,
@@ -98,6 +101,7 @@ import type {
   CriterionPatch,
   EventsQuery,
   GraphResponse,
+  InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
@@ -552,6 +556,15 @@ export class ApiClient {
   readonly events = {
     list: (slug: string, query: EventsQuery = {}) =>
       this.get<DomainEvent[]>(`${this.w(slug)}/events`, { ...query }),
+  };
+
+  readonly insights = {
+    /** Health signals, flow metrics and agent failure signals (GET /insights). */
+    report: (slug: string, query: InsightsQuery = {}) =>
+      this.get<InsightsReport>(`${this.w(slug)}/insights`, { ...query }),
+    /** One signal with up to `limit` items: what a health tile drills into. */
+    signal: (slug: string, id: InsightSignalId, query: InsightsQuery = {}) =>
+      this.get<InsightSignal>(`${this.w(slug)}/insights/signals/${id}`, { ...query }),
   };
 
   readonly attention = {

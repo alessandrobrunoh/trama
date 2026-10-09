@@ -1186,6 +1186,8 @@ export interface InsightItem {
   title: string;
   /** Workstream the item belongs to, so the UI can link to the right page. */
   workstreamKey?: string;
+  /** Project of a milestone or project item. */
+  projectId?: ID;
   /** When the condition started. */
   since?: ISODate;
   /** Days since `since` (rounded to one decimal). */

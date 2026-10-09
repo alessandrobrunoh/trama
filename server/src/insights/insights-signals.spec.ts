@@ -205,6 +205,7 @@ describe('overdue', () => {
     const items = computeSignalItems(emptyData({ milestones: [milestone({ targetDate: today }), milestone({ targetDate: yesterday })] }));
     expect(items.overdue_milestones).toHaveLength(1);
     expect(items.overdue_milestones[0].detail).toContain('past 2026-10-08');
+    expect(items.overdue_milestones[0].projectId).toBe('pj_1');
   });
 
   it('skips finished milestones, completed projects and milestones without a date', () => {
@@ -366,7 +367,7 @@ describe('customer_demand_waiting', () => {
       }),
     );
     expect(items.customer_demand_waiting).toHaveLength(2);
-    expect(items.customer_demand_waiting[0]).toMatchObject({ type: 'project', title: 'Platform', ageDays: 100, value: 1 });
+    expect(items.customer_demand_waiting[0]).toMatchObject({ type: 'project', title: 'Platform', ageDays: 100, value: 1, projectId: 'pj_9' });
     expect(items.customer_demand_waiting[1]).toMatchObject({ type: 'issue', ageDays: 40, value: 2 });
     expect(items.customer_demand_waiting[1].detail).toContain('2 customers waiting');
     expect(items.customer_demand_waiting[1].detail).toContain('1 marked important');
