@@ -1342,6 +1342,31 @@ html {
   }
 }
 
+/* ───────────────────── Detail pages on phones ───────────────────── */
+@media (max-width: 47.999rem) {
+  /* Properties: one comfortable row per property, the value is a full-height tap target. */
+  app-property-row {
+    min-block-size: 3rem;
+    font-size: 1rem;
+  }
+  app-property-row button,
+  app-property-row [role='combobox'],
+  app-property-row a {
+    min-block-size: 2.75rem;
+  }
+  .prop-chips button[data-slot='popover-trigger'] {
+    min-block-size: 2.75rem;
+    padding-inline: 0.875rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    font-size: 0.9375rem;
+  }
+  /* iOS keeps the layout viewport under the keyboard: lift the app above it (Chrome resizes by itself). */
+  html[data-keyboard='open'] main[hlmsidebarinset] {
+    padding-bottom: var(--kb-inset);
+  }
+}
+
 /* Shortcut chips on primary surfaces (e.g. "New issue C"): a lighter shade of the accent
    instead of the muted keycap, so the chip reads as part of the button. */
 .bg-primary [data-slot='kbd'] {
