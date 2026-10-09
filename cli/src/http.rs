@@ -199,11 +199,11 @@ mod tests {
     fn reads_session_cookie() {
         let mut h = HeaderMap::new();
         h.append(SET_COOKIE, HeaderValue::from_static("other=1; Path=/"));
-        h.append(SET_COOKIE, HeaderValue::from_static("nabla_session=abc123; HttpOnly; Path=/; SameSite=Lax"));
-        assert_eq!(cookie_value(&h, "nabla_session").as_deref(), Some("nabla_session=abc123"));
+        h.append(SET_COOKIE, HeaderValue::from_static("trama_session=abc123; HttpOnly; Path=/; SameSite=Lax"));
+        assert_eq!(cookie_value(&h, "trama_session").as_deref(), Some("trama_session=abc123"));
         assert_eq!(cookie_value(&h, "missing"), None);
         h.clear();
-        h.append(SET_COOKIE, HeaderValue::from_static("nabla_session=; Max-Age=0"));
-        assert_eq!(cookie_value(&h, "nabla_session"), None);
+        h.append(SET_COOKIE, HeaderValue::from_static("trama_session=; Max-Age=0"));
+        assert_eq!(cookie_value(&h, "trama_session"), None);
     }
 }

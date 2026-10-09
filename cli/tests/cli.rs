@@ -526,7 +526,7 @@ fn usage_errors_are_json_and_name_what_is_missing() {
 #[test]
 fn refuses_plain_http_to_remote_hosts_and_unknown_key_formats() {
     let o = Run::new()
-        .env("TRAMA_API_KEY", "nbl_x")
+        .env("TRAMA_API_KEY", "trm_x")
         .env("TRAMA_API_URL", "http://trama.example.com/api")
         .run(&["whoami"]);
     assert_eq!(code(&o), 2);
@@ -714,7 +714,7 @@ fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
     let run = Run::new();
     let o = run.run_stdin(
         &["login", "--with-token", "--api-url", &mock.api()],
-        "nbl_secretvalue123\n",
+        "trm_secretvalue123\n",
     );
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     assert_eq!(out_json(&o)["workspace"]["slug"], "acme");
@@ -725,7 +725,7 @@ fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
 
     let file = run.config.join("config.json");
     let saved: Value = serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-    assert_eq!(saved["profiles"]["default"]["token"], "nbl_secretvalue123");
+    assert_eq!(saved["profiles"]["default"]["token"], "trm_secretvalue123");
     assert_eq!(saved["profiles"]["default"]["workspace"], "acme");
     #[cfg(unix)]
     {
@@ -752,7 +752,7 @@ fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
     let o = run.run(&["profile", "list"]);
     let rows = out_json(&o);
     assert_eq!(rows[0]["name"], "default");
-    assert_eq!(rows[0]["token"], "nbl_secr…");
+    assert_eq!(rows[0]["token"], "trm_secr…");
     assert!(!stdout(&o).contains("secretvalue123"));
 }
 
@@ -772,7 +772,7 @@ fn login_accepts_a_site_url_and_rejects_bad_keys() {
             "--api-url",
             &mock.api().replace("/api", ""),
         ],
-        "nbl_revoked\n",
+        "trm_revoked\n",
     );
     assert_eq!(code(&o), 3);
     assert!(
@@ -796,7 +796,7 @@ fn login_with_email_mints_a_token_and_closes_the_session() {
     );
     login.headers.push((
         "Set-Cookie",
-        "nabla_session=sess123; Path=/; HttpOnly".into(),
+        "trama_session=sess123; Path=/; HttpOnly".into(),
     ));
     let mock = Mock::start(vec![
         login,
@@ -804,7 +804,7 @@ fn login_with_email_mints_a_token_and_closes_the_session() {
             "POST",
             "/api/w/acme/tokens",
             201,
-            json!({ "token": { "id": "tok_2" }, "secret": "nbl_minted_for_this_machine" }),
+            json!({ "token": { "id": "tok_2" }, "secret": "trm_minted_for_this_machine" }),
         ),
         route("POST", "/api/auth/logout", 204, Value::Null),
         route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
@@ -843,21 +843,21 @@ fn login_with_email_mints_a_token_and_closes_the_session() {
         reqs[0].json(),
         json!({ "email": "ann@example.com", "password": "hunter2hunter2" })
     );
-    assert_eq!(reqs[1].headers["cookie"], "nabla_session=sess123");
+    assert_eq!(reqs[1].headers["cookie"], "trama_session=sess123");
     let minted = reqs[1].json();
     assert_eq!(
         (minted["name"].as_str(), minted["scope"].as_str()),
         (Some("laptop"), Some("write"))
     );
     assert!(minted["expiresAt"].as_str().unwrap().ends_with('Z'));
-    assert_eq!(reqs[2].headers["cookie"], "nabla_session=sess123");
+    assert_eq!(reqs[2].headers["cookie"], "trama_session=sess123");
     assert_eq!(
         reqs[3].headers["authorization"],
-        "Bearer nbl_minted_for_this_machine"
+        "Bearer trm_minted_for_this_machine"
     );
     let saved = std::fs::read_to_string(run.config.join("config.json")).unwrap();
     assert!(
-        saved.contains("nbl_minted_for_this_machine") && !saved.contains("hunter2"),
+        saved.contains("trm_minted_for_this_machine") && !saved.contains("hunter2"),
         "the password is never stored"
     );
 }
@@ -894,7 +894,7 @@ fn logout_can_revoke_the_key_server_side() {
     let run = Run::new();
     run.run_stdin(
         &["login", "--with-token", "--api-url", &mock.api()],
-        "nbl_tobe_revoked\n",
+        "trm_tobe_revoked\n",
     );
     let o = run.run(&["logout", "--revoke"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
@@ -1099,8 +1099,8 @@ fn handle_keyed(mut stream: TcpStream, log: &Arc<Mutex<Vec<Recorded>>>) {
         .unwrap_or("");
     let body = if path == "/api/auth/token" {
         match key {
-            "Bearer nbl_acme" => identity_in("acme", "Acme", &["issues:read"]),
-            "Bearer nbl_beta" => identity_in("beta", "Beta", &["issues:read"]),
+            "Bearer trm_acme" => identity_in("acme", "Acme", &["issues:read"]),
+            "Bearer trm_beta" => identity_in("beta", "Beta", &["issues:read"]),
             _ => json!({ "message": "unknown key" }),
         }
     } else if path == "/api/w/acme/issues" {
@@ -1110,7 +1110,7 @@ fn handle_keyed(mut stream: TcpStream, log: &Arc<Mutex<Vec<Recorded>>>) {
     } else {
         json!({ "message": "no such route" })
     };
-    let status = if path == "/api/auth/token" && !key.starts_with("Bearer nbl_") {
+    let status = if path == "/api/auth/token" && !key.starts_with("Bearer trm_") {
         401
     } else {
         200
@@ -1156,7 +1156,7 @@ fn account_add_saves_one_profile_per_token_and_reads_span_them() {
             "--name",
             "work",
         ],
-        "nbl_acme\nnbl_beta\n",
+        "trm_acme\ntrm_beta\n",
     );
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     let added = out_json(&o);
@@ -1231,7 +1231,7 @@ fn account_add_with_email_mints_one_key_per_workspace() {
     );
     login.headers.push((
         "Set-Cookie",
-        "nabla_session=sess123; Path=/; HttpOnly".into(),
+        "trama_session=sess123; Path=/; HttpOnly".into(),
     ));
     let mock = Mock::start(vec![
         login,
@@ -1239,13 +1239,13 @@ fn account_add_with_email_mints_one_key_per_workspace() {
             "POST",
             "/api/w/acme/tokens",
             201,
-            json!({ "secret": "nbl_minted_acme" }),
+            json!({ "secret": "trm_minted_acme" }),
         ),
         route(
             "POST",
             "/api/w/beta/tokens",
             201,
-            json!({ "secret": "nbl_minted_beta" }),
+            json!({ "secret": "trm_minted_beta" }),
         ),
         route("POST", "/api/auth/logout", 204, Value::Null),
         route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
@@ -1296,7 +1296,7 @@ fn mcp_stdio_reads_across_every_saved_profile() {
             "--name",
             "work",
         ],
-        "nbl_acme\nnbl_beta\n",
+        "trm_acme\ntrm_beta\n",
     );
     assert_eq!(code(&o), 0, "{}", stderr(&o));
 

@@ -1,6 +1,6 @@
 //! Connecting the CLI to a Trama instance: `login`, `logout`, `whoami`, `profile`.
 //!
-//! Three ways in, all ending with a workspace-bound API key (`nbl_…`) saved in a profile:
+//! Three ways in, all ending with a workspace-bound API key (`trm_…`) saved in a profile:
 //!
 //! 1. paste / pipe a key you created in Settings → API tokens (`--with-token`, or interactively)
 //! 2. email + password: the CLI signs in once, mints a key for this machine in the workspace you pick,
@@ -22,7 +22,13 @@ use crate::http::{Api, Request, cookie_value};
 use crate::output;
 use crate::util;
 
-const SESSION_COOKIE: &str = "nabla_session";
+const SESSION_COOKIE: &str = "trama_session";
+/// Cookie name of API servers from before the rename; still read so the CLI works against them.
+const LEGACY_SESSION_COOKIE: &str = "nabla_session";
+
+fn session_cookie(headers: &reqwest::header::HeaderMap) -> Option<String> {
+    cookie_value(headers, SESSION_COOKIE).or_else(|| cookie_value(headers, LEGACY_SESSION_COOKIE))
+}
 
 /// What `GET /auth/token` says about a key.
 #[derive(Debug)]
@@ -176,7 +182,7 @@ pub async fn login(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             } else if let Some(k) = config::env("TRAMA_API_KEY").filter(|_| !util::interactive()) {
                 k
             } else {
-                util::prompt_secret("API token (nbl_…)")?
+                util::prompt_secret("API token (trm_…)")?
             };
             check_token_format(&key)?;
             key
@@ -187,7 +193,7 @@ pub async fn login(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             if !m.get_flag("no-browser") {
                 util::open_browser(&origin);
             }
-            let key = util::prompt_secret("Paste the token (nbl_…)")?;
+            let key = util::prompt_secret("Paste the token (trm_…)")?;
             check_token_format(&key)?;
             key
         }
@@ -267,7 +273,7 @@ async fn mint_with_password(api: &Api, m: &ArgMatches) -> Result<String> {
         return Err(CliError::auth("wrong email or password").status(401));
     }
     let login = login.into_result()?;
-    let cookie = cookie_value(&login.headers, SESSION_COOKIE)
+    let cookie = session_cookie(&login.headers)
         .ok_or_else(|| CliError::internal("the API did not start a session"))?;
     let result = mint_in_session(api, m, &login.json()?, &cookie).await;
     // Always close the session, whatever happened.
@@ -751,7 +757,7 @@ async fn mint_many(api: &Api, m: &ArgMatches) -> Result<Vec<String>> {
         return Err(CliError::auth("wrong email or password").status(401));
     }
     let login = login.into_result()?;
-    let cookie = cookie_value(&login.headers, SESSION_COOKIE)
+    let cookie = session_cookie(&login.headers)
         .ok_or_else(|| CliError::internal("the API did not start a session"))?;
     let wanted = m
         .get_many::<String>("workspace")
@@ -903,6 +909,18 @@ fn account_remove(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn session_cookie_falls_back_to_the_pre_rename_name() {
+        use reqwest::header::{HeaderMap, HeaderValue, SET_COOKIE};
+        let mut old = HeaderMap::new();
+        old.append(SET_COOKIE, HeaderValue::from_static("nabla_session=abc; Path=/; HttpOnly"));
+        assert_eq!(session_cookie(&old).as_deref(), Some("nabla_session=abc"));
+        let mut new = HeaderMap::new();
+        new.append(SET_COOKIE, HeaderValue::from_static("trama_session=def; Path=/; HttpOnly"));
+        new.append(SET_COOKIE, HeaderValue::from_static("nabla_session=; Max-Age=0; Path=/"));
+        assert_eq!(session_cookie(&new).as_deref(), Some("trama_session=def"));
+    }
 
     #[test]
     fn summary_hides_hashes_and_sorts_permissions() {
