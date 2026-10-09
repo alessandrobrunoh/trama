@@ -50,16 +50,11 @@ export interface LinkIssueInput {
     ownerTeamId: string;
     deltaThreadUrl?: string;
   };
-  /** Defaults to `in_progress` when the issue is still `backlog` or `todo`. */
+  /** Optional explicit status. Without it, linking leaves the status unchanged. */
   status?: IssueStatus;
 }
 
 const KEY_RE = /^[A-Za-z]+-\d+$/;
-const SCHEDULED: ReadonlySet<IssueStatus> = new Set([
-  'draft',
-  'backlog',
-  'todo',
-]);
 const STARTED: ReadonlySet<IssueStatus> = new Set(['in_progress', 'in_review']);
 const FINISHED: ReadonlySet<IssueStatus> = new Set(['done', 'canceled']);
 
@@ -470,8 +465,8 @@ export class IssuesService {
 
   /**
    * Attach the issue to existing workstreams and/or a newly created one (`createWorkstream`,
-   * created atomically). Backlog, draft and todo issues move to `in_progress` unless `status`
-   * is set. That move assigns the acting user when the issue has no assignee.
+   * created atomically). Linking is organizational and never changes the status by itself; only an
+   * explicit `status` does (moving to `in_progress` then assigns the acting user if unassigned).
    */
   async link(
     workspaceId: string,
@@ -498,7 +493,7 @@ export class IssuesService {
     const previous = row.workstreamIds;
     const from = row.status;
     const previousAssigneeId = row.assigneeId;
-    const nextStatus = input.status ?? (SCHEDULED.has(row.status) ? 'in_progress' : row.status);
+    const nextStatus = input.status ?? row.status;
     const nextAssignee = claimAssignee(actor, from, nextStatus, row.assigneeId, false);
     if (nextAssignee !== row.assigneeId) await this.refs.users(workspaceId, [nextAssignee]);
     await this.ds.transaction(async (m) => {

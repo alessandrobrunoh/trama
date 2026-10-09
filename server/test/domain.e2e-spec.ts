@@ -64,7 +64,7 @@ describe('domain', () => {
     const linked = (
       await c.post(`${base()}/issues/BUG-1/link`, { createWorkstream: { title: 'Fix session loss', objective: 'Sessions are stable', ownerTeamId: auth.id, deltaThreadUrl: 'https://delta.dev/t/fix-session' } }).expect(200)
     ).body;
-    expect(linked.status).toBe('in_progress');
+    expect(linked.status).toBe('backlog');
     expect(linked.workstreamIds).toHaveLength(1);
     const ws = (await c.get(`${base()}/workstreams/${linked.workstreamIds[0]}`).expect(200)).body;
     expect(ws.title).toBe('Fix session loss');

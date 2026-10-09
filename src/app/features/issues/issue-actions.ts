@@ -105,7 +105,7 @@ export class IssueActions {
 
   /**
    * Link issues into a workstream. Uses the link endpoint (records `issue.linked` on the workstream;
-   * backlog / todo issues move to in progress). Canceled issues are attached with a plain update,
+   * the issue status is left unchanged). Canceled issues are attached with a plain update,
    * duplicates are skipped.
    */
   link(ids: readonly string[], workstreamId: string): void {
@@ -123,9 +123,8 @@ export class IssueActions {
       if (i.status === 'canceled') void this.store.updateIssue(i.id, { workstreamIds: [...i.workstreamIds, ws.id] });
       else void this.store.linkIssue(i.id, { workstreamIds: [ws.id] });
     }
-    const moved = list.some((i) => i.status === 'backlog' || i.status === 'todo');
     this.notifier.success(`${this.subject(list.map((i) => i.id))} added to ${ws.key}`, {
-      description: moved ? 'Backlog and todo issues moved to In progress.' : ws.title,
+      description: ws.title,
       action: { label: 'Undo', run: () => this.restore(before) },
     });
   }

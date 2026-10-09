@@ -411,8 +411,7 @@ export class AiActions {
       const w = this.store.getWorkstream(k);
       return w && !before.workstreamIds.includes(w.id) ? [w.id] : [];
     });
-    // keep the issue's status: linking would otherwise move backlog/todo issues to in progress
-    if (ids.length) ok = !!(await this.store.linkIssue(issue.id, { workstreamIds: ids, status: before.status })) && ok;
+    if (ids.length) ok = !!(await this.store.linkIssue(issue.id, { workstreamIds: ids })) && ok;
     if (!ok) return 0;
 
     const n = (Object.keys(patch).length ? Object.keys(patch).length : 0) + ids.length;

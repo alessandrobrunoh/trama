@@ -137,7 +137,7 @@ Success: JSON on stdout (`{"ok":true}` for deletes). Failure: JSON on stderr, `{
 5. If a human must choose, open an `input-request` instead of guessing or stalling.
 6. Search before creating, to avoid duplicates. Write once, not in a loop: keys have per-minute and per-day write caps.
 7. On an issue you create, set `--project-id` when this checkout resolves to exactly one project, `--labels` to catalog ids from `trama workspace get` (bug, incident, security → `lb_bug`; feature, idea → `lb_feature`; tech debt → `lb_improvement`; docs → `lb_documentation`, and only when that id exists), and `--estimate` only when `settings.estimateScale` is not `none` and you can justify the number on that scale. Fibonacci is `0, 1, 2, 3, 5, 8, 13, 21`. Omit an estimate you cannot justify.
-8. Leave `--assignee-id` empty on a backlog issue. When you set `--status in_progress` and nobody is assigned, pass `whoami`'s actor id if that actor is a `user`. The server does the same on create, update and link, and does not assign an agent. Never replace an assignee who is already set.
+8. Leave `--assignee-id` empty on a backlog issue. When you set `--status in_progress` and nobody is assigned, pass `whoami`'s actor id if that actor is a `user`. The server does the same on create, update and link with an explicit `in_progress` status (linking alone never changes status), and does not assign an agent. Never replace an assignee who is already set.
 
 ## Wake up on activity
 
