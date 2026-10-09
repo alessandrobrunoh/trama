@@ -473,6 +473,55 @@ app-shell:has(.mobile-fab) #main-content [class*='overflow-y-auto']::after {
   block-size: 5.5rem;
 }
 
+/* Pull-to-refresh indicator (layout/mobile-pull-to-refresh.ts) */
+.ptr {
+  position: relative;
+  z-index: 20;
+  display: block;
+  block-size: 0;
+  flex: none;
+  pointer-events: none;
+}
+.ptr__bubble {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline-start: calc(50% - 1.125rem);
+  display: grid;
+  inline-size: 2.25rem;
+  block-size: 2.25rem;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--popover);
+  color: var(--muted-foreground);
+  box-shadow:
+    0 2px 10px rgb(0 0 0 / 0.18),
+    0 0 0 1px var(--border);
+  opacity: 0;
+}
+.ptr__bubble--settling {
+  transition:
+    transform 260ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 160ms ease-out;
+}
+.ptr__arrow {
+  transition: transform 160ms ease-out;
+}
+.ptr__spin {
+  animation: ptr-spin 0.8s linear infinite;
+}
+@keyframes ptr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (max-width: 47.999rem) {
+  #main-content {
+    overscroll-behavior-y: contain;
+  }
+}
+
+/* A bulk-action bar owns that spot while rows are selected. */
+app-shell:has([role='toolbar'][aria-label='Bulk actions']) .mobile-fab,
 html[data-keyboard='open'] .mobile-fab {
   display: none;
 }
@@ -1124,16 +1173,16 @@ html {
   }
 
   /* Command palette / search: a full-screen search page. */
-  .cdk-global-overlay-wrapper:has(hlm-dialog-content[data-variant='palette']) {
+  .cdk-global-overlay-wrapper:has(hlm-dialog-content[data-variant='palette']:has(app-command-panel)) {
     align-items: stretch !important;
     justify-content: stretch !important;
   }
-  .cdk-overlay-pane:has(hlm-dialog-content[data-variant='palette']) {
+  .cdk-overlay-pane:has(hlm-dialog-content[data-variant='palette']:has(app-command-panel)) {
     inline-size: 100%;
     max-inline-size: 100%;
     block-size: 100%;
   }
-  hlm-dialog-content[data-variant='palette'] {
+  hlm-dialog-content[data-variant='palette']:has(app-command-panel) {
     inset: 0 !important;
     inline-size: 100% !important;
     max-inline-size: none !important;
@@ -1148,11 +1197,11 @@ html {
     transform: none !important;
     animation: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1) !important;
   }
-  hlm-dialog-content[data-variant='palette'] [data-slot='command'] {
+  hlm-dialog-content[data-variant='palette']:has(app-command-panel) [data-slot='command'] {
     block-size: 100%;
     max-block-size: none;
   }
-  hlm-dialog-content[data-variant='palette'] [data-slot='command-list'] {
+  hlm-dialog-content[data-variant='palette']:has(app-command-panel) [data-slot='command-list'] {
     max-block-size: none;
     flex: 1 1 auto;
     padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
@@ -1176,6 +1225,120 @@ html {
   }
   hlm-dialog-content[data-variant='fullscreen'] > .sheet-handle {
     display: none;
+  }
+}
+
+/* ───────────────────── Swipe rows + phone lists (shared/swipe-row.ts, issue rows) ───────────────────── */
+.swipe-row {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+
+.swipe-row__content {
+  position: relative;
+  z-index: 1;
+  background: var(--background);
+  transform: translateX(var(--swipe-x, 0px));
+  transition: transform 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  touch-action: pan-y;
+}
+
+.swipe-row--dragging .swipe-row__content {
+  transition: none;
+}
+
+.swipe-row__actions {
+  position: absolute;
+  inset-block: 0;
+  display: flex;
+  overflow: hidden;
+  align-items: stretch;
+}
+
+.swipe-row__actions--start {
+  inset-inline-start: 0;
+  inline-size: max(var(--swipe-x, 0px), 0px);
+}
+
+.swipe-row__actions--end {
+  inset-inline-end: 0;
+  inline-size: max(calc(var(--swipe-x, 0px) * -1), 0px);
+}
+
+.swipe-row--dragging .swipe-row__actions {
+  transition: none;
+}
+
+.swipe-action {
+  display: flex;
+  min-inline-size: 0;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0 0.25rem;
+  border: 0;
+  color: #fff;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  touch-action: manipulation;
+}
+
+.swipe-action--blue {
+  background: #3d7be0;
+}
+.swipe-action--green {
+  background: #2f9e62;
+}
+.swipe-action--grey {
+  background: #7a7d86;
+}
+
+@media (max-width: 47.999rem) {
+  .issue-m {
+    min-block-size: 3.5rem;
+  }
+  .issue-m__tap button[data-slot='popover-trigger'] {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+    justify-content: center;
+  }
+  .issue-m__check {
+    display: grid;
+    inline-size: 2.5rem;
+    block-size: 2.75rem;
+    place-items: center;
+  }
+
+  /* The page scrolls as a whole (header folds, filter chips stick) instead of one scroller per list. */
+  #main-content > [class*='h-full'] {
+    height: auto;
+    min-height: 100%;
+  }
+  #main-content app-kanban > [role='list'] {
+    flex: none;
+    overflow: visible;
+  }
+  app-kanban [class*='sticky'] {
+    top: var(--sticky-offset, 0px);
+  }
+  app-issue-board:has([data-mobile-sticky]) {
+    --sticky-offset: 3.0625rem;
+  }
+  [data-mobile-sticky] {
+    min-block-size: 3rem;
+    scrollbar-width: none;
+  }
+  /* Filter chips: a thumb-sized row, one tap each. */
+  [data-mobile-sticky] app-picker button,
+  [data-mobile-sticky] > div > button {
+    min-block-size: 2.25rem;
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
   }
 }
 

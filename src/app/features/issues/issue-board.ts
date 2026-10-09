@@ -120,21 +120,27 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
     <!-- Filter + display toolbar -->
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6 max-md:contents">
+      <div class="relative w-full sm:w-52 max-md:border-b max-md:px-4 max-md:py-2">
+        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 max-md:left-6"></svg>
         <input
           #searchBox
           hlmInput
-          class="h-7 w-full pl-8 text-xs"
+          class="h-7 w-full pl-8 text-xs max-md:h-11 max-md:pl-9"
           placeholder="Filter by key or title…"
+          type="search"
+          enterkeyhint="search"
+          autocomplete="off"
+          autocapitalize="off"
           aria-label="Filter issues"
           [value]="search()"
           (input)="search.set($any($event.target).value)"
           (keydown.escape)="search.set(''); searchBox.blur()"
         />
       </div>
-      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain max-sm:basis-full">
+      <!-- Phones: this row sticks under the header while the list scrolls (see styles.css, [data-mobile-sticky]). -->
+      <div class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:border-b max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2" data-mobile-sticky>
+      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
         <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
@@ -242,6 +248,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             </div>
           </hlm-popover-content>
         </hlm-popover>
+      </div>
       </div>
     </div>
 
@@ -496,7 +503,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
 
     <!-- Bulk action bar -->
     @if (selection().length) {
-      <div class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
+      <div class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4 max-md:fixed max-md:bottom-[calc(3.0625rem+env(safe-area-inset-bottom)+0.5rem)]">
         <div
           class="bg-popover text-popover-foreground ring-foreground/10 pointer-events-auto flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg p-1 text-[13px] shadow-lg ring-1"
           role="toolbar"

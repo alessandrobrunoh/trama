@@ -68,7 +68,7 @@ export class KanbanLabelDirective {
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()">
+                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay">
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 }
@@ -78,10 +78,11 @@ export class KanbanLabelDirective {
         }
       </div>
     } @else {
-      <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden">
+      <!-- Phones: one column per screen, swipe sideways between them (scroll-snap). -->
+      <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden max-md:snap-x max-md:snap-mandatory max-md:scroll-px-4">
         <div class="flex h-full min-w-max gap-3 px-4 py-3 sm:px-6" cdkDropListGroup>
           @for (g of columns(); track g.key) {
-            <section class="group/col bg-muted/30 flex h-full w-[18rem] shrink-0 flex-col rounded-lg">
+            <section class="group/col bg-muted/30 flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
               <header class="flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
                 <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.items.length }}</span>
@@ -107,7 +108,7 @@ export class KanbanLabelDirective {
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [class.cursor-grab]="!disabled()">
+                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay" [class.cursor-grab]="!disabled()">
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 } @empty {
@@ -125,6 +126,8 @@ export class Kanban<T> {
   readonly columns = input.required<readonly KanbanColumn<T>[]>();
   readonly layout = input<'list' | 'board'>('board');
   readonly disabled = input(false);
+  /** Touch drags start after a short hold so swiping and scrolling keep working. */
+  protected readonly touchDelay = { touch: 280, mouse: 0 };
   /** Drop-list id prefix, unique per board on the page. */
   readonly prefix = input('kanban');
   readonly track = input<(item: T) => string>((item) => String((item as { id?: string }).id ?? ''));

@@ -16,6 +16,7 @@ import { TopBar } from './top-bar';
 import { AssistantOverlay } from '../features/ai/assistant-overlay';
 import { MobileHeader } from './mobile-header';
 import { MobileNav } from './mobile-nav';
+import { PullToRefresh } from './mobile-pull-to-refresh';
 import { Viewport } from '../core/viewport';
 
 /**
@@ -43,6 +44,7 @@ import { Viewport } from '../core/viewport';
     AssistantOverlay,
     MobileNav,
     MobileHeader,
+    PullToRefresh,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
@@ -68,6 +70,7 @@ import { Viewport } from '../core/viewport';
         <app-top-bar />
         @if (viewport.isMobile()) {
           <app-mobile-header />
+          <app-pull-to-refresh />
         }
         <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
