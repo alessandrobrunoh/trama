@@ -146,8 +146,26 @@ export function tabStatuses(tab: IssueViewTab): readonly IssueStatus[] | null {
 
 export type IssueLayout = 'list' | 'board';
 export type IssueGroup =
-  'status' | 'kind' | 'priority' | 'teamId' | 'assigneeId' | 'workstreamIds' | 'projectId' | 'none';
-export type IssueSort = 'updatedAt' | 'createdAt' | 'priority' | 'status' | 'key' | 'title';
+  | 'status'
+  | 'kind'
+  | 'priority'
+  | 'teamId'
+  | 'assigneeId'
+  | 'workstreamIds'
+  | 'projectId'
+  | 'customerId'
+  | 'customerTierId'
+  | 'none';
+export type IssueSort =
+  | 'updatedAt'
+  | 'createdAt'
+  | 'priority'
+  | 'status'
+  | 'key'
+  | 'title'
+  | 'customerCount'
+  | 'requestCount'
+  | 'customerRevenue';
 export type IssueDensity = 'comfortable' | 'compact';
 export type IssueProp = 'kind' | 'workstreams' | 'project' | 'team' | 'assignee' | 'date';
 
@@ -169,6 +187,8 @@ export const GROUPS: readonly IssueGroup[] = [
   'assigneeId',
   'workstreamIds',
   'projectId',
+  'customerId',
+  'customerTierId',
   'none',
 ];
 export const SORTS: readonly IssueSort[] = [
@@ -178,6 +198,9 @@ export const SORTS: readonly IssueSort[] = [
   'status',
   'key',
   'title',
+  'customerCount',
+  'requestCount',
+  'customerRevenue',
 ];
 export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'project', 'team', 'assignee', 'date'];
 
@@ -189,6 +212,8 @@ export const GROUP_LABEL: Record<IssueGroup, string> = {
   assigneeId: 'Assignee',
   workstreamIds: 'Workstream',
   projectId: 'Project',
+  customerId: 'Customer',
+  customerTierId: 'Customer tier',
   none: 'No grouping',
 };
 export const SORT_LABEL: Record<IssueSort, string> = {
@@ -198,6 +223,9 @@ export const SORT_LABEL: Record<IssueSort, string> = {
   status: 'Status',
   key: 'Key',
   title: 'Title',
+  customerCount: 'Customers',
+  requestCount: 'Requests',
+  customerRevenue: 'Customer revenue',
 };
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
@@ -284,6 +312,10 @@ export function groupLabel(store: NablaStore, group: IssueGroup, key: string): s
       return key ? (store.getWorkstream(key)?.title ?? 'Unknown workstream') : 'No workstream';
     case 'projectId':
       return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
+    case 'customerId':
+      return key ? (store.getCustomer(key)?.name ?? 'Unknown customer') : 'No customer';
+    case 'customerTierId':
+      return key ? (store.settings().customerTiers.find((t) => t.id === key)?.name ?? 'Unknown tier') : 'No tier';
     default:
       return 'Issues';
   }

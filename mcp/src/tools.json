@@ -524,13 +524,19 @@
   "method": "GET",
   "path": "/projects",
   "permission": "projects:read",
-  "description": "Projects: planned outcomes (Linear-style) that workstreams carry out.",
+  "description": "Projects: planned outcomes (Linear-style) that workstreams carry out. Each project carries customerCount (distinct customers who asked for it).",
   "params": {
    "status": "query string(backlog|planned|in_progress|paused|completed|canceled) Status",
    "teamId": "query string Team",
    "leadId": "query string Lead user",
    "repositoryId": "query string Repository",
-   "q": "query string Text filter"
+   "q": "query string Text filter",
+   "customerId": "query string Only projects this customer asked for",
+   "tierId": "query string Only projects a customer of this tier asked for (workspace.settings.customerTiers id)",
+   "minCustomers": "query integer At least this many distinct requesting customers",
+   "minRequests": "query integer At least this many customer requests",
+   "minRevenue": "query integer The requesting customers' annual revenue adds up to at least this (each customer counted once)",
+   "important": "query boolean true = only projects with at least one request flagged important"
   }
  },
  {
@@ -827,7 +833,7 @@
   "method": "GET",
   "path": "/issues",
   "permission": "issues:read",
-  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security).",
+  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security). Sort out demand with customerId, minCustomers, minRequests, tierId, minRevenue and important.",
   "params": {
    "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
@@ -841,7 +847,11 @@
    "milestoneId": "query string Milestone",
    "customerId": "query string Only issues linked to this customer",
    "minCustomers": "query integer At least this many distinct linked customers",
-   "q": "query string Text filter"
+   "q": "query string Text filter",
+   "minRequests": "query integer At least this many customer requests",
+   "tierId": "query string Only issues a customer of this tier asked for (workspace.settings.customerTiers id)",
+   "minRevenue": "query integer The requesting customers' annual revenue adds up to at least this (each customer counted once)",
+   "important": "query boolean true = only issues with at least one request flagged important"
   }
  },
  {
@@ -1357,7 +1367,7 @@
   "params": {
    "name": "body string! Name",
    "entity": "body string(workstream|issue|decision|project)! Entity",
-   "filters": "body object[] [{field, op, value}]",
+   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
@@ -1375,7 +1385,7 @@
    "id": "path string! View id",
    "name": "body string Name",
    "entity": "body string(workstream|issue|decision|project) Entity",
-   "filters": "body object[] [{field, op, value}]",
+   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",

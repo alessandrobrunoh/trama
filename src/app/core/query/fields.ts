@@ -2,6 +2,7 @@
 // grouped per entity, and how to read their value(s) from an item.
 import type {
   Decision,
+  Demand,
   ID,
   Issue,
   Project,
@@ -30,9 +31,14 @@ export type Queryable = EntityOf[ViewEntity];
 export interface QueryContext {
   /** Needed by an issue's `projectId` (to include the projects of its workstreams). */
   workstreamById?: ReadonlyMap<ID, Workstream>;
+  /**
+   * Customer demand per issue and project id (see `buildDemandIndex`). Needed by the customer fields of issues
+   * and projects; without it they have no value.
+   */
+  demand?: ReadonlyMap<ID, Demand>;
 }
 
-export type FieldKind = 'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date';
+export type FieldKind = 'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date' | 'number';
 
 export interface FieldDef {
   field: string;
@@ -41,13 +47,37 @@ export interface FieldDef {
   /** Fixed value set for enums (in display order). */
   values?: readonly string[];
   /** For `id` / `multi-id` fields: the NablaStore collection the ids come from. */
-  refersTo?: 'team' | 'user' | 'repository' | 'project' | 'workstream' | 'milestone' | 'actor';
+  refersTo?: 'team' | 'user' | 'repository' | 'project' | 'workstream' | 'milestone' | 'actor' | 'customer' | 'customerTier';
   sortable: boolean;
   groupable: boolean;
 }
 
 const keysByOrder = (m: Record<string, { order: number }>) =>
   Object.keys(m).sort((a, b) => m[a].order - m[b].order);
+
+
+/** Customer demand: derived from the customer requests on an issue or project (see `Demand`). */
+const DEMAND_FIELDS: readonly FieldDef[] = [
+  { field: 'customerId', label: 'Customer', kind: 'multi-id', refersTo: 'customer', sortable: false, groupable: true },
+  { field: 'customerTierId', label: 'Customer tier', kind: 'multi-id', refersTo: 'customerTier', sortable: false, groupable: true },
+  { field: 'customerCount', label: 'Customers', kind: 'number', sortable: true, groupable: false },
+  { field: 'requestCount', label: 'Requests', kind: 'number', sortable: true, groupable: false },
+  { field: 'importantCount', label: 'Important requests', kind: 'number', sortable: true, groupable: false },
+  { field: 'customerRevenue', label: 'Customer revenue', kind: 'number', sortable: true, groupable: false },
+  { field: 'customerSize', label: 'Largest customer size', kind: 'number', sortable: true, groupable: false },
+];
+
+/** The `Demand` property behind each numeric demand field. */
+const DEMAND_NUMBER: Record<string, keyof Pick<Demand, 'customerCount' | 'requestCount' | 'importantCount' | 'revenue' | 'size'>> = {
+  customerCount: 'customerCount',
+  requestCount: 'requestCount',
+  importantCount: 'importantCount',
+  customerRevenue: 'revenue',
+  customerSize: 'size',
+};
+
+const isDemandField = (field: string): boolean =>
+  field === 'customerId' || field === 'customerTierId' || field in DEMAND_NUMBER;
 
 export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
   workstream: [
@@ -78,6 +108,7 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
     { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
     { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
     { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
+    ...DEMAND_FIELDS,
   ],
   decision: [
     { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(DECISION_STATUS_META), sortable: true, groupable: true },
@@ -100,6 +131,7 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
     { field: 'name', label: 'Name', kind: 'text', sortable: true, groupable: false },
     { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
     { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
+    ...DEMAND_FIELDS,
   ],
 };
 
@@ -127,6 +159,13 @@ export function issueProjectIds(issue: Issue, workstreamById?: ReadonlyMap<ID, W
  */
 export function fieldValues(entity: ViewEntity, item: Queryable, field: string, ctx: QueryContext = {}): string[] {
   const any = item as unknown as Record<string, unknown>;
+  if ((entity === 'issue' || entity === 'project') && isDemandField(field)) {
+    const demand = ctx.demand?.get((item as Issue | Project).id);
+    if (field === 'customerId') return demand ? [...demand.customerIds] : [];
+    if (field === 'customerTierId') return demand ? [...demand.tierIds] : [];
+    // Numbers are 0 for work nobody asked for, so "at least 1" and sorting just work. No context, no value.
+    return ctx.demand ? [String(demand?.[DEMAND_NUMBER[field]] ?? 0)] : [];
+  }
   if (entity === 'workstream' && field === 'teamId') {
     const w = item as Workstream;
     return [w.ownerTeamId, ...w.participatingTeamIds];

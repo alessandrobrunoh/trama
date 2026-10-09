@@ -2,16 +2,18 @@
 // Mirrors src/app/core/query/{fields,query}.ts, with one deliberate difference: only the fields
 // listed below can be filtered, sorted or grouped on. An unknown field never falls back to the raw
 // property, so a crafted view cannot be used to probe columns the view does not display.
-import type { ViewEntity, ViewFilter } from '../contracts/domain.js';
+import type { Demand, ViewEntity, ViewFilter } from '../contracts/domain.js';
 
 type Row = Record<string, unknown>;
-type FieldKind = 'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date';
+type FieldKind = 'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date' | 'number';
 export type RefKind = 'team' | 'user' | 'project' | 'workstream';
 
 interface FieldSpec {
   kind: FieldKind;
   refersTo?: RefKind;
   values?: readonly string[];
+  /** `false`: the field may filter and sort but never group, because group labels would name what the ids stand for. */
+  groupable?: false;
 }
 
 const PRIORITIES = ['urgent', 'high', 'medium', 'low', 'none'];
@@ -22,6 +24,28 @@ const refs = (refersTo: RefKind): FieldSpec => ({ kind: 'multi-id', refersTo });
 const text: FieldSpec = { kind: 'text' };
 const date: FieldSpec = { kind: 'date' };
 const tags: FieldSpec = { kind: 'tags' };
+const count: FieldSpec = { kind: 'number' };
+
+/**
+ * Customer demand on issues and projects (derived from the customer requests, see `Demand`). It can filter and
+ * sort a public view but never group it, and nothing about a customer (name, tier name) is ever returned.
+ */
+const DEMAND_FIELDS: Record<string, FieldSpec> = {
+  customerId: { kind: 'multi-id', groupable: false },
+  customerTierId: { kind: 'multi-id', groupable: false },
+  customerCount: count,
+  requestCount: count,
+  importantCount: count,
+  customerRevenue: count,
+  customerSize: count,
+};
+const DEMAND_NUMBER = {
+  customerCount: 'customerCount',
+  requestCount: 'requestCount',
+  importantCount: 'importantCount',
+  customerRevenue: 'revenue',
+  customerSize: 'size',
+} as const;
 
 /** Queryable fields per entity; enum values are in display order. */
 export const VIEW_FIELDS: Record<ViewEntity, Record<string, FieldSpec>> = {
@@ -53,6 +77,7 @@ export const VIEW_FIELDS: Record<ViewEntity, Record<string, FieldSpec>> = {
     title: text,
     createdAt: date,
     updatedAt: date,
+    ...DEMAND_FIELDS,
   },
   decision: {
     status: enumOf(['draft', 'proposed', 'accepted', 'superseded', 'rejected']),
@@ -75,12 +100,15 @@ export const VIEW_FIELDS: Record<ViewEntity, Record<string, FieldSpec>> = {
     name: text,
     createdAt: date,
     updatedAt: date,
+    ...DEMAND_FIELDS,
   },
 };
 
 export interface QueryContext {
   /** Workstream id -> its project id, so an issue's `projectId` also counts its workstreams' projects. */
   workstreamProjects?: ReadonlyMap<string, string | null>;
+  /** Customer demand per issue and project id; without it the customer fields have no value. */
+  demand?: ReadonlyMap<string, Demand>;
 }
 
 const asArray = (v: string | string[]): string[] => (Array.isArray(v) ? v : [v]);
@@ -95,6 +123,13 @@ function toStrings(raw: unknown): string[] {
 /** All values of `field` on `item` as strings (empty = no value). Unknown fields have no value. */
 export function fieldValues(entity: ViewEntity, item: Row, field: string, ctx: QueryContext = {}): string[] {
   if (!Object.hasOwn(VIEW_FIELDS[entity], field)) return [];
+  if (Object.hasOwn(DEMAND_FIELDS, field)) {
+    const demand = ctx.demand?.get(String(item['id']));
+    if (field === 'customerId') return demand ? [...demand.customerIds] : [];
+    if (field === 'customerTierId') return demand ? [...demand.tierIds] : [];
+    // Numbers are 0 for work nobody asked for; without a demand map there is no value at all.
+    return ctx.demand ? [String(demand?.[DEMAND_NUMBER[field as keyof typeof DEMAND_NUMBER]] ?? 0)] : [];
+  }
   if (entity === 'workstream' && field === 'teamId') {
     return [...toStrings(item['ownerTeamId']), ...toStrings(item['participatingTeamIds'])];
   }
@@ -130,8 +165,16 @@ export function matchesFilter(entity: ViewEntity, item: Row, filter: ViewFilter,
       return values.length > 0 && values[0] < want[0];
     case 'after':
       return values.length > 0 && values[0] > want[0];
+    case 'gte':
+    case 'lte': {
+      const have = Number(values[0]);
+      const limit = Number(want[0]);
+      if (values.length === 0 || Number.isNaN(have) || Number.isNaN(limit)) return false;
+      return filter.op === 'gte' ? have >= limit : have <= limit;
+    }
     default:
-      return true;
+      // An operator this server does not know must never widen what an anonymous reader sees.
+      return false;
   }
 }
 
@@ -178,7 +221,9 @@ export interface Group<T> {
 
 /** Group by a field (multi-valued fields place an item in each group); the "no value" group is last. */
 export function groupItems<T extends Row>(entity: ViewEntity, items: readonly T[], groupBy: string | null | undefined, ctx: QueryContext = {}): Group<T>[] {
-  if (!groupBy || !Object.hasOwn(VIEW_FIELDS[entity], groupBy)) return [{ key: '', items: items.slice() }];
+  if (!groupBy || !Object.hasOwn(VIEW_FIELDS[entity], groupBy) || VIEW_FIELDS[entity][groupBy].groupable === false) {
+    return [{ key: '', items: items.slice() }];
+  }
   const map = new Map<string, T[]>();
   for (const item of items) {
     const keys = fieldValues(entity, item, groupBy, ctx);

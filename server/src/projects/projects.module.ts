@@ -1,13 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectEntity } from '../database/entities/index.js';
+import { CustomersModule } from '../customers/customers.module.js';
 import { ProjectContextController } from './project-context.controller.js';
 import { ProjectContextService } from './project-context.service.js';
 import { ProjectsController } from './projects.controller.js';
 import { ProjectsService } from './projects.service.js';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ProjectEntity])],
+  imports: [TypeOrmModule.forFeature([ProjectEntity]), CustomersModule],
   controllers: [ProjectsController, ProjectContextController],
   providers: [ProjectsService, ProjectContextService],
   exports: [ProjectsService, ProjectContextService],

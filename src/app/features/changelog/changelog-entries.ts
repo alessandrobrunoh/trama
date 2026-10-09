@@ -11,6 +11,33 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: '2026-10-09',
+    title: 'Customers: see who is waiting on what',
+    summary: 'A customer list and page built around demand, demand filters on issues, projects and views, and a bell that tells you when a request is delivered.',
+    changes: [
+      {
+        kind: 'new',
+        text: 'Customers list with revenue, size, tier, requests, important requests and what is still waiting. Sort, group by tier or status, filter, and keep your cuts while you navigate.',
+      },
+      {
+        kind: 'new',
+        text: 'Customer page with requests (waiting, delivered, important), the work they asked for grouped your way, and an activity timeline.',
+      },
+      {
+        kind: 'new',
+        text: 'Follow a customer to be told when a request is added, flagged important or delivered, when the issue is done or the project completed. Whoever recorded a request hears about its delivery too.',
+      },
+      {
+        kind: 'new',
+        text: 'Filter and sort issues, projects and saved views by customer, tier, number of customers or requests, revenue and size. Issue, project and workstream pages show who is waiting.',
+      },
+      {
+        kind: 'new',
+        text: 'Create a customer or a customer request from the command menu, and pin customers to your favorites. The same filters are available in the API and the MCP tools.',
+      },
+    ],
+  },
+  {
     date: '2026-10-08',
     title: 'Projects, separate from repositories',
     summary: 'Plan outcomes as projects, carry them out with workstreams, and keep repositories in their own section.',

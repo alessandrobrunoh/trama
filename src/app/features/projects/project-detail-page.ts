@@ -55,7 +55,9 @@ import { labelOptions, priorityOptions, repoOptions, teamOptions, userOptions } 
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
+import { projectWorkState } from '../customers/customer-model';
 import { CustomerRequests } from '../customers/customer-requests';
+import { DemandSummary } from '../customers/demand-summary';
 import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectHealthBadge } from './project-health';
@@ -92,6 +94,7 @@ const ACTIVITY_CAP = 20;
     CommentThread,
     EditableMarkdown,
     CustomerRequests,
+    DemandSummary,
     InlineText,
     Picker,
     WsDatePicker,
@@ -340,6 +343,7 @@ const ACTIVITY_CAP = 20;
                 <app-project-issue-suggestions [project]="p" />
               }
 
+              <app-demand-summary [demand]="store.demand().get(p.id)" [state]="workState(p.status)" />
               <app-customer-requests [projectId]="p.id" />
 
               <app-project-milestones [project]="p" />
@@ -593,7 +597,8 @@ export class ProjectDetailPage {
   /** `?tab=` query param (bound by the router), default overview. */
   readonly tab = input<string>();
 
-  private readonly store = inject(NablaStore);
+  protected readonly store = inject(NablaStore);
+  protected readonly workState = projectWorkState;
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
 

@@ -9,7 +9,7 @@ import { MAX_GRANTS, ViewsService } from './views.service.js';
 
 const ENTITIES = [...VIEW_ENTITIES];
 const LAYOUTS = [...VIEW_LAYOUTS];
-const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after'];
+const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after', 'gte', 'lte'];
 
 /** A filter value is a string or a list of strings; anything else breaks the evaluators (client and public link). */
 const IsFilterValue = () =>

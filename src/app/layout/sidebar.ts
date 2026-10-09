@@ -51,6 +51,7 @@ import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
+import { CustomerAvatar } from '../features/customers/customer-avatar';
 import { ProjectGlyph } from '../features/projects/project-glyph';
 import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
 
@@ -74,6 +75,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
     ActorAvatar,
     StatusIcon,
     ProjectGlyph,
+    CustomerAvatar,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -178,6 +180,9 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
                       }
                       @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
                       @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                      @case ('customer') {
+                        @if (store.getCustomer(e.subjectId); as cu) { <app-customer-avatar [customer]="cu" [size]="14" /> }
+                      }
                     }
                     <span class="flex-1 truncate">{{ e.label }}</span>
                   </a>

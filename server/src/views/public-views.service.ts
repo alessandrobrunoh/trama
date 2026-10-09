@@ -1,8 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
+import { buildDemandIndex, mergeDemand, type CustomerRequest, type Demand } from '../contracts/domain.js';
 import type { PublicView, PublicViewGroup, PublicViewItem, ViewEntity } from '../contracts/domain.js';
 import {
+  CustomerEntity,
+  CustomerRequestEntity,
   DecisionEntity,
   IssueEntity,
   MembershipEntity,
@@ -53,6 +56,9 @@ export class PublicViewsService {
       const ws = await this.ds.getRepository(WorkstreamEntity).find({ where: { workspaceId }, select: { id: true, projectId: true } });
       ctx.workstreamProjects = new Map(ws.map((w) => [w.id, w.projectId]));
     }
+    if (entity === 'issue' || entity === 'project') {
+      ctx.demand = await this.demandFor(workspaceId, entity, rows);
+    }
 
     const sort = view.sort ?? (view.layout === 'timeline' ? { field: 'startDate', direction: 'asc' as const } : null);
     const matched = sortItems(entity, applyFilters(entity, rows, view.filters, ctx), sort, ctx);
@@ -80,6 +86,45 @@ export class PublicViewsService {
       truncated: matched.length > kept.length,
       generatedAt: new Date().toISOString(),
     };
+  }
+
+  /** Customer demand per issue or project of the workspace (a project counts the requests on its issues too). */
+  private async demandFor(workspaceId: string, entity: 'issue' | 'project', rows: readonly Row[]): Promise<Map<string, Demand>> {
+    const requests = await this.ds.getRepository(CustomerRequestEntity).find({ where: { workspaceId } });
+    if (!requests.length) return new Map();
+    const customers = new Map(
+      (await this.ds.getRepository(CustomerEntity).find({ where: { workspaceId } })).map((c) => [
+        c.id,
+        { tierId: c.tierId ?? undefined, revenue: c.revenue ?? undefined, size: c.size ?? undefined },
+      ]),
+    );
+    const own = buildDemandIndex(
+      requests.map((r) => ({ ...r, issueId: r.issueId ?? undefined, projectId: r.projectId ?? undefined }) as unknown as CustomerRequest),
+      customers,
+    );
+    if (entity === 'issue') return own;
+    // A project also counts the requests on its issues: planned under it, or linked to one of its workstreams.
+    const workstreams = await this.ds.getRepository(WorkstreamEntity).find({ where: { workspaceId }, select: { id: true, projectId: true } });
+    const projectOf = new Map(workstreams.map((w) => [w.id, w.projectId]));
+    const issues = await this.ds.getRepository(IssueEntity).find({ where: { workspaceId }, select: { id: true, projectId: true, workstreamIds: true } });
+    const byProject = new Map<string, Demand[]>();
+    for (const issue of issues) {
+      const demand = own.get(issue.id);
+      if (!demand) continue;
+      const targets = new Set<string>(issue.projectId ? [issue.projectId] : []);
+      for (const w of issue.workstreamIds) {
+        const p = projectOf.get(w);
+        if (p) targets.add(p);
+      }
+      for (const p of targets) byProject.set(p, [...(byProject.get(p) ?? []), demand]);
+    }
+    const out = new Map<string, Demand>();
+    for (const row of rows) {
+      const id = String(row['id']);
+      const parts = [own.get(id), ...(byProject.get(id) ?? [])].filter((d): d is Demand => !!d);
+      if (parts.length) out.set(id, mergeDemand(parts, customers));
+    }
+    return out;
   }
 
   private async rowsOf(entity: ViewEntity, workspaceId: string): Promise<Row[]> {

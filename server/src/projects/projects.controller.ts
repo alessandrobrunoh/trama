@@ -1,9 +1,11 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
-import { ArrayMaxSize, IsArray, IsIn, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, Max, Min, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import { PROJECT_STATUSES, type ActorRef, type Priority, type ProjectStatus } from '../contracts/domain.js';
+import { CUSTOMER_REVENUE_MAX, PROJECT_STATUSES, type ActorRef, type Priority, type ProjectStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { PROJECT_ICON_MAX, PROJECT_ICON_PATTERN } from './project-icon.js';
+import { CustomersService } from '../customers/customers.service.js';
 import { ProjectsService } from './projects.service.js';
 
 const PRIORITIES: Priority[] = ['none', 'urgent', 'high', 'medium', 'low'];
@@ -49,20 +51,40 @@ class ListProjectsQuery {
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsString() q?: string;
+  /** Only projects this customer asked for. */
+  @IsOptional() @IsString() @MaxLength(100) customerId?: string;
+  /** Only projects a customer of this tier asked for. */
+  @IsOptional() @IsString() @MaxLength(100) tierId?: string;
+  /** At least this many distinct requesting customers. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) minCustomers?: number;
+  /** At least this many customer requests. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) minRequests?: number;
+  /** The requesting customers' revenue adds up to at least this. */
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(CUSTOMER_REVENUE_MAX) minRevenue?: number;
+  /** `true`: only projects with at least one request flagged important. */
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @IsBoolean()
+  important?: boolean;
 }
 
 @Controller('w/:slug/projects')
 export class ProjectsController {
-  constructor(private readonly service: ProjectsService) {}
+  constructor(
+    private readonly service: ProjectsService,
+    private readonly customers: CustomersService,
+  ) {}
 
   @Get()
-  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListProjectsQuery) {
-    return this.service.list(ctx.workspace.id, q);
+  async list(@Ctx() ctx: WorkspaceContext, @Query() q: ListProjectsQuery) {
+    return this.customers.attachProjectCounts(ctx.workspace.id, await this.service.list(ctx.workspace.id, q));
   }
 
   @Get(':id')
-  get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    return this.service.get(ctx.workspace.id, id);
+  async get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
+    const row = await this.service.get(ctx.workspace.id, id);
+    await this.customers.attachProjectCounts(ctx.workspace.id, [row]);
+    return row;
   }
 
   @Post()

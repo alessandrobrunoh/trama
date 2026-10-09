@@ -9,6 +9,8 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { Clipboard, NablaStore, Notifier, isDeltaThreadUrl, type Workstream } from '../../core';
 import { RelativeTimePipe } from '../../shared/pipes';
+import { DemandSummary } from '../customers/demand-summary';
+import type { RequestState } from '../customers/customer-model';
 import { WsSideCards } from '../milestones/ws-side-cards';
 import { WsProjectMilestones } from '../milestones/ws-project-milestones';
 import { CommentThread } from './comments';
@@ -36,6 +38,7 @@ import { WsProperties } from './ws-properties';
     WsDependencies,
     WsInputRequests,
     WsIssuesSection,
+    DemandSummary,
     WsProjectMilestones,
     WsSideCards,
     WsProperties,
@@ -67,6 +70,8 @@ import { WsProperties } from './ws-properties';
         </section>
 
         <app-ws-project-milestones [ws]="ws()" />
+
+        <app-demand-summary [demand]="store.demand().get(ws().id)" [state]="demandState()" />
 
         <app-ws-issues-section [ws]="ws()" />
 
@@ -179,6 +184,11 @@ export class WsOverviewTab {
   protected readonly pencil = LucidePencil;
   protected readonly comments = LucideMessagesSquare;
   protected readonly canEdit = computed(() => this.store.can('member'));
+  /** Customers wait on a workstream until it ships; canceled work delivers nothing. */
+  protected readonly demandState = computed<RequestState>(() => {
+    const status = this.ws().status;
+    return status === 'shipped' ? 'delivered' : status === 'canceled' ? 'dropped' : 'open';
+  });
 
   protected readonly editingDelta = signal(false);
   protected readonly deltaDraft = signal('');

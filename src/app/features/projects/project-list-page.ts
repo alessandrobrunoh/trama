@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { PROJECT_HEALTH_META, NablaStore, UiStore } from '../../core';
+import { PROJECT_HEALTH_META, NablaStore, UiStore, applyFilters, sortItems, type Project, type ViewFilter } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -11,6 +11,8 @@ import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
+import { compactNumber, describeDemand } from '../customers/customer-model';
+import { DemandFilters } from '../customers/demand-filters';
 import { Picker } from '../workstreams/picker';
 import { teamOptions } from '../workstreams/ws-model';
 import { ProjectGlyph } from './project-glyph';
@@ -26,6 +28,8 @@ import {
 
 const NO_UPDATES = 'none';
 
+type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount';
+
 @Component({
   selector: 'app-project-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,6 +40,7 @@ const NO_UPDATES = 'none';
     LucideDynamicIcon,
     PageHeader,
     Picker,
+    DemandFilters,
     Kbd,
     EmptyState,
     TopBarActions,
@@ -104,6 +109,7 @@ const NO_UPDATES = 'none';
           [value]="teamFilter()"
           (valueChange)="teamFilter.set($event)"
         />
+        <app-demand-filters [filters]="demandFilters()" (filtersChange)="demandFilters.set($event)" />
         @if (hasFilters()) {
           <button
             hlmBtn
@@ -116,6 +122,21 @@ const NO_UPDATES = 'none';
           </button>
         }
       </div>
+      @if (store.customerRequests().length) {
+        <label class="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
+          Sort
+          <select
+            class="border-input bg-background text-foreground h-7 rounded-md border px-1.5 text-xs"
+            aria-label="Sort projects"
+            [value]="sort()"
+            (change)="sort.set($any($event.target).value)"
+          >
+            @for (o of sorts; track o.value) {
+              <option [value]="o.value">{{ o.label }}</option>
+            }
+          </select>
+        </label>
+      }
     </div>
 
     @if (total() === 0) {
@@ -150,6 +171,9 @@ const NO_UPDATES = 'none';
           <span class="w-24">Updated</span>
           <span class="w-32">Lead</span>
           <span class="w-28">Target</span>
+          @if (showCustomers()) {
+            <span class="w-24 text-right">Customers</span>
+          }
           <span class="w-20 text-right">Repos</span>
         </div>
         @for (row of rows(); track row.project.id) {
@@ -200,6 +224,15 @@ const NO_UPDATES = 'none';
               >
                 {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
               </span>
+              @if (showCustomers()) {
+                <span class="w-24 text-right whitespace-nowrap tabular-nums max-md:w-auto" [title]="row.demandText">
+                  @if (row.demand; as d) {
+                    {{ d.customerCount }}<span class="text-muted-foreground"> · {{ compact(d.revenue) }}</span>
+                  } @else {
+                    <span class="text-muted-foreground">—</span>
+                  }
+                </span>
+              }
               <span class="w-20 text-right whitespace-nowrap tabular-nums max-md:w-auto">
                 {{ p.repositoryIds.length
                 }}<span class="md:hidden">
@@ -217,7 +250,7 @@ export class ProjectListPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  protected readonly store = inject(NablaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 
@@ -236,6 +269,17 @@ export class ProjectListPage {
   protected readonly statusFilter = this.listState.remember<string[]>('projects.status', []);
   protected readonly healthFilter = this.listState.remember<string[]>('projects.health', []);
   protected readonly teamFilter = this.listState.remember<string[]>('projects.team', []);
+  protected readonly demandFilters = this.listState.remember<ViewFilter[]>('projects.demand', []);
+  protected readonly sort = this.listState.remember<ProjectSort>('projects.sort', 'name');
+  protected readonly sorts: { value: ProjectSort; label: string }[] = [
+    { value: 'name', label: 'Name' },
+    { value: 'customerCount', label: 'Most customers' },
+    { value: 'customerRevenue', label: 'Most revenue' },
+    { value: 'requestCount', label: 'Most requests' },
+  ];
+  protected readonly compact = compactNumber;
+  /** The customers column appears once any customer has asked for something. */
+  protected readonly showCustomers = computed(() => this.store.demand().size > 0);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
@@ -246,7 +290,8 @@ export class ProjectListPage {
       !!this.search().trim() ||
       this.statusFilter().length > 0 ||
       this.healthFilter().length > 0 ||
-      this.teamFilter().length > 0,
+      this.teamFilter().length > 0 ||
+      this.demandFilters().length > 0,
   );
 
   protected readonly rows = computed(() => {
@@ -255,9 +300,15 @@ export class ProjectListPage {
     const teams = new Set(this.teamFilter());
     const healths = new Set(this.healthFilter());
     const users = this.store.userById();
+    const demand = this.store.demand();
+    const ctx = { demand };
+    const sort = this.sort();
+    const matching = applyFilters('project', this.store.projects(), this.demandFilters(), ctx);
+    // "Most customers / revenue / requests" first; the others stay as before (open first, then by name).
+    const ordered: readonly Project[] =
+      sort === 'name' ? matching : sortItems('project', matching, { field: sort, direction: 'desc' }, ctx);
     return (
-      this.store
-        .projects()
+      ordered
         .filter((p) => {
           if (statuses.size && !statuses.has(p.status)) return false;
           if (healths.size && !healths.has(p.health ?? NO_UPDATES)) return false;
@@ -265,14 +316,16 @@ export class ProjectListPage {
           return !q || `${p.name} ${p.summary ?? ''}`.toLowerCase().includes(q);
         })
         .slice()
-        // Open projects first, then by name.
-        .sort((a, b) => Number(isClosed(a)) - Number(isClosed(b)) || a.name.localeCompare(b.name))
+        // Open projects first, then by name (or by demand when asked).
+        .sort((a, b) => (sort === 'name' ? Number(isClosed(a)) - Number(isClosed(b)) || a.name.localeCompare(b.name) : 0))
         .map((project) => ({
           project,
           status: PROJECT_STATUS_META[project.status],
           lead: project.leadId ? users.get(project.leadId)?.name : undefined,
           overdue: isOverdue(project),
           updateOverdue: isUpdateOverdue(project),
+          demand: demand.get(project.id),
+          demandText: demand.has(project.id) ? describeDemand(demand.get(project.id)!) : '',
         }))
     );
   });
@@ -292,5 +345,6 @@ export class ProjectListPage {
     this.statusFilter.set([]);
     this.healthFilter.set([]);
     this.teamFilter.set([]);
+    this.demandFilters.set([]);
   }
 }

@@ -78,7 +78,7 @@ export class SnapshotService {
       agents,
       teams,
       repositories,
-      projects,
+      projects: await this.customers.attachProjectCounts(workspaceId, projects),
       workstreams,
       milestones,
       inputRequests,

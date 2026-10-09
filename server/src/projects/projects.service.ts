@@ -6,6 +6,7 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
 import { ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { demandConditions, type DemandFilter } from '../customers/demand-filter.js';
 import { LabelsService } from '../workspaces/labels.service.js';
 import { isProjectIcon } from './project-icon.js';
 
@@ -26,7 +27,7 @@ export interface ProjectInput {
   targetDate?: string | null;
 }
 
-export interface ProjectFilter {
+export interface ProjectFilter extends DemandFilter {
   status?: ProjectStatus;
   teamId?: string;
   leadId?: string;
@@ -55,6 +56,7 @@ export class ProjectsService {
     if (f.leadId) qb.andWhere('p.leadId = :leadId', { leadId: f.leadId });
     if (f.teamId) qb.andWhere('p.teamIds @> :tid::jsonb', { tid: JSON.stringify([f.teamId]) });
     if (f.repositoryId) qb.andWhere('p.repositoryIds @> :rid::jsonb', { rid: JSON.stringify([f.repositoryId]) });
+    for (const c of demandConditions('p', 'projectId', f)) qb.andWhere(c.sql, c.params);
     if (f.q) qb.andWhere('p.name ILIKE :q', { q: `%${f.q}%` });
     return qb.getMany();
   }

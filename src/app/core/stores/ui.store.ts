@@ -10,6 +10,7 @@ export type ModalKind =
   | 'shortcuts'
   | 'customize-sidebar'
   | 'create'
+  | 'customer'
   | 'confirm-delete'
   | null;
 
@@ -33,6 +34,11 @@ export type CreateKind =
   | 'repository'
   | 'project'
   | 'input-request';
+
+/** What the customer dialog does: add a customer, or record a request (optionally prefilled with who and where). */
+export type CustomerDialogState =
+  | { kind: 'customer' }
+  | { kind: 'request'; customerId?: string; issueId?: string; projectId?: string };
 
 /** Prefill for the create dialog, e.g. `{ workstreamId }`, `{ ownerTeamId }`, `{ kind: 'bug' }`. */
 export type CreateDefaults = Record<string, unknown>;
@@ -102,6 +108,7 @@ export class UiStore {
   );
   readonly mobileSidebarOpen = signal(false);
   readonly modal = signal<ModalKind>(null);
+  readonly customerDialog = signal<CustomerDialogState>({ kind: 'customer' });
   readonly createKind = signal<CreateKind>('workstream');
   readonly createDefaults = signal<CreateDefaults>({});
   readonly confirmDelete = signal<ConfirmDeleteState | null>(null);
@@ -184,6 +191,11 @@ export class UiStore {
     this.createKind.set(kind);
     this.createDefaults.set(defaults);
     this.openModal('create');
+  }
+  /** Open the dialog that adds a customer or records a customer request. */
+  openCustomerDialog(state: CustomerDialogState): void {
+    this.customerDialog.set(state);
+    this.openModal('customer');
   }
   /** Opens the confirm dialog (or closes it when `state` is null). */
   setConfirmDelete(state: ConfirmDeleteState | null): void {

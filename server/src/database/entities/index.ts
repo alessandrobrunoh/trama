@@ -241,6 +241,8 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
+  /** Filled on read. Not a column. */
+  customerCount?: number;
 }
 
 @Entity('project_updates')
@@ -456,6 +458,25 @@ export class CustomerRequestEntity extends Wire {
   @Column({ type: 'jsonb' }) createdBy: ActorRef;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+}
+
+/** A person following a customer: told about new, important and delivered requests. Private to them. */
+@Entity('customer_subscriptions')
+@Index('UQ_customer_subscriptions_pair', ['customerId', 'userId'], { unique: true })
+@Index('IDX_customer_subscriptions_user', ['workspaceId', 'userId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
+export class CustomerSubscriptionEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) customerId: string;
+  @Column({ type: 'varchar' }) userId: string;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['userId'];
+  }
 }
 
 // ───────────────────────────── artifacts / decisions / dependencies ─────────────────────────────
@@ -846,6 +867,7 @@ export const ENTITIES = [
   IssueEntity,
   CustomerEntity,
   CustomerRequestEntity,
+  CustomerSubscriptionEntity,
   ArtifactEntity,
   DecisionEntity,
   DependencyEntity,

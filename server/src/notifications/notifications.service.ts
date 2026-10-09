@@ -5,6 +5,8 @@ import { uid } from '../common/util.js';
 import {
   NOTIFICATION_KINDS,
   resolveNotificationSettings,
+  isIssueDelivered,
+  isProjectDelivered,
   type ActorRef,
   type NotificationChannels,
   type NotificationKind,
@@ -12,11 +14,15 @@ import {
 } from '../contracts/domain.js';
 import {
   AgentEntity,
+  CustomerEntity,
+  CustomerRequestEntity,
+  CustomerSubscriptionEntity,
   DecisionEntity,
   DomainEventEntity,
   IssueEntity,
   MembershipEntity,
   NotificationEntity,
+  ProjectEntity,
   TeamEntity,
   UserEntity,
   WorkspaceEntity,
@@ -115,13 +121,36 @@ export class NotificationsService implements OnModuleInit {
       event.type === 'review.requested' ||
       event.type === 'artifact.updated' ||
       event.type === 'comment.created' ||
-      event.type === 'workstream.status_changed';
+      event.type === 'workstream.status_changed' ||
+      event.type === 'customer_request.linked' ||
+      event.type === 'customer_request.updated' ||
+      event.type === 'issue.status_changed' ||
+      event.type === 'project.status_changed';
     if (!interesting) return null;
+    if (event.type === 'customer_request.updated' && event.data['important'] !== true) return null;
+    if (event.type === 'issue.status_changed' && !isIssueDelivered(String(event.data['to']))) return null;
+    if (event.type === 'project.status_changed' && !isProjectDelivered(String(event.data['to']))) return null;
     if (event.type === 'issue.updated' && !(event.data['assignee'] as { to?: unknown } | undefined)?.to) return null;
     if (event.type === 'issue.created' && !event.data['assigneeId']) return null;
 
     const { workspaceId, subject } = event;
     const rule: RuleContext = { event, actorName: await this.actorName(event.actor) };
+
+    if (event.type.startsWith('customer_request.')) {
+      const customerId = event.data['customerId'];
+      if (typeof customerId !== 'string') return null;
+      const customer = await this.ds.getRepository(CustomerEntity).findOneBy({ workspaceId, id: customerId });
+      if (!customer) return null;
+      rule.customer = { id: customer.id, name: customer.name, subscriberIds: await this.followers(workspaceId, [customer.id]) };
+      return rule;
+    }
+    if (event.type === 'issue.status_changed' || event.type === 'project.status_changed') {
+      const isIssue = event.type === 'issue.status_changed';
+      const delivery = await this.delivery(workspaceId, isIssue ? 'issue' : 'project', subject.id);
+      if (!delivery) return null;
+      rule.delivery = delivery;
+      return rule;
+    }
 
     if (subject.type === 'issue') {
       const issue = await this.ds.getRepository(IssueEntity).findOneBy({ workspaceId, id: subject.id });
@@ -139,6 +168,51 @@ export class NotificationsService implements OnModuleInit {
         (await this.ds.getRepository(WorkstreamEntity).findOneBy({ workspaceId, id: workstreamId })) ?? undefined;
     }
     return rule;
+  }
+
+  /** Of the given customers, who follows each one. */
+  private async followers(workspaceId: string, customerIds: string[]): Promise<string[]> {
+    const rows = await this.ds
+      .getRepository(CustomerSubscriptionEntity)
+      .find({ where: { workspaceId, customerId: In(customerIds) } });
+    return [...new Set(rows.map((r) => r.userId))];
+  }
+
+  /** The customers behind an issue or project that was just delivered; null when nobody asked for it. */
+  private async delivery(
+    workspaceId: string,
+    type: 'issue' | 'project',
+    id: string,
+  ): Promise<RuleContext['delivery'] | null> {
+    const requests = await this.ds
+      .getRepository(CustomerRequestEntity)
+      .find({ where: { workspaceId, ...(type === 'issue' ? { issueId: id } : { projectId: id }) } });
+    if (!requests.length) return null;
+    let label: string;
+    let link: string;
+    if (type === 'issue') {
+      const issue = await this.ds.getRepository(IssueEntity).findOneBy({ workspaceId, id });
+      if (!issue) return null;
+      label = `${issue.key}: ${issue.title}`;
+      link = `issues/${issue.key}`;
+    } else {
+      const project = await this.ds.getRepository(ProjectEntity).findOneBy({ workspaceId, id });
+      if (!project) return null;
+      label = project.name;
+      link = `projects/${project.id}`;
+    }
+    const customerIds = [...new Set(requests.map((r) => r.customerId))];
+    const customers = await this.ds.getRepository(CustomerEntity).find({ where: { workspaceId, id: In(customerIds) } });
+    const subs = await this.ds
+      .getRepository(CustomerSubscriptionEntity)
+      .find({ where: { workspaceId, customerId: In(customerIds) } });
+    return {
+      target: { type, id, label, link },
+      customers: customers
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map((c) => ({ id: c.id, name: c.name, subscriberIds: subs.filter((s) => s.customerId === c.id).map((s) => s.userId) })),
+      requesterIds: [...new Set(requests.flatMap((r) => (r.createdBy.type === 'user' && r.createdBy.id ? [r.createdBy.id] : [])))],
+    };
   }
 
   /** Applies the person's settings and membership, stores the notification and emails it if asked. */

@@ -20,6 +20,7 @@ import {
   ProjectEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
+import { demandScope } from './demand-filter.js';
 import { EventsService } from '../events/events.service.js';
 
 export interface CustomerInput {
@@ -309,6 +310,7 @@ export class CustomersService {
         customerId,
         customer: customer.name,
         important: row.important,
+        ...(row.body ? { excerpt: row.body.slice(0, 200) } : {}),
         ...(issue ? { issueId: issue.id, issueKey: issue.key } : {}),
         ...(project ? { projectId: project.id, project: project.name } : {}),
       },
@@ -388,6 +390,21 @@ export class CustomersService {
     const counts = new Map(rows.map((r) => [r.id, Number(r.n)]));
     for (const issue of issues) issue.customerCount = counts.get(issue.id) ?? 0;
     return issues;
+  }
+
+  /** Sets `customerCount` (including 0) on project rows about to be serialized: its own requests plus those on its issues. */
+  async attachProjectCounts(workspaceId: string, projects: { id: string; customerCount?: number }[]) {
+    if (!projects.length) return projects;
+    const rows = await this.ds.query<{ id: string; n: number }[]>(
+      `SELECT p.id AS id,
+              (SELECT COUNT(DISTINCT cr."customerId") FROM customer_requests cr WHERE ${demandScope('p', 'projectId')})::int AS n
+       FROM projects p
+       WHERE p."workspaceId" = $1 AND p.id = ANY($2)`,
+      [workspaceId, projects.map((p) => p.id)],
+    );
+    const counts = new Map(rows.map((r) => [r.id, Number(r.n)]));
+    for (const project of projects) project.customerCount = counts.get(project.id) ?? 0;
+    return projects;
   }
 
   // ───────────────────────────── validation ─────────────────────────────
