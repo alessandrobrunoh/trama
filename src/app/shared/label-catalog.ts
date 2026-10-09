@@ -15,6 +15,10 @@ export interface LabelUsage {
 export const NO_USAGE: LabelUsage = { issues: 0, workstreams: 0, projects: 0, repositories: 0, total: 0 };
 
 const RECENT_MAX = 4;
+/** Labels offered as suggestions when nothing is typed. */
+const SUGGESTED_MAX = 4;
+/** Below this many labels a "suggested" group only repeats the list. */
+const SUGGEST_FROM = 8;
 const recentKey = (slug: string | null) => `trama.labels.recent.${slug ?? ''}`;
 
 /** "12 issues · 3 workstreams"; "Not used" when nothing carries the label. */
@@ -88,6 +92,29 @@ export class LabelCatalog {
 
   usageOf(id: string): LabelUsage {
     return this.usage().get(id) ?? NO_USAGE;
+  }
+
+  /**
+   * The labels to offer, in the one order every label list uses (picker and the `L` command list):
+   * `suggested` (recent picks, then the most used, only in a long list) and `rest` (alphabetical).
+   * Archived labels appear only when `keep` holds them, so they can be unticked.
+   */
+  arrange(keep: ReadonlySet<string> = new Set(), withSuggested = true): { suggested: WorkspaceLabel[]; rest: WorkspaceLabel[] } {
+    const offered = this.all()
+      .filter((label) => !label.archived || keep.has(label.id))
+      .sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+    const suggested: WorkspaceLabel[] = [];
+    if (withSuggested && offered.length >= SUGGEST_FROM) {
+      const byId = new Map(offered.map((label) => [label.id, label]));
+      const add = (label?: WorkspaceLabel) => {
+        if (label && !label.archived && !suggested.includes(label) && suggested.length < SUGGESTED_MAX) suggested.push(label);
+      };
+      for (const id of this.recent()) add(byId.get(id));
+      const byUse = [...offered].sort((a, b) => this.usageOf(b.id).total - this.usageOf(a.id).total);
+      for (const label of byUse) if (this.usageOf(label.id).total > 0) add(label);
+    }
+    const skip = new Set(suggested.map((label) => label.id));
+    return { suggested, rest: offered.filter((label) => !skip.has(label.id)) };
   }
 
   /** The first swatch no label uses yet: what a new label gets unless the person picks one. */

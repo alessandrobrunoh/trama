@@ -78,6 +78,7 @@ import type {
   UpdateMilestoneInput,
   UpdateInputRequestInput,
   CreateCustomerInput,
+  BulkIssuePatch,
   CreateIssueInput,
   CreateCustomerRequestInput,
   CreateCustomerTierInput,
@@ -492,6 +493,11 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
       this.patch<Issue>(`${this.w(slug)}/issues/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/issues/${id}`),
+    /** One patch for many issues, all or nothing. */
+    bulkUpdate: (slug: string, ids: ID[], patch: BulkIssuePatch) =>
+      this.post<Issue[]>(`${this.w(slug)}/issues/bulk`, { ids, patch }),
+    bulkRemove: (slug: string, ids: ID[]) =>
+      this.post<{ deleted: ID[] }>(`${this.w(slug)}/issues/bulk-delete`, { ids }),
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),

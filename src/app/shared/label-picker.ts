@@ -10,11 +10,6 @@ import { LABEL_NAME_MAX, NablaStore, type WorkspaceLabel } from '../core';
 import { LabelCatalog } from './label-catalog';
 import { LabelChip, LabelChips } from './label-chip';
 
-/** Labels offered as suggestions when the search box is empty. */
-const SUGGESTED_MAX = 4;
-/** Below this many labels a "suggested" group only repeats the list. */
-const SUGGEST_FROM = 8;
-
 /**
  * Trigger styles: `field` (borderless row of chips for property panels) and `chip` (dashed filter chip).
  * Set `creatable` to false for filters: they never create labels.
@@ -180,33 +175,9 @@ export class LabelPicker {
   protected readonly known = computed(() => this.value().filter((id) => this.catalog.byId().has(id)));
   protected readonly atMax = computed(() => this.value().length >= this.catalog.maxPerRecord);
 
-  /** Active labels, plus archived ones this item already carries (so they can be unticked). */
-  private readonly offered = computed<WorkspaceLabel[]>(() => {
-    const picked = this.picked();
-    return this.catalog
-      .all()
-      .filter((label) => !label.archived || picked.has(label.id))
-      .sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
-  });
-
-  /** Recent picks first, then the most used, so the labels you reach for are one glance away. Only without a search. */
-  protected readonly suggested = computed<WorkspaceLabel[]>(() => {
-    if (this.query().trim() || this.offered().length < SUGGEST_FROM) return [];
-    const offered = this.offered();
-    const byId = new Map(offered.map((label) => [label.id, label]));
-    const out: WorkspaceLabel[] = [];
-    const add = (label?: WorkspaceLabel) => {
-      if (label && !label.archived && !out.includes(label) && out.length < SUGGESTED_MAX) out.push(label);
-    };
-    for (const id of this.catalog.recent()) add(byId.get(id));
-    const byUse = [...offered].sort((a, b) => this.catalog.usageOf(b.id).total - this.catalog.usageOf(a.id).total);
-    for (const label of byUse) if (this.catalog.usageOf(label.id).total > 0) add(label);
-    return out;
-  });
-  protected readonly listed = computed(() => {
-    const skip = new Set(this.suggested().map((label) => label.id));
-    return this.offered().filter((label) => !skip.has(label.id));
-  });
+  private readonly arranged = computed(() => this.catalog.arrange(this.picked(), !this.query().trim()));
+  protected readonly suggested = computed(() => this.arranged().suggested);
+  protected readonly listed = computed(() => this.arranged().rest);
 
   /** Rows of the list: optional headings, then labels. One flat group, so keyboard order is the visual order. */
   protected readonly entries = computed<{ key: string; heading?: string; label?: WorkspaceLabel }[]>(() => {

@@ -13,8 +13,11 @@ import {
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayMinSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
+  IsDefined,
   IsIn,
   IsInt,
   IsNumber,
@@ -48,6 +51,7 @@ import {
   PRIORITIES,
 } from '../workstreams/workstreams.controller.js';
 import { CustomersService } from '../customers/customers.service.js';
+import { PermissionsService } from '../workspaces/permissions.service.js';
 import { IssuesService } from './issues.service.js';
 
 const KINDS: IssueKind[] = [
@@ -124,6 +128,43 @@ class UpdateIssueDto {
   @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
 }
 
+/** At most this many issues per bulk request. */
+export const BULK_ISSUES_MAX = 100;
+
+/** Ids or keys of the issues a bulk request acts on. */
+class IssueRefsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(BULK_ISSUES_MAX)
+  @ArrayUnique()
+  @IsString({ each: true })
+  @MaxLength(100, { each: true })
+  ids: string[];
+}
+
+/** One change applied to every issue. Labels and workstreams are added / removed, not replaced. */
+export class BulkIssuePatchDto {
+  @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
+  @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
+  @Clearable() @IsString() assigneeId?: string | null;
+  @Clearable() @IsString() teamId?: string | null;
+  /** `null` clears it and drops that project's milestone. */
+  @Clearable() @IsString() projectId?: string | null;
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) addLabels?: string[];
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) removeLabels?: string[];
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) addWorkstreamIds?: string[];
+  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) removeWorkstreamIds?: string[];
+}
+
+export class BulkUpdateIssuesDto extends IssueRefsDto {
+  @IsDefined()
+  @ValidateNested()
+  @Type(() => BulkIssuePatchDto)
+  patch: BulkIssuePatchDto;
+}
+
+export class BulkDeleteIssuesDto extends IssueRefsDto {}
+
 class LinkIssueDto {
   @IsOptional() @IsArray() @IsString({ each: true }) workstreamIds?: string[];
   @IsOptional()
@@ -177,11 +218,44 @@ export class IssuesController {
   constructor(
     private readonly service: IssuesService,
     private readonly customers: CustomersService,
+    private readonly permissions: PermissionsService,
   ) {}
 
   @Get()
   async list(@Ctx() ctx: WorkspaceContext, @Query() q: ListIssueQuery) {
     return this.withCounts(ctx, await this.service.list(ctx.workspace.id, q));
+  }
+
+  /**
+   * One patch for up to 100 issues, all-or-nothing: unknown issues / references or a team the caller
+   * may not edit reject the whole request, and nothing is written. Responds with the updated issues.
+   */
+  @Post('bulk')
+  @HttpCode(200)
+  async bulkUpdate(
+    @Ctx() ctx: WorkspaceContext,
+    @Actor() actor: ActorRef,
+    @Body() dto: BulkUpdateIssuesDto,
+  ) {
+    const rows = await this.service.getMany(ctx.workspace.id, dto.ids);
+    await this.assertTeams(ctx, rows, dto.patch.teamId);
+    const updated = await this.service.updateMany(ctx.workspace.id, actor, rows, dto.patch);
+    return this.withCounts(ctx, updated);
+  }
+
+  /** Delete up to 100 issues in one transaction. Needs the `deleteIssues` capability. */
+  @Post('bulk-delete')
+  @Can('deleteIssues')
+  @HttpCode(200)
+  async bulkDelete(
+    @Ctx() ctx: WorkspaceContext,
+    @Actor() actor: ActorRef,
+    @Body() dto: BulkDeleteIssuesDto,
+  ) {
+    const rows = await this.service.getMany(ctx.workspace.id, dto.ids);
+    await this.assertTeams(ctx, rows);
+    await this.service.removeMany(ctx.workspace.id, actor, rows);
+    return { deleted: rows.map((r) => r.id) };
   }
 
   @Get(':idOrKey')
@@ -232,6 +306,18 @@ export class IssuesController {
     @Param('idOrKey') idOrKey: string,
   ) {
     return this.service.remove(ctx.workspace.id, actor, idOrKey);
+  }
+
+  /** The team edit policy of every team the request touches (current teams of the issues and the one they move to). */
+  private async assertTeams(
+    ctx: WorkspaceContext,
+    rows: readonly { teamId?: string | null }[],
+    moveTo?: string | null,
+  ) {
+    const teams = new Set<string>();
+    for (const r of rows) if (r.teamId) teams.add(r.teamId);
+    if (moveTo) teams.add(moveTo);
+    for (const id of teams) await this.permissions.assertTeamEdit(ctx, id);
   }
 
   private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T): Promise<T>;
