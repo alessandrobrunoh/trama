@@ -9,6 +9,9 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   labels: 'workspace',
   'customer-tiers': 'workspace',
   'customer-requests': 'customers',
+  // the triage inbox is customer work; the sources behind it are integrations (admin)
+  'customer-intake': 'customers',
+  'intake-sources': 'integrations',
 };
 
 /**
@@ -31,6 +34,7 @@ const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> =
   decisions: { accept: 'decisions:accept', reject: 'decisions:accept', supersede: 'decisions:accept' },
   // an attachment is an artifact: linking or unlinking needs `artifacts:write`, not only the right to edit documents
   documents: { attach: 'artifacts:write', detach: 'artifacts:write' },
+  issues: { 'bulk-delete': 'issues:delete' },
 };
 
 function actionFor(method: string): ApiAction {

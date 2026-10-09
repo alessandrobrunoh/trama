@@ -7,33 +7,31 @@ description: How to record progress in Trama accurately, by updating acceptance 
 
 Trama derives a workstream's status from **facts you record**. Recording them correctly is how the status becomes true. Never write the status yourself.
 
-## How the status is derived (first match wins)
+## Reading the status
 
-1. A manual `statusOverride` (do not set it).
-2. **shipped**: the outcome is achieved. It needs delivery evidence (a healthy `deployment`, a `published` `release`, every non-closed PR/MR `merged`, or every linked issue that is not canceled `done`) **and** every acceptance criterion `met` (when any exist) **and** none of the rules 3 and 4 below applies. Delivery evidence alone never ships a workstream.
-3. **blocked**: a failing-CI or conflicting open PR, or an unshipped workstream it depends on.
-4. **needs_input**: an open input request or a `proposed` decision.
-5. **ready_to_land**: an open PR with `review: approved`, `ci: passing` and `hasConflicts: false`.
-6. **in_review**: any open PR, or a linked issue is `in_review` and none is `in_progress`.
-7. **working**: a linked issue is `in_progress`, a criterion is `in_progress`, or a `build` / `test_report` artifact.
-8. **planned**: has acceptance criteria.
-9. **draft**: nothing yet.
+The server derives `status` from the facts you record and tells you what is missing. Do not recompute it from a rule list; read it:
 
-Delivery is reported separately as `delivery`: `none`, `in_review` (an open PR), `merged` (every non-closed PR merged), `released` or `deployed`. A merged PR sets `delivery: merged`, not `status: shipped`. When code is delivered but the outcome is open (criteria not met), the status stays `working`, or `blocked` / `needs_input` when something waits on a person. Never read `merged` as "done"; check `status` and the criteria.
+```
+get_workstream { idOrKey }      // status, derivedStatus, delivery, completion: { achieved, gaps[] }
+```
 
-Canceled issues do not count. So: moving an issue to in progress makes the workstream working; moving the issues to in review (with none still in progress) makes it in review; completing every linked issue ships it once all criteria are met and nothing blocks it. Opening a PR also moves it to in review; CI and review state on that PR decide ready to land; merging every PR sets delivery to merged; it ships only once every criterion is met.
+- `completion.achieved` is true only when the outcome is done. `completion.gaps` lists why not: `no_criteria`, `criteria_pending`, `blocked`, `needs_input`, `no_delivery`. Fix the gaps; do not argue with them.
+- `delivery` (`none`, `in_review`, `merged`, `released`, `deployed`) is what the code did. A merged PR sets `delivery: merged`, never "done". A workstream with no acceptance criteria never ships on its own: add one.
+- `statusOverride` set means a person pinned the status by hand. It is not evidence that the outcome is achieved; `completion` still says what is missing.
+- Canceled issues do not count. Linking an issue or a PR never changes a criterion.
 
 ## What to record, and when
 
 ### Acceptance criteria
 
-Mark each criterion as you genuinely satisfy it:
+Mark each criterion as you genuinely satisfy it, and attach the proof in the same call:
 
 ```
-update_criterion { idOrKey, criterionId, state: "met" }   // pending → in_progress → met
+update_criterion { idOrKey, criterionId, state: "met",
+  evidence: { artifactIds: ["art_…"], note: "tested on staging" } }   // pending → in_progress → met
 ```
 
-Only `met` when it is demonstrably true (tests pass, behaviour verified). Do not delete criteria you could not meet; leave them and say why in a comment.
+Set `met` only with evidence: an artifact of this workstream (test report, deployment, PR) and/or a short note saying what you verified. The server records that **you** declared it (shown as "declared by agent"); a person can still verify it. `met` without evidence is allowed but shows as "no evidence", so do not do it. Do not set `met` just because a PR is open or merged, and say in a comment what you did not verify. Changing a criterion's text resets it to `pending`. Do not delete criteria you could not meet; leave them and say why in a comment.
 
 ### Pull requests and builds
 
@@ -104,7 +102,8 @@ Skip comments for trivial steps; the activity log already records every change.
 
 ## Checklist before you say "done"
 
-- Criteria reflect reality (`met` only where true).
+- Criteria reflect reality (`met` only where true, with evidence).
+- `completion.gaps` is empty, or you told the user what remains.
 - If the work moved a project (milestone, risk), a project update says so, with an honest `health`.
 - Every PR you opened exists as an artifact with current `state`, `ci`, `review`.
 - Linked issues have the right status.

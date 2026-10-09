@@ -61,6 +61,12 @@ export function configureApp(app: INestApplication): void {
     // (`verify` is passed through to body-parser but missing from Nest's option typing)
     verify: captureWebhookRawBody,
   } as Parameters<NestExpressApplication['useBodyParser']>[1]);
+  // Slack slash commands are form-encoded and signed over the raw bytes
+  (app as NestExpressApplication).useBodyParser('urlencoded', {
+    extended: true,
+    limit: JSON_BODY_LIMIT,
+    verify: captureWebhookRawBody,
+  } as Parameters<NestExpressApplication['useBodyParser']>[1]);
   app.useGlobalPipes(
     new RejectUnsafeInputPipe(),
     new ValidationPipe({

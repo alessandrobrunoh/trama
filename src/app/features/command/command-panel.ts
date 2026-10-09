@@ -713,8 +713,12 @@ export class CommandPanel {
     const searching = this.isSearching();
     if (!searching) {
       if (scope === 'all') {
-        const recent = this.recents.list().slice(0, 5);
-        return recent.length ? [{ id: 'recent', label: 'Recent', items: recent }] : [];
+        const here = this.recents.current();
+        const recent = this.recents
+          .list()
+          .filter((r) => !(here && r.type === here.type && r.id === here.id))
+          .slice(0, 8);
+        return recent.length ? [{ id: 'recent', label: 'Recently viewed', items: recent }] : [];
       }
       const items = scope === 'person' ? this.people() : this.browse();
       const label = SCOPES.find((x) => x.id === scope)?.label ?? '';

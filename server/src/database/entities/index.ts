@@ -20,6 +20,7 @@ import type {
   FavoriteType,
   GitProvider,
   InputRequestState,
+  IntakeProvider,
   IssueKind,
   IssueSource,
   IssueStatus,
@@ -42,6 +43,7 @@ import type {
   ViewLayout,
   WorkspaceSettings,
   DeliveryState,
+  WorkstreamCompletion,
   WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
@@ -360,6 +362,11 @@ export class WorkstreamEntity extends Wire {
   derivedStatus: WorkstreamStatus;
   /** Delivery evidence (PR / release / deployment); separate from the outcome `status`. */
   @Column({ type: 'varchar', default: 'none' }) delivery: DeliveryState;
+  /** Outcome achieved? and the gaps if not. Recomputed with `status` (see StatusService). */
+  @Column({ type: 'jsonb', default: () => `'{"achieved":false,"gaps":[]}'` })
+  completion: WorkstreamCompletion;
+  /** Grandfathered by migration: was shipped with no criteria before that stopped being derivable. */
+  @Column({ type: 'boolean', default: false }) legacyShipped: boolean;
   @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
   @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
@@ -509,6 +516,11 @@ export class CustomerRequestEntity extends Wire {
   @Column({ type: 'text', nullable: true }) body: string | null;
   @Column({ type: 'boolean', default: false }) important: boolean;
   @Column({ type: 'varchar', nullable: true }) sourceUrl: string | null;
+  /** Provenance when the request came through a customer-request source (see customer-intake). */
+  @Column({ type: 'varchar', nullable: true }) source: IntakeProvider | null;
+  @Column({ type: 'varchar', nullable: true }) externalId: string | null;
+  @Column({ type: 'varchar', nullable: true }) requesterEmail: string | null;
+  @Column({ type: 'varchar', nullable: true }) requesterName: string | null;
   @Column({ type: 'jsonb' }) createdBy: ActorRef;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;

@@ -35,7 +35,7 @@ const issue = (n: number, over: Record<string, unknown> = {}) => ({
   teamId: 't1',
   projectId: null,
   workstreamIds: [],
-  labels: ['ui'],
+  labels: ['lb_ui', 'lb_gone'],
   updatedAt: new Date('2026-02-01T00:00:00Z'),
   createdAt: new Date('2026-01-01T00:00:00Z'),
   ...over,
@@ -73,7 +73,7 @@ function setup(view: Partial<SavedViewEntity> | null, issues: Record<string, unk
     [TeamEntity, { find: async () => [{ id: 't1', name: 'Platform' }, { id: 't2', name: 'Other' }] }],
     [MembershipEntity, { findBy: async () => [{ userId: 'u1' }] }],
     [UserEntity, { findBy: async () => [{ id: 'u1', name: 'Ada', email: 'ada@example.com', passwordHash: 'x' }] }],
-    [WorkspaceEntity, { findOneBy: async () => ({ id: 'w1', name: 'Acme' }) }],
+    [WorkspaceEntity, { findOneBy: async () => ({ id: 'w1', name: 'Acme', settings: { labels: [{ id: 'lb_ui', name: 'UI', color: '#2563eb', template: false }] } }) }],
   ]);
   const ds = { getRepository: (e: unknown) => tables.get(e) ?? { find: async () => [] } };
   return { token, service: new PublicViewsService(ds as never, repo as never), repo, find };
@@ -95,7 +95,7 @@ describe('PublicViewsService', () => {
       priority: 'high',
       team: 'Platform',
       assignee: 'Ada',
-      labels: ['ui'],
+      labels: ['UI'],
       updatedAt: '2026-02-01T00:00:00.000Z',
     });
   });

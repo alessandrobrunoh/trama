@@ -7,6 +7,7 @@ import {
   LucideArrowUpNarrowWide,
   LucideCheck,
   LucideBox,
+  LucideTag,
   LucideCircleUserRound,
   LucideColumns3,
   LucideCopy,
@@ -29,7 +30,6 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
@@ -52,6 +52,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { IssueKindLabel } from '../../shared/issue';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
+import { PeekPanel } from '../../shared/peek-panel';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -82,6 +83,8 @@ import {
   type IssueProp,
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
+import { LabelPicker } from '../../shared/label-picker';
+import { SearchInput } from '../../shared/search-input';
 
 interface Column {
   key: string;
@@ -94,8 +97,9 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   selector: 'app-issue-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
+    LabelPicker,
     HlmButtonImports,
-    HlmInputImports,
     HlmPopoverImports,
     HlmContextMenuImports,
     HlmDropdownMenuImports,
@@ -116,30 +120,20 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     KanbanItemDirective,
     KanbanLabelDirective,
     Kbd,
+    PeekPanel,
   ],
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
     <!-- Filter + display toolbar -->
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          #searchBox
-          hlmInput
-          class="h-7 w-full pl-8 text-xs"
-          placeholder="Filter by key or title…"
-          aria-label="Filter issues"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-          (keydown.escape)="search.set(''); searchBox.blur()"
-        />
-      </div>
+      <app-search-input noun="issues" [(value)]="search" />
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain max-sm:basis-full">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
         <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Assignee" [multiple]="true" [options]="assigneeFilter()" [value]="fv('assigneeId')" (valueChange)="setF('assigneeId', $event)" />
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         <app-picker variant="chip" label="Workstream" [multiple]="true" [options]="wsFilter()" [value]="fv('workstreamIds')" (valueChange)="setF('workstreamIds', $event)" />
         @if (projectFilter().length > 1) {
           <app-picker variant="chip" label="Project" [multiple]="true" [icon]="projectIcon" [options]="projectFilter()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
@@ -494,6 +488,8 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
       </ng-template>
     </ng-template>
 
+    <app-peek-panel />
+
     <!-- Bulk action bar -->
     @if (selection().length) {
       <div class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4">
@@ -520,6 +516,12 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           </button>
           <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Assign · A" (click)="actions.openPrompt('assignee', selection())">
             <svg [lucideIcon]="noUser" [size]="14"></svg> Assignee
+          </button>
+          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Labels · L" (click)="actions.openPrompt('label', selection())">
+            <svg [lucideIcon]="tagIcon" [size]="14"></svg> Labels
+          </button>
+          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Move to project · ⇧P" (click)="actions.openPrompt('project', selection())">
+            <svg [lucideIcon]="projectIcon" [size]="14"></svg> Project
           </button>
           <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Add to workstream · W" (click)="actions.openPrompt('workstream', selection())">
             <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Workstream
@@ -615,6 +617,7 @@ export class IssueBoard {
   protected readonly linkIcon = LucideLink;
   protected readonly openIcon = LucideExternalLink;
   protected readonly trash = LucideTrash2;
+  protected readonly tagIcon = LucideTag;
   protected readonly checkIcon = LucideCheck;
 
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -684,6 +687,8 @@ export class IssueBoard {
     { keys: 'p', label: 'Set priority', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('priority', this.targets()) },
     { keys: 'a', label: 'Assign to…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('assignee', this.targets()) },
     { keys: 'i', label: 'Assign to me', group: 'Issues', when: () => this.canAct(), run: () => this.actions.toggleAssignMe(this.targets()) },
+    { keys: 'l', label: 'Toggle labels…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('label', this.targets()) },
+    { keys: 'shift+p', label: 'Move to project…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('project', this.targets()) },
     { keys: 'w', label: 'Add to workstream', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('workstream', this.targets()) },
     { keys: 'mod+.', label: 'Copy issue key', group: 'Issues', when: () => this.targets().length > 0 && !this.typing(), run: () => this.actions.copyKeys(this.targets()) },
     { keys: 'mod+shift+l', label: 'Copy issue link', group: 'Issues', when: () => this.targets().length > 0 && !this.typing(), run: () => this.actions.copyLinks(this.targets()) },

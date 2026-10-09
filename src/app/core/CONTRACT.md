@@ -1,7 +1,9 @@
 # Nabla client data layer — contract
 
 Everything under `src/app/core/**` (except `theme/`, `contracts/`). Feature agents rely on this file only; read it before touching data.
-Authoritative inputs: `PLAN.md` (§4 API, §5 routes), `contracts/domain.ts` (types; synced copy at `core/contracts/domain.ts`, never edit).
+Authoritative inputs: `server/API.md` (API), `src/app/app.routes.ts` (routes), `contracts/domain.ts` (types; synced copy at `core/contracts/domain.ts`, never edit). The former `PLAN.md` no longer exists.
+
+> **Stale parts:** this file still describes the removed `Execution` concept (routes, store methods, `executions` tab). The `executions` table was dropped by the `DropExecutions` migration; check `contracts/domain.ts` and `app.routes.ts` before relying on anything execution-related below.
 
 Import from the barrel: `import { NablaStore, SessionStore, KeyboardShortcuts, type Workstream } from '../../core';`
 (barrel = `core/index.ts`; it re-exports the domain types too).
