@@ -1,8 +1,10 @@
 # Trama API
 
-REST + SSE backend (NestJS 12, TypeORM, Postgres 17). Everything lives under the `/api` prefix. Entity shapes are defined in
+REST + SSE backend (NestJS 12, TypeORM, Postgres 18). Everything lives under the `/api` prefix. Entity shapes are defined in
 [`contracts/domain.ts`](../contracts/domain.ts) (synced to `src/contracts/domain.ts`); this file documents routes, auth and behaviour.
 Architecture and extension points: [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+> **Stale parts:** the `Execution` concept was removed (migration `DropExecutions`; there is no `executions` module or route). Mentions of executions (`ex_…` ids, `executionId`, `execution` graph nodes and dependency types) below are leftovers and need a pass against `contracts/domain.ts` and the controllers.
 
 Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after first boot: **demo@nabla.dev / nabla-demo** (workspace slug `acme`).
 
@@ -227,7 +229,7 @@ Sharing: a view has `sharing { visibility: private|workspace|link, grants: [{ us
 Public view — `GET /api/public/views/:token` (**unauthenticated**, no query string or body is read): the fixed result of the view as `PublicView` (`groups[]` of `PublicViewItem`: key, title, kind, status, priority, health, team/assignee/project names, labels, dates, updatedAt; at most 500 rows). Filters, sort and grouping come only from the saved view and are evaluated on the server; only whitelisted fields can be filtered on. Unknown, malformed, revoked or no-longer-`link` tokens all answer `404`. Responses are `Cache-Control: no-store`, `X-Robots-Tag: noindex`.
 
 ### Attention — `/attention` (human attention: agent tokens get `403`)
-`GET /attention?scope=mine|all&state=open|snoozed|dismissed|active` → `AttentionItem[]` for the caller (PLAN.md §3). `scope=all` (admin+, else `403`) returns every item of the workspace. `state=active` = open + snoozed. Without `state` dismissed/snoozed items are included with their `state` (the snapshot's `attention` is this unfiltered list). Sorted by severity (high → low), then `since` ascending (longest waiting first).
+`GET /attention?scope=mine|all&state=open|snoozed|dismissed|active` → `AttentionItem[]` for the caller (rules in `src/attention/attention-rules.ts`). `scope=all` (admin+, else `403`) returns every item of the workspace. `state=active` = open + snoozed. Without `state` dismissed/snoozed items are included with their `state` (the snapshot's `attention` is this unfiltered list). Sorted by severity (high → low), then `since` ascending (longest waiting first).
 
 - **Relevance**: accountable user, members of the owner/participating teams. Narrower: `input_requested` goes to the assignee (else the accountable user, else the owner team); `review_requested` to the accountable user + owner team; `triage` to members of the issue's team (backlog issues without a team: workspace admins/owners, id `triage:workspace`). Workstreams with a `statusOverride` and shipped workstreams raise nothing.
 - **Kinds / severity**: `input_requested` high, `needs_decision` high, `ci_failed` high, `blocked` high (blocked/failed executions; CI, conflicts and dependencies have their own kinds), `review_requested` medium, `conflict` medium, `ready_to_land` medium, `deadline` medium (high when overdue; within 3 days), `dependency` low (another team's unshipped workstream), `ready_to_ship` low, `triage` low (one item per team, with a count).
@@ -275,11 +277,11 @@ Edge semantics: `contains` team → workstream, workstream → top-level executi
 Viewer+ and agent tokens. `text/markdown` by default; JSON with `Accept: application/json` or `?format=json`. Markdown sections: `# KEY — title`, status line, Objective, Acceptance Criteria (`- [x]` met, `- [ ]` pending, `- [ ] … _(in progress)_`), Context, Repositories (fullName — url, default branch), Teams, Dependencies (what it waits on with resolution state, what it blocks), Decisions (accepted with rationale one-liners; proposed flagged; superseded marked "do not follow"), Related issues, Artifacts (state, CI, review, conflicts), Executions, Open input requests, Recent progress (last 10 progress notes / state changes / answers). Empty sections are omitted. The JSON mirrors the same data (`AgentContext` in `src/agent-context/agent-context.service.ts`).
 
 ### MCP
-Not yet implemented (planned: Streamable HTTP MCP server with `nabla.*` tools over the same services; see PLAN.md §4). Agents can use the REST API with a `Bearer nbl_…` agent token in the meantime.
+Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](../mcp/README.md): it forwards each client's `Bearer nbl_…` key to this REST API, which stays the only authority. The `trama` CLI in [`cli/`](../cli/README.md) offers the same commands.
 
 ## Derived workstream status
 
-`status` / `derivedStatus` / `shippedAt` are written by the status engine (`src/status`), never by clients: after any change to a workstream or its criteria, executions, input requests, artifacts, originating decisions or dependencies (and on boot / after seed reset) it re-derives PLAN.md §2 (first match wins; `status = statusOverride ?? derivedStatus`), sets `shippedAt` the first time it ships, and on a change records a `workstream.status_changed` event (`actor: system`, `data: { key, title, from, to, derivedStatus }`). Workstreams that depend on it are re-derived too. Clarifications: closed (abandoned) PRs/MRs do not hold back "all PRs merged"; a failed execution stops blocking once a later-created completed execution with the same parent exists; only `open` PRs (not `draft`) count for CI/conflict/review rules; dependency edges into an already-terminal execution are ignored.
+`status` / `derivedStatus` / `shippedAt` are written by the status engine (`src/status`), never by clients: after any change to a workstream or its criteria, executions, input requests, artifacts, originating decisions or dependencies (and on boot / after seed reset) it re-derives the status with the rules in `src/status/derive-status.ts` (first match wins; `status = statusOverride ?? derivedStatus`), sets `shippedAt` the first time it ships, and on a change records a `workstream.status_changed` event (`actor: system`, `data: { key, title, from, to, derivedStatus }`). Workstreams that depend on it are re-derived too. Clarifications: closed (abandoned) PRs/MRs do not hold back "all PRs merged"; a failed execution stops blocking once a later-created completed execution with the same parent exists; only `open` PRs (not `draft`) count for CI/conflict/review rules; dependency edges into an already-terminal execution are ignored.
 
 ## Events (activity log + live updates)
 

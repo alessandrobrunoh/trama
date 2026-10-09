@@ -15,7 +15,7 @@ For larger changes, please open a GitHub Issue or Discussion first.
 This is especially important for changes involving:
 
 - the Workstream domain model;
-- Executions;
+- Input requests;
 - Artifacts;
 - Decisions;
 - Attention;
@@ -45,7 +45,7 @@ Contributions should generally reinforce these principles:
    Trama should surface where human judgment is needed.
 
 4. **Reality should drive status**  
-   Git, CI, reviews, executions, and deployments should determine state whenever possible.
+   Git, CI, reviews, input requests, and deployments should determine state whenever possible.
 
 5. **Context should be reusable**  
    Decisions, dependencies, acceptance criteria, and outcomes should remain useful to future humans and agents.
@@ -263,7 +263,6 @@ Agent actions should eventually be attributable to:
 ```text
 workspace
 workstream
-execution
 provider
 actor
 ```
@@ -307,7 +306,7 @@ Feature requests should explain the underlying problem before proposing a specif
 
 Prefer:
 
-> When several agents work on the same Workstream, it is difficult to see which execution currently needs human input.
+> When several agents work on the same Workstream, it is difficult to see which one currently needs human input.
 
 over:
 
