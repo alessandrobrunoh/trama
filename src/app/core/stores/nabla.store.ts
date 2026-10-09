@@ -2079,6 +2079,18 @@ export class NablaStore {
     return this.ok('remove member', (s) => this.api.members.remove(s, membershipId), { tx });
   }
 
+  /** Hand the workspace to another member (primary owner only): they become owner and primary owner; I stay an owner. */
+  async transferOwnership(membershipId: ID): Promise<boolean> {
+    return this.write('transfer ownership', (s) => this.api.members.transferOwnership(s, membershipId), {
+      onResult: (ws) => {
+        this._workspace.update((cur) => (cur ? { ...cur, primaryOwnerId: ws.primaryOwnerId } : cur));
+        this._memberships.update((list) =>
+          list.map((m) => (m.id === membershipId ? { ...m, role: 'owner' as Role } : m)),
+        );
+      },
+    }).then((r) => !!r);
+  }
+
   /** Workspace customization (admin) and the permission policy (`permissions`, owner only). */
   async updateSettings(input: UpdateWorkspaceSettingsInput): Promise<boolean> {
     return this.write('save settings', (s) => this.api.workspaces.updateSettings(s, input), {

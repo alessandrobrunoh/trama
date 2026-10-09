@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucidePlus, LucideRows3, LucideScale, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   DECISION_STATUSES,
@@ -23,6 +22,7 @@ import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
+import { SearchInput } from '../../shared/search-input';
 
 const PREFS_KEY = 'nabla.decisions.list.v1';
 type GroupMode = 'status' | 'none';
@@ -38,9 +38,9 @@ interface DecisionGroup {
   selector: 'app-decision-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
     RouterLink,
     HlmButtonImports,
-    HlmInputImports,
     HlmTooltip,
     LucideDynamicIcon,
     PageHeader,
@@ -68,18 +68,7 @@ interface DecisionGroup {
     <app-page-header title="Decisions" [description]="description()" />
 
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          hlmInput
-          class="h-7 w-full pl-8 text-xs"
-          placeholder="Search decisions…"
-          aria-label="Search decisions"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-          (keydown.escape)="search.set('')"
-        />
-      </div>
+      <app-search-input noun="decisions" [(value)]="search" />
       <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="statusFilter()" (valueChange)="statusFilter.set($event)" />
       @if (tagOptions().length) {
         <app-picker variant="chip" label="Tag" [multiple]="true" [options]="tagOptions()" [value]="tagFilter()" (valueChange)="tagFilter.set($event)" />
@@ -155,7 +144,7 @@ interface DecisionGroup {
               @if (d.originWorkstreamId) {
                 <app-entity-chip type="workstream" [ref]="d.originWorkstreamId" compact class="relative max-sm:hidden" />
               }
-              <span class="text-meta pointer-events-none relative w-10 shrink-0 text-end tabular-nums max-sm:hidden">{{ (d.decidedAt ?? d.updatedAt) | relativeTime }}</span>
+              <span class="text-meta pointer-events-none relative w-24 shrink-0 text-end whitespace-nowrap tabular-nums max-sm:hidden">{{ (d.decidedAt ?? d.updatedAt) | relativeTime }}</span>
             </div>
           }
         }

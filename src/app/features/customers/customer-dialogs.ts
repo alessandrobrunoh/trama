@@ -88,7 +88,7 @@ function wholeNumber(raw: string): number | null | undefined {
           </div>
           <hlm-dialog-footer>
             <button hlmBtn variant="outline" hlmDialogClose type="button">Cancel</button>
-            <button hlmBtn type="button" [disabled]="busy() || !requestCustomer() || !targetId()" (click)="submit()">Add request</button>
+            <button hlmBtn type="button" [disabled]="busy()" (click)="submit()">Add request</button>
           </hlm-dialog-footer>
         } @else {
           <hlm-dialog-header>
@@ -98,19 +98,22 @@ function wholeNumber(raw: string): number | null | undefined {
           <div class="grid gap-3">
             <div class="grid gap-1.5">
               <label hlmLabel for="cd-name">Name</label>
-              <input hlmInput id="cd-name" maxlength="200" autocomplete="off" placeholder="Acme" [value]="name()" (input)="name.set($any($event.target).value)" />
+              <input hlmInput id="cd-name" maxlength="200" autocomplete="off" placeholder="Acme" [attr.aria-invalid]="nameError() ? 'true' : null" [value]="name()" (input)="name.set($any($event.target).value)" />
+              @if (nameError()) {
+                <p class="text-destructive text-xs" role="alert">Required.</p>
+              }
             </div>
             <div class="grid gap-1.5">
-              <label hlmLabel for="cd-domains">Domains <span class="text-muted-foreground font-normal">(comma separated, the first is primary)</span></label>
+              <label hlmLabel for="cd-domains">Domains <span class="text-muted-foreground font-normal">· comma separated, the first is primary</span></label>
               <input hlmInput id="cd-domains" maxlength="2000" autocomplete="off" placeholder="acme.com, acme.io" [value]="domains()" (input)="domains.set($any($event.target).value)" />
             </div>
             <div class="grid gap-3 sm:grid-cols-2">
               <div class="grid gap-1.5">
-                <label hlmLabel for="cd-revenue">Annual revenue <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <label hlmLabel for="cd-revenue">Annual revenue <span class="text-muted-foreground font-normal">· optional</span></label>
                 <input hlmInput id="cd-revenue" type="number" min="0" step="1" [value]="revenue()" (input)="revenue.set($any($event.target).value)" />
               </div>
               <div class="grid gap-1.5">
-                <label hlmLabel for="cd-size">Size in people <span class="text-muted-foreground font-normal">(optional)</span></label>
+                <label hlmLabel for="cd-size">Size in people <span class="text-muted-foreground font-normal">· optional</span></label>
                 <input hlmInput id="cd-size" type="number" min="0" step="1" [value]="size()" (input)="size.set($any($event.target).value)" />
               </div>
               <div class="grid min-w-0 gap-1.5">
@@ -130,7 +133,7 @@ function wholeNumber(raw: string): number | null | undefined {
           </div>
           <hlm-dialog-footer>
             <button hlmBtn variant="outline" hlmDialogClose type="button">Cancel</button>
-            <button hlmBtn type="button" [disabled]="busy() || !name().trim() || !domains().trim()" (click)="submit()">Create customer</button>
+            <button hlmBtn type="button" [disabled]="busy()" (click)="submit()">Create customer</button>
           </hlm-dialog-footer>
         }
       </hlm-dialog-content>
@@ -169,6 +172,8 @@ export class CustomerDialogs {
 
   protected readonly busy = signal(false);
   protected readonly error = signal('');
+  private readonly submitted = signal(false);
+  protected readonly nameError = computed(() => this.submitted() && !this.name().trim());
 
   protected readonly tierOptions = computed<PickOption[]>(() =>
     this.store.settings().customerTiers.map((t) => ({ value: t.id, label: t.name, kind: 'label', color: t.color })),
@@ -212,6 +217,7 @@ export class CustomerDialogs {
         this.important.set(false);
         this.busy.set(false);
         this.error.set('');
+        this.submitted.set(false);
         if (state.kind === 'request') {
           this.requestCustomer.set(state.customerId ?? '');
           this.kind.set(state.projectId ? 'project' : 'issue');
@@ -237,6 +243,7 @@ export class CustomerDialogs {
   protected async submit(): Promise<void> {
     if (this.busy()) return;
     this.error.set('');
+    this.submitted.set(true);
     if (this.isRequest()) await this.submitRequest();
     else await this.submitCustomer();
   }
@@ -268,13 +275,16 @@ export class CustomerDialogs {
     if (!created) return;
     this.ui.closeModal();
     const commands = ['/', this.store.slug() ?? '', 'customers', created.id];
-    this.notifier.success(`Added ${created.name}`, { action: { label: 'Open', run: () => void this.router.navigate(commands) } });
+    this.notifier.success(`Customer ${created.name} created`, { action: { label: 'Open', run: () => void this.router.navigate(commands) } });
   }
 
   private async submitRequest(): Promise<void> {
     const customerId = this.requestCustomer();
     const target = this.targetId();
-    if (!customerId || !target) return;
+    if (!customerId || !target) {
+      this.error.set(!customerId ? 'Choose a customer.' : 'Choose an issue or a project.');
+      return;
+    }
     const source = this.source().trim();
     if (source && !normalizeHttpUrl(source)) {
       this.error.set('The source must be an http(s) link.');

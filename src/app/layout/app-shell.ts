@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
+import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
 import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
@@ -109,8 +110,19 @@ export class AppShell {
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */
   private readonly keyboard = inject(KeyboardShortcuts);
 
+  /** 768-1023px: the page next to a 240px sidebar is too narrow for list rows, so start collapsed. */
+  private readonly compact = signal(false);
+
   constructor() {
+    const win = inject(DOCUMENT).defaultView;
+    if (win?.matchMedia) {
+      const query = win.matchMedia('(min-width: 768px) and (max-width: 1023.98px)');
+      const onChange = (e: { matches: boolean }) => this.compact.set(e.matches);
+      onChange(query);
+      query.addEventListener('change', onChange);
+      inject(DestroyRef).onDestroy(() => query.removeEventListener('change', onChange));
+    }
     // UiStore (persisted, driven by keyboard shortcuts) → Spartan sidebar state.
-    effect(() => this.sidebar.setOpen(!this.ui.sidebarCollapsed()));
+    effect(() => this.sidebar.setOpen(!this.ui.sidebarCollapsed() && !this.compact()));
   }
 }

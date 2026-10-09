@@ -59,7 +59,7 @@ interface ViewSection {
               role="listitem"
               [routerLink]="['/', slug(), 'views', v.id]"
               [attr.data-row-id]="v.id"
-              class="hover:bg-hover focus-visible:bg-hover flex min-h-14 items-center gap-3 border-b px-4 py-2.5 outline-none sm:px-6 md:min-h-9 md:py-1.5"
+              class="hover:bg-hover focus-visible:bg-hover focus-visible:ring-ring flex min-h-14 items-center gap-3 border-b px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-9 md:py-1.5"
               [class.bg-selected]="ui.focusedRowId() === v.id"
             >
               <svg
@@ -87,7 +87,7 @@ interface ViewSection {
                 position="bottom"
               ></svg>
               <app-actor-avatar [actor]="{ type: 'user', id: v.ownerId }" [size]="18" class="shrink-0" />
-              <span class="text-meta w-10 shrink-0 text-end tabular-nums max-sm:hidden">{{ v.updatedAt | relativeTime }}</span>
+              <span class="text-meta w-24 shrink-0 text-end whitespace-nowrap tabular-nums max-sm:hidden">{{ v.updatedAt | relativeTime }}</span>
             </a>
           }
         }

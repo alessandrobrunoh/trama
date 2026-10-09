@@ -194,8 +194,8 @@ export class ApiClient {
     this.request<T>('POST', path, { body: body ?? {}, quiet: o?.quiet });
   private patch = <T>(path: string, body: unknown, o?: RequestOptions) =>
     this.request<T>('PATCH', path, { body, quiet: o?.quiet });
-  private del = <T = void>(path: string, o?: RequestOptions) =>
-    this.request<T>('DELETE', path, { quiet: o?.quiet });
+  private del = <T = void>(path: string, o?: RequestOptions & { body?: unknown }) =>
+    this.request<T>('DELETE', path, { quiet: o?.quiet, body: o?.body });
 
   private w(slug: string): string {
     return `/w/${encodeURIComponent(slug)}`;
@@ -237,8 +237,8 @@ export class ApiClient {
     updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
       this.patch<Workspace>(`${this.w(slug)}/customer-tiers/${id}`, input),
     deleteCustomerTier: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
-    /** Owner only. */
-    remove: (slug: string) => this.del(this.w(slug)),
+    /** Owner only. `confirm` must be the workspace's exact slug or name. */
+    remove: (slug: string, confirm: string) => this.del(this.w(slug), { body: { confirm } }),
     /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
     snapshot: (slug: string, comments: SnapshotCommentsMode = 'full') =>
       this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`, comments === 'full' ? undefined : { comments }),
@@ -251,6 +251,9 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+    /** Primary owner only: the target becomes owner and primary owner. */
+    transferOwnership: (slug: string, membershipId: ID) =>
+      this.post<Workspace>(`${this.w(slug)}/transfer-ownership`, { membershipId }),
   };
 
   /** Invitations by email (admins). `create` and `resend` return the secret link once. */

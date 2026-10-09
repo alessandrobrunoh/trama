@@ -152,7 +152,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
         <div class="mt-4 max-md:mt-2">
           <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('favorites')" [attr.aria-expanded]="!ui.isFolded('favorites')">
             Favorites
-            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('favorites')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('favorites')" [class.opacity-0]="!ui.isFolded('favorites')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
           </button>
           @if (!ui.isFolded('favorites')) {
             <ul hlmSidebarMenu class="gap-px">
@@ -206,7 +206,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
       <div class="mt-4 max-md:mt-2">
         <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('workspace')" [attr.aria-expanded]="!ui.isFolded('workspace')">
           Workspace
-          <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('workspace')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+          <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('workspace')" [class.opacity-0]="!ui.isFolded('workspace')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
         </button>
         @if (!ui.isFolded('workspace')) {
           <ul hlmSidebarMenu class="gap-px">
@@ -222,7 +222,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('teams')" [attr.aria-expanded]="!ui.isFolded('teams')">
             Your teams
-            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('teams')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('teams')" [class.opacity-0]="!ui.isFolded('teams')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
           </button>
           <a
             [routerLink]="['/', slug(), 'teams']"
@@ -301,7 +301,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
         <div class="group/sec flex items-center">
           <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('views')" [attr.aria-expanded]="!ui.isFolded('views')">
             Views
-            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="ui.isFolded('views')"><svg [lucideIcon]="chevronDown" [size]="12" class="opacity-0 group-hover/sec:opacity-100"></svg></span>
+            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('views')" [class.opacity-0]="!ui.isFolded('views')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
           </button>
           <a
             [routerLink]="['/', slug(), 'views']"
@@ -366,7 +366,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
     </div>
 
     <!-- footer: user menu + help -->
-    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
+    <div hlmSidebarFooter class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
       <button
         type="button"
         class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"

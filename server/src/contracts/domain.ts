@@ -33,6 +33,11 @@ export interface Workspace {
   slug: string;
   /** Always fully resolved by the server (defaults filled in). */
   settings: WorkspaceSettings;
+  /**
+   * The user who owns the workspace: its creator until ownership is transferred. Nobody else can remove
+   * or demote them, and only they can remove or demote other owners. Absent on legacy rows.
+   */
+  primaryOwnerId?: ID;
   createdAt: ISODate;
 }
 

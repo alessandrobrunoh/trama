@@ -436,7 +436,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
                     @for (t of d.tags.slice(0, 2); track t) {
                       <span class="border-border-strong text-muted-foreground hidden h-5 items-center rounded-full border px-1.5 text-[11px] md:inline-flex">{{ t }}</span>
                     }
-                    <span class="text-meta w-10 text-end tabular-nums max-sm:hidden">{{ d.updatedAt | relativeTime }}</span>
+                    <span class="text-meta w-24 text-end whitespace-nowrap tabular-nums max-sm:hidden">{{ d.updatedAt | relativeTime }}</span>
                   </a>
                 }
               }
