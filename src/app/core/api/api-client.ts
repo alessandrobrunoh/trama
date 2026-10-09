@@ -21,6 +21,9 @@ import type {
   SnapshotCommentsMode,
   Decision,
   Dependency,
+  Document,
+  DocumentRevision,
+  DocumentSummary,
   DomainEvent,
   Favorite,
   CustomerSubscription,
@@ -71,6 +74,10 @@ import type {
   CreateArtifactInput,
   CreateCommentInput,
   CreateDecisionInput,
+  CreateDocumentInput,
+  DocumentOwnerInput,
+  DocumentsQuery,
+  UpdateDocumentInput,
   CreateDependencyInput,
   CreateInputRequestInput,
   CreateInviteInput,
@@ -376,6 +383,30 @@ export class ApiClient {
     add: (slug: string, customerId: ID) =>
       this.post<CustomerSubscription>(`${this.w(slug)}/customer-subscriptions`, { customerId }),
     remove: (slug: string, customerId: ID) => this.del(`${this.w(slug)}/customer-subscriptions/${encodeURIComponent(customerId)}`),
+  };
+
+  /** Markdown documents of the workspace, with revisions; attached to work through `document` artifacts. */
+  readonly documents = {
+    list: (slug: string, query: DocumentsQuery = {}) =>
+      this.get<DocumentSummary[]>(`${this.w(slug)}/documents`, { ...query }),
+    get: (slug: string, id: ID) => this.get<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
+    create: (slug: string, input: CreateDocumentInput) => this.post<Document>(`${this.w(slug)}/documents`, input),
+    /** 409 (`ApiError.body.current`) when `baseVersion` is stale. */
+    update: (slug: string, id: ID, input: UpdateDocumentInput, o?: RequestOptions) =>
+      this.patch<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`, input, o),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
+    archive: (slug: string, id: ID) => this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/archive`),
+    restore: (slug: string, id: ID) => this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/restore`),
+    revisions: (slug: string, id: ID) =>
+      this.get<DocumentRevision[]>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions`),
+    revision: (slug: string, id: ID, version: number) =>
+      this.get<DocumentRevision>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}`),
+    restoreRevision: (slug: string, id: ID, version: number, baseVersion: number) =>
+      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}/restore`, { baseVersion }),
+    attach: (slug: string, id: ID, owner: DocumentOwnerInput) =>
+      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/attach`, owner),
+    detach: (slug: string, id: ID, artifactId: ID) =>
+      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/detach`, { artifactId }),
   };
 
   readonly projects = {

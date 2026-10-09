@@ -29,7 +29,7 @@ Five objects carry the product. Everything else is supporting detail.
 | **Issue** | What problem or request exists? | Demand. Bug, feature, incident, tech debt, feedback. Familiar and deliberately unremarkable. |
 | **Workstream** | What outcome are we pursuing? | A coordinated effort that groups the issues sharing a root cause. Has acceptance criteria, an accountable human, contributors (humans and agents), dependencies. |
 | **Decision** | Why did we choose this? | A durable record (proposed, accepted, superseded, rejected) kept next to the work. Agents may propose; a human accepts. |
-| **Artifact** | What did the work produce? | Pull requests, builds, documents, deployments, with live CI and review state. This is the proof of delivery. |
+| **Artifact** | What did the work produce? | Pull requests, builds, documents (a link, or a Trama document for the spec or plan that lives in no repository), deployments, with live CI and review state. This is the proof of delivery. |
 | **Input request / Attention** | Where is a human needed right now? | A blocked agent asks a person instead of guessing; the attention queue lists reviews, decisions, failing CI and open questions. Human attention is the scarce resource. |
 
 Projects sit above workstreams for planning (goals, milestones, updates); repositories and teams give context. They support the five objects and must not compete with them.

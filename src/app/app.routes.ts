@@ -241,6 +241,18 @@ export const routes: Routes = [
           import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
       },
       {
+        path: 'documents',
+        title: 'Documents · Trama',
+        loadComponent: () =>
+          import('./features/documents/document-list-page').then((m) => m.DocumentListPage),
+      },
+      {
+        path: 'documents/:id',
+        title: 'Document · Trama',
+        loadComponent: () =>
+          import('./features/documents/document-page').then((m) => m.DocumentPage),
+      },
+      {
         path: 'repositories',
         title: 'Repositories · Trama',
         loadComponent: () =>

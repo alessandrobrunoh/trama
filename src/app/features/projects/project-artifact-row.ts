@@ -137,7 +137,13 @@ const LONG_DESCRIPTION = 140;
         @if (a.externalId) {
           <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ a.externalId }}</span>
         }
-        @if (a.url) {
+        @if (a.documentId) {
+          <a
+            [routerLink]="['/', slug(), 'documents', a.documentId]"
+            class="inline-flex min-w-0 items-center gap-1 text-sm hover:underline"
+            ><span class="truncate">{{ a.title }}</span></a
+          >
+        } @else if (a.url) {
           <a
             [href]="a.url"
             target="_blank"
@@ -212,12 +218,18 @@ const LONG_DESCRIPTION = 140;
         </button>
         <ng-template #menu>
           <hlm-dropdown-menu class="w-44">
-            <button hlmDropdownMenuItem (triggered)="edit.emit(a)">
-              <svg [lucideIcon]="pencil" [size]="14"></svg>Edit
-            </button>
+            @if (a.documentId) {
+              <a hlmDropdownMenuItem [routerLink]="['/', slug(), 'documents', a.documentId]">
+                <svg [lucideIcon]="pencil" [size]="14"></svg>Open document
+              </a>
+            } @else {
+              <button hlmDropdownMenuItem (triggered)="edit.emit(a)">
+                <svg [lucideIcon]="pencil" [size]="14"></svg>Edit
+              </button>
+            }
             <hlm-dropdown-menu-separator />
             <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
-              <svg [lucideIcon]="trash" [size]="14"></svg>Remove
+              <svg [lucideIcon]="trash" [size]="14"></svg>{{ a.documentId ? 'Detach' : 'Remove' }}
             </button>
           </hlm-dropdown-menu>
         </ng-template>
@@ -267,6 +279,7 @@ export class ProjectArtifactRow {
   protected readonly longLimit = LONG_DESCRIPTION;
   protected readonly expanded = signal(false);
 
+  protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly showProvider = computed(() => SHOW_PROVIDER.has(this.artifact().provider));
   protected readonly chain = computed(() => {
     const mode = this.origin();
@@ -282,9 +295,11 @@ export class ProjectArtifactRow {
   protected remove(): void {
     const a = this.artifact();
     this.ui.setConfirmDelete({
-      title: `Remove “${a.title}”?`,
-      description: 'The item is detached from the context. The linked page itself is not touched.',
-      confirmLabel: 'Remove',
+      title: `${a.documentId ? 'Detach' : 'Remove'} “${a.title}”?`,
+      description: a.documentId
+        ? 'The document is detached from here. The document itself is kept.'
+        : 'The item is detached from the context. The linked page itself is not touched.',
+      confirmLabel: a.documentId ? 'Detach' : 'Remove',
       onConfirm: async () => {
         await this.store.removeArtifact(a.id);
       },

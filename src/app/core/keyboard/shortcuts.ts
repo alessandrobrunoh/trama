@@ -13,6 +13,7 @@ export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = 
   w: { segment: 'workstreams', label: 'Workstreams' },
   d: { segment: 'decisions', label: 'Decisions' },
   p: { segment: 'projects', label: 'Projects' },
+  u: { segment: 'documents', label: 'Documents' },
   r: { segment: 'repositories', label: 'Repositories' },
   x: { segment: 'graph', label: 'Graph' },
   s: { segment: 'settings/profile', label: 'Settings' },

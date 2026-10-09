@@ -270,6 +270,57 @@ export class ProjectUpdateEntity extends Wire {
   @Column({ type: 'timestamptz', nullable: true }) editedAt: Date | null;
 }
 
+// ───────────────────────────── documents ─────────────────────────────
+
+/** `searchVector` (generated, GIN-indexed) exists only in the database; queries reference it by name. */
+@Entity('documents')
+@Index('IDX_documents_workspace_updated', ['workspaceId', 'updatedAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class DocumentEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) title: string;
+  @Column({ type: 'text', default: '' }) body: string;
+  @Column({ type: 'varchar', nullable: true }) icon: string | null;
+  @Column({ type: 'integer', default: 1 }) version: number;
+  @Column({ type: 'jsonb' }) author: ActorRef;
+  @Column({ type: 'jsonb' }) lastEditor: ActorRef;
+  @Column({ type: 'timestamptz', nullable: true }) archivedAt: Date | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+
+  protected override hidden() {
+    return ['workspaceId'];
+  }
+}
+
+@Entity('document_revisions')
+@Index('UQ_document_revisions_version', ['documentId', 'version'], {
+  unique: true,
+})
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => DocumentEntity, ['documentId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class DocumentRevisionEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) documentId: string;
+  @Column({ type: 'integer' }) version: number;
+  @Column({ type: 'varchar' }) title: string;
+  @Column({ type: 'text' }) body: string;
+  @Column({ type: 'jsonb' }) editor: ActorRef;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['workspaceId'];
+  }
+}
+
 // ───────────────────────────── workstreams ─────────────────────────────
 
 @Entity('workstreams')
@@ -528,6 +579,8 @@ export class ArtifactEntity extends Wire {
   @Column({ type: 'varchar', default: 'other' }) provider: ArtifactProvider;
   @Column({ type: 'varchar' }) title: string;
   @Column({ type: 'varchar', nullable: true }) url: string | null;
+  /** A `document` artifact that points to a Trama document; deleting the document deletes the artifact. */
+  @Column({ type: 'varchar', nullable: true }) documentId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalId: string | null;
   @Column({ type: 'varchar', default: 'open' }) state: ArtifactState;
   @Column({ type: 'varchar', nullable: true }) ci: CiState | null;
@@ -876,6 +929,8 @@ export const ENTITIES = [
   RepositoryEntity,
   ProjectEntity,
   ProjectUpdateEntity,
+  DocumentEntity,
+  DocumentRevisionEntity,
   WorkstreamEntity,
   MilestoneEntity,
   InputRequestEntity,

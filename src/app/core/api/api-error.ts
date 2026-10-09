@@ -12,6 +12,8 @@ export class ApiError extends Error {
     readonly code?: string,
     /** Field-level validation messages, when the server sends them. */
     readonly details?: Record<string, string> | string[],
+    /** The parsed JSON error body (a 409 on a document carries the current document in `current`). */
+    readonly body?: unknown,
   ) {
     super(message);
   }
@@ -59,7 +61,7 @@ export class ApiError extends Error {
       } else if (typeof body === 'string' && body.trim() && body.length < 300) {
         message = body;
       }
-      return new ApiError(error.status, message, code, details);
+      return new ApiError(error.status, message, code, details, body && typeof body === 'object' ? body : undefined);
     }
     return new ApiError(0, error instanceof Error ? error.message : 'Unexpected error');
   }
