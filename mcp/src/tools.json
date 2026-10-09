@@ -432,7 +432,7 @@
   "params": {
    "title": "body string! Title",
    "ownerTeamId": "body string! Owner team id",
-   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Required unless status is draft or the workspace turned Delta threads off",
+   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Optional: a workstream can exist before its thread; omit it rather than invent one. A supplied URL is validated",
    "description": "body string Description",
    "objective": "body string Objective",
    "context": "body string Context",
@@ -906,12 +906,12 @@
   "method": "POST",
   "path": "/issues/{idOrKey}/link",
   "permission": "issues:write",
-  "description": "Attach an issue to existing workstreams and/or a new one created atomically.",
+  "description": "Attach an issue to existing workstreams and/or a new one created atomically. Linking is organizational and does not change the issue status; pass status only to change it deliberately (moving to in_progress is a separate action).",
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
    "workstreamIds": "body string[] Existing workstream ids",
    "createWorkstream": "body object New workstream {title, ownerTeamId, deltaThreadUrl?, objective?, ...}",
-   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Resulting status"
+   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Optional explicit status. Omit to keep the current one"
   }
  },
  {

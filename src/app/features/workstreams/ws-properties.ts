@@ -1,7 +1,7 @@
 // Properties sidebar of a workstream: every row is an inline popover editor.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
+import { DELIVERY_STATE_META, NablaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
@@ -9,7 +9,7 @@ import { isoFromDate } from '../milestones/milestone-actions';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
-import { contributors, issueCounts, labelOptions, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
+import { contributors, isDeliveredState, issueCounts, labelOptions, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
 
 @Component({
@@ -34,6 +34,14 @@ import { IssueProgress, WsDatePicker } from './ws-parts';
         />
         <span class="text-muted-foreground shrink-0 text-[11px]" [hlmTooltip]="w.statusOverride ? 'Set manually. Derived: ' + derivedLabel() : 'Derived from the work'">{{ w.statusOverride ? 'manual' : 'auto' }}</span>
       </app-property-row>
+      @if (w.delivery !== 'none') {
+        <app-property-row label="Delivery">
+          <span class="text-sm" [hlmTooltip]="deliveryHint()">{{ deliveryLabel() }}</span>
+          @if (w.status !== 'shipped' && w.status !== 'canceled' && delivered()) {
+            <span class="text-muted-foreground shrink-0 text-[11px]">outcome open</span>
+          }
+        </app-property-row>
+      }
       <app-property-row label="Owner team">
         <app-picker variant="field" label="Owner team" [disabled]="!canEdit()" [options]="teams()" [value]="[w.ownerTeamId]" (valueChange)="setOwner($event[0])" />
       </app-property-row>
@@ -144,6 +152,13 @@ export class WsProperties {
   protected readonly statuses = statusOptions();
   protected readonly showAll = signal(false);
   protected readonly derivedLabel = computed(() => WORKSTREAM_STATUS_META[this.ws().derivedStatus].label);
+  protected readonly deliveryLabel = computed(() => DELIVERY_STATE_META[this.ws().delivery].label);
+  protected readonly delivered = computed(() => isDeliveredState(this.ws().delivery));
+  protected readonly deliveryHint = computed(() =>
+    this.ws().status === 'shipped'
+      ? 'Delivered, and the outcome is achieved.'
+      : 'Delivery evidence only. The outcome is not achieved until criteria are met and nothing blocks or waits on a person.',
+  );
   protected readonly counts = computed(() => issueCounts(this.store.issuesByWorkstream().get(this.ws().id) ?? []));
   protected readonly deps = computed(() => ({
     waits: (this.store.incomingDependencies().get(this.ws().id) ?? []).filter((d) => d.fromType === 'workstream').length,

@@ -73,6 +73,8 @@ import type {
   AttentionItem,
   AttentionKind,
   Comment,
+  CommentIndexEntry,
+  CommentPage,
   Customer,
   CustomerRequest,
   Decision,
@@ -137,6 +139,14 @@ export interface ResolvedActor {
 
 /** Load state of an on-demand resource (project updates, project context). */
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
+
+/** Where a subject's comment thread stands: the newest page is loaded, `nextCursor` leads to older ones. */
+export interface CommentThreadInfo {
+  state: LoadState;
+  nextCursor: string | null;
+  loadingMore: boolean;
+}
+const IDLE_THREAD: CommentThreadInfo = { state: 'idle', nextCursor: null, loadingMore: false };
 
 /**
  * A node of the local project tree (project → workstream → issue). `artifacts` are the ones attached
@@ -254,6 +264,8 @@ export class NablaStore {
   private readonly _decisions = signal<readonly Decision[]>([]);
   private readonly _dependencies = signal<readonly Dependency[]>([]);
   private readonly _comments = signal<readonly Comment[]>([]);
+  private readonly _commentIndex = signal<readonly CommentIndexEntry[]>([]);
+  private readonly _commentThreads = signal<ReadonlyMap<string, CommentThreadInfo>>(new Map());
   private readonly _events = signal<readonly DomainEvent[]>([]);
   private readonly _attention = signal<readonly AttentionItem[]>([]);
   private readonly _views = signal<readonly SavedView[]>([]);
@@ -276,7 +288,10 @@ export class NablaStore {
   readonly artifacts = this._artifacts.asReadonly();
   readonly decisions = this._decisions.asReadonly();
   readonly dependencies = this._dependencies.asReadonly();
+  /** Comments loaded so far (the threads opened on demand), not every comment of the workspace. */
   readonly comments = this._comments.asReadonly();
+  /** Who commented how often on what, for the whole workspace (comes with the snapshot). */
+  readonly commentIndex = this._commentIndex.asReadonly();
   /** Newest first. */
   readonly events = this._events.asReadonly();
   /** All attention items for me (open, snoozed and dismissed). */
@@ -619,9 +634,38 @@ export class NablaStore {
   getView(id: string | null | undefined): SavedView | undefined {
     return id ? this.viewById().get(id) : undefined;
   }
-  /** Comments on a subject, oldest first. */
+  /** Loaded comments on a subject, oldest first. Call `loadComments(subject)` when its detail view opens. */
   commentsFor(subject: SubjectRef): readonly Comment[] {
     return this.commentsBySubject().get(subjectKey(subject.type, subject.id)) ?? [];
+  }
+  /** Comment count and commenters of every subject, from the snapshot's comment index. */
+  private readonly commentSummary = computed(() => {
+    const map = new Map<string, { count: number; authors: ActorRef[] }>();
+    for (const e of this._commentIndex()) {
+      const key = subjectKey(e.subject.type, e.subject.id);
+      const entry = map.get(key) ?? { count: 0, authors: [] };
+      entry.count += e.count;
+      entry.authors.push(e.author);
+      map.set(key, entry);
+    }
+    return map;
+  });
+  /** Number of comments on a subject without loading them (exact once the whole thread is loaded). */
+  commentCountFor(subject: SubjectRef): number {
+    const key = subjectKey(subject.type, subject.id);
+    const loaded = this.commentsBySubject().get(key)?.length ?? 0;
+    const thread = this._commentThreads().get(key);
+    if (thread?.state === 'ready' && thread.nextCursor === null) return loaded;
+    return Math.max(this.commentSummary().get(key)?.count ?? 0, loaded);
+  }
+  /** Everyone who commented on a subject (from the index, plus whoever is in the loaded part of the thread). */
+  commentAuthorsFor(subject: SubjectRef): readonly ActorRef[] {
+    const authors = this.commentSummary().get(subjectKey(subject.type, subject.id))?.authors ?? [];
+    return [...authors, ...this.commentsFor(subject).map((c) => c.author)];
+  }
+  /** Load state of a subject's comment thread: `idle` until `loadComments` ran. */
+  commentThread(subject: SubjectRef): CommentThreadInfo {
+    return this._commentThreads().get(subjectKey(subject.type, subject.id)) ?? IDLE_THREAD;
   }
   /** Whether the current user may act at `minRole` or above. */
   can(minRole: Role): boolean {
@@ -701,7 +745,7 @@ export class NablaStore {
 
   private async doLoad(slug: string): Promise<LoadResult> {
     try {
-      const snapshot = await this.api.workspaces.snapshot(slug);
+      const snapshot = await this.api.workspaces.snapshot(slug, 'index');
       if (this.slug() !== slug) return 'error';
       this.applySnapshot(snapshot, false);
       this.status.set('ready');
@@ -736,6 +780,11 @@ export class NablaStore {
     ] as WritableSignal<readonly Row[]>[]) {
       c.set([]);
     }
+    this._commentIndex.set([]);
+    this._commentThreads.set(new Map());
+    this.commentInflight.clear();
+    if (this.commentReloadTimer) clearTimeout(this.commentReloadTimer);
+    this.commentReloadTimer = null;
     this._integrationDetails.set([]);
     this._outgoingWebhooks.set([]);
     this.resetProjectData();
@@ -748,7 +797,7 @@ export class NablaStore {
     if (this.pending > 0) return this.scheduleRefetch(REFETCH_DEBOUNCE_MS);
     const startEpoch = this.epoch;
     try {
-      const snapshot = await this.api.workspaces.snapshot(slug);
+      const snapshot = await this.api.workspaces.snapshot(slug, 'index');
       if (this.slug() !== slug) return;
       // A write started/finished meanwhile: this snapshot may predate it. Try again.
       if (this.epoch !== startEpoch || this.pending > 0) return this.scheduleRefetch(REFETCH_DEBOUNCE_MS);
@@ -790,7 +839,13 @@ export class NablaStore {
     list(this._artifacts, s.artifacts);
     list(this._decisions, s.decisions);
     list(this._dependencies, s.dependencies);
-    list(this._comments, s.comments);
+    if (s.commentIndex) {
+      // Slim snapshot: the comments themselves load per subject (`loadComments`); only the summary arrives here.
+      const index = s.commentIndex;
+      this._commentIndex.update((p) => (merge ? reconcileOne(p, index) : index));
+    } else {
+      list(this._comments, s.comments);
+    }
     // Events beyond the snapshot window (loaded via loadOlderEvents) are kept.
     const older = merge ? this._events().filter((e) => !s.events.some((n) => n.id === e.id)) : [];
     const oldest = s.events.reduce((m, e) => (e.at < m ? e.at : m), '9999');
@@ -1143,14 +1198,14 @@ export class NablaStore {
 
   /**
    * Attach the issue to existing workstreams and/or a new one (`createWorkstream`).
-   * Backlog and todo issues move to `in_progress` unless `status` is set. The created
+   * Linking never changes the status; only an explicit `status` does. The created
    * workstream arrives with the next refetch (`issue.workstreamIds`).
    */
   async linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined> {
     const current = this.issueById().get(id);
     if (!current) return undefined;
     const tx = this.tx();
-    const status = input.status ?? (current.status === 'backlog' || current.status === 'todo' ? 'in_progress' : current.status);
+    const status = input.status ?? current.status;
     tx.patch(this._issues, id, {
       status,
       ...(input.workstreamIds ? { workstreamIds: [...new Set([...current.workstreamIds, ...input.workstreamIds])] } : {}),
@@ -1385,6 +1440,99 @@ export class NablaStore {
   }
 
   // ─────────────────────────── comments ───────────────────────────
+
+  private readonly commentInflight = new Map<string, Promise<void>>();
+  private commentReloadTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * Load (or with `force` reload) the newest page of a subject's comments. Never rejects: failures toast and the
+   * thread state becomes `error`. Concurrent calls share one request. Loaded threads stay fresh through live
+   * `comment` events (see `handleLiveEvent`).
+   */
+  loadComments(subject: SubjectRef, options: { force?: boolean; quiet?: boolean } = {}): Promise<void> {
+    const slug = this.slug();
+    if (!slug) return Promise.resolve();
+    const key = subjectKey(subject.type, subject.id);
+    const current = this._commentThreads().get(key);
+    if (!options.force && current?.state === 'ready') return Promise.resolve();
+    const running = this.commentInflight.get(key);
+    if (running) return running;
+    if (!current) this.setThread(key, { state: 'loading', nextCursor: null, loadingMore: false });
+    const startEpoch = this.epoch;
+    const promise = this.api.comments
+      .page(slug, subject)
+      .then((page) => {
+        if (this.slug() !== slug) return;
+        // A local write started or settled meanwhile: the page may predate it, so do not drop anything.
+        const settled = this.epoch === startEpoch && this.pending === 0;
+        const prev = this._commentThreads().get(key);
+        const keepsOlder = prev?.state === 'ready' && prev.nextCursor !== null && page.nextCursor !== null;
+        this.mergeCommentPage(key, page, settled ? 'replace' : 'union');
+        this.setThread(key, { state: 'ready', nextCursor: keepsOlder ? prev.nextCursor : page.nextCursor, loadingMore: false });
+      })
+      .catch((e: unknown) => {
+        if (this.slug() !== slug) return;
+        const err = ApiError.from(e);
+        this.setThread(key, { state: current?.state === 'ready' ? 'ready' : 'error', nextCursor: current?.nextCursor ?? null, loadingMore: false });
+        if (!options.quiet && err.status !== 401 && err.status !== 403) {
+          this.notifier.error('Could not load comments', { description: err.message });
+        }
+      })
+      .finally(() => this.commentInflight.delete(key));
+    this.commentInflight.set(key, promise);
+    return promise;
+  }
+
+  /** Load the next (older) page of a thread that `loadComments` already opened. */
+  async loadMoreComments(subject: SubjectRef): Promise<void> {
+    const slug = this.slug();
+    const key = subjectKey(subject.type, subject.id);
+    const thread = this._commentThreads().get(key);
+    if (!slug || !thread || thread.state !== 'ready' || thread.nextCursor === null || thread.loadingMore) return;
+    this.setThread(key, { ...thread, loadingMore: true });
+    try {
+      const page = await this.api.comments.page(slug, subject, { cursor: thread.nextCursor });
+      if (this.slug() !== slug) return;
+      this.mergeCommentPage(key, page, 'union');
+      this.setThread(key, { state: 'ready', nextCursor: page.nextCursor, loadingMore: false });
+    } catch (e) {
+      if (this.slug() !== slug) return;
+      this.setThread(key, { ...thread, loadingMore: false });
+      this.notifier.error('Could not load older comments', { description: ApiError.from(e).message });
+    }
+  }
+
+  /** Reload the newest page of every thread that was opened (live `comment` events, reconnects). Debounced. */
+  refreshLoadedComments(ms = 300): void {
+    if (this.commentReloadTimer) clearTimeout(this.commentReloadTimer);
+    this.commentReloadTimer = setTimeout(() => {
+      this.commentReloadTimer = null;
+      for (const [key, thread] of this._commentThreads()) {
+        if (thread.state !== 'ready') continue;
+        const i = key.indexOf(':');
+        void this.loadComments({ type: key.slice(0, i) as SubjectRef['type'], id: key.slice(i + 1) }, { force: true, quiet: true });
+      }
+    }, ms);
+  }
+
+  private setThread(key: string, info: CommentThreadInfo): void {
+    this._commentThreads.update((m) => new Map(m).set(key, info));
+  }
+
+  /**
+   * Fold a page (newest first) into the loaded comments. `union` only adds/updates. `replace` is for a reload of the
+   * newest page: loaded comments of that subject inside the page's time range that the page lacks were deleted.
+   */
+  private mergeCommentPage(key: string, page: CommentPage, mode: 'union' | 'replace'): void {
+    const incoming = new Set(page.items.map((c) => c.id));
+    const oldest = page.items.length ? page.items[page.items.length - 1].createdAt : undefined;
+    const kept = this._comments().filter((c) => {
+      if (incoming.has(c.id)) return false;
+      if (mode === 'union' || subjectKey(c.subject.type, c.subject.id) !== key) return true;
+      return page.nextCursor !== null && oldest !== undefined && c.createdAt < oldest;
+    });
+    this._comments.update((prev) => reconcileList(prev, [...kept, ...page.items]));
+  }
 
   async addComment(subject: SubjectRef, body: string): Promise<Comment | undefined> {
     return this.write('post comment', (s) => this.api.comments.create(s, { subject, body }), {
@@ -1836,6 +1984,7 @@ export class NablaStore {
    * `project_update` reloads the loaded feeds; anything that can appear in a project's context reloads the cached contexts.
    */
   handleLiveEvent(event: Pick<LiveEvent, 'entity' | 'type'>): void {
+    if (event.entity === 'comment') this.refreshLoadedComments();
     if (event.entity === 'project_update') {
       for (const [id, state] of this._projectUpdatesState()) {
         if (state === 'ready') void this.loadProjectUpdates(id, { force: true, quiet: true });

@@ -13,6 +13,7 @@ import {
   type DecisionStatus,
 } from '../../core';
 import { readJson, writeJson } from '../../core/stores/storage';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { EntityChip } from '../../shared/entity-chip';
@@ -166,6 +167,7 @@ export class DecisionListPage {
   readonly workspaceSlug = input<string>();
 
   private readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 
   protected readonly plus = LucidePlus;
@@ -181,9 +183,10 @@ export class DecisionListPage {
     statusEntity: 'other',
   }));
 
-  protected readonly search = signal('');
-  protected readonly statusFilter = signal<string[]>([]);
-  protected readonly tagFilter = signal<string[]>([]);
+  // Filters survive navigation inside the app (see ListStateStore).
+  protected readonly search = this.listState.remember('decisions.search', '');
+  protected readonly statusFilter = this.listState.remember<string[]>('decisions.status', []);
+  protected readonly tagFilter = this.listState.remember<string[]>('decisions.tag', []);
   protected readonly group = signal<GroupMode>(readJson<{ group: GroupMode }>(PREFS_KEY)?.group === 'none' ? 'none' : 'status');
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));

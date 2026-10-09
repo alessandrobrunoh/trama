@@ -380,7 +380,9 @@ export type ProjectAiResult = ProjectAiUpdateDraft | ProjectAiSummary | ProjectA
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
 /**
- * Derived from artifacts / input requests / decisions / dependencies.
+ * Outcome status, derived from artifacts / input requests / decisions / dependencies / criteria.
+ * `shipped` means the outcome is achieved (criteria met, no blockers, nothing waiting on a person),
+ * not merely that code landed: see {@link DeliveryState} for that.
  * Any status can be pinned manually via `statusOverride` (the board does this). `null` clears it.
  */
 export type WorkstreamStatus =
@@ -393,6 +395,15 @@ export type WorkstreamStatus =
   | 'ready_to_land'
   | 'shipped'
   | 'canceled';
+
+/**
+ * How far the code got, derived from artifacts only (highest evidence wins):
+ * `deployed` (healthy deployment) > `released` (published release) > `merged` (every live PR
+ * merged) > `in_review` (an open PR) > `none`. This is delivery evidence, not the outcome:
+ * a merged PR never makes a workstream `shipped` unless its criteria are met and nothing
+ * blocks it or waits on a person.
+ */
+export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
 export interface AcceptanceCriterion {
@@ -434,6 +445,11 @@ export interface Workstream {
   status: WorkstreamStatus;
   /** The derived status, ignoring the override. Computed by the server. */
   derivedStatus: WorkstreamStatus;
+  /**
+   * Delivery state (PR / release / deployment evidence), separate from the outcome `status`.
+   * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
+   */
+  delivery: DeliveryState;
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;
@@ -495,7 +511,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
 
 /**
  * Tracker status, independent of workstream status.
- * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
+ * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
 export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
@@ -749,6 +765,28 @@ export interface Comment {
   body: string;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+/** Page size of GET /comments/page: `limit` defaults to `default` and may not exceed `max`. */
+export const COMMENT_PAGE_SIZE = { default: 50, max: 100 } as const;
+
+/**
+ * GET /api/w/:slug/comments/page — one page of the comments of a single subject, newest first.
+ * `nextCursor` is opaque; pass it back as `cursor` to get the next (older) page, `null` on the last page.
+ */
+export interface CommentPage {
+  items: Comment[];
+  nextCursor: string | null;
+}
+
+/**
+ * Compact comment summary the slim snapshot carries instead of the comments themselves: how many comments
+ * each author left on each subject. Enough for counts and "who contributed" without loading any body.
+ */
+export interface CommentIndexEntry {
+  subject: SubjectRef;
+  author: ActorRef;
+  count: number;
 }
 
 /**
@@ -1333,6 +1371,13 @@ export function webhookEventMatches(patterns: readonly string[], type: string): 
 
 // ───────────────────────────── Snapshot ─────────────────────────────
 
+/**
+ * `?comments=` on GET /snapshot. `full` (default, kept for MCP/CLI consumers) inlines every comment;
+ * `index` returns `comments: []` plus `commentIndex`, and the client loads threads via GET /comments/page.
+ */
+export type SnapshotCommentsMode = 'full' | 'index';
+export const SNAPSHOT_COMMENTS_MODES: readonly SnapshotCommentsMode[] = ['full', 'index'];
+
 /** GET /api/w/:slug/snapshot — everything the client needs to boot a workspace. */
 export interface WorkspaceSnapshot {
   workspace: Workspace;
@@ -1355,7 +1400,10 @@ export interface WorkspaceSnapshot {
   artifacts: Artifact[];
   decisions: Decision[];
   dependencies: Dependency[];
+  /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
+  /** Present only in `index` mode. */
+  commentIndex?: CommentIndexEntry[];
   /** Most recent events (e.g. last 500); older ones via GET /events?before=. */
   events: DomainEvent[];
   attention: AttentionItem[];

@@ -260,6 +260,7 @@ export class SeedBuilder {
       labels: o.labels ?? [],
       status: o.override ?? current,
       derivedStatus: current,
+      delivery: 'none',
       statusOverride: o.override ?? null,
       startDate: o.start !== undefined ? this.at(o.start) : null,
       targetDate: o.target !== undefined ? this.at(-o.target) : null,

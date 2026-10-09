@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, ReviewState } from '../contracts/domain.js';
+import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState } from '../contracts/domain.js';
 import {
   AgentEntity,
   ArtifactEntity,
@@ -23,7 +23,10 @@ export interface AgentContext {
   key: string;
   id: string;
   title: string;
+  /** Outcome status. `shipped` means the outcome is achieved, not merely that code landed. */
   status: string;
+  /** Delivery evidence (PR / release / deployment); a merged PR does not by itself mean the outcome is done. */
+  delivery: DeliveryState;
   priority: string;
   targetDate?: string;
   description?: string;
@@ -146,6 +149,7 @@ export class AgentContextService {
       id: ws.id,
       title: ws.title,
       status: ws.status,
+      delivery: ws.delivery,
       priority: ws.priority,
       ...(ws.targetDate ? { targetDate: ws.targetDate.toISOString().slice(0, 10) } : {}),
       objective: ws.objective,
@@ -194,7 +198,14 @@ export class AgentContextService {
       if (lines.length) out.push(`## ${title}`, '', ...lines, '');
     };
     const status = c.status.replace('_', ' ');
-    out.push(`# ${c.key} — ${c.title}`, '', `Status: ${status} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
+    const delivery = c.delivery.replace('_', ' ');
+    const pendingCriteria = c.acceptanceCriteria.filter((a) => a.state !== 'met').length;
+    out.push(`# ${c.key} — ${c.title}`, '', `Outcome status: ${status} · Delivery: ${delivery} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
+    if (c.delivery !== 'none' && c.delivery !== 'in_review' && c.status !== 'shipped')
+      out.push(
+        `> Delivery is ${delivery}, but the outcome is not achieved (status: ${status}${pendingCriteria ? `; ${pendingCriteria} acceptance criteri${pendingCriteria === 1 ? 'on' : 'a'} not met` : ''}). Do not treat this work as done.`,
+        '',
+      );
     section('Description', [c.description?.trim() || '_No description yet._']);
     if (c.deltaThreadUrl) section('Delta thread', [c.deltaThreadUrl]);
     section('Objective', [c.objective.trim() || '_No objective written yet._']);

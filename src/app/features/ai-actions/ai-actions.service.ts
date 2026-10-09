@@ -330,12 +330,14 @@ export class AiActions {
 
   /** TL;DR plus what is unclear. */
   async summarizeIssue(issue: Issue, signal: AbortSignal): Promise<Summary> {
+    await this.store.loadComments({ type: 'issue', id: issue.id });
     const prompt = summarizePrompt(issuePromptData(this.store, issue), this.locale);
     return parseSummary(await this.chat(prompt, { kind: 'issue', id: issue.id, label: issue.key }, signal));
   }
 
   /** Suggested priority, estimate, type and workstreams (proposals only). */
   async triageIssue(issue: Issue, signal: AbortSignal): Promise<TriageResult> {
+    await this.store.loadComments({ type: 'issue', id: issue.id });
     const inputs = triageInputs(this.store, issue);
     const prompt = triagePrompt(
       {
@@ -411,8 +413,7 @@ export class AiActions {
       const w = this.store.getWorkstream(k);
       return w && !before.workstreamIds.includes(w.id) ? [w.id] : [];
     });
-    // keep the issue's status: linking would otherwise move backlog/todo issues to in progress
-    if (ids.length) ok = !!(await this.store.linkIssue(issue.id, { workstreamIds: ids, status: before.status })) && ok;
+    if (ids.length) ok = !!(await this.store.linkIssue(issue.id, { workstreamIds: ids })) && ok;
     if (!ok) return 0;
 
     const n = (Object.keys(patch).length ? Object.keys(patch).length : 0) + ids.length;

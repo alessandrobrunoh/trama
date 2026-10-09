@@ -363,9 +363,7 @@ export class WsIssuesSection {
     const before = { status: issue.status, workstreamIds: [...issue.workstreamIds] };
     const res = await this.store.linkIssue(issue.id, { workstreamIds: [this.ws().id] });
     if (!res) return;
-    const moved = res.status !== before.status;
     this.notify.success(`Linked ${issue.key}`, {
-      description: moved ? `Issue moved to ${this.statusLabel(res.status)}.` : undefined,
       action: { label: 'Undo', run: () => void this.store.updateIssue(issue.id, before) },
     });
   }
@@ -389,15 +387,11 @@ export class WsIssuesSection {
     const w = this.ws();
     const created = await this.store.createIssue({ kind: this.newKind(), title, teamId: w.ownerTeamId, status: 'todo' });
     if (created) {
-      await this.store.linkIssue(created.id, { workstreamIds: [w.id], status: created.status });
+      await this.store.linkIssue(created.id, { workstreamIds: [w.id] });
       this.newDraft.set('');
       this.notify.success(`${created.key} created and linked`);
     }
     this.busy.set(false);
     this.newTitle()?.nativeElement.focus();
-  }
-
-  private statusLabel(s: IssueStatus): string {
-    return this.issueStatuses.find((o) => o.value === s)?.label ?? s;
   }
 }

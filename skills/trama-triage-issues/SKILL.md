@@ -39,13 +39,13 @@ create_issue {
 - **projectId**: the project resolved from this checkout (`trama`, "Issues of this checkout") when there is exactly one. Several: ask. None: omit it and say the issue is not on a project.
 - **labels**: ids from `get_workspace` → `settings.labels`, never names and never new labels. Use the catalog entry that exists: bug, incident, security → Bug; feature, idea → Feature; tech_debt → Improvement; a documentation change → Documentation. Skip a mapping whose id is not in the catalog.
 - **estimate**: omit it when `settings.estimateScale` is `none`. Otherwise set a value on that scale only when you can justify it in one sentence (the user gave a size, or the change is obviously one small fix or a wide one). Fibonacci is `0, 1, 2, 3, 5, 8, 13, 21`. Linear is `1`–`10`. Exponential is `1, 2, 4, 8, 16, 32`. T-shirt is stored as XS `1`, S `2`, M `3`, L `5`, XL `8`. If you cannot justify a number, omit it and say why. Do not pick one just to fill the field.
-- **assigneeId**: leave it empty while the issue stays in `backlog`, `draft` or `todo`. When you set `in_progress` and nobody is assigned, set it to `whoami.actor.id` if `actor.type` is `user`. The server does the same on create, update and link, and does not claim an `agent`. Never replace an assignee who is already set. Passing `assigneeId` yourself, including `null`, wins over that rule.
+- **assigneeId**: leave it empty while the issue stays in `backlog`, `draft` or `todo`. When you set `in_progress` and nobody is assigned, set it to `whoami.actor.id` if `actor.type` is `user`. The server does the same on create, update and link with an explicit `in_progress` status (linking alone never changes status), and does not claim an `agent`. Never replace an assignee who is already set. Passing `assigneeId` yourself, including `null`, wins over that rule.
 
 ## Group issues into a workstream
 
 Group when several issues **share a root cause or need the same change**. Do not group by convenience or by team.
 
-Exception: the parent agent of a Delta thread was told to do these issues here, with subagents. Then there is one workstream for that thread, and every listed issue links to it. Do not invent one workstream per issue. Do not propose the split first. Spawn one subagent per issue; the subagent does not get its own workstream. If a slice has no issue yet, create an issue on that workstream, not a second workstream.
+A Delta thread does not change this. The thread is the execution context, not a reason to group: issues requested in one thread but serving different outcomes go to different workstreams (or stay plain issues). One thread may touch several workstreams. Only when the user says the issues are one effort do you link them together without asking. Spawn one subagent per issue; a subagent does not get its own workstream. If a slice has no issue yet, create an issue on the workstream it serves.
 
 1. Check there is not already a workstream for it (`search`, `list_workstreams`).
 2. To attach to an existing one:
@@ -58,12 +58,12 @@ Exception: the parent agent of a Delta thread was told to do these issues here, 
      idOrKey: "BUG-142",
      createWorkstream: {
        title: "Stabilize authentication before v2",
-       ownerTeamId, deltaThreadUrl,       // https URL of the Delta thread; omit it if the workspace turned Delta threads off
+       ownerTeamId, deltaThreadUrl,       // deltaThreadUrl is optional: https URL of the Delta thread; omit it if there is none yet
        objective: "Sessions survive token rotation on all supported browsers."
      }
    }
    ```
-   If the workspace uses Delta threads and you do not have a `deltaThreadUrl`, **ask the user**; do not invent one. The create call tells you when it is required.
+   `deltaThreadUrl` is optional. If you do not have one, omit it (the thread can be linked later); do not invent one and do not block on asking. A supplied URL is validated.
 4. Then add acceptance criteria that are *observable* ("OAuth login passes on Safari 18"), not tasks ("fix OAuth").
 
 An issue can belong to several workstreams, but only if it truly contributes to each; keep that rare.

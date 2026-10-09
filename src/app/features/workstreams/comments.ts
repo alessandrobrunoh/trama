@@ -3,8 +3,10 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
+  untracked,
   output,
   signal,
 } from '@angular/core';
@@ -227,10 +229,60 @@ export class CommentItem {
 }
 
 /** All comments on a subject + composer, newest first. */
+/**
+ * Loads the newest page of a subject's comments when it appears (comments are not part of the workspace
+ * snapshot) and offers "Load older comments" while more pages exist. Renders nothing otherwise.
+ */
+@Component({
+  selector: 'app-comments-loader',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmButtonImports],
+  host: { class: 'block' },
+  template: `
+    @if (thread().state === 'error') {
+      <p class="text-muted-foreground text-xs">
+        Comments could not be loaded.
+        <button type="button" class="hover:text-foreground underline" (click)="reload()">Retry</button>
+      </p>
+    } @else if (thread().state === 'loading') {
+      <p class="text-muted-foreground text-xs">Loading comments…</p>
+    }
+    @if (thread().nextCursor !== null) {
+      <div class="mt-3 flex justify-center">
+        <button hlmBtn variant="outline" size="sm" [disabled]="thread().loadingMore" (click)="more()">
+          {{ thread().loadingMore ? 'Loading…' : 'Load older comments' }}
+        </button>
+      </div>
+    }
+  `,
+})
+export class CommentsLoader {
+  private readonly store = inject(NablaStore);
+  readonly subject = input.required<SubjectRef>();
+  protected readonly thread = computed(() => this.store.commentThread(this.subject()));
+
+  constructor() {
+    effect(() => {
+      const subject = this.subject();
+      // Wait for the workspace: before that there is no slug to load from.
+      if (!this.store.ready()) return;
+      untracked(() => void this.store.loadComments(subject));
+    });
+  }
+
+  protected reload(): void {
+    void this.store.loadComments(this.subject(), { force: true });
+  }
+
+  protected more(): void {
+    void this.store.loadMoreComments(this.subject());
+  }
+}
+
 @Component({
   selector: 'app-comment-thread',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CommentItem, CommentComposer],
+  imports: [CommentItem, CommentComposer, CommentsLoader],
   host: { class: 'block min-w-0' },
   template: `
     <div class="flex flex-col gap-5">
@@ -244,6 +296,7 @@ export class CommentItem {
           <p class="text-muted-foreground text-sm">No comments yet.</p>
         }
       }
+      <app-comments-loader [subject]="subject()" />
     </div>
   `,
 })

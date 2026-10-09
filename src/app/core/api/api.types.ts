@@ -246,7 +246,7 @@ export interface CreateWorkstreamInput {
   description?: string;
   objective?: string;
   context?: string;
-  /** https link on delta.dev. Required unless the workstream is a draft or the workspace turned Delta threads off. */
+  /** https link on delta.dev. Optional: a workstream can exist before its Delta thread. A supplied value must be valid. */
   deltaThreadUrl?: string;
   ownerTeamId: ID;
   participatingTeamIds?: ID[];

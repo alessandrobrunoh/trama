@@ -17,6 +17,8 @@ import type {
   Artifact,
   ApiToken,
   Comment,
+  CommentPage,
+  SnapshotCommentsMode,
   Decision,
   Dependency,
   DomainEvent,
@@ -220,7 +222,9 @@ export class ApiClient {
     deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
     /** Owner only. */
     remove: (slug: string) => this.del(this.w(slug)),
-    snapshot: (slug: string) => this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`),
+    /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
+    snapshot: (slug: string, comments: SnapshotCommentsMode = 'full') =>
+      this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`, comments === 'full' ? undefined : { comments }),
   };
 
   readonly members = {
@@ -506,6 +510,14 @@ export class ApiClient {
   };
 
   readonly comments = {
+    /** One page of the comments of a subject, newest first; pass `nextCursor` back as `cursor` for older ones. */
+    page: (slug: string, subject: { type: string; id: ID }, page: { cursor?: string; limit?: number } = {}) =>
+      this.get<CommentPage>(`${this.w(slug)}/comments/page`, {
+        subjectType: subject.type,
+        subjectId: subject.id,
+        cursor: page.cursor,
+        limit: page.limit,
+      }),
     list: (slug: string, subject?: { type: string; id: ID }) =>
       this.get<Comment[]>(`${this.w(slug)}/comments`, {
         subjectType: subject?.type,
