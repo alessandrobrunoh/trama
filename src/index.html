@@ -28,8 +28,22 @@
     <script>
       (function () {
         var el = document.documentElement;
+        // One-time move of the pre-rename `nabla.*` localStorage keys to `trama.*`, so people keep
+        // their settings. A key that already exists under the new name wins; the old one is dropped.
         try {
-          var pref = localStorage.getItem('nabla.theme') || 'system';
+          var legacy = [];
+          for (var i = 0; i < localStorage.length; i++) {
+            var k = localStorage.key(i);
+            if (k && k.indexOf('nabla.') === 0) legacy.push(k);
+          }
+          legacy.forEach(function (old) {
+            var next = 'trama.' + old.slice('nabla.'.length);
+            if (localStorage.getItem(next) === null) localStorage.setItem(next, localStorage.getItem(old));
+            localStorage.removeItem(old);
+          });
+        } catch (e) {}
+        try {
+          var pref = localStorage.getItem('trama.theme') || 'system';
           var dark =
             pref === 'dark' ||
             (pref !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
@@ -38,7 +52,7 @@
         } catch (e) {}
         // Personal preferences (core/preferences.ts): same attributes, before first paint.
         try {
-          var p = JSON.parse(localStorage.getItem('nabla.preferences.v1') || '{}');
+          var p = JSON.parse(localStorage.getItem('trama.preferences.v1') || '{}');
           var scale = { small: 0.9, large: 1.1, xlarge: 1.2 }[p.fontSize];
           if (scale) {
             el.style.setProperty('--font-scale', String(scale));

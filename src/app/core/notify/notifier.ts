@@ -20,8 +20,8 @@ export type NoticeSink = (kind: NoticeKind, title: string, options?: NoticeOptio
 export class Notifier {
   private sink: NoticeSink = (kind, title, options) => {
     const line = options?.description ? `${title} - ${options.description}` : title;
-    if (kind === 'error') console.error(`[nabla] ${line}`);
-    else console.info(`[nabla] ${line}`);
+    if (kind === 'error') console.error(`[trama] ${line}`);
+    else console.info(`[trama] ${line}`);
   };
 
   /** Install the toast implementation. */

@@ -4,7 +4,7 @@ import { Injectable, computed, effect, inject, signal } from '@angular/core';
 export type ThemeMode = 'light' | 'dark' | 'system';
 
 /** localStorage key; the inline script in index.html reads the same key to avoid a flash. */
-export const THEME_STORAGE_KEY = 'nabla.theme';
+export const THEME_STORAGE_KEY = 'trama.theme';
 
 /**
  * Light / dark / system theme.

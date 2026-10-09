@@ -13,7 +13,7 @@ import { readJson, writeJson } from '../stores/storage';
 import { ListStateStore } from '../stores/list-state.store';
 import { TramaStore } from '../stores/trama.store';
 
-const LAST_WORKSPACE_KEY = 'nabla.session.v1';
+const LAST_WORKSPACE_KEY = 'trama.session.v1';
 
 export type EnterResult = 'ok' | 'not-found' | 'error';
 
@@ -66,7 +66,7 @@ export class SessionStore {
       this._user.set(null);
       this._workspaces.set([]);
       // 401 = signed out (normal). Anything else (server down) also leaves us signed out.
-      if (err.status !== 401) console.warn('[nabla] session check failed:', err.message);
+      if (err.status !== 401) console.warn('[trama] session check failed:', err.message);
     } finally {
       this._ready.set(true);
     }

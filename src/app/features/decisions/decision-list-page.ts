@@ -24,7 +24,7 @@ import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { SearchInput } from '../../shared/search-input';
 
-const PREFS_KEY = 'nabla.decisions.list.v1';
+const PREFS_KEY = 'trama.decisions.list.v1';
 type GroupMode = 'status' | 'none';
 
 interface DecisionGroup {

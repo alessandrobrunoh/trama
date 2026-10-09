@@ -1,5 +1,5 @@
 // UiStore — app-level UI state shared by shell, keyboard service and overlays.
-// Persisted (localStorage 'nabla.ui.v1'): sidebarCollapsed + folded sidebar sections. Theme lives in core/theme.
+// Persisted (localStorage 'trama.ui.v1'): sidebarCollapsed + folded sidebar sections. Theme lives in core/theme.
 import { Injectable, computed, effect, signal } from '@angular/core';
 import { oneOf, readJson, writeJson } from './storage';
 
@@ -88,7 +88,7 @@ function readOrder(value: unknown): Record<SidebarSection, string[]> {
   return out;
 }
 
-export const UI_STORAGE_KEY = 'nabla.ui.v1';
+export const UI_STORAGE_KEY = 'trama.ui.v1';
 
 @Injectable({ providedIn: 'root' })
 export class UiStore {

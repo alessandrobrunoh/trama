@@ -27,7 +27,7 @@ import { breakdownPrompt, digestPrompt, summarizePrompt, triagePrompt, updatePro
 /** Requests the server allows per user and minute. */
 export const RATE_LIMIT = 10;
 const WINDOW_MS = 60_000;
-const NOTED_KEY = 'nabla.ai.noted';
+const NOTED_KEY = 'trama.ai.noted';
 
 function readNoted(): boolean {
   try {

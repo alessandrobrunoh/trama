@@ -75,7 +75,7 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 
 - `withComponentInputBinding()` is on and `paramsInheritanceStrategy: 'always'`: **any page can declare `readonly workspaceSlug = input<string>()`** plus its own params and query params (`readonly tab = input<string>()`).
 - **Workstream detail tabs use the `tab` query param**, not child routes: `?tab=` one of `overview` (default, param absent), `executions`, `artifacts`, `decisions`, `graph`, `activity`, `context`. Change tab with `router.navigate([], { queryParams: { tab }, queryParamsHandling: 'merge' })`.
-- Link helper: `['/', workspaceSlug, 'workstreams', ws.key]`. There is no global "current slug" other than `nabla.slug()` / `session.workspace()?.slug`.
+- Link helper: `['/', workspaceSlug, 'workstreams', ws.key]`. There is no global "current slug" other than `trama.slug()` / `session.workspace()?.slug`.
 - Guards re-run when `:workspaceSlug` changes, so switching workspace reloads the snapshot.
 - Not a member / unknown workspace: guard redirects to `/404?workspace=<slug>` (server unreachable: `/404?error=1`).
 
@@ -151,7 +151,7 @@ Extras: `goAfterAuth(next?)` (after login/signup: navigate to `next` if it is a 
 
 Guards (`core/session/guards.ts`): `authGuard` (-> `/login?next=`), `guestGuard`, `landingGuard`, `workspaceGuard`, `roleGuard(minRole)` (use on a route to hide an admin screen; redirects to overview).
 
-In templates, hide admin-only controls with `nabla.can('admin')` (works in `computed`/templates; viewers are read-only; the server enforces anyway and a 403 toasts).
+In templates, hide admin-only controls with `trama.can('admin')` (works in `computed`/templates; viewers are read-only; the server enforces anyway and a 403 toasts).
 
 ---
 
@@ -382,4 +382,4 @@ private readonly _keys = usePageShortcuts([
 - Do not catch mutation errors; they never throw. Do catch `ApiError` from SessionStore auth methods and direct `ApiClient` calls.
 - Do not create new entity types or edit `contracts/`; ask the orchestrator.
 - Optional fields are omitted (never null) in entities; compare with `=== undefined`.
-- Viewer role: hide mutating controls with `nabla.can('member')`.
+- Viewer role: hide mutating controls with `trama.can('member')`.

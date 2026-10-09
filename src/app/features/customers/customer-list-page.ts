@@ -32,7 +32,7 @@ import {
 } from './customer-model';
 import { SearchInput } from '../../shared/search-input';
 
-const DISPLAY_KEY = 'nabla.customers.display.v1';
+const DISPLAY_KEY = 'trama.customers.display.v1';
 const SORTS: readonly CustomerSort[] = ['name', 'tier', 'revenue', 'size', 'requests', 'important', 'open', 'last'];
 const GROUPS: readonly CustomerGroup[] = ['none', 'tier', 'status'];
 

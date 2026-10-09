@@ -7,7 +7,7 @@ import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject, signal } from '@angular/core';
 import { oneOf, readJson, writeJson } from './stores/storage';
 
-export const PREFERENCES_STORAGE_KEY = 'nabla.preferences.v1';
+export const PREFERENCES_STORAGE_KEY = 'trama.preferences.v1';
 
 /** Page opened after signing in and from "/". */
 export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'issues', 'workstreams'] as const;

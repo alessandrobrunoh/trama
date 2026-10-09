@@ -568,10 +568,10 @@ export class IssueBoard {
   );
   readonly showCreate = input(true);
   /** localStorage key for display options. */
-  readonly storageKey = input('nabla.issues.display.v1');
+  readonly storageKey = input('trama.issues.display.v1');
 
   // display options (persisted)
-  protected readonly d = signal<IssueDisplay>(readDisplay('nabla.issues.display.v1'));
+  protected readonly d = signal<IssueDisplay>(readDisplay('trama.issues.display.v1'));
   // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
   protected readonly filters = this.listState.remember<ViewFilter[]>('issues.filters', []);
   protected readonly search = this.listState.remember('issues.search', '');

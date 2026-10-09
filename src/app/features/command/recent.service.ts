@@ -14,7 +14,7 @@ export interface RecentItem {
   at: number;
 }
 
-const KEY = 'nabla.recent.v1';
+const KEY = 'trama.recent.v1';
 const MAX = 12;
 
 @Injectable({ providedIn: 'root' })
