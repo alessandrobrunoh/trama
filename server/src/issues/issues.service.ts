@@ -121,6 +121,10 @@ export class IssuesService {
       projectId?: string;
       workstreamId?: string;
       milestoneId?: string;
+      /** Only issues linked to this customer. */
+      customerId?: string;
+      /** Only issues linked to at least this many distinct customers. */
+      minCustomers?: number;
       q?: string;
       priority?: Priority[];
       /** Only issues still in play: backlog, todo, in progress, in review. */
@@ -152,6 +156,16 @@ export class IssuesService {
       qb.andWhere('i.milestoneIds @> :m::jsonb', {
         m: JSON.stringify([f.milestoneId]),
       });
+    if (f.customerId)
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM customer_requests cr WHERE cr."workspaceId" = i."workspaceId" AND cr."issueId" = i.id AND cr."customerId" = :customerId)`,
+        { customerId: f.customerId },
+      );
+    if (f.minCustomers)
+      qb.andWhere(
+        `(SELECT COUNT(DISTINCT cr."customerId") FROM customer_requests cr WHERE cr."workspaceId" = i."workspaceId" AND cr."issueId" = i.id) >= :minCustomers`,
+        { minCustomers: f.minCustomers },
+      );
     if (f.q)
       qb.andWhere(
         '(i.title ILIKE :q OR i.key ILIKE :q OR i.aliases::text ILIKE :q)',

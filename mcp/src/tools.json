@@ -67,7 +67,7 @@
   "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, repositories and teams.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: workstream,project,issue,decision,execution,artifact,repository,team",
+   "types": "query string Comma-separated: workstream,project,issue,customer,decision,artifact,repository,team",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -839,6 +839,8 @@
    "projectId": "query string Project",
    "workstreamId": "query string Workstream",
    "milestoneId": "query string Milestone",
+   "customerId": "query string Only issues linked to this customer",
+   "minCustomers": "query integer At least this many distinct linked customers",
    "q": "query string Text filter"
   }
  },
@@ -920,6 +922,95 @@
   "description": "Delete an issue.",
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+  }
+ },
+ {
+  "name": "list_customers",
+  "method": "GET",
+  "path": "/customers",
+  "permission": "customers:read",
+  "description": "Companies whose feedback is linked to issues. Archived customers are hidden unless archived=true or archived=all.",
+  "params": {
+   "archived": "query string(true|false|all) true = only archived, all = both, otherwise active",
+   "issueId": "query string Only customers linked to this issue",
+   "q": "query string Name or domain"
+  }
+ },
+ {
+  "name": "get_customer",
+  "method": "GET",
+  "path": "/customers/{id}",
+  "permission": "customers:read",
+  "description": "One customer, archived or not.",
+  "params": {
+   "id": "path string! Customer id"
+  }
+ },
+ {
+  "name": "create_customer",
+  "method": "POST",
+  "path": "/customers",
+  "permission": "customers:write",
+  "description": "Create a customer. Domain is normalized (lower-case, no scheme or www) and unique in the workspace.",
+  "params": {
+   "name": "body string! Customer name",
+   "domain": "body string! Domain, e.g. acme.com or https://www.acme.com"
+  }
+ },
+ {
+  "name": "update_customer",
+  "method": "PATCH",
+  "path": "/customers/{id}",
+  "permission": "customers:write",
+  "description": "Rename, change the domain, or archive/restore a customer. Archiving keeps the links and the issues.",
+  "params": {
+   "id": "path string! Customer id",
+   "name": "body string Name",
+   "domain": "body string Domain",
+   "archived": "body boolean true archives, false restores"
+  }
+ },
+ {
+  "name": "delete_customer",
+  "method": "DELETE",
+  "path": "/customers/{id}",
+  "permission": "customers:delete",
+  "description": "Delete a customer and its links. Issues are kept.",
+  "params": {
+   "id": "path string! Customer id"
+  }
+ },
+ {
+  "name": "list_customer_requests",
+  "method": "GET",
+  "path": "/customers/{id}/requests",
+  "permission": "customers:read",
+  "description": "Feedback linking this customer to issues, newest first, with each issue's key, title and status.",
+  "params": {
+   "id": "path string! Customer id"
+  }
+ },
+ {
+  "name": "create_customer_request",
+  "method": "POST",
+  "path": "/customers/{id}/requests",
+  "permission": "customers:write",
+  "description": "Link a customer to an existing issue. The same pair cannot be linked twice (409).",
+  "params": {
+   "id": "path string! Customer id",
+   "issueId": "body string! Issue id",
+   "body": "body string Optional note"
+  }
+ },
+ {
+  "name": "unlink_customer_request",
+  "method": "POST",
+  "path": "/customers/{id}/requests/{requestId}/unlink",
+  "permission": "customers:write",
+  "description": "Unlink a customer from an issue. The issue is kept.",
+  "params": {
+   "id": "path string! Customer id",
+   "requestId": "path string! Customer request id"
   }
  },
  {

@@ -94,8 +94,14 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       </nav>
     </app-page-header>
     <app-stats-board variant="strip" [model]="stats()" [moreLink]="['/', slug(), 'stats']" />
+    @if (customerRef(); as c) {
+      <p class="text-muted-foreground border-b px-4 py-2 text-xs sm:px-6">
+        Showing issues linked to <a class="text-foreground font-medium" [routerLink]="['/', slug(), 'customers', c.id]">{{ c.name }}</a>.
+        <a class="hover:text-foreground underline" [routerLink]="[]" [queryParams]="{ customer: null }" queryParamsHandling="merge">Clear</a>
+      </p>
+    }
     <app-issue-board
-      [issues]="store.issues()"
+      [issues]="visibleIssues()"
       [scope]="scope()"
       [status]="status()"
       [team]="teamRef()?.id ?? team()"
@@ -120,6 +126,8 @@ export class IssuePage {
   readonly project = input<string>();
   /** Query `?view=active|backlog|done` (view tabs). */
   readonly view = input<string>();
+  /** Query `?customer=<customerId>`: only issues linked to that customer. */
+  readonly customer = input<string>();
 
   protected readonly plus = LucidePlus;
   protected readonly tabs = ISSUE_TABS;
@@ -129,6 +137,14 @@ export class IssuePage {
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
   protected readonly teamRef = computed(() => this.store.getTeam(this.team()));
+  protected readonly customerRef = computed(() => this.store.getCustomer(this.customer()));
+  protected readonly visibleIssues = computed(() => {
+    const id = this.customerRef()?.id;
+    if (!this.customer()) return this.store.issues();
+    if (!id) return [];
+    const ids = new Set(this.store.customerRequests().filter((r) => r.customerId === id).map((r) => r.issueId));
+    return this.store.issues().filter((i) => ids.has(i.id));
+  });
   protected readonly title = computed(() =>
     this.teamRef() ? `${this.teamRef()!.name} issues` : 'Issues',
   );

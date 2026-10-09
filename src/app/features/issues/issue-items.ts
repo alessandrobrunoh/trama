@@ -11,6 +11,7 @@ import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue } from './issue-model';
+import { customerCounts } from '../customers/customer-model';
 import { IssueProp } from './issue-prop';
 
 /** Shared bits of row + card. */
@@ -34,6 +35,7 @@ abstract class IssueItemBase {
   protected readonly check = LucideCheck;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly quiet = computed(() => isClosedIssue(this.issue()));
+  protected readonly customerCount = computed(() => customerCounts(this.store.customerRequests()).get(this.issue().id) ?? 0);
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
     return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
@@ -128,6 +130,13 @@ abstract class IssueItemBase {
           <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
         }
       </span>
+      @if (customerCount()) {
+        <span
+          class="text-muted-foreground relative hidden shrink-0 text-xs tabular-nums sm:inline"
+          [hlmTooltip]="customerCount() === 1 ? '1 customer' : customerCount() + ' customers'"
+          [attr.aria-label]="customerCount() + ' customers'"
+        >{{ customerCount() }}</span>
+      }
 
       @if (hasEstimate()) {
         <app-estimate class="relative text-xs max-sm:hidden" [value]="i.estimate" />

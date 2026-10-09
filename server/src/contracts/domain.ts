@@ -546,8 +546,66 @@ export interface Issue {
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
+  /**
+   * Distinct customers linked to this issue. Set on issue reads and in the snapshot.
+   * `0` when nobody is linked. Not stored on the issue row.
+   */
+  customerCount?: number;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+// ───────────────────────────── Customers ─────────────────────────────
+
+/**
+ * A company that asked for something, not a contact and not a CRM account.
+ * `domain` is the identity inside the workspace: stored lower-case, without a scheme,
+ * path, port or leading `www.`. Two customers cannot share one.
+ */
+export interface Customer {
+  /** `cus_…` */
+  id: ID;
+  workspaceId: ID;
+  name: string;
+  domain: string;
+  /** Who created the record. */
+  createdBy: ActorRef;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** Set when the customer is archived. The record and its links stay; issues are untouched. */
+  archivedAt?: ISODate;
+}
+
+/**
+ * One piece of feedback: a customer linked to an existing issue.
+ * The pair is unique. Deleting the customer or the issue removes the link and nothing else.
+ */
+export interface CustomerRequest {
+  /** `crq_…` */
+  id: ID;
+  workspaceId: ID;
+  customerId: ID;
+  issueId: ID;
+  /** Optional note about what this customer asked for. */
+  body?: string;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+}
+
+const CUSTOMER_DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
+
+/**
+ * `https://WWW.Acme.com/pricing` → `acme.com`. `null` when it is not a domain
+ * (empty, a single label, an IP, or anything with characters a hostname cannot have).
+ */
+export function normalizeCustomerDomain(input: string): string | null {
+  let raw = input.trim().toLowerCase();
+  if (!raw) return null;
+  raw = raw.replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
+  raw = (raw.split(/[/?#]/)[0] ?? '').replace(/:\d+$/, '');
+  if (raw.startsWith('www.')) raw = raw.slice(4);
+  raw = raw.replace(/\.+$/, '');
+  return CUSTOMER_DOMAIN.test(raw) ? raw : null;
 }
 
 // ───────────────────────────── Artifacts ─────────────────────────────
@@ -665,6 +723,8 @@ export interface Dependency {
 export type SubjectType =
   | 'workstream'
   | 'issue'
+  | 'customer'
+  | 'customer_request'
   | 'artifact'
   | 'decision'
   | 'input_request'
@@ -835,7 +895,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
   | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
@@ -851,6 +911,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   projects: { label: 'Projects', group: 'Work', actions: RWD },
   workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
   issues: { label: 'Issues', group: 'Work', actions: RWD },
+  customers: { label: 'Customers', group: 'Work', actions: RWD },
   decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
@@ -879,7 +940,7 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOUR
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
 export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
@@ -909,6 +970,8 @@ export type Capability =
   | 'deleteWorkstreams'
   | 'createIssues'
   | 'deleteIssues'
+  | 'manageCustomers'
+  | 'deleteCustomers'
   | 'acceptDecisions'
   | 'manageSharedViews'
   | 'createTeams'
@@ -937,6 +1000,8 @@ export const CAPABILITIES: Capability[] = [
   'deleteWorkstreams',
   'createIssues',
   'deleteIssues',
+  'manageCustomers',
+  'deleteCustomers',
   'acceptDecisions',
   'manageSharedViews',
   'createTeams',
@@ -954,6 +1019,8 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   deleteWorkstreams: { group: 'Work', label: 'Delete workstreams', description: 'Permanently delete a workstream with its input requests, artifacts and comments.' },
   createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
   deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
+  manageCustomers: { group: 'Work', label: 'Manage customers', description: 'Create and edit customers, archive them, and link or unlink their feedback on issues.' },
+  deleteCustomers: { group: 'Work', label: 'Delete customers', description: 'Permanently delete a customer. Linked issues are kept; the links are removed.' },
   acceptDecisions: { group: 'Work', label: 'Accept and reject decisions', description: 'Accept, reject or supersede a proposed decision. Always needs a person, never an agent.' },
   manageSharedViews: { group: 'Work', label: 'Share views', description: 'Create or publish saved views for the whole workspace.' },
   createTeams: { group: 'Organization', label: 'Create teams', description: 'Add a team to the workspace.' },
@@ -972,6 +1039,8 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   deleteWorkstreams: 'member',
   createIssues: 'member',
   deleteIssues: 'member',
+  manageCustomers: 'member',
+  deleteCustomers: 'member',
   acceptDecisions: 'member',
   manageSharedViews: 'member',
   createTeams: 'admin',
@@ -1171,6 +1240,7 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   { entity: 'project_update', label: 'Project updates', events: ['project_update.created', 'project_update.updated', 'project_update.deleted'] },
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
+  { entity: 'customer', label: 'Customers', events: ['customer.created', 'customer.updated', 'customer.archived', 'customer.restored', 'customer.deleted', 'customer_request.linked', 'customer_request.unlinked'] },
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
@@ -1202,6 +1272,10 @@ export interface WorkspaceSnapshot {
   milestones: Milestone[];
   inputRequests: InputRequest[];
   issues: Issue[];
+  /** Companies whose feedback is linked to issues. Includes archived customers. */
+  customers: Customer[];
+  /** Customer ↔ issue links. Deleting either side removes the row. */
+  customerRequests: CustomerRequest[];
   artifacts: Artifact[];
   decisions: Decision[];
   dependencies: Dependency[];

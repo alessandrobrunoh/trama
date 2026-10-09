@@ -30,6 +30,8 @@ import type {
   NotificationSettings,
   InviteLink,
   InvitePreview,
+  Customer,
+  CustomerRequest,
   Issue,
   Membership,
   Milestone,
@@ -65,7 +67,9 @@ import type {
   CreateMilestoneInput,
   UpdateMilestoneInput,
   UpdateInputRequestInput,
+  CreateCustomerInput,
   CreateIssueInput,
+  LinkCustomerInput,
   CreateIntegrationInput,
   IntegrationDetail,
   IntegrationWithWebhook,
@@ -94,6 +98,7 @@ import type {
   UpdateAgentInput,
   UpdateArtifactInput,
   UpdateDecisionInput,
+  UpdateCustomerInput,
   UpdateIssueInput,
   UpdateMemberInput,
   UpdateProjectInput,
@@ -313,6 +318,21 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateTeamInput) =>
       this.patch<Team>(`${this.w(slug)}/teams/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/teams/${id}`),
+  };
+
+  readonly customers = {
+    list: (slug: string) => this.get<Customer[]>(`${this.w(slug)}/customers`, { archived: 'all' }),
+    get: (slug: string, id: ID) => this.get<Customer>(`${this.w(slug)}/customers/${id}`),
+    create: (slug: string, input: CreateCustomerInput) => this.post<Customer>(`${this.w(slug)}/customers`, input),
+    update: (slug: string, id: ID, input: UpdateCustomerInput) =>
+      this.patch<Customer>(`${this.w(slug)}/customers/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/customers/${id}`),
+    requests: (slug: string, id: ID) =>
+      this.get<CustomerRequest[]>(`${this.w(slug)}/customers/${id}/requests`),
+    link: (slug: string, id: ID, input: LinkCustomerInput) =>
+      this.post<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests`, input),
+    unlink: (slug: string, id: ID, requestId: ID) =>
+      this.post<void>(`${this.w(slug)}/customers/${id}/requests/${requestId}/unlink`),
   };
 
   readonly projects = {

@@ -169,6 +169,23 @@ export interface UpdateRepositoryInput {
   labels?: ID[];
 }
 
+// ───── customers ─────
+export interface CreateCustomerInput {
+  name: string;
+  /** Raw domain. The server stores it normalized. */
+  domain: string;
+}
+export interface UpdateCustomerInput {
+  name?: string;
+  domain?: string;
+  /** `true` archives, `false` restores. Links stay. */
+  archived?: boolean;
+}
+export interface LinkCustomerInput {
+  issueId: ID;
+  body?: string;
+}
+
 // ───── projects ─────
 export interface CreateProjectInput {
   name: string;
