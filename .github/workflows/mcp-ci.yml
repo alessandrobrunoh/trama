@@ -1,0 +1,28 @@
+name: MCP
+
+on:
+  pull_request:
+    paths: ['mcp/**', 'skills/**', 'README.md', '.github/workflows/mcp-ci.yml']
+  push:
+    branches: [main]
+    paths: ['mcp/**', 'skills/**', 'README.md', '.github/workflows/mcp-ci.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: mcp
+      # Besides the unit tests this checks that the tool count / table in README.md and mcp/README.md
+      # match the curated profile, that curated.json maps onto tools.json, and that the skills only
+      # name tools the default profile lists (fix with: UPDATE_MCP_DOCS=1 cargo test generated_tool_docs).
+      - run: cargo test --locked
+        working-directory: mcp
+      - run: cargo build --locked
+        working-directory: mcp
