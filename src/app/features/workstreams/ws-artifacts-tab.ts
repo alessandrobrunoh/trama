@@ -25,6 +25,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { ProviderIcon, providerLabel } from '../../shared/provider-icon';
 import { StatusBadge, statusLabel } from '../../shared/status';
+import { DocumentActions } from '../documents/document-attach';
 import { Picker, type PickOption } from './picker';
 import { ARTIFACT_GROUPS } from './ws-model';
 
@@ -76,13 +77,17 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
     StatusBadge,
     RelativeTimePipe,
     Picker,
+    DocumentActions,
   ],
   host: { class: 'block' },
   template: `
     <div class="flex items-center gap-2 border-b px-4 py-2 sm:px-6">
       <span class="text-muted-foreground text-xs">{{ all().length }} artifact{{ all().length === 1 ? '' : 's' }}</span>
       @if (canEdit()) {
-        <button hlmBtn size="sm" class="ml-auto" (click)="openAttach()"><svg [lucideIcon]="plus" [size]="14"></svg>Attach artifact</button>
+        <span class="ml-auto flex items-center gap-1.5">
+          <app-document-actions variant="outline" [owner]="{ workstreamId: ws().id }" />
+          <button hlmBtn size="sm" (click)="openAttach()"><svg [lucideIcon]="plus" [size]="14"></svg>Attach artifact</button>
+        </span>
       }
     </div>
 
@@ -98,7 +103,9 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
               @if (a.externalId) {
                 <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ a.externalId }}</span>
               }
-              @if (a.url) {
+              @if (a.documentId) {
+                <a [routerLink]="['/', slug(), 'documents', a.documentId]" class="min-w-0 truncate text-sm hover:underline">{{ a.title }}</a>
+              } @else if (a.url) {
                 <a [href]="a.url" target="_blank" rel="noopener" class="min-w-0 truncate text-sm hover:underline">{{ a.title }}</a>
                 <svg [lucideIcon]="ext" [size]="11" class="text-muted-foreground shrink-0"></svg>
               } @else {

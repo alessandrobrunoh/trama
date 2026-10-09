@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { LucidePackage, LucidePlus, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { NablaStore, type Artifact, type Issue } from '../../core';
+import { DocumentActions } from '../documents/document-attach';
 import { ProjectArtifactDialog } from '../projects/project-artifact-dialog';
 import { ProjectArtifactRow } from '../projects/project-artifact-row';
 
@@ -12,7 +13,7 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
 @Component({
   selector: 'app-issue-artifacts',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon, ProjectArtifactDialog, ProjectArtifactRow],
+  imports: [HlmButtonImports, LucideDynamicIcon, ProjectArtifactDialog, ProjectArtifactRow, DocumentActions],
   host: { class: 'block' },
   template: `
     <div class="mb-2 flex items-center gap-2">
@@ -21,15 +22,18 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
         <span class="text-muted-foreground text-xs tabular-nums">{{ items().length }}</span>
       }
       @if (canEdit()) {
-        <button
-          hlmBtn
-          size="sm"
-          variant="ghost"
-          class="ml-auto h-7 gap-1.5 text-xs"
-          (click)="openAdd()"
-        >
-          <svg [lucideIcon]="plus" [size]="13"></svg> Add document / link
-        </button>
+        <span class="ml-auto flex items-center gap-1">
+          <app-document-actions [owner]="{ issueId: issue().id }" />
+          <button
+            hlmBtn
+            size="sm"
+            variant="ghost"
+            class="h-7 gap-1.5 text-xs"
+            (click)="openAdd()"
+          >
+            <svg [lucideIcon]="plus" [size]="13"></svg> Add document / link
+          </button>
+        </span>
       }
     </div>
 
