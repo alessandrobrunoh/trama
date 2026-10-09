@@ -1,11 +1,11 @@
 ---
 name: trama-workflow
-description: Run the Trama work cycle when you are about to start, continue, or close work, not when you are only looking something up. Use when the user hands you one or more issues, asks you to take, start, triage, or ship work in Trama, or names a workstream to work on. Search first. If a matching workstream already exists, attach the issues to it. If not, create one and document the outcome there before writing code. Then hand off to the other Trama skills. Do not use for a single read (get_issue, search, whoami).
+description: Run the Trama work cycle when you are about to start, continue, or close work, not when you are only looking something up. Use when the user hands you one or more issues, asks you to take, start, triage, or ship work in Trama, or names a workstream to work on. Search first. If a matching workstream already exists, attach the issues to it. If not, create one and document the outcome there before writing code. Then hand off to the other Trama skills. Do not use for a single read (get_context, search, whoami).
 ---
 
 # The Trama work cycle
 
-You are the dispatcher, not the specialist. Decide where the work belongs, then hand off. Do not re-explain what the other skills already specify: `trama` for the rules, `trama-triage-issues` for filing, `trama-start-work` for picking up a workstream, `trama-report-progress` for recording facts, `trama-ask-and-decide` for a question or a decision. On the CLI the same tools are `trama` commands (`trama-cli`).
+You are the dispatcher, not the specialist. Decide where the work belongs, then hand off. Do not re-explain what the other skills already specify: `trama` for the rules, `trama-triage-issues` for filing, `trama-start-work` for picking up a workstream, `trama-report-progress` for recording facts, `trama-ask-and-decide` for a question or a decision. On the CLI the same work is `trama` commands (`trama-cli`). The MCP server lists a short task-level tool set; anything not listed is `list_capabilities` then `run_tool`.
 
 ## 1. Know which workspace
 
@@ -27,11 +27,11 @@ Read what comes back, including the `workspace` stamp on each row. Do not create
 
 A workstream is an outcome, not a container, and not a Delta thread. The thread is only the execution context; it does not set work boundaries. One workstream per outcome, never a second for the same outcome, and never one stretched over unrelated outcomes just because they share a thread.
 
-Per issue, ask: does it serve the outcome of an existing workstream? Search first (`search`, `list_workstreams`; a workstream whose `deltaThreadUrl` is this thread is a candidate, not a rule). If yes, link it there. If no, it needs its own workstream or stays a plain issue. One thread can therefore touch several workstreams; you may treat one as the thread's primary. A subagent works an issue; it gets no workstream of its own, and a slice with no issue yet becomes an issue on the workstream it serves. Only when the user says these issues are one effort do you group them without further questions.
+Per issue, ask: does it serve the outcome of an existing workstream? Search first (`search`, `find_work { scope: "workstreams" }`; a workstream whose `deltaThreadUrl` is this thread is a candidate, not a rule). If yes, link it there. If no, it needs its own workstream or stays a plain issue. One thread can therefore touch several workstreams; you may treat one as the thread's primary. A subagent works an issue; it gets no workstream of its own, and a slice with no issue yet becomes an issue on the workstream it serves. Only when the user says these issues are one effort do you group them without further questions.
 
 For each issue or group of issues:
 
-- The issues are already on a workstream: use that one. Load it with `get_workstream_context` and continue at step 5.
+- The issues are already on a workstream: use that one. Load it with `get_context` (or go straight to `start_work`) and continue at step 5.
 - Several issues share one outcome and have no workstream: create one and link them.
   ```
   link_issue {
@@ -45,7 +45,7 @@ For each issue or group of issues:
 
 `deltaThreadUrl` is optional: a workstream can exist before its Delta thread. If you are the parent of a Delta thread, set it to this thread's URL. Otherwise omit it; do not invent one. A supplied URL must be an https link on delta.dev.
 
-Document the outcome on the workstream, not on the issue: an objective in one sentence, and criteria that are observable ("OAuth login passes on Safari 18"), not tasks ("fix OAuth").
+Document the outcome on the workstream, not on the issue: an objective in one sentence, and criteria that are observable ("OAuth login passes on Safari 18"), not tasks ("fix OAuth"). Add them with `report_progress { workstream, addCriteria: [...] }`.
 
 ## 4. Do not write the status
 

@@ -155,6 +155,12 @@ export const routes: Routes = [
           import('./features/customers/customer-list-page').then((m) => m.CustomerListPage),
       },
       {
+        path: 'customers/inbox',
+        title: 'Customer request inbox · Trama',
+        loadComponent: () =>
+          import('./features/customers/customer-inbox-page').then((m) => m.CustomerInboxPage),
+      },
+      {
         path: 'customers/:id',
         title: 'Customer · Trama',
         loadComponent: () =>

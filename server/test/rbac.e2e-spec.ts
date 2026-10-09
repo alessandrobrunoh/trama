@@ -23,7 +23,8 @@ describe('workspaces, RBAC and tenancy', () => {
   }
 
   it('creator becomes owner; workspaces list shows my role', async () => {
-    const { owner, slug } = await setup();
+    const { owner, slug, ws, ownerUserId } = await setup();
+    expect(ws.primaryOwnerId).toBe(ownerUserId);
     const mine = (await owner.client.get('/api/workspaces').expect(200)).body;
     expect(mine.find((w: { slug: string }) => w.slug === slug).role).toBe('owner');
   });
@@ -52,8 +53,11 @@ describe('workspaces, RBAC and tenancy', () => {
     await admin.post(`/api/w/${slug}/repositories`, { provider: 'github', fullName: 'acme/api' }).expect(201);
     await admin.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'codex' }).expect(201);
     await admin.patch(`/api/w/${slug}`, { name: 'Renamed' }).expect(200);
-    await admin.delete(`/api/w/${slug}`).expect(403);
-    await owner.client.delete(`/api/w/${slug}`).expect(204);
+    await admin.delete(`/api/w/${slug}`, { confirm: slug }).expect(403);
+    // the owner must repeat the slug or name
+    await owner.client.delete(`/api/w/${slug}`).expect(400);
+    await owner.client.delete(`/api/w/${slug}`, { confirm: 'not-this-one' }).expect(400);
+    await owner.client.delete(`/api/w/${slug}`, { confirm: slug }).expect(204);
     await owner.client.get(`/api/w/${slug}`).expect(404);
   });
 
@@ -91,9 +95,15 @@ describe('workspaces, RBAC and tenancy', () => {
     // existing users only
     await owner.client.post(`/api/w/${slug}/members`, { email: 'nobody@nowhere.dev', role: 'member' }).expect(404);
     await owner.client.post(`/api/w/${slug}/members`, { email: members[1].user.email, role: 'member' }).expect(409);
-    // promote a second owner, then the first can step down
+    // promote a second owner: the creator still cannot step down or leave until ownership is transferred
     await owner.client.patch(`/api/w/${slug}/members/${memberMembership.id}`, { role: 'owner' }).expect(200);
+    await owner.client.patch(`/api/w/${slug}/members/${ownerMembership.id}`, { role: 'admin' }).expect(409);
+    await owner.client.delete(`/api/w/${slug}/members/${ownerMembership.id}`).expect(409);
+    // the second owner can neither demote nor remove the creator
+    await member.patch(`/api/w/${slug}/members/${ownerMembership.id}`, { role: 'admin' }).expect(403);
+    await member.delete(`/api/w/${slug}/members/${ownerMembership.id}`).expect(403);
+    // after a transfer the former creator can step down
+    await owner.client.post(`/api/w/${slug}/transfer-ownership`, { membershipId: memberMembership.id }).expect(200);
     await owner.client.patch(`/api/w/${slug}/members/${ownerMembership.id}`, { role: 'admin' }).expect(200);
-    expect(member).toBeDefined();
   });
 });

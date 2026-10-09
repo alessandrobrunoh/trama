@@ -7,6 +7,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { NablaStore, WORKSTREAM_STATUS_META, isDeltaThreadUrl, type Priority, type WorkstreamStatus } from '../../core';
+import { Notifier } from '../../core/notify/notifier';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
 import { priorityOptions, projectOptions, repoOptionsIn, teamOptions, userOptions } from './ws-model';
@@ -57,12 +58,16 @@ export interface CreateWorkstreamDefaults {
               id="cw-title"
               placeholder="Stabilize authentication before v2"
               autocomplete="off"
+              [attr.aria-invalid]="titleError() ? 'true' : null"
               [value]="title()"
               (input)="title.set($any($event.target).value)"
             />
+            @if (titleError(); as err) {
+              <p class="text-destructive text-xs" role="alert">{{ err }}</p>
+            }
           </div>
           <div class="grid gap-1.5">
-            <label hlmLabel for="cw-desc">Description</label>
+            <label hlmLabel for="cw-desc">Description <span class="text-muted-foreground font-normal">· optional</span></label>
             <textarea
               hlmTextarea
               id="cw-desc"
@@ -75,19 +80,23 @@ export interface CreateWorkstreamDefaults {
           </div>
           @if (deltaEnabled()) {
             <div class="grid gap-1.5">
-              <label hlmLabel for="cw-delta">Delta thread <span class="text-muted-foreground font-normal">(optional)</span></label>
+              <label hlmLabel for="cw-delta">Delta thread <span class="text-muted-foreground font-normal">· optional</span></label>
               <input
                 hlmInput
                 id="cw-delta"
                 placeholder="https://delta.dev/t/…"
                 autocomplete="off"
+                [attr.aria-invalid]="deltaError() ? 'true' : null"
                 [value]="deltaUrl()"
                 (input)="deltaUrl.set($any($event.target).value)"
               />
+              @if (deltaError(); as err) {
+                <p class="text-destructive text-xs" role="alert">{{ err }}</p>
+              }
             </div>
           }
           <div class="grid gap-1.5">
-            <label hlmLabel for="cw-objective">Objective <span class="text-muted-foreground font-normal">(markdown)</span></label>
+            <label hlmLabel for="cw-objective">Objective <span class="text-muted-foreground font-normal">· optional, markdown</span></label>
             <textarea
               hlmTextarea
               id="cw-objective"
@@ -108,6 +117,9 @@ export interface CreateWorkstreamDefaults {
                 [value]="ownerTeamId() ? [ownerTeamId()] : []"
                 (valueChange)="setOwner($event[0])"
               />
+              @if (teamError(); as err) {
+                <p class="text-destructive text-xs" role="alert">{{ err }}</p>
+              }
             </div>
             <div class="grid min-w-0 gap-1.5">
               <label hlmLabel>Accountable</label>
@@ -179,7 +191,7 @@ export interface CreateWorkstreamDefaults {
 
         <hlm-dialog-footer>
           <button hlmBtn variant="outline" hlmDialogClose type="button">Cancel</button>
-          <button hlmBtn type="button" [disabled]="!canSubmit() || busy()" (click)="submit()">
+          <button hlmBtn type="button" [disabled]="busy()" (click)="submit()">
             Create workstream
             <app-kbd keys="mod+enter" class="opacity-70" />
           </button>
@@ -191,6 +203,7 @@ export interface CreateWorkstreamDefaults {
 export class CreateWorkstreamDialog {
   private readonly store = inject(NablaStore);
   private readonly router = inject(Router);
+  private readonly notifier = inject(Notifier);
 
   readonly open = model(false);
   readonly defaults = input<CreateWorkstreamDefaults>({});
@@ -218,8 +231,14 @@ export class CreateWorkstreamDialog {
     this.teams().filter((t) => t.value !== this.ownerTeamId()),
   );
   protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
-  protected readonly canSubmit = computed(
-    () => this.title().trim().length > 0 && !!this.ownerTeamId() && (!this.deltaEnabled() || !this.deltaUrl().trim() || isDeltaThreadUrl(this.deltaUrl().trim())),
+  /** Errors only show once the person has tried to create, like the other creation dialogs. */
+  private readonly submitted = signal(false);
+  protected readonly titleError = computed(() => (this.submitted() && !this.title().trim() ? 'Give it a title.' : null));
+  protected readonly teamError = computed(() => (this.submitted() && !this.ownerTeamId() ? 'Pick the owner team.' : null));
+  protected readonly deltaError = computed(() =>
+    this.submitted() && this.deltaEnabled() && this.deltaUrl().trim() && !isDeltaThreadUrl(this.deltaUrl().trim())
+      ? 'The Delta thread must be an https link on delta.dev.'
+      : null,
   );
 
   constructor() {
@@ -244,6 +263,7 @@ export class CreateWorkstreamDialog {
     this.target.set(undefined);
     this.projectId.set(this.store.getProject(d.projectId)?.id ?? '');
     this.repositories.set(d.repositoryIds ?? []);
+    this.submitted.set(false);
     this.busy.set(false);
   }
 
@@ -267,7 +287,9 @@ export class CreateWorkstreamDialog {
   }
 
   protected async submit(): Promise<void> {
-    if (!this.canSubmit() || this.busy()) return;
+    if (this.busy()) return;
+    this.submitted.set(true);
+    if (this.titleError() || this.teamError() || this.deltaError()) return;
     this.busy.set(true);
     const target = this.target();
     const ws = await this.store.createWorkstream({
@@ -286,6 +308,7 @@ export class CreateWorkstreamDialog {
     });
     this.busy.set(false);
     if (!ws) return;
+    this.notifier.success(`${ws.key} created`, { description: ws.title });
     this.open.set(false);
     const slug = this.store.slug();
     if (slug) void this.router.navigate(['/', slug, 'workstreams', ws.key]);

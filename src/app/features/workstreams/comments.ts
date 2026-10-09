@@ -14,6 +14,7 @@ import { LucideDynamicIcon, LucidePencil, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
+  DraftStore,
   NablaStore,
   Preferences,
   UiStore,
@@ -66,14 +67,32 @@ import { CommentInput } from './comment-input';
 })
 export class CommentComposer {
   protected readonly prefs = inject(Preferences);
+  private readonly drafts = inject(DraftStore);
   readonly placeholder = input('Leave a comment…');
+  /** Keeps the unsent text under this key, so it survives navigation and refresh (e.g. `comment:issue:in_x`). */
+  readonly draftKey = input<string>();
   readonly submitted = output<string>();
   protected readonly draft = signal('');
   protected readonly busy = signal(false);
 
+  constructor() {
+    // Order matters: restore first, then persist what is typed.
+    effect(() => {
+      const key = this.draftKey();
+      if (key) untracked(() => this.draft.set(this.drafts.get<string>(key) ?? ''));
+    });
+    effect(() => {
+      const key = this.draftKey();
+      const text = this.draft();
+      if (key) this.drafts.set(key, text.trim() ? text : null);
+    });
+  }
+
   /** Parent awaits the write and calls this to clear the draft. */
   reset(): void {
     this.draft.set('');
+    const key = this.draftKey();
+    if (key) this.drafts.set(key, null);
     this.busy.set(false);
   }
 
@@ -292,7 +311,7 @@ export class CommentsLoader {
   template: `
     <div class="flex flex-col gap-5">
       @if (canEdit()) {
-        <app-comment-composer #composer (submitted)="send($event, composer)" />
+        <app-comment-composer #composer [draftKey]="'comment:' + subject().type + ':' + subject().id" (submitted)="send($event, composer)" />
       }
       @for (c of comments(); track c.id) {
         <app-comment-item [comment]="c" />

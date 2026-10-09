@@ -9,13 +9,14 @@ import { isoFromDate } from '../milestones/milestone-actions';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
-import { contributors, isDeliveredState, issueCounts, labelOptions, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
+import { contributors, isDeliveredState, issueCounts, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
+import { LabelPicker } from '../../shared/label-picker';
 
 @Component({
   selector: 'app-ws-properties',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PropertyRow, Picker, HlmTooltip, ActorLabel, FullDatePipe, IssueProgress, WsDatePicker],
+  imports: [LabelPicker, PropertyRow, Picker, HlmTooltip, ActorLabel, FullDatePipe, IssueProgress, WsDatePicker],
   host: { class: 'block' },
   template: `
     @let w = ws();
@@ -108,7 +109,7 @@ import { IssueProgress, WsDatePicker } from './ws-parts';
         </span>
       </app-property-row>
       <app-property-row label="Labels">
-        <app-picker variant="field" label="Labels" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="labelChoices()" [value]="w.labels" (valueChange)="update({ labels: $event })" />
+        <app-label-picker [disabled]="!canEdit()" [value]="w.labels" (valueChange)="update({ labels: $event })" />
       </app-property-row>
     </div>
 
@@ -174,7 +175,6 @@ export class WsProperties {
   protected readonly repos = computed(() => repoOptionsIn(this.store, this.ws().projectId));
   protected readonly projects = computed(() => projectOptions(this.store, this.ws().projectId));
   protected readonly priorities = priorityOptions();
-  protected readonly labelChoices = computed(() => labelOptions(this.store));
   protected readonly participantOptions = computed(() => this.teams().filter((t) => t.value !== this.ws().ownerTeamId));
 
   protected readonly overdue = computed(

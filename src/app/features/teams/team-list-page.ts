@@ -2,7 +2,6 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucidePlus, LucideSearch, LucideUsers } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
@@ -12,13 +11,15 @@ import { KeyChip } from '../../shared/key-chip';
 import { PageHeader } from '../../shared/page-header';
 import { AvatarStack } from '../../shared/actor-avatar';
 import { StatusIcon } from '../../shared/status';
+import { SearchInput } from '../../shared/search-input';
 
 const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 
 @Component({
   selector: 'app-team-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, PageHeader, Kbd, EmptyState, KeyChip, TopBarActions, AvatarStack, StatusIcon],
+  imports: [
+    SearchInput, RouterLink, HlmButtonImports, LucideDynamicIcon, PageHeader, Kbd, EmptyState, KeyChip, TopBarActions, AvatarStack, StatusIcon],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
@@ -34,10 +35,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
     <app-page-header title="Teams" [description]="description()" />
 
     <div class="border-b px-4 py-2 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input hlmInput class="h-10 w-full pl-9 text-sm" placeholder="Search teams…" aria-label="Search teams" [value]="search()" (input)="search.set($any($event.target).value)" />
-      </div>
+      <app-search-input noun="teams" [(value)]="search" />
     </div>
 
     @if (total() === 0) {
@@ -61,7 +59,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             [routerLink]="['/', slug(), 'teams', r.team.key]"
             [attr.data-row-id]="r.team.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 flex min-h-16 items-center gap-3 border-b px-4 py-3 outline-none sm:px-6 md:min-h-11 md:py-2"
+            class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex min-h-16 items-center gap-3 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-11 md:py-2"
             [class.bg-muted]="ui.focusedRowId() === r.team.id"
           >
             <span class="flex size-6 shrink-0 items-center justify-center rounded-md" [style.background]="r.tint">

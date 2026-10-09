@@ -27,8 +27,9 @@ import { repositoryStats } from '../stats/stats-model';
 import { CommentThread } from '../workstreams/comments';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { buildSummary, labelOptions, teamOptions } from '../workstreams/ws-model';
+import { buildSummary, teamOptions } from '../workstreams/ws-model';
 import { WorkstreamRow } from '../workstreams/workstream-items';
+import { LabelPicker } from '../../shared/label-picker';
 
 const ACTIVITY_CAP = 20;
 const ARTIFACT_CAP = 12;
@@ -36,7 +37,7 @@ const ARTIFACT_CAP = 12;
 @Component({
   selector: 'app-repository-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [LabelPicker, 
     RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -162,7 +163,7 @@ const ARTIFACT_CAP = 12;
                       <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ a.externalId }}</span>
                     }
                     <span class="text-muted-foreground w-20 shrink-0 text-right font-mono text-xs max-sm:hidden">{{ workstreamKey(a.workstreamId) }}</span>
-                    <span class="text-muted-foreground w-16 shrink-0 text-right text-xs max-sm:hidden">{{ a.updatedAt | relativeTime }}</span>
+                    <span class="text-muted-foreground w-24 shrink-0 text-right text-xs whitespace-nowrap max-sm:hidden">{{ a.updatedAt | relativeTime }}</span>
                   </a>
                 }
               </div>
@@ -233,16 +234,7 @@ const ARTIFACT_CAP = 12;
             }
           </app-property-row>
           <app-property-row label="Labels">
-            <app-picker
-              variant="field"
-              label="Labels"
-              placeholder="None"
-              [multiple]="true"
-              [disabled]="!canAdmin()"
-              [options]="labels()"
-              [value]="r.labels"
-              (valueChange)="saveLabels($event)"
-            />
+            <app-label-picker [disabled]="!canAdmin()" [value]="r.labels" (valueChange)="saveLabels($event)" />
           </app-property-row>
           <app-property-row label="Teams">
             <app-picker
@@ -320,7 +312,6 @@ export class RepositoryDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canAdmin = computed(() => this.store.allowed('manageRepositories'));
   protected readonly teams = computed(() => teamOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly repo = computed(() => this.store.getRepository(this.id()));
   protected readonly providerName = computed(() => {
     const r = this.repo();

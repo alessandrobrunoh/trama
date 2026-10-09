@@ -56,6 +56,7 @@ import {
   WORKSTREAM_STATUS_META,
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
+import { DraftStore } from '../../core/stores/draft.store';
 import { NablaStore } from '../../core/stores/nabla.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { StatusIcon } from '../../shared/status';
@@ -253,7 +254,13 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           </div>
         </hlm-dialog-header>
 
-        <form (submit)="submit($event)" novalidate class="flex flex-col">
+        <form (submit)="submit($event)" novalidate class="flex flex-col" [class]="composer() ? '' : 'sm:min-w-md'">
+          @if (restored()) {
+            <div class="bg-muted/50 text-muted-foreground mx-5 mt-3 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs" data-testid="draft-restored">
+              Restored your unsent {{ kindLabel().toLowerCase() }}.
+              <button type="button" class="text-foreground ml-auto underline-offset-2 hover:underline" (click)="discardDraft()">Discard</button>
+            </div>
+          }
           @if (composer()) {
             <!-- title + description -->
             <div class="flex flex-col gap-1 px-5 pt-3">
@@ -718,6 +725,7 @@ export class CreateDialog {
   protected readonly canShare = computed(() => this.store.allowed('manageSharedViews'));
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
+  private readonly drafts = inject(DraftStore);
 
   private readonly titleEl = viewChild<ElementRef<HTMLInputElement>>('titleEl');
 
@@ -916,14 +924,74 @@ export class CreateDialog {
     }
   });
 
+  /** True while the form shows text restored from an unsent draft. */
+  protected readonly restored = signal(false);
+
   constructor() {
     // Reset the form from the context defaults each time the dialog opens.
     effect(() => {
       if (!this.open()) return;
       const kind = this.ui.createKind();
       const defaults = this.ui.createDefaults();
-      untracked(() => this.reset(kind, defaults));
+      untracked(() => {
+        this.reset(kind, defaults);
+        this.restoreDraft(kind, defaults);
+      });
     });
+    // Keep what is typed, so closing the dialog or navigating away does not lose it.
+    effect(() => {
+      if (!this.open() || !this.composer()) return;
+      const draft = {
+        title: this.title(),
+        text: this.text(),
+        text2: this.text2(),
+        priority: this.priority(),
+        issueKind: this.issueKind(),
+        teamId: this.teamId(),
+        assigneeId: this.assigneeId(),
+        projectId: this.projectId(),
+        tags: this.tags(),
+        deltaUrl: this.deltaUrl(),
+      };
+      const kind = this.kind();
+      untracked(() => {
+        // Nothing to keep until there is a title or a description.
+        const hasText = !!(draft.title.trim() || draft.text.trim());
+        this.drafts.set(this.draftKey(kind), hasText ? draft : null);
+      });
+    });
+  }
+
+  private draftKey(kind: CreateKind): string {
+    return `create:${kind}`;
+  }
+
+  /** Bring back the unsent text of this kind, unless the dialog was opened with its own prefill. */
+  private restoreDraft(kind: CreateKind, d: Record<string, unknown>): void {
+    this.restored.set(false);
+    if (!SWITCHER.some((k) => k.kind === kind)) return;
+    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement'])) return;
+    const draft = this.drafts.get<Record<string, unknown>>(this.draftKey(kind));
+    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim())) return;
+    this.title.set(asStr(draft['title']));
+    this.text.set(asStr(draft['text']));
+    this.text2.set(asStr(draft['text2']));
+    this.priority.set(oneOf(PRIORITIES, draft['priority']) ?? this.priority());
+    this.issueKind.set(oneOf(ISSUE_KINDS, draft['issueKind']) ?? this.issueKind());
+    if (this.store.teamById().has(asStr(draft['teamId']))) this.teamId.set(asStr(draft['teamId']));
+    if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
+    if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
+    this.tags.set(asStr(draft['tags']));
+    this.deltaUrl.set(asStr(draft['deltaUrl']));
+    this.restored.set(true);
+  }
+
+  /** Throw the restored text away and start from the context defaults. */
+  protected discardDraft(): void {
+    this.drafts.set(this.draftKey(this.kind()), null);
+    this.reset(this.kind(), this.ui.createDefaults());
+    this.restored.set(false);
+    this.focusTitle();
   }
 
   private reset(kind: CreateKind, d: Record<string, unknown>): void {
@@ -1044,6 +1112,9 @@ export class CreateDialog {
   protected onSwitch(next: ComposerKind): void {
     if (next === this.kind()) return;
     // Title / description / priority carry over; kind-specific properties keep their own state.
+    // The text moves to the new kind's draft, so the old one is not left behind.
+    this.drafts.set(this.draftKey(this.kind()), null);
+    this.restored.set(false);
     this.kind.set(next);
     this.submitted.set(false);
     this.ui.createKind.set(next);
@@ -1227,7 +1298,7 @@ export class CreateDialog {
           });
           if (d)
             done = {
-              label: asDraft ? `${d.key} saved as draft` : `${d.key} recorded`,
+              label: asDraft ? `${d.key} saved as draft` : `${d.key} created`,
               path: ['decisions', d.key],
             };
           break;
@@ -1287,6 +1358,7 @@ export class CreateDialog {
           ? undefined
           : { label: 'Open', run: () => void this.router.navigate(commands) },
       });
+      this.drafts.set(this.draftKey(this.kind()), null);
       if (this.createMore() && this.composer()) {
         this.title.set('');
         this.text.set('');

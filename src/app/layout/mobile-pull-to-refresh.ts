@@ -6,7 +6,7 @@ import {
   inject,
   signal,
 } from '@angular/core';
-import { LucideArrowDown, LucideDynamicIcon, LucideRefreshCw } from '@lucide/angular';
+import { LucideArrowDown, LucideDynamicIcon, LucideLoaderCircle } from '@lucide/angular';
 import { NablaStore } from '../core/stores/nabla.store';
 import { haptic } from '../core/viewport';
 
@@ -50,7 +50,7 @@ export class PullToRefresh {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly arrow = LucideArrowDown;
-  protected readonly spinner = LucideRefreshCw;
+  protected readonly spinner = LucideLoaderCircle;
   protected readonly offset = signal(0);
   protected readonly pulling = signal(false);
   protected readonly refreshing = signal(false);

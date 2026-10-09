@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { DataSource, type EntityManager } from 'typeorm';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import {
   LABEL_NAME_MAX,
@@ -7,11 +7,13 @@ import {
   LABEL_TEMPLATES,
   assignLabelIds,
   resolveLabelCatalog,
+  type ViewFilter,
   type WorkspaceLabel,
 } from '../contracts/domain.js';
 import { uid } from '../common/util.js';
 import { WorkspaceEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { rewriteLabelFilters } from '../labels/label-filters.js';
 
 const COLOR = /^#[0-9a-fA-F]{6}$/;
 const CUSTOM_MAX = 100;
@@ -48,7 +50,7 @@ export class LabelsService {
     return this.save(ctx, [...catalog, { id: uid('lb'), name, color, template: false }]);
   }
 
-  async update(ctx: WorkspaceContext, id: string, patch: { name?: string; color?: string }): Promise<WorkspaceEntity> {
+  async update(ctx: WorkspaceContext, id: string, patch: { name?: string; color?: string; archived?: boolean }): Promise<WorkspaceEntity> {
     const catalog = resolveLabelCatalog(ctx.workspace.settings?.labels);
     const current = catalog.find((label) => label.id === id);
     if (!current) throw new BadRequestException(`Unknown label "${id}"`);
@@ -65,8 +67,27 @@ export class LabelsService {
       color = patch.color.toLowerCase();
       if (!COLOR.test(color)) throw new BadRequestException('color must be #rrggbb');
     }
-    const next = catalog.map((label) => (label.id === id ? { ...label, name, color, template: label.template || LABEL_TEMPLATES.some((t) => t.id === id) } : label));
+    if (patch.archived === true && current.template) throw new BadRequestException('Template labels cannot be archived');
+    const archived = patch.archived ?? current.archived === true;
+    const next = catalog.map((label): WorkspaceLabel => {
+      if (label.id !== id) return label;
+      const template = label.template || LABEL_TEMPLATES.some((t) => t.id === id);
+      return archived && !template ? { id, name, color, template, archived: true } : { id, name, color, template };
+    });
     return this.save(ctx, next);
+  }
+
+  /** Move every assignment of `id` onto `into`, then drop `id`. Templates cannot be merged away. */
+  async merge(ctx: WorkspaceContext, id: string, into: string): Promise<WorkspaceEntity> {
+    const catalog = resolveLabelCatalog(ctx.workspace.settings?.labels);
+    const current = catalog.find((label) => label.id === id);
+    if (!current) throw new BadRequestException(`Unknown label "${id}"`);
+    if (current.template) throw new BadRequestException('Template labels cannot be merged into another label');
+    const target = catalog.find((label) => label.id === into);
+    if (!target) throw new BadRequestException(`Unknown label "${into}"`);
+    if (target.id === id) throw new BadRequestException('A label cannot be merged into itself');
+    if (target.archived) throw new BadRequestException(`Label "${target.name}" is archived. Restore it before merging into it`);
+    return this.drop(ctx, catalog, id, into);
   }
 
   async remove(ctx: WorkspaceContext, id: string): Promise<WorkspaceEntity> {
@@ -74,29 +95,21 @@ export class LabelsService {
     const current = catalog.find((label) => label.id === id);
     if (!current) throw new BadRequestException(`Unknown label "${id}"`);
     if (current.template) throw new BadRequestException('Template labels cannot be removed');
+    return this.drop(ctx, catalog, id, null);
+  }
+
+  /** Replace `id` by `into` (or remove it) on every record and saved view, then take it out of the catalog. One transaction. */
+  private async drop(ctx: WorkspaceContext, catalog: readonly WorkspaceLabel[], id: string, into: string | null): Promise<WorkspaceEntity> {
     const ws = ctx.workspace;
     await this.ds.transaction(async (m) => {
-      for (const table of TABLES) {
-        await m.query(
-          `UPDATE "${table}" SET "labels" = COALESCE((SELECT jsonb_agg(x) FROM jsonb_array_elements_text("labels") x WHERE x <> $2), '[]'::jsonb) WHERE "workspaceId" = $1 AND "labels" @> jsonb_build_array($2::text)`,
-          [ws.id, id],
-        );
-      }
-      const views = await m.query(`SELECT "id", "filters" FROM "saved_views" WHERE "workspaceId" = $1`, [ws.id]) as {
+      for (const table of TABLES) await replaceInTable(m, table, ws.id, id, into);
+      const views = (await m.query(`SELECT "id", "filters" FROM "saved_views" WHERE "workspaceId" = $1`, [ws.id])) as {
         id: string;
-        filters: { field: string; op: string; value: string | string[] }[] | null;
+        filters: ViewFilter[] | null;
       }[];
       for (const view of views) {
-        if (!(view.filters ?? []).some((filter) => filter.field === 'labels')) continue;
-        const filters = (view.filters ?? []).flatMap((filter) => {
-          if (filter.field !== 'labels') return [filter];
-          if (Array.isArray(filter.value)) {
-            const value = filter.value.filter((item) => item !== id);
-            return value.length ? [{ ...filter, value }] : [];
-          }
-          return filter.value === id ? [] : [filter];
-        });
-        await m.query(`UPDATE "saved_views" SET "filters" = $2::jsonb WHERE "id" = $1`, [view.id, JSON.stringify(filters)]);
+        const filters = rewriteLabelFilters(view.filters, id, into);
+        if (filters) await m.query(`UPDATE "saved_views" SET "filters" = $2::jsonb WHERE "id" = $1`, [view.id, JSON.stringify(filters)]);
       }
       ws.settings = { ...ws.settings, labels: catalog.filter((label) => label.id !== id) };
       await m.save(WorkspaceEntity, ws);
@@ -112,6 +125,22 @@ export class LabelsService {
     this.events.publish(ws.id, { type: 'updated', entity: 'workspace', id: ws.id });
     return saved;
   }
+}
+
+/** Rewrites the `labels` array of the records that carry `from`: swap for `into` (no duplicates, order kept) or remove. */
+async function replaceInTable(m: EntityManager, table: (typeof TABLES)[number], workspaceId: string, from: string, into: string | null): Promise<void> {
+  await m.query(
+    `UPDATE "${table}" SET "labels" = COALESCE((
+       SELECT jsonb_agg(d.x ORDER BY d.ord) FROM (
+         SELECT DISTINCT ON (r.x) r.x, r.ord FROM (
+           SELECT CASE WHEN e.v = $2 THEN $3 ELSE e.v END AS x, e.ord
+           FROM jsonb_array_elements_text("labels") WITH ORDINALITY AS e(v, ord)
+         ) r WHERE r.x IS NOT NULL ORDER BY r.x, r.ord
+       ) d
+     ), '[]'::jsonb)
+     WHERE "workspaceId" = $1 AND "labels" @> jsonb_build_array($2::text)`,
+    [workspaceId, from, into],
+  );
 }
 
 function nextColor(catalog: readonly WorkspaceLabel[]): string {

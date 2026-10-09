@@ -9,6 +9,9 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   labels: 'workspace',
   'customer-tiers': 'workspace',
   'customer-requests': 'customers',
+  // the triage inbox is customer work; the sources behind it are integrations (admin)
+  'customer-intake': 'customers',
+  'intake-sources': 'integrations',
 };
 
 /**
@@ -29,6 +32,7 @@ const PARENT_OWNED = new Set<string>(['graph']);
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> = {
   decisions: { accept: 'decisions:accept', reject: 'decisions:accept', supersede: 'decisions:accept' },
+  issues: { 'bulk-delete': 'issues:delete' },
 };
 
 function actionFor(method: string): ApiAction {

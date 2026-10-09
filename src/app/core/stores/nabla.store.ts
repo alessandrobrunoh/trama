@@ -23,6 +23,7 @@ import type {
   CreateDependencyInput,
   CreateInputRequestInput,
   CreateCustomerInput,
+  BulkIssuePatch,
   CreateIssueInput,
   CreateCustomerRequestInput,
   CreateCustomerTierInput,
@@ -108,6 +109,7 @@ import type {
   WebhookDeliveryLog,
   Workspace,
   WorkspaceSettings,
+  WorkspaceLabel,
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
@@ -227,6 +229,28 @@ const PROJECT_CONTEXT_ENTITIES: ReadonlySet<string> = new Set([
 /** A shallow copy without `undefined` values (so spreading a PATCH body does not wipe fields). */
 function definedOnly<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+/** Optimistic view of a criterion edit; mirrors the server rules (verification and proof follow the state and text). */
+function previewCriterion(c: AcceptanceCriterion, patch: CriterionPatch): AcceptanceCriterion {
+  const { evidence, ...rest } = patch;
+  const next: AcceptanceCriterion = { ...c, ...rest };
+  if (rest.text !== undefined) next.text = rest.text.trim();
+  if (next.text !== c.text && c.state === 'met' && rest.state === undefined) {
+    next.state = 'pending';
+    delete next.evidence;
+  }
+  if (next.state !== 'met') {
+    delete next.verifiedBy;
+    delete next.verifiedAt;
+  }
+  if (evidence !== undefined) {
+    const ids = [...new Set(evidence?.artifactIds ?? [])];
+    const note = evidence?.note?.trim();
+    if (ids.length || note) next.evidence = { artifactIds: ids, ...(note ? { note } : {}) };
+    else delete next.evidence;
+  }
+  return next;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -745,6 +769,8 @@ export class NablaStore {
 
   private loading: { slug: string; promise: Promise<LoadResult> } | null = null;
   private refetchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Issue ids removed from the UI whose server delete is still waiting (Undo window). */
+  private readonly stagedDeletes = new Set<string>();
   /** Bumped when a write starts and when it settles; a refetch started before is stale. */
   private epoch = 0;
   private pending = 0;
@@ -860,7 +886,8 @@ export class NablaStore {
     list(this._workstreams, s.workstreams);
     list(this._milestones, s.milestones ?? []);
     list(this._inputRequests, s.inputRequests);
-    list(this._issues, s.issues);
+    // Issues waiting for their delayed delete stay hidden even if a refetch still lists them.
+    list(this._issues, this.stagedDeletes.size ? s.issues.filter((i) => !this.stagedDeletes.has(i.id)) : s.issues);
     list(this._customers, s.customers ?? []);
     list(this._customerRequests, s.customerRequests ?? []);
     list(this._artifacts, s.artifacts);
@@ -1089,9 +1116,16 @@ export class NablaStore {
     if (!ws) return false;
     const tx = this.tx();
     tx.patch(this._workstreams, ws.id, {
-      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? { ...c, ...patch } : c)),
+      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? previewCriterion(c, patch) : c)),
     });
-    return this.ok('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), { tx });
+    // The server stamps who verified a `met` criterion, so take its answer back.
+    return this.write('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), {
+      tx,
+      onResult: (res) => {
+        const r = res as Rec | null;
+        if (r && Array.isArray(r['acceptanceCriteria'])) this.upsert(this._workstreams, r as unknown as Workstream);
+      },
+    }).then((r) => r !== undefined);
   }
 
   async removeCriterion(ref: string, criterionId: ID): Promise<boolean> {
@@ -1191,6 +1225,16 @@ export class NablaStore {
   private async patchIssue(id: ID, patch: UpdateIssueInput): Promise<Issue | undefined> {
     const current = this.issueById().get(id);
     if (!current) return undefined;
+    const tx = this.tx();
+    tx.patch(this._issues, id, this.issueOptimistic(current, patch));
+    return this.write('update issue', (s) => this.api.issues.update(s, id, patch), {
+      tx,
+      onResult: (i) => this.upsert(this._issues, i),
+    });
+  }
+
+  /** What the issue looks like right after `patch` (before the server answers). */
+  private issueOptimistic(current: Issue, patch: UpdateIssueInput): Record<string, unknown> {
     const { kind: _kind, ...local } = patch;
     const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
     if ((patch.workstreamIds || patch.projectId !== undefined) && patch.milestoneIds === undefined) {
@@ -1206,12 +1250,38 @@ export class NablaStore {
         return !!ms && projects.has(ms.projectId);
       });
     }
+    return optimistic;
+  }
+
+  /**
+   * One patch for many issues in a single atomic request. Applied optimistically; if the server
+   * refuses (nothing was written) every issue is rolled back. Resolves `true` on success.
+   */
+  async bulkUpdateIssues(ids: readonly ID[], patch: BulkIssuePatch): Promise<boolean> {
+    const targets = ids.flatMap((id) => this.issueById().get(id) ?? []);
+    if (!targets.length) return false;
     const tx = this.tx();
-    tx.patch(this._issues, id, optimistic);
-    return this.write('update issue', (s) => this.api.issues.update(s, id, patch), {
-      tx,
-      onResult: (i) => this.upsert(this._issues, i),
-    });
+    for (const current of targets) {
+      const local: UpdateIssueInput = {};
+      if (patch.status !== undefined) local.status = patch.status;
+      if (patch.priority !== undefined) local.priority = patch.priority;
+      if (patch.assigneeId !== undefined) local.assigneeId = patch.assigneeId;
+      if (patch.teamId !== undefined) local.teamId = patch.teamId;
+      if (patch.projectId !== undefined) local.projectId = patch.projectId;
+      if (patch.addLabels?.length || patch.removeLabels?.length)
+        local.labels = [...new Set([...current.labels, ...(patch.addLabels ?? [])])].filter((l) => !(patch.removeLabels ?? []).includes(l));
+      if (patch.addWorkstreamIds?.length || patch.removeWorkstreamIds?.length)
+        local.workstreamIds = [...new Set([...current.workstreamIds, ...(patch.addWorkstreamIds ?? [])])].filter(
+          (w) => !(patch.removeWorkstreamIds ?? []).includes(w),
+        );
+      tx.patch(this._issues, current.id, this.issueOptimistic(current, local));
+    }
+    if (patch.addWorkstreamIds?.length) this.hideAttentionWhere(tx, (a) => !!a.issueId && targets.some((t) => t.id === a.issueId));
+    return this.writeOk(
+      'update issues',
+      (s) => this.api.issues.bulkUpdate(s, targets.map((t) => t.id), patch),
+      { tx, onResult: (rows) => rows.forEach((i) => this.upsert(this._issues, i)) },
+    );
   }
 
   async deleteIssue(id: ID): Promise<boolean> {
@@ -1221,6 +1291,55 @@ export class NablaStore {
     for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId && !x.workstreamId)) tx.remove(this._artifacts, a.id);
     for (const link of this._customerRequests().filter((r) => r.issueId === id)) tx.remove(this._customerRequests, link.id);
     return this.ok('delete issue', (s) => this.api.issues.remove(s, id), { tx });
+  }
+
+  /**
+   * Remove issues from the UI now and delete them on the server after `graceMs`, unless `cancel()`
+   * brings them back first (Undo). One transaction on the server; if it refuses, everything reappears.
+   * The delete is also sent as soon as the tab is hidden, so a closed tab does not keep the grace period.
+   * Returns `null` when none of the ids exists.
+   */
+  stageIssueDelete(
+    ids: readonly ID[],
+    graceMs = 6000,
+  ): { cancel: () => void; commit: () => Promise<boolean> } | null {
+    const targets = ids.filter((id) => this.issueById().has(id));
+    if (!targets.length) return null;
+    const gone = new Set(targets);
+    const tx = this.tx();
+    for (const id of targets) tx.remove(this._issues, id);
+    for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId) && !x.projectId && !x.workstreamId)) tx.remove(this._artifacts, a.id);
+    for (const link of this._customerRequests().filter((r) => !!r.issueId && gone.has(r.issueId))) tx.remove(this._customerRequests, link.id);
+    for (const id of targets) this.stagedDeletes.add(id);
+    const release = () => targets.forEach((id) => this.stagedDeletes.delete(id));
+    let state: 'pending' | 'committed' | 'canceled' = 'pending';
+    let result: Promise<boolean> | undefined;
+    const doc = globalThis.document;
+    const onHidden = () => {
+      if (doc.visibilityState === 'hidden') void commit();
+    };
+    const timer = setTimeout(() => void commit(), graceMs);
+    doc?.addEventListener('visibilitychange', onHidden);
+    const cleanup = () => {
+      clearTimeout(timer);
+      doc?.removeEventListener('visibilitychange', onHidden);
+    };
+    const commit = (): Promise<boolean> => {
+      if (state === 'canceled') return Promise.resolve(false);
+      if (state === 'committed') return result!;
+      state = 'committed';
+      cleanup();
+      result = this.ok('delete issues', (s) => this.api.issues.bulkRemove(s, targets), { tx }).finally(release);
+      return result;
+    };
+    const cancel = () => {
+      if (state !== 'pending') return;
+      state = 'canceled';
+      cleanup();
+      release();
+      tx.rollback();
+    };
+    return { cancel, commit };
   }
 
   /**
@@ -2079,6 +2198,18 @@ export class NablaStore {
     return this.ok('remove member', (s) => this.api.members.remove(s, membershipId), { tx });
   }
 
+  /** Hand the workspace to another member (primary owner only): they become owner and primary owner; I stay an owner. */
+  async transferOwnership(membershipId: ID): Promise<boolean> {
+    return this.write('transfer ownership', (s) => this.api.members.transferOwnership(s, membershipId), {
+      onResult: (ws) => {
+        this._workspace.update((cur) => (cur ? { ...cur, primaryOwnerId: ws.primaryOwnerId } : cur));
+        this._memberships.update((list) =>
+          list.map((m) => (m.id === membershipId ? { ...m, role: 'owner' as Role } : m)),
+        );
+      },
+    }).then((r) => !!r);
+  }
+
   /** Workspace customization (admin) and the permission policy (`permissions`, owner only). */
   async updateSettings(input: UpdateWorkspaceSettingsInput): Promise<boolean> {
     return this.write('save settings', (s) => this.api.workspaces.updateSettings(s, input), {
@@ -2093,16 +2224,25 @@ export class NablaStore {
     this._workspace.update((cur) => (cur ? { ...cur, settings: ws.settings } : cur));
   }
 
-  /** Add a custom workspace label (admin). */
-  async createLabel(input: CreateLabelInput): Promise<boolean> {
-    return this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+  /** Add a custom workspace label (members and above). Resolves the new label, or `undefined` when the API refused. */
+  async createLabel(input: CreateLabelInput): Promise<WorkspaceLabel | undefined> {
+    const ws = await this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+      onResult: (w) => this.applyWorkspace(w),
+    });
+    const name = input.name.trim().toLowerCase();
+    return ws?.settings.labels.find((label) => label.name.toLowerCase() === name);
+  }
+
+  /** Rename, recolor, archive or restore a workspace label (admin). Templates can only be recolored. */
+  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
+    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
 
-  /** Rename or recolor a workspace label (admin). Templates can only be recolored. */
-  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
-    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
+  /** Move everything labelled `id` onto `into` and remove `id` (admin). */
+  async mergeLabel(id: ID, into: ID): Promise<boolean> {
+    return this.write('merge label', (s) => this.api.workspaces.mergeLabel(s, id, { into }), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }

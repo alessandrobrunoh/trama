@@ -23,7 +23,7 @@
   "method": "POST",
   "path": "/labels",
   "permission": "workspace:write",
-  "description": "Add a custom workspace label (admin). Templates Bug, Feature, Improvement and Documentation already exist. Returns the workspace.",
+  "description": "Add a custom workspace label (member or above). Templates Bug, Feature, Improvement and Documentation already exist. Reuse an existing label when one fits. Returns the workspace.",
   "params": {
    "name": "body string! Label name",
    "color": "body string #rrggbb"
@@ -34,11 +34,23 @@
   "method": "PATCH",
   "path": "/labels/{id}",
   "permission": "workspace:write",
-  "description": "Rename or recolor a workspace label (admin). Templates can be recolored but not renamed.",
+  "description": "Rename, recolor, archive or restore a workspace label (admin). Templates can be recolored but not renamed or archived. An archived label stays on what carries it but is no longer offered when assigning.",
   "params": {
    "id": "path string! Label id",
    "name": "body string New name (custom labels only)",
-   "color": "body string #rrggbb"
+   "color": "body string #rrggbb",
+   "archived": "body boolean true archives the label, false restores it"
+  }
+ },
+ {
+  "name": "merge_label",
+  "method": "POST",
+  "path": "/labels/{id}/merge",
+  "permission": "workspace:write",
+  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories, workstreams, saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
+  "params": {
+   "id": "path string! Label id to merge away",
+   "into": "body string! Label id that takes over"
   }
  },
  {
@@ -398,7 +410,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}",
   "permission": "workstreams:read",
-  "description": "One workstream with criteria and status.",
+  "description": "One workstream with criteria, status and completion ({achieved, gaps[]}: why the outcome is not done yet). statusOverride set means the status is pinned by hand, not derived.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -408,7 +420,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}/context",
   "permission": "workstreams:read",
-  "description": "Markdown briefing for a workstream: objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
+  "description": "Markdown briefing for a workstream: outcome status and what is still missing (completion gaps), objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -500,12 +512,13 @@
   "method": "PATCH",
   "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
   "permission": "workstreams:write",
-  "description": "Update an acceptance criterion.",
+  "description": "Update an acceptance criterion: text, state, and the evidence that proves it.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
    "criterionId": "path string! Criterion id",
-   "text": "body string Text",
-   "state": "body string(pending|in_progress|met) State"
+   "text": "body string Text (editing a met criterion resets it to pending)",
+   "state": "body string(pending|in_progress|met) State (met records who verified it; a person or an agent)",
+   "evidence": "body object {artifactIds?: [artifact ids of this workstream], note?: string} Proof for the criterion (null clears). Does not change state"
   }
  },
  {
@@ -935,6 +948,27 @@
   }
  },
  {
+  "name": "bulk_update_issues",
+  "method": "POST",
+  "path": "/issues/bulk",
+  "permission": "issues:write",
+  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels and workstreams are added/removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)",
+   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?, addWorkstreamIds?, removeWorkstreamIds?}"
+  }
+ },
+ {
+  "name": "bulk_delete_issues",
+  "method": "POST",
+  "path": "/issues/bulk-delete",
+  "permission": "issues:delete",
+  "description": "Delete up to 100 issues in one transaction (their comments go too). Returns the deleted ids.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)"
+  }
+ },
+ {
   "name": "list_customers",
   "method": "GET",
   "path": "/customers",
@@ -1010,7 +1044,7 @@
   "method": "GET",
   "path": "/customers/{id}/requests",
   "permission": "customers:read",
-  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl), each with its issue (key, title, status) or project (name, status).",
+  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl, source/externalId/requester when they came from Intercom, Zendesk…), each with its issue or project.",
   "params": {
    "id": "path string! Customer id"
   }
@@ -1066,6 +1100,113 @@
   "params": {
    "id": "path string! Customer id",
    "requestId": "path string! Customer request id"
+  }
+ },
+ {
+  "name": "list_intake_sources",
+  "method": "GET",
+  "path": "/intake-sources",
+  "permission": "integrations:read",
+  "description": "Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook) with their webhookUrl, hasSecret and lastReceivedAt. Never the secret. Admin.",
+  "params": {}
+ },
+ {
+  "name": "create_intake_source",
+  "method": "POST",
+  "path": "/intake-sources",
+  "permission": "integrations:write",
+  "description": "Add a source of inbound customer requests. Email and generic sources get a generated secret, returned once; for the others pass the provider's own signing secret now or later with update_intake_source. Admin.",
+  "params": {
+   "provider": "body string(intercom|zendesk|front|slack|email|generic)! Tool the requests come from",
+   "name": "body string! Name shown in the inbox (<= 80 chars)",
+   "autoCreateCustomers": "body boolean Create a prospect customer from the sender's company domain when none matches (default true; mailbox providers never do)",
+   "targetProjectId": "body string Attach requests from known customers straight to this project; otherwise they wait in the inbox",
+   "subdomain": "body string Zendesk only: the part before .zendesk.com, to link tickets",
+   "secret": "body string Provider-issued signing secret (not for email / generic)",
+   "enabled": "body boolean Accept deliveries (default true)"
+  }
+ },
+ {
+  "name": "update_intake_source",
+  "method": "PATCH",
+  "path": "/intake-sources/{id}",
+  "permission": "integrations:write",
+  "description": "Edit a source: name, enabled, autoCreateCustomers, targetProjectId (null clears), subdomain (null clears) or the provider-issued secret. Admin.",
+  "params": {
+   "id": "path string! Source id",
+   "name": "body string Name",
+   "enabled": "body boolean Accept deliveries",
+   "autoCreateCustomers": "body boolean Create customers from unknown domains",
+   "targetProjectId": "body string Project to attach to, null clears",
+   "subdomain": "body string Zendesk subdomain, null clears",
+   "secret": "body string Provider-issued signing secret (not for email / generic, use rotate_intake_source)"
+  }
+ },
+ {
+  "name": "delete_intake_source",
+  "method": "DELETE",
+  "path": "/intake-sources/{id}",
+  "permission": "integrations:delete",
+  "description": "Delete a source. Requests still waiting in the inbox from it are removed; requests already linked stay. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "rotate_intake_source",
+  "method": "POST",
+  "path": "/intake-sources/{id}/rotate-secret",
+  "permission": "integrations:write",
+  "description": "Generate a new secret for an email or generic source (returned once). The old one stops working at once. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "test_intake_source",
+  "method": "POST",
+  "path": "/intake-sources/{id}/test",
+  "permission": "integrations:write",
+  "description": "Dry run: a sample delivery signed with the stored secret goes through verification, parsing and customer matching. Reports what would happen; nothing is saved. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "list_intake_items",
+  "method": "GET",
+  "path": "/customer-intake",
+  "permission": "customers:read",
+  "description": "The triage inbox of inbound customer requests, newest first: source, external ticket id and URL, requester, subject, body, matched customerId, status. Default status is pending.",
+  "params": {
+   "status": "query string(pending|linked|dismissed|all) Inbox state (default pending)",
+   "limit": "query integer 1-500 (default 200)"
+  }
+ },
+ {
+  "name": "link_intake_item",
+  "method": "POST",
+  "path": "/customer-intake/{id}/link",
+  "permission": "customers:write",
+  "description": "Turn a pending inbox item into a customer request on exactly one issue (issueId) or project (projectId). Without a matched customer pass customerId, or createCustomer to create one from the sender's company domain.",
+  "params": {
+   "id": "path string! Inbox item id",
+   "issueId": "body string Issue id (exactly one of issueId / projectId)",
+   "projectId": "body string Project id (exactly one of issueId / projectId)",
+   "customerId": "body string Customer id (overrides the matched one)",
+   "createCustomer": "body boolean Create the customer from the sender's email domain",
+   "customerName": "body string Name for the new customer",
+   "important": "body boolean Flag the request as important"
+  }
+ },
+ {
+  "name": "dismiss_intake_item",
+  "method": "POST",
+  "path": "/customer-intake/{id}/dismiss",
+  "permission": "customers:write",
+  "description": "Dismiss a pending inbox item (spam, not a request). POST /customer-intake/{id}/restore brings it back.",
+  "params": {
+   "id": "path string! Inbox item id"
   }
  },
  {
@@ -1401,6 +1542,35 @@
   "description": "Delete a saved view.",
   "params": {
    "id": "path string! View id"
+  }
+ },
+ {
+  "name": "get_insights",
+  "method": "GET",
+  "path": "/insights",
+  "permission": "insights:read",
+  "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
+  "params": {
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items kept per signal, 1-500 (default 25); counts always cover everything"
+  }
+ },
+ {
+  "name": "get_insight_signal",
+  "method": "GET",
+  "path": "/insights/signals/{id}",
+  "permission": "insights:read",
+  "description": "The full item list behind one health signal (what a tile of get_insights drills into).",
+  "params": {
+    "id": "path string(blocked_workstreams|needs_input|stale_workstreams|stale_issues|delivered_outcome_open|overdue_milestones|overdue_workstreams|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items returned, 1-500 (default 100)"
   }
  },
  {

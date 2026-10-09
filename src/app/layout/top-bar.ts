@@ -30,19 +30,19 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
       @if (sectionIcon(); as icon) {
         <svg [lucideIcon]="icon" [size]="15" class="text-muted-foreground shrink-0 max-sm:hidden"></svg>
       }
-      <ol class="flex min-w-0 items-center gap-1 text-[13px]">
+      <ol class="flex min-w-0 items-center gap-0.5 text-[13px]">
         @for (c of crumbs(); track $index; let last = $last) {
           <li class="flex min-w-0 items-center gap-1" [class.shrink-0]="!last" [class.min-w-0]="last">
             @if (c.link && !last) {
               <a
                 [routerLink]="c.link"
-                class="text-muted-foreground hover:text-foreground truncate rounded px-1 py-0.5 hover:bg-accent"
+                class="text-muted-foreground hover:text-foreground hover:bg-accent truncate rounded-md px-1.5 py-0.5 transition-colors"
                 [class.font-mono]="c.mono"
                 >{{ c.label }}</a
               >
             } @else {
               <span
-                class="truncate px-1 font-medium"
+                class="truncate px-1.5 font-medium"
                 [class.font-mono]="c.mono"
                 [class.text-muted-foreground]="!last"
                 [attr.aria-current]="last ? 'page' : null"
@@ -50,13 +50,13 @@ import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './na
               >
             }
             @if (!last) {
-              <svg [lucideIcon]="sep" [size]="12" class="text-muted-foreground/60 shrink-0"></svg>
+              <svg [lucideIcon]="sep" [size]="12" class="text-muted-foreground/50 shrink-0" aria-hidden="true"></svg>
             }
           </li>
         }
       </ol>
       @if (description(); as d) {
-        <span class="text-muted-foreground min-w-0 truncate text-[13px] max-md:hidden">{{ d }}</span>
+        <span class="text-muted-foreground/90 min-w-0 shrink-[20] truncate text-[13px] max-lg:hidden">{{ d }}</span>
       }
     </nav>
 

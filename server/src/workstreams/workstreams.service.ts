@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, type EntityManager, type Repository } from 'typeorm';
+import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import {
   isDeltaThreadUrl,
   type AcceptanceCriterion,
@@ -13,16 +13,20 @@ import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
 import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
-import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ArtifactEntity, TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { LabelsService } from '../workspaces/labels.service.js';
 
-export interface CriterionInput {
-  id?: string;
-  text: string;
-  state?: CriterionState;
-}
+import {
+  applyCriterionChange,
+  newCriterion,
+  replaceCriteria,
+  type CriterionInput,
+  type CriterionPatch,
+} from './criteria.js';
+
+export type { CriterionInput, CriterionPatch } from './criteria.js';
 
 export interface WorkstreamInput {
   title?: string;
@@ -56,14 +60,6 @@ export interface WorkstreamFilter {
 }
 
 const KEY_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
-
-function criteria(items: CriterionInput[] | undefined): AcceptanceCriterion[] {
-  return (items ?? []).map((c) => ({
-    id: c.id ?? uid('ac'),
-    text: c.text.trim(),
-    state: c.state ?? 'pending',
-  }));
-}
 
 @Injectable()
 export class WorkstreamsService {
@@ -167,7 +163,7 @@ export class WorkstreamsService {
         [workspaceId, `${team.key}-%`],
       );
       const number = await this.counters.nextAbove(m, workspaceId, `wskey:${team.key}`, top);
-      const acceptanceCriteria = criteria(input.acceptanceCriteria);
+      const acceptanceCriteria = replaceCriteria(input.acceptanceCriteria, [], actor);
       const derived: WorkstreamStatus = acceptanceCriteria.length
         ? 'planned'
         : 'draft';
@@ -277,7 +273,7 @@ export class WorkstreamsService {
     if (patch.repositoryIds !== undefined)
       set('repositoryIds', unique(patch.repositoryIds));
     if (patch.acceptanceCriteria !== undefined)
-      set('acceptanceCriteria', criteria(patch.acceptanceCriteria));
+      set('acceptanceCriteria', replaceCriteria(patch.acceptanceCriteria, ws.acceptanceCriteria, actor));
     if (patch.priority !== undefined) set('priority', patch.priority);
     if (patch.labels !== undefined) set('labels', (await this.labels.assign(workspaceId, patch.labels)) ?? []);
     if (patch.startDate !== undefined)
@@ -384,11 +380,7 @@ export class WorkstreamsService {
     input: CriterionInput,
   ) {
     const ws = await this.get(workspaceId, idOrKey);
-    const criterion: AcceptanceCriterion = {
-      id: uid('ac'),
-      text: input.text.trim(),
-      state: input.state ?? 'pending',
-    };
+    const criterion = newCriterion(input, actor);
     ws.acceptanceCriteria = [...ws.acceptanceCriteria, criterion];
     return this.saveCriteria(ws, actor, 'added', criterion);
   }
@@ -398,20 +390,32 @@ export class WorkstreamsService {
     actor: ActorRef,
     idOrKey: string,
     criterionId: string,
-    patch: Partial<CriterionInput>,
+    patch: CriterionPatch,
   ) {
     const ws = await this.get(workspaceId, idOrKey);
     const current = ws.acceptanceCriteria.find((c) => c.id === criterionId);
     if (!current) throw notFound('Criterion', criterionId);
-    const next: AcceptanceCriterion = {
-      ...current,
-      ...(patch.text !== undefined ? { text: patch.text.trim() } : {}),
-      ...(patch.state !== undefined ? { state: patch.state } : {}),
-    };
+    if (patch.evidence?.artifactIds?.length)
+      await this.assertEvidenceArtifacts(ws, patch.evidence.artifactIds);
+    const next = applyCriterionChange(current, patch, actor);
     ws.acceptanceCriteria = ws.acceptanceCriteria.map((c) =>
       c.id === criterionId ? next : c,
     );
     return this.saveCriteria(ws, actor, 'updated', next, current.state);
+  }
+
+  /** Proof must come from the same workstream: anything else is a 400, never silently dropped. */
+  private async assertEvidenceArtifacts(ws: WorkstreamEntity, ids: string[]) {
+    const unique = [...new Set(ids)];
+    const rows = await this.ds
+      .getRepository(ArtifactEntity)
+      .find({ where: { workspaceId: ws.workspaceId, id: In(unique), workstreamId: ws.id }, select: { id: true } });
+    const found = new Set(rows.map((r) => r.id));
+    const missing = unique.filter((id) => !found.has(id));
+    if (missing.length)
+      throw new BadRequestException(
+        `Evidence must reference artifacts of workstream ${ws.key}; not found there: ${missing.join(', ')}`,
+      );
   }
 
   async removeCriterion(
@@ -453,6 +457,7 @@ export class WorkstreamsService {
           text: criterion.text,
           state: criterion.state,
           previousState,
+          ...(criterion.evidence ? { evidence: criterion.evidence.artifactIds.length } : {}),
         },
       },
       { type: 'updated', entity: 'workstream', id: ws.id },

@@ -1,9 +1,10 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
-import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type WorkspaceLabel, type CustomerTier } from '../../../core/contracts/domain';
+import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type CustomerTier } from '../../../core/contracts/domain';
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
@@ -20,7 +21,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 @Component({
   selector: 'app-workspace-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, FullDatePipe, ProviderIcon, AppSelect, ...SECTION_KIT],
+  imports: [RouterLink, HlmButtonImports, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, FullDatePipe, ProviderIcon, AppSelect, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -201,50 +202,9 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       <app-settings-row label="Contents" description="What this workspace holds right now.">
         <span class="text-muted-foreground text-[13px] tabular-nums">{{ counts() }}</span>
       </app-settings-row>
-    </app-settings-group>
-
-    <app-settings-group title="Labels" description="Defined once for the workspace, then assigned to issues, projects, repositories and workstreams. Bug, Feature, Improvement and Documentation are always available.">
-      @for (label of catalog(); track label.id) {
-        <div class="flex items-center gap-2 border-t px-4 py-2 first:border-t-0">
-          <span class="flex items-center gap-1" role="radiogroup" [attr.aria-label]="label.name + ' color'">
-            @for (swatch of swatchList; track swatch) {
-              <button
-                type="button"
-                role="radio"
-                class="size-4 rounded-full border-2 disabled:opacity-50"
-                [style.background]="swatch"
-                [class]="label.color === swatch ? 'border-foreground' : 'border-transparent'"
-                [attr.aria-checked]="label.color === swatch"
-                [attr.aria-label]="swatch"
-                [disabled]="!canAdmin() || savingLabel()"
-                (click)="recolor(label, swatch)"
-              ></button>
-            }
-          </span>
-          @if (label.template) {
-            <span class="min-w-0 flex-1 truncate text-[13px]">{{ label.name }}</span>
-            <span class="text-muted-foreground text-[11px]">Template</span>
-          } @else {
-            <input
-              hlmInput
-              class="h-8 min-w-0 flex-1 text-[13px]"
-              [value]="label.name"
-              [disabled]="!canAdmin() || savingLabel()"
-              [attr.aria-label]="'Rename ' + label.name"
-              (change)="rename(label, $any($event.target).value)"
-            />
-            <button type="button" class="text-muted-foreground hover:text-destructive text-xs" [disabled]="!canAdmin() || savingLabel()" (click)="removeLabel(label)">Remove</button>
-          }
-        </div>
-      }
-      @if (canAdmin()) {
-        <form class="flex items-center gap-2 border-t px-4 py-2" (submit)="addLabel($event)">
-          <input hlmInput class="h-8 min-w-0 flex-1 text-[13px]" placeholder="New label" aria-label="New label" [value]="newLabel()" [disabled]="savingLabel()" (input)="newLabel.set($any($event.target).value)" />
-          <button hlmBtn type="submit" size="sm" [disabled]="!newLabel().trim() || savingLabel()">Add</button>
-        </form>
-      } @else {
-        <div class="text-muted-foreground border-t px-4 py-2 text-xs">Only admins and owners can change labels.</div>
-      }
+      <app-settings-row label="Labels" description="One catalog shared by issues, workstreams, projects and repositories.">
+        <a hlmBtn variant="outline" size="sm" [routerLink]="['/', store.slug(), 'settings', 'labels']">Manage labels</a>
+      </app-settings-row>
     </app-settings-group>
 
     <app-settings-group title="Customer tiers" description="Tiers you use to rank customers, for example Enterprise, Growth or Free. Assign one on each customer. Removing a tier leaves its customers without one.">
@@ -325,13 +285,10 @@ export class WorkspaceSection {
   protected readonly checkIcon = LucideCheck;
   protected readonly savingScale = signal(false);
   protected readonly savingFeature = signal(false);
-  protected readonly savingLabel = signal(false);
-  protected readonly newLabel = signal('');
   protected readonly savingTier = signal(false);
   protected readonly newTier = signal('');
   protected readonly tiers = computed(() => this.store.settings().customerTiers);
   protected readonly swatchList = LABEL_SWATCHES;
-  protected readonly catalog = computed(() => this.store.settings().labels);
   protected readonly scale = computed(() => this.store.estimateScale());
   protected readonly scaleDefs = ESTIMATE_SCALE_ORDER.filter((s) => ESTIMATE_SCALES.includes(s)).map((id) => {
     const def = ESTIMATE_SCALE_DEFS[id];
@@ -458,44 +415,6 @@ export class WorkspaceSection {
     if (ok) this.notify.success('Workspace updated');
   }
 
-  protected async recolor(label: WorkspaceLabel, color: string): Promise<void> {
-    if (!this.canAdmin() || label.color === color || this.savingLabel()) return;
-    this.savingLabel.set(true);
-    const ok = await this.store.updateLabel(label.id, { color });
-    this.savingLabel.set(false);
-    if (ok) this.notify.success('Label updated');
-  }
-
-  protected async rename(label: WorkspaceLabel, value: string): Promise<void> {
-    const name = value.trim();
-    if (!this.canAdmin() || !name || name === label.name || this.savingLabel()) return;
-    this.savingLabel.set(true);
-    const ok = await this.store.updateLabel(label.id, { name });
-    this.savingLabel.set(false);
-    if (ok) this.notify.success('Label updated');
-  }
-
-  protected async removeLabel(label: WorkspaceLabel): Promise<void> {
-    if (!this.canAdmin() || label.template || this.savingLabel()) return;
-    this.savingLabel.set(true);
-    const ok = await this.store.deleteLabel(label.id);
-    this.savingLabel.set(false);
-    if (ok) this.notify.success('Label removed');
-  }
-
-  protected async addLabel(event: Event): Promise<void> {
-    event.preventDefault();
-    const name = this.newLabel().trim();
-    if (!this.canAdmin() || !name || this.savingLabel()) return;
-    this.savingLabel.set(true);
-    const ok = await this.store.createLabel({ name });
-    this.savingLabel.set(false);
-    if (ok) {
-      this.newLabel.set('');
-      this.notify.success('Label added');
-    }
-  }
-
   protected async recolorTier(tier: CustomerTier, color: string): Promise<void> {
     if (!this.canAdmin() || tier.color === color || this.savingTier()) return;
     this.savingTier.set(true);
@@ -535,13 +454,16 @@ export class WorkspaceSection {
   }
 
   protected deleteWorkspace(): void {
-    const name = this.session.workspace()?.name ?? 'this workspace';
+    const ws = this.session.workspace();
+    if (!ws) return;
     this.ui.setConfirmDelete({
-      title: `Delete ${name}?`,
-      description: 'Every workstream, issue, repository and decision in it is removed. This cannot be undone.',
+      title: `Delete ${ws.name}?`,
+      description:
+        'Every workstream, issue, repository and decision in it is removed for everyone. This cannot be undone.',
       confirmLabel: 'Delete workspace',
-      onConfirm: async () => {
-        await this.session.deleteWorkspace();
+      requireText: { accept: [ws.name, ws.slug], label: `Type ${ws.name} to confirm` },
+      onConfirm: async (typed) => {
+        await this.session.deleteWorkspace(typed);
       },
     });
   }

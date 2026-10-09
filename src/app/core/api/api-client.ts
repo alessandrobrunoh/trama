@@ -35,6 +35,12 @@ import type {
   InvitePreview,
   Customer,
   CustomerRequest,
+  InsightSignal,
+  InsightSignalId,
+  InsightsReport,
+  IntakeItem,
+  IntakeItemStatus,
+  IntakeSource,
   Issue,
   Membership,
   Milestone,
@@ -72,12 +78,18 @@ import type {
   UpdateMilestoneInput,
   UpdateInputRequestInput,
   CreateCustomerInput,
+  BulkIssuePatch,
   CreateIssueInput,
   CreateCustomerRequestInput,
   CreateCustomerTierInput,
   UpdateCustomerRequestInput,
   UpdateCustomerTierInput,
+  CreateIntakeSourceInput,
   CreateIntegrationInput,
+  IntakeSourceWithSecret,
+  IntakeTestResult,
+  LinkIntakeItemInput,
+  UpdateIntakeSourceInput,
   IntegrationDetail,
   IntegrationWithWebhook,
   LinkRepositoryInput,
@@ -98,6 +110,7 @@ import type {
   CriterionPatch,
   EventsQuery,
   GraphResponse,
+  InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
@@ -118,6 +131,7 @@ import type {
   CreateLabelInput,
   CreateWebhookInput,
   UpdateLabelInput,
+  MergeLabelInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -186,8 +200,8 @@ export class ApiClient {
     this.request<T>('POST', path, { body: body ?? {}, quiet: o?.quiet });
   private patch = <T>(path: string, body: unknown, o?: RequestOptions) =>
     this.request<T>('PATCH', path, { body, quiet: o?.quiet });
-  private del = <T = void>(path: string, o?: RequestOptions) =>
-    this.request<T>('DELETE', path, { quiet: o?.quiet });
+  private del = <T = void>(path: string, o?: RequestOptions & { body?: unknown }) =>
+    this.request<T>('DELETE', path, { quiet: o?.quiet, body: o?.body });
 
   private w(slug: string): string {
     return `/w/${encodeURIComponent(slug)}`;
@@ -223,14 +237,15 @@ export class ApiClient {
       this.patch<Workspace>(`${this.w(slug)}/settings`, input),
     createLabel: (slug: string, input: CreateLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels`, input),
     updateLabel: (slug: string, id: ID, input: UpdateLabelInput) => this.patch<Workspace>(`${this.w(slug)}/labels/${id}`, input),
+    mergeLabel: (slug: string, id: ID, input: MergeLabelInput) => this.post<Workspace>(`${this.w(slug)}/labels/${id}/merge`, input),
     deleteLabel: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/labels/${id}`),
     createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
       this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),
     updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
       this.patch<Workspace>(`${this.w(slug)}/customer-tiers/${id}`, input),
     deleteCustomerTier: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
-    /** Owner only. */
-    remove: (slug: string) => this.del(this.w(slug)),
+    /** Owner only. `confirm` must be the workspace's exact slug or name. */
+    remove: (slug: string, confirm: string) => this.del(this.w(slug), { body: { confirm } }),
     /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
     snapshot: (slug: string, comments: SnapshotCommentsMode = 'full') =>
       this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`, comments === 'full' ? undefined : { comments }),
@@ -243,6 +258,9 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+    /** Primary owner only: the target becomes owner and primary owner. */
+    transferOwnership: (slug: string, membershipId: ID) =>
+      this.post<Workspace>(`${this.w(slug)}/transfer-ownership`, { membershipId }),
   };
 
   /** Invitations by email (admins). `create` and `resend` return the secret link once. */
@@ -475,6 +493,11 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
       this.patch<Issue>(`${this.w(slug)}/issues/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/issues/${id}`),
+    /** One patch for many issues, all or nothing. */
+    bulkUpdate: (slug: string, ids: ID[], patch: BulkIssuePatch) =>
+      this.post<Issue[]>(`${this.w(slug)}/issues/bulk`, { ids, patch }),
+    bulkRemove: (slug: string, ids: ID[]) =>
+      this.post<{ deleted: ID[] }>(`${this.w(slug)}/issues/bulk-delete`, { ids }),
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
@@ -554,6 +577,15 @@ export class ApiClient {
       this.get<DomainEvent[]>(`${this.w(slug)}/events`, { ...query }),
   };
 
+  readonly insights = {
+    /** Health signals, flow metrics and agent failure signals (GET /insights). */
+    report: (slug: string, query: InsightsQuery = {}) =>
+      this.get<InsightsReport>(`${this.w(slug)}/insights`, { ...query }),
+    /** One signal with up to `limit` items: what a health tile drills into. */
+    signal: (slug: string, id: InsightSignalId, query: InsightsQuery = {}) =>
+      this.get<InsightSignal>(`${this.w(slug)}/insights/signals/${id}`, { ...query }),
+  };
+
   readonly attention = {
     list: (slug: string, query: AttentionQuery = {}) =>
       this.get<AttentionItem[]>(`${this.w(slug)}/attention`, { ...query }),
@@ -628,6 +660,32 @@ export class ApiClient {
     test: (slug: string, id: ID) => this.post<WebhookDeliveryLog>(`${this.w(slug)}/outgoing-webhooks/${id}/test`),
     deliveries: (slug: string, id: ID, limit = 20) =>
       this.get<WebhookDeliveryLog[]>(`${this.w(slug)}/outgoing-webhooks/${id}/deliveries`, { limit }),
+  };
+
+  /** Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook). Needs manageIntegrations. */
+  readonly intakeSources = {
+    list: (slug: string, o?: RequestOptions) => this.get<IntakeSource[]>(`${this.w(slug)}/intake-sources`, undefined, o),
+    /** Trama-signed sources (email, generic) return their secret once. */
+    create: (slug: string, input: CreateIntakeSourceInput) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources`, input),
+    update: (slug: string, id: ID, input: UpdateIntakeSourceInput) =>
+      this.patch<IntakeSource>(`${this.w(slug)}/intake-sources/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/intake-sources/${id}`),
+    rotateSecret: (slug: string, id: ID) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources/${id}/rotate-secret`),
+    /** Dry run of a sample delivery: nothing is saved. */
+    test: (slug: string, id: ID) => this.post<IntakeTestResult>(`${this.w(slug)}/intake-sources/${id}/test`),
+  };
+
+  /** The triage inbox: inbound customer requests waiting to be linked to an issue or project. */
+  readonly customerIntake = {
+    list: (slug: string, status: IntakeItemStatus | 'all' = 'pending', o?: RequestOptions) =>
+      this.get<IntakeItem[]>(`${this.w(slug)}/customer-intake`, { status }, o),
+    count: (slug: string, o?: RequestOptions) => this.get<{ pending: number }>(`${this.w(slug)}/customer-intake/count`, undefined, o),
+    link: (slug: string, id: ID, input: LinkIntakeItemInput) =>
+      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/link`, input),
+    dismiss: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/dismiss`),
+    restore: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/restore`),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

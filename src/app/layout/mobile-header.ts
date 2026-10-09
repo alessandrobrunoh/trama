@@ -11,7 +11,7 @@ import {
 } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, NavigationStart, Router } from '@angular/router';
-import { LucideChevronRight, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
+import { LucideChevronLeft, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { filter, map, startWith } from 'rxjs';
 import { FavoritesStore } from '../core/stores/favorites.store';
 import { NablaStore } from '../core/stores/nabla.store';
@@ -46,7 +46,7 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
       <div class="mobile-header__lead">
         @if (!isRoot()) {
           <button type="button" class="mobile-header__back" [attr.aria-label]="'Back to ' + parentLabel()" (click)="back()">
-            <svg [lucideIcon]="backIcon" [size]="26" class="rotate-180" aria-hidden="true"></svg>
+            <svg [lucideIcon]="backIcon" [size]="26" aria-hidden="true"></svg>
             <span class="mobile-header__back-label">{{ parentLabel() }}</span>
           </button>
         } @else {
@@ -108,7 +108,7 @@ export class MobileHeader {
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly backIcon = LucideChevronRight;
+  protected readonly backIcon = LucideChevronLeft;
   protected readonly plusIcon = LucidePlus;
   protected readonly favoriteTarget = this.favorites.current;
   protected readonly collapsed = signal(false);

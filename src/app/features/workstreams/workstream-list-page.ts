@@ -3,7 +3,7 @@
 // URL: `?view=active|backlog|shipped|all` (tabs), `?team=<teamId>` (owner OR participating team,
 // used by the sidebar team links). Display options (layout, grouping, ordering, visible properties)
 // persist in localStorage. Rows are editable in place, right-click opens the workstream menu,
-// multi-selection shows the bulk bar, and the focused row reacts to s / p / a / t / ⌘. / ⌘⇧C / ⌘⌫.
+// multi-selection shows the bulk bar, and the focused row reacts to s / p / a / t / ⌘. / ⌘⇧L / ⌘⌫.
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import {
@@ -49,6 +49,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { Kbd } from '../../shared/kbd';
+import { PeekPanel } from '../../shared/peek-panel';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -60,7 +61,6 @@ import { WsBulkBar } from './ws-bulk-bar';
 import {
   WS_VIEW_TABS,
   buildSummary,
-  labelOptions,
   priorityOptions,
   projectFilterOptions,
   repoOptions,
@@ -71,6 +71,8 @@ import {
   type WsViewTab,
 } from './ws-model';
 import { DEFAULT_ROW_PROPS, ROW_PROP_LABELS, WorkstreamCard, WorkstreamRow, type WsRowProps } from './workstream-items';
+import { LabelPicker } from '../../shared/label-picker';
+import { SearchInput } from '../../shared/search-input';
 
 type Layout = 'list' | 'board';
 type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
@@ -146,6 +148,8 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
   selector: 'app-workstream-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
+    LabelPicker,
     HlmButtonImports,
     HlmInputImports,
     HlmPopoverImports,
@@ -168,8 +172,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     CreateWorkstreamDialog,
     TopBarActions,
     WsBulkBar,
+    PeekPanel,
   ],
-  host: { class: 'flex h-full min-h-0 flex-col' },
+  host: { class: 'relative flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (canCreate()) {
@@ -215,19 +220,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
         </span>
       }
       <span class="flex-1"></span>
-      <div class="relative max-sm:w-full sm:w-48">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          #searchBox
-          hlmInput
-          class="h-7 w-full pl-8 text-xs"
-          placeholder="Filter by title or key…"
-          aria-label="Filter workstreams"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-          (keydown.escape)="search.set(''); searchBox.blur()"
-        />
-      </div>
+      <app-search-input noun="workstreams" [(value)]="search" />
       <div class="border-border-strong flex h-7 items-center rounded-md border p-0.5" role="group" aria-label="Layout">
         <button type="button" class="hover:text-foreground flex h-full items-center rounded-[4px] px-1.5" [class.bg-accent]="display().layout === 'list'" [class.text-muted-foreground]="display().layout !== 'list'" aria-label="List layout" hlmTooltip="List (v)" position="bottom" (click)="setLayout('list')">
           <svg [lucideIcon]="listIcon" [size]="14"></svg>
@@ -290,9 +283,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
           <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
         }
         <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
-        @if (labels().length) {
-          <app-picker variant="chip" label="Label" [multiple]="true" [options]="labels()" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
-        }
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -407,6 +398,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       </app-kanban>
     }
 
+    <app-peek-panel />
     <app-ws-bulk-bar />
     <app-create-workstream-dialog [(open)]="createOpen" [defaults]="createDefaults()" />
   `,
@@ -436,7 +428,7 @@ export class WorkstreamListPage {
   protected readonly displayState = signal<'open' | 'closed'>('closed');
   protected readonly viewName = signal('');
   protected readonly viewShared = signal(true);
-  private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('searchBox');
+  private readonly searchBox = viewChild(SearchInput);
 
   protected readonly tabs = WS_VIEW_TABS;
   protected readonly statusMeta = WORKSTREAM_STATUS_META;
@@ -449,7 +441,6 @@ export class WorkstreamListPage {
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repos = computed(() => repoOptions(this.store));
   protected readonly projects = computed(() => projectFilterOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
 
   protected readonly plus = LucidePlus;
   protected readonly listIcon = LucideLayoutList;
@@ -565,13 +556,13 @@ export class WorkstreamListPage {
   private readonly _keys = usePageShortcuts([
     { keys: 'c', label: 'New workstream', run: () => this.canCreate() && this.create() },
     { keys: 'v', label: 'Toggle list / board', run: () => this.setLayout(this.display().layout === 'list' ? 'board' : 'list') },
-    { keys: 'f', label: 'Filter by text', run: () => this.searchBox()?.nativeElement.focus() },
+    { keys: 'f', label: 'Filter by text', run: () => this.searchBox()?.focus() },
     { keys: 's', label: 'Set status', when: this.editTarget, run: () => this.intent('status') },
     { keys: 'p', label: 'Set priority', when: this.editTarget, run: () => this.intent('priority') },
     { keys: 'a', label: 'Set accountable', when: this.editTarget, run: () => this.intent('accountable') },
     { keys: 't', label: 'Set target date', when: this.editTarget, run: () => this.intent('date') },
     { keys: 'mod+.', label: 'Copy key', when: this.hasTarget, run: () => this.actions.copyKey(this.targets()) },
-    { keys: 'mod+shift+c', label: 'Copy link', when: this.hasTarget, run: () => this.actions.copyLink(this.targets()) },
+    { keys: 'mod+shift+l', label: 'Copy link', when: this.hasTarget, run: () => this.actions.copyLink(this.targets()) },
     { keys: 'mod+shift+g', label: 'Copy git branch name', when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },
     { keys: 'mod+shift+.', label: 'Copy git branch name', hidden: true, when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },
     { keys: 'mod+shift+>', label: 'Copy git branch name', hidden: true, when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },

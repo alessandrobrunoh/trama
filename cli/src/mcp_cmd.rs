@@ -11,12 +11,18 @@ use crate::Ctx;
 use crate::config;
 use crate::error::{CliError, Result};
 use crate::output;
+use crate::profile::Profile;
 use crate::protocol::{Account, Server};
 use crate::upstream::{AuthError, Upstream};
 
 const MAX_OUTPUT_BYTES: usize = 200_000;
 
-pub async fn serve(ctx: &Ctx) -> Result<()> {
+pub async fn serve(ctx: &Ctx, m: &ArgMatches) -> Result<()> {
+    // `--tools` wins over `TRAMA_MCP_PROFILE`; the default is the curated `core` set.
+    let profile = match m.get_one::<String>("tools") {
+        Some(p) => Profile::parse(p).ok_or_else(|| CliError::usage(format!("--tools must be core or full (got {p})")))?,
+        None => Profile::from_env().map_err(CliError::usage)?,
+    };
     // `TRAMA_API_KEY` is one key and wins, exactly as it does for every other command. Otherwise the
     // server speaks for every saved profile the flags select, so an agent can read across workspaces.
     let creds = if config::env("TRAMA_API_KEY").is_some() {
@@ -45,7 +51,7 @@ pub async fn serve(ctx: &Ctx) -> Result<()> {
     }
     let upstream = Upstream::new(&url, ctx.timeout, MAX_OUTPUT_BYTES)
         .map_err(|e| CliError::internal(e.to_string()))?;
-    let server = Server::new(upstream).map_err(CliError::internal)?;
+    let server = Server::new(upstream).map_err(CliError::internal)?.with_profile(profile);
     let mut accounts = Vec::new();
     for cred in &creds {
         let who = server
@@ -69,7 +75,9 @@ pub async fn serve(ctx: &Ctx) -> Result<()> {
     }
     let slugs: Vec<&str> = accounts.iter().map(|a| a.who.slug.as_str()).collect();
     eprintln!(
-        "trama mcp: {} tools, {} workspace(s) ({}), API {}",
+        "trama mcp: {} profile ({} tools listed, {} in the catalog), {} workspace(s) ({}), API {}",
+        profile.as_str(),
+        server.listed_count(profile),
         server.tool_count(),
         accounts.len(),
         slugs.join(", "),

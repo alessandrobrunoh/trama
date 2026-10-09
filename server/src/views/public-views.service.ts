@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import { buildDemandIndex, mergeDemand, type CustomerRequest, type Demand } from '../contracts/domain.js';
+import { buildDemandIndex, mergeDemand, resolveLabelCatalog, type CustomerRequest, type Demand } from '../contracts/domain.js';
 import type { PublicView, PublicViewGroup, PublicViewItem, ViewEntity } from '../contracts/domain.js';
 import {
   CustomerEntity,
@@ -70,10 +70,12 @@ export class PublicViewsService {
     const names = await this.namesFor(workspaceId, entity, groupBy);
     const workspace = await this.ds.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId });
 
+    // Label ids mean nothing to a reader of the link: show the names.
+    const labelNames = new Map(resolveLabelCatalog(workspace?.settings?.labels).map((l) => [l.id, l.name]));
     const out: PublicViewGroup[] = groups.map((g) => ({
       key: g.key,
       label: this.groupLabel(entity, groupBy, g.key, names),
-      items: g.items.map((r) => this.project(entity, r, names)),
+      items: g.items.map((r) => this.project(entity, r, names, labelNames)),
     }));
     return {
       name: view.name,
@@ -167,9 +169,10 @@ export class PublicViewsService {
   }
 
   /** The only place that decides which fields leave the server for an anonymous reader. */
-  private project(entity: ViewEntity, r: Row, names: Names): PublicViewItem {
+  private project(entity: ViewEntity, r: Row, names: Names, labelNames: ReadonlyMap<string, string>): PublicViewItem {
     const name = (kind: RefKind, id: unknown): string | undefined => (typeof id === 'string' ? names[kind].get(id) : undefined);
     const base = { id: String(r['id']), updatedAt: iso(r['updatedAt']) ?? '' };
+    const labels = (v: unknown): string[] | undefined => strs(Array.isArray(v) ? v.map((id) => labelNames.get(String(id))).filter((n): n is string => !!n) : undefined);
     const compact = <T extends object>(o: T): T => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T;
     switch (entity) {
       case 'workstream':
@@ -182,7 +185,7 @@ export class PublicViewsService {
           team: name('team', r['ownerTeamId']),
           assignee: name('user', r['accountableUserId']),
           project: name('project', r['projectId']),
-          labels: strs(r['labels']),
+          labels: labels(r['labels']),
           startDate: iso(r['startDate']),
           targetDate: iso(r['targetDate']),
         });
@@ -197,7 +200,7 @@ export class PublicViewsService {
           team: name('team', r['teamId']),
           assignee: name('user', r['assigneeId']),
           project: name('project', r['projectId']),
-          labels: strs(r['labels']),
+          labels: labels(r['labels']),
         });
       case 'decision':
         return compact({
@@ -215,7 +218,7 @@ export class PublicViewsService {
           priority: str(r['priority']) as PublicViewItem['priority'],
           health: str(r['health']),
           assignee: name('user', r['leadId']),
-          labels: strs(r['labels']),
+          labels: labels(r['labels']),
           startDate: iso(r['startDate']),
           targetDate: iso(r['targetDate']),
         });

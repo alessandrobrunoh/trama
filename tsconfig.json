@@ -13,6 +13,8 @@
     "target": "ES2022",
     "module": "preserve",
     "paths": {
+      "@lucide/angular": ["./src/app/ui/icons/lucide.ts"],
+      "@lucide/angular-lib": ["./node_modules/@lucide/angular"],
       "@spartan-ng/helm/button": ["./src/app/ui/button/src/index.ts"],
       "@spartan-ng/helm/utils": ["./src/app/ui/utils/src/index.ts"],
       "@spartan-ng/helm/accordion": ["./src/app/ui/accordion/src/index.ts"],
