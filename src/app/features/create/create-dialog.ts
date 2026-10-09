@@ -1185,8 +1185,7 @@ export class CreateDialog {
           });
           if (i) {
             const links = this.workstreamIds();
-            // Keep the chosen status: linking would otherwise move backlog/todo to in_progress.
-            if (links.length) await this.store.linkIssue(i.id, { workstreamIds: links, status });
+            if (links.length) await this.store.linkIssue(i.id, { workstreamIds: links });
             done = { label: `${i.key} created`, path: ['issues', i.key] };
           }
           break;

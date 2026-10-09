@@ -197,7 +197,7 @@ export class IssuesController {
     return this.withCounts(ctx, await this.service.update(ctx.workspace.id, actor, idOrKey, dto));
   }
 
-  /** Link to existing workstreams and/or create one. Moves backlog/todo issues to `in_progress`. */
+  /** Link to existing workstreams and/or create one. Does not change the issue status unless `status` is given. */
   @Post(':idOrKey/link')
   @HttpCode(200)
   async link(

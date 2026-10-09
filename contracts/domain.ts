@@ -495,7 +495,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
 
 /**
  * Tracker status, independent of workstream status.
- * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
+ * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
 export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';

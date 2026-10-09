@@ -1142,14 +1142,14 @@ export class NablaStore {
 
   /**
    * Attach the issue to existing workstreams and/or a new one (`createWorkstream`).
-   * Backlog and todo issues move to `in_progress` unless `status` is set. The created
+   * Linking never changes the status; only an explicit `status` does. The created
    * workstream arrives with the next refetch (`issue.workstreamIds`).
    */
   async linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined> {
     const current = this.issueById().get(id);
     if (!current) return undefined;
     const tx = this.tx();
-    const status = input.status ?? (current.status === 'backlog' || current.status === 'todo' ? 'in_progress' : current.status);
+    const status = input.status ?? current.status;
     tx.patch(this._issues, id, {
       status,
       ...(input.workstreamIds ? { workstreamIds: [...new Set([...current.workstreamIds, ...input.workstreamIds])] } : {}),

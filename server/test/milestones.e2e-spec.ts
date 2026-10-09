@@ -185,13 +185,17 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const canceled = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'canceled' }).expect(200)).body;
     expect(canceled.completedAt).toBeTruthy();
 
-    // linking moves backlog -> in_progress and starts the clock
+    // linking alone keeps the status; an explicit status starts the clock
     const linked = await mkIssue('bug', 'Linked');
     const ws = await mkWs('Link target');
     const afterLink = (await c.post(`${base()}/issues/${linked.key}/link`, { workstreamIds: [ws.id] }).expect(200)).body;
-    expect(afterLink.status).toBe('in_progress');
-    expect(afterLink.startedAt).toBeTruthy();
-    expect(afterLink.assigneeId).toBe(me);
+    expect(afterLink.status).toBe('backlog');
+    expect(afterLink.startedAt).toBeFalsy();
+    expect(afterLink.assigneeId).toBeFalsy();
+    const started2 = (await c.post(`${base()}/issues/${linked.key}/link`, { workstreamIds: [ws.id], status: 'in_progress' }).expect(200)).body;
+    expect(started2.status).toBe('in_progress');
+    expect(started2.startedAt).toBeTruthy();
+    expect(started2.assigneeId).toBe(me);
 
     // created straight into done
     const finished = await mkIssue('idea', 'Already done', { status: 'done' });
