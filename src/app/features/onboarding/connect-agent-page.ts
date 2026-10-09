@@ -17,7 +17,7 @@ type Access = 'contributor' | 'read-only';
 
 /** Same installer the settings page shows (see cli/README.md). */
 const INSTALL_URL = 'https://raw.githubusercontent.com/alessandrobrunoh/trama/main/cli/install/install.sh';
-const PLACEHOLDER = 'nbl_YOUR_TOKEN';
+const PLACEHOLDER = 'trm_YOUR_TOKEN';
 
 const CLIENTS: { id: Client; label: string }[] = [
   { id: 'claude-code', label: 'Claude Code' },

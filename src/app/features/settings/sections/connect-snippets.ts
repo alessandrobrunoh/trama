@@ -76,7 +76,7 @@ type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'wri
     <p class="text-muted-foreground text-xs leading-snug">{{ current().hint }}</p>
     @if (!token()) {
       <p class="text-muted-foreground text-xs leading-snug">
-        <code class="font-mono">nbl_YOUR_TOKEN</code> is a placeholder: the real secret is only shown once, when the token is created.
+        <code class="font-mono">trm_YOUR_TOKEN</code> is a placeholder: the real secret is only shown once, when the token is created.
       </p>
     }
   `,
@@ -94,7 +94,7 @@ export class ConnectSnippets {
   /** Absolute API base: the SPA proxies/serves `/api` from its own origin. */
   protected readonly apiUrl = computed(() => (this.base.startsWith('/') && typeof location !== 'undefined' ? location.origin + this.base : this.base));
   protected readonly slug = computed(() => this.store.slug() ?? 'my-workspace');
-  private readonly secret = computed(() => this.token() ?? 'nbl_YOUR_TOKEN');
+  private readonly secret = computed(() => this.token() ?? 'trm_YOUR_TOKEN');
   private readonly exampleKey = computed(() => this.store.workstreams()[0]?.key ?? 'AUTH-42');
 
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [

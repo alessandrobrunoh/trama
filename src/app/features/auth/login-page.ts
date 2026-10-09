@@ -62,9 +62,9 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
                   class="bg-background/70 mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md px-2.5 py-2 text-xs"
                 >
                   <span class="text-muted-foreground">Email</span>
-                  <code class="text-foreground font-mono">demo@nabla.dev</code>
+                  <code class="text-foreground font-mono">demo@trama.dev</code>
                   <span class="text-muted-foreground">Password</span>
-                  <code class="text-foreground font-mono">nabla-demo</code>
+                  <code class="text-foreground font-mono">trama-demo</code>
                 </div>
               </div>
             </div>
@@ -188,8 +188,8 @@ export class LoginPage implements OnInit {
   }
 
   protected fillDemo(): void {
-    this.email.set('demo@nabla.dev');
-    this.password.set('nabla-demo');
+    this.email.set('demo@trama.dev');
+    this.password.set('trama-demo');
     this.error.set(null);
   }
 

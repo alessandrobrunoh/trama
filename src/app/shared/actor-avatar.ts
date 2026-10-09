@@ -17,7 +17,7 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
  *   user  → round, initials on a hue-derived tint
  *   agent → rounded SQUARE with the provider mark + a small "bot" corner pip (never mistaken for a person)
  *   team  → rounded square in the team colour with the team key
- *   system→ ∇ glyph
+ *   system→ Trama symbol
  *   <app-actor-avatar [actor]="ws.accountable" [size]="20" />   (ActorRef or ResolvedActor)
  */
 @Component({
@@ -74,9 +74,10 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
           class="bg-muted text-muted-foreground inline-flex items-center justify-center rounded-full"
           [style.width.px]="size()"
           [style.height.px]="size()"
-          [style.font-size.px]="fontSize() + 2"
-          >∇</span
-        >
+          >
+          <img src="/icons/trama-symbol-black.svg" alt="" [style.width.px]="glyph()" [style.height.px]="glyph()" class="dark:hidden" />
+          <img src="/icons/trama-symbol-white.svg" alt="" [style.width.px]="glyph()" [style.height.px]="glyph()" class="hidden dark:block" />
+        </span>
       }
     }
   `,

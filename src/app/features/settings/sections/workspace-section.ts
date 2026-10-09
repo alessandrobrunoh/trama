@@ -265,7 +265,7 @@ export class WorkspaceSection {
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
 
-  protected readonly host = typeof location !== 'undefined' ? location.host : 'nabla';
+  protected readonly host = typeof location !== 'undefined' ? location.host : 'trama';
   protected readonly name = signal('');
   protected readonly slugValue = signal('');
   protected readonly busy = signal(false);

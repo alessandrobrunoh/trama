@@ -34,7 +34,7 @@ import { AssistantChat, timeAgo } from './assistant-chat';
   template: `
     @if (ai.open() && !ai.onAssistantPage()) {
       <section
-        id="nabla-assistant"
+        id="trama-assistant"
         role="dialog"
         aria-modal="false"
         aria-labelledby="assistant-title"
@@ -111,7 +111,7 @@ import { AssistantChat, timeAgo } from './assistant-chat';
           id="desktop-assistant-launcher"
           class="hover:bg-accent text-foreground inline-flex h-6 items-center gap-1.5 rounded px-2"
           [class.bg-accent]="ai.open() && !activeInDock()"
-          aria-controls="nabla-assistant"
+          aria-controls="trama-assistant"
           [attr.aria-expanded]="ai.open()"
           (click)="toggle()"
         >

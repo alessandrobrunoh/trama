@@ -21,7 +21,8 @@ import { Kbd } from '../../shared/kbd';
         class="bg-primary/10 pointer-events-none absolute top-[-18rem] left-1/2 -z-10 h-[32rem] w-[52rem] -translate-x-1/2 rounded-full blur-3xl"
       ></div>
       <a routerLink="/" class="absolute top-3 left-4 flex items-center gap-2 text-[13px] font-semibold tracking-tight sm:left-6">
-        <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-[5px] text-[13px] leading-none" aria-hidden="true">∇</span>
+        <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 dark:hidden" />
+        <img src="/icons/trama-symbol-white.svg" alt="" class="hidden size-5 dark:block" />
         Trama
       </a>
     }

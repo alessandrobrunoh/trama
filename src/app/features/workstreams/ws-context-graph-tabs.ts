@@ -93,7 +93,7 @@ export class WsContextTab {
   protected readonly term = LucideTerminal;
   protected readonly curl = computed(
     () =>
-      `curl -H "Authorization: Bearer $NABLA_TOKEN" -H "Accept: text/markdown" ${globalThis.location?.origin ?? ''}/api/w/${this.store.slug()}/workstreams/${this.ws().key}/context`,
+      `curl -H "Authorization: Bearer $TRAMA_API_KEY" -H "Accept: text/markdown" ${globalThis.location?.origin ?? ''}/api/w/${this.store.slug()}/workstreams/${this.ws().key}/context`,
   );
 
   constructor() {

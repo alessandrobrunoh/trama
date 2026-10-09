@@ -32,13 +32,13 @@ function verify(secret, rawBody, header) {
   return header?.length === expected.length &&
     timingSafeEqual(Buffer.from(header), Buffer.from(expected));
 }
-// header = request.headers['x-nabla-signature'], rawBody = the unparsed request body`;
+// header = request.headers['x-trama-signature'], rawBody = the unparsed request body`;
 
-const PAYLOAD_SNIPPET = `POST https://your.app/hooks/nabla
+const PAYLOAD_SNIPPET = `POST https://your.app/hooks/trama
 Content-Type: application/json
-X-Nabla-Event: issue.created
-X-Nabla-Delivery: ev_8f3k2…
-X-Nabla-Signature: sha256=9b74c9897bac…
+X-Trama-Event: issue.created
+X-Trama-Delivery: ev_8f3k2…
+X-Trama-Signature: sha256=9b74c9897bac…
 
 {
   "id": "ev_8f3k2…",
@@ -95,7 +95,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
           </p>
           <app-copy-field [value]="s.value" label="Signing secret" />
           <p class="text-muted-foreground text-xs leading-snug">
-            Every delivery carries <code class="font-mono">X-Nabla-Signature: sha256=&lt;HMAC-SHA256 of the raw body with this secret&gt;</code>. Verify it on your side:
+            Every delivery carries <code class="font-mono">X-Trama-Signature: sha256=&lt;HMAC-SHA256 of the raw body with this secret&gt;</code>. Verify it on your side:
           </p>
           <app-code-block [code]="verifySnippet" label="Verification code" />
           <div class="flex justify-end"><button hlmBtn size="sm" variant="outline" (click)="secret.set(null)">Done</button></div>
@@ -108,7 +108,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
             <input hlmInput class="h-8 w-full text-[13px]" placeholder="Ops chat bridge" [value]="f.name" (input)="patch({ name: $any($event.target).value })" aria-label="Webhook name" />
           </app-settings-row>
           <app-settings-row label="Payload URL" description="Trama POSTs here. Must be reachable from the API server; redirects are not followed." wide>
-            <input hlmInput type="url" class="h-8 w-full font-mono text-xs" placeholder="https://example.com/hooks/nabla" [value]="f.url" (input)="patch({ url: $any($event.target).value })" aria-label="Payload URL" />
+            <input hlmInput type="url" class="h-8 w-full font-mono text-xs" placeholder="https://example.com/hooks/trama" [value]="f.url" (input)="patch({ url: $any($event.target).value })" aria-label="Payload URL" />
           </app-settings-row>
           <div class="px-4 py-3">
             <div class="flex flex-wrap items-center justify-between gap-2">

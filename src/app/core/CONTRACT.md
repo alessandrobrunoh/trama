@@ -1,4 +1,4 @@
-# Nabla client data layer — contract
+# Trama client data layer — contract
 
 Everything under `src/app/core/**` (except `theme/`, `contracts/`). Feature agents rely on this file only; read it before touching data.
 Authoritative inputs: `server/API.md` (API), `src/app/app.routes.ts` (routes), `contracts/domain.ts` (types; synced copy at `core/contracts/domain.ts`, never edit). The former `PLAN.md` no longer exists.
@@ -45,7 +45,7 @@ Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (
 | `/` | `LandingPage` (features/landing/landing-page.ts) when signed out; signed in → last-used or first workspace `/<slug>/overview`, `/new-workspace` if none | landingGuard |
 | `/:workspaceSlug` | `AppShell` (layout/app-shell.ts) | authGuard, workspaceGuard |
 
-Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
+Children of `/:workspaceSlug` (all lazy, title `<Page> · Trama`):
 
 | path | class (file under features/) | inputs besides `workspaceSlug` |
 |---|---|---|
@@ -85,7 +85,7 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 
 `inject(ApiClient)`. Promise-based; base URL `/api` (`API_BASE_URL`, proxied to the Nest server). Features should normally use `TramaStore` mutations; use ApiClient directly for endpoints that are not part of the snapshot (search, graph, agent context, attention for `scope=all`, events with filters, comments of a subject).
 
-Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
+Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `trama_session`; the API still accepts the pre-rename `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
 
 Errors: every call rejects with `ApiError { status, message, code?, details?, isUnauthorized/isForbidden/isNotFound/isConflict/isValidation/isNetwork }` (`status 0` = unreachable).
 - 401 other than `POST /auth/login`, `POST /auth/signup` or `POST /auth/logout`: `api.sessionExpired` emits; SessionStore clears the session and redirects to `/login?next=<url>` (toast "Your session expired"). A 401 from `GET /auth/me` is a dead session too. Wrong-password and logout 401s do not.
@@ -182,7 +182,7 @@ commentAuthorsFor(subject): readonly ActorRef[]
 loadComments(subject, {force?,quiet?}): Promise<void>     // newest page; call when a detail view opens (<app-comments-loader>)
 loadMoreComments(subject): Promise<void>                  // next (older) page; commentThread(subject) -> {state,nextCursor,loadingMore}
 resolveActor(ref?: ActorRef): ResolvedActor   // { type, id?, name, hue? (user), color?/key? (team), provider? (agent), known }
-actorName(ref?: ActorRef): string             // 'Nabla' for system / missing
+actorName(ref?: ActorRef): string             // 'Trama' for system / missing
 userRef(id): ActorRef
 can(minRole: Role): boolean                   // same as session.can, available without SessionStore
 loadOlderEvents(query?: {workstreamId?, subject?, limit?}): Promise<number>   // activity "load more"
