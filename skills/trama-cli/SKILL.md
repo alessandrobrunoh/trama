@@ -1,6 +1,6 @@
 ---
 name: trama-cli
-description: Work in Trama (issues, workstreams, decisions, artifacts, input requests) from the shell with the `trama` CLI. Use when the Trama MCP tools are unavailable, when the user tells you to use the `trama` command, or whenever `trama` is on PATH and the user mentions a workstream like AUTH-42, an issue like BUG-142 or a decision like ADR-21.
+description: Work in Trama (issues, workstreams, decisions, artifacts, input requests) from the shell with the `trama` CLI. Use when the Trama MCP tools are unavailable, when the user tells you to use the `trama` command, or whenever `trama` is on PATH and the user mentions a workstream like AUTH-42, an issue like BUG-142, a decision like ADR-21, or the issues of this project, this repository, or the current checkout.
 ---
 
 # Trama through the `trama` CLI
@@ -59,6 +59,26 @@ trama workstream list --status working --team-id tm_…
 trama event list --workstream-id wk_… --limit 20
 ```
 
+### Issues of this checkout
+
+"This project", said from a git checkout, is a Trama project reached through the registered repository. It is not the forge's issue list. Resolve it in order and stop when a step is missing.
+
+```bash
+git remote get-url origin
+trama repository list --fields id,provider,fullName,url
+trama project list --repository-id rp_… --fields id,name,status
+trama issue list --project-id pj_… --open --fields key,title,status,assigneeId,estimate,labels
+trama project context pj_…
+trama workspace get --fields settings.estimateScale,settings.labels
+```
+
+1. From the remote, keep the host and `owner/name`, without `.git` or credentials. Also check `upstream` when it exists.
+2. Follow a rename before matching. `gh repo view --json nameWithOwner,url` does. Without `gh`, request the remote URL and use the final host and path. `github.com/alessandrobrunoh/nabla` redirects to `github.com/alessandrobrunoh/trama`; those are one repository.
+3. Match `fullName` (case-insensitive) or the same host and path on `url`.
+4. No match: the checkout is not registered. Say so. Do not run `gh issue list`, and do not create the repository unless the user asked.
+5. One project for that repository is "this project". Several: name them and ask which, unless the user already named one. None: say the repository is on no project. `trama workstream list --repository-id rp_…` can still show work that lists this repository; that is not the project.
+6. An issue has no repository of its own. `--project-id` returns issues on that project and issues linked to its workstreams. `project context` is the whole picture.
+
 Output is compact JSON when piped. Keep it small with `--fields a,b.c` (dot paths work on arrays too); `-o table` for a human view, `-o jsonl` for one object per line, `-o raw` for the exact reply. Avoid `trama snapshot get`: it is huge.
 
 Several workspaces: `trama issue list --account work` (or `--all-workspaces`, or `--workspace acme,beta`) reads every matching profile and stamps each row with `workspace` and `profile`. Use it for reads only. A write (`create`, `update`, `delete`) is refused when it matches more than one workspace: add `--workspace <slug>` or `--profile <name>` so it lands in exactly one. The same rule as MCP: one key is one workspace; a read may span them, a write may not.
@@ -66,7 +86,7 @@ Several workspaces: `trama issue list --account work` (or `--all-workspaces`, or
 ## Writing
 
 ```bash
-trama issue create --kind bug --title "Login times out" --priority high
+trama issue create --kind bug --title "Login times out" --priority high --project-id pj_… --labels lb_bug --estimate 2 --source agent
 trama issue update BUG-142 --status in_progress --assignee-id usr_…
 trama issue update BUG-142 --unset estimate          # null clears an optional field
 trama issue link BUG-142 --workstream-ids wk_…
@@ -116,6 +136,8 @@ Success: JSON on stdout (`{"ok":true}` for deletes). Failure: JSON on stderr, `{
 4. You cannot accept decisions: create them as `draft` or `proposed`.
 5. If a human must choose, open an `input-request` instead of guessing or stalling.
 6. Search before creating, to avoid duplicates. Write once, not in a loop: keys have per-minute and per-day write caps.
+7. On an issue you create, set `--project-id` when this checkout resolves to exactly one project, `--labels` to catalog ids from `trama workspace get` (bug, incident, security → `lb_bug`; feature, idea → `lb_feature`; tech debt → `lb_improvement`; docs → `lb_documentation`, and only when that id exists), and `--estimate` only when `settings.estimateScale` is not `none` and you can justify the number on that scale. Fibonacci is `0, 1, 2, 3, 5, 8, 13, 21`. Omit an estimate you cannot justify.
+8. Leave `--assignee-id` empty on a backlog issue. When you set `--status in_progress` and nobody is assigned, pass `whoami`'s actor id if that actor is a `user`. The server does the same on create, update and link, and does not assign an agent. Never replace an assignee who is already set.
 
 ## Wake up on activity
 

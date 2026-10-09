@@ -78,6 +78,25 @@ export function applyStatusFacts(
   else row.completedAt = null;
 }
 
+/**
+ * The user who moves an unassigned issue to `in_progress` becomes the assignee.
+ * An explicit assignee (including `null`) wins. Agents and other actors do not claim,
+ * and an issue that is already `in_progress` is left as it is.
+ */
+export function claimAssignee(
+  actor: ActorRef,
+  from: IssueStatus | null,
+  to: IssueStatus,
+  assigneeId: string | null,
+  assigneeWasSet: boolean,
+): string | null {
+  if (assigneeWasSet) return assigneeId;
+  if (to === 'in_progress' && from !== 'in_progress' && !assigneeId && actor.type === 'user' && actor.id) {
+    return actor.id;
+  }
+  return assigneeId;
+}
+
 @Injectable()
 export class IssuesService {
   constructor(
@@ -217,9 +236,10 @@ export class IssuesService {
       workspaceId,
       [input.teamId].filter((x): x is string => !!x),
     );
-    await this.refs.users(workspaceId, [input.assigneeId]);
     await this.refs.projects(workspaceId, [input.projectId].filter((x): x is string => !!x));
     const status = input.status ?? 'backlog';
+    const assigneeId = claimAssignee(actor, null, status, input.assigneeId ?? null, input.assigneeId !== undefined);
+    await this.refs.users(workspaceId, [assigneeId]);
     const facts: Pick<IssueEntity, 'startedAt' | 'completedAt'> = {
       startedAt: null,
       completedAt: null,
@@ -243,7 +263,7 @@ export class IssuesService {
           source: input.source ?? (actor.type === 'agent' ? 'agent' : 'manual'),
           reporterName: input.reporterName ?? null,
           reporterId: actor.type === 'user' ? (actor.id ?? null) : null,
-          assigneeId: input.assigneeId ?? null,
+          assigneeId,
           teamId: input.teamId ?? null,
           projectId: input.projectId ?? null,
           priority: input.priority ?? 'none',
@@ -364,6 +384,11 @@ export class IssuesService {
       row.status = patch.status;
       if (row.status !== from) applyStatusFacts(row, row.status);
     }
+    const claimed = claimAssignee(actor, from, row.status, row.assigneeId, patch.assigneeId !== undefined);
+    if (claimed !== row.assigneeId) {
+      await this.refs.users(workspaceId, [claimed]);
+      row.assigneeId = claimed;
+    }
     row.duplicateOfId = duplicateOfId;
     row.updatedAt = new Date();
     const rekey = patch.kind !== undefined && patch.kind !== fromKind;
@@ -386,6 +411,7 @@ export class IssuesService {
     const fields = Object.keys(patch)
       .filter((k) => (patch as Record<string, unknown>)[k] !== undefined)
       .filter((k) => k !== 'status' && k !== 'kind');
+    if (row.assigneeId !== previousAssigneeId && !fields.includes('assigneeId')) fields.push('assigneeId');
     if (rekey)
       await this.events.record({
         workspaceId,
@@ -430,7 +456,8 @@ export class IssuesService {
 
   /**
    * Attach the issue to existing workstreams and/or a newly created one (`createWorkstream`,
-   * created atomically). Backlog and todo issues move to `in_progress` unless `status` is set.
+   * created atomically). Backlog, draft and todo issues move to `in_progress` unless `status`
+   * is set. That move assigns the acting user when the issue has no assignee.
    */
   async link(
     workspaceId: string,
@@ -456,6 +483,10 @@ export class IssuesService {
     let created: Awaited<ReturnType<WorkstreamsService['create']>> | undefined;
     const previous = row.workstreamIds;
     const from = row.status;
+    const previousAssigneeId = row.assigneeId;
+    const nextStatus = input.status ?? (SCHEDULED.has(row.status) ? 'in_progress' : row.status);
+    const nextAssignee = claimAssignee(actor, from, nextStatus, row.assigneeId, false);
+    if (nextAssignee !== row.assigneeId) await this.refs.users(workspaceId, [nextAssignee]);
     await this.ds.transaction(async (m) => {
       const ids = unique([
         ...(row.workstreamIds ?? []),
@@ -474,9 +505,8 @@ export class IssuesService {
         ids.push(created.id);
       }
       row.workstreamIds = ids;
-      row.status =
-        input.status ??
-        (SCHEDULED.has(row.status) ? 'in_progress' : row.status);
+      row.assigneeId = nextAssignee;
+      row.status = nextStatus;
       if (row.status !== from) applyStatusFacts(row, row.status);
       row.updatedAt = new Date();
       await m.save(row);
@@ -504,6 +534,15 @@ export class IssuesService {
         subject: { type: 'issue', id: row.id },
         workstreamId: row.workstreamIds[0] ?? null,
         data: { key: row.key, from, to: row.status },
+      });
+    if (row.assigneeId !== previousAssigneeId)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.updated',
+        subject: { type: 'issue', id: row.id },
+        workstreamId: row.workstreamIds[0] ?? null,
+        data: { key: row.key, fields: ['assigneeId'], assignee: { from: previousAssigneeId, to: row.assigneeId } },
       });
     await this.bus.touchMany(
       workspaceId,

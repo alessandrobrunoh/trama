@@ -1,6 +1,6 @@
 ---
 name: trama
-description: Core concepts and ground rules for working in Trama through its MCP tools (issues, workstreams, decisions, artifacts, input requests). Read this first whenever you are about to read or change anything in a Trama workspace, or when the user mentions Trama, a workstream key like AUTH-42, an issue key like BUG-142, or a decision like ADR-21.
+description: Core concepts and ground rules for working in Trama through its MCP tools (issues, workstreams, decisions, artifacts, input requests). Read this first whenever you are about to read or change anything in a Trama workspace, when the user mentions Trama, a workstream key like AUTH-42, an issue key like BUG-142, or a decision like ADR-21, or when they ask for the issues of this project, this repository, or the current checkout.
 ---
 
 # Trama: how it works
@@ -31,6 +31,19 @@ A **project** sits above them: the planned outcome (with milestones, a lead, a h
 
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.
 
+## Issues of this checkout
+
+"This project", said from a git checkout, is a Trama project reached through the registered repository. It is not a guess, and it is not the forge's own issue list. Resolve it in order and stop when a step is missing.
+
+1. Read the remote (`git remote get-url origin`, and `upstream` when it exists). Keep the host and `owner/name`, without `.git` or credentials.
+2. Follow a rename before matching. `gh repo view --json nameWithOwner,url` does. Without `gh`, request the remote URL and use the final host and path. `github.com/alessandrobrunoh/nabla` redirects to `github.com/alessandrobrunoh/trama`; those are one repository.
+3. `list_repositories` and match `fullName` (case-insensitive) or the same host and path on `url`.
+4. No match: the checkout is not registered. Say so. Do not list GitHub or GitLab issues instead, and do not create the repository unless the user asked.
+5. `list_projects { repositoryId }`. One project is "this project". Several: name them and ask which, unless the user already named one. None: the repository is registered but on no project. Say so. `list_workstreams { repositoryId }` can still show work that lists this repository; that is not the project.
+6. Read the issues with `list_issues { projectId, open: true }` or, for the whole picture, `get_project_context { id }`. An issue has no repository of its own. It belongs here through `projectId`, or through a workstream of that project.
+
+`get_workspace` returns `settings.estimateScale` and `settings.labels` (`id`, `name`). Assign those ids. Do not invent label names. Filing those fields is `trama-triage-issues`.
+
 ## Ground rules
 
 1. **Start with `whoami`.** It tells you which workspace and role you act as and which tools your token allows. If several keys are connected it returns one entry per workspace; `list_accounts` lists them. Tools your key cannot use are hidden; do not look for workarounds.
@@ -57,6 +70,6 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 
 ## Tool map
 
-`workspace/whoami` · `list_accounts` (only when several keys are connected) · `search` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
+`whoami` · `get_workspace` · `list_accounts` (only when several keys are connected) · `search` · `list_repositories` `get_repository` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
 
 `api_request` is an escape hatch for workspace routes with no dedicated tool. Prefer the dedicated tools; it only takes plain workspace-relative paths.

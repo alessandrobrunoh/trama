@@ -43,6 +43,8 @@ update_criterion { idOrKey, criterionId, state: "in_progress" }
 
 That is the signal Trama uses to show the workstream as `working`. Do not touch `statusOverride`.
 
+When the work is an issue and you are actually starting it, set that issue to `in_progress` if it is not already. If it has no assignee and `whoami.actor.type` is `user`, set `assigneeId` to that id. The server does this on the status change and on `link_issue` (which moves `draft`, `backlog` and `todo` to `in_progress`). An `agent` actor is not assigned. Do not replace an assignee who is already set. Filing an issue you are not starting leaves the assignee empty.
+
 ## 5. Work where the code lives
 
 Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` (empty when the workspace does not use Delta threads) and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.

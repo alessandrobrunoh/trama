@@ -4,6 +4,7 @@ import { Client, createTestApp } from './app.js';
 describe('milestones, estimates, issue facts and re-keying', () => {
   let app: INestApplication;
   let c: Client;
+  let me: string;
   let slug: string;
   let team: { id: string };
   const base = () => `/api/w/${slug}`;
@@ -17,6 +18,7 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     app = await createTestApp();
     const u = await Client.signup(app.getHttpServer(), 'Milestone Dev');
     c = u.client;
+    me = u.user.id;
     slug = (await c.post('/api/workspaces', { name: 'Milestone Co' }).expect(201)).body.slug;
     team = (await c.post(`${base()}/teams`, { name: 'Identity', key: 'AUTH', memberIds: [u.user.id] }).expect(201)).body;
   });
@@ -189,10 +191,38 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const afterLink = (await c.post(`${base()}/issues/${linked.key}/link`, { workstreamIds: [ws.id] }).expect(200)).body;
     expect(afterLink.status).toBe('in_progress');
     expect(afterLink.startedAt).toBeTruthy();
+    expect(afterLink.assigneeId).toBe(me);
 
     // created straight into done
     const finished = await mkIssue('idea', 'Already done', { status: 'done' });
     expect(finished.completedAt).toBeTruthy();
+  });
+
+  it('assigns the user who moves an unassigned issue to in_progress', async () => {
+    const filed = await mkIssue('bug', 'Filed only');
+    expect(filed.assigneeId).toBeUndefined();
+
+    const started = (await c.patch(`${base()}/issues/${filed.key}`, { status: 'in_progress' }).expect(200)).body;
+    expect(started.assigneeId).toBe(me);
+    const review = (await c.patch(`${base()}/issues/${filed.key}`, { status: 'in_review' }).expect(200)).body;
+    expect(review.assigneeId).toBe(me);
+
+    const kept = await mkIssue('bug', 'Already owned', { assigneeId: me, status: 'todo' });
+    const moved = (await c.patch(`${base()}/issues/${kept.key}`, { status: 'in_progress' }).expect(200)).body;
+    expect(moved.assigneeId).toBe(me);
+
+    const declined = await mkIssue('bug', 'Leave empty');
+    const empty = (await c.patch(`${base()}/issues/${declined.key}`, { status: 'in_progress', assigneeId: null }).expect(200)).body;
+    expect(empty.assigneeId).toBeUndefined();
+
+    const born = await mkIssue('bug', 'Born started', { status: 'in_progress' });
+    expect(born.assigneeId).toBe(me);
+
+    const evs = (await c.get(`${base()}/events?type=issue.updated`).expect(200)).body as {
+      subject: { id: string };
+      data: { fields: string[]; assignee?: { to: string } };
+    }[];
+    expect(evs.some((e) => e.subject.id === filed.id && e.data.fields.includes('assigneeId') && e.data.assignee?.to === me)).toBe(true);
   });
 
   it('changing the kind re-keys the issue and keeps the old key working', async () => {
