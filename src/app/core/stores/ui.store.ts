@@ -50,7 +50,12 @@ export interface ConfirmDeleteState {
   confirmLabel?: string;
   /** `false` renders the confirm button in the primary style (non-destructive confirmations). */
   destructive?: boolean;
-  onConfirm: () => Promise<void> | void;
+  /**
+   * Second step for irreversible actions: the confirm button stays disabled until the user types one of the
+   * `accept` strings exactly (surrounding spaces ignored). `onConfirm` then receives what they typed.
+   */
+  requireText?: { accept: readonly string[]; label: string };
+  onConfirm: (typed: string) => Promise<void> | void;
 }
 
 interface PersistedUi {

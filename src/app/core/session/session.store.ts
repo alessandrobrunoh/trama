@@ -143,12 +143,15 @@ export class SessionStore {
     }
   }
 
-  /** Delete the active workspace (owner), then go to another one (or /new-workspace). */
-  async deleteWorkspace(): Promise<boolean> {
+  /**
+   * Delete the active workspace (owner), then go to another one (or /new-workspace). `confirm` is the slug or
+   * name the user typed; the server refuses anything else.
+   */
+  async deleteWorkspace(confirm: string): Promise<boolean> {
     const current = this._workspace();
     if (!current) return false;
     try {
-      await this.api.workspaces.remove(current.slug);
+      await this.api.workspaces.remove(current.slug, confirm);
     } catch (e) {
       this.reportFailure('delete workspace', e);
       return false;

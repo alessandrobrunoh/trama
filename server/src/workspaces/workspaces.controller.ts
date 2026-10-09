@@ -73,6 +73,16 @@ class UpdateSettingsDto {
   @OptionalNotNull() @IsBoolean() deltaThreads?: boolean;
 }
 
+/** Deleting a workspace is irreversible: repeat its slug or name. */
+export class DeleteWorkspaceDto {
+  @IsString() @MinLength(1) @MaxLength(200) confirm: string;
+}
+
+class TransferOwnershipDto {
+  /** Membership id of the new owner. */
+  @IsString() @MinLength(1) membershipId: string;
+}
+
 class AddMemberDto {
   @IsEmail() email: string;
   @IsIn(ROLES) role: Role;
@@ -160,11 +170,20 @@ export class WorkspaceController {
     return Object.assign(await this.service.updateSettings(ctx, dto), { role: ctx.role });
   }
 
+  /** Hand the workspace to another member (they become owner and primary owner). Browser session, primary owner only. */
+  @Post('transfer-ownership')
+  @Roles('owner')
+  @SessionOnly()
+  @HttpCode(200)
+  async transferOwnership(@Ctx() ctx: WorkspaceContext, @Body() dto: TransferOwnershipDto) {
+    return this.service.transferOwnership(ctx.workspace, { role: ctx.role, userId: ctx.userId }, dto.membershipId);
+  }
+
   @Delete()
   @Roles('owner')
   @HttpCode(204)
-  async remove(@Ctx() ctx: WorkspaceContext): Promise<void> {
-    await this.service.remove(ctx.workspace);
+  async remove(@Ctx() ctx: WorkspaceContext, @Body() dto: DeleteWorkspaceDto): Promise<void> {
+    await this.service.remove(ctx.workspace, dto.confirm);
   }
 }
 
@@ -186,15 +205,18 @@ export class MembersController {
   @Patch(':id')
   @Roles('admin')
   change(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: ChangeRoleDto) {
-    return this.service.changeRole(ctx.workspace.id, ctx.role, id, dto.role);
+    return this.service.changeRole(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id, dto.role);
   }
 
-  /** Admins remove anyone below owner; any member can remove themselves (leave). */
+  /**
+   * Admins remove anyone below owner; any member can remove themselves (leave). Only the workspace owner removes
+   * other owners, and nobody else removes the workspace owner, who transfers ownership before leaving.
+   */
   @Delete(':id')
   @Roles('viewer')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    return this.service.removeMember(ctx.workspace.id, ctx.role, ctx.userId, id);
+    return this.service.removeMember(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id);
   }
 }
 
