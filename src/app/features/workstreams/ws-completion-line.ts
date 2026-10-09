@@ -1,4 +1,4 @@
-// The "Codice · Risultato · Prossima azione" line above the acceptance criteria.
+// The "Code · Outcome · Next" line above the acceptance criteria.
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import type { Workstream } from '../../core';
@@ -11,16 +11,16 @@ import { completionSummary } from './completion-summary';
   host: { class: 'block' },
   template: `
     <p class="text-muted-foreground mb-2 text-[13px] leading-snug" data-testid="completion-line">
-      <span>Codice: <b class="text-foreground font-medium">{{ s().code }}</b></span>
+      <span>Code: <b class="text-foreground font-medium">{{ s().code }}</b></span>
       <span aria-hidden="true"> · </span>
-      <span>Risultato: <b class="font-medium" [class]="s().achieved ? 'text-status-shipped' : 'text-foreground'">{{ s().result }}</b></span>
+      <span>Outcome: <b class="font-medium" [class]="s().achieved ? 'text-status-shipped' : 'text-foreground'">{{ s().result }}</b></span>
       <span aria-hidden="true"> · </span>
-      <span>Prossima azione: <b class="text-foreground font-medium">{{ s().next }}</b></span>
+      <span>Next: <b class="text-foreground font-medium">{{ s().next }}</b></span>
       @if (s().pinned) {
         <span
           class="bg-muted ml-1.5 rounded px-1.5 py-px text-[11px]"
-          hlmTooltip="Lo stato è fissato a mano: non dice se il risultato è raggiunto."
-          >stato fissato a mano</span
+          hlmTooltip="The status was pinned by hand: it does not say whether the outcome is achieved."
+          >manually pinned</span
         >
       }
     </p>

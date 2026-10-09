@@ -12,36 +12,36 @@ export interface CompletionSummary {
 }
 
 const CODE: Record<DeliveryState, string> = {
-  none: 'nessuna consegna',
+  none: 'nothing delivered',
   in_review: 'in review',
   merged: 'merged',
-  released: 'rilasciato',
-  deployed: 'in produzione',
+  released: 'released',
+  deployed: 'deployed',
 };
 
 /** Most blocking first: this is the order the "next action" is picked in. */
 const NEXT_ORDER: CompletionGap[] = ['blocked', 'needs_input', 'no_criteria', 'criteria_pending', 'no_delivery'];
 
 const NEXT: Record<CompletionGap, string> = {
-  blocked: 'sblocca CI, conflitti o dipendenza',
-  needs_input: 'rispondi alla richiesta o alla decisione aperta',
-  no_criteria: 'aggiungi almeno un criterio di accettazione',
-  criteria_pending: 'verifica i criteri aperti e collega le prove',
-  no_delivery: 'porta il codice in review e in merge',
+  blocked: 'unblock CI, conflicts or the dependency',
+  needs_input: 'answer the open request or decision',
+  no_criteria: 'add at least one acceptance criterion',
+  criteria_pending: 'verify the open criteria and link evidence',
+  no_delivery: 'get the code reviewed and merged',
 };
 
 function missing(gap: CompletionGap, pending: number): string {
   switch (gap) {
     case 'no_criteria':
-      return 'nessun criterio definito';
+      return 'no criteria defined';
     case 'criteria_pending':
-      return pending === 1 ? '1 criterio aperto' : `${pending} criteri aperti`;
+      return pending === 1 ? '1 criterion open' : `${pending} criteria open`;
     case 'blocked':
-      return 'bloccato';
+      return 'blocked';
     case 'needs_input':
-      return 'in attesa di una persona';
+      return 'waiting on a person';
     case 'no_delivery':
-      return 'codice non ancora consegnato';
+      return 'code not delivered yet';
   }
 }
 
@@ -51,8 +51,8 @@ export function completionSummary(ws: Pick<Workstream, 'delivery' | 'completion'
   const first = NEXT_ORDER.find((g) => gaps.includes(g));
   return {
     code: CODE[ws.delivery],
-    result: achieved ? 'raggiunto' : gaps.map((g) => missing(g, pending)).join(', '),
-    next: first ? NEXT[first] : 'nessuna',
+    result: achieved ? 'achieved' : gaps.map((g) => missing(g, pending)).join(', '),
+    next: first ? NEXT[first] : 'none',
     achieved,
     pinned: !!ws.statusOverride,
   };

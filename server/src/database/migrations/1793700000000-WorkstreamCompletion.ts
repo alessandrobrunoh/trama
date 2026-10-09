@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * and dependency cascades (`resolved = shipped`) stay exactly as they were. New workstreams never
  * get the flag. `completion` is filled by the boot-time status recompute.
  */
-export class WorkstreamCompletion1793650000000 implements MigrationInterface {
-  name = 'WorkstreamCompletion1793650000000';
+export class WorkstreamCompletion1793700000000 implements MigrationInterface {
+  name = 'WorkstreamCompletion1793700000000';
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(

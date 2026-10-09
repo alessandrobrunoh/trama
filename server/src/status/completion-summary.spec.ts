@@ -14,33 +14,33 @@ describe('completionSummary (workstream overview line)', () => {
   it('merged code with open criteria: the code is done, the outcome is not', () => {
     expect(completionSummary(ws('merged', ['criteria_pending'], ['met', 'pending', 'in_progress']))).toMatchObject({
       code: 'merged',
-      result: '2 criteri aperti',
-      next: 'verifica i criteri aperti e collega le prove',
+      result: '2 criteria open',
+      next: 'verify the open criteria and link evidence',
       achieved: false,
     });
   });
 
   it('achieved: nothing left to do', () => {
     expect(completionSummary(ws('deployed', [], ['met']))).toMatchObject({
-      code: 'in produzione',
-      result: 'raggiunto',
-      next: 'nessuna',
+      code: 'deployed',
+      result: 'achieved',
+      next: 'none',
       achieved: true,
     });
   });
 
   it('picks the most blocking gap as the next action, whatever the order of the gaps', () => {
     expect(completionSummary(ws('in_review', ['no_criteria', 'needs_input', 'blocked', 'no_delivery'])).next).toBe(
-      'sblocca CI, conflitti o dipendenza',
+      'unblock CI, conflicts or the dependency',
     );
-    expect(completionSummary(ws('none', ['no_criteria', 'no_delivery'])).next).toBe('aggiungi almeno un criterio di accettazione');
-    expect(completionSummary(ws('none', ['no_delivery'], ['met'])).next).toBe('porta il codice in review e in merge');
+    expect(completionSummary(ws('none', ['no_criteria', 'no_delivery'])).next).toBe('add at least one acceptance criterion');
+    expect(completionSummary(ws('none', ['no_delivery'], ['met'])).next).toBe('get the code reviewed and merged');
   });
 
   it('says why each gap is missing', () => {
-    expect(completionSummary(ws('merged', ['no_criteria'])).result).toBe('nessun criterio definito');
-    expect(completionSummary(ws('merged', ['criteria_pending'], ['pending'])).result).toBe('1 criterio aperto');
-    expect(completionSummary(ws('merged', ['needs_input'], ['met'])).result).toBe('in attesa di una persona');
+    expect(completionSummary(ws('merged', ['no_criteria'])).result).toBe('no criteria defined');
+    expect(completionSummary(ws('merged', ['criteria_pending'], ['pending'])).result).toBe('1 criterion open');
+    expect(completionSummary(ws('merged', ['needs_input'], ['met'])).result).toBe('waiting on a person');
   });
 
   it('flags a manually pinned status as not being evidence', () => {

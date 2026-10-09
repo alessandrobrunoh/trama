@@ -1,6 +1,6 @@
-// Proof line under an acceptance criterion: how many proofs back a `met` criterion (or "senza prova"),
-// who declared it, and a "Collega prova" picker over the workstream's own artifacts plus a short note.
-// Proof is signalled, never required: a met criterion without it is flagged, not blocked.
+// Evidence line under an acceptance criterion: how many pieces of evidence back a `met` criterion (or "no evidence"),
+// who declared it, and a "Link evidence" picker over the workstream's own artifacts plus a short note.
+// Evidence is signalled, never required: a met criterion without it is flagged, not blocked.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon, LucidePaperclip } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -31,7 +31,7 @@ export function proofCount(c: AcceptanceCriterion, liveArtifactIds: ReadonlySet<
         >{{ proofLabel() }}</span
       >
       @if (byAgent()) {
-        <span class="text-muted-foreground" [hlmTooltip]="who()" position="bottom">dichiarato dall'agente</span>
+        <span class="text-muted-foreground" [hlmTooltip]="who()" position="bottom">declared by agent</span>
       }
     } @else if (count()) {
       <span class="text-muted-foreground">{{ proofLabel() }}</span>
@@ -44,10 +44,10 @@ export function proofCount(c: AcceptanceCriterion, liveArtifactIds: ReadonlySet<
           class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 rounded px-1 py-px underline-offset-2 hover:underline"
           (click)="reset()"
         >
-          <svg [lucideIcon]="clip" [size]="12"></svg>Collega prova
+          <svg [lucideIcon]="clip" [size]="12"></svg>Link evidence
         </button>
         <hlm-popover-content class="w-80 max-w-[calc(100vw-2rem)] gap-2 p-3" *hlmPopoverPortal>
-          <h3 class="text-sm font-medium">Prove per questo criterio</h3>
+          <h3 class="text-sm font-medium">Evidence for this criterion</h3>
           @if (artifacts().length) {
             <ul class="flex max-h-56 flex-col overflow-y-auto">
               @for (a of artifacts(); track a.id) {
@@ -74,21 +74,21 @@ export function proofCount(c: AcceptanceCriterion, liveArtifactIds: ReadonlySet<
               }
             </ul>
           } @else {
-            <p class="text-muted-foreground text-xs">Nessun artefatto in questo workstream: scrivi una nota di verifica.</p>
+            <p class="text-muted-foreground text-xs">This workstream has no artifacts yet: write a verification note.</p>
           }
           <input
             hlmInput
             class="h-8 text-xs"
-            placeholder="Nota di verifica (es. provato su staging)"
-            aria-label="Nota di verifica"
+            placeholder="Verification note (e.g. tested on staging)"
+            aria-label="Verification note"
             maxlength="500"
             [value]="note()"
             (input)="draftNote.set($any($event.target).value)"
           />
-          <p class="text-muted-foreground text-[11px]">Collegare una prova non cambia lo stato del criterio.</p>
+          <p class="text-muted-foreground text-[11px]">Linking evidence does not change the criterion's state.</p>
           <div class="flex justify-end gap-2">
-            <button hlmBtn size="sm" variant="ghost" (click)="pop.set('closed')">Annulla</button>
-            <button hlmBtn size="sm" (click)="save()">Salva</button>
+            <button hlmBtn size="sm" variant="ghost" (click)="pop.set('closed')">Cancel</button>
+            <button hlmBtn size="sm" (click)="save()">Save</button>
           </div>
         </hlm-popover-content>
       </hlm-popover>
@@ -109,19 +109,19 @@ export class CriterionEvidence {
   protected readonly count = computed(() => proofCount(this.c(), this.liveIds()));
   protected readonly proofLabel = computed(() => {
     const n = this.count();
-    return n === 0 ? 'senza prova' : n === 1 ? '1 prova' : `${n} prove`;
+    return n === 0 ? 'no evidence' : n === 1 ? '1 piece of evidence' : `${n} pieces of evidence`;
   });
   protected readonly byAgent = computed(() => {
     const t = this.c().verifiedBy?.type;
     return t === 'agent';
   });
-  /** "Verificato da Ann · 9 ott 2026" / "Dichiarato da Claude (agente) · …" / no author for older criteria. */
+  /** "Verified by Ann · Oct 9, 2026" / "Declared by Claude (agent) · …" / no author for older criteria. */
   protected readonly who = computed(() => {
     const c = this.c();
-    if (!c.verifiedBy) return 'Impostato prima che Trama registrasse chi lo verifica';
+    if (!c.verifiedBy) return 'Set before Trama recorded who verifies criteria';
     const name = this.store.actorName(c.verifiedBy);
-    const verb = c.verifiedBy.type === 'user' ? 'Verificato da' : 'Dichiarato da';
-    const kind = c.verifiedBy.type === 'agent' ? ' (agente)' : '';
+    const verb = c.verifiedBy.type === 'user' ? 'Verified by' : 'Declared by';
+    const kind = c.verifiedBy.type === 'agent' ? ' (agent)' : '';
     return `${verb} ${name}${kind}${c.verifiedAt ? ' · ' + fullDate(c.verifiedAt) : ''}`;
   });
 
