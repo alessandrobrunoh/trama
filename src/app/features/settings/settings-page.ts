@@ -7,6 +7,7 @@ import {
   LucideDynamicIcon,
   LucideKeyRound,
   LucideBell,
+  LucideDownload,
   LucideKeyboard,
   LucideShieldCheck,
   LucidePlug,
@@ -25,6 +26,7 @@ import { AgentsSection } from './sections/agents-section';
 import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { CustomerRequestsSection } from './sections/customer-requests-section';
+import { ImportSection } from './sections/import-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { MembersSection } from './sections/members-section';
 import { NotificationsSection } from './sections/notifications-section';
@@ -68,6 +70,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'tokens', label: 'API tokens', icon: LucideKeyRound },
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
       { id: 'customer-requests', label: 'Customer requests', icon: LucideInbox },
+      { id: 'import', label: 'Import', icon: LucideDownload },
     ],
   },
 ];
@@ -101,6 +104,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     TokensSection,
     IntegrationsSection,
     CustomerRequestsSection,
+    ImportSection,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -170,6 +174,9 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             }
             @case ('customer-requests') {
               <app-customer-requests-section />
+            }
+            @case ('import') {
+              <app-import-section />
             }
             @default {
               <app-empty-state [icon]="warn" title="Unknown settings section" description="Pick a section from the list on the left." />

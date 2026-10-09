@@ -44,6 +44,7 @@ import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
 import { labelOptions, projectOptions, teamOptions } from '../workstreams/ws-model';
 import { IssueActions } from './issue-actions';
+import { IssueExternalRef } from './issue-external-ref';
 import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
@@ -72,6 +73,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
     RelativeTimePipe,
     PropertyRow,
     IssueMilestoneProp,
+    IssueExternalRef,
     Picker,
     InlineText,
     IssueProp,
@@ -311,6 +313,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
                   </a>
                 }
               </app-property-row>
+              <app-issue-external-ref [issue]="i" [canEdit]="canEdit()" />
               <app-property-row label="Duplicate of" [icon]="copyIcon">
                 @if (duplicate(); as dup) {
                   <app-entity-chip type="issue" [ref]="dup.id" compact />
