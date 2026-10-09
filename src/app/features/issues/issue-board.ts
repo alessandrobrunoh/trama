@@ -30,7 +30,6 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
@@ -84,6 +83,7 @@ import {
   type IssueProp,
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
+import { SearchInput } from '../../shared/search-input';
 
 interface Column {
   key: string;
@@ -96,8 +96,8 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   selector: 'app-issue-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    SearchInput,
     HlmButtonImports,
-    HlmInputImports,
     HlmPopoverImports,
     HlmContextMenuImports,
     HlmDropdownMenuImports,
@@ -124,19 +124,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   template: `
     <!-- Filter + display toolbar -->
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6">
-      <div class="relative w-full sm:w-52">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
-        <input
-          #searchBox
-          hlmInput
-          class="h-7 w-full pl-8 text-xs"
-          placeholder="Filter by key or title…"
-          aria-label="Filter issues"
-          [value]="search()"
-          (input)="search.set($any($event.target).value)"
-          (keydown.escape)="search.set(''); searchBox.blur()"
-        />
-      </div>
+      <app-search-input noun="issues" [(value)]="search" />
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain max-sm:basis-full">
         <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
         <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />

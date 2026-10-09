@@ -686,6 +686,13 @@ export interface CustomerRequest {
   important: boolean;
   /** Where the request came from (ticket, email thread, call notes): an http(s) URL. */
   sourceUrl?: string;
+  /** Set when the request arrived through a customer-request source (Intercom, Zendesk, Front, Slack, email, generic webhook). */
+  source?: IntakeProvider;
+  /** The ticket / conversation / message id in the source system (with `source`). */
+  externalId?: string;
+  /** Who asked, as reported by the source. */
+  requesterEmail?: string;
+  requesterName?: string;
   /** Who recorded the request. */
   createdBy: ActorRef;
   createdAt: ISODate;
@@ -734,6 +741,87 @@ export function normalizeCustomerDomains(inputs: readonly string[]): { domains: 
     else if (!domains.includes(domain)) domains.push(domain);
   }
   return { domains, invalid };
+}
+
+// ───────────────────────────── Customer intake ─────────────────────────────
+
+/**
+ * Where inbound customer requests come from. Each source of a workspace has its own webhook URL and secret.
+ * `generic` is a signed JSON webhook, `email` takes a parsed inbound email (Postmark / SendGrid style JSON).
+ */
+export type IntakeProvider = 'intercom' | 'zendesk' | 'front' | 'slack' | 'email' | 'generic';
+export const INTAKE_PROVIDERS: IntakeProvider[] = ['intercom', 'zendesk', 'front', 'slack', 'email', 'generic'];
+
+export interface IntakeProviderMeta {
+  label: string;
+  /** Trama generates the secret (shown once). Otherwise the provider issues it and an admin pastes it. */
+  generatesSecret: boolean;
+  /** Where the secret comes from, for the setup instructions. */
+  secretName: string;
+}
+
+export const INTAKE_PROVIDER_META: Record<IntakeProvider, IntakeProviderMeta> = {
+  intercom: { label: 'Intercom', generatesSecret: false, secretName: 'the app client secret (Developer Hub → your app → Basic information)' },
+  zendesk: { label: 'Zendesk', generatesSecret: false, secretName: 'the webhook signing secret (Admin Center → the webhook → Signing secret)' },
+  front: { label: 'Front', generatesSecret: false, secretName: 'the application secret (Settings → Developers → your app → Basic information)' },
+  slack: { label: 'Slack', generatesSecret: false, secretName: 'the signing secret (api.slack.com/apps → Basic Information)' },
+  email: { label: 'Email forward', generatesSecret: true, secretName: 'the secret Trama generates' },
+  generic: { label: 'Signed webhook', generatesSecret: true, secretName: 'the secret Trama generates' },
+};
+
+export const INTAKE_SOURCE_NAME_MAX = 80;
+export const INTAKE_ITEM_STATUSES = ['pending', 'linked', 'dismissed'] as const;
+export type IntakeItemStatus = (typeof INTAKE_ITEM_STATUSES)[number];
+
+/**
+ * An endpoint that turns a provider's tickets or messages into inbound customer requests.
+ * The secret is never returned except once, when Trama generates it (create / rotate).
+ */
+export interface IntakeSource {
+  /** `isrc_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: IntakeProvider;
+  name: string;
+  enabled: boolean;
+  /** False until the provider's secret has been pasted in: deliveries are refused until then. */
+  hasSecret: boolean;
+  /** Create the customer from the sender's email domain when none matches. Free mail domains never do. */
+  autoCreateCustomers: boolean;
+  /** Requests are attached straight to this project; without one they wait in the triage inbox. */
+  targetProjectId?: ID;
+  /** Provider settings that are not secret (Zendesk: `subdomain`, used to build ticket links). */
+  subdomain?: string;
+  /** Where the provider should POST. */
+  webhookUrl: string;
+  lastReceivedAt?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+/** A request that came in through an {@link IntakeSource}; `pending` ones wait in the triage inbox. */
+export interface IntakeItem {
+  /** `cin_…` */
+  id: ID;
+  workspaceId: ID;
+  sourceId: ID;
+  provider: IntakeProvider;
+  /** Ticket / conversation / message id in the source system. Unique per source: a second delivery is ignored. */
+  externalId: string;
+  externalUrl?: string;
+  requesterEmail?: string;
+  requesterName?: string;
+  subject?: string;
+  body: string;
+  status: IntakeItemStatus;
+  /** The customer matched (or created) from the sender's email domain. */
+  customerId?: ID;
+  /** Set once linked. */
+  issueId?: ID;
+  projectId?: ID;
+  customerRequestId?: ID;
+  receivedAt: ISODate;
+  resolvedAt?: ISODate;
 }
 
 /**

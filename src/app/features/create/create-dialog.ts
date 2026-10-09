@@ -253,7 +253,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           </div>
         </hlm-dialog-header>
 
-        <form (submit)="submit($event)" novalidate class="flex flex-col">
+        <form (submit)="submit($event)" novalidate class="flex flex-col" [class]="composer() ? '' : 'sm:min-w-md'">
           @if (restored()) {
             <div class="bg-muted/50 text-muted-foreground mx-5 mt-3 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs" data-testid="draft-restored">
               Restored your unsent {{ kindLabel().toLowerCase() }}.
@@ -1297,7 +1297,7 @@ export class CreateDialog {
           });
           if (d)
             done = {
-              label: asDraft ? `${d.key} saved as draft` : `${d.key} recorded`,
+              label: asDraft ? `${d.key} saved as draft` : `${d.key} created`,
               path: ['decisions', d.key],
             };
           break;

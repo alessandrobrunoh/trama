@@ -19,6 +19,7 @@ export * from './stores/list-state.store';
 export * from './stores/invites.store';
 export * from './stores/favorites.store';
 export * from './stores/customer-subscriptions.store';
+export * from './stores/customer-intake.store';
 export * from './stores/notifications.store';
 export * from './sync';
 export * from './query';

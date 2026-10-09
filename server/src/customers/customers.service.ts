@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import type { ActorRef, CustomerStatus } from '../contracts/domain.js';
+import type { ActorRef, CustomerStatus, IntakeProvider } from '../contracts/domain.js';
 import {
   CUSTOMER_DOMAINS_MAX,
   CUSTOMER_REQUEST_BODY_MAX,
@@ -57,6 +57,11 @@ export interface CustomerRequestInput {
   body?: string | null;
   important?: boolean;
   sourceUrl?: string | null;
+  /** Provenance, set only by the customer-intake service (never by the REST body). */
+  source?: IntakeProvider;
+  externalId?: string;
+  requesterEmail?: string;
+  requesterName?: string;
 }
 
 export interface CustomerRequestPatch {
@@ -81,6 +86,10 @@ export interface CustomerRequestView {
   body?: string;
   important: boolean;
   sourceUrl?: string;
+  source?: IntakeProvider;
+  externalId?: string;
+  requesterEmail?: string;
+  requesterName?: string;
   createdBy: ActorRef;
   createdAt: Date;
   updatedAt: Date;
@@ -296,6 +305,10 @@ export class CustomersService {
       body: this.requestBody(input.body),
       important: input.important === true,
       sourceUrl: this.sourceUrl(input.sourceUrl),
+      source: input.source ?? null,
+      externalId: input.externalId ?? null,
+      requesterEmail: input.requesterEmail ?? null,
+      requesterName: input.requesterName ?? null,
       createdBy: actor,
       createdAt: now,
       updatedAt: now,
@@ -502,6 +515,10 @@ export class CustomersService {
         ...(json['body'] !== undefined ? { body: json['body'] as string } : {}),
         important: row.important,
         ...(json['sourceUrl'] !== undefined ? { sourceUrl: json['sourceUrl'] as string } : {}),
+        ...(row.source ? { source: row.source } : {}),
+        ...(row.externalId ? { externalId: row.externalId } : {}),
+        ...(row.requesterEmail ? { requesterEmail: row.requesterEmail } : {}),
+        ...(row.requesterName ? { requesterName: row.requesterName } : {}),
         createdBy: row.createdBy,
         createdAt: row.createdAt,
         updatedAt: row.updatedAt,
