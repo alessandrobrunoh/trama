@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
-import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState } from '../contracts/domain.js';
+import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState, CompletionGap, WorkstreamCompletion, WorkstreamStatus } from '../contracts/domain.js';
 import {
   AgentEntity,
   ArtifactEntity,
@@ -17,6 +17,15 @@ import {
 import { WorkstreamsService } from '../workstreams/workstreams.service.js';
 
 export const RECENT_PROGRESS = 10;
+
+/** What each completion gap means for whoever reads the briefing. */
+export const GAP_TEXT: Record<CompletionGap, string> = {
+  no_criteria: 'no acceptance criteria (add at least one; it defines done)',
+  criteria_pending: 'acceptance criteria not met',
+  blocked: 'blocked (failing CI, conflicts or an unresolved dependency)',
+  needs_input: 'waiting on a person (open input request or proposed decision)',
+  no_delivery: 'no delivery yet (merged PR, release or deployment, or every issue done)',
+};
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v));
 
 export interface AgentContext {
@@ -27,6 +36,12 @@ export interface AgentContext {
   status: string;
   /** Delivery evidence (PR / release / deployment); a merged PR does not by itself mean the outcome is done. */
   delivery: DeliveryState;
+  /** Derived status from the facts. Differs from `status` only when a person pinned `statusOverride`. */
+  derivedStatus: WorkstreamStatus;
+  /** Present when a person pinned the status by hand; that is not evidence the outcome is achieved. */
+  statusOverride?: WorkstreamStatus;
+  /** Whether the outcome is achieved and what is missing. Computed by the server, never re-derive it. */
+  completion: WorkstreamCompletion;
   priority: string;
   targetDate?: string;
   description?: string;
@@ -150,6 +165,9 @@ export class AgentContextService {
       title: ws.title,
       status: ws.status,
       delivery: ws.delivery,
+      derivedStatus: ws.derivedStatus,
+      ...(ws.statusOverride ? { statusOverride: ws.statusOverride } : {}),
+      completion: ws.completion,
       priority: ws.priority,
       ...(ws.targetDate ? { targetDate: ws.targetDate.toISOString().slice(0, 10) } : {}),
       objective: ws.objective,
@@ -199,13 +217,14 @@ export class AgentContextService {
     };
     const status = c.status.replace('_', ' ');
     const delivery = c.delivery.replace('_', ' ');
-    const pendingCriteria = c.acceptanceCriteria.filter((a) => a.state !== 'met').length;
-    out.push(`# ${c.key} — ${c.title}`, '', `Outcome status: ${status} · Delivery: ${delivery} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
-    if (c.delivery !== 'none' && c.delivery !== 'in_review' && c.status !== 'shipped')
-      out.push(
-        `> Delivery is ${delivery}, but the outcome is not achieved (status: ${status}${pendingCriteria ? `; ${pendingCriteria} acceptance criteri${pendingCriteria === 1 ? 'on' : 'a'} not met` : ''}). Do not treat this work as done.`,
-        '',
-      );
+    const overridden = c.statusOverride ? ` (pinned manually; the facts say ${c.derivedStatus.replace('_', ' ')})` : '';
+    out.push(`# ${c.key} — ${c.title}`, '', `Outcome status: ${status}${overridden} · Delivery: ${delivery} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
+    out.push(
+      c.completion.achieved
+        ? '> Outcome achieved: nothing is missing.'
+        : `> Outcome not achieved. Missing: ${c.completion.gaps.map((g) => GAP_TEXT[g]).join('; ')}.${c.delivery !== 'none' && c.delivery !== 'in_review' ? ' Do not treat this work as done.' : ''}`,
+      '',
+    );
     section('Description', [c.description?.trim() || '_No description yet._']);
     if (c.deltaThreadUrl) section('Delta thread', [c.deltaThreadUrl]);
     section('Objective', [c.objective.trim() || '_No objective written yet._']);

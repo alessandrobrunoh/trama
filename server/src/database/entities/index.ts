@@ -42,6 +42,7 @@ import type {
   ViewLayout,
   WorkspaceSettings,
   DeliveryState,
+  WorkstreamCompletion,
   WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
@@ -306,6 +307,11 @@ export class WorkstreamEntity extends Wire {
   derivedStatus: WorkstreamStatus;
   /** Delivery evidence (PR / release / deployment); separate from the outcome `status`. */
   @Column({ type: 'varchar', default: 'none' }) delivery: DeliveryState;
+  /** Outcome achieved? and the gaps if not. Recomputed with `status` (see StatusService). */
+  @Column({ type: 'jsonb', default: () => `'{"achieved":false,"gaps":[]}'` })
+  completion: WorkstreamCompletion;
+  /** Grandfathered by migration: was shipped with no criteria before that stopped being derivable. */
+  @Column({ type: 'boolean', default: false }) legacyShipped: boolean;
   @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
   @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;

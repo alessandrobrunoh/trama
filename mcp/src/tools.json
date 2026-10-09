@@ -398,7 +398,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}",
   "permission": "workstreams:read",
-  "description": "One workstream with criteria and status.",
+  "description": "One workstream with criteria, status and completion ({achieved, gaps[]}: why the outcome is not done yet). statusOverride set means the status is pinned by hand, not derived.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -408,7 +408,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}/context",
   "permission": "workstreams:read",
-  "description": "Markdown briefing for a workstream: objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
+  "description": "Markdown briefing for a workstream: outcome status and what is still missing (completion gaps), objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }

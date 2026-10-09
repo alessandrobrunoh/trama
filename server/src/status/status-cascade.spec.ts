@@ -128,3 +128,37 @@ describe('shippedAt follows the effective shipped status', () => {
     expect(ws['A'].shippedAt).toBeNull();
   });
 });
+
+describe('workstreams without criteria (completion rule)', () => {
+  const noCriteria = (extra: Row = {}) => {
+    const s = setup(['A'], [], 'shipped');
+    s.ws['A'].acceptanceCriteria = [];
+    Object.assign(s.ws['A'], extra);
+    return s;
+  };
+
+  it('a historic shipped workstream (legacyShipped) stays shipped on the boot recompute', async () => {
+    const { ws, svc } = noCriteria({ legacyShipped: true });
+    ws['A'].shippedAt = new Date('2026-01-01T00:00:00Z');
+    await svc.recompute('A', [], new Set(), false); // what the boot recompute does per row
+    expect(ws['A'].status).toBe('shipped');
+    expect(ws['A'].shippedAt).toEqual(new Date('2026-01-01T00:00:00Z'));
+    expect(ws['A'].completion).toEqual({ achieved: true, gaps: [] });
+  });
+
+  it('a new workstream with delivery but no criteria is not shipped and says why', async () => {
+    const { ws, svc } = noCriteria({ legacyShipped: false });
+    await svc.recompute('A', [], new Set(), false);
+    expect(ws['A'].status).toBe('working');
+    expect(ws['A'].completion).toEqual({ achieved: false, gaps: ['no_criteria'] });
+  });
+
+  it('dependents of a legacy shipped workstream stay unblocked', async () => {
+    const { ws, svc } = setup(['A', 'B'], [['A', 'B']], 'shipped');
+    ws['A'].acceptanceCriteria = [];
+    ws['A'].legacyShipped = true;
+    await svc.recompute('A', [], new Set(), true);
+    expect(ws['A'].status).toBe('shipped');
+    expect(ws['B'].status).toBe('shipped');
+  });
+});
