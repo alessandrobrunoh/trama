@@ -102,7 +102,7 @@ import { WsActions } from './ws-actions';
           <button hlmDropdownMenuItem (triggered)="actions.copyLink(targets())">
             <svg [lucideIcon]="linkIcon" [size]="14" class="text-muted-foreground"></svg>
             Copy {{ targets().length > 1 ? 'links' : 'link' }}
-            <app-kbd keys="mod+shift+c" class="ml-auto opacity-70" />
+            <app-kbd keys="mod+shift+l" class="ml-auto opacity-70" />
           </button>
           @if (targets().length === 1) {
             <button hlmDropdownMenuItem (triggered)="actions.copyKeyAndTitle(ws())">

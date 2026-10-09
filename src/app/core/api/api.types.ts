@@ -27,6 +27,8 @@ import type {
   Issue,
   IssueKind,
   IssueSource,
+  IntakeProvider,
+  IntakeSource,
   IntegrationConnection,
   IssueStatus,
   Priority,
@@ -630,4 +632,53 @@ export interface UpdateWebhookInput {
 export interface WebhookWithSecret {
   webhook: OutgoingWebhook;
   secret: string;
+}
+
+// ───── customer intake (inbound customer requests) ─────
+export interface CreateIntakeSourceInput {
+  provider: IntakeProvider;
+  name: string;
+  enabled?: boolean;
+  autoCreateCustomers?: boolean;
+  targetProjectId?: ID;
+  /** Zendesk only: the part before `.zendesk.com`, to build ticket links. */
+  subdomain?: string;
+  /** The provider's own signing secret (Intercom, Zendesk, Front, Slack). Can be added later. */
+  secret?: string;
+}
+export interface UpdateIntakeSourceInput {
+  name?: string;
+  enabled?: boolean;
+  autoCreateCustomers?: boolean;
+  /** `null` clears. */
+  targetProjectId?: ID | null;
+  subdomain?: string | null;
+  secret?: string;
+}
+/** `secret` is only present when Trama generated it (email, signed webhook) and is shown once. */
+export interface IntakeSourceWithSecret {
+  source: IntakeSource;
+  secret?: string;
+}
+/** Dry run of a sample delivery. */
+export interface IntakeTestResult {
+  ok: boolean;
+  dryRun: true;
+  status?: string;
+  /** What the sample was reduced to. */
+  request?: { externalId: string; requesterEmail?: string; subject?: string; body: string };
+  customer?: { id: ID; name: string; created: boolean };
+  wouldCreate?: { name: string; domain: string };
+  target?: { issueId?: ID; issueKey?: string; projectId?: ID };
+  /** True when the request would wait in the triage inbox. */
+  inbox?: boolean;
+}
+export interface LinkIntakeItemInput {
+  /** Exactly one of issueId / projectId. */
+  issueId?: ID;
+  projectId?: ID;
+  customerId?: ID;
+  createCustomer?: boolean;
+  customerName?: string;
+  important?: boolean;
 }

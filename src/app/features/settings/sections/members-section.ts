@@ -16,9 +16,10 @@ import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
 import { NablaStore } from '../../../core/stores/nabla.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import type { InviteLink, Role, WorkspaceInvite } from '../../../core/contracts/domain';
+import type { InviteLink, Membership, Role, WorkspaceInvite } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
 import { AppSelect, type Option } from '../../create/form-kit';
+import { memberRules, type MemberUiRules } from './member-permissions';
 import { SECTION_KIT } from './section-kit';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -151,25 +152,50 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             </div>
           </div>
           @if (canAdmin()) {
-            <div class="w-28">
-              <app-select
+            @let rules = rulesFor(m.membership);
+            @if (rules.roleLocked) {
+              <span
+                class="text-muted-foreground w-28 cursor-help text-xs"
+                [attr.title]="rules.roleLocked"
+                tabindex="0"
+                >{{ roleName(m.membership.role) }}</span
+              >
+            } @else {
+              <div class="w-28">
+                <app-select
+                  size="sm"
+                  [options]="roleOptionsFor(m.membership.role)"
+                  [value]="m.membership.role"
+                  (valueChange)="setRole(m.membership.id, $event)"
+                  label="Role"
+                />
+              </div>
+            }
+            @if (rules.canTransfer) {
+              <button
+                hlmBtn
+                variant="ghost"
                 size="sm"
-                [options]="roleOptions"
-                [value]="m.membership.role"
-                (valueChange)="setRole(m.membership.id, $event)"
-                label="Role"
-              />
-            </div>
-            <button
-              hlmBtn
-              variant="ghost"
-              size="icon-sm"
-              class="text-muted-foreground"
-              [attr.aria-label]="'Remove ' + m.user.name"
-              (click)="remove(m.membership.id, m.user.name)"
-            >
-              <svg [lucideIcon]="xIcon" [size]="14"></svg>
-            </button>
+                class="text-muted-foreground h-7 text-xs"
+                title="Make this person the workspace owner. You stay an owner."
+                (click)="transfer(m.membership.id, m.user.name)"
+              >
+                Transfer ownership
+              </button>
+            }
+            <span [attr.title]="rules.removeLocked">
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="text-muted-foreground"
+                [disabled]="!!rules.removeLocked"
+                [attr.aria-label]="'Remove ' + m.user.name"
+                (click)="remove(m.membership.id, m.user.name)"
+              >
+                <svg [lucideIcon]="xIcon" [size]="14"></svg>
+              </button>
+            </span>
           } @else {
             <span class="text-muted-foreground text-xs">{{ roleName(m.membership.role) }}</span>
           }
@@ -222,6 +248,25 @@ export class MembersSection {
       (o) => !mine || ROLE_META[o.value as Role].rank <= ROLE_META[mine].rank,
     );
   });
+  /** Roles I may assign (never above my own); the row's current role always stays listed. */
+  protected roleOptionsFor(current: Role): Option[] {
+    return this.inviteOptions().length
+      ? this.roleOptions.filter(
+          (o) => o.value === current || this.inviteOptions().some((i) => i.value === o.value),
+        )
+      : this.roleOptions;
+  }
+  protected rulesFor(m: Membership): MemberUiRules {
+    return memberRules(
+      {
+        meId: this.meId(),
+        myRole: this.store.myRole(),
+        primaryOwnerId: this.store.workspace()?.primaryOwnerId,
+        ownerCount: this.store.memberships().filter((x) => x.role === 'owner').length,
+      },
+      m,
+    );
+  }
   protected readonly roleValue = computed(() => this.role() as Role);
   protected readonly meId = computed(() => this.store.me()?.id);
   protected readonly shown = computed(() => {
@@ -299,6 +344,18 @@ export class MembersSection {
 
   protected setRole(membershipId: string, role: string): void {
     if (ROLES.includes(role as Role)) void this.store.updateMemberRole(membershipId, role as Role);
+  }
+
+  protected transfer(id: string, name: string): void {
+    this.ui.setConfirmDelete({
+      title: `Transfer ownership to ${name}?`,
+      description: `${name} becomes the workspace owner and can remove or demote other owners, including you. You stay an owner.`,
+      confirmLabel: 'Transfer ownership',
+      destructive: false,
+      onConfirm: async () => {
+        await this.store.transferOwnership(id);
+      },
+    });
   }
 
   protected remove(id: string, name: string): void {

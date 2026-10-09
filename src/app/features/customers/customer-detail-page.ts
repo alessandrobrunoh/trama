@@ -37,6 +37,7 @@ import { RelativeTimePipe } from '../../shared/pipes';
 import { StatusIcon } from '../../shared/status';
 import { PROJECT_STATUS_META } from '../projects/project-model';
 import { CustomerAvatar } from './customer-avatar';
+import { IntakeSourceBadge } from './intake-source-badge';
 import {
   compactNumber,
   customerActivity,
@@ -74,6 +75,7 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
   selector: 'app-customer-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    IntakeSourceBadge,
     RouterLink,
     HlmButtonImports,
     HlmInputImports,
@@ -250,7 +252,12 @@ const PRIORITY_LABEL: Record<Priority, string> = { urgent: 'Urgent', high: 'High
                       <app-actor-avatar [actor]="r.request.createdBy" [size]="14" />
                       {{ store.actorName(r.request.createdBy) }} · {{ r.request.createdAt | relativeTime }}
                     </span>
-                    @if (safeSource(r.request); as href) {
+                    @if (r.request.source; as provider) {
+                      <app-intake-source-badge [provider]="provider" [url]="r.request.sourceUrl" [ticket]="r.request.externalId" />
+                      @if (r.request.requesterEmail || r.request.requesterName) {
+                        <span class="truncate">from {{ r.request.requesterName || r.request.requesterEmail }}</span>
+                      }
+                    } @else if (safeSource(r.request); as href) {
                       <a [href]="href" target="_blank" rel="noopener noreferrer nofollow" class="hover:text-foreground inline-flex items-center gap-1 underline underline-offset-2">
                         <svg [lucideIcon]="external" [size]="12"></svg> Source
                       </a>

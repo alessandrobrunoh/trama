@@ -38,6 +38,9 @@ import type {
   InsightSignal,
   InsightSignalId,
   InsightsReport,
+  IntakeItem,
+  IntakeItemStatus,
+  IntakeSource,
   Issue,
   Membership,
   Milestone,
@@ -80,7 +83,12 @@ import type {
   CreateCustomerTierInput,
   UpdateCustomerRequestInput,
   UpdateCustomerTierInput,
+  CreateIntakeSourceInput,
   CreateIntegrationInput,
+  IntakeSourceWithSecret,
+  IntakeTestResult,
+  LinkIntakeItemInput,
+  UpdateIntakeSourceInput,
   IntegrationDetail,
   IntegrationWithWebhook,
   LinkRepositoryInput,
@@ -190,8 +198,8 @@ export class ApiClient {
     this.request<T>('POST', path, { body: body ?? {}, quiet: o?.quiet });
   private patch = <T>(path: string, body: unknown, o?: RequestOptions) =>
     this.request<T>('PATCH', path, { body, quiet: o?.quiet });
-  private del = <T = void>(path: string, o?: RequestOptions) =>
-    this.request<T>('DELETE', path, { quiet: o?.quiet });
+  private del = <T = void>(path: string, o?: RequestOptions & { body?: unknown }) =>
+    this.request<T>('DELETE', path, { quiet: o?.quiet, body: o?.body });
 
   private w(slug: string): string {
     return `/w/${encodeURIComponent(slug)}`;
@@ -233,8 +241,8 @@ export class ApiClient {
     updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
       this.patch<Workspace>(`${this.w(slug)}/customer-tiers/${id}`, input),
     deleteCustomerTier: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
-    /** Owner only. */
-    remove: (slug: string) => this.del(this.w(slug)),
+    /** Owner only. `confirm` must be the workspace's exact slug or name. */
+    remove: (slug: string, confirm: string) => this.del(this.w(slug), { body: { confirm } }),
     /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
     snapshot: (slug: string, comments: SnapshotCommentsMode = 'full') =>
       this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`, comments === 'full' ? undefined : { comments }),
@@ -247,6 +255,9 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+    /** Primary owner only: the target becomes owner and primary owner. */
+    transferOwnership: (slug: string, membershipId: ID) =>
+      this.post<Workspace>(`${this.w(slug)}/transfer-ownership`, { membershipId }),
   };
 
   /** Invitations by email (admins). `create` and `resend` return the secret link once. */
@@ -641,6 +652,32 @@ export class ApiClient {
     test: (slug: string, id: ID) => this.post<WebhookDeliveryLog>(`${this.w(slug)}/outgoing-webhooks/${id}/test`),
     deliveries: (slug: string, id: ID, limit = 20) =>
       this.get<WebhookDeliveryLog[]>(`${this.w(slug)}/outgoing-webhooks/${id}/deliveries`, { limit }),
+  };
+
+  /** Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook). Needs manageIntegrations. */
+  readonly intakeSources = {
+    list: (slug: string, o?: RequestOptions) => this.get<IntakeSource[]>(`${this.w(slug)}/intake-sources`, undefined, o),
+    /** Trama-signed sources (email, generic) return their secret once. */
+    create: (slug: string, input: CreateIntakeSourceInput) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources`, input),
+    update: (slug: string, id: ID, input: UpdateIntakeSourceInput) =>
+      this.patch<IntakeSource>(`${this.w(slug)}/intake-sources/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/intake-sources/${id}`),
+    rotateSecret: (slug: string, id: ID) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources/${id}/rotate-secret`),
+    /** Dry run of a sample delivery: nothing is saved. */
+    test: (slug: string, id: ID) => this.post<IntakeTestResult>(`${this.w(slug)}/intake-sources/${id}/test`),
+  };
+
+  /** The triage inbox: inbound customer requests waiting to be linked to an issue or project. */
+  readonly customerIntake = {
+    list: (slug: string, status: IntakeItemStatus | 'all' = 'pending', o?: RequestOptions) =>
+      this.get<IntakeItem[]>(`${this.w(slug)}/customer-intake`, { status }, o),
+    count: (slug: string, o?: RequestOptions) => this.get<{ pending: number }>(`${this.w(slug)}/customer-intake/count`, undefined, o),
+    link: (slug: string, id: ID, input: LinkIntakeItemInput) =>
+      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/link`, input),
+    dismiss: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/dismiss`),
+    restore: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/restore`),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */
