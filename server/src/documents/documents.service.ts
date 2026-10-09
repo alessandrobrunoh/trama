@@ -101,12 +101,10 @@ export class DocumentsService {
   ): Promise<Map<string, DocumentLink[]>> {
     const out = new Map<string, DocumentLink[]>();
     if (!ids.length) return out;
-    const rows = await this.ds
-      .getRepository(ArtifactEntity)
-      .find({
-        where: { workspaceId, documentId: In(ids) },
-        order: { createdAt: 'ASC' },
-      });
+    const rows = await this.ds.getRepository(ArtifactEntity).find({
+      where: { workspaceId, documentId: In(ids) },
+      order: { createdAt: 'ASC' },
+    });
     for (const a of rows) {
       const list = out.get(a.documentId!) ?? [];
       list.push({
@@ -363,17 +361,15 @@ export class DocumentsService {
       body: patch.body ?? row.body,
     };
     const checkpoint = await this.ds.transaction(async (m) => {
-      const res = await m
-        .getRepository(DocumentEntity)
-        .update(
-          { id: row.id, workspaceId, version: baseVersion },
-          {
-            ...patch,
-            version: baseVersion + 1,
-            lastEditor: ctx.actor,
-            updatedAt: now,
-          },
-        );
+      const res = await m.getRepository(DocumentEntity).update(
+        { id: row.id, workspaceId, version: baseVersion },
+        {
+          ...patch,
+          version: baseVersion + 1,
+          lastEditor: ctx.actor,
+          updatedAt: now,
+        },
+      );
       // somebody saved between our read and this write
       if (!res.affected) return null;
       const revisions = m.getRepository(DocumentRevisionEntity);
@@ -441,12 +437,10 @@ export class DocumentsService {
   }
 
   private async touchWorkstreams(workspaceId: string, documentId: string) {
-    const rows = await this.ds
-      .getRepository(ArtifactEntity)
-      .find({
-        where: { workspaceId, documentId },
-        select: { workstreamId: true },
-      });
+    const rows = await this.ds.getRepository(ArtifactEntity).find({
+      where: { workspaceId, documentId },
+      select: { workstreamId: true },
+    });
     for (const w of new Set(
       rows.map((r) => r.workstreamId).filter((w): w is string => !!w),
     ))

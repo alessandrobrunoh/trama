@@ -43,13 +43,11 @@ import { OWNER_ICONS, describeLink } from './document-attach';
         </span>
         @if (d.snippet) {
           <span
-            class="text-muted-foreground [&_mark]:bg-primary/20 [&_mark]:text-foreground mt-0.5 line-clamp-2 block text-xs [&_mark]:rounded-sm [&_mark]:px-0.5"
+            class="text-muted-foreground [&_mark]:bg-primary/20 [&_mark]:text-foreground mt-0.5 line-clamp-2 text-xs [&_mark]:rounded-sm [&_mark]:px-0.5"
             [innerHTML]="d.snippet"
           ></span>
         } @else if (d.excerpt) {
-          <span class="text-muted-foreground mt-0.5 line-clamp-1 block text-xs">{{
-            d.excerpt
-          }}</span>
+          <span class="text-muted-foreground mt-0.5 line-clamp-1 text-xs">{{ d.excerpt }}</span>
         }
       </span>
       <span class="text-muted-foreground flex shrink-0 items-center gap-2.5 pt-0.5 text-xs">

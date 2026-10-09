@@ -53,6 +53,7 @@ describe('excerptOf', () => {
       '# Title\n\n- **bold** item with [a link](https://x.test)\n\n```ts\nconst hidden = 1;\n```\n\nAfter';
     expect(excerptOf(md)).toBe('Title bold item with a link After');
     expect(excerptOf('- [x] done\n- [ ] todo')).toBe('done todo');
+    expect(excerptOf('| a | b |\n| --- | --- |\n| 1 | 2 |')).toBe('a b 1 2');
   });
 
   it('truncates with an ellipsis', () => {

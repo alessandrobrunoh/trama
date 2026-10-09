@@ -28,6 +28,7 @@ export function excerptOf(body: string | null | undefined, max = 180): string {
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/<[^>]+>/g, ' ')
+    .replace(/^[\s|:-]*\|[\s|:-]*$/gm, ' ')
     .replace(/^\s{0,3}(#{1,6}|>|[-*+]|\d+\.)\s+(\[[ xX]\]\s+)?/gm, '')
     .replace(/[*_`~|]/g, '')
     .replace(/\s+/g, ' ')
