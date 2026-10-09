@@ -12,6 +12,8 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   // the triage inbox is customer work; the sources behind it are integrations (admin)
   'customer-intake': 'customers',
   'intake-sources': 'integrations',
+  // importing from GitHub / Linear is an integration (admin); linking one issue is an issue edit (see issues/:id/external-ref)
+  imports: 'integrations',
 };
 
 /**

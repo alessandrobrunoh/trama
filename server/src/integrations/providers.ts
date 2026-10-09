@@ -31,7 +31,7 @@ function describeError(res: HttpResponse): string {
 }
 
 /** Throws ProviderHttpError (with rate-limit info) for non-2xx responses. */
-function ensureOk(res: HttpResponse): void {
+export function ensureOk(res: HttpResponse): void {
   if (res.status >= 200 && res.status < 300) return;
   const remaining = res.headers['x-ratelimit-remaining'] ?? res.headers['ratelimit-remaining'];
   const retryAfter = Number(res.headers['retry-after']);

@@ -12,6 +12,11 @@ import type {
   CustomerStatus,
   Decision,
   EstimateScale,
+  ExternalProvider,
+  ImportCredentialRef,
+  ImportMapping,
+  ImportOptions,
+  ImportSource,
   PermissionMap,
   TeamEditPolicy,
   TokenScope,
@@ -738,4 +743,21 @@ export interface LinkIntakeItemInput {
   createCustomer?: boolean;
   customerName?: string;
   important?: boolean;
+}
+
+// ───── imports from GitHub Issues / Linear ─────
+export interface ImportTargetInput extends ImportCredentialRef {
+  provider: ExternalProvider;
+  source: ImportSource;
+}
+export interface StartImportInput extends ImportTargetInput {
+  /** Omit to use the preview's suggestions. */
+  mapping?: ImportMapping;
+  options?: Partial<ImportOptions>;
+}
+export interface CreateImportCredentialInput {
+  provider: ExternalProvider;
+  token: string;
+  /** GitHub Enterprise only. */
+  baseUrl?: string;
 }

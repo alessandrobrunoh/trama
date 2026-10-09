@@ -17,6 +17,7 @@ import type {
   DecisionStatus,
   DependencyNodeType,
   ExecutionProvider,
+  ExternalRef,
   FavoriteType,
   GitProvider,
   InputRequestState,
@@ -464,6 +465,8 @@ export class IssueEntity extends Wire {
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) aliases: string[];
   @Column({ type: 'varchar', nullable: true }) duplicateOfId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;
+  /** Pointer to the issue in an external tracker (see importers). Unique per workspace through a partial index on provider + id. */
+  @Column({ type: 'jsonb', nullable: true }) externalRef: ExternalRef | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   /** Filled on read. Not a column. */

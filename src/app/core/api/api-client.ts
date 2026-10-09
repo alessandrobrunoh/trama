@@ -27,6 +27,9 @@ import type {
   DomainEvent,
   Favorite,
   CustomerSubscription,
+  ImportCredential,
+  ImportJob,
+  ImportPreview,
   FavoriteType,
   ID,
   InputRequest,
@@ -69,6 +72,9 @@ import { Notifier } from '../notify/notifier';
 import { ApiError } from './api-error';
 import type {
   AddMemberInput,
+  CreateImportCredentialInput,
+  ImportTargetInput,
+  StartImportInput,
   AttentionQuery,
   CreateAgentInput,
   CreateArtifactInput,
@@ -532,6 +538,15 @@ export class ApiClient {
     /** Attach workstreams (and optionally create one). `id` may be an id or key. */
     link: (slug: string, id: ID, input: LinkIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
+    /** Link to a GitHub / Linear issue by URL; the external status is a read-only mirror. */
+    externalRef: {
+      link: (slug: string, idOrKey: string, url: string) =>
+        this.post<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref`, { url }),
+      refresh: (slug: string, idOrKey: string) =>
+        this.post<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref/refresh`),
+      unlink: (slug: string, idOrKey: string) =>
+        this.del<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref`),
+    },
     artifacts: {
       list: (slug: string, idOrKey: string) =>
         this.get<Artifact[]>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/artifacts`),
@@ -717,6 +732,23 @@ export class ApiClient {
       this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/link`, input),
     dismiss: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/dismiss`),
     restore: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/restore`),
+  };
+
+  /** Import from GitHub Issues and Linear. Needs the manageIntegrations capability; tokens never come back. */
+  readonly imports = {
+    credentials: {
+      list: (slug: string, o?: RequestOptions) => this.get<ImportCredential[]>(`${this.w(slug)}/imports/credentials`, undefined, o),
+      create: (slug: string, input: CreateImportCredentialInput) => this.post<ImportCredential>(`${this.w(slug)}/imports/credentials`, input),
+      remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/imports/credentials/${id}`),
+    },
+    /** Reads the source and suggests a mapping; writes nothing. */
+    preview: (slug: string, input: ImportTargetInput) => this.post<ImportPreview>(`${this.w(slug)}/imports/preview`, input),
+    start: (slug: string, input: StartImportInput) => this.post<ImportJob>(`${this.w(slug)}/imports`, input),
+    list: (slug: string, o?: RequestOptions) => this.get<ImportJob[]>(`${this.w(slug)}/imports`, undefined, o),
+    get: (slug: string, id: ID, o?: RequestOptions) => this.get<ImportJob>(`${this.w(slug)}/imports/${id}`, undefined, o),
+    cancel: (slug: string, id: ID) => this.post<ImportJob>(`${this.w(slug)}/imports/${id}/cancel`),
+    retry: (slug: string, id: ID) => this.post<ImportJob>(`${this.w(slug)}/imports/${id}/retry`),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/imports/${id}`),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

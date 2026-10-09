@@ -35,6 +35,18 @@ describe('requiredPermission', () => {
     expect(requiredPermission('DELETE', '/api/w/:slug/intake-sources/:id')).toBe('integrations:delete');
   });
 
+  it('maps imports to integrations (admin) and issue external links to issues', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/imports')).toBe('integrations:read');
+    expect(requiredPermission('GET', '/api/w/:slug/imports/credentials')).toBe('integrations:read');
+    expect(requiredPermission('POST', '/api/w/:slug/imports/preview')).toBe('integrations:write');
+    expect(requiredPermission('POST', '/api/w/:slug/imports')).toBe('integrations:write');
+    expect(requiredPermission('POST', '/api/w/:slug/imports/:id/cancel')).toBe('integrations:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug/imports/credentials/:id')).toBe('integrations:delete');
+    expect(requiredPermission('POST', '/api/w/:slug/issues/:idOrKey/external-ref')).toBe('issues:write');
+    expect(requiredPermission('POST', '/api/w/:slug/issues/:idOrKey/external-ref/refresh')).toBe('issues:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug/issues/:idOrKey/external-ref')).toBe('issues:delete');
+  });
+
   it('maps customer tiers to workspace settings and the flat request list to customers', () => {
     expect(requiredPermission('POST', '/api/w/:slug/customer-tiers')).toBe('workspace:write');
     expect(requiredPermission('DELETE', '/api/w/:slug/customer-tiers/:id')).toBe('workspace:delete');
