@@ -75,7 +75,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Numbering
 
-`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `ws:<teamId>` (workstream numbers per owner team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Changing a workstream's owner team keeps its key. Changing an issue's `kind` takes the next number of the new kind and keeps the old key in `aliases` (lookups match aliases).
+`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `wskey:<teamKey>` (workstream numbers per team key, so they survive deleting and recreating a team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Workstream creation uses `nextAbove(…, max number already used with that key prefix)`, so a key kept by a reassigned workstream can never be handed out again; a leftover unique violation is mapped to 409. Changing a workstream's owner team keeps its key. Changing an issue's `kind` takes the next number of the new kind and keeps the old key in `aliases` (lookups match aliases).
 
 ## Database
 
