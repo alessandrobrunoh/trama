@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, signal } from '@angular/core';
 import { Meta } from '@angular/platform-browser';
 import { LucideDynamicIcon, LucideEye, LucideLink2Off } from '@lucide/angular';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
@@ -146,6 +146,7 @@ export class PublicViewPage implements OnInit {
 
   private readonly api = inject(ApiClient);
   private readonly meta = inject(Meta);
+  private readonly destroyRef = inject(DestroyRef);
 
   protected readonly eyeIcon = LucideEye;
   protected readonly offIcon = LucideLink2Off;
@@ -163,6 +164,11 @@ export class PublicViewPage implements OnInit {
   ngOnInit(): void {
     this.meta.updateTag({ name: 'robots', content: 'noindex, nofollow' });
     this.meta.updateTag({ name: 'referrer', content: 'no-referrer' });
+    // These tags are only for this page: do not leave `noindex` on whatever the SPA shows next.
+    this.destroyRef.onDestroy(() => {
+      this.meta.removeTag("name='robots'");
+      this.meta.removeTag("name='referrer'");
+    });
     void this.load();
   }
 
