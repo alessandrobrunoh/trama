@@ -20,7 +20,8 @@ const defaultConfig: HlmSidebarConfig = {
   sidebarCookieName: 'sidebar_state',
   sidebarCookieMaxAge: 60 * 60 * 24 * 7, // 7 days in seconds
   sidebarKeyboardShortcut: 'b',
-  mobileBreakpoint: '768px',
+  // Tailwind's `md` starts AT 768px: a `max-width: 768px` query made exactly 768px neither desktop nor mobile.
+  mobileBreakpoint: '767.98px',
   closeMobileSidebarOnMenuButtonClick: false,
 };
 

@@ -121,7 +121,7 @@ export class MobileNav {
   protected readonly ui = inject(UiStore);
   protected readonly session = inject(SessionStore);
   protected readonly items = [
-    { ...PERSONAL_NAV[0], label: 'Inbox' },
+    PERSONAL_NAV[0],
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
     { segment: 'activity', label: 'Activity', icon: LucideActivity },
     { segment: 'projects', label: 'Projects', icon: LucideBox },
@@ -134,9 +134,10 @@ export class MobileNav {
   protected readonly checkIcon = LucideCheck;
   protected readonly plusIcon = LucidePlus;
   protected readonly menuItems = [
-    { ...PERSONAL_NAV[0], label: 'Inbox' },
-    { ...PERSONAL_NAV[1], label: 'My issues' },
-    { segment: 'activity', label: 'Pulse', icon: LucideActivity },
+    PERSONAL_NAV[0],
+    PERSONAL_NAV[1],
+    PERSONAL_NAV[3],
+    { segment: 'activity', label: 'Activity', icon: LucideActivity },
     ...MAIN_NAV.filter((item) => item.segment !== 'activity'),
     { segment: 'settings', label: 'Settings', icon: LucideSettings },
   ];
