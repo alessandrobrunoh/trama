@@ -35,6 +35,7 @@ import {
   Can,
   Ctx,
   RequireUser,
+  SessionOnly,
   Roles,
   canDo,
   type AuthInfo,
@@ -120,15 +121,18 @@ class CreateTokenDto {
 export class WorkspacesController {
   constructor(private readonly service: WorkspacesService) {}
 
-  /** Workspaces I belong to, each with my `role`. */
+  /** Workspaces I belong to, each with my `role`. An API token only sees the workspace it belongs to. */
   @Get()
   @RequireUser()
-  list(@Auth() auth: AuthInfo) {
-    return this.service.listMine(auth.user!.id);
+  async list(@Auth() auth: AuthInfo) {
+    const mine = await this.service.listMine(auth.user!.id);
+    return auth.token ? mine.filter((w) => w.id === auth.token!.workspaceId) : mine;
   }
 
+  /** Account-level: a token is bound to one workspace and cannot mint new ones. */
   @Post()
   @RequireUser()
+  @SessionOnly()
   create(@Auth() auth: AuthInfo, @Body() dto: CreateWorkspaceDto) {
     return this.service.create(auth.user!, dto);
   }

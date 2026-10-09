@@ -443,7 +443,8 @@ mod tests {
         assert_eq!(tool("list_project_artifacts").build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/artifacts");
         let call = tool("list_issue_artifacts").build_call(&json!({ "idOrKey": "BUG-1" })).unwrap();
         assert_eq!(call.path, "/issues/BUG-1/artifacts");
-        assert_eq!(tool("list_issue_artifacts").permission, "issues:read");
+        assert_eq!(tool("list_issue_artifacts").permission, "artifacts:read");
+        assert_eq!(tool("list_project_artifacts").permission, "artifacts:read");
     }
 
     #[test]

@@ -90,7 +90,9 @@ export class AuthController {
   @Get('me')
   @RequireUser()
   async me(@Auth() auth: AuthInfo) {
-    return { user: auth.user, workspaces: await this.auth.workspacesOf(auth.user!.id) };
+    const workspaces = await this.auth.workspacesOf(auth.user!.id);
+    // an API token belongs to one workspace: it does not learn about the user's others
+    return { user: auth.user, workspaces: auth.token ? workspaces.filter((w) => w.id === auth.token!.workspaceId) : workspaces };
   }
 
   /**

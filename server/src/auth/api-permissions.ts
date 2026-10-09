@@ -11,6 +11,21 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   'customer-requests': 'customers',
 };
 
+/**
+ * Sub-resources mounted under another resource (`/w/:slug/<parent>/:id/<sub>`) that carry their own
+ * permission instead of the parent's: `issues/:id/artifacts` needs `artifacts:*`, not `issues:*`.
+ */
+const NESTED_RESOURCE: Record<string, ApiResource> = {
+  artifacts: 'artifacts',
+};
+
+/**
+ * Nested segments that are also catalog resources but stay under the parent's permission (the
+ * workstream graph). Any other nested segment naming a catalog resource is a sub-resource nobody
+ * mapped yet and is refused for custom tokens, so it cannot silently fall under the parent's permission.
+ */
+const PARENT_OWNED = new Set<string>(['graph']);
+
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> = {
   decisions: { accept: 'decisions:accept', reject: 'decisions:accept', supersede: 'decisions:accept' },
@@ -35,9 +50,16 @@ export function requiredPermission(method: string, routePath: string): ApiPermis
   const segment = m[1];
   const resource = (segment === undefined ? 'workspace' : (SEGMENT_RESOURCE[segment] ?? segment)) as ApiResource;
   if (!(resource in API_RESOURCES)) return null;
+  // `/<segment>/:id/<sub>[/…]`: the sub-segment may switch the permission to its own resource.
+  const nested = /^\/:[^/]+\/([^/]+)/.exec(m[2])?.[1];
+  let target = resource;
+  if (nested !== undefined) {
+    if (Object.hasOwn(NESTED_RESOURCE, nested)) target = NESTED_RESOURCE[nested];
+    else if (Object.hasOwn(API_RESOURCES, nested) && !PARENT_OWNED.has(nested)) return null;
+  }
   const last = routePath.split('/').pop() ?? '';
-  const override = method === 'POST' ? ACTION_OVERRIDES[resource]?.[last] : undefined;
-  const permission = override ?? (`${resource}:${actionFor(method)}` as ApiPermission);
+  const override = method === 'POST' ? ACTION_OVERRIDES[target]?.[last] : undefined;
+  const permission = override ?? (`${target}:${actionFor(method)}` as ApiPermission);
   return KNOWN.has(permission) ? permission : null;
 }
 

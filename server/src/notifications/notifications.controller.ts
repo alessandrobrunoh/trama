@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Patch, Post, Put, Que
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, IsUrl, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { BadRequestException } from '@nestjs/common';
-import { Ctx, RequireUser, Roles, Auth, type AuthInfo, type WorkspaceContext } from '../auth/request-context.js';
+import { Ctx, RequireUser, Roles, SessionOnly, Auth, type AuthInfo, type WorkspaceContext } from '../auth/request-context.js';
 import { NOTIFICATION_KINDS, type NotificationChannels, type NotificationKind } from '../contracts/domain.js';
 import { NotificationsService } from './notifications.service.js';
 import { PushService } from './push.service.js';
@@ -44,6 +44,7 @@ export class NotificationsController {
 /** The signed-in person's notification settings, the same in every workspace. */
 @Controller('me/notification-settings')
 @RequireUser()
+@SessionOnly()
 export class NotificationSettingsController {
   constructor(private readonly service: NotificationsService) {}
 
@@ -88,6 +89,7 @@ class PushEndpointDto {
 /** Web Push for the signed-in person: which devices get a system notification. Personal, like the settings. */
 @Controller('me/push')
 @RequireUser()
+@SessionOnly()
 export class PushController {
   constructor(private readonly push: PushService) {}
 

@@ -8,8 +8,13 @@ import { record, type AiToolDef } from './ai-provider.js';
 /** Name of the short-lived tokens minted for a chat turn (hidden from the tokens list). */
 export const ASSISTANT_TOKEN_NAME = 'Assistant (temporary)';
 
-/** Access management and workspace destruction stay out of the model's reach, whatever the user's role. */
-const WITHHELD: readonly ApiPermission[] = [
+/**
+ * Access management, workspace configuration and agent management stay out of the model's reach,
+ * whatever the user's role: text it reads (an issue body, a comment) may carry a prompt injection, so
+ * it must not be able to rewrite the permission policy (`PATCH /settings`), rename the workspace,
+ * edit labels or customer tiers (all `workspace:write`), or create and edit agents. Reading stays open.
+ */
+export const WITHHELD: readonly ApiPermission[] = [
   'tokens:read',
   'tokens:write',
   'tokens:delete',
@@ -19,7 +24,10 @@ const WITHHELD: readonly ApiPermission[] = [
   'integrations:delete',
   'outgoing-webhooks:write',
   'outgoing-webhooks:delete',
+  'workspace:write',
   'workspace:delete',
+  'agents:write',
+  'agents:delete',
 ];
 export const ASSISTANT_PERMISSIONS: ApiPermission[] = API_PERMISSIONS.filter((p) => !WITHHELD.includes(p));
 

@@ -7,6 +7,7 @@ import {
   Ctx,
   Public,
   RequireUser,
+  SessionOnly,
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
@@ -65,6 +66,7 @@ export class InviteLinksController {
   @Post(':token/accept')
   @HttpCode(200)
   @RequireUser()
+  @SessionOnly()
   accept(@Param('token') token: string, @Auth() auth: AuthInfo) {
     return this.service.accept(token, auth.user!);
   }

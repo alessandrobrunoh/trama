@@ -59,6 +59,7 @@ export const REQUIRE_USER_KEY = 'nabla:require-user';
 export const CAPABILITY_KEY = 'nabla:capability';
 export const TEAM_SCOPE_KEY = 'nabla:team-scope';
 export const ALLOW_CUSTOM_TOKEN_KEY = 'nabla:allow-custom-token';
+export const SESSION_ONLY_KEY = 'nabla:session-only';
 
 /** Skip authentication (login, signup, health, webhooks…). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
@@ -83,6 +84,12 @@ export const EditsTeamWork = (kind: 'workstream' | 'issue') => SetMetadata(TEAM_
 
 /** A non-workspace route that `custom` (fine-grained) tokens may call, e.g. `GET /auth/token`. */
 export const AllowCustomToken = () => SetMetadata(ALLOW_CUSTOM_TOKEN_KEY, true);
+
+/**
+ * An account-level route (not bound to one workspace): browser sessions only. An API token belongs to
+ * a single workspace, so it must not create workspaces, accept invites or change the person's account settings.
+ */
+export const SessionOnly = () => SetMetadata(SESSION_ONLY_KEY, true);
 
 /** Reject agent tokens: the route needs a human principal (a user). */
 export const RequireUser = () => SetMetadata(REQUIRE_USER_KEY, true);

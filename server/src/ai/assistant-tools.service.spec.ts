@@ -1,5 +1,61 @@
 import { describe, expect, it } from 'vitest';
-import { compactResult } from './assistant-tools.service.js';
+import { requiredPermission } from '../auth/api-permissions.js';
+import { API_PERMISSIONS } from '../contracts/domain.js';
+import { ASSISTANT_PERMISSIONS, compactResult } from './assistant-tools.service.js';
+
+describe('assistant token scope', () => {
+  it('cannot rewrite workspace configuration, manage agents or touch access management', () => {
+    for (const p of [
+      'workspace:write',
+      'workspace:delete',
+      'agents:write',
+      'agents:delete',
+      'tokens:read',
+      'tokens:write',
+      'members:write',
+      'integrations:write',
+      'outgoing-webhooks:write',
+    ] as const) {
+      expect(ASSISTANT_PERMISSIONS, p).not.toContain(p);
+    }
+  });
+
+  it('keeps what the assistant needs to read and manage work items', () => {
+    for (const p of [
+      'workspace:read',
+      'agents:read',
+      'issues:write',
+      'workstreams:write',
+      'projects:write',
+      'artifacts:write',
+      'comments:write',
+      'decisions:write',
+      'input-requests:write',
+      'search:read',
+    ] as const) {
+      expect(ASSISTANT_PERMISSIONS, p).toContain(p);
+    }
+  });
+
+  it('cannot call the routes that hold the permission policy or the workspace identity', () => {
+    for (const [method, route] of [
+      ['PATCH', '/api/w/:slug/settings'],
+      ['PATCH', '/api/w/:slug'],
+      ['POST', '/api/w/:slug/labels'],
+      ['POST', '/api/w/:slug/customer-tiers'],
+      ['POST', '/api/w/:slug/agents'],
+      ['PATCH', '/api/w/:slug/agents/:id'],
+    ] as const) {
+      const needed = requiredPermission(method, route);
+      expect(needed, `${method} ${route}`).not.toBeNull();
+      expect(ASSISTANT_PERMISSIONS, `${method} ${route}`).not.toContain(needed);
+    }
+  });
+
+  it('only lists permissions from the catalog', () => {
+    for (const p of ASSISTANT_PERMISSIONS) expect(API_PERMISSIONS).toContain(p);
+  });
+});
 
 describe('compactResult', () => {
   it('drops bulky fields from lists but leaves single records and non-JSON alone', () => {

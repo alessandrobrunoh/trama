@@ -33,9 +33,46 @@ describe('requiredPermission', () => {
     expect(requiredPermission('PATCH', '/api/w/:slug/decisions/:idOrKey')).toBe('decisions:write');
   });
 
+  it('maps nested artifact routes to artifacts:*, not the parent resource', () => {
+    const table: [string, string, string][] = [
+      ['GET', '/api/w/:slug/issues/:idOrKey/artifacts', 'artifacts:read'],
+      ['POST', '/api/w/:slug/issues/:idOrKey/artifacts', 'artifacts:write'],
+      ['GET', '/api/w/:slug/workstreams/:idOrKey/artifacts', 'artifacts:read'],
+      ['POST', '/api/w/:slug/workstreams/:idOrKey/artifacts', 'artifacts:write'],
+      ['GET', '/api/w/:slug/projects/:id/artifacts', 'artifacts:read'],
+      ['POST', '/api/w/:slug/projects/:id/artifacts', 'artifacts:write'],
+      ['GET', '/api/w/:slug/artifacts/:id', 'artifacts:read'],
+      ['DELETE', '/api/w/:slug/artifacts/:id', 'artifacts:delete'],
+    ];
+    for (const [method, route, expected] of table) expect(requiredPermission(method, route), `${method} ${route}`).toBe(expected);
+  });
+
+  it('keeps the other nested routes under their parent resource', () => {
+    const table: [string, string, string][] = [
+      ['POST', '/api/w/:slug/projects/:projectId/updates', 'projects:write'],
+      ['DELETE', '/api/w/:slug/projects/:projectId/updates/:id', 'projects:delete'],
+      ['GET', '/api/w/:slug/projects/:id/context', 'projects:read'],
+      ['GET', '/api/w/:slug/workstreams/:idOrKey/graph', 'workstreams:read'],
+      ['GET', '/api/w/:slug/workstreams/:idOrKey/context', 'workstreams:read'],
+      ['PATCH', '/api/w/:slug/workstreams/:idOrKey/criteria/:criterionId', 'workstreams:write'],
+      ['POST', '/api/w/:slug/issues/:idOrKey/link', 'issues:write'],
+      ['POST', '/api/w/:slug/input-requests/:id/answer', 'input-requests:write'],
+    ];
+    for (const [method, route, expected] of table) expect(requiredPermission(method, route), `${method} ${route}`).toBe(expected);
+  });
+
+  it('fails closed on a nested sub-resource that is in the catalog but not mapped', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/issues/:idOrKey/comments')).toBeNull();
+    expect(requiredPermission('POST', '/api/w/:slug/workstreams/:idOrKey/issues')).toBeNull();
+    expect(requiredPermission('DELETE', '/api/w/:slug/projects/:id/tokens/:tokenId')).toBeNull();
+  });
+
   it('fails closed outside the catalog', () => {
     expect(requiredPermission('GET', '/api/workspaces')).toBeNull();
     expect(requiredPermission('GET', '/api/auth/me')).toBeNull();
+    expect(requiredPermission('POST', '/api/invites/:token/accept')).toBeNull();
+    expect(requiredPermission('PATCH', '/api/me/notification-settings')).toBeNull();
+    expect(requiredPermission('PUT', '/api/me/push/subscription')).toBeNull();
     expect(requiredPermission('POST', '/api/w/:slug/ai/chat')).toBeNull();
     expect(requiredPermission('GET', '/api/w/:slug/something-new')).toBeNull();
     // actions a resource does not offer

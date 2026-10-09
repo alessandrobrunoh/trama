@@ -674,7 +674,7 @@
   "name": "list_project_artifacts",
   "method": "GET",
   "path": "/projects/{id}/artifacts",
-  "permission": "projects:read",
+  "permission": "artifacts:read",
   "description": "Artifacts attached to the project itself, plus those of its workstreams and issues.",
   "params": {
    "id": "path string! Project id"
@@ -1151,7 +1151,7 @@
   "name": "list_issue_artifacts",
   "method": "GET",
   "path": "/issues/{idOrKey}/artifacts",
-  "permission": "issues:read",
+  "permission": "artifacts:read",
   "description": "Artifacts attached to an issue.",
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
