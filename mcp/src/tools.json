@@ -1551,5 +1551,90 @@
   "params": {
    "id": "path string! Attention item id"
   }
+ },
+ {
+  "name": "list_import_credentials",
+  "method": "GET",
+  "path": "/imports/credentials",
+  "permission": "integrations:read",
+  "description": "Saved tracker credentials (GitHub, Linear) usable by start_import, with the account they belong to. Never the token. Tokens are added in Settings -> Import, not through the agent. Admin.",
+  "params": {}
+ },
+ {
+  "name": "preview_import",
+  "method": "POST",
+  "path": "/imports/preview",
+  "permission": "integrations:write",
+  "description": "Read a GitHub repository or Linear workspace and return counts plus the suggested mapping (teams, projects, labels, users, statuses). Writes nothing. Public GitHub repositories need no credential. Admin.",
+  "params": {
+   "provider": "body string(github|linear)! Tracker",
+   "source": "body object! GitHub: {repository: 'owner/name'}. Linear: {teamIds?: string[]} (empty = all teams)",
+   "credentialId": "body string Saved credential id (list_import_credentials). Required for Linear",
+   "connectionId": "body string GitHub only: reuse a GitHub integration connection instead"
+  }
+ },
+ {
+  "name": "start_import",
+  "method": "POST",
+  "path": "/imports",
+  "permission": "integrations:write",
+  "description": "Queue a background import and return the job (poll get_import). Idempotent: issues already imported are skipped, so it can be re-run. Without mapping, the preview's suggestions are used. One import at a time per workspace. Admin.",
+  "params": {
+   "provider": "body string(github|linear)! Tracker",
+   "source": "body object! GitHub: {repository: 'owner/name'}. Linear: {teamIds?: string[]}",
+   "credentialId": "body string Saved credential id. Required for Linear",
+   "connectionId": "body string GitHub only: reuse a GitHub integration connection",
+   "mapping": "body object Edited preview mapping {teams,projects,labels: {externalId: {action: map|create|skip, id?}}, users: {externalId: userId|null}, statuses: {externalId: issueStatus}}",
+   "options": "body object {includeComments?: boolean, includeClosed?: boolean, defaultKind?: bug|feature|incident|tech_debt|feedback|idea|security}"
+  }
+ },
+ {
+  "name": "list_imports",
+  "method": "GET",
+  "path": "/imports",
+  "permission": "integrations:read",
+  "description": "The last imports of the workspace with status, progress and errors (newest first). Admin.",
+  "params": {}
+ },
+ {
+  "name": "get_import",
+  "method": "GET",
+  "path": "/imports/{id}",
+  "permission": "integrations:read",
+  "description": "One import: status (queued|running|completed|failed|canceled), progress {phase, processed, created, skipped, failed, comments}, the first errors, waitingUntil while rate limited. Admin.",
+  "params": {
+   "id": "path string! Import id (imp_...)"
+  }
+ },
+ {
+  "name": "cancel_import",
+  "method": "POST",
+  "path": "/imports/{id}/cancel",
+  "permission": "integrations:write",
+  "description": "Stop an import after the page in progress. What was already imported stays. Admin.",
+  "params": {
+   "id": "path string! Import id"
+  }
+ },
+ {
+  "name": "link_external_issue",
+  "method": "POST",
+  "path": "/issues/{idOrKey}/external-ref",
+  "permission": "issues:write",
+  "description": "Link a Trama issue to a GitHub or Linear issue by URL, so its external status shows as a read-only badge (the Trama status is never changed). One external issue links to one Trama issue.",
+  "params": {
+   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
+   "url": "body string! https://github.com/owner/repo/issues/12 or https://linear.app/team/issue/ENG-123/..."
+  }
+ },
+ {
+  "name": "refresh_external_issue",
+  "method": "POST",
+  "path": "/issues/{idOrKey}/external-ref/refresh",
+  "permission": "issues:write",
+  "description": "Re-read the status of the linked external issue (read-only mirror).",
+  "params": {
+   "idOrKey": "path string! Issue id or key"
+  }
  }
 ]

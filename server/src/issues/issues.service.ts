@@ -569,7 +569,7 @@ export class IssuesService {
         const other = await this.ds
           .getRepository(IssueEntity)
           .createQueryBuilder('i')
-          .where(`i.workspaceId = :workspaceId AND i.externalRef->>'provider' = :p AND i.externalRef->>'id' = :id`, { workspaceId, p: ref.provider, id: ref.id })
+          .where(`i."workspaceId" = :workspaceId AND i."externalRef"->>'provider' = :p AND i."externalRef"->>'id' = :id`, { workspaceId, p: ref.provider, id: ref.id })
           .getOne();
         throw new ConflictException(`${ref.key ?? ref.id} is already ${other ? `linked to ${other.key}` : 'linked to another issue'}`);
       }

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Post, Put } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
 import { Actor, Can, Ctx, EditsTeamWork, type WorkspaceContext } from '../auth/request-context.js';
@@ -117,7 +117,9 @@ export class ImportsController {
 export class IssueExternalRefController {
   constructor(private readonly links: ExternalLinksService) {}
 
-  @Put(':idOrKey/external-ref')
+  /** Reads the external issue and links it (replacing an earlier link). */
+  @Post(':idOrKey/external-ref')
+  @HttpCode(200)
   link(@Ctx() ctx: WorkspaceContext, @Actor() actor: ActorRef, @Param('idOrKey') idOrKey: string, @Body() dto: LinkExternalDto) {
     return this.links.link(ctx.workspace.id, actor, idOrKey, dto.url);
   }
