@@ -9,7 +9,7 @@ import {
   LucideFlag,
   LucideRotateCcw,
   LucideUserPlus,
-  LucideUserRoundX,
+  LucideUserMinus,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { NablaStore, Viewport, fullDate, haptic, issueProjectIds, shortDate, type Issue } from '../../core';
@@ -272,7 +272,7 @@ export class IssueRow extends IssueItemBase {
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly mine = computed(() => this.issue().assigneeId === this.store.me()?.id);
   protected readonly assignIcon = LucideUserPlus;
-  protected readonly unassignIcon = LucideUserRoundX;
+  protected readonly unassignIcon = LucideUserMinus;
   protected readonly flagIcon = LucideFlag;
   protected readonly reopenIcon = LucideRotateCcw;
 
