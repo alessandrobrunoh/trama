@@ -410,7 +410,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}",
   "permission": "workstreams:read",
-  "description": "One workstream with criteria and status.",
+  "description": "One workstream with criteria, status and completion ({achieved, gaps[]}: why the outcome is not done yet). statusOverride set means the status is pinned by hand, not derived.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -420,7 +420,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}/context",
   "permission": "workstreams:read",
-  "description": "Markdown briefing for a workstream: objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
+  "description": "Markdown briefing for a workstream: outcome status and what is still missing (completion gaps), objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -512,12 +512,13 @@
   "method": "PATCH",
   "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
   "permission": "workstreams:write",
-  "description": "Update an acceptance criterion.",
+  "description": "Update an acceptance criterion: text, state, and the evidence that proves it.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
    "criterionId": "path string! Criterion id",
-   "text": "body string Text",
-   "state": "body string(pending|in_progress|met) State"
+   "text": "body string Text (editing a met criterion resets it to pending)",
+   "state": "body string(pending|in_progress|met) State (met records who verified it; a person or an agent)",
+   "evidence": "body object {artifactIds?: [artifact ids of this workstream], note?: string} Proof for the criterion (null clears). Does not change state"
   }
  },
  {

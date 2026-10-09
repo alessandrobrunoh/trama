@@ -2,7 +2,9 @@ import type {
   ArtifactKind,
   ArtifactState,
   CiState,
+  CompletionGap,
   DeliveryState,
+  WorkstreamCompletion,
   ReviewState,
   WorkstreamStatus,
 } from '../contracts/domain.js';
@@ -10,6 +12,11 @@ import type {
 /** Minimal shapes the engine needs; entities satisfy them structurally. */
 export interface StatusWorkstream {
   statusOverride?: WorkstreamStatus | null;
+  /**
+   * Grandfathered by migration: was `shipped` with no criteria before "no criteria never ships".
+   * Lets such a workstream keep shipping without a criterion; never set for new workstreams.
+   */
+  legacyShipped?: boolean;
   acceptanceCriteria: readonly { state?: string }[];
 }
 export interface StatusInputRequest {
@@ -65,6 +72,8 @@ export interface DerivedStatus {
    * A merged PR is `merged` here but never makes the workstream `shipped` by itself.
    */
   delivery: DeliveryState;
+  /** Whether the outcome is achieved by the facts and what is missing; ignores the override. */
+  completion: WorkstreamCompletion;
 }
 
 /**
@@ -130,18 +139,21 @@ export function deriveStatus(input: StatusInput): DerivedStatus {
   const override = input.workstream.statusOverride ?? null;
   const derived = deriveWithoutOverride(input);
   const delivery = deriveDelivery(input);
+  const completion = deriveCompletion(input);
   if (override)
     return {
       status: override,
       derivedStatus: derived.status,
       rule: 1,
       delivery,
+      completion,
     };
   return {
     status: derived.status,
     derivedStatus: derived.status,
     rule: derived.rule,
     delivery,
+    completion,
   };
 }
 
@@ -150,33 +162,51 @@ function openIssues(input: StatusInput): StatusIssue[] {
   return (input.issues ?? []).filter((i) => i.status !== 'canceled');
 }
 
+/**
+ * The single source of truth for "is the outcome achieved, and if not, why". `status === 'shipped'`
+ * (derived) is exactly `achieved`; UI, briefing, MCP and CLI show `gaps` instead of re-deriving them.
+ *
+ * Delivery evidence (merged / released / deployed, or every linked issue done) is only one
+ * precondition. A workstream with no acceptance criteria never ships on its own, since nothing
+ * defines "done" (`legacyShipped` workstreams are the migrated exception).
+ */
+export function deriveCompletion(input: StatusInput): WorkstreamCompletion {
+  const issues = openIssues(input);
+  const allIssuesDone =
+    issues.length > 0 && issues.every((i) => i.status === 'done');
+  const delivered = isDelivered(deriveDelivery(input));
+  const criteria = input.workstream.acceptanceCriteria;
+  const gaps: CompletionGap[] = [];
+  if (criteria.length === 0) {
+    if (!input.workstream.legacyShipped) gaps.push('no_criteria');
+  } else if (!criteria.every((c) => c.state === 'met')) {
+    gaps.push('criteria_pending');
+  }
+  if (blockers(input).length > 0) gaps.push('blocked');
+  if (
+    input.inputRequests.some((r) => r.state === 'open') ||
+    input.decisions.some((d) => d.status === 'proposed')
+  )
+    gaps.push('needs_input');
+  if (!delivered && !allIssuesDone) gaps.push('no_delivery');
+  return { achieved: gaps.length === 0, gaps };
+}
+
 function deriveWithoutOverride(input: StatusInput): {
   status: WorkstreamStatus;
   rule: number;
 } {
   const { artifacts } = input;
   const issues = openIssues(input);
-  const allIssuesDone =
-    issues.length > 0 && issues.every((i) => i.status === 'done');
-
-  // Delivery evidence (merged / released / deployed, or every linked issue done) is only a
-  // precondition of the outcome. It never ships the workstream on its own: criteria,
-  // blockers, input requests and undecided decisions come first.
   const delivery = deriveDelivery(input);
   const delivered = isDelivered(delivery);
   const hasBlockers = blockers(input).length > 0;
   const waitingOnPeople =
     input.inputRequests.some((r) => r.state === 'open') ||
     input.decisions.some((d) => d.status === 'proposed');
-  const criteria = input.workstream.acceptanceCriteria;
-  const criteriaMet = criteria.every((c) => c.state === 'met');
-  if (
-    (delivered || allIssuesDone) &&
-    criteriaMet &&
-    !hasBlockers &&
-    !waitingOnPeople
-  )
-    return { status: 'shipped', rule: 2 };
+
+  // Outcome achieved: criteria met (at least one), delivered, nothing blocks or waits on a person.
+  if (deriveCompletion(input).achieved) return { status: 'shipped', rule: 2 };
 
   if (hasBlockers) return { status: 'blocked', rule: 3 };
 

@@ -381,6 +381,8 @@ export function explainStatus(
       if (isDeliveredState(ws.delivery)) {
         reasons.push(`${deliveryReason(ws.delivery, prs)}, but the outcome is not achieved yet.`);
         const unmet = ws.acceptanceCriteria.filter((c) => c.state !== 'met').length;
+        if (ws.completion.gaps.includes('no_criteria'))
+          reasons.push('There are no acceptance criteria yet: add one to define what done means.');
         if (unmet)
           reasons.push(
             `${unmet} acceptance criteri${unmet === 1 ? 'on is' : 'a are'} not met.`,
