@@ -111,6 +111,8 @@ export class UiStore {
   readonly sidebarOrder = signal<Record<SidebarSection, string[]>>(
     readOrder(this.persisted?.sidebarOrder),
   );
+  /** Bumped when the person asks to see the setup checklist again; the OnboardingStore reacts (it is not in the initial bundle). */
+  readonly checklistRequests = signal(0);
   readonly mobileSidebarOpen = signal(false);
   readonly modal = signal<ModalKind>(null);
   readonly customerDialog = signal<CustomerDialogState>({ kind: 'customer' });
@@ -170,6 +172,9 @@ export class UiStore {
     this.sidebarBadgeStyle.set('count');
     this.sidebarVisibility.set({});
     this.sidebarOrder.set({ personal: [], workspace: [] });
+  }
+  requestChecklist(): void {
+    this.checklistRequests.update((n) => n + 1);
   }
   setMobileSidebar(value: boolean): void {
     this.mobileSidebarOpen.set(value);

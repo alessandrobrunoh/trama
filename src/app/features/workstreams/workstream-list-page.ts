@@ -5,7 +5,7 @@
 // persist in localStorage. Rows are editable in place, right-click opens the workstream menu,
 // multi-selection shows the bulk bar, and the focused row reacts to s / p / a / t / ⌘. / ⌘⇧L / ⌘⌫.
 import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   LucideArrowDownWideNarrow,
   LucideArrowUpNarrowWide,
@@ -149,6 +149,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
+    RouterLink,
     LabelPicker,
     HlmButtonImports,
     HlmInputImports,
@@ -317,6 +318,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       <app-empty-state [icon]="flow" [title]="team() ? 'No workstreams for ' + team()!.name : 'No workstreams yet'" description="A workstream is an outcome: coordinated work that resolves one or more issues, with its PRs, decisions and acceptance criteria in one place.">
         @if (canEdit()) {
           <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New workstream</button>
+        }
+        @if (!store.agents().length) {
+          <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', store.slug(), 'connect']">Connect your agent</a>
         }
       </app-empty-state>
     } @else if (shown() === 0) {
