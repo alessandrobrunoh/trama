@@ -25,11 +25,11 @@ Read what comes back, including the `workspace` stamp on each row. Do not create
 
 ## 3. Decide where the work lives
 
-A workstream is an outcome, not a container. One per outcome, never a second for the same outcome.
+A workstream is an outcome, not a container, and not a Delta thread. The thread is only the execution context; it does not set work boundaries. One workstream per outcome, never a second for the same outcome, and never one stretched over unrelated outcomes just because they share a thread.
 
-If you are the parent agent of this Delta thread, stop here and do not apply the cases below. Search for a workstream whose `deltaThreadUrl` is this thread and continue it. If none exists, create one and link every issue you were asked to do. A subagent works one of those issues; it does not get a workstream, and it does not get a new issue when the issue already exists. A slice with no issue yet becomes an issue on that workstream, never a second workstream. Do not split the list because the issues look unrelated, and do not ask whether to: being told to do them here is the grouping. People may say "workspace" for this thread. The Trama object is still one workstream.
+Per issue, ask: does it serve the outcome of an existing workstream? Search first (`search`, `list_workstreams`; a workstream whose `deltaThreadUrl` is this thread is a candidate, not a rule). If yes, link it there. If no, it needs its own workstream or stays a plain issue. One thread can therefore touch several workstreams; you may treat one as the thread's primary. A subagent works an issue; it gets no workstream of its own, and a slice with no issue yet becomes an issue on the workstream it serves. Only when the user says these issues are one effort do you group them without further questions.
 
-Otherwise:
+For each issue or group of issues:
 
 - The issues are already on a workstream: use that one. Load it with `get_workstream_context` and continue at step 5.
 - Several issues share one outcome and have no workstream: create one and link them.
