@@ -17,6 +17,7 @@ import {
   ATTENTION_KIND_META,
   ATTENTION_KINDS,
   ISSUE_STATUS_META,
+  ListStateStore,
   NablaStore,
   UiStore,
   usePageShortcuts,
@@ -369,6 +370,7 @@ export class MyWorkPage {
   readonly tabParam = input<string | undefined>(undefined, { alias: 'tab' });
 
   protected readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly router = inject(Router);
 
@@ -383,8 +385,9 @@ export class MyWorkPage {
 
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
-  protected readonly tab = signal<Tab>('assigned');
-  protected readonly showClosed = signal(false);
+  // Tab and filter survive navigation inside the app (see ListStateStore); `?tab=` still wins.
+  protected readonly tab = this.listState.remember<Tab>('my-work.tab', 'assigned');
+  protected readonly showClosed = this.listState.remember('my-work.showClosed', false);
   private readonly folded = signal<ReadonlySet<string>>(new Set());
 
   constructor() {

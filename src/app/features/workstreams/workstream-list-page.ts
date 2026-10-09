@@ -27,6 +27,7 @@ import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Notifier,
+  ListStateStore,
   NablaStore,
   UiStore,
   PRIORITY_META,
@@ -412,6 +413,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
 })
 export class WorkstreamListPage {
   protected readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
   private readonly router = inject(Router);
@@ -425,8 +427,9 @@ export class WorkstreamListPage {
   readonly viewParam = input<string | undefined>(undefined, { alias: 'view' });
 
   protected readonly display = signal<DisplayPrefs>(loadDisplay());
-  protected readonly filters = signal<ViewFilter[]>([]);
-  protected readonly search = signal('');
+  // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
+  protected readonly filters = this.listState.remember<ViewFilter[]>('workstreams.filters', []);
+  protected readonly search = this.listState.remember('workstreams.search', '');
   protected readonly createOpen = signal(false);
   protected readonly createDefaults = signal<CreateWorkstreamDefaults>({});
   protected readonly saveState = signal<'open' | 'closed'>('closed');

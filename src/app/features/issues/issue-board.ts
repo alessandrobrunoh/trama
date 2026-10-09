@@ -35,6 +35,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
   FavoritesStore,
+  ListStateStore,
   NablaStore,
   UiStore,
   filterValues,
@@ -533,6 +534,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
 })
 export class IssueBoard {
   protected readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
   protected readonly favorites = inject(FavoritesStore);
@@ -560,8 +562,9 @@ export class IssueBoard {
 
   // display options (persisted)
   protected readonly d = signal<IssueDisplay>(readDisplay('nabla.issues.display.v1'));
-  protected readonly filters = signal<ViewFilter[]>([]);
-  protected readonly search = signal('');
+  // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
+  protected readonly filters = this.listState.remember<ViewFilter[]>('issues.filters', []);
+  protected readonly search = this.listState.remember('issues.search', '');
   private anchor: string | null = null;
 
   protected readonly statuses = issueStatusOptions();
@@ -703,12 +706,16 @@ export class IssueBoard {
       writeDisplay(key, d);
     });
     // `?status=` / `?team=` from links (sidebar team links, attention, saved links).
+    // On open, a link's params override the remembered filters; with no params the remembered ones stay.
+    let opening = true;
     effect(() => {
       const status = this.status();
       const team = this.team();
       const project = this.project();
+      const initial = opening;
+      opening = false;
       this.filters.update((f) => {
-        let next = setFilter(f, 'teamId', 'in', team ? [team] : []);
+        let next = team || !initial ? setFilter(f, 'teamId', 'in', team ? [team] : []) : f;
         if (project) next = setFilter(next, 'projectId', 'in', [project]);
         if (status && (ISSUE_STATUSES as readonly string[]).includes(status)) next = setFilter(next, 'status', 'in', [status]);
         return next;

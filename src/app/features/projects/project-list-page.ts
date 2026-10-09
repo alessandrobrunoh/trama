@@ -4,6 +4,7 @@ import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from 
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { PROJECT_HEALTH_META, NablaStore, UiStore } from '../../core';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
@@ -217,6 +218,7 @@ export class ProjectListPage {
   readonly workspaceSlug = input<string>();
 
   private readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 
   protected readonly plus = LucidePlus;
@@ -229,10 +231,11 @@ export class ProjectListPage {
     { value: NO_UPDATES, label: 'No updates' },
   ];
 
-  protected readonly search = signal('');
-  protected readonly statusFilter = signal<string[]>([]);
-  protected readonly healthFilter = signal<string[]>([]);
-  protected readonly teamFilter = signal<string[]>([]);
+  // Filters survive navigation inside the app (see ListStateStore).
+  protected readonly search = this.listState.remember('projects.search', '');
+  protected readonly statusFilter = this.listState.remember<string[]>('projects.status', []);
+  protected readonly healthFilter = this.listState.remember<string[]>('projects.health', []);
+  protected readonly teamFilter = this.listState.remember<string[]>('projects.team', []);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));

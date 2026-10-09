@@ -4,6 +4,7 @@ import { LucideDynamicIcon, LucidePlus, LucideSearch, LucideUsers } from '@lucid
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, UiStore } from '../../core';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
@@ -98,11 +99,13 @@ export class TeamListPage {
   readonly workspaceSlug = input<string>();
 
   private readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
   protected readonly searchIcon = LucideSearch;
   protected readonly users = LucideUsers;
-  protected readonly search = signal('');
+  // Filters survive navigation inside the app (see ListStateStore).
+  protected readonly search = this.listState.remember('teams.search', '');
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canAdmin = computed(() => this.store.allowed('createTeams'));
   protected readonly total = computed(() => this.store.teams().length);
