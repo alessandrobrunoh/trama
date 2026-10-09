@@ -146,30 +146,69 @@ describe('deriveStatus', () => {
       statusOverride: null,
     });
 
-    it('delivery evidence ships a workstream with no criteria', () => {
+    it('delivery evidence alone never ships a workstream with no criteria', () => {
+      const evidence: Partial<StatusInput>[] = [
+        { artifacts: [{ kind: 'deployment', state: 'healthy' }] },
+        { artifacts: [{ kind: 'release', state: 'published' }] },
+        { artifacts: [pr({ state: 'merged' }), pr({ state: 'closed' })] },
+        { issues: [{ status: 'done' }, { status: 'done' }] },
+        { issues: [{ status: 'done' }, { status: 'canceled' }] },
+      ];
+      for (const e of evidence) {
+        const r = status(e);
+        expect(r.status).not.toBe('shipped');
+        expect(r.completion).toEqual({ achieved: false, gaps: ['no_criteria'] });
+      }
       expect(
         status({ artifacts: [{ kind: 'deployment', state: 'healthy' }] }),
-      ).toMatchObject({ status: 'shipped', rule: 2, delivery: 'deployed' });
+      ).toMatchObject({ status: 'working', delivery: 'deployed' });
       expect(
-        status({ artifacts: [{ kind: 'release', state: 'published' }] }),
-      ).toMatchObject({ status: 'shipped', delivery: 'released' });
+        status({ issues: [{ status: 'done' }], artifacts: [pr({ state: 'merged' })] })
+          .status,
+      ).toBe('working');
+      expect(status({ issues: [{ status: 'done' }] }).status).toBe('draft');
+    });
+
+    it('every issue done plus every criterion met ships; one open issue does not', () => {
       expect(
-        status({
-          artifacts: [pr({ state: 'merged' }), pr({ state: 'closed' })],
-        }),
-      ).toMatchObject({ status: 'shipped', delivery: 'merged' });
-      expect(
-        status({ artifacts: [pr({ state: 'merged' }), pr()] }).status,
-      ).not.toBe('shipped');
-      expect(
-        status({ issues: [{ status: 'done' }, { status: 'done' }] }),
+        status({ workstream: met(), issues: [{ status: 'done' }, { status: 'canceled' }] }),
       ).toMatchObject({ status: 'shipped', rule: 2, delivery: 'none' });
       expect(
-        status({ issues: [{ status: 'done' }, { status: 'canceled' }] }).status,
-      ).toBe('shipped');
+        status({ workstream: met(), issues: [{ status: 'done' }, { status: 'todo' }] }).status,
+      ).not.toBe('shipped');
       expect(
-        status({ issues: [{ status: 'done' }, { status: 'todo' }] }).status,
-      ).toBe('draft');
+        status({
+          workstream: met(),
+          artifacts: [pr({ state: 'merged' }), pr()],
+        }).status,
+      ).not.toBe('shipped');
+    });
+
+    it('a legacyShipped workstream with no criteria keeps shipping (history unchanged)', () => {
+      const legacy = { acceptanceCriteria: [], statusOverride: null, legacyShipped: true };
+      expect(
+        status({ workstream: legacy, artifacts: [pr({ state: 'merged' })] }),
+      ).toMatchObject({
+        status: 'shipped',
+        completion: { achieved: true, gaps: [] },
+      });
+      expect(status({ workstream: legacy, issues: [{ status: 'done' }] }).status).toBe('shipped');
+      // The grandfathering covers only the missing criteria: everything else still counts.
+      expect(status({ workstream: legacy }).completion.gaps).toEqual(['no_delivery']);
+      expect(
+        status({
+          workstream: legacy,
+          artifacts: [pr({ state: 'merged' })],
+          inputRequests: [{ state: 'open' }],
+        }).status,
+      ).toBe('needs_input');
+      // Once it has a criterion, the criterion rules apply as for any workstream.
+      expect(
+        status({
+          workstream: { acceptanceCriteria: [{ state: 'pending' }], legacyShipped: true },
+          artifacts: [pr({ state: 'merged' })],
+        }).status,
+      ).toBe('working');
     });
 
     it('delivery evidence plus every criterion met ships', () => {
@@ -290,6 +329,76 @@ describe('deriveStatus', () => {
           issues: [{ status: 'done' }],
         }),
       ).toMatchObject({ status: 'working', delivery: 'merged' });
+    });
+  });
+
+  describe('completion gaps', () => {
+    const met = { acceptanceCriteria: [{ state: 'met' }], statusOverride: null };
+    const merged = [pr({ state: 'merged' })];
+
+    it('no gaps means achieved, and equals the derived shipped status', () => {
+      const r = status({ workstream: met, artifacts: merged });
+      expect(r.completion).toEqual({ achieved: true, gaps: [] });
+      expect(r.derivedStatus).toBe('shipped');
+    });
+
+    it('no_criteria', () => {
+      expect(status({ artifacts: merged }).completion.gaps).toEqual(['no_criteria']);
+      expect(status().completion.gaps).toEqual(['no_criteria', 'no_delivery']);
+    });
+
+    it('criteria_pending covers pending and in_progress criteria', () => {
+      for (const state of ['pending', 'in_progress']) {
+        expect(
+          status({
+            workstream: { acceptanceCriteria: [{ state: 'met' }, { state }] },
+            artifacts: merged,
+          }).completion,
+        ).toEqual({ achieved: false, gaps: ['criteria_pending'] });
+      }
+    });
+
+    it('blocked (failing PR, conflict, unresolved dependency)', () => {
+      const gaps = (p: Partial<StatusInput>) =>
+        status({ workstream: met, artifacts: merged, ...p }).completion.gaps;
+      expect(gaps({ artifacts: [...merged, pr({ ci: 'failing' })] })).toEqual(['blocked', 'no_delivery']); // the open PR is not delivered
+      expect(gaps({ artifacts: [...merged, pr({ hasConflicts: true })] })).toEqual(['blocked', 'no_delivery']);
+      expect(
+        gaps({ incomingDependencies: [{ sourceType: 'workstream', sourceState: 'working' }] }),
+      ).toEqual(['blocked']);
+    });
+
+    it('needs_input (open input request or proposed decision)', () => {
+      const gaps = (p: Partial<StatusInput>) =>
+        status({ workstream: met, artifacts: merged, ...p }).completion.gaps;
+      expect(gaps({ inputRequests: [{ state: 'open' }] })).toEqual(['needs_input']);
+      expect(gaps({ decisions: [{ status: 'proposed' }] })).toEqual(['needs_input']);
+      expect(gaps({ inputRequests: [{ state: 'answered' }], decisions: [{ status: 'accepted' }] })).toEqual([]);
+    });
+
+    it('no_delivery: met criteria without merged work or finished issues', () => {
+      expect(status({ workstream: met }).completion.gaps).toEqual(['no_delivery']);
+      expect(
+        status({ workstream: met, artifacts: [pr()] }).completion.gaps,
+      ).toEqual(['no_delivery']);
+      expect(
+        status({ workstream: met, issues: [{ status: 'done' }, { status: 'todo' }] }).completion.gaps,
+      ).toEqual(['no_delivery']);
+    });
+
+    it('gaps accumulate in a stable order', () => {
+      expect(
+        status({
+          inputRequests: [{ state: 'open' }],
+          incomingDependencies: [{ sourceType: 'workstream', sourceState: 'working' }],
+        }).completion.gaps,
+      ).toEqual(['no_criteria', 'blocked', 'needs_input', 'no_delivery']);
+    });
+
+    it('a manual override changes the status but not the completion', () => {
+      const r = status({ workstream: { acceptanceCriteria: [], statusOverride: 'shipped' } });
+      expect(r).toMatchObject({ status: 'shipped', derivedStatus: 'draft' });
+      expect(r.completion.achieved).toBe(false);
     });
   });
 

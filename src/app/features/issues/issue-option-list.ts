@@ -3,9 +3,13 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
-import { NablaStore } from '../../core';
+import { LABEL_NAME_MAX, NablaStore } from '../../core';
+import { LabelCatalog } from '../../shared/label-catalog';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueOptionGlyph, PROMPT_TITLE, applyOption, currentValues, promptOptions, type IssueOption } from './issue-options';
+
+/** Value prefix of the "Create label" row. */
+const CREATE = '__create:';
 
 @Component({
   selector: 'app-issue-option-list',
@@ -43,6 +47,7 @@ import { IssueOptionGlyph, PROMPT_TITLE, applyOption, currentValues, promptOptio
 export class IssueOptionList {
   private readonly store = inject(NablaStore);
   private readonly actions = inject(IssueActions);
+  private readonly catalog = inject(LabelCatalog);
 
   readonly field = input.required<IssuePromptField>();
   readonly ids = input.required<readonly string[]>();
@@ -52,14 +57,34 @@ export class IssueOptionList {
   protected readonly query = signal('');
   protected readonly check = LucideCheck;
   private readonly issues = computed(() => this.actions.issues(this.ids()));
-  protected readonly options = computed(() => promptOptions(this.store, this.field(), this.issues()));
   protected readonly current = computed(() => currentValues(this.field(), this.issues()));
+  protected readonly options = computed(() => {
+    if (this.field() !== 'label') return promptOptions(this.store, this.field(), this.issues());
+    // Same labels, same order as the label picker; a typed name that matches nothing can be created on the spot.
+    const { suggested, rest } = this.catalog.arrange(this.current(), !this.query().trim());
+    const list = promptOptions(this.store, 'label', this.issues(), [...suggested, ...rest]);
+    const name = this.query().trim();
+    if (!name || name.length > LABEL_NAME_MAX || !this.catalog.canCreate() || this.catalog.find(name)) return list;
+    return [...list, { value: CREATE + name, label: `Create “${name}”`, glyph: 'label' as const, color: this.catalog.nextColor(), search: name }];
+  });
   protected readonly placeholder = computed(() => PROMPT_TITLE[this.field()]);
   /** Number hints only for short, fixed lists. */
   protected readonly digits = computed(() => this.field() === 'status' || this.field() === 'priority');
 
   protected pick(o: IssueOption): void {
+    if (o.value.startsWith(CREATE)) {
+      void this.createAndToggle(o.value.slice(CREATE.length));
+      return;
+    }
     if (applyOption(this.actions, this.field(), this.ids(), o.value)) this.done.emit();
+  }
+
+  private async createAndToggle(name: string): Promise<void> {
+    const made = await this.catalog.create(name);
+    if (!made) return;
+    this.query.set('');
+    this.catalog.touch(made.id);
+    this.actions.toggleLabel(this.ids(), made.id);
   }
 
   protected onKey(e: KeyboardEvent): void {

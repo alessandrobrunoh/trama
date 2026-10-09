@@ -3,13 +3,20 @@
 //! Every REST route in the MCP catalog (`mcp/src/tools.json`) is a command, so the CLI and the MCP
 //! server expose the same surface by construction. See `cli/README.md`.
 
-// The protocol layer and the catalog are shared with the MCP server, not copied.
+// The protocol layer, the catalog and the tool profiles are shared with the MCP server, not copied.
+// The CLI itself always runs on the FULL catalog; profiles only shape what `trama mcp` lists.
 #[path = "../../mcp/src/catalog.rs"]
 #[allow(dead_code)]
 mod catalog;
+#[path = "../../mcp/src/composite.rs"]
+#[allow(dead_code)]
+mod composite;
 #[path = "../../mcp/src/generic.rs"]
 #[allow(dead_code)]
 mod generic;
+#[path = "../../mcp/src/profile.rs"]
+#[allow(dead_code)]
+mod profile;
 #[path = "../../mcp/src/protocol.rs"]
 #[allow(dead_code)]
 mod protocol;
@@ -244,7 +251,7 @@ async fn run() -> Result<()> {
         }
         "mcp" => match sub.subcommand() {
             Some(("config", cm)) => mcp_cmd::config_snippet(cm, &ctx),
-            _ => mcp_cmd::serve(&ctx).await,
+            _ => mcp_cmd::serve(&ctx, sub).await,
         },
         "skill" => skill::run(sub, &ctx),
         "update" => update::run(sub, &ctx).await,

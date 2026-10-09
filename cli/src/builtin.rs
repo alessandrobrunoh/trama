@@ -102,7 +102,8 @@ pub fn definitions() -> Vec<Command> {
             .after_help("Example:\n  trama completion zsh > ~/.zfunc/_trama"),
         Command::new("mcp")
             .about("Run as an MCP server over stdio (uses your saved login), or print client config")
-            .long_about("`trama mcp` speaks the Model Context Protocol on stdin/stdout with the same tools as the hosted MCP server, authenticated by your saved profiles. With several profiles (or TRAMA_API_KEYS) every tool takes an optional `workspace` argument and reads run across all of them when it is omitted. Add it to a client as: command `trama`, args `mcp`.")
+            .long_about("`trama mcp` speaks the Model Context Protocol on stdin/stdout with the same tools as the hosted MCP server, authenticated by your saved profiles. By default it lists a short set of task-level tools (`--tools full` lists every operation); `list_capabilities` and `run_tool` reach the rest. With several profiles (or TRAMA_API_KEYS) every tool takes an optional `workspace` argument and reads run across all of them when it is omitted. Add it to a client as: command `trama`, args `mcp`.")
+            .arg(Arg::new("tools").long("tools").value_name("PROFILE").value_parser(["core", "full"]).help("Tool set to list: core (default; task-oriented) or full (every operation). Env: TRAMA_MCP_PROFILE"))
             .subcommand(
                 Command::new("config")
                     .about("Print the snippet that connects an MCP client")

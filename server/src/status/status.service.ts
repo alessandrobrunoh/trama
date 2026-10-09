@@ -165,6 +165,7 @@ export class StatusService
     const dirty =
       ws.derivedStatus !== result.derivedStatus ||
       ws.delivery !== result.delivery ||
+      JSON.stringify(ws.completion) !== JSON.stringify(result.completion) ||
       ws.status !== result.status ||
       (ws.shippedAt ?? null) !== shippedAt;
     if (dirty) {
@@ -172,6 +173,7 @@ export class StatusService
       const patch: Partial<WorkstreamEntity> = {
         derivedStatus: result.derivedStatus,
         delivery: result.delivery,
+        completion: result.completion,
         status: result.status,
       };
       patch.shippedAt = shippedAt;

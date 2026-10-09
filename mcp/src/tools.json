@@ -23,7 +23,7 @@
   "method": "POST",
   "path": "/labels",
   "permission": "workspace:write",
-  "description": "Add a custom workspace label (admin). Templates Bug, Feature, Improvement and Documentation already exist. Returns the workspace.",
+  "description": "Add a custom workspace label (member or above). Templates Bug, Feature, Improvement and Documentation already exist. Reuse an existing label when one fits. Returns the workspace.",
   "params": {
    "name": "body string! Label name",
    "color": "body string #rrggbb"
@@ -34,11 +34,23 @@
   "method": "PATCH",
   "path": "/labels/{id}",
   "permission": "workspace:write",
-  "description": "Rename or recolor a workspace label (admin). Templates can be recolored but not renamed.",
+  "description": "Rename, recolor, archive or restore a workspace label (admin). Templates can be recolored but not renamed or archived. An archived label stays on what carries it but is no longer offered when assigning.",
   "params": {
    "id": "path string! Label id",
    "name": "body string New name (custom labels only)",
-   "color": "body string #rrggbb"
+   "color": "body string #rrggbb",
+   "archived": "body boolean true archives the label, false restores it"
+  }
+ },
+ {
+  "name": "merge_label",
+  "method": "POST",
+  "path": "/labels/{id}/merge",
+  "permission": "workspace:write",
+  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories, workstreams, saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
+  "params": {
+   "id": "path string! Label id to merge away",
+   "into": "body string! Label id that takes over"
   }
  },
  {
@@ -398,7 +410,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}",
   "permission": "workstreams:read",
-  "description": "One workstream with criteria and status.",
+  "description": "One workstream with criteria, status and completion ({achieved, gaps[]}: why the outcome is not done yet). statusOverride set means the status is pinned by hand, not derived.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -408,7 +420,7 @@
   "method": "GET",
   "path": "/workstreams/{idOrKey}/context",
   "permission": "workstreams:read",
-  "description": "Markdown briefing for a workstream: objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
+  "description": "Markdown briefing for a workstream: outcome status and what is still missing (completion gaps), objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
   }
@@ -500,12 +512,13 @@
   "method": "PATCH",
   "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
   "permission": "workstreams:write",
-  "description": "Update an acceptance criterion.",
+  "description": "Update an acceptance criterion: text, state, and the evidence that proves it.",
   "params": {
    "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
    "criterionId": "path string! Criterion id",
-   "text": "body string Text",
-   "state": "body string(pending|in_progress|met) State"
+   "text": "body string Text (editing a met criterion resets it to pending)",
+   "state": "body string(pending|in_progress|met) State (met records who verified it; a person or an agent)",
+   "evidence": "body object {artifactIds?: [artifact ids of this workstream], note?: string} Proof for the criterion (null clears). Does not change state"
   }
  },
  {
@@ -932,6 +945,27 @@
   "description": "Delete an issue.",
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+  }
+ },
+ {
+  "name": "bulk_update_issues",
+  "method": "POST",
+  "path": "/issues/bulk",
+  "permission": "issues:write",
+  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels and workstreams are added/removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)",
+   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?, addWorkstreamIds?, removeWorkstreamIds?}"
+  }
+ },
+ {
+  "name": "bulk_delete_issues",
+  "method": "POST",
+  "path": "/issues/bulk-delete",
+  "permission": "issues:delete",
+  "description": "Delete up to 100 issues in one transaction (their comments go too). Returns the deleted ids.",
+  "params": {
+   "ids": "body string[]! Issue ids or keys (1-100)"
   }
  },
  {
@@ -1508,6 +1542,35 @@
   "description": "Delete a saved view.",
   "params": {
    "id": "path string! View id"
+  }
+ },
+ {
+  "name": "get_insights",
+  "method": "GET",
+  "path": "/insights",
+  "permission": "insights:read",
+  "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
+  "params": {
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items kept per signal, 1-500 (default 25); counts always cover everything"
+  }
+ },
+ {
+  "name": "get_insight_signal",
+  "method": "GET",
+  "path": "/insights/signals/{id}",
+  "permission": "insights:read",
+  "description": "The full item list behind one health signal (what a tile of get_insights drills into).",
+  "params": {
+    "id": "path string(blocked_workstreams|needs_input|stale_workstreams|stale_issues|delivered_outcome_open|overdue_milestones|overdue_workstreams|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items returned, 1-500 (default 100)"
   }
  },
  {

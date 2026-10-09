@@ -19,6 +19,7 @@ import { provideSpartanHlm } from '@spartan-ng/helm/utils';
 import { routes } from './app.routes';
 import { apiInterceptor } from './core/api/api.interceptor';
 import { Notifier } from './core/notify/notifier';
+import { RecentItems } from './features/command/recent.service';
 import { LiveSync } from './core/sync/live-sync.service';
 import { provideServiceWorker } from '@angular/service-worker';
 
@@ -53,6 +54,10 @@ export const appConfig: ApplicationConfig = {
     // Instantiate LiveSync (SSE) up front; it connects whenever a workspace is loaded.
     provideAppInitializer(() => {
       inject(LiveSync);
+    }),
+    // Record opened detail pages as "recently viewed" for the command palette.
+    provideAppInitializer(() => {
+      inject(RecentItems);
     }),
     provideLucideConfig({ size: 16, strokeWidth: 1.75 }),
     provideServiceWorker('ngsw-worker.js', {

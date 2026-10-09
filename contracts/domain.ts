@@ -427,10 +427,40 @@ export type WorkstreamStatus =
 export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
+
+/**
+ * Why a workstream is not (yet) a finished outcome. Computed by the server; clients show it and
+ * never re-derive it. `shipped` (derived) means no gaps.
+ * - `no_criteria`: nothing defines "done" yet (add at least one acceptance criterion).
+ * - `criteria_pending`: some criterion is not `met`.
+ * - `blocked`: a failing/conflicting open PR or an unresolved dependency.
+ * - `needs_input`: an open input request or a proposed decision waits on a person.
+ * - `no_delivery`: no merged/released/deployed work and not every linked issue is done.
+ */
+export type CompletionGap = 'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
+export interface WorkstreamCompletion {
+  /** True when the outcome is achieved by the facts (ignores any manual `statusOverride`). */
+  achieved: boolean;
+  gaps: CompletionGap[];
+}
+/** Proof attached to a criterion. Artifacts must belong to the same workstream. */
+export interface CriterionEvidence {
+  artifactIds: ID[];
+  /** Short free-text verification (e.g. "checked manually on staging"). */
+  note?: string;
+}
 export interface AcceptanceCriterion {
   id: ID;
   text: string;
   state: CriterionState;
+  /**
+   * Optional proof. Signalled, never required: a `met` criterion without evidence is shown as
+   * "no proof", not rejected. Linking an artifact (a PR, say) never changes `state`.
+   */
+  evidence?: CriterionEvidence;
+  /** Who set the criterion to `met` (user or agent). Set by the server, cleared when it leaves `met`. */
+  verifiedBy?: ActorRef;
+  verifiedAt?: ISODate;
 }
 
 export interface Workstream {
@@ -471,6 +501,14 @@ export interface Workstream {
    * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
    */
   delivery: DeliveryState;
+  /** Whether the outcome is achieved and what is missing, computed from the facts (not from the override). */
+  completion: WorkstreamCompletion;
+  /**
+   * Set once by a migration on workstreams that were already `shipped` with no acceptance criteria
+   * when "no criteria never ships" was introduced. They keep shipping; everything else needs a criterion.
+   */
+  legacyShipped?: boolean;
+  /** A manual pin. When set, `status` is this value and `derivedStatus` is what the facts say. */
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;
@@ -1171,6 +1209,277 @@ export interface AttentionItem {
   snoozedUntil?: ISODate;
 }
 
+// ───────────────────────────── Insights ─────────────────────────────
+
+/** Time windows offered by GET /insights, in days. */
+export const INSIGHT_RANGES = [7, 30, 90] as const;
+export type InsightRange = (typeof INSIGHT_RANGES)[number];
+
+/**
+ * A health signal: something that is going wrong right now. Every signal lists the items that
+ * cause it, so a lead (or an agent) can act on them. Definitions live in {@link INSIGHT_SIGNALS}.
+ */
+export type InsightSignalId =
+  | 'blocked_workstreams'
+  | 'needs_input'
+  | 'stale_workstreams'
+  | 'stale_issues'
+  | 'delivered_outcome_open'
+  | 'overdue_milestones'
+  | 'overdue_workstreams'
+  | 'scope_creep'
+  | 'prs_stuck_in_review'
+  | 'ci_failing'
+  | 'undecided_decisions'
+  | 'customer_demand_waiting';
+
+export interface InsightSignalMeta {
+  label: string;
+  /** What exactly is counted. Shown in the UI and returned to agents. */
+  definition: string;
+  /** Singular noun of an item, for "3 workstreams". */
+  unit: string;
+}
+
+export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
+  blocked_workstreams: {
+    label: 'Blocked workstreams',
+    definition: 'Open workstreams whose status is Blocked, with the time since they entered it.',
+    unit: 'workstream',
+  },
+  needs_input: {
+    label: 'Waiting for input',
+    definition: 'Open input requests, by how long they have waited and who has to answer.',
+    unit: 'question',
+  },
+  stale_workstreams: {
+    label: 'Stale workstreams',
+    definition: 'In-flight workstreams (working, in review, blocked, needs input, ready to land) with no activity by a person or an agent for the stale threshold.',
+    unit: 'workstream',
+  },
+  stale_issues: {
+    label: 'Stale issues',
+    definition: 'Issues In Progress or In Review that were not updated for the stale threshold.',
+    unit: 'issue',
+  },
+  delivered_outcome_open: {
+    label: 'Delivered, outcome open',
+    definition: 'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
+    unit: 'workstream',
+  },
+  overdue_milestones: {
+    label: 'Overdue milestones',
+    definition: 'Milestones past their target date that still have open issues, in projects that are not completed or canceled.',
+    unit: 'milestone',
+  },
+  overdue_workstreams: {
+    label: 'Overdue workstreams',
+    definition: 'Open workstreams past their target date.',
+    unit: 'workstream',
+  },
+  scope_creep: {
+    label: 'Scope creep',
+    definition: 'Open workstreams that gained at least two issues after they started (first move out of Draft or Planned) inside the selected range.',
+    unit: 'workstream',
+  },
+  prs_stuck_in_review: {
+    label: 'PRs stuck in review',
+    definition: 'Open, non-draft pull requests without an approval and without an update for 3 days or more.',
+    unit: 'pull request',
+  },
+  ci_failing: {
+    label: 'CI failing',
+    definition: 'Open pull requests whose latest CI result is failing.',
+    unit: 'pull request',
+  },
+  undecided_decisions: {
+    label: 'Undecided decisions',
+    definition: 'Decisions that are Proposed and still wait for a person to accept or reject them.',
+    unit: 'decision',
+  },
+  customer_demand_waiting: {
+    label: 'Customer demand waiting',
+    definition: 'Issues and projects that customers asked for and that are still open, longest-waiting first.',
+    unit: 'request target',
+  },
+};
+
+export const INSIGHT_SIGNAL_IDS = Object.keys(INSIGHT_SIGNALS) as InsightSignalId[];
+
+export type InsightItemType = 'workstream' | 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
+
+/** One thing that causes a signal (or sits in a flow list). Enough to render a row and link to it. */
+export interface InsightItem {
+  type: InsightItemType;
+  id: ID;
+  /** Human key (AUTH-42, BUG-7, ADR-3) when the type has one. */
+  key?: string;
+  title: string;
+  /** Workstream the item belongs to, so the UI can link to the right page. */
+  workstreamKey?: string;
+  /** Project of a milestone or project item. */
+  projectId?: ID;
+  /** When the condition started. */
+  since?: ISODate;
+  /** Days since `since` (rounded to one decimal). */
+  ageDays?: number;
+  /** Who has to act, when that is known. */
+  waitingOn?: InsightActor;
+  /** Metric-specific number (customers asking, issues added, ...), see `detail`. */
+  value?: number;
+  /** One sentence that says why the item is in the list. */
+  detail: string;
+}
+
+export interface InsightActor {
+  type: 'user' | 'agent' | 'unassigned';
+  id?: ID;
+  name: string;
+}
+
+export type InsightSeverity = 'ok' | 'info' | 'warning' | 'critical';
+
+export interface InsightSignal {
+  id: InsightSignalId;
+  label: string;
+  definition: string;
+  unit: string;
+  /** `ok` when nothing is wrong. */
+  severity: InsightSeverity;
+  /** All matching items (before the item limit). */
+  count: number;
+  /** Age in days of the oldest item. */
+  oldestDays?: number;
+  /** The worst items first, at most the requested `limit`. */
+  items: InsightItem[];
+  truncated: boolean;
+}
+
+/** Who is the bottleneck: open questions, decisions and reviews waiting on one actor. */
+export interface InsightBottleneck {
+  actor: InsightActor;
+  inputRequests: number;
+  decisions: number;
+  reviews: number;
+  oldestDays: number;
+  /** Sum of waiting days over everything waiting on this actor. */
+  totalWaitDays: number;
+}
+
+export interface DurationStats {
+  count: number;
+  p50?: number;
+  p85?: number;
+  p95?: number;
+  mean?: number;
+  max?: number;
+}
+
+export interface HistogramBucket {
+  label: string;
+  /** Inclusive lower bound, days. */
+  from: number;
+  /** Exclusive upper bound, days. Omitted on the last bucket. */
+  to?: number;
+  count: number;
+}
+
+export interface FlowDuration {
+  stats: DurationStats;
+  /** Same measure over the period before, for comparison. */
+  previous?: DurationStats;
+  histogram: HistogramBucket[];
+  /** Slowest finished items in the range: what stretches the tail. */
+  slowest: InsightItem[];
+}
+
+export interface ThroughputBucket {
+  start: ISODate;
+  end: ISODate;
+  issuesDone: number;
+  workstreamsShipped: number;
+}
+
+export interface InsightWipRow {
+  actor: InsightActor;
+  /** Issues In Progress or In Review assigned to the person (people only). */
+  issues: number;
+  /** Open workstreams: accountable (people) or touched in the last 7 days (agents). */
+  workstreams: number;
+  overloaded: boolean;
+  items: InsightItem[];
+}
+
+export interface AgingItem extends InsightItem {
+  status: IssueStatus;
+  /** Days in progress. */
+  inProgressDays: number;
+  /** Older than the p85 cycle time of recent work. */
+  overBaseline: boolean;
+}
+
+export interface CumulativeFlow {
+  /** One ISO day per column, oldest first. */
+  days: ISODate[];
+  series: { status: IssueStatus; values: number[] }[];
+}
+
+export interface InsightFlow {
+  issueCycle: FlowDuration;
+  issueLead: FlowDuration;
+  workstreamLead: FlowDuration;
+  throughput: ThroughputBucket[];
+  previousThroughput: { issuesDone: number; workstreamsShipped: number };
+  wip: { people: InsightWipRow[]; agents: InsightWipRow[]; limits: { issues: number; workstreams: number } };
+  aging: { baselineDays?: number; baselineSamples: number; items: AgingItem[] };
+  cumulativeFlow?: CumulativeFlow;
+}
+
+export interface InsightContributor {
+  actor: InsightActor;
+  /** Events recorded by this actor in the range (everything they changed). */
+  events: number;
+  issuesDone: number;
+  comments: number;
+  pullRequests: number;
+  decisionsProposed: number;
+  inputRequestsRaised: number;
+  lastActiveAt?: ISODate;
+}
+
+export interface AgentFailureRow {
+  agent: InsightActor;
+  inputRequestsRaised: number;
+  inputRequestsOpen: number;
+  /** Median hours from raising a question to the answer. */
+  medianAnswerHours?: number;
+  pullRequests: number;
+  /** Closed without being merged. */
+  pullRequestsAbandoned: number;
+  pullRequestsCiFailing: number;
+  /** Issues this agent moved to Done that someone moved out of Done again. */
+  issuesReopened: number;
+}
+
+export interface InsightActors {
+  people: InsightContributor[];
+  agents: InsightContributor[];
+  /** Share of recorded events: people vs agents. */
+  share: { people: number; agents: number };
+  failures: AgentFailureRow[];
+}
+
+export interface InsightsReport {
+  generatedAt: ISODate;
+  range: { days: number; from: ISODate; to: ISODate };
+  scope: { teamId?: ID; projectId?: ID };
+  staleDays: number;
+  signals: InsightSignal[];
+  bottlenecks: InsightBottleneck[];
+  flow: InsightFlow;
+  actors: InsightActors;
+}
+
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
 export type ViewEntity = 'workstream' | 'issue' | 'decision' | 'project';
@@ -1337,7 +1646,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
   | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
-  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
+  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot' | 'insights'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
 
@@ -1365,6 +1674,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   graph: { label: 'Graph', group: 'Insight', actions: ['read'] },
   events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
   snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
+  insights: { label: 'Insights', group: 'Insight', actions: ['read'] },
   teams: { label: 'Teams', group: 'Organization', actions: RWD },
   repositories: { label: 'Repositories', group: 'Organization', actions: RWD },
   workspace: { label: 'Workspace & settings', group: 'Organization', actions: RWD },
@@ -1499,8 +1809,13 @@ export interface WorkspaceLabel {
   name: string;
   /** `#rrggbb`. */
   color: string;
-  /** Templates are always present and cannot be renamed or removed. */
+  /** Templates are always present and cannot be renamed, removed, merged away or archived. */
   template: boolean;
+  /**
+   * Archived labels stay on what already carries them but are no longer offered when assigning.
+   * Only ever `true`; an active label omits the field.
+   */
+  archived?: boolean;
 }
 
 /** Always available. Ids are stable so existing assignments survive a settings rewrite. */
@@ -1512,7 +1827,20 @@ export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
 ];
 
 /** Swatches offered when creating or recoloring a label. */
-export const LABEL_SWATCHES = ['#e11d48', '#f97316', '#eab308', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#64748b'] as const;
+export const LABEL_SWATCHES = [
+  '#e11d48',
+  '#f97316',
+  '#eab308',
+  '#84cc16',
+  '#16a34a',
+  '#14b8a6',
+  '#0891b2',
+  '#2563eb',
+  '#6366f1',
+  '#7c3aed',
+  '#db2777',
+  '#64748b',
+] as const;
 
 export const LABEL_NAME_MAX = 40;
 export const LABEL_ASSIGN_MAX = 20;
@@ -1533,9 +1861,22 @@ export function resolveLabelCatalog(stored?: readonly WorkspaceLabel[] | null): 
     if (!item || item.template || templateIds.has(item.id) || custom.some((label) => label.id === item.id)) continue;
     const name = typeof item.name === 'string' ? item.name.trim() : '';
     if (!name || name.length > LABEL_NAME_MAX || !LABEL_COLOR.test(item.color ?? '')) continue;
-    custom.push({ id: item.id, name, color: item.color, template: false });
+    custom.push(item.archived === true ? { id: item.id, name, color: item.color, template: false, archived: true } : { id: item.id, name, color: item.color, template: false });
   }
   return [...templates, ...custom];
+}
+
+/**
+ * The ids of one record after `from` is merged into `into` (or removed when `into` is null).
+ * Keeps the order, never lists an id twice.
+ */
+export function replaceLabelId(ids: readonly string[], from: string, into: string | null): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const next = id === from ? into : id;
+    if (next && !out.includes(next)) out.push(next);
+  }
+  return out;
 }
 
 /** Unique catalog ids, in order. Throws when an id is not in the catalog or the list is too long. */

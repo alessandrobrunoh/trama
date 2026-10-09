@@ -8,20 +8,35 @@
 use serde_json::{Map, Value, json};
 
 use crate::catalog::{Tool, load};
+use crate::composite::{self, Exec};
 use crate::generic;
+use crate::profile::{self, Entry, EntryKind, Profile};
 use crate::upstream::{ToolOutput, Upstream, Whoami};
 
 const SUPPORTED: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 const WHOAMI: &str = "whoami";
 const ACCOUNTS: &str = "list_accounts";
+const RUN_TOOL: &str = "run_tool";
+const LIST_CAPABILITIES: &str = "list_capabilities";
 /// Extra argument added to every tool when more than one key is connected. It is not an API field:
 /// it only chooses which connected key the call runs with.
 const WORKSPACE_ARG: &str = "workspace";
 
-const INSTRUCTIONS: &str = "Trama (coordination for human + AI engineering teams). \
-Items can be addressed by id (iss_…, wk_…) or by key (BUG-142, AUTH-42, ADR-21, team key AUTH). \
+const INSTRUCTIONS_COMMON: &str = "Trama (coordination for human + AI engineering teams). \
+Items can be addressed by id (in_…, wk_…) or by key (BUG-142, AUTH-42, ADR-21, team key AUTH). \
 Tools you are not permitted to use are hidden; writes are limited by per-key caps (HTTP 429 means stop and report, never retry in a loop). \
 In update_* tools, null clears an optional field. Start with `whoami` if unsure what this key can do.";
+
+const INSTRUCTIONS_CORE: &str = "This is the compact tool set: read with get_context before you act, find existing work with find_work or search, \
+start with start_work, record facts with report_progress / attach_artifact, ask a person with ask_human, propose lasting choices with record_decision. \
+For anything else (teams, projects, milestones, customers, members, webhooks…) call list_capabilities to find the operation, then run_tool to execute it; api_request covers routes without a tool.";
+
+fn instructions(profile: Profile) -> String {
+    match profile {
+        Profile::Core => format!("{INSTRUCTIONS_COMMON} {INSTRUCTIONS_CORE}"),
+        Profile::Full => INSTRUCTIONS_COMMON.to_string(),
+    }
+}
 
 const ONE_WORKSPACE: &str =
     "The API key you connected with is bound to one workspace, so no workspace argument is needed.";
@@ -39,6 +54,9 @@ pub struct Account {
 
 pub struct Server {
     tools: Vec<Tool>,
+    curated: Vec<Entry>,
+    /// The profile used when a request does not choose one.
+    profile: Profile,
     pub upstream: Upstream,
 }
 
@@ -62,15 +80,39 @@ fn tool_error(message: String) -> Value {
 }
 
 impl Server {
+    /// A server on the default profile (`core`).
     pub fn new(upstream: Upstream) -> Result<Self, String> {
+        let tools = load()?;
+        let curated = profile::load(&tools)?;
         Ok(Self {
-            tools: load()?,
+            tools,
+            curated,
+            profile: Profile::default(),
             upstream,
         })
     }
 
+    /// Chooses the profile used when a request does not name one.
+    pub fn with_profile(mut self, profile: Profile) -> Self {
+        self.profile = profile;
+        self
+    }
+
+    pub fn profile(&self) -> Profile {
+        self.profile
+    }
+
+    /// Size of the full catalog.
     pub fn tool_count(&self) -> usize {
         self.tools.len()
+    }
+
+    /// How many tools `profile` lists to a key that may use everything (`list_accounts` excluded).
+    pub fn listed_count(&self, profile: Profile) -> usize {
+        match profile {
+            Profile::Full => self.tools.len() + 2,
+            Profile::Core => profile::core_names(&self.curated).len(),
+        }
     }
 
     fn whoami_listing() -> Value {
@@ -91,31 +133,48 @@ impl Server {
         })
     }
 
-    /// The tools these keys may use. A tool is listed when at least one key has its permission.
-    /// With more than one key every tool also takes `workspace`, and `list_accounts` is added.
-    /// With exactly one key the schemas stay exactly as the catalog defines them.
+    /// The tools these keys may use, on the server's default profile. See `list_tools_for`.
+    #[cfg(test)]
     pub fn list_tools(&self, accounts: &[Account]) -> Vec<Value> {
+        self.list_tools_for(self.profile, accounts)
+    }
+
+    /// The tools these keys may use under `profile`. A tool is listed when at least one key has its
+    /// permission. With more than one key every tool also takes `workspace`, and `list_accounts` is
+    /// added. With exactly one key the schemas stay exactly as the catalog defines them.
+    pub fn list_tools_for(&self, profile: Profile, accounts: &[Account]) -> Vec<Value> {
         let multi = accounts.len() > 1;
+        let permissions: Vec<&std::collections::HashSet<String>> = accounts.iter().map(|a| &a.who.permissions).collect();
         let mut out = vec![Self::whoami_listing()];
         if multi {
             out.push(Self::accounts_listing());
         }
-        out.extend(
-            self.tools
-                .iter()
-                .filter(|t| {
-                    accounts
-                        .iter()
-                        .any(|a| a.who.permissions.contains(&t.permission))
-                })
-                .map(|t| with_workspace(t.listing(), multi)),
-        );
+        match profile {
+            Profile::Full => out.extend(
+                self.tools
+                    .iter()
+                    .filter(|t| accounts.iter().any(|a| a.who.permissions.contains(&t.permission)))
+                    .map(|t| with_workspace(t.listing(), multi)),
+            ),
+            Profile::Core => out.extend(
+                self.curated
+                    .iter()
+                    .filter(|e| e.visible(&self.tools, &permissions))
+                    .map(|e| with_workspace(e.listing(&self.tools), multi)),
+            ),
+        }
         out.push(with_workspace(generic::listing(), multi));
         out
     }
 
-    /// Handles one JSON-RPC message for the keys connected to this request. `None` = notification (no reply).
+    /// Handles one JSON-RPC message on the server's default profile.
     pub async fn handle(&self, accounts: &[Account], msg: Value) -> Option<Value> {
+        self.handle_with(self.profile, accounts, msg).await
+    }
+
+    /// Handles one JSON-RPC message for the keys connected to this request, listing the tools of
+    /// `profile`. `None` = notification (no reply).
+    pub async fn handle_with(&self, profile: Profile, accounts: &[Account], msg: Value) -> Option<Value> {
         let Some(method) = msg.get("method").and_then(Value::as_str) else {
             return msg
                 .get("id")
@@ -157,18 +216,18 @@ impl Server {
                         "protocolVersion": version,
                         "capabilities": { "tools": { "listChanged": false } },
                         "serverInfo": { "name": "trama-mcp", "title": "Trama", "version": env!("CARGO_PKG_VERSION") },
-                        "instructions": format!("{INSTRUCTIONS} {note}{where_}"),
+                        "instructions": format!("{} {note}{where_}", instructions(profile)),
                     }),
                 )
             }
             "ping" => rpc_result(id, json!({})),
-            "tools/list" => rpc_result(id, json!({ "tools": self.list_tools(accounts) })),
+            "tools/list" => rpc_result(id, json!({ "tools": self.list_tools_for(profile, accounts) })),
             "tools/call" => {
                 let Some(name) = params.get("name").and_then(Value::as_str) else {
                     return Some(rpc_error(id, -32602, "tools/call needs a tool name"));
                 };
                 let args = params.get("arguments").cloned().unwrap_or(Value::Null);
-                match self.call_tool(accounts, name, &args).await {
+                match self.call_tool(profile, accounts, name, &args).await {
                     Some(result) => rpc_result(id, result),
                     None => rpc_error(id, -32602, &format!("Unknown tool: {name}")),
                 }
@@ -178,7 +237,7 @@ impl Server {
     }
 
     /// `None` = no such tool.
-    async fn call_tool(&self, accounts: &[Account], name: &str, args: &Value) -> Option<Value> {
+    async fn call_tool(&self, profile: Profile, accounts: &[Account], name: &str, args: &Value) -> Option<Value> {
         if name == WHOAMI {
             return Some(tool_result(ToolOutput {
                 text: whoami_text(accounts).to_string(),
@@ -201,9 +260,37 @@ impl Server {
             Ok(v) => v,
             Err(e) => return Some(tool_error(e)),
         };
-        let known = name == generic::NAME || self.tools.iter().any(|t| t.name == name);
-        if !known {
-            return None;
+        // `run_tool` runs a catalog tool by name, whatever the profile lists.
+        let (name, args, via_run_tool) = if name == RUN_TOOL {
+            match unwrap_run_tool(&args) {
+                Ok((inner, inner_args)) => (inner, inner_args, true),
+                Err(e) => return Some(tool_error(e)),
+            }
+        } else {
+            (name.to_string(), args, false)
+        };
+        let name = name.as_str();
+        if name == LIST_CAPABILITIES && !via_run_tool {
+            let mut permissions = std::collections::HashSet::new();
+            for a in &targets {
+                permissions.extend(a.who.permissions.iter().cloned());
+            }
+            return Some(match profile::capabilities(&self.tools, &self.curated, profile, &permissions, &args) {
+                Ok(v) => tool_result(ToolOutput { text: self.upstream.clip(v.to_string()), is_error: false }),
+                Err(e) => tool_error(e),
+            });
+        }
+        let Some(target) = self.find_target(profile, name, via_run_tool) else {
+            return if via_run_tool {
+                Some(tool_error(format!(
+                    "Unknown tool '{name}'. Use list_capabilities (q or group) to find the exact name; routes without a tool go through api_request."
+                )))
+            } else {
+                None
+            };
+        };
+        if let Target::Composite(entry) = target {
+            return Some(tool_result(self.call_composite(entry, &args, &targets).await));
         }
         let call = if name == generic::NAME {
             generic::build_call(&args)
@@ -254,6 +341,96 @@ impl Server {
         Some(tool_result(self.call_across(name, &call, &targets).await))
     }
 
+    /// What a tool name means under `profile`. The curated profile prefers its task-level tool when
+    /// a catalog tool has the same name (`create_issue`); the full profile prefers the catalog. Tools
+    /// that a profile does not list stay callable by name, so older prompts and skills keep working.
+    fn find_target(&self, profile: Profile, name: &str, via_run_tool: bool) -> Option<Target<'_>> {
+        if name == generic::NAME {
+            return (!via_run_tool).then_some(Target::Generic);
+        }
+        let catalog = self.tools.iter().any(|t| t.name == name);
+        if via_run_tool {
+            return catalog.then_some(Target::Catalog);
+        }
+        let composite = self
+            .curated
+            .iter()
+            .find(|e| e.kind == EntryKind::Composite && !e.local && e.name == name);
+        match (profile, catalog, composite) {
+            (Profile::Core, _, Some(e)) => Some(Target::Composite(e)),
+            (_, true, _) => Some(Target::Catalog),
+            (_, false, Some(e)) => Some(Target::Composite(e)),
+            _ => None,
+        }
+    }
+
+    /// Runs a task-level tool. It acts in exactly one workspace unless it only reads.
+    async fn call_composite(&self, entry: &Entry, args: &Value, targets: &[&Account]) -> ToolOutput {
+        let Some(schema) = entry.input_schema.as_ref() else {
+            return ToolOutput { text: "tool has no schema".into(), is_error: true };
+        };
+        let args = match composite::normalize(schema, args) {
+            Ok(v) => v,
+            Err(e) => return ToolOutput { text: format!("Invalid arguments: {e}"), is_error: true },
+        };
+        if !entry.read_only && targets.len() > 1 {
+            let slugs: Vec<&str> = targets.iter().map(|a| a.who.slug.as_str()).collect();
+            return ToolOutput {
+                text: format!(
+                    "this changes data, so it needs exactly one workspace (it matched {}). Pass `workspace` with one slug.",
+                    slugs.join(", ")
+                ),
+                is_error: true,
+            };
+        }
+        let mut rows: Vec<Value> = vec![];
+        let mut errors: Vec<Value> = vec![];
+        for account in targets {
+            if !entry.visible(&self.tools, &[&account.who.permissions]) {
+                let needs = if entry.visible_if.is_empty() { "the permissions of its steps".to_string() } else { format!("one of {}", entry.visible_if.join(", ")) };
+                let text = format!(
+                    "The key for '{}' cannot use {}: it needs {needs}. Ask a workspace admin to grant it in Settings → API tokens.",
+                    account.who.slug, entry.name
+                );
+                if targets.len() == 1 {
+                    return ToolOutput { text, is_error: true };
+                }
+                errors.push(json!({ "workspace": account.who.slug, "error": text }));
+                continue;
+            }
+            tracing::info!(tool = %entry.name, workspace = %account.who.slug, "composite call");
+            let out = self.run_composite(entry, &args, account).await;
+            if targets.len() == 1 {
+                return out;
+            }
+            if out.is_error {
+                errors.push(json!({ "workspace": account.who.slug, "error": out.text }));
+                continue;
+            }
+            match serde_json::from_str::<Value>(&out.text) {
+                Ok(Value::Array(items)) => rows.extend(items.into_iter().map(|item| stamp(item, &account.who.slug))),
+                Ok(other) => rows.push(stamp(other, &account.who.slug)),
+                Err(_) => rows.push(json!({ "workspace": account.who.slug, "result": out.text })),
+            }
+        }
+        merge(rows, errors)
+    }
+
+    async fn run_composite(&self, entry: &Entry, args: &Value, account: &Account) -> ToolOutput {
+        let exec = Exec { upstream: &self.upstream, tools: &self.tools, account, uses: &entry.uses };
+        match composite::run(&entry.name, args, &exec).await {
+            Some(Ok(done)) => {
+                let text = match &done.value {
+                    Value::String(s) => s.clone(),
+                    other => other.to_string(),
+                };
+                ToolOutput { text: self.upstream.clip(text), is_error: done.failed }
+            }
+            Some(Err(message)) => ToolOutput { text: message, is_error: true },
+            None => ToolOutput { text: format!("{} has no implementation", entry.name), is_error: true },
+        }
+    }
+
     /// One read per connected workspace, merged. A workspace that fails is reported, not fatal, as
     /// long as another one answered.
     async fn call_across(
@@ -288,22 +465,57 @@ impl Server {
                 Err(_) => rows.push(json!({ "workspace": account.who.slug, "result": out.text })),
             }
         }
-        if rows.is_empty() {
-            return ToolOutput {
-                text: format!("every workspace failed: {errors:?}"),
-                is_error: true,
-            };
-        }
-        let merged = if errors.is_empty() {
-            Value::Array(rows)
-        } else {
-            json!({ "results": rows, "errors": errors })
-        };
-        ToolOutput {
-            text: merged.to_string(),
-            is_error: false,
-        }
+        merge(rows, errors)
     }
+}
+
+/// Rows from several workspaces, plus the workspaces that failed. All failed = an error.
+fn merge(rows: Vec<Value>, errors: Vec<Value>) -> ToolOutput {
+    // Nothing found everywhere is an answer; only failures everywhere are an error.
+    if rows.is_empty() && !errors.is_empty() {
+        return ToolOutput {
+            text: format!("every workspace failed: {errors:?}"),
+            is_error: true,
+        };
+    }
+    let merged = if errors.is_empty() {
+        Value::Array(rows)
+    } else {
+        json!({ "results": rows, "errors": errors })
+    };
+    ToolOutput {
+        text: merged.to_string(),
+        is_error: false,
+    }
+}
+
+enum Target<'a> {
+    Generic,
+    Catalog,
+    Composite(&'a Entry),
+}
+
+/// `run_tool { name, arguments }` -> the catalog tool to run and its arguments.
+fn unwrap_run_tool(args: &Value) -> Result<(String, Value), String> {
+    let obj = args.as_object().ok_or("arguments must be an object")?;
+    if let Some(k) = obj.keys().find(|k| !matches!(k.as_str(), "name" | "arguments")) {
+        return Err(format!("Invalid arguments: unknown argument '{k}'"));
+    }
+    let name = obj
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .ok_or("Invalid arguments: missing required argument 'name'")?;
+    if name == RUN_TOOL {
+        return Err("run_tool cannot run itself".into());
+    }
+    let inner = match obj.get("arguments") {
+        None | Some(Value::Null) => json!({}),
+        Some(v @ Value::Object(_)) => v.clone(),
+        Some(_) => return Err("Invalid arguments: arguments must be an object".into()),
+    };
+    Ok((name.to_string(), inner))
 }
 
 /// Adds the `workspace` argument to a tool listing, only when more than one key is connected.
@@ -455,8 +667,13 @@ mod tests {
 
     use super::*;
 
+    /// The full catalog profile, which the tests below were written for.
     fn server() -> Server {
-        // The upstream is never reached in these tests.
+        core_server().with_profile(Profile::Full)
+    }
+
+    /// The default (curated) profile. The upstream is never reached in these tests.
+    fn core_server() -> Server {
         Server::new(Upstream::new("http://127.0.0.1:1", Duration::from_secs(1), 1000).unwrap())
             .unwrap()
     }
@@ -694,5 +911,110 @@ mod tests {
         assert_eq!(select(&accounts, Some("work-acme")).unwrap()[0].key, "a");
         assert_eq!(select(&accounts, Some("acme,beta")).unwrap().len(), 2);
         assert!(select(&accounts, Some("nope")).is_err());
+    }
+
+    fn everything() -> Whoami {
+        let perms: Vec<String> = load().unwrap().into_iter().map(|t| t.permission).collect();
+        let refs: Vec<&str> = perms.iter().map(String::as_str).collect();
+        who(&refs)
+    }
+
+    #[test]
+    fn the_default_profile_is_core_and_is_short() {
+        let s = core_server();
+        assert_eq!(s.profile(), Profile::Core);
+        let accounts = one("k", everything());
+        let tools = s.list_tools(&accounts);
+        let n = names(&tools);
+        assert!((15..=25).contains(&n.len()), "{} tools: {n:?}", n.len());
+        assert_eq!(n.first().map(String::as_str), Some("whoami"));
+        assert_eq!(n.last().map(String::as_str), Some("api_request"));
+        for must in ["get_context", "find_work", "start_work", "report_progress", "ask_human", "record_decision", "list_capabilities", "run_tool"] {
+            assert!(n.contains(&must.to_string()), "{must}");
+        }
+        assert!(!n.contains(&"list_teams".to_string()) && !n.contains(&"create_milestone".to_string()));
+        assert_eq!(n.len(), s.listed_count(Profile::Core));
+    }
+
+    #[test]
+    fn full_lists_the_whole_catalog_and_core_a_fraction() {
+        let s = core_server();
+        let accounts = one("k", everything());
+        let full = s.list_tools_for(Profile::Full, &accounts);
+        let core = s.list_tools_for(Profile::Core, &accounts);
+        assert_eq!(full.len(), s.tool_count() + 2, "catalog + whoami + api_request");
+        assert_eq!(full.len(), s.listed_count(Profile::Full));
+        let bytes = |v: &[Value]| v.iter().map(|t| t.to_string().len()).sum::<usize>();
+        assert!(bytes(&core) * 2 < bytes(&full), "core {} vs full {} bytes", bytes(&core), bytes(&full));
+        assert!(!names(&full).contains(&"get_context".to_string()), "full is the plain catalog");
+    }
+
+    #[test]
+    fn the_core_profile_hides_tools_the_key_cannot_use() {
+        let s = core_server();
+        let n = names(&s.list_tools(&one("k", who(&["issues:read", "search:read"]))));
+        assert!(n.contains(&"get_context".to_string()) && n.contains(&"find_work".to_string()) && n.contains(&"search".to_string()));
+        assert!(!n.contains(&"create_issue".to_string()) && !n.contains(&"update_issue".to_string()) && !n.contains(&"ask_human".to_string()));
+        assert_eq!(names(&s.list_tools(&one("k", who(&[])))), vec!["whoami", "list_capabilities", "run_tool", "api_request"]);
+    }
+
+    #[test]
+    fn several_keys_add_the_workspace_argument_to_core_tools_too() {
+        let s = core_server();
+        let accounts = vec![
+            Account { key: "a".into(), profile: String::new(), who: everything() },
+            Account { key: "b".into(), profile: String::new(), who: who_in("beta", &["issues:read"]) },
+        ];
+        let tools = s.list_tools(&accounts);
+        assert!(names(&tools).contains(&"list_accounts".to_string()));
+        for t in tools.iter().filter(|t| t["name"] != "whoami" && t["name"] != "list_accounts") {
+            assert!(t["inputSchema"]["properties"].get("workspace").is_some(), "{}", t["name"]);
+        }
+    }
+
+    #[tokio::test]
+    async fn the_request_profile_decides_what_tools_list() {
+        let s = core_server();
+        let accounts = one("k", everything());
+        let list = |profile: Profile| {
+            let s = &s;
+            let accounts = &accounts;
+            async move {
+                let r = s.handle_with(profile, accounts, json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).await.unwrap();
+                names(r["result"]["tools"].as_array().unwrap())
+            }
+        };
+        assert!(list(Profile::Core).await.contains(&"start_work".to_string()));
+        assert!(list(Profile::Full).await.contains(&"list_teams".to_string()));
+        // `handle` uses the server default, which can be switched
+        let full_default = core_server().with_profile(Profile::Full);
+        let r = full_default.handle(&accounts, json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" })).await.unwrap();
+        assert!(names(r["result"]["tools"].as_array().unwrap()).contains(&"list_teams".to_string()));
+    }
+
+    #[tokio::test]
+    async fn instructions_describe_the_profile_in_use() {
+        let s = core_server();
+        let accounts = one("k", who(&[]));
+        let init = |profile: Profile| {
+            let s = &s;
+            let accounts = &accounts;
+            async move {
+                let r = s.handle_with(profile, accounts, json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {} })).await.unwrap();
+                r["result"]["instructions"].as_str().unwrap().to_string()
+            }
+        };
+        let core = init(Profile::Core).await;
+        assert!(core.contains("list_capabilities") && core.contains("run_tool") && core.contains("Acme"));
+        let full = init(Profile::Full).await;
+        assert!(!full.contains("list_capabilities") && full.contains("Acme"));
+    }
+
+    #[test]
+    fn the_curated_names_never_shadow_the_protocol_tools() {
+        let s = core_server();
+        for e in &s.curated {
+            assert!(!["whoami", "list_accounts", "api_request"].contains(&e.name.as_str()), "{}", e.name);
+        }
     }
 }
