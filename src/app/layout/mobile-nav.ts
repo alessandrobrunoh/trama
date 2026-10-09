@@ -15,7 +15,7 @@ import {
 } from '@lucide/angular';
 import { AssistantStore } from '../core/ai/assistant.store';
 import { NablaStore } from '../core/stores/nabla.store';
-import { MAIN_NAV, PERSONAL_NAV } from './nav';
+import { MAIN_NAV, PERSONAL_NAV, type NavItem } from './nav';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
 
@@ -85,6 +85,9 @@ import { SessionStore } from '../core/session/session.store';
         >
           <svg [lucideIcon]="item.icon" [size]="22" aria-hidden="true"></svg>
           <span class="sr-only">{{ item.label }}</span>
+          @if (item.badge === 'attention' && store.attentionCount() > 0) {
+            <span class="mobile-nav__badge" aria-hidden="true">{{ store.attentionCount() > 99 ? '99+' : store.attentionCount() }}</span>
+          }
         </a>
       }
       <button
@@ -120,13 +123,14 @@ export class MobileNav {
   protected readonly assistant = inject(AssistantStore);
   protected readonly ui = inject(UiStore);
   protected readonly session = inject(SessionStore);
-  protected readonly items = [
+  protected readonly items: Pick<NavItem, 'segment' | 'label' | 'icon' | 'badge'>[] = [
     PERSONAL_NAV[0],
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
     { segment: 'activity', label: 'Activity', icon: LucideActivity },
     { segment: 'projects', label: 'Projects', icon: LucideBox },
   ];
-  protected readonly slug = inject(NablaStore).slug;
+  protected readonly store = inject(NablaStore);
+  protected readonly slug = this.store.slug;
   protected readonly assistantIcon = LucideMessageSquare;
   protected readonly menuIcon = LucideMenu;
   protected readonly closeIcon = LucideX;

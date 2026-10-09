@@ -366,7 +366,7 @@ import { MAIN_NAV, PERSONAL_NAV, orderNav, type NavItem } from './nav';
     </div>
 
     <!-- footer: user menu + help -->
-    <div hlmSidebarFooter class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
+    <div hlmSidebarFooter class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
       <button
         type="button"
         class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"

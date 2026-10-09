@@ -173,6 +173,27 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+.mobile-nav__link {
+  position: relative;
+}
+
+.mobile-nav__badge {
+  position: absolute;
+  inset-block-start: 0.125rem;
+  inset-inline-end: 0.0625rem;
+  min-inline-size: 1.0625rem;
+  padding-inline: 0.3125rem;
+  border-radius: 999px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 0 0 2px var(--popover);
+  font-size: 0.625rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.0625rem;
+  text-align: center;
+}
+
 .mobile-nav__link--active {
   background: color-mix(in oklab, var(--foreground) 8%, var(--popover));
   color: var(--foreground);
