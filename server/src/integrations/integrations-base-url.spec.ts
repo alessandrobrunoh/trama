@@ -47,3 +47,17 @@ describe('IntegrationsService.update base URL change', () => {
     expect(row.baseUrl).toBe('https://ghe.example.org');
   });
 });
+
+describe('IntegrationsService base URL SSRF guard', () => {
+  it.each(['http://169.254.169.254', 'http://127.0.0.1:8080', 'http://localhost', 'https://10.0.0.5/gitlab', 'http://[::1]'])(
+    'rejects %s with a 400 before contacting it',
+    async (baseUrl) => {
+      const { service, http } = setup();
+      await expect(service.update('w1', 'ic_1', { baseUrl, token: 'fresh' }, 'http://x')).rejects.toThrow(/Invalid baseUrl: .*not allowed/);
+      await expect(service.create('w1', { type: 'user', id: 'u' } as never, { provider: 'gitlab', token: 't', baseUrl }, 'http://x')).rejects.toBeInstanceOf(
+        BadRequestException,
+      );
+      expect(http.request).not.toHaveBeenCalled();
+    },
+  );
+});

@@ -2,10 +2,10 @@ import { BadRequestException, Body, ConflictException, Controller, Delete, Get, 
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
+import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { OptionalNotNull } from '../common/validation.js';
 import { EventsService } from '../events/events.service.js';
 import { MAX_WEBHOOKS_PER_WORKSPACE, OutgoingWebhooksService } from './outgoing-webhooks.service.js';
-import { webhookUrlProblem } from './url-policy.js';
 
 const EVENT_PATTERN = /^(\*|[a-z_]+\.(\*|[a-z_]+))$/;
 const EVENT_MESSAGE = 'events must be "*", "<entity>.*" or an event type like "issue.created"';
@@ -28,8 +28,8 @@ class DeliveriesQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(50) limit?: number;
 }
 
-function assertUrl(url: string): void {
-  const problem = webhookUrlProblem(url);
+async function assertUrl(url: string): Promise<void> {
+  const problem = await outboundUrlProblem(url);
   if (problem) throw new BadRequestException(problem);
 }
 
@@ -52,7 +52,7 @@ export class OutgoingWebhooksController {
 
   @Post()
   async create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateWebhookDto) {
-    assertUrl(dto.url);
+    await assertUrl(dto.url);
     if ((await this.service.list(ctx.workspace.id)).length >= MAX_WEBHOOKS_PER_WORKSPACE)
       throw new ConflictException(`A workspace can have at most ${MAX_WEBHOOKS_PER_WORKSPACE} outgoing webhooks`);
     const res = await this.service.create(ctx.workspace.id, dto);
@@ -67,7 +67,7 @@ export class OutgoingWebhooksController {
 
   @Patch(':id')
   async update(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: UpdateWebhookDto) {
-    if (dto.url !== undefined) assertUrl(dto.url);
+    if (dto.url !== undefined) await assertUrl(dto.url);
     const row = await this.service.update(ctx.workspace.id, id, dto);
     this.events.publish(ctx.workspace.id, { type: 'updated', entity: 'webhook', id });
     return row;

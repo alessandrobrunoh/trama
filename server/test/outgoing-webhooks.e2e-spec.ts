@@ -73,6 +73,8 @@ describe('outgoing webhooks (custom integrations)', () => {
     await member.post(w, { name: 'x', url: 'https://a.example.com', events: ['*'] }).expect(403);
     await owner.post(w, { name: 'x', url: 'ftp://a.example.com', events: ['*'] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://u:p@a.example.com', events: ['*'] }).expect(400);
+    await owner.post(w, { name: 'x', url: 'http://169.254.169.254/latest/meta-data', events: ['*'] }).expect(400);
+    await owner.post(w, { name: 'x', url: 'http://localhost:3000/hook', events: ['*'] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://a.example.com', events: [] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://a.example.com', events: ['Issue Created'] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://a.example.com', events: ['issue.created', 'team.*', '*'] }).expect(201);

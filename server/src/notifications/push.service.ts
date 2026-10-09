@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import webpush from 'web-push';
+import { createSafeHttpsAgent, outboundPolicyFromEnv, outboundUrlProblem } from '../common/safe-fetch.js';
 import { uid } from '../common/util.js';
 import { PushSubscriptionEntity } from '../database/entities/index.js';
 
@@ -22,6 +23,13 @@ export interface PushSubscriptionInput {
 }
 
 const TTL_SECONDS = 24 * 60 * 60;
+const SEND_TIMEOUT_MS = 10_000;
+
+/** Why a push endpoint must not be stored or contacted (SSRF guard: https, no internal addresses), or null. */
+export async function pushEndpointProblem(endpoint: string): Promise<string | null> {
+  const problem = await outboundUrlProblem(endpoint, { policy: { ...outboundPolicyFromEnv(), requireHttps: true } });
+  return problem ?? (new URL(endpoint).protocol === 'https:' ? null : 'url must use https://');
+}
 
 /**
  * Angular's service worker (ngsw-worker.js) shows a `push` payload shaped `{ notification: {…} }` and,
@@ -48,6 +56,8 @@ export function pushPayload(message: PushMessage): string {
 export class PushService {
   private readonly log = new Logger(PushService.name);
   private readonly publicKey: string | null;
+  /** Connects only to vetted public addresses; a stored endpoint may have started pointing inward since it was saved. */
+  private readonly agent = createSafeHttpsAgent();
 
   constructor(private readonly ds: DataSource) {
     const pub = process.env.VAPID_PUBLIC_KEY?.trim();
@@ -81,6 +91,8 @@ export class PushService {
 
   /** Idempotent per endpoint; a device that moves to another account is re-pointed to it. */
   async subscribe(userId: string, input: PushSubscriptionInput) {
+    const problem = await pushEndpointProblem(input.endpoint);
+    if (problem) throw new BadRequestException(`Invalid push endpoint: ${problem}`);
     const repo = this.ds.getRepository(PushSubscriptionEntity);
     const existing = await repo.findOneBy({ endpoint: input.endpoint });
     const row = existing ?? repo.create({ id: uid('psh'), endpoint: input.endpoint, createdAt: new Date() });
@@ -106,10 +118,13 @@ export class PushService {
     await Promise.all(
       subs.map(async (sub) => {
         try {
+          const problem = await pushEndpointProblem(sub.endpoint);
+          if (problem) throw new Error(problem);
           await webpush.sendNotification(
-            { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
+            // the normalized href, so numeric host spellings (0x7f.1) reach the guard as the address they are
+            { endpoint: new URL(sub.endpoint).href, keys: { p256dh: sub.p256dh, auth: sub.auth } },
             payload,
-            { TTL: TTL_SECONDS, urgency: 'normal' },
+            { TTL: TTL_SECONDS, urgency: 'normal', timeout: SEND_TIMEOUT_MS, agent: this.agent },
           );
           delivered++;
         } catch (e) {

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import type { Repository } from 'typeorm';
 import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
+import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { notFound, uid } from '../common/util.js';
 import { IntegrationConnectionEntity, RepositoryEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -101,16 +102,23 @@ export class IntegrationsService {
     }
   }
 
-  private baseUrlOf(provider: ConnectionProvider, raw?: string | null): string | null {
+  /** Normalizes the base URL and refuses ones that point at internal addresses (SSRF), with a 400. */
+  private async baseUrlOf(provider: ConnectionProvider, raw?: string | null): Promise<string | null> {
+    let normalized: string | null;
     try {
       const url = normalizeBaseUrl(raw);
       if (provider === 'delta' && !url) throw new Error('baseUrl is required for Delta');
       if (provider !== 'delta' && url && !GIT_PROVIDER_META[provider].selfHosted)
         throw new Error(`${label(provider)} has no custom base URL`);
-      return url;
+      normalized = url;
     } catch (e) {
       throw new BadRequestException(`Invalid baseUrl: ${(e as Error).message}`);
     }
+    if (normalized) {
+      const problem = await outboundUrlProblem(normalized);
+      if (problem) throw new BadRequestException(`Invalid baseUrl: ${problem}`);
+    }
+    return normalized;
   }
 
   async create(
@@ -119,7 +127,7 @@ export class IntegrationsService {
     input: { provider: ConnectionProvider; token: string; baseUrl?: string },
     origin: string,
   ) {
-    const baseUrl = this.baseUrlOf(input.provider, input.baseUrl);
+    const baseUrl = await this.baseUrlOf(input.provider, input.baseUrl);
     const id = uid('ic');
     let account: string;
     if (input.provider === 'delta') account = new URL(baseUrl!).host; // stub: no validation call yet
@@ -170,7 +178,7 @@ export class IntegrationsService {
   ) {
     const row = await this.getRow(workspaceId, id);
     if (patch.baseUrl !== undefined) {
-      const base = this.baseUrlOf(row.provider, patch.baseUrl);
+      const base = await this.baseUrlOf(row.provider, patch.baseUrl);
       const next = row.provider !== 'delta' && !base ? null : base;
       // The stored token would be sent to the new host to validate it: never without the owner supplying it again.
       if (row.provider !== 'delta' && next !== (row.baseUrl ?? null) && patch.token === undefined)
