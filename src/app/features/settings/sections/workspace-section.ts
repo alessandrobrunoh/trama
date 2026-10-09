@@ -138,7 +138,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
     </form>
 
     <app-settings-group title="Features" description="Optional parts of Trama. Turn off what your team does not use.">
-      <app-settings-row label="Delta threads" description="Link each workstream to the Delta thread where the work happens, and show it on workstreams, the timeline and the graph. When off, the link is hidden and no longer required to create a workstream. Existing links are kept.">
+      <app-settings-row label="Delta threads" description="Link each workstream to the Delta thread where the work happens, and show it on workstreams, the timeline and the graph. When off, the link is hidden. The link is always optional when creating a workstream. Existing links are kept.">
         <span class="flex items-center gap-3">
           <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
             <app-provider-icon provider="delta" [size]="11" /> Recommended

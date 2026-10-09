@@ -71,7 +71,7 @@ class UpdateCriterionDto {
 export class CreateWorkstreamDto {
   @IsString() @MinLength(1) @MaxLength(200) title: string;
   @IsString() ownerTeamId: string;
-  /** Required unless the workstream is a draft or the workspace turned Delta threads off (checked in the service). */
+  /** Optional: a workstream can exist before its Delta thread. When supplied it must be an https link on delta.dev (checked in the service). */
   @IsOptional() @IsString() @MaxLength(500) deltaThreadUrl?: string;
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @IsString() @MaxLength(20000) objective?: string;
