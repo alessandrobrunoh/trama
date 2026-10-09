@@ -574,7 +574,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
  * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
 export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
-export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
+export type IssueSource = 'manual' | 'github' | 'gitlab' | 'linear' | 'email' | 'api' | 'agent';
 
 /**
  * A unit of demand: one bug, request, incident, or task.
@@ -624,6 +624,8 @@ export interface Issue {
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
+  /** The issue this one was imported from or is linked to in an external tracker (read-only mirror of its status). */
+  externalRef?: ExternalRef;
   /**
    * Distinct customers linked to this issue. Set on issue reads and in the snapshot.
    * `0` when nobody is linked. Not stored on the issue row.
@@ -1043,6 +1045,8 @@ export interface Artifact {
   provider: ArtifactProvider;
   title: string;
   url?: string;
+  /** Set on a `document` artifact that points to a Trama document (`Document.id`); its title follows the document. */
+  documentId?: ID;
   /** e.g. "#182", a commit sha, "ADR-021", "staging/auth-2026-10-07". */
   externalId?: string;
   state: ArtifactState;
@@ -1057,6 +1061,81 @@ export interface Artifact {
   authorRef?: ActorRef;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+// ───────────────────────────── Documents ─────────────────────────────
+
+/** Hard limits of a document (also enforced by the API). */
+export const DOCUMENT_LIMITS = {
+  titleMax: 200,
+  /** Markdown characters. Also bounded by the 2 MB JSON body limit. */
+  bodyMax: 150_000,
+  /** Revisions kept per document; the oldest are dropped. */
+  revisionsKept: 50,
+  /** Edits by the same person within this window update the newest revision instead of adding one. */
+  revisionWindowMs: 5 * 60 * 1000,
+} as const;
+
+/**
+ * A page of markdown that lives in Trama (specs, plans, notes that are not in a repository). It belongs to the
+ * workspace; it is linked to projects, workstreams and issues by `document` artifacts (`links`), so it shows up
+ * in their Artifacts and there is no second "parent" to keep in sync. Edits are optimistic: every change names the
+ * `version` it was based on and a stale write is refused with 409.
+ */
+export interface Document {
+  id: ID;
+  workspaceId: ID;
+  title: string;
+  /** Markdown source. Only returned by the single-document endpoints. */
+  body: string;
+  /** One emoji or a Lucide icon name. */
+  icon?: string;
+  /** Starts at 1 and grows by one on every change to the title, body or icon. */
+  version: number;
+  author: ActorRef;
+  lastEditor: ActorRef;
+  /** Set while the document is archived (hidden from lists, still readable and restorable). */
+  archivedAt?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** The projects / workstreams / issues the document is attached to. Set on single reads. */
+  links?: DocumentLink[];
+}
+
+/** One attachment of a document: the `document` artifact and its owner. */
+export interface DocumentLink {
+  artifactId: ID;
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+
+/** A document as listed: no body, but the start of it (and, for a search, the matching passage). */
+export type DocumentSummary = Omit<Document, 'body'> & {
+  excerpt: string;
+  /** Search only: passage around the match with `<mark>` around the terms (HTML-escaped otherwise). */
+  snippet?: string;
+};
+
+/** An earlier state of a document. The newest revision is the current state. */
+export interface DocumentRevision {
+  id: ID;
+  documentId: ID;
+  /** The document version this revision holds (the last one it covers when saves were merged). */
+  version: number;
+  title: string;
+  /** Left out of lists. */
+  body?: string;
+  editor: ActorRef;
+  createdAt: ISODate;
+}
+
+/** Body of a 409 on a stale write: the version in the database, so the client can merge or reload. */
+export interface DocumentConflict {
+  statusCode: 409;
+  code: 'document_conflict';
+  message: string;
+  current: Document;
 }
 
 // ───────────────────────────── Decisions ─────────────────────────────
@@ -1115,7 +1194,9 @@ export type SubjectType =
   | 'team'
   | 'project'
   | 'project_update'
-  | 'milestone';
+  | 'milestone'
+  | 'import'
+  | 'document';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -1646,7 +1727,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts' | 'documents'
   | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot' | 'insights'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
@@ -1667,6 +1748,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
+  documents: { label: 'Documents', group: 'Work', actions: RWD },
   dependencies: { label: 'Dependencies', group: 'Work', actions: RWD },
   'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
   views: { label: 'Views', group: 'Work', actions: RWD },
@@ -1692,7 +1774,7 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOUR
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'documents', 'dependencies', 'input-requests', 'views', 'attention'];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
 export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
@@ -2031,10 +2113,12 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
+  { entity: 'document', label: 'Documents', events: ['document.created', 'document.updated', 'document.archived', 'document.restored', 'document.deleted'] },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
   { entity: 'dependency', label: 'Dependencies', events: ['dependency.added', 'dependency.removed'] },
   { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
   { entity: 'repository', label: 'Repositories', events: ['repository.created', 'repository.updated', 'repository.deleted'] },
+  { entity: 'import', label: 'Imports', events: ['import.started', 'import.completed', 'import.failed', 'import.canceled'] },
 ];
 
 /** Does a webhook subscription pattern (`*`, `issue.*`, `issue.created`) match an event type? */
@@ -2092,4 +2176,190 @@ export interface LiveEvent {
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;
   at: ISODate;
+}
+
+// ───────────────────────────── External trackers: import and link ─────────────────────────────
+
+/** Trackers Trama can import from or link to. Trama stays usable next to them: nothing is written back. */
+export type ExternalProvider = 'github' | 'linear';
+export const EXTERNAL_PROVIDERS: ExternalProvider[] = ['github', 'linear'];
+export const EXTERNAL_PROVIDER_META: Record<ExternalProvider, { label: string }> = {
+  github: { label: 'GitHub Issues' },
+  linear: { label: 'Linear' },
+};
+
+/** The external status, normalized so a badge can colour it without knowing the tracker. */
+export type ExternalStateType = 'open' | 'in_progress' | 'done' | 'canceled';
+
+/**
+ * Pointer from a Trama issue to an issue in another tracker. Unique per workspace: one external issue
+ * is one Trama issue, which is what makes an import idempotent. `state` and `syncedAt` are a read-only
+ * mirror refreshed on demand; they never change the Trama status.
+ */
+export interface ExternalRef {
+  provider: ExternalProvider;
+  /** Stable id in the tracker: `owner/repo#12` (lower-case) for GitHub, the issue uuid for Linear. */
+  id: string;
+  url: string;
+  /** What people call it: `#12` or `ENG-123`. */
+  key?: string;
+  /** The tracker's own state name (`open`, `In Progress`). */
+  state?: string;
+  stateType?: ExternalStateType;
+  /** Last time `state` was read from the tracker. */
+  syncedAt?: ISODate;
+  /** `import` when Trama created the issue from it, `link` when a person attached it. */
+  origin: 'import' | 'link';
+}
+
+export type ImportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
+export const IMPORT_STATUSES: ImportStatus[] = ['queued', 'running', 'completed', 'failed', 'canceled'];
+export const IMPORT_ACTIVE_STATUSES: ImportStatus[] = ['queued', 'running'];
+export type ImportPhase = 'setup' | 'issues' | 'comments' | 'done';
+
+/** A tracker credential kept (encrypted) on the server so an import can resume and a link can refresh. Never returns the token. */
+export interface ImportCredential {
+  /** `tcr_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: ExternalProvider;
+  /** The account the token belongs to (GitHub login, Linear user). */
+  account: string;
+  /** Self-hosted GitHub Enterprise only. */
+  baseUrl?: string;
+  createdAt: ISODate;
+  lastUsedAt?: ISODate;
+}
+
+/** What to read. GitHub: one repository. Linear: one or more teams (empty = every team). */
+export interface ImportSource {
+  /** `owner/name` (GitHub). */
+  repository?: string;
+  /** Linear team ids. */
+  teamIds?: string[];
+}
+
+export interface ImportCredentialRef {
+  /** A saved tracker credential. */
+  credentialId?: ID;
+  /** A GitHub integration connection of the workspace (its token is reused). GitHub only. */
+  connectionId?: ID;
+}
+
+export type ImportTarget = { action: 'map'; id: ID } | { action: 'create' } | { action: 'skip' };
+
+/** The editable mapping from the tracker's entities to Trama's. Keys are the preview's ids. */
+export interface ImportMapping {
+  teams: Record<string, ImportTarget>;
+  projects: Record<string, ImportTarget>;
+  labels: Record<string, ImportTarget>;
+  /** Tracker user id → Trama user id; `null` leaves the issue unassigned. */
+  users: Record<string, ID | null>;
+  /** Tracker state id → Trama status. */
+  statuses: Record<string, IssueStatus>;
+}
+
+export interface ImportOptions {
+  includeComments: boolean;
+  /** Import closed / completed / canceled issues too. */
+  includeClosed: boolean;
+  /** Kind for issues no label points at (bug, security…). */
+  defaultKind: IssueKind;
+}
+export const DEFAULT_IMPORT_OPTIONS: ImportOptions = { includeComments: false, includeClosed: true, defaultKind: 'feature' };
+
+export interface ImportPreviewEntity {
+  id: string;
+  name: string;
+  key?: string;
+  color?: string;
+  /** Issues using it, when the tracker tells cheaply. */
+  count?: number;
+  suggested: ImportTarget;
+}
+
+export interface ImportPreviewUser {
+  id: string;
+  name?: string;
+  login?: string;
+  email?: string;
+  /** Trama member matched by email, then by login or name. */
+  suggestedUserId: ID | null;
+}
+
+export interface ImportPreviewStatus {
+  id: string;
+  name: string;
+  /** The tracker's own category (`started`, `closed`, `not_planned`…). */
+  type: string;
+  count?: number;
+  suggested: IssueStatus;
+}
+
+export interface ImportPreview {
+  provider: ExternalProvider;
+  account: string;
+  /** `owner/name` or the Linear workspace. */
+  sourceLabel: string;
+  sourceUrl?: string;
+  counts: {
+    /** `null` when the tracker cannot count without reading everything. */
+    issues: number | null;
+    open: number | null;
+    closed: number | null;
+    projects: number;
+    milestones: number;
+    labels: number;
+    users: number;
+  };
+  teams: ImportPreviewEntity[];
+  projects: ImportPreviewEntity[];
+  labels: ImportPreviewEntity[];
+  milestones: { id: string; name: string; projectId?: string; dueOn?: string }[];
+  users: ImportPreviewUser[];
+  statuses: ImportPreviewStatus[];
+  sample: { key: string; title: string; state: string }[];
+  warnings: string[];
+}
+
+export interface ImportProgress {
+  phase: ImportPhase;
+  /** Issues the tracker says there are, when known. */
+  total?: number;
+  processed: number;
+  created: number;
+  /** Already imported earlier (their mirrored status is refreshed). */
+  skipped: number;
+  failed: number;
+  comments: number;
+}
+
+export interface ImportErrorEntry {
+  /** External key or id the failure belongs to. */
+  ref: string;
+  message: string;
+}
+
+export interface ImportJob {
+  /** `imp_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: ExternalProvider;
+  status: ImportStatus;
+  /** Human label of what is imported (`acme/api`, `Linear: ENG, WEB`). */
+  sourceLabel: string;
+  source: ImportSource;
+  options: ImportOptions;
+  mapping: ImportMapping;
+  progress: ImportProgress;
+  /** First errors only (capped); `progress.failed` has the real count. */
+  errors: ImportErrorEntry[];
+  /** Set while the tracker's rate limit is being waited out. */
+  waitingUntil?: ISODate;
+  cancelRequested: boolean;
+  lastError?: string;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+  startedAt?: ISODate;
+  finishedAt?: ISODate;
 }

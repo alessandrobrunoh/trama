@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 
-export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'customer', 'decision', 'artifact', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'customer', 'decision', 'artifact', 'document', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -66,6 +66,13 @@ const SPECS: Spec[] = [
     from: `"artifacts" x LEFT JOIN "workstreams" w ON w."id" = x."workstreamId"`,
     select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", COALESCE(x."url", x."description") AS body`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
+    rank: 4,
+  },
+  {
+    type: 'document',
+    from: `"documents" x`,
+    select: `x."id", NULL AS key, x."title", CASE WHEN x."archivedAt" IS NULL THEN 'document' ELSE 'document · archived' END AS subtitle, NULL AS "workstreamKey", NULL AS body`,
+    fields: [['x."title"', 'title']],
     rank: 4,
   },
   {

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type {
@@ -11,7 +11,7 @@ import type {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { ArtifactEntity, IssueEntity, ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ArtifactEntity, DocumentEntity, IssueEntity, ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 
@@ -21,6 +21,8 @@ export interface ArtifactInput {
   projectId?: string | null;
   issueId?: string | null;
   repositoryId?: string | null;
+  /** Create only: points the artifact at a Trama document (kind `document`); the title and provider follow it. */
+  documentId?: string | null;
   description?: string | null;
   kind?: ArtifactKind;
   provider?: ArtifactProvider;
@@ -164,11 +166,27 @@ export class ArtifactsService {
     if (url && !isHttpUrl(url)) throw new BadRequestException('An artifact url must be a valid http(s) url');
   }
 
-  async create(workspaceId: string, actor: ActorRef, input: ArtifactInput & { kind: ArtifactKind; title: string }) {
+  /** The document a `document` artifact points to: it must exist in the workspace and not already be attached to the same owner. */
+  private async resolveDocument(workspaceId: string, input: ArtifactInput & { kind: ArtifactKind }) {
+    if (!input.documentId) return null;
+    if (input.kind !== 'document') throw new BadRequestException('documentId needs kind "document"');
+    const doc = await this.ds.getRepository(DocumentEntity).findOne({ where: { workspaceId, id: input.documentId }, select: { id: true, title: true } });
+    if (!doc) throw new BadRequestException(`Unknown document "${input.documentId}"`);
+    for (const owner of ['workstreamId', 'projectId', 'issueId'] as const) {
+      if (input[owner] && (await this.repo.existsBy({ workspaceId, documentId: doc.id, [owner]: input[owner] })))
+        throw new ConflictException('This document is already attached there');
+    }
+    return doc;
+  }
+
+  async create(workspaceId: string, actor: ActorRef, input: ArtifactInput & { kind: ArtifactKind }) {
     if (!input.workstreamId && !input.projectId && !input.issueId)
       throw new BadRequestException('An artifact needs at least one owner: workstreamId, projectId or issueId');
     this.assertLinkUrl(input.kind, input.url);
     await this.validate(workspaceId, input);
+    const doc = await this.resolveDocument(workspaceId, input);
+    const title = doc?.title ?? input.title?.trim();
+    if (!title) throw new BadRequestException('An artifact needs a title');
     const isPr = input.kind === 'pull_request' || input.kind === 'merge_request';
     const row = await this.repo.save(
       this.repo.create({
@@ -180,9 +198,10 @@ export class ArtifactsService {
         repositoryId: input.repositoryId ?? null,
         description: input.description?.trim() || null,
         kind: input.kind,
-        provider: input.provider ?? (input.kind === 'merge_request' ? 'gitlab' : input.kind === 'pull_request' ? 'github' : 'other'),
-        title: input.title.trim(),
-        url: input.url ?? null,
+        provider: doc ? 'docs' : (input.provider ?? (input.kind === 'merge_request' ? 'gitlab' : input.kind === 'pull_request' ? 'github' : 'other')),
+        title,
+        documentId: doc?.id ?? null,
+        url: doc ? null : (input.url ?? null),
         externalId: input.externalId ?? null,
         state: input.state ?? DEFAULT_STATE[input.kind],
         ci: input.ci ?? (isPr ? 'pending' : null),
@@ -232,7 +251,10 @@ export class ArtifactsService {
         fields.push(k);
       }
     };
-    if (patch.title !== undefined) set('title', patch.title.trim());
+    if (patch.title !== undefined) {
+      if (row.documentId) throw new BadRequestException('The title of a document artifact follows the document; rename the document instead');
+      set('title', patch.title.trim());
+    }
     if (patch.description !== undefined) set('description', patch.description?.trim() || null);
     for (const k of ['workstreamId', 'projectId', 'issueId', 'repositoryId', 'provider', 'url', 'externalId', 'state', 'ci', 'review', 'hasConflicts', 'environment'] as const)
       set(k, patch[k]);

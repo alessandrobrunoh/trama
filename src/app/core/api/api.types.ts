@@ -12,6 +12,11 @@ import type {
   CustomerStatus,
   Decision,
   EstimateScale,
+  ExternalProvider,
+  ImportCredentialRef,
+  ImportMapping,
+  ImportOptions,
+  ImportSource,
   PermissionMap,
   TeamEditPolicy,
   TokenScope,
@@ -655,6 +660,42 @@ export interface WebhookWithSecret {
   secret: string;
 }
 
+// ───── documents ─────
+export interface CreateDocumentInput {
+  title: string;
+  body?: string;
+  icon?: string | null;
+  /** Attach on creation (project id, workstream id or key, issue id or key). */
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+export interface UpdateDocumentInput {
+  /** The `version` this change is based on; a stale one is refused with 409. */
+  baseVersion: number;
+  title?: string;
+  body?: string;
+  icon?: string | null;
+}
+export interface DocumentsQuery {
+  q?: string;
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+  attached?: boolean;
+  archived?: 'false' | 'only' | 'all';
+  authorId?: string;
+  sort?: 'updated' | 'created' | 'title';
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+export interface DocumentOwnerInput {
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+
 // ───── customer intake (inbound customer requests) ─────
 export interface CreateIntakeSourceInput {
   provider: IntakeProvider;
@@ -702,4 +743,21 @@ export interface LinkIntakeItemInput {
   createCustomer?: boolean;
   customerName?: string;
   important?: boolean;
+}
+
+// ───── imports from GitHub Issues / Linear ─────
+export interface ImportTargetInput extends ImportCredentialRef {
+  provider: ExternalProvider;
+  source: ImportSource;
+}
+export interface StartImportInput extends ImportTargetInput {
+  /** Omit to use the preview's suggestions. */
+  mapping?: ImportMapping;
+  options?: Partial<ImportOptions>;
+}
+export interface CreateImportCredentialInput {
+  provider: ExternalProvider;
+  token: string;
+  /** GitHub Enterprise only. */
+  baseUrl?: string;
 }

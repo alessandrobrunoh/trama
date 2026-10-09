@@ -154,6 +154,11 @@ export class RoadmapPage {
           title: 'Ask Trama',
           body: 'An assistant in the command palette and a popup, with chat history.',
         },
+        {
+          area: 'Adoption',
+          title: 'Import and link GitHub Issues and Linear',
+          body: 'Keep your current tracker and add Trama next to it: import with a mapping you can edit, or link one issue and see its status. Trama only reads.',
+        },
       ],
     },
     {
@@ -181,8 +186,8 @@ export class RoadmapPage {
       items: [
         {
           area: 'Adoption',
-          title: 'Link issues from Jira, Linear and GitHub',
-          body: 'Group issues that live in your current tracker into Trama workstreams, without migrating your backlog on day one.',
+          title: 'Jira, and automatic sync of linked issues',
+          body: 'Link Jira issues too, and keep the status of linked GitHub and Linear issues up to date in the background instead of on demand.',
         },
         {
           area: 'Workstreams',

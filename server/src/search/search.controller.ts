@@ -6,7 +6,7 @@ import { SEARCH_TYPES, SearchService, type SearchType } from './search.service.j
 
 class SearchQuery {
   @IsString() q: string;
-  /** comma-separated: workstream,project,issue,customer,decision,artifact,repository,team */
+  /** comma-separated: workstream,project,issue,customer,decision,artifact,document,repository,team */
   @IsOptional()
   @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.split(',').map((s) => s.trim()).filter(Boolean) : value))
   @IsArray()

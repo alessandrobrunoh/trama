@@ -76,6 +76,7 @@ const SOURCES: IssueSource[] = [
   'manual',
   'github',
   'gitlab',
+  'linear',
   'email',
   'api',
   'agent',

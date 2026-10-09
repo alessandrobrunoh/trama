@@ -12,6 +12,8 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   // the triage inbox is customer work; the sources behind it are integrations (admin)
   'customer-intake': 'customers',
   'intake-sources': 'integrations',
+  // importing from GitHub / Linear is an integration (admin); linking one issue is an issue edit (see issues/:id/external-ref)
+  imports: 'integrations',
 };
 
 /**
@@ -32,6 +34,8 @@ const PARENT_OWNED = new Set<string>(['graph']);
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<string, Partial<Record<string, ApiPermission>>> = {
   decisions: { accept: 'decisions:accept', reject: 'decisions:accept', supersede: 'decisions:accept' },
+  // an attachment is an artifact: linking or unlinking needs `artifacts:write`, not only the right to edit documents
+  documents: { attach: 'artifacts:write', detach: 'artifacts:write' },
   issues: { 'bulk-delete': 'issues:delete' },
 };
 

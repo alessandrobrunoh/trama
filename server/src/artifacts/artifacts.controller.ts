@@ -25,7 +25,10 @@ class CreateArtifactDto {
   @IsOptional() @IsString() issueId?: string;
   @IsOptional() @IsString() @MaxLength(10000) description?: string;
   @IsIn(KINDS) kind: ArtifactKind;
-  @IsString() @MinLength(1) @MaxLength(300) title: string;
+  /** Required unless `documentId` is given (the artifact then takes the document's title). */
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(300) title?: string;
+  /** Kind `document` only: attach a Trama document (see POST /documents/:id/attach). */
+  @IsOptional() @IsString() @MaxLength(64) documentId?: string;
   @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @IsOptional() @IsString() @MaxLength(1000) url?: string;

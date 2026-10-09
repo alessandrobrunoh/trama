@@ -23,6 +23,7 @@ export const SOURCE_LABEL: Record<string, string> = {
   manual: 'Manual',
   github: 'GitHub',
   gitlab: 'GitLab',
+  linear: 'Linear',
   email: 'Email',
   api: 'API',
   agent: 'Agent',

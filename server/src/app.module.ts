@@ -10,12 +10,14 @@ import { CustomersModule } from './customers/customers.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DecisionsModule } from './decisions/decisions.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
 import { DependenciesModule } from './dependencies/dependencies.module.js';
 import { EventsModule } from './events/events.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
 import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
+import { ImportersModule } from './importers/importers.module.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
 import { InsightsModule } from './insights/insights.module.js';
 import { InvitesModule } from './invites/invites.module.js';
@@ -59,6 +61,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     CustomerIntakeModule,
     MilestonesModule,
     ArtifactsModule,
+    DocumentsModule,
     DecisionsModule,
     DependenciesModule,
     CommentsModule,
@@ -72,6 +75,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     AiModule,
     SnapshotModule,
     IntegrationsModule,
+    ImportersModule,
     WebhooksModule,
     OutgoingWebhooksModule,
   ],
