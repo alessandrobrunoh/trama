@@ -28,7 +28,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Notifier,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
@@ -408,7 +408,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
   `,
 })
 export class WorkstreamListPage {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);

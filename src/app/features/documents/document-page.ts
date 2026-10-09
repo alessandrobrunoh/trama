@@ -40,7 +40,7 @@ import {
   ApiError,
   Clipboard,
   LiveSync,
-  NablaStore,
+  TramaStore,
   Notifier,
   UiStore,
   usePageShortcuts,
@@ -585,7 +585,7 @@ interface Conflict {
   `,
 })
 export class DocumentPage {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly documents = inject(Documents);
   private readonly notifier = inject(Notifier);
   private readonly ui = inject(UiStore);

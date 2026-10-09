@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, OnDestroy, computed, inject } from 
 import { RouterLink } from '@angular/router';
 import { LucideCopy, LucideDynamicIcon, LucideSparkles } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { Clipboard, NablaStore } from '../../core';
+import { Clipboard, TramaStore } from '../../core';
 import { Markdown } from '../../shared/markdown';
 import { AiActions } from './ai-actions.service';
 import { AiButton } from './ai-button';
@@ -57,7 +57,7 @@ import { AiResult } from './ai-result';
 })
 export class AiDigestCard implements OnDestroy {
   protected readonly ai = inject(AiActions);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
   protected readonly sparkles = LucideSparkles;
   protected readonly copyIcon = LucideCopy;

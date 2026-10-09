@@ -2,7 +2,7 @@
 // health, lead and target date. The whole row/card is a link to the project page.
 import { ChangeDetectionStrategy, Component, Directive, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { NablaStore, type Project } from '../../core';
+import { TramaStore, type Project } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -12,7 +12,7 @@ import { PROJECT_STATUS_META, isOverdue } from '../projects/project-model';
 
 @Directive()
 abstract class ProjectItemBase {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly project = input.required<Project>();
   readonly focused = input(false);
 

@@ -12,7 +12,7 @@ import {
 } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
-import { ApiError, NablaStore, type DocumentRevision } from '../../core';
+import { ApiError, TramaStore, type DocumentRevision } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { Documents } from './documents.service';
@@ -175,7 +175,7 @@ function compact(ops: readonly DiffOp[]): { rows: Row[]; truncated: boolean } {
   `,
 })
 export class DocumentHistory {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly documents = inject(Documents);
 
   readonly open = model(false);

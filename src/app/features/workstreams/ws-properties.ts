@@ -1,7 +1,7 @@
 // Properties sidebar of a workstream: every row is an inline popover editor.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { DELIVERY_STATE_META, NablaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
+import { DELIVERY_STATE_META, TramaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
@@ -145,7 +145,7 @@ import { LabelPicker } from '../../shared/label-picker';
   `,
 })
 export class WsProperties {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly actions = inject(WsActions);
   private readonly msInfo = inject(MilestoneInfo);
   readonly ws = input.required<Workstream>();
@@ -180,7 +180,7 @@ export class WsProperties {
   protected readonly overdue = computed(
     () => isOverdue(this.ws().targetDate) && this.ws().status !== 'shipped' && this.ws().status !== 'canceled',
   );
-  protected update(patch: Parameters<NablaStore['updateWorkstream']>[1]): void {
+  protected update(patch: Parameters<TramaStore['updateWorkstream']>[1]): void {
     void this.store.updateWorkstream(this.ws().id, patch);
   }
 

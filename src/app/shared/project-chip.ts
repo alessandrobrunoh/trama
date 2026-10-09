@@ -1,7 +1,7 @@
 // Linkable project pill for issue and workstream rows and cards: project glyph + name.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { NablaStore } from '../core';
+import { TramaStore } from '../core';
 import { ProjectGlyph } from '../features/projects/project-glyph';
 
 @Component({
@@ -23,7 +23,7 @@ import { ProjectGlyph } from '../features/projects/project-glyph';
   `,
 })
 export class ProjectChip {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly projectId = input.required<string>();
   protected readonly project = computed(() => this.store.getProject(this.projectId()));
   protected readonly slug = computed(() => this.store.slug() ?? '');

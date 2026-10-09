@@ -1,6 +1,6 @@
 // Plain issue + milestone records for the "time and estimates" analytics. Built once per stats model
 // from the store; the maths lives in perf.ts and never touches the store.
-import type { Issue, IssueKind, IssueStatus, NablaStore, Priority, Workstream } from '../../core';
+import type { Issue, IssueKind, IssueStatus, TramaStore, Priority, Workstream } from '../../core';
 
 export interface WorkRec {
   id: string;
@@ -55,7 +55,7 @@ function endOfDay(iso: string | undefined): number | undefined {
   return iso && iso.length <= 10 ? t + 86_400_000 - 1 : t;
 }
 
-export function buildWork(store: NablaStore, issues: readonly Issue[], workstreams: readonly Workstream[]): WorkData {
+export function buildWork(store: TramaStore, issues: readonly Issue[], workstreams: readonly Workstream[]): WorkData {
   const recs: WorkRec[] = [];
   for (const i of issues) {
     const created = ts(i.createdAt);

@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { DraftBox } from './drafts';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 function browserStorage(): Storage | null {
   try {
@@ -13,7 +13,7 @@ function browserStorage(): Storage | null {
 /** Unsent text per workspace (localStorage): `get`/`set` with a key like `comment:issue:in_x`. */
 @Injectable({ providedIn: 'root' })
 export class DraftStore {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly box = new DraftBox(browserStorage());
 
   get<T>(key: string): T | null {

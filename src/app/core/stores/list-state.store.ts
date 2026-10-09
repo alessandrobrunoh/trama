@@ -8,11 +8,11 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import { scopedKey, workspaceSlugOf } from './list-state-scope';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 @Injectable({ providedIn: 'root' })
 export class ListStateStore {
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly cells = new Map<string, WritableSignal<unknown>>();
 
@@ -29,7 +29,7 @@ export class ListStateStore {
     ),
     { initialValue: this.router.url },
   );
-  private readonly scope: Signal<string> = computed(() => workspaceSlugOf(this.url()) ?? this.nabla.slug() ?? '');
+  private readonly scope: Signal<string> = computed(() => workspaceSlugOf(this.url()) ?? this.trama.slug() ?? '');
 
   /**
    * The signal remembered under `key` for the current workspace, created with `initial` the first

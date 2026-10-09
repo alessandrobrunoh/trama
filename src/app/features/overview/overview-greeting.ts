@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideChartGantt, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { format } from 'date-fns';
-import { NablaStore, UiStore } from '../../core';
+import { TramaStore, UiStore } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { timelineViewLink } from '../views/view-model';
 import { OverviewModel } from './overview-model';
@@ -42,7 +42,7 @@ import { OverviewModel } from './overview-model';
 })
 export class OverviewGreeting {
   protected readonly m = inject(OverviewModel);
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
   protected readonly timeline = LucideChartGantt;

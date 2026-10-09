@@ -1,7 +1,7 @@
 // Comment textarea with `@person` and `#record` suggestions and optional `:emoji:` conversion.
 import { ChangeDetectionStrategy, Component, computed, ElementRef, afterNextRender, inject, input, model, output, signal, viewChild } from '@angular/core';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { NablaStore, Preferences, type ActorRef } from '../../core';
+import { TramaStore, Preferences, type ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { replaceEmojiShortcodes } from '../../shared/emoji';
 
@@ -77,7 +77,7 @@ const PER_KIND = 4;
 })
 export class CommentInput {
   private static nextId = 0;
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly prefs = inject(Preferences);
   private readonly field = viewChild.required<ElementRef<HTMLTextAreaElement>>('field');
 

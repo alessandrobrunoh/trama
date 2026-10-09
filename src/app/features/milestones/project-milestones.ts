@@ -6,7 +6,7 @@ import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, injec
 import { LucideCalendar, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore, shortDate, type Project } from '../../core';
+import { TramaStore, shortDate, type Project } from '../../core';
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { MilestoneActions, isoFromDate } from './milestone-actions';
 import { MilestoneIcon } from './milestone-icon';
@@ -75,7 +75,7 @@ import { ProgressChart } from './progress-chart';
   `,
 })
 export class ProjectMilestones {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly actions = inject(MilestoneActions);
   readonly project = input.required<Project>();
   /** List only: no adding, reordering or editing. */

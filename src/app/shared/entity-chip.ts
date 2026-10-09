@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 
 export type EntityChipType = 'workstream' | 'issue' | 'decision';
@@ -36,7 +36,7 @@ export type EntityChipType = 'workstream' | 'issue' | 'decision';
   `,
 })
 export class EntityChip {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly type = input.required<EntityChipType>();
   /** Id or key. */
   readonly ref = input.required<string>();

@@ -20,7 +20,7 @@ import {
   LucideUsersRound,
   type LucideIcon,
 } from '@lucide/angular';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
@@ -201,7 +201,7 @@ export class SettingsPage {
   /** `?agent=<id>`: opens that agent (Agents) or preselects it when creating a token (API tokens). */
   readonly agent = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   protected readonly groups = GROUPS;
   protected readonly warn = LucideTriangleAlert;

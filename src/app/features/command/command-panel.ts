@@ -79,7 +79,7 @@ import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
 import { CustomerSubscriptionsStore } from '../../core/stores/customer-subscriptions.store';
 import { FavoritesStore } from '../../core/stores/favorites.store';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { ThemeService } from '../../core/theme';
 import { ALL_NAV } from '../../layout/nav';
@@ -592,7 +592,7 @@ export class CommandPanel {
   readonly mode = input<'palette' | 'search'>('palette');
 
   protected readonly ui = inject(UiStore);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
   private readonly customerSubs = inject(CustomerSubscriptionsStore);
   private readonly session = inject(SessionStore);

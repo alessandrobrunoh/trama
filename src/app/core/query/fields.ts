@@ -46,7 +46,7 @@ export interface FieldDef {
   kind: FieldKind;
   /** Fixed value set for enums (in display order). */
   values?: readonly string[];
-  /** For `id` / `multi-id` fields: the NablaStore collection the ids come from. */
+  /** For `id` / `multi-id` fields: the TramaStore collection the ids come from. */
   refersTo?: 'team' | 'user' | 'repository' | 'project' | 'workstream' | 'milestone' | 'actor' | 'customer' | 'customerTier';
   sortable: boolean;
   groupable: boolean;
@@ -143,7 +143,7 @@ export function fieldDef(entity: ViewEntity, field: string): FieldDef | undefine
 
 /**
  * Projects an issue belongs to: its own `projectId` first, then the projects of its workstreams
- * (the same meaning as NablaStore.issuesByProject). Without `workstreamById`, only its own project.
+ * (the same meaning as TramaStore.issuesByProject). Without `workstreamById`, only its own project.
  */
 export function issueProjectIds(issue: Issue, workstreamById?: ReadonlyMap<ID, Workstream>): string[] {
   const ids = new Set<string>();

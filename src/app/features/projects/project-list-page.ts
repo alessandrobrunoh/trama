@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { PROJECT_HEALTH_META, NablaStore, UiStore, applyFilters, sortItems, type Project, type ViewFilter } from '../../core';
+import { PROJECT_HEALTH_META, TramaStore, UiStore, applyFilters, sortItems, type Project, type ViewFilter } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -244,7 +244,7 @@ export class ProjectListPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 

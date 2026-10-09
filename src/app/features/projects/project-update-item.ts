@@ -12,7 +12,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
-  NablaStore,
+  TramaStore,
   UiStore,
   fullDateTime,
   type Project,
@@ -167,7 +167,7 @@ import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
   `,
 })
 export class ProjectUpdateItem {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   protected readonly refs = inject(EntityRefs);
 

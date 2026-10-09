@@ -13,7 +13,7 @@ import {
   ISSUE_KINDS,
   ISSUE_KIND_META,
   ISSUE_STATUSES,
-  NablaStore,
+  TramaStore,
   Notifier,
   PRIORITY_META,
   shortDate,
@@ -256,7 +256,7 @@ import { ISSUE_STATUS_COLOR, issueBreakdown, issueCounts, issueOptions, issueSta
   `,
 })
 export class WsIssuesSection {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
   private readonly actions = inject(WsActions);
   protected readonly ai = inject(AiActions);

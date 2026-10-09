@@ -29,7 +29,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { toast } from '@spartan-ng/brain/sonner';
-import { ATTENTION_KIND_META, NablaStore, Notifier, shortDate, type AttentionItem } from '../../core';
+import { ATTENTION_KIND_META, TramaStore, Notifier, shortDate, type AttentionItem } from '../../core';
 import { ActorAvatar, EntityChip, Kbd, RelativeTimePipe, type EntityChipType } from '../../shared';
 import { AgoPipe } from '../overview/ago';
 import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
@@ -295,7 +295,7 @@ import { snoozePresets, type SnoozePreset } from './snooze';
   `,
 })
 export class AttentionRow {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
 
   readonly item = input.required<AttentionItem>();
   readonly slug = input.required<string>();

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { NablaStore } from '../../core';
+import { TramaStore } from '../../core';
 import { PageHeader } from '../../shared/page-header';
 import { StatsBoard } from './stats-board';
 import { workspaceStats } from './stats-model';
@@ -21,7 +21,7 @@ import { workspaceStats } from './stats-model';
   `,
 })
 export class StatsPage {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
   protected readonly model = computed(() => workspaceStats(this.store));

@@ -19,7 +19,7 @@ import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon, LucideInfo, LucideSparkles } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { ISSUE_KIND_META, NablaStore, PRIORITY_META, formatEstimate, type Issue, type IssueKind, type Priority } from '../../core';
+import { ISSUE_KIND_META, TramaStore, PRIORITY_META, formatEstimate, type Issue, type IssueKind, type Priority } from '../../core';
 import { IssueKindLabel } from '../../shared/issue';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { AiActions, type TriageChange, type TriageResult } from './ai-actions.service';
@@ -157,7 +157,7 @@ interface TriageRow {
 })
 export class AiTriageCard implements OnInit, OnDestroy {
   private readonly ai = inject(AiActions);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly issue = input.required<Issue>();
   readonly closed = output<void>();
   protected readonly check = LucideCheck;

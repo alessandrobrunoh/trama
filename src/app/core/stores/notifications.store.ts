@@ -14,7 +14,7 @@ import type {
 import { resolveNotificationSettings } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { LiveSync } from '../sync/live-sync.service';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 const PAGE = 100;
 
@@ -29,7 +29,7 @@ const NEEDS_YOU_KINDS: ReadonlySet<NotificationKind> = new Set([
 @Injectable({ providedIn: 'root' })
 export class NotificationsStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   private readonly live = inject(LiveSync);
   private readonly swPush = inject(SwPush);
@@ -72,8 +72,8 @@ export class NotificationsStore {
 
   constructor() {
     effect(() => {
-      const slug = this.nabla.slug();
-      const ready = this.nabla.ready();
+      const slug = this.trama.slug();
+      const ready = this.trama.ready();
       untracked(() => {
         if (slug && ready) void this.load();
         else {
@@ -88,11 +88,11 @@ export class NotificationsStore {
   }
 
   async load(): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       const res = await this.api.notifications.list(slug, { limit: PAGE });
-      if (this.nabla.slug() !== slug) return;
+      if (this.trama.slug() !== slug) return;
       this.items.set(res.items);
       this.unread.set(res.unread);
       this.loaded.set(true);
@@ -103,7 +103,7 @@ export class NotificationsStore {
 
   /** Marks the given notifications (or all of them) read, immediately in the UI. */
   async markRead(ids?: ID[]): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     const before = this.items();
     const before_unread = this.unread();

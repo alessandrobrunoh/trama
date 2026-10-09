@@ -18,7 +18,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { WEBHOOK_EVENT_GROUPS, type OutgoingWebhook, type WebhookDeliveryLog } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { CodeBlock } from './connect-snippets';
@@ -251,7 +251,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
   `,
 })
 export class OutgoingWebhooks {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
 

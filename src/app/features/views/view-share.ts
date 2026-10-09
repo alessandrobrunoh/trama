@@ -13,7 +13,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmRadioGroupImports } from '@spartan-ng/helm/radio-group';
-import { Clipboard, NablaStore, type SavedView, type ShareLevel, type ShareVisibility } from '../../core';
+import { Clipboard, TramaStore, type SavedView, type ShareLevel, type ShareVisibility } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { canManageViewSharing, publicViewUrl } from './view-access';
 
@@ -140,7 +140,7 @@ const VISIBILITY_LABEL = { private: 'Private', workspace: 'Workspace', link: 'Pu
 export class ViewShare {
   readonly view = input.required<SavedView>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
 
   protected readonly linkIcon = LucideLink2;

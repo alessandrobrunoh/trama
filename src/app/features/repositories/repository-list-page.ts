@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideDownload, LucideDynamicIcon, LucideFolderGit2, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore, UiStore } from '../../core';
+import { TramaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { GIT_PROVIDERS, GIT_PROVIDER_META } from '../../core/contracts/domain';
 import { TopBarActions } from '../../layout/page-chrome';
@@ -143,7 +143,7 @@ export class RepositoryListPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 

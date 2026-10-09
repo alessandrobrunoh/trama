@@ -36,7 +36,7 @@ import {
   ISSUE_STATUSES,
   FavoritesStore,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   filterValues,
   isTypingTarget,
@@ -543,7 +543,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   `,
 })
 export class IssueBoard {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);

@@ -13,7 +13,7 @@ import {
   type Role,
 } from '../../../core/contracts/domain';
 import { ROLES, ROLE_DETAILS, ROLE_META } from '../../../core/meta';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { SECTION_KIT } from './section-kit';
 
 interface Group {
@@ -138,7 +138,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access 
   `,
 })
 export class RolesSection {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   protected readonly roles = ROLES;
   protected readonly details = ROLE_DETAILS;

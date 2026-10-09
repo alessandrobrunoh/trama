@@ -4,7 +4,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { API_BASE_URL, MCP_URL } from '../../../core/config';
 import type { TokenScope } from '../../../core/contracts/domain';
 import { Clipboard } from '../../../core/notify/notifier';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 
 /** Monospace block with a copy button. */
 @Component({
@@ -82,7 +82,7 @@ type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'wri
   `,
 })
 export class ConnectSnippets {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly base = inject(API_BASE_URL).replace(/\/$/, '');
   private readonly mcpUrl = inject(MCP_URL);
 

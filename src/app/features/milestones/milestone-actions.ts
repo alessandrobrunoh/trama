@@ -2,7 +2,7 @@
 // create / rename / dates / delete (with Undo) / reorder and assigning issues. Milestones belong to a
 // project, and an issue is in at most one milestone per project, so assigning replaces the previous one.
 import { Injectable, inject } from '@angular/core';
-import { NablaStore, Notifier, type Issue, type Milestone } from '../../core';
+import { TramaStore, Notifier, type Issue, type Milestone } from '../../core';
 import type { PickOption } from '../workstreams/picker';
 import { isoOfDay } from './milestone-model';
 
@@ -11,7 +11,7 @@ export const isoFromDate = (d: Date): string => new Date(d.getFullYear(), d.getM
 
 @Injectable({ providedIn: 'root' })
 export class MilestoneActions {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
 
   create(projectId: string, name: string, targetDate?: string): Promise<Milestone | undefined> {

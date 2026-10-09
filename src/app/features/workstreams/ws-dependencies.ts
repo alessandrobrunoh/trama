@@ -5,7 +5,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, un
 import { LucideArrowLeftToLine, LucideArrowRightFromLine, LucideDynamicIcon, LucideGitFork, LucidePlus, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, Notifier, WORKSTREAM_STATUS_META, type Dependency, type Workstream } from '../../core';
+import { TramaStore, Notifier, WORKSTREAM_STATUS_META, type Dependency, type Workstream } from '../../core';
 import { EntityChip } from '../../shared/entity-chip';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
@@ -119,7 +119,7 @@ interface DepRow {
   `,
 })
 export class WsDependencies {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
   private readonly actions = inject(WsActions);
   readonly ws = input.required<Workstream>();

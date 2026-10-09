@@ -13,7 +13,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore } from '../../core';
+import { TramaStore } from '../../core';
 import type { Project } from '../../core/contracts/domain';
 
 /**
@@ -275,7 +275,7 @@ export class ProjectGlyph {
   `,
 })
 export class ProjectGlyphPicker {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly project = input.required<Project>();
   readonly canEdit = input.required<boolean>();

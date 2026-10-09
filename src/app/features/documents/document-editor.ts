@@ -26,7 +26,7 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, Notifier, type ActorRef } from '../../core';
+import { TramaStore, Notifier, type ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import {
   SLASH_COMMANDS,
@@ -236,7 +236,7 @@ function caretCoords(
 export class DocumentEditor {
   private static nextId = 0;
   private readonly doc = inject(DOCUMENT);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   private readonly documents = inject(Documents);
   private readonly field = viewChild.required<ElementRef<HTMLTextAreaElement>>('field');

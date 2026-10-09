@@ -16,7 +16,7 @@ import {
   LucideWorkflow,
   type LucideIcon,
 } from '@lucide/angular';
-import { WORKSTREAM_STATUS_META, type DomainEvent, type NablaStore } from '../../core';
+import { WORKSTREAM_STATUS_META, type DomainEvent, type TramaStore } from '../../core';
 
 export interface EventLine {
   icon: LucideIcon;
@@ -38,7 +38,7 @@ function stateLabel(v: unknown): string {
   );
 }
 
-export function describeEvent(store: NablaStore, ev: DomainEvent): EventLine {
+export function describeEvent(store: TramaStore, ev: DomainEvent): EventLine {
   const d = ev.data;
   const title = str(d['title']);
   const subjectLink = (): string[] | undefined => {

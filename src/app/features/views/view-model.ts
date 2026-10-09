@@ -11,7 +11,7 @@ import {
   WORKSTREAM_STATUS_META,
   type ActorRef,
   type FieldDef,
-  type NablaStore,
+  type TramaStore,
   type Priority,
   type Queryable,
   type SavedView,
@@ -100,7 +100,7 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
 }
 
 /** Human label of one field value ('' = "No …"). */
-export function valueLabel(store: NablaStore, entity: ViewEntity, field: string, value: string): string {
+export function valueLabel(store: TramaStore, entity: ViewEntity, field: string, value: string): string {
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (value === '') return `No ${(def?.label ?? field).toLowerCase()}`;
   if (field === 'labels') return store.settings().labels.find((l) => l.id === value)?.name ?? value;
@@ -135,7 +135,7 @@ export function valueGlyph(
   entity: ViewEntity,
   field: string,
   value: string,
-  store: NablaStore,
+  store: TramaStore,
 ): { status?: AnyStatus; statusEntity?: StatusEntity; actor?: ActorRef } {
   if (!value) return {};
   // Project statuses have their own coloured dot (see valueDot), not a status glyph.
@@ -174,7 +174,7 @@ export function valueColor(entity: ViewEntity, field: string, value: string): st
 }
 
 /** All selectable values for a filterable field. */
-export function fieldOptions(store: NablaStore, entity: ViewEntity, field: string): PickOption[] {
+export function fieldOptions(store: TramaStore, entity: ViewEntity, field: string): PickOption[] {
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (!def) return [];
   const opt = (value: string, extra: Partial<PickOption> = {}): PickOption => ({
@@ -232,7 +232,7 @@ const OP_LABEL: Record<ViewFilter['op'], string> = {
   lte: 'at most',
 };
 
-export function describeFilter(store: NablaStore, entity: ViewEntity, f: ViewFilter): string {
+export function describeFilter(store: TramaStore, entity: ViewEntity, f: ViewFilter): string {
   const values = (Array.isArray(f.value) ? f.value : [f.value]).map((v) =>
     f.op === 'before' || f.op === 'after' ? v.slice(0, 10) : valueLabel(store, entity, f.field, v),
   );
@@ -240,13 +240,13 @@ export function describeFilter(store: NablaStore, entity: ViewEntity, f: ViewFil
   return `${fieldLabel(entity, f.field)} ${op} ${values.join(', ')}`;
 }
 
-export function describeFilters(store: NablaStore, view: SavedView): string {
+export function describeFilters(store: TramaStore, view: SavedView): string {
   if (!view.filters.length) return 'No filters';
   return view.filters.map((f) => describeFilter(store, view.entity, f)).join(' · ');
 }
 
 /** Router commands to the workspace's timeline: its first timeline view (workstreams first), else the views list. */
-export function timelineViewLink(store: NablaStore): string[] {
+export function timelineViewLink(store: TramaStore): string[] {
   const views = store.views();
   const view = views.find((v) => v.layout === 'timeline' && v.entity === 'workstream') ?? views.find((v) => v.layout === 'timeline');
   const base = ['/', store.slug() ?? '', 'views'];

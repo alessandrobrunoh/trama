@@ -13,7 +13,7 @@ import {
   type EstimateScale,
   type Issue,
   type IssueStatus,
-  type NablaStore,
+  type TramaStore,
   type Workstream,
 } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
@@ -86,7 +86,7 @@ export const issueKindOptions = (): PickOption[] =>
 
 /** Workstreams as picker options (hexagon glyph + key hint), open ones first. */
 export function workstreamPickOptions(
-  store: NablaStore,
+  store: TramaStore,
   exclude: readonly string[] = [],
 ): PickOption[] {
   const skip = new Set(exclude);
@@ -271,7 +271,7 @@ export function writeDisplay(key: string, value: IssueDisplay): void {
 }
 
 /** Group keys forced to exist (empty columns / sections) for a grouping. */
-export function groupUniverse(store: NablaStore, group: IssueGroup): string[] | undefined {
+export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | undefined {
   switch (group) {
     case 'status':
       return [...ISSUE_STATUSES];
@@ -298,7 +298,7 @@ export function groupUniverse(store: NablaStore, group: IssueGroup): string[] | 
   }
 }
 
-export function groupLabel(store: NablaStore, group: IssueGroup, key: string): string {
+export function groupLabel(store: TramaStore, group: IssueGroup, key: string): string {
   switch (group) {
     case 'status':
       return ISSUE_STATUS_META[key as IssueStatus]?.label ?? key;
@@ -324,7 +324,7 @@ export function groupLabel(store: NablaStore, group: IssueGroup, key: string): s
 }
 
 /** Milestones as filter options; the hint is the project they belong to. */
-export function milestoneFilterOptions(store: NablaStore): PickOption[] {
+export function milestoneFilterOptions(store: TramaStore): PickOption[] {
   return store
     .milestones()
     .map((m) => {

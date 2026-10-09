@@ -11,7 +11,7 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { AssistantStore } from '../core/ai/assistant.store';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
 import { SessionStore } from '../core/session/session.store';
 import { UiStore } from '../core/stores/ui.store';
@@ -163,7 +163,7 @@ export class MobileNav {
   protected readonly assistant = inject(AssistantStore);
   protected readonly ui = inject(UiStore);
   protected readonly session = inject(SessionStore);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notifications = inject(NotificationsStore);
 
   protected readonly slug = this.store.slug;

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { LucideArrowRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore } from '../../core';
+import { TramaStore } from '../../core';
 import { KeyChip } from '../../shared/key-chip';
 import { StatusIcon } from '../../shared/status';
 import { MilestoneIcon } from '../milestones/milestone-icon';
@@ -103,7 +103,7 @@ import { HEALTH_VIEW, OverviewModel } from './overview-model';
 })
 export class OverviewUpcoming {
   protected readonly m = inject(OverviewModel);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly timelineLink = computed(() => timelineViewLink(this.store));
   protected readonly health = HEALTH_VIEW;
   protected readonly arrow = LucideArrowRight;

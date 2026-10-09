@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { RouterLink } from '@angular/router';
 import { LucideChevronRight, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { TEAM_EDIT_POLICIES, type Team } from '../../../core/contracts/domain';
 import { AvatarStack } from '../../../shared/actor-avatar';
@@ -59,7 +59,7 @@ import { SECTION_KIT } from './section-kit';
   `,
 })
 export class TeamsSection {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
   protected readonly chevron = LucideChevronRight;

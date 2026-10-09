@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { NablaStore, UiStore, usePageShortcuts } from '../../core';
+import { TramaStore, UiStore, usePageShortcuts } from '../../core';
 import { PageHeader } from '../../shared/page-header';
 import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
 import { OverviewFlow } from './overview-flow';
@@ -58,7 +58,7 @@ export class OverviewPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly model = inject(OverviewModel);
   protected readonly skeleton = [1, 2, 3, 4, 5];

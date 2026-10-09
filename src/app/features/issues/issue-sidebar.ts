@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideHexagon, LucidePlus, LucideTimer } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, formatEstimate, fullDateTime, formatSpan, relativeTime, type Issue } from '../../core';
+import { TramaStore, formatEstimate, fullDateTime, formatSpan, relativeTime, type Issue } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { StatusIcon } from '../../shared/status';
 import { MilestoneIcon } from '../milestones/milestone-icon';
@@ -76,7 +76,7 @@ import { issueCost, type CostVerdict } from './issue-cost';
   `,
 })
 export class IssueSideWorkstreams {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly milestones = inject(MilestoneInfo);
   protected readonly actions = inject(IssueActions);
   readonly issue = input.required<Issue>();
@@ -208,7 +208,7 @@ const BAR: Record<CostVerdict, string> = {
   `,
 })
 export class IssueTimeCard {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly issue = input.required<Issue>();
 
   protected readonly timer = LucideTimer;

@@ -7,7 +7,7 @@ import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import {
   CUSTOMER_STATUSES,
-  NablaStore,
+  TramaStore,
   Notifier,
   UiStore,
   normalizeCustomerDomains,
@@ -141,7 +141,7 @@ function wholeNumber(raw: string): number | null | undefined {
   `,
 })
 export class CustomerDialogs {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);

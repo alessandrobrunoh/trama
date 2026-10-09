@@ -6,7 +6,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import type { Issue, Workstream } from '../core/contracts/domain';
 import { usePageShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
 import { Clipboard } from '../core/notify/notifier';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { PeekStore } from '../core/stores/peek.store';
 import { UiStore } from '../core/stores/ui.store';
 import { shortDate } from '../core/format';
@@ -169,7 +169,7 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
   `,
 })
 export class PeekPanel {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly peek = inject(PeekStore);
   protected readonly refs = inject(EntityRefs);

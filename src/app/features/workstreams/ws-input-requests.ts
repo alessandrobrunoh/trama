@@ -19,7 +19,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, Notifier, UiStore, type InputRequest, type Workstream } from '../../core';
+import { TramaStore, Notifier, UiStore, type InputRequest, type Workstream } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { Kbd } from '../../shared/kbd';
 import { RelativeTimePipe } from '../../shared/pipes';
@@ -141,7 +141,7 @@ const splitOptions = (raw: string): string[] =>
   `,
 })
 export class InputRequestItem {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
   readonly request = input.required<InputRequest>();
@@ -285,7 +285,7 @@ export class InputRequestItem {
   `,
 })
 export class WsInputRequests {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly actions = inject(WsActions);
   readonly ws = input.required<Workstream>();
 

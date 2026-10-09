@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { LucideDynamicIcon, LucideKeyRound, LucidePlus, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { DEFAULT_TOKEN_LIMITS, MAX_TOKEN_LIMITS, TOKEN_SCOPES, type ApiPermission, type ApiToken, type TokenLimits, type TokenScope } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
@@ -169,7 +169,7 @@ const EXPIRY: Option[] = [
   `,
 })
 export class TokensSection {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** Preselect "acts as" this agent (from Agents → Create token). */

@@ -1,7 +1,7 @@
 import { Injectable, effect, inject, signal, untracked } from '@angular/core';
 import { NavigationEnd, Router } from '@angular/router';
 import { readJson, writeJson } from '../../core/stores/storage';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import type { HitType, SearchHit } from './search.service';
 import { visitedRef } from './visited-ref';
 
@@ -19,7 +19,7 @@ const MAX = 12;
 
 @Injectable({ providedIn: 'root' })
 export class RecentItems {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly all = signal<Record<string, RecentItem[]>>((readJson<Record<string, RecentItem[]>>(KEY) ?? {}) as Record<string, RecentItem[]>);
 

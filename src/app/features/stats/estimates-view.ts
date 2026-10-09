@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { NablaStore, type EstimateScale } from '../../core';
+import { TramaStore, type EstimateScale } from '../../core';
 import { BarList } from './charts/bar-list';
 import { BoxPlot } from './charts/box-plot';
 import { ChartCard } from './charts/chart-card';
@@ -227,7 +227,7 @@ export class EstimatesView {
   readonly scale = input<EstimateScale>('fibonacci');
   readonly periodLong = input('');
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly dayFormat = dayLabel;

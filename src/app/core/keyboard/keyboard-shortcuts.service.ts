@@ -8,7 +8,7 @@
 import { DOCUMENT } from '@angular/common';
 import { DestroyRef, Injectable, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { NablaStore } from '../stores/nabla.store';
+import { TramaStore } from '../stores/trama.store';
 import { CreateKind, UiStore } from '../stores/ui.store';
 import { isTypingTarget } from '../utils';
 import { ThemeService } from '../theme/theme.service';
@@ -92,7 +92,7 @@ export class KeyboardShortcuts {
   private readonly document = inject(DOCUMENT);
   private readonly router = inject(Router);
   private readonly ui = inject(UiStore);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly theme = inject(ThemeService);
 
   private gTimer: ReturnType<typeof setTimeout> | undefined;
@@ -160,7 +160,7 @@ export class KeyboardShortcuts {
         return { kind: 'view', defaults: {} };
       case 'teams':
         return key
-          ? { kind: 'workstream', defaults: { ownerTeamId: this.nabla.getTeam(key)?.id } }
+          ? { kind: 'workstream', defaults: { ownerTeamId: this.trama.getTeam(key)?.id } }
           : { kind: 'team', defaults: {} };
       case 'projects':
         return key ? { kind: 'workstream', defaults: { projectId: key } } : { kind: 'project', defaults: {} };
@@ -180,7 +180,7 @@ export class KeyboardShortcuts {
   }
 
   private goTo(segment: string): void {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (slug) void this.router.navigateByUrl(`/${slug}/${segment}`);
   }
 

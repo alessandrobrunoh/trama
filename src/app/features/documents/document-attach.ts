@@ -27,7 +27,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   ApiError,
-  NablaStore,
+  TramaStore,
   Notifier,
   type Document,
   type DocumentLink,
@@ -46,7 +46,7 @@ const OWNER_ICON: Record<OwnerType, LucideIcon> = {
 };
 
 /** What a link of a document points at, resolved for display. `null` when the record is not loaded (anymore). */
-export function describeLink(store: NablaStore, link: DocumentLink) {
+export function describeLink(store: TramaStore, link: DocumentLink) {
   const slug = store.slug() ?? '';
   if (link.projectId) {
     const p = store.getProject(link.projectId);
@@ -171,7 +171,7 @@ export function linksTo(link: DocumentLink, owner: DocumentOwnerInput): boolean 
   `,
 })
 export class DocumentOwnerDialog {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly documents = inject(Documents);
   private readonly notifier = inject(Notifier);
 

@@ -7,7 +7,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import { EXTERNAL_PROVIDER_META, type ExternalRef, type ExternalStateType, type Issue } from '../../core/contracts/domain';
 import { Notifier } from '../../core/notify/notifier';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { relativeTime } from '../../core/format';
 import { PropertyRow } from '../../shared/property-row';
 import { ProviderIcon } from '../../shared/provider-icon';
@@ -86,7 +86,7 @@ const DOT: Record<ExternalStateType, string> = {
 })
 export class IssueExternalRef {
   private readonly api = inject(ApiClient);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
 
   readonly issue = input.required<Issue>();

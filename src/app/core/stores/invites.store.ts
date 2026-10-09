@@ -6,23 +6,23 @@ import { ApiError } from '../api/api-error';
 import type { CreateInviteInput } from '../api/api.types';
 import type { ID, InviteLink, WorkspaceInvite } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 @Injectable({ providedIn: 'root' })
 export class InvitesStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly notifier = inject(Notifier);
 
   /** Newest first. Expired invitations stay listed so they can be resent. */
   readonly invites = signal<readonly WorkspaceInvite[]>([]);
 
   async load(): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       const list = await this.api.invites.list(slug);
-      if (this.nabla.slug() === slug) this.invites.set(list);
+      if (this.trama.slug() === slug) this.invites.set(list);
     } catch {
       /* the list is a convenience; the invite form still works */
     }
@@ -40,7 +40,7 @@ export class InvitesStore {
   async revoke(id: ID): Promise<boolean> {
     const before = this.invites();
     this.invites.set(before.filter((i) => i.id !== id));
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return false;
     try {
       await this.api.invites.revoke(slug, id);
@@ -58,7 +58,7 @@ export class InvitesStore {
     label: string,
     call: (slug: string) => Promise<InviteLink>,
   ): Promise<InviteLink | undefined> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return undefined;
     try {
       const link = await call(slug);

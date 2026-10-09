@@ -3,7 +3,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { BRANCH_FORMATS, DEFAULT_BRANCH_FORMAT, branchName, branchUser, type BranchFormat } from './branch-name';
 import { Clipboard } from './notify/notifier';
-import { NablaStore } from './stores/nabla.store';
+import { TramaStore } from './stores/trama.store';
 
 export const PREFS_STORAGE_KEY = 'nabla.prefs.v1';
 
@@ -26,7 +26,7 @@ function writePrefs(patch: Record<string, unknown>): void {
 
 @Injectable({ providedIn: 'root' })
 export class BranchNames {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
 
   readonly format = signal<BranchFormat>(this.initialFormat());

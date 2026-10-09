@@ -19,7 +19,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { LABEL_NAME_MAX, LABEL_SWATCHES, type WorkspaceLabel } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { EmptyState } from '../../../shared/empty-state';
 import { LabelCatalog, describeUsage, type LabelUsage } from '../../../shared/label-catalog';
 import { LabelChip } from '../../../shared/label-chip';
@@ -317,7 +317,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
   `,
 })
 export class LabelsSection {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly catalog = inject(LabelCatalog);
   private readonly notify = inject(Notifier);
 

@@ -5,7 +5,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { TOKEN_SCOPES, type Agent, type ApiToken, type TokenScope } from '../../../core/contracts/domain';
 import { PROVIDER_META } from '../../../core/meta';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
@@ -193,7 +193,7 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
   `,
 })
 export class AgentDetail {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   readonly agentId = input.required<string>();

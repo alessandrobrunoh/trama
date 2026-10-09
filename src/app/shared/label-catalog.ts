@@ -1,6 +1,6 @@
 // The label catalog as the UI uses it: lookup by id, usage counts, "recent" for pickers, and inline creation.
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { LABEL_ASSIGN_MAX, LABEL_SWATCHES, NablaStore, type WorkspaceLabel } from '../core';
+import { LABEL_ASSIGN_MAX, LABEL_SWATCHES, TramaStore, type WorkspaceLabel } from '../core';
 import { readJson, writeJson } from '../core/stores/storage';
 
 /** How many records carry one label, per kind of record. */
@@ -36,7 +36,7 @@ export function describeUsage(u: LabelUsage, empty = 'Not used'): string {
 
 @Injectable({ providedIn: 'root' })
 export class LabelCatalog {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly all = computed<readonly WorkspaceLabel[]>(() => this.store.settings().labels);
   readonly active = computed(() => this.all().filter((label) => !label.archived));

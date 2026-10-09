@@ -1,6 +1,6 @@
 import { DOCUMENT } from '@angular/common';
 import { Injectable, effect, inject } from '@angular/core';
-import { NablaStore } from '../stores/nabla.store';
+import { TramaStore } from '../stores/trama.store';
 
 /** CSS variables that carry the accent; styles.css defines their defaults for light and dark. */
 const ACCENT_VARS = ['--primary', '--ring', '--chart-1', '--sidebar-primary', '--sidebar-ring'] as const;
@@ -22,7 +22,7 @@ function onColor(hex: string): string {
 @Injectable({ providedIn: 'root' })
 export class AccentService {
   private readonly style = inject(DOCUMENT).documentElement.style;
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   constructor() {
     effect(() => {

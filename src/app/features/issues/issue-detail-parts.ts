@@ -18,7 +18,7 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   WORKSTREAM_STATUS_META,
   fullDate,
   type Comment,
@@ -320,7 +320,7 @@ export class IssueDescription {
   `,
 })
 export class IssueWorkstreams {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly actions = inject(IssueActions);
   readonly issue = input.required<Issue>();
   protected readonly hex = LucideHexagon;
@@ -449,7 +449,7 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
   `,
 })
 export class IssueActivity {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly issue = input.required<Issue>();
   protected readonly all = signal(false);
   protected readonly arrow = LucideArrowRight;

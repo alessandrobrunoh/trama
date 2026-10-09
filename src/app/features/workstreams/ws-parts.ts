@@ -13,7 +13,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCalendar } from '@spartan-ng/helm/calendar';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, isOverdue, shortDate, type Artifact, type Workstream } from '../../core';
+import { TramaStore, isOverdue, shortDate, type Artifact, type Workstream } from '../../core';
 import { ActorAvatar, AvatarStack } from '../../shared/actor-avatar';
 import { ArtifactIcon } from '../../shared/artifact';
 import { StatusIcon } from '../../shared/status';
@@ -114,7 +114,7 @@ export class CriteriaBar {
   `,
 })
 export class TeamDots {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly participants = computed(() =>
     this.ws().participatingTeamIds.map((id) => ({ type: 'team' as const, id })),
@@ -265,7 +265,7 @@ export class CriteriaCount {
   `,
 })
 export class WsDatePicker {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   /** Current ISO date (or undefined). */
   readonly value = input<string | undefined>();
   readonly disabled = input(false);

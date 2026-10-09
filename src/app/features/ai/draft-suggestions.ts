@@ -30,7 +30,7 @@ import {
   type AiSuggestion,
 } from '../../core/ai/ai-api';
 import { AssistantStore } from '../../core/ai/assistant.store';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { rankByOverlap } from '../ai-actions/similar';
 import { localTriage } from './local-triage';
 
@@ -210,7 +210,7 @@ export class DraftSuggestions {
   readonly questionPicked = output<string>();
   protected readonly ai = inject(AssistantStore);
   private readonly api = inject(AiApi);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private controller?: AbortController;
   private autoTimer?: ReturnType<typeof setTimeout>;
   private expectedTitle?: string;

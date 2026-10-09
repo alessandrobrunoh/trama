@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input } f
 import { LucideActivity, LucideCircleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSkeleton } from '@spartan-ng/helm/skeleton';
-import { NablaStore, type Project } from '../../core';
+import { TramaStore, type Project } from '../../core';
 import { EmptyState } from '../../shared/empty-state';
 import { ProjectUpdateComposer } from './project-update-composer';
 import { ProjectUpdateItem } from './project-update-item';
@@ -53,7 +53,7 @@ import { canPostUpdate } from './project-model';
   `,
 })
 export class ProjectUpdatesTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly project = input.required<Project>();
 

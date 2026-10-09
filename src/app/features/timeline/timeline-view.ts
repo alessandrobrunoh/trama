@@ -15,7 +15,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
-  NablaStore,
+  TramaStore,
   Notifier,
   PROJECT_STATUS_META,
   WORKSTREAM_STATUS_META,
@@ -360,7 +360,7 @@ const dayLabel = (d: number): string => format(dateOfDay(d), 'MMM d');
   `,
 })
 export class TimelineView {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly notify = inject(Notifier);
   private readonly info = inject(MilestoneInfo);

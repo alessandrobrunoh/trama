@@ -6,7 +6,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   DECISION_STATUSES,
   DECISION_STATUS_META,
-  NablaStore,
+  TramaStore,
   UiStore,
   type Decision,
   type DecisionStatus,
@@ -155,7 +155,7 @@ interface DecisionGroup {
 export class DecisionListPage {
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 

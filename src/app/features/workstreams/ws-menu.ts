@@ -25,7 +25,7 @@ import {
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
   FavoritesStore,
-  NablaStore,
+  TramaStore,
   PRIORITIES,
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
@@ -220,7 +220,7 @@ import { WsActions } from './ws-actions';
   `,
 })
 export class WsMenu {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly actions = inject(WsActions);
   protected readonly ai = inject(AiActions);
 

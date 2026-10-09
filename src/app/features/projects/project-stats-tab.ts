@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideChartBar } from '@lucide/angular';
 import { format } from 'date-fns';
-import { ISSUE_STATUS_META, NablaStore, PRIORITY_META, type Project } from '../../core';
+import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, type Project } from '../../core';
 import { EmptyState } from '../../shared/empty-state';
 import { BarList, type BarRow } from '../stats/charts/bar-list';
 import { ChartCard } from '../stats/charts/chart-card';
@@ -149,7 +149,7 @@ import { projectStats, type ProjectStats } from './project-stats-model';
   `,
 })
 export class ProjectStatsTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly project = input.required<Project>();
 

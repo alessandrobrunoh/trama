@@ -30,7 +30,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, fullDate, isTypingTarget, usePageShortcuts } from '../../core';
+import { TramaStore, fullDate, isTypingTarget, usePageShortcuts } from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { EntityChip } from '../../shared/entity-chip';
@@ -382,7 +382,7 @@ import { LabelPicker } from '../../shared/label-picker';
 export class IssueDetailPage {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly workState = issueWorkState;
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);

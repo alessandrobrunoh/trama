@@ -28,7 +28,7 @@ import {
 } from '../../../core/contracts/domain';
 import { ISSUE_KIND_META, ISSUE_KINDS, ISSUE_STATUS_META, ISSUE_STATUSES } from '../../../core/meta';
 import { Notifier } from '../../../core/notify/notifier';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import {
@@ -412,7 +412,7 @@ const POLL_MS = 2000;
   `,
 })
 export class ImportSection {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly api = inject(ApiClient);
   private readonly notify = inject(Notifier);
   private readonly destroyRef = inject(DestroyRef);

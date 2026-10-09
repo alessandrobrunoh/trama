@@ -1,11 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { HlmAvatarImports } from '@spartan-ng/helm/avatar';
-import { NablaStore, type ResolvedActor } from '../core/stores/nabla.store';
+import { TramaStore, type ResolvedActor } from '../core/stores/trama.store';
 import type { ActorRef } from '../core/contracts/domain';
 import { initials } from '../core/utils';
 import { ProviderIcon } from './provider-icon';
 
-/** Anything that can be shown as an actor: a raw ref (resolved via NablaStore) or an already resolved actor. */
+/** Anything that can be shown as an actor: a raw ref (resolved via TramaStore) or an already resolved actor. */
 export type ActorInput = ActorRef | ResolvedActor | null | undefined;
 
 function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
@@ -82,7 +82,7 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
   `,
 })
 export class ActorAvatar {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly actor = input<ActorInput>();
   readonly size = input(20);
@@ -110,7 +110,7 @@ export class ActorAvatar {
   `,
 })
 export class ActorLabel {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly actor = input<ActorInput>();
   readonly size = input(18);
   protected readonly name = computed(() => {

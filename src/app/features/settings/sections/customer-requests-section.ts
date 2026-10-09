@@ -22,7 +22,7 @@ import type { IntakeTestResult } from '../../../core/api/api.types';
 import { INTAKE_PROVIDERS, INTAKE_PROVIDER_META, INTAKE_SOURCE_NAME_MAX, type IntakeProvider, type IntakeSource } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { CustomerIntakeStore } from '../../../core/stores/customer-intake.store';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { INTAKE_ICONS } from '../../customers/intake-source-badge';
@@ -297,7 +297,7 @@ const emptyDraft = (): Draft => ({ provider: 'intercom', name: '', subdomain: ''
   `,
 })
 export class CustomerRequestsSection {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly api = inject(ApiClient);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);

@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, input, si
 import { LucideBot, LucideCheck, LucideCopy, LucideDynamicIcon, LucideTerminal } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
-import { ApiClient, ApiError, NablaStore, Notifier, type Workstream } from '../../core';
+import { ApiClient, ApiError, TramaStore, Notifier, type Workstream } from '../../core';
 import { Markdown } from '../../shared/markdown';
 import { buildExecutionGraph } from '../graph/graph-model';
 import { ExecutionGraph } from '../graph/execution-graph';
@@ -20,7 +20,7 @@ import { ExecutionGraph } from '../graph/execution-graph';
   `,
 })
 export class WsGraphTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly graph = computed(() =>
     buildExecutionGraph(
@@ -78,7 +78,7 @@ export class WsGraphTab {
 })
 export class WsContextTab {
   private readonly api = inject(ApiClient);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
   readonly ws = input.required<Workstream>();
 

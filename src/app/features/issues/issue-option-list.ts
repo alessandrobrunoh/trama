@@ -3,7 +3,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
-import { LABEL_NAME_MAX, NablaStore } from '../../core';
+import { LABEL_NAME_MAX, TramaStore } from '../../core';
 import { LabelCatalog } from '../../shared/label-catalog';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueOptionGlyph, PROMPT_TITLE, applyOption, currentValues, promptOptions, type IssueOption } from './issue-options';
@@ -45,7 +45,7 @@ const CREATE = '__create:';
   `,
 })
 export class IssueOptionList {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly actions = inject(IssueActions);
   private readonly catalog = inject(LabelCatalog);
 

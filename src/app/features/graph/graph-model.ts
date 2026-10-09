@@ -1,7 +1,7 @@
 import type { Artifact, Dependency, ID, Workstream } from '../../core';
 
 /**
- * Workstream graph, derived client-side from the NablaStore collections.
+ * Workstream graph, derived client-side from the TramaStore collections.
  * Edges point in flow direction: a dependency goes blocker -> blocked.
  */
 export type GraphNodeKind = 'workstream' | 'artifact';

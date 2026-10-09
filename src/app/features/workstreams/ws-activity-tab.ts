@@ -4,7 +4,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, fullDate, shortDate, type Comment, type DomainEvent, type Workstream } from '../../core';
+import { TramaStore, fullDate, shortDate, type Comment, type DomainEvent, type Workstream } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { describeEvent, type EventLine } from './activity-format';
@@ -81,7 +81,7 @@ const PAGE = 30;
   `,
 })
 export class WsActivityTab {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly visible = signal(PAGE);
   protected readonly loading = signal(false);

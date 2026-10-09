@@ -5,7 +5,7 @@ Authoritative inputs: `server/API.md` (API), `src/app/app.routes.ts` (routes), `
 
 > **Stale parts:** this file still describes the removed `Execution` concept (routes, store methods, `executions` tab). The `executions` table was dropped by the `DropExecutions` migration; check `contracts/domain.ts` and `app.routes.ts` before relying on anything execution-related below.
 
-Import from the barrel: `import { NablaStore, SessionStore, KeyboardShortcuts, type Workstream } from '../../core';`
+Import from the barrel: `import { TramaStore, SessionStore, KeyboardShortcuts, type Workstream } from '../../core';`
 (barrel = `core/index.ts`; it re-exports the domain types too).
 
 Conventions: Angular 22 zoneless, standalone, signals, `inject()`, OnPush, built-in control flow. Route params bind to `input()`s.
@@ -18,7 +18,7 @@ core/
   meta.ts                  labels / tone / order for every enum (WORKSTREAM_STATUS_META, ...)
   api/                     ApiClient, ApiError, apiInterceptor, request DTO types (api.types.ts)
   session/                 SessionStore, authGuard, guestGuard, workspaceGuard, landingGuard, roleGuard
-  stores/nabla.store.ts    NablaStore  (workspace data + mutations)
+  stores/trama.store.ts    TramaStore  (workspace data + mutations)
   stores/ui.store.ts       UiStore     (modals, sidebar, list focus/selection)
   sync/                    LiveSync (SSE), SyncStatus, reconcile, CLIENT_ID
   query/                   filter / sort / group utilities driven by ViewFilter
@@ -83,7 +83,7 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 
 ## 2. ApiClient (`core/api`)
 
-`inject(ApiClient)`. Promise-based; base URL `/api` (`API_BASE_URL`, proxied to the Nest server). Features should normally use `NablaStore` mutations; use ApiClient directly for endpoints that are not part of the snapshot (search, graph, agent context, attention for `scope=all`, events with filters, comments of a subject).
+`inject(ApiClient)`. Promise-based; base URL `/api` (`API_BASE_URL`, proxied to the Nest server). Features should normally use `TramaStore` mutations; use ApiClient directly for endpoints that are not part of the snapshot (search, graph, agent context, attention for `scope=all`, events with filters, comments of a subject).
 
 Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
 
@@ -155,9 +155,9 @@ In templates, hide admin-only controls with `nabla.can('admin')` (works in `comp
 
 ---
 
-## 4. NablaStore (`core/stores/nabla.store.ts`)
+## 4. TramaStore (`core/stores/trama.store.ts`)
 
-`inject(NablaStore)`. Holds the current workspace's `WorkspaceSnapshot` in signals. Everything is readonly outside the store.
+`inject(TramaStore)`. Holds the current workspace's `WorkspaceSnapshot` in signals. Everything is readonly outside the store.
 
 **Lifecycle**: `workspaceGuard` loads it, so inside `/:workspaceSlug/**` the store is always `ready`. `status: 'idle'|'loading'|'ready'|'error'`, `ready`, `loadError`, `slug` (active slug), `load(slug): Promise<'ok'|'not-found'|'error'>`, `reset()`, `refetch()`, `scheduleRefetch(ms?)`.
 
@@ -293,7 +293,7 @@ Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnec
 
 ## 5. LiveSync (`core/sync`)
 
-`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `NablaStore.handleLiveEvent(event)`, which refreshes the on-demand project data and reloads the newest page of every opened comment thread on `comment` events (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
+`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `TramaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `TramaStore.handleLiveEvent(event)`, which refreshes the on-demand project data and reloads the newest page of every opened comment thread on `comment` events (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
 
 ---
 
@@ -377,8 +377,8 @@ private readonly _keys = usePageShortcuts([
 
 ## 10. Rules of the road
 
-- Read data from `NablaStore` signals/computeds; never copy entities into component state. Use `computed()` over lookups.
-- Mutate only through `NablaStore` (or `ApiClient` for non-snapshot endpoints, then `store.scheduleRefetch(0)`).
+- Read data from `TramaStore` signals/computeds; never copy entities into component state. Use `computed()` over lookups.
+- Mutate only through `TramaStore` (or `ApiClient` for non-snapshot endpoints, then `store.scheduleRefetch(0)`).
 - Do not catch mutation errors; they never throw. Do catch `ApiError` from SessionStore auth methods and direct `ApiClient` calls.
 - Do not create new entity types or edit `contracts/`; ask the orchestrator.
 - Optional fields are omitted (never null) in entities; compare with `=== undefined`.

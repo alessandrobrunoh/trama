@@ -22,7 +22,7 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import type { IntegrationDetail, WebhookSetup } from '../../../core/api/api.types';
 import type { IntegrationConnection } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { RelativeTimePipe } from '../../../shared/pipes';
@@ -335,7 +335,7 @@ type Row = IntegrationDetail & { detailed: boolean };
   `,
 })
 export class IntegrationsSection {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
 

@@ -6,7 +6,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { API_BASE_URL, MCP_URL } from '../../core/config';
 import { PERMISSION_PRESETS } from '../../core/contracts/domain';
 import type { ApiToken } from '../../core/contracts/domain';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { PageHeader } from '../../shared/page-header';
 import { AppSelect, type Option } from '../create/form-kit';
 import { CodeBlock } from '../settings/sections/connect-snippets';
@@ -172,7 +172,7 @@ const EXPIRY: Option[] = [
   `,
 })
 export class ConnectAgentPage {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly api = inject(API_BASE_URL).replace(/\/$/, '');
   private readonly mcpUrl = inject(MCP_URL);
 

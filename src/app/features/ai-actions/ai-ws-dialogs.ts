@@ -8,7 +8,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { Clipboard, NablaStore, formatEstimate, type Workstream } from '../../core';
+import { Clipboard, TramaStore, formatEstimate, type Workstream } from '../../core';
 import { IssueKindLabel } from '../../shared/issue';
 import { Markdown } from '../../shared/markdown';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -173,7 +173,7 @@ interface Row extends ProposedIssue {
 })
 export class AiBreakdownDialog {
   private readonly ai = inject(AiActions);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   readonly open = model(false);
 

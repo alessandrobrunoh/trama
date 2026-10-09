@@ -6,7 +6,7 @@ import { LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmSidebarTrigger } from '@spartan-ng/helm/sidebar';
 import { filter, map, startWith } from 'rxjs';
 import { FavoritesStore } from '../core/stores/favorites.store';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { FavoriteButton } from '../shared/favorite-button';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport } from '../core/viewport';
@@ -85,7 +85,7 @@ export class TopBar {
   protected readonly chrome = inject(PageChrome);
   protected readonly sync = inject(SyncStatus);
   private readonly router = inject(Router);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
   protected readonly sep = LucideChevronRight;
 

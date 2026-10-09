@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   Notifier,
   PRIORITY_META,
   isOverdue,
@@ -55,7 +55,7 @@ const ROW =
   `,
 })
 export class MyIssueRow {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   readonly issue = input.required<Issue>();
   readonly focused = input(false);
@@ -134,7 +134,7 @@ export class MyIssueRow {
   `,
 })
 export class MyWorkstreamRow {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   /** Short reasons this workstream is on my list ("AUTH team", "2 of my issues"). */
   readonly reasons = input<readonly string[]>([]);

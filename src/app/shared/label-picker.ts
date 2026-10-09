@@ -6,7 +6,7 @@ import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTag 
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { LABEL_NAME_MAX, NablaStore, type WorkspaceLabel } from '../core';
+import { LABEL_NAME_MAX, TramaStore, type WorkspaceLabel } from '../core';
 import { LabelCatalog } from './label-catalog';
 import { LabelChip, LabelChips } from './label-chip';
 
@@ -144,7 +144,7 @@ import { LabelChip, LabelChips } from './label-chip';
 })
 export class LabelPicker {
   protected readonly catalog = inject(LabelCatalog);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   /** Selected label ids. */
   readonly value = input<readonly string[]>([]);

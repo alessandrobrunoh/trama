@@ -7,7 +7,7 @@ import { LucideArrowUpRight, LucideCopy, LucideDynamicIcon, LucideMessagesSquare
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { Clipboard, NablaStore, Notifier, isDeltaThreadUrl, type Workstream } from '../../core';
+import { Clipboard, TramaStore, Notifier, isDeltaThreadUrl, type Workstream } from '../../core';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { DemandSummary } from '../customers/demand-summary';
 import type { RequestState } from '../customers/customer-model';
@@ -176,7 +176,7 @@ import { WsProperties } from './ws-properties';
   `,
 })
 export class WsOverviewTab {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly clipboard = inject(Clipboard);
   private readonly notify = inject(Notifier);
   readonly ws = input.required<Workstream>();

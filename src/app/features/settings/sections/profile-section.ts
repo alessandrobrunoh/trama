@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { LucideDynamicIcon, LucideLogOut, LucidePlus } from '@lucide/angular';
 import { SessionStore } from '../../../core/session/session.store';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { ROLE_META } from '../../../core/meta';
 import { Clipboard } from '../../../core/notify/notifier';
 import { avatarColor } from '../../../core/utils';
@@ -89,7 +89,7 @@ import { SECTION_KIT } from './section-kit';
 })
 export class ProfileSection {
   protected readonly session = inject(SessionStore);
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
   protected readonly logout = LucideLogOut;
   protected readonly plus = LucidePlus;

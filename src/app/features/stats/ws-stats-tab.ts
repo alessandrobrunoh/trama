@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { NablaStore, type Workstream } from '../../core';
+import { TramaStore, type Workstream } from '../../core';
 import { StatsBoard } from './stats-board';
 import { workstreamStats } from './stats-model';
 
@@ -15,7 +15,7 @@ import { workstreamStats } from './stats-model';
   `,
 })
 export class WsStatsTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly model = computed(() => workstreamStats(this.store, this.ws().id));
 }

@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucidePlus, LucideSearch, LucideUsers } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore, UiStore } from '../../core';
+import { TramaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -97,7 +97,7 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 export class TeamListPage {
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
