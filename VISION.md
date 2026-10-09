@@ -568,6 +568,12 @@ Artifacts connect intent to delivered change.
 
 Trama should automate artifact discovery where reliable integrations exist.
 
+## Documents
+
+Some knowledge has no home in a repository: the spec of a feature, a plan, the notes of a decision that is still forming. Trama keeps those as **documents**: Markdown pages of the workspace that people and agents write in Trama itself and attach, as `document` artifacts, to the projects, workstreams and issues they explain. A document is one page however many places it is attached to.
+
+Documents obey the duplication test: they are for what is written once, on purpose. They never mirror a README, an ADR already in a repository, a Delta thread or an issue body. When the text already exists elsewhere, attach a link artifact instead.
+
 ---
 
 # 15. Traceability

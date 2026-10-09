@@ -33,7 +33,9 @@ If the user explicitly says these issues are one effort, that is the outcome: li
 
 People may say "workspace" for the thread. Do not create extra Trama workspaces.
 
-A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. To understand a whole project in one read, call `get_project_context` (markdown "mega context"); to report on it, post a project update (see `trama-report-progress`).
+A **project** sits above them: the planned outcome (with milestones, a lead, a health and a feed of status updates) that workstreams carry out. Projects are planning, workstreams are execution; a project reaches its workstreams, their issues and all their artifacts. **Documents** are Markdown pages that live in Trama (specs, plans and notes that do not belong in a repository); a document is attached to projects, workstreams and issues as a `document` artifact, so it stays one page. Search with `list_documents` before writing a new one, read with `get_document`, and edit with `update_document`, which needs the `baseVersion` you read (a stale one answers 409 with the current text: merge, then retry). Do not copy into a document what already lives in a repository or an issue.
+
+To understand a whole project in one read, call `get_project_context` (markdown "mega context"); to report on it, post a project update (see `trama-report-progress`).
 
 Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) and workstream status are independent. Do not move one to match the other.
 
@@ -76,6 +78,6 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 
 ## Tool map
 
-`whoami` · `get_workspace` · `list_accounts` (only when several keys are connected) · `search` · `list_repositories` `get_repository` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
+`whoami` · `get_workspace` · `list_accounts` (only when several keys are connected) · `search` · `list_repositories` `get_repository` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `list_documents` `get_document` `create_document` `update_document` `attach_document` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
 
 `api_request` is an escape hatch for workspace routes with no dedicated tool. Prefer the dedicated tools; it only takes plain workspace-relative paths.

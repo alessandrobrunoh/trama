@@ -64,10 +64,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, repositories and teams.",
+  "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, documents (titles), repositories and teams.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: workstream,project,issue,customer,decision,artifact,repository,team",
+   "types": "query string Comma-separated: workstream,project,issue,customer,decision,artifact,document,repository,team",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -668,6 +668,152 @@
   "params": {
    "projectId": "path string! Project id",
    "id": "path string! Project update id (pu_…)"
+  }
+ },
+ {
+  "name": "list_documents",
+  "method": "GET",
+  "path": "/documents",
+  "permission": "documents:read",
+  "description": "Markdown documents of the workspace (specs, plans and notes that do not live in a repository), without their body: title, excerpt, where they are attached. With q, full-text search over titles and text (every word is a prefix), best match first, with the matching passage in snippet.",
+  "params": {
+   "q": "query string Search text (title and body)",
+   "projectId": "query string Only documents attached to this project",
+   "workstreamId": "query string Only documents attached to this workstream (id or key)",
+   "issueId": "query string Only documents attached to this issue (id or key)",
+   "attached": "query boolean true = attached somewhere, false = loose documents",
+   "archived": "query string(false|only|all) Archived documents: false (default) hides them, only shows just them",
+   "authorId": "query string Author actor id (usr_… or ag_…)",
+   "sort": "query string(updated|created|title) Sort field (default: relevance with q, else updated)",
+   "order": "query string(asc|desc) Sort order",
+   "limit": "query integer Max results (1-200, default 100)",
+   "offset": "query integer Skip this many results"
+  }
+ },
+ {
+  "name": "get_document",
+  "method": "GET",
+  "path": "/documents/{id}",
+  "permission": "documents:read",
+  "description": "One document with its Markdown body, its version and where it is attached (links). Read it before update_document: edits must name this version.",
+  "params": {
+   "id": "path string! Document id (doc_…)"
+  }
+ },
+ {
+  "name": "create_document",
+  "method": "POST",
+  "path": "/documents",
+  "permission": "documents:write",
+  "description": "Create a Markdown document (specs, plans, notes that are not in a repository). Give projectId, workstreamId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate what already lives in a repository or an issue.",
+  "params": {
+   "title": "body string! Title (max 200 characters)",
+   "body": "body string Markdown body (max 150000 characters)",
+   "icon": "body string One emoji",
+   "projectId": "body string Attach to this project",
+   "workstreamId": "body string Attach to this workstream (id or key)",
+   "issueId": "body string Attach to this issue (id or key)"
+  }
+ },
+ {
+  "name": "update_document",
+  "method": "PATCH",
+  "path": "/documents/{id}",
+  "permission": "documents:write",
+  "description": "Change the title, body or icon of a document. baseVersion is required: if somebody saved since, nothing is written and the answer is 409 with the current document (merge and retry). The whole body is replaced.",
+  "params": {
+   "id": "path string! Document id (doc_…)",
+   "baseVersion": "body integer! The document version this edit is based on (read it with get_document). A stale one answers 409 with the current document in `current`: merge, then retry.",
+   "title": "body string New title",
+   "body": "body string New Markdown body (replaces the old one)",
+   "icon": "body string One emoji; null clears it"
+  }
+ },
+ {
+  "name": "archive_document",
+  "method": "POST",
+  "path": "/documents/{id}/archive",
+  "permission": "documents:write",
+  "description": "Archive a document: hidden from lists, read only, restorable. Prefer this to deleting.",
+  "params": {
+   "id": "path string! Document id (doc_…)"
+  }
+ },
+ {
+  "name": "restore_document",
+  "method": "POST",
+  "path": "/documents/{id}/restore",
+  "permission": "documents:write",
+  "description": "Bring an archived document back.",
+  "params": {
+   "id": "path string! Document id (doc_…)"
+  }
+ },
+ {
+  "name": "delete_document",
+  "method": "DELETE",
+  "path": "/documents/{id}",
+  "permission": "documents:delete",
+  "description": "Permanently delete a document with its history and attachments (author or admin only). Prefer archive_document.",
+  "params": {
+   "id": "path string! Document id (doc_…)"
+  }
+ },
+ {
+  "name": "list_document_revisions",
+  "method": "GET",
+  "path": "/documents/{id}/revisions",
+  "permission": "documents:read",
+  "description": "Version history of a document, newest first (without bodies). Saves by the same person within a few minutes share one revision.",
+  "params": {
+   "id": "path string! Document id (doc_…)"
+  }
+ },
+ {
+  "name": "get_document_revision",
+  "method": "GET",
+  "path": "/documents/{id}/revisions/{version}",
+  "permission": "documents:read",
+  "description": "One earlier state of a document with its body, to compare or restore.",
+  "params": {
+   "id": "path string! Document id (doc_…)",
+   "version": "path integer! Version number from list_document_revisions"
+  }
+ },
+ {
+  "name": "restore_document_revision",
+  "method": "POST",
+  "path": "/documents/{id}/revisions/{version}/restore",
+  "permission": "documents:write",
+  "description": "Make an earlier revision the current text as a new version (history is kept). Needs the current baseVersion.",
+  "params": {
+   "id": "path string! Document id (doc_…)",
+   "version": "path integer! Revision to bring back",
+   "baseVersion": "body integer! The document version this edit is based on (read it with get_document). A stale one answers 409 with the current document in `current`: merge, then retry."
+  }
+ },
+ {
+  "name": "attach_document",
+  "method": "POST",
+  "path": "/documents/{id}/attach",
+  "permission": "artifacts:write",
+  "description": "Attach a document to exactly one project, workstream or issue (it then appears in their artifacts as a document artifact). Idempotent.",
+  "params": {
+   "id": "path string! Document id (doc_…)",
+   "projectId": "body string Project id",
+   "workstreamId": "body string Workstream id or key",
+   "issueId": "body string Issue id or key"
+  }
+ },
+ {
+  "name": "detach_document",
+  "method": "POST",
+  "path": "/documents/{id}/detach",
+  "permission": "artifacts:write",
+  "description": "Remove one attachment of a document (the document itself stays). artifactId comes from the document links.",
+  "params": {
+   "id": "path string! Document id (doc_…)",
+   "artifactId": "body string! The document artifact to remove (ar_…)"
   }
  },
  {

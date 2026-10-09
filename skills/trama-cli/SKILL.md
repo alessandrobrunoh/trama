@@ -29,7 +29,7 @@ Never print, log or commit the key. Use the narrowest permissions that do the jo
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `issue` `workstream` `criterion` `decision` `artifact` `input-request` `comment` `project` `project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration` `outgoing-webhook` `graph` `snapshot` `workspace`, plus `search`.
+Resources: `issue` `workstream` `criterion` `decision` `artifact` `document` `input-request` `comment` `project` `project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration` `outgoing-webhook` `graph` `snapshot` `workspace`, plus `search`.
 Verbs: `list` `get` `create` `update` `delete` and action verbs (`link`, `accept`, `answer`, `dismiss`, `context`, …).
 
 **Discover instead of guessing:**
