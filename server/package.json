@@ -4,7 +4,7 @@
   "description": "NestJS + PostgreSQL API for Nabla (coordination for human + AI engineering teams)",
   "author": "",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "PolyForm-Shield-1.0.0",
   "type": "module",
   "scripts": {
     "build": "nest build",

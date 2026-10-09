@@ -5,6 +5,8 @@
     "ng": "ng",
     "start": "ng serve",
     "build": "ng build",
+    "size": "node scripts/check-bundle-size.mjs",
+    "icons": "node scripts/generate-lucide-icons.mjs",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

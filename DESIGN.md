@@ -1,4 +1,6 @@
-# Delta — Style Reference
+# Trama — Style Reference
+
+> Editor's note: this style reference was extracted from the Delta website (a third-party product that inspired Trama's look) and is applied to Trama. "Delta" in the text below means that source design, not a Trama concept.
 > Blueprint workshop, wide open. A near-white gridded page held together by a single deep violet-blue and the calm authority of a humanist serif — every screen feels like a chapter in a well-printed technical manual.
 
 **Theme:** light

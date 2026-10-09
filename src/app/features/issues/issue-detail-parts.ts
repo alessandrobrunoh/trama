@@ -399,7 +399,7 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
     <h2 class="mb-3 text-sm font-semibold">Activity</h2>
     @if (canEdit()) {
       <div class="mb-4">
-        <app-comment-composer #composer placeholder="Leave a comment…" (submitted)="send($event, composer)" />
+        <app-comment-composer #composer placeholder="Leave a comment…" [draftKey]="'comment:issue:' + issue().id" (submitted)="send($event, composer)" />
       </div>
     }
     <ol class="relative flex flex-col gap-3">

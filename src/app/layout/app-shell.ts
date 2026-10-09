@@ -98,9 +98,9 @@ import { MobileNav } from './mobile-nav';
       <app-create-dialog />
       <app-customer-dialogs />
       <app-search-dialog />
+      <app-confirm-dialog />
+      <app-assistant-overlay />
     }
-    <app-confirm-dialog />
-    <app-assistant-overlay />
   `,
 })
 export class AppShell {
