@@ -6,8 +6,9 @@ because a shell command is the cheapest tool a coding agent has: no tool schemas
 when it needs one.
 
 **Every API route is a command.** The CLI is generated from the same catalog as the MCP server
-(`mcp/src/tools.json`: 107 routes with parameters, enums and permissions), so the two can never drift apart:
-a route added to the catalog appears here with its flags, types and allowed values.
+(`mcp/src/tools.json`: every route with its parameters, enums and permissions), so the two can never drift apart:
+a route added to the catalog appears here with its flags, types and allowed values. The CLI always has the full catalog;
+the MCP server's shorter default tool list is a separate layer on top (`mcp/src/curated.json`) and never shrinks the CLI.
 
 ```bash
 trama issue list --open --priority urgent,high --fields key,title,status
@@ -153,7 +154,7 @@ Everything is predictable so an agent can use it without reading docs twice.
 - **Teach the agent.** `trama skill install` writes the `trama-cli` skill to `~/.claude/skills`
   (`--target agents` → `.agents/skills`, `--scope project`, `--dir`). `trama skill show` prints it for an `AGENTS.md`.
 - **MCP bridge.** `trama mcp` is an MCP server over stdio using your saved login, with the same tools as the hosted one:
-  `claude mcp add trama -- trama mcp`. `trama mcp config --client claude|cursor|vscode|codex [--transport http]` prints the snippet for each client.
+  `claude mcp add trama -- trama mcp`. It lists the short task-level `core` set by default; `trama mcp --tools full` (or `TRAMA_MCP_PROFILE=full`) lists every catalog tool, and `list_capabilities` + `run_tool` reach the rest of the catalog from `core`. `trama mcp config --client claude|cursor|vscode|codex [--transport http]` prints the snippet for each client.
 
 ## Development
 
@@ -166,7 +167,7 @@ cargo run -- --help
 - `src/cmdtree.rs` turns the catalog into the command tree; `src/auth.rs` is login/logout/profiles; `src/http.rs`,
   `src/output.rs`, `src/error.rs` are the client, formatting and exit codes. Hand-written commands live in
   `src/builtin.rs`, `src/events.rs`, `src/mcp_cmd.rs`, `src/skill.rs`, `src/update.rs`.
-- **Shared with the MCP server, not copied:** `mcp/src/{catalog,generic,protocol,upstream}.rs` and `tools.json`
+- **Shared with the MCP server, not copied:** `mcp/src/{catalog,composite,generic,profile,protocol,upstream}.rs`, `tools.json` and `curated.json`
   are compiled into this crate (`#[path]` in `src/main.rs`). Change them and both binaries move together.
 - `tests/cli.rs` also checks that **every example in `skills/trama-cli/SKILL.md` parses** as a real command.
   When you edit that skill, run the tests.

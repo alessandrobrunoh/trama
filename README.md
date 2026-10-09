@@ -85,7 +85,7 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 - **Decisions and artifacts** traced back to the issues they came from. Agents propose decisions; humans accept them.
 - **Input requests and an attention inbox** that surface where a person is actually needed.
 - **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Import repositories, link PRs, receive webhooks.
-- **MCP server** (Rust) that exposes the API as tools, so Claude, Cursor, VS Code or any MCP client can read and change the workspace, plus a **CLI** with the same commands.
+- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->21 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
 - **Agent skills** that teach a coding agent how to pick up work, report progress, ask for input and triage.
 - **Live updates** over SSE, a command palette, keyboard shortcuts, search, roles and API tokens with narrow scopes.
 - **Self-hosting first**: one PostgreSQL, three small images, no large infrastructure stack.
