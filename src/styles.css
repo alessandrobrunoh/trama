@@ -388,9 +388,30 @@ html[data-keyboard='open'] .mobile-tabbar {
   gap: 0.25rem;
 }
 
-/* "New …" actions are the floating button on phones. */
-.mobile-header__actions [data-slot='button']:has(app-kbd) {
+/* Page actions are sorted by <app-mobile-header> into icon-only (in the bar), labelled (a full-width row under
+   it) and "New …" (the floating button): data-mh = icon | text | fab. Untagged ones wait, invisible. */
+.mobile-header :is(.mobile-header__actions, .mobile-header__row) [data-slot='button']:not([data-mh]) {
+  opacity: 0;
+  pointer-events: none;
+}
+.mobile-header__actions :is([data-mh='text'], [data-mh='fab']),
+.mobile-header__row :is([data-mh='icon'], [data-mh='fab']),
+.mobile-header__row > :not([data-slot='button']) {
   display: none;
+}
+.mobile-header__row {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0.5rem;
+}
+.mobile-header__row:not(:has([data-mh='text'])) {
+  display: none;
+}
+.mobile-header__row [data-mh='text'] {
+  flex: 1 1 0;
+  min-block-size: 2.75rem;
+  justify-content: center;
+  font-size: 0.9375rem;
 }
 
 .mobile-header__end [data-slot='button'],
@@ -1323,7 +1344,7 @@ html {
   }
 
   /* The page scrolls as a whole (header folds, filter chips stick) instead of one scroller per list. */
-  #main-content > [class*='h-full'] {
+  #main-content > [class*='h-full']:not(app-assistant-page, app-graph-page) {
     height: auto;
     min-height: 100%;
   }

@@ -75,6 +75,12 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
         </div>
       </div>
     </div>
+    <!-- Labelled actions (Accept, Reject, + Workstream…) get a full-width row so they are real touch targets. -->
+    <div class="mobile-header__row" #row>
+      @if (chrome.actions(); as tpl) {
+        <ng-container *ngTemplateOutlet="tpl" />
+      }
+    </div>
     @if (isRoot()) {
       <div class="mobile-header__large" aria-hidden="true">
         <p class="mobile-header__large-title">{{ title() }}</p>
@@ -182,19 +188,29 @@ export class MobileHeader {
       scroller.addEventListener('scroll', onScroll, { capture: true, passive: true });
       this.destroyRef.onDestroy(() => scroller.removeEventListener('scroll', onScroll, true));
 
-      // The page's "New …" button (hidden on phones) is what the floating button triggers.
+      // Tag each action as icon-only, labelled or the "New …" button (-> floating button): CSS places them.
       const actions = this.el.nativeElement.querySelector('.mobile-header__actions');
-      if (!actions) return;
-      const sync = (): void => this.fab.set(this.createButton() ? (this.createButton()?.querySelector('span')?.textContent?.trim() || 'New') : null);
-      const mo = new MutationObserver(sync);
-      mo.observe(actions, { childList: true, subtree: true, characterData: true });
+      const containers = [actions, this.el.nativeElement.querySelector('.mobile-header__row')].filter(
+        (c): c is Element => !!c,
+      );
+      const classify = (): void => {
+        for (const c of containers)
+          for (const b of Array.from(c.querySelectorAll<HTMLElement>('[data-slot="button"]'))) {
+            const kind = b.querySelector('app-kbd') ? 'fab' : b.innerText.trim() ? 'text' : 'icon';
+            if (b.dataset['mh'] !== kind) b.dataset['mh'] = kind;
+          }
+        const fab = this.createButton();
+        this.fab.set(fab ? (fab.querySelector('span')?.textContent?.trim() || 'New') : null);
+      };
+      const mo = new MutationObserver(classify);
+      for (const c of containers) mo.observe(c, { childList: true, subtree: true, characterData: true });
       this.destroyRef.onDestroy(() => mo.disconnect());
-      sync();
+      classify();
     });
   }
 
   private createButton(): HTMLElement | null {
-    return this.el.nativeElement.querySelector<HTMLElement>('.mobile-header__actions [data-slot="button"]:has(app-kbd)');
+    return this.el.nativeElement.querySelector<HTMLElement>('[data-mh="fab"]');
   }
 
   protected create(): void {
