@@ -1066,7 +1066,6 @@
   "description": "PRs, docs, builds, deployments, links etc. attached to workstreams, issues and projects.",
   "params": {
    "workstreamId": "query string Workstream",
-   "executionId": "query string Execution",
    "repositoryId": "query string Repository",
    "kind": "query string Kind",
    "state": "query string State"
@@ -1095,7 +1094,6 @@
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release)! Kind",
    "title": "body string! Title",
    "description": "body string Why it is attached / what it is (markdown)",
-   "executionId": "body string Execution id",
    "repositoryId": "body string Repository id",
    "provider": "body string Provider",
    "url": "body string URL",
@@ -1118,7 +1116,6 @@
    "workstreamId": "body string Workstream id",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release) Kind",
    "title": "body string Title",
-   "executionId": "body string Execution id",
    "repositoryId": "body string Repository id",
    "provider": "body string Provider",
    "url": "body string URL",
@@ -1184,7 +1181,6 @@
    "statement": "body string! Decision statement",
    "rationale": "body string Rationale",
    "originWorkstreamId": "body string Origin workstream",
-   "originExecutionId": "body string Origin execution",
    "relatedWorkstreamIds": "body string[] Related workstreams",
    "tags": "body string[] Tags",
    "status": "body string(draft|proposed) Initial status"
@@ -1202,7 +1198,6 @@
    "statement": "body string Decision statement",
    "rationale": "body string Rationale",
    "originWorkstreamId": "body string Origin workstream",
-   "originExecutionId": "body string Origin execution",
    "relatedWorkstreamIds": "body string[] Related workstreams",
    "tags": "body string[] Tags"
   }
@@ -1276,9 +1271,9 @@
   "permission": "dependencies:write",
   "description": "'from' blocks 'to'. Cycles are rejected.",
   "params": {
-   "fromType": "body string!(workstream|execution) From type",
+   "fromType": "body string!(workstream) From type",
    "fromId": "body string! From id",
-   "toType": "body string!(workstream|execution) To type",
+   "toType": "body string!(workstream) To type",
    "toId": "body string! To id"
   }
  },
@@ -1299,7 +1294,7 @@
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(workstream|execution|issue|artifact|decision|input_request|repository|team|project) Subject type",
+   "subjectType": "query string(workstream|issue|artifact|decision|input_request|repository|team|project|project_update) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -1310,7 +1305,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: workstream|execution|issue|artifact|decision|input_request|repository|team|project, id}",
+   "subject": "body object! {type: workstream|issue|artifact|decision|input_request|repository|team|project|project_update, id}",
    "body": "body string! Comment (markdown)"
   }
  },
