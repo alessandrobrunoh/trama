@@ -12,14 +12,26 @@ export const DEFAULT_CORS_ORIGINS = [
 
 export const JSON_BODY_LIMIT = '2mb';
 
+/** True when a string anywhere in `value` holds a NUL character. */
+export function hasNulChar(value: unknown, depth = 0): boolean {
+  if (typeof value === 'string') return value.includes('\u0000');
+  if (depth > 20 || value === null || typeof value !== 'object') return false;
+  return Object.entries(value).some(([k, v]) => k.includes('\u0000') || hasNulChar(v, depth + 1));
+}
+
 /**
- * A JSON array is not a valid body for any route that expects a DTO: left alone it passes
- * validation (no property is wrong) and its methods (`sort`, `filter`…) shadow missing fields.
+ * Input checks that apply to every route before DTO validation:
+ *  - a JSON array is not a valid body where a DTO is expected: left alone it passes validation (no
+ *    property is wrong) and its methods (`sort`, `filter`…) shadow missing fields;
+ *  - PostgreSQL cannot store NUL (`\u0000`) in text or jsonb, so it would surface as a 500 from the
+ *    database: it is a 400 here.
  */
-export class RejectArrayBodyPipe implements PipeTransform {
+export class RejectUnsafeInputPipe implements PipeTransform {
   transform(value: unknown, metadata: ArgumentMetadata): unknown {
     if (metadata.type === 'body' && Array.isArray(value) && metadata.metatype !== Array)
       throw new BadRequestException('Request body must be a JSON object');
+    if ((metadata.type === 'body' || metadata.type === 'query' || metadata.type === 'param') && hasNulChar(value))
+      throw new BadRequestException('Text must not contain NUL characters');
     return value;
   }
 }
@@ -34,7 +46,7 @@ export function configureApp(app: INestApplication): void {
     verify: captureWebhookRawBody,
   } as Parameters<NestExpressApplication['useBodyParser']>[1]);
   app.useGlobalPipes(
-    new RejectArrayBodyPipe(),
+    new RejectUnsafeInputPipe(),
     new ValidationPipe({
       whitelist: true,
       transform: true,
