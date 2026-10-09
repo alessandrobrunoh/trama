@@ -3,6 +3,7 @@ import {
   blockers,
   deriveDelivery,
   deriveStatus,
+  nextShippedAt,
   type StatusArtifact,
   type StatusInput,
 } from './derive-status.js';
@@ -383,4 +384,23 @@ describe('demo seed still covers every stored status', () => {
       ),
     ).toBe(true);
   });
+});
+
+describe('nextShippedAt', () => {
+  const t0 = new Date('2026-01-01T00:00:00Z');
+  const now = new Date('2026-02-01T00:00:00Z');
+
+  it('stamps the moment a workstream becomes shipped', () => {
+    expect(nextShippedAt('shipped', null, now)).toBe(now);
+    expect(nextShippedAt('shipped', undefined, now)).toBe(now);
+  });
+  it('keeps the existing timestamp while it stays shipped', () => {
+    expect(nextShippedAt('shipped', t0, now)).toBe(t0);
+  });
+  it.each(['working', 'blocked', 'needs_input', 'planned', 'draft'] as const)(
+    'clears the timestamp when the status is %s',
+    (status) => {
+      expect(nextShippedAt(status, t0, now)).toBeNull();
+    },
+  );
 });

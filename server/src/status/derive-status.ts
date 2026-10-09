@@ -67,6 +67,20 @@ export interface DerivedStatus {
   delivery: DeliveryState;
 }
 
+/**
+ * `shippedAt` is when the workstream entered the effective `shipped` status (derived or pinned
+ * through `statusOverride`). It is kept while the workstream stays shipped and cleared when it
+ * leaves, so it never describes a delivery that is no longer current.
+ */
+export function nextShippedAt(
+  status: WorkstreamStatus,
+  current: Date | null | undefined,
+  now: Date = new Date(),
+): Date | null {
+  if (status !== 'shipped') return null;
+  return current ?? now;
+}
+
 const isPr = (a: StatusArtifact): boolean =>
   a.kind === 'pull_request' || a.kind === 'merge_request';
 const isOpenPr = (a: StatusArtifact): boolean => isPr(a) && a.state === 'open';
