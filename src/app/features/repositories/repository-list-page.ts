@@ -15,6 +15,8 @@ import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { ImportRepositoriesDialog } from './import-repositories-dialog';
 import { teamOptions } from '../workstreams/ws-model';
+import { LabelPicker } from '../../shared/label-picker';
+import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
 
 const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label, kind: 'provider', provider: p }));
@@ -24,6 +26,8 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
+    LabelPicker,
+    LabelChips,
     RouterLink,
     HlmButtonImports,
     LucideDynamicIcon,
@@ -60,6 +64,7 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full">
         <app-picker variant="chip" label="Provider" [multiple]="true" [searchable]="false" [options]="providers" [value]="providerFilter()" (valueChange)="providerFilter.set($event)" />
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="teamFilter()" (valueChange)="teamFilter.set($event)" />
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="labelFilter()" (valueChange)="labelFilter.set($event)" />
         @if (hasFilters()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
@@ -102,6 +107,9 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT
               <span class="min-w-0 truncate font-mono text-sm">
                 <span class="text-muted-foreground">{{ row.owner }}/</span><span class="text-foreground font-medium">{{ row.name }}</span>
               </span>
+              @if (r.labels.length) {
+                <app-label-chips class="max-md:hidden" [ids]="r.labels" [max]="2" />
+              }
             </span>
             <span class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[30px] max-md:text-[13px] md:contents">
               <span class="w-28 truncate font-mono max-md:w-auto">{{ r.defaultBranch }}</span>
@@ -151,24 +159,27 @@ export class RepositoryListPage {
   protected readonly search = this.listState.remember('repositories.search', '');
   protected readonly providerFilter = this.listState.remember<string[]>('repositories.provider', []);
   protected readonly teamFilter = this.listState.remember<string[]>('repositories.team', []);
+  protected readonly labelFilter = this.listState.remember<string[]>('repositories.labels', []);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canAdmin = computed(() => this.store.allowed('manageRepositories'));
   protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly total = computed(() => this.store.repositories().length);
   protected readonly hasFilters = computed(
-    () => !!this.search().trim() || this.providerFilter().length > 0 || this.teamFilter().length > 0,
+    () => !!this.search().trim() || this.providerFilter().length > 0 || this.teamFilter().length > 0 || this.labelFilter().length > 0,
   );
 
   protected readonly shown = computed(() => {
     const q = this.search().trim().toLowerCase();
     const providers = new Set(this.providerFilter());
     const teams = new Set(this.teamFilter());
+    const labels = this.labelFilter();
     return this.store
       .repositories()
       .filter((r) => {
         if (providers.size && !providers.has(r.provider)) return false;
         if (teams.size && !r.teamIds.some((id) => teams.has(id))) return false;
+        if (labels.length && !labels.some((id) => r.labels.includes(id))) return false;
         if (!q) return true;
         const names = r.teamIds.map((id) => this.store.teamById().get(id)?.name ?? '').join(' ');
         return `${r.fullName} ${r.url} ${r.defaultBranch} ${names}`.toLowerCase().includes(q);
@@ -214,5 +225,6 @@ export class RepositoryListPage {
     this.search.set('');
     this.providerFilter.set([]);
     this.teamFilter.set([]);
+    this.labelFilter.set([]);
   }
 }

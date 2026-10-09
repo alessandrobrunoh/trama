@@ -42,7 +42,7 @@ import { IssueMilestoneProp } from '../milestones/milestone-chips';
 import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { labelOptions, projectOptions, teamOptions } from '../workstreams/ws-model';
+import { projectOptions, teamOptions } from '../workstreams/ws-model';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle, IssueWorkstreams } from './issue-detail-parts';
@@ -54,11 +54,12 @@ import { CustomerRequests } from '../customers/customer-requests';
 import { DemandSummary } from '../customers/demand-summary';
 import { IssueSideWorkstreams, IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
+import { LabelPicker } from '../../shared/label-picker';
 
 @Component({
   selector: 'app-issue-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [LabelPicker, 
     RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -262,7 +263,7 @@ import { IssueCommandDialog, IssueProp } from './issue-prop';
               }
               <app-issue-milestone-prop [issue]="i" />
               <app-property-row label="Labels" [icon]="tagGlyph">
-                <app-picker variant="field" label="Labels" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="labels()" [value]="i.labels" (valueChange)="store.updateIssue(i.id, { labels: $event })" />
+                <app-label-picker #labelPicker [disabled]="!canEdit()" [value]="i.labels" (valueChange)="store.updateIssue(i.id, { labels: $event })" />
               </app-property-row>
               <app-property-row label="Type" [icon]="tagGlyph">
                 <app-picker variant="bare" label="Type" [searchable]="false" [disabled]="!canEdit()" [options]="kindOpts" [value]="[i.kind]" triggerClass="h-7 px-1.5 text-[13px]" (valueChange)="actions.changeKind(i, $any($event[0]))">
@@ -384,6 +385,7 @@ export class IssueDetailPage {
 
   private readonly titleEditor = viewChild<IssueTitle>('title');
   private readonly descEditor = viewChild<IssueDescription>('desc');
+  private readonly labelPicker = viewChild<LabelPicker>('labelPicker');
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -408,7 +410,6 @@ export class IssueDetailPage {
     return i.reporterId ? (this.store.getUser(i.reporterId)?.name ?? i.reporterName ?? '') : (i.reporterName ?? '');
   });
   protected readonly teams = computed(() => teamOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly projects = computed(() => projectOptions(this.store, this.issue()?.projectId));
   protected readonly kindOpts = issueKindOptions();
   /** Estimates are off in this workspace, but an issue that still has one keeps showing it. */
@@ -467,10 +468,10 @@ export class IssueDetailPage {
   private readonly _keys = usePageShortcuts([
     { keys: 's', label: 'Change status', group: 'Issue', when: () => this.editable(), run: () => this.prompt('status') },
     { keys: 'p', label: 'Set priority', group: 'Issue', when: () => this.editable(), run: () => this.prompt('priority') },
-    { keys: 'l', label: 'Toggle labels…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('label') },
     { keys: 'shift+p', label: 'Move to project…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('project') },
     { keys: 'a', label: 'Assign to…', group: 'Issue', when: () => this.editable(), run: () => this.prompt('assignee') },
     { keys: 'i', label: 'Assign to me', group: 'Issue', when: () => this.editable(), run: () => this.ids().length && this.actions.toggleAssignMe(this.ids()) },
+    { keys: 'l', label: 'Add labels', group: 'Issue', when: () => this.editable(), run: () => this.labelPicker()?.open() },
     { keys: 'w', label: 'Add to workstream', group: 'Issue', when: () => this.editable() && !this.issue()?.duplicateOfId, run: () => this.prompt('workstream') },
     { keys: 'shift+d', label: 'Mark as duplicate', group: 'Issue', when: () => this.editable() && !this.issue()?.duplicateOfId, run: () => this.prompt('duplicate') },
     { keys: 'r', label: 'Rename', group: 'Issue', when: () => this.editable(), run: () => this.titleEditor()?.start() },

@@ -44,7 +44,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
     it('derives status through the lifecycle and records system events', async () => {
       const w = await mk('Rotate tokens');
       expect(w.status).toBe('draft');
-      await c.post(`${base()}/workstreams/${w.key}/criteria`, { text: 'Sessions survive' }).expect(201);
+      const withCriterion = (await c.post(`${base()}/workstreams/${w.key}/criteria`, { text: 'Sessions survive' }).expect(201)).body;
       expect((await ws(w.key)).status).toBe('planned');
 
       await c.post(`${base()}/artifacts`, { workstreamId: w.id, kind: 'build', title: 'auth-42 build' }).expect(201);
@@ -64,14 +64,18 @@ describe('intelligence: status, attention, graph, search, context', () => {
       expect((await ws(w.key)).status).toBe('ready_to_land');
 
       await c.patch(`${base()}/artifacts/${pr.id}`, { state: 'merged' }).expect(200);
+      // Merged but the only criterion is open: the code landed, the outcome did not.
+      expect(await ws(w.key)).toMatchObject({ status: 'working', delivery: 'merged', completion: { achieved: false, gaps: ['criteria_pending'] } });
+      await c.patch(`${base()}/workstreams/${w.key}/criteria/${withCriterion.acceptanceCriteria[0].id}`, { state: 'met' }).expect(200);
       const shipped = await ws(w.key);
+      expect(shipped.completion).toEqual({ achieved: true, gaps: [] });
       expect(shipped.status).toBe('shipped');
       expect(shipped.shippedAt).toBeTruthy();
 
       const evs = (await get(`/events?workstreamId=${w.id}&type=workstream.status&limit=50`)) as Ev[];
       expect(evs.every((e) => e.actor.type === 'system')).toBe(true);
       const path = evs.map((e) => e.data.to).reverse();
-      expect(path).toEqual(['planned', 'working', 'in_review', 'ready_to_land', 'blocked', 'ready_to_land', 'needs_input', 'ready_to_land', 'shipped']);
+      expect(path).toEqual(['planned', 'working', 'in_review', 'ready_to_land', 'blocked', 'ready_to_land', 'needs_input', 'ready_to_land', 'working', 'shipped']);
 
       // override wins but derivedStatus follows reality
       await c.patch(`${base()}/workstreams/${w.key}`, { statusOverride: 'canceled' }).expect(200);
@@ -81,6 +85,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
     it('re-derives dependents when the blocker ships', async () => {
       const blocker = await mk('Collector rollout', {}, infra);
       const waiting = await mk('Use collector');
+      await c.post(`${base()}/workstreams/${blocker.key}/criteria`, { text: 'Collector runs in production', state: 'met' }).expect(201);
       await c.post(`${base()}/dependencies`, { fromType: 'workstream', fromId: blocker.id, toType: 'workstream', toId: waiting.id }).expect(201);
       expect((await ws(waiting.key)).status).toBe('blocked');
       await c.post(`${base()}/artifacts`, { workstreamId: blocker.id, kind: 'deployment', title: 'prod', state: 'healthy', environment: 'production' }).expect(201);

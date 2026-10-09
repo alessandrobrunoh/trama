@@ -722,3 +722,46 @@ async fn tools_the_core_profile_does_not_list_still_answer_by_name() {
     assert!(!err, "{text}");
     assert!(!s.list_tools(&all()).iter().any(|t| t["name"] == "list_teams"));
 }
+
+#[tokio::test]
+async fn report_progress_passes_criterion_evidence_through_and_warns_without_it() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/workstreams/wk_1") => {
+            let mut w = workstream();
+            w["completion"] = json!({ "achieved": false, "gaps": ["criteria_pending"] });
+            j(w)
+        }
+        ("PATCH", _) => j(json!({})),
+        _ => not_found(),
+    });
+    let args = json!({ "workstream": "wk_1", "criteria": [
+        { "criterion": "1", "state": "met", "evidence": { "artifactIds": ["ar_1"], "note": "tested on staging" } },
+        { "criterion": "2", "state": "met" }
+    ] });
+    let (err, text) = call(&server(&mock), &all(), "report_progress", args).await;
+    assert!(!err, "{text}");
+    let w = mock.writes();
+    assert_eq!(w[0].body, json!({ "state": "met", "evidence": { "artifactIds": ["ar_1"], "note": "tested on staging" } }));
+    assert_eq!(w[1].body, json!({ "state": "met" }));
+    let v = parsed(&text);
+    assert_eq!(v["warnings"].as_array().unwrap().len(), 1, "only the met without evidence is flagged");
+    assert!(v["warnings"][0].as_str().unwrap().contains("criterion 2"));
+    assert_eq!(v["workstream"]["completion"]["gaps"], json!(["criteria_pending"]), "the result carries completion");
+}
+
+#[tokio::test]
+async fn get_context_on_an_issue_carries_each_workstreams_completion() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/issues/OPS-7") => j(json!({ "id": "in_7", "key": "OPS-7", "title": "t", "workstreamIds": ["wk_1"] })),
+        ("GET", "/workstreams/wk_1") => {
+            let mut w = workstream();
+            w["completion"] = json!({ "achieved": false, "gaps": ["no_delivery"] });
+            j(w)
+        }
+        ("GET", "/issues/OPS-7/artifacts") => j(json!([])),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "OPS-7", "type": "issue" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["workstreams"][0]["completion"]["gaps"], json!(["no_delivery"]));
+}

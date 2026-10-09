@@ -15,6 +15,7 @@ import { WsSideCards } from '../milestones/ws-side-cards';
 import { WsProjectMilestones } from '../milestones/ws-project-milestones';
 import { CommentThread } from './comments';
 import { CriteriaList } from './criteria-list';
+import { WsCompletionLine } from './ws-completion-line';
 import { EditableMarkdown } from './inline-edit';
 import { WsAttention } from './ws-attention';
 import { WsDependencies } from './ws-dependencies';
@@ -33,6 +34,7 @@ import { WsProperties } from './ws-properties';
     LucideDynamicIcon,
     EditableMarkdown,
     CriteriaList,
+    WsCompletionLine,
     CommentThread,
     WsAttention,
     WsDependencies,
@@ -66,6 +68,7 @@ import { WsProperties } from './ws-properties';
         </section>
 
         <section>
+          <app-ws-completion-line [ws]="ws()" />
           <app-criteria-list [ws]="ws()" />
         </section>
 

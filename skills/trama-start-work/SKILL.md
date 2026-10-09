@@ -14,7 +14,7 @@ whoami
 get_context { id: "AUTH-42" }
 ```
 
-`get_context` returns the briefing: objective, acceptance criteria, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. Use it alone when the user only asks what is left or what the state is.
+`get_context` returns the briefing: the outcome status and what is still missing (`completion.gaps`), the objective, acceptance criteria (with who declared each `met` and its proof), decisions, dependencies, artifacts, open questions and recent progress. Read all of it. Use it alone when the user only asks what is left or what the state is.
 
 If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, `get_context` returns the issue with the workstreams it belongs to; `start_work` below loads the briefing of the workstream for you.
 
@@ -30,13 +30,13 @@ When you decide to begin, one call does the checks and the writes:
 start_work { key: "AUTH-42", plan: "Rotating refresh tokens; targeting criteria 1 and 2.", criteria: ["1", "2"] }
 ```
 
-`key` is a workstream or an issue. `start_work` stops **without writing** (`ready: false`, with `stopBecause`) when the workstream is `blocked`, `shipped` or `canceled`, or the issue is `done`/`canceled`. Report that to the user instead of working.
+`key` is a workstream or an issue. `start_work` stops **without writing** (`ready: false`, with `stopBecause`) when the workstream is `blocked` (completion gap `blocked`), `shipped` or `canceled`, or the issue is `done`/`canceled`. A `statusOverride` is a pin by a person, not a fact: read `completion.gaps` for what is really missing. Report a stop to the user instead of working.
 
-When it proceeds it returns `cautions`. Read them; stop and tell the user when:
+When it proceeds it returns `cautions` and the workstream's `completion`. Read them; stop and tell the user when:
 
 - There is an **open input request** whose answer changes the approach.
 - A **proposed decision** touches the area you are about to change. Wait for a person to accept it, or ask.
-- Acceptance criteria are empty or vague. Propose concrete, observable ones with `addCriteria` (`start_work { key, addCriteria: ["OAuth login passes on Safari 18"] }`) and confirm them with the user before relying on them.
+- The gap `no_criteria` is present, or the criteria are vague. A workstream with no criteria cannot ship. Propose concrete, observable ones with `addCriteria` (`start_work { key, addCriteria: ["OAuth login passes on Safari 18"] }`) and confirm them with the user before relying on them.
 
 ## 3. Respect what is already decided
 

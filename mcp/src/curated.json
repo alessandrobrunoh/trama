@@ -6,7 +6,7 @@
     "readOnly": true,
     "visibleIf": ["issues:read", "workstreams:read", "projects:read", "decisions:read", "input-requests:read", "artifacts:read"],
     "uses": ["get_issue", "get_workstream", "get_workstream_context", "get_project_context", "get_decision", "get_input_request", "get_artifact", "list_issue_artifacts", "list_comments"],
-    "description": "Read everything about ONE thing before you act on it. Pass any key or id; the kind is inferred. Workstream (AUTH-42, wk_…): markdown briefing with objective, criteria, decisions, artifacts, open questions, progress. Project (pj_…): markdown mega-context. Issue (BUG-142, in_…): the issue plus its workstreams and artifacts (comments:true adds the thread). Decision (ADR-21), input request (ir_…), artifact (ar_…): the record itself. Use ask_human's ir_… id here to see whether a person answered. Example: {\"id\":\"AUTH-42\"}.",
+    "description": "Read everything about ONE thing before you act on it. Pass any key or id; the kind is inferred. Workstream (AUTH-42, wk_…): markdown briefing with outcome status and completion gaps, objective, criteria (with who declared each met and its proof), decisions, artifacts, open questions, progress. Project (pj_…): markdown mega-context. Issue (BUG-142, in_…): the issue plus its workstreams (each with completion: achieved, gaps) and artifacts (comments:true adds the thread). Decision (ADR-21), input request (ir_…), artifact (ar_…): the record itself. Use ask_human's ir_… id here to see whether a person answered. Example: {\"id\":\"AUTH-42\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -146,7 +146,7 @@
     "readOnly": false,
     "visibleIf": ["workstreams:write", "artifacts:write", "comments:write", "issues:write"],
     "uses": ["get_issue", "get_workstream", "get_project", "add_criterion", "update_criterion", "list_artifacts", "list_issue_artifacts", "list_project_artifacts", "create_artifact", "update_artifact", "update_issue", "create_project_update", "create_comment"],
-    "description": "Record facts about your work in one call. Any combination of: criteria (mark each {criterion, state}; criterion = id, 1-based position or unique text; met ONLY when demonstrably true), addCriteria, artifact (PR/build/doc: created once, then updated in place, matched by externalId or url), issueStatus (for `issue`), projectUpdate {health, body} (for `project`; only after a meaningful milestone), comment (one factual line). Never sets workstream status: Trama derives it from these facts, and the reply shows the resulting status. Never claim ci 'passing' or state 'merged' unless you saw it. Example: {\"workstream\":\"AUTH-42\",\"criteria\":[{\"criterion\":\"1\",\"state\":\"met\"}],\"artifact\":{\"kind\":\"pull_request\",\"title\":\"Rotate refresh tokens\",\"url\":\"https://github.com/o/r/pull/318\",\"externalId\":\"318\",\"state\":\"open\",\"ci\":\"pending\"},\"comment\":\"PR #318 open; criterion 1 met.\"}.",
+    "description": "Record facts about your work in one call. Any combination of: criteria (mark each {criterion, state, evidence}; criterion = id, 1-based position or unique text; set met ONLY when demonstrably true and with evidence {artifactIds, note}: the reply warns when a met has none), addCriteria, artifact (PR/build/doc: created once, then updated in place, matched by externalId or url), issueStatus (for `issue`), projectUpdate {health, body} (for `project`; only after a meaningful milestone), comment (one factual line). Never sets workstream status: Trama derives it from these facts, and the reply shows the resulting status and completion.gaps (what is still missing). Never claim ci 'passing' or state 'merged' unless you saw it. Example: {\"workstream\":\"AUTH-42\",\"criteria\":[{\"criterion\":\"1\",\"state\":\"met\"}],\"artifact\":{\"kind\":\"pull_request\",\"title\":\"Rotate refresh tokens\",\"url\":\"https://github.com/o/r/pull/318\",\"externalId\":\"318\",\"state\":\"open\",\"ci\":\"pending\"},\"comment\":\"PR #318 open; criterion 1 met.\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -159,7 +159,16 @@
             "type": "object",
             "properties": {
               "criterion": { "type": "string", "description": "Criterion id, 1-based position or unique text fragment." },
-              "state": { "type": "string", "enum": ["pending", "in_progress", "met"] }
+              "state": { "type": "string", "enum": ["pending", "in_progress", "met"] },
+              "evidence": {
+                "type": "object",
+                "description": "Proof for the criterion. Set it with state met: artifactIds of this workstream (test report, deployment, PR) and/or a note saying what you verified.",
+                "properties": {
+                  "artifactIds": { "type": "array", "items": { "type": "string" } },
+                  "note": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
             },
             "required": ["criterion", "state"],
             "additionalProperties": false

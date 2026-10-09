@@ -103,6 +103,7 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
 export function valueLabel(store: NablaStore, entity: ViewEntity, field: string, value: string): string {
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (value === '') return `No ${(def?.label ?? field).toLowerCase()}`;
+  if (field === 'labels') return store.settings().labels.find((l) => l.id === value)?.name ?? value;
   if (def?.kind === 'enum') return enumLabel(entity, field, value) ?? value;
   switch (def?.refersTo) {
     case 'team':
@@ -184,9 +185,11 @@ export function fieldOptions(store: NablaStore, entity: ViewEntity, field: strin
     ...extra,
   });
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));
+  if (field === 'labels') {
+    return store.settings().labels.filter((l) => !l.archived).map((l) => opt(l.id, { color: l.color }));
+  }
   if (def.kind === 'tags') {
     const set = new Set<string>();
-    if (entity === 'workstream') for (const w of store.workstreams()) for (const l of w.labels) set.add(l);
     if (entity === 'decision') for (const d of store.decisions()) for (const t of d.tags) set.add(t);
     return [...set].sort().map((v) => opt(v));
   }

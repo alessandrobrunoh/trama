@@ -428,10 +428,40 @@ export type WorkstreamStatus =
 export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
+
+/**
+ * Why a workstream is not (yet) a finished outcome. Computed by the server; clients show it and
+ * never re-derive it. `shipped` (derived) means no gaps.
+ * - `no_criteria`: nothing defines "done" yet (add at least one acceptance criterion).
+ * - `criteria_pending`: some criterion is not `met`.
+ * - `blocked`: a failing/conflicting open PR or an unresolved dependency.
+ * - `needs_input`: an open input request or a proposed decision waits on a person.
+ * - `no_delivery`: no merged/released/deployed work and not every linked issue is done.
+ */
+export type CompletionGap = 'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
+export interface WorkstreamCompletion {
+  /** True when the outcome is achieved by the facts (ignores any manual `statusOverride`). */
+  achieved: boolean;
+  gaps: CompletionGap[];
+}
+/** Proof attached to a criterion. Artifacts must belong to the same workstream. */
+export interface CriterionEvidence {
+  artifactIds: ID[];
+  /** Short free-text verification (e.g. "checked manually on staging"). */
+  note?: string;
+}
 export interface AcceptanceCriterion {
   id: ID;
   text: string;
   state: CriterionState;
+  /**
+   * Optional proof. Signalled, never required: a `met` criterion without evidence is shown as
+   * "no proof", not rejected. Linking an artifact (a PR, say) never changes `state`.
+   */
+  evidence?: CriterionEvidence;
+  /** Who set the criterion to `met` (user or agent). Set by the server, cleared when it leaves `met`. */
+  verifiedBy?: ActorRef;
+  verifiedAt?: ISODate;
 }
 
 export interface Workstream {
@@ -472,6 +502,14 @@ export interface Workstream {
    * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
    */
   delivery: DeliveryState;
+  /** Whether the outcome is achieved and what is missing, computed from the facts (not from the override). */
+  completion: WorkstreamCompletion;
+  /**
+   * Set once by a migration on workstreams that were already `shipped` with no acceptance criteria
+   * when "no criteria never ships" was introduced. They keep shipping; everything else needs a criterion.
+   */
+  legacyShipped?: boolean;
+  /** A manual pin. When set, `status` is this value and `derivedStatus` is what the facts say. */
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;
@@ -1772,8 +1810,13 @@ export interface WorkspaceLabel {
   name: string;
   /** `#rrggbb`. */
   color: string;
-  /** Templates are always present and cannot be renamed or removed. */
+  /** Templates are always present and cannot be renamed, removed, merged away or archived. */
   template: boolean;
+  /**
+   * Archived labels stay on what already carries them but are no longer offered when assigning.
+   * Only ever `true`; an active label omits the field.
+   */
+  archived?: boolean;
 }
 
 /** Always available. Ids are stable so existing assignments survive a settings rewrite. */
@@ -1785,7 +1828,20 @@ export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
 ];
 
 /** Swatches offered when creating or recoloring a label. */
-export const LABEL_SWATCHES = ['#e11d48', '#f97316', '#eab308', '#16a34a', '#0891b2', '#2563eb', '#7c3aed', '#db2777', '#64748b'] as const;
+export const LABEL_SWATCHES = [
+  '#e11d48',
+  '#f97316',
+  '#eab308',
+  '#84cc16',
+  '#16a34a',
+  '#14b8a6',
+  '#0891b2',
+  '#2563eb',
+  '#6366f1',
+  '#7c3aed',
+  '#db2777',
+  '#64748b',
+] as const;
 
 export const LABEL_NAME_MAX = 40;
 export const LABEL_ASSIGN_MAX = 20;
@@ -1806,9 +1862,22 @@ export function resolveLabelCatalog(stored?: readonly WorkspaceLabel[] | null): 
     if (!item || item.template || templateIds.has(item.id) || custom.some((label) => label.id === item.id)) continue;
     const name = typeof item.name === 'string' ? item.name.trim() : '';
     if (!name || name.length > LABEL_NAME_MAX || !LABEL_COLOR.test(item.color ?? '')) continue;
-    custom.push({ id: item.id, name, color: item.color, template: false });
+    custom.push(item.archived === true ? { id: item.id, name, color: item.color, template: false, archived: true } : { id: item.id, name, color: item.color, template: false });
   }
   return [...templates, ...custom];
+}
+
+/**
+ * The ids of one record after `from` is merged into `into` (or removed when `into` is null).
+ * Keeps the order, never lists an id twice.
+ */
+export function replaceLabelId(ids: readonly string[], from: string, into: string | null): string[] {
+  const out: string[] = [];
+  for (const id of ids) {
+    const next = id === from ? into : id;
+    if (next && !out.includes(next)) out.push(next);
+  }
+  return out;
 }
 
 /** Unique catalog ids, in order. Throws when an id is not in the catalog or the list is too long. */

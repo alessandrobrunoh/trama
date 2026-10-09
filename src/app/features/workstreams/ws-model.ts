@@ -263,12 +263,6 @@ export const repoOptionsIn = (store: NablaStore, projectId?: string | null): Pic
   return project ? all.filter((o) => project.repositoryIds.includes(o.value)) : all;
 };
 
-export const labelOptions = (store: NablaStore): PickOption[] =>
-  store.settings().labels.map((label) => ({ value: label.id, label: label.name, kind: 'label' as const, color: label.color }));
-
-export const labelName = (store: NablaStore, id: string): string =>
-  store.settings().labels.find((label) => label.id === id)?.name ?? id;
-
 /** Users + agents + teams as performer options (`type:id` values). */
 export const performerOptions = (store: NablaStore): PickOption[] => [
   ...store
@@ -387,6 +381,8 @@ export function explainStatus(
       if (isDeliveredState(ws.delivery)) {
         reasons.push(`${deliveryReason(ws.delivery, prs)}, but the outcome is not achieved yet.`);
         const unmet = ws.acceptanceCriteria.filter((c) => c.state !== 'met').length;
+        if (ws.completion.gaps.includes('no_criteria'))
+          reasons.push('There are no acceptance criteria yet: add one to define what done means.');
         if (unmet)
           reasons.push(
             `${unmet} acceptance criteri${unmet === 1 ? 'on is' : 'a are'} not met.`,

@@ -265,15 +265,36 @@ fn numbered_criteria(ws: &Value) -> Value {
         criteria_of(ws)
             .iter()
             .enumerate()
-            .map(|(i, c)| json!({ "n": i + 1, "id": c["id"], "text": c["text"], "state": c["state"] }))
+            .map(|(i, c)| {
+                let mut row = json!({ "n": i + 1, "id": c["id"], "text": c["text"], "state": c["state"] });
+                for k in ["evidence", "verifiedBy", "verifiedAt"] {
+                    if !c[k].is_null() {
+                        row[k] = c[k].clone();
+                    }
+                }
+                row
+            })
             .collect(),
     )
+}
+
+/// `update_criterion` arguments; `evidence` is passed through only when it holds something.
+fn criterion_args(workstream: &str, criterion: &Value, state: &str, evidence: Option<&Value>) -> Value {
+    let mut args = json!({ "idOrKey": workstream, "criterionId": criterion, "state": state });
+    if has_evidence(evidence) {
+        args["evidence"] = evidence.cloned().unwrap_or(Value::Null);
+    }
+    args
+}
+
+fn has_evidence(evidence: Option<&Value>) -> bool {
+    evidence.is_some_and(|e| e.get("note").and_then(Value::as_str).is_some_and(|n| !n.trim().is_empty()) || e.get("artifactIds").and_then(Value::as_array).is_some_and(|a| !a.is_empty()))
 }
 
 fn workstream_summary(ws: &Value) -> Value {
     let criteria = criteria_of(ws);
     let met = criteria.iter().filter(|c| c["state"] == "met").count();
-    let mut v = pick(ws, &["key", "id", "title", "status", "derivedStatus", "delivery", "priority", "projectId", "ownerTeamId"]);
+    let mut v = pick(ws, &["key", "id", "title", "status", "derivedStatus", "delivery", "completion", "priority", "projectId", "ownerTeamId"]);
     v["criteria"] = json!({ "met": met, "total": criteria.len() });
     v
 }
@@ -996,6 +1017,7 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     };
 
     let mut applied: Vec<String> = vec![];
+    let mut warnings: Vec<String> = vec![];
     let mut failed: Vec<String> = vec![];
 
     if let Some(w) = &ws {
@@ -1010,8 +1032,13 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
             for item in items {
                 let (sel, state) = (item["criterion"].as_str().unwrap_or(""), item["state"].as_str().unwrap_or(""));
                 match match_criterion(&list, sel) {
-                    Ok(i) => match ex.call("update_criterion", json!({ "idOrKey": w.id, "criterionId": list[i]["id"], "state": state })).await {
-                        Ok(_) => applied.push(format!("criterion {} is {state}", i + 1)),
+                    Ok(i) => match ex.call("update_criterion", criterion_args(&w.id, &list[i]["id"], state, item.get("evidence"))).await {
+                        Ok(_) => {
+                            applied.push(format!("criterion {} is {state}", i + 1));
+                            if state == "met" && !has_evidence(item.get("evidence")) {
+                                warnings.push(format!("criterion {} was set met without evidence; attach a test report, deployment or PR via `evidence` (artifactIds and/or note)", i + 1));
+                            }
+                        }
                         Err(e) => failed.push(format!("criterion {}: {}", i + 1, e.message())),
                     },
                     Err(e) => failed.push(e),
@@ -1058,6 +1085,9 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
 
     let mut out = Map::new();
     out.insert("applied".into(), json!(applied));
+    if !warnings.is_empty() {
+        out.insert("warnings".into(), json!(warnings));
+    }
     if !failed.is_empty() {
         out.insert("failed".into(), json!(failed));
         out.insert("note".into(), json!("Do not repeat the applied steps; fix and resend only the failed ones."));
