@@ -17,6 +17,7 @@ import { FavoritesModule } from './favorites/favorites.module.js';
 import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
+import { InsightsModule } from './insights/insights.module.js';
 import { InvitesModule } from './invites/invites.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
 import { IssuesModule } from './issues/issues.module.js';
@@ -64,6 +65,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     ViewsModule,
     StatusModule,
     AttentionModule,
+    InsightsModule,
     GraphModule,
     SearchModule,
     AgentContextModule,
