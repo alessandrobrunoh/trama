@@ -37,6 +37,8 @@ import {
   LucideMoon,
   LucidePanelLeft,
   LucidePlug,
+  LucideFilePlus,
+  LucideFileText,
   LucidePlus,
   LucideScale,
   LucideBell,
@@ -71,6 +73,7 @@ import {
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
+import { Documents } from '../documents/documents.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
 import { CustomerSubscriptionsStore } from '../../core/stores/customer-subscriptions.store';
@@ -579,6 +582,7 @@ export class CommandPanel {
   private readonly customerSubs = inject(CustomerSubscriptionsStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
+  private readonly documents = inject(Documents);
   private readonly theme = inject(ThemeService);
   private readonly searchSvc = inject(SearchService);
   private readonly recents = inject(RecentItems);
@@ -1001,6 +1005,21 @@ export class CommandPanel {
         icon: LucidePlus,
         run: create('decision'),
       });
+    if (this.store.can('member'))
+      out.push({
+        id: 'new:document',
+        label: 'Create document',
+        keywords: 'new doc write note spec plan markdown page',
+        icon: LucideFilePlus,
+        run: () => void this.documents.createAndOpen(),
+      });
+    out.push({
+      id: 'docs:search',
+      label: 'Search documents',
+      keywords: 'find docs notes specs plans text',
+      icon: LucideFileText,
+      run: () => void this.router.navigate(['/', this.slug(), 'documents'], { queryParams: { focus: 'search' } }),
+    });
     if (this.store.allowed('manageCustomers')) {
       const here = this.favorites.current();
       out.push(
