@@ -319,7 +319,7 @@ interface WsItem {
                   <span class="text-muted-foreground w-[4.25rem] shrink-0 truncate font-mono text-[11px]">{{ d.key }}</span>
                   <span class="min-w-0 flex-1 truncate text-sm">{{ d.title }}</span>
                   <span class="text-meta">{{ label(d.status) }}</span>
-                  <span class="text-meta w-16 text-end">{{ d.updatedAt | relativeTime }}</span>
+                  <span class="text-meta w-24 text-end whitespace-nowrap">{{ d.updatedAt | relativeTime }}</span>
                 </a>
               }
             }
