@@ -62,7 +62,7 @@ export class SnapshotService {
         all(DependencyEntity, { createdAt: 'ASC' }),
         all(CommentEntity, { createdAt: 'ASC' }),
         this.ds.getRepository(DomainEventEntity).find({ where, order: { at: 'DESC', id: 'DESC' }, take: SNAPSHOT_EVENTS }),
-        this.views.list(workspaceId, ctx.userId),
+        this.views.list(ctx),
         this.ds.getRepository(IntegrationConnectionEntity).find({ where, order: { createdAt: 'ASC' } }),
         this.attention.forUser(ctx),
       ]);

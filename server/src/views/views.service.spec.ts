@@ -10,6 +10,7 @@ import {
   VIEW_LAYOUTS,
   viewLayoutProblem,
 } from './view-rules.js';
+import { SavedViewEntity } from '../database/entities/index.js';
 import { ViewsService } from './views.service.js';
 
 const errorsOf = async (cls: new () => object, plain: object) =>
@@ -77,13 +78,23 @@ describe('ViewsService layout/entity validation', () => {
     workspace: { id: 'w1' },
   } as unknown as WorkspaceContext;
   const events = { publish: vi.fn() };
+  const entityOf = (row: Record<string, unknown>) =>
+    Object.assign(new SavedViewEntity(), {
+      sharing: { visibility: 'private', grants: [] },
+      publicTokenHash: null,
+      publicTokenEnc: null,
+      ...row,
+    });
   const make = (row?: Record<string, unknown>) => {
     const repo = {
-      create: vi.fn((v: object) => v),
+      create: vi.fn((v: object) => entityOf(v as Record<string, unknown>)),
       save: vi.fn(async (v: object) => v),
-      findOneBy: vi.fn(async () => row ?? null),
+      findOneBy: vi.fn(async () => (row ? entityOf(row) : null)),
     };
-    return { repo, service: new ViewsService(events as never, repo as never) };
+    return {
+      repo,
+      service: new ViewsService(events as never, repo as never, {} as never),
+    };
   };
 
   it('creates a project timeline view', async () => {

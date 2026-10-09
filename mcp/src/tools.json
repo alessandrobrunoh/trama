@@ -1321,7 +1321,8 @@
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
-   "shared": "body boolean Visible to everyone"
+   "shared": "body boolean Visible to everyone (legacy; same as sharing.visibility workspace|private)",
+   "sharing": "body object {visibility: private|workspace|link, grants?: [{userId, level: view|edit}]} (link = anyone with the public link can read it)"
   }
  },
  {
@@ -1338,7 +1339,8 @@
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
-   "shared": "body boolean Visible to everyone"
+   "shared": "body boolean Visible to everyone (legacy; same as sharing.visibility workspace|private)",
+   "sharing": "body object {visibility: private|workspace|link, grants?: [{userId, level: view|edit}]} (link = anyone with the public link can read it)"
   }
  },
  {

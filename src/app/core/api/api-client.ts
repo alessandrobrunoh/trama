@@ -43,6 +43,7 @@ import type {
   ProjectUpdate,
   Repository,
   Role,
+  PublicView,
   SavedView,
   Team,
   User,
@@ -84,6 +85,7 @@ import type {
   CreateTokenInput,
   CreatedToken,
   CreateViewInput,
+  InviteViewInput,
   CreateWorkspaceInput,
   CreateWorkstreamInput,
   CriterionInput,
@@ -541,6 +543,18 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateViewInput) =>
       this.patch<SavedView>(`${this.w(slug)}/views/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/views/${id}`),
+    /** Invite existing workspace members by email. */
+    invite: (slug: string, id: ID, input: InviteViewInput) =>
+      this.post<SavedView>(`${this.w(slug)}/views/${id}/invite`, input),
+    /** New public link; the old one stops working. */
+    rotateLink: (slug: string, id: ID) =>
+      this.post<SavedView>(`${this.w(slug)}/views/${id}/rotate-link`),
+  };
+
+  /** Anonymous, read-only: the fixed result of a view shared by link. */
+  readonly publicViews = {
+    get: (token: string) =>
+      this.get<PublicView>(`/public/views/${encodeURIComponent(token)}`, undefined, { quiet: true }),
   };
 
   graph = (slug: string) => this.get<GraphResponse>(`${this.w(slug)}/graph`);

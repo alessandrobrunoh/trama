@@ -33,6 +33,9 @@ import type {
   ProjectStatus,
   ReviewState,
   Role,
+  ShareGrant,
+  ShareLevel,
+  ShareVisibility,
   SubjectRef,
   User,
   ViewEntity,
@@ -457,6 +460,17 @@ export interface CreateViewInput {
   groupBy?: string;
   layout?: ViewLayout;
   shared?: boolean;
+  sharing?: SharingInput;
+}
+/** Who can open a view. `grants` replaces the whole list of invited workspace members. */
+export interface SharingInput {
+  visibility?: ShareVisibility;
+  grants?: ShareGrant[];
+}
+export interface InviteViewInput {
+  /** Existing workspace members, by email. */
+  emails: string[];
+  level?: ShareLevel;
 }
 export interface UpdateViewInput {
   name?: string;
@@ -466,6 +480,7 @@ export interface UpdateViewInput {
   groupBy?: string | null;
   layout?: ViewLayout;
   shared?: boolean;
+  sharing?: SharingInput;
 }
 
 // ───── graph / search ─────

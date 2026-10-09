@@ -471,7 +471,7 @@ export class SeedBuilder {
     if (entity === 'execution') return;
     this.data.views.push({
       id: uid('vw'), workspaceId: this.workspaceId, ownerId: owner, name, entity, filters: o.filters ?? [], sort: o.sort ?? null,
-      groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, createdAt: this.at(o.created), updatedAt: this.at(o.created),
+      groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, sharing: { visibility: o.shared ? 'workspace' : 'private', grants: [] }, publicTokenHash: null, publicTokenEnc: null, createdAt: this.at(o.created), updatedAt: this.at(o.created),
     });
   }
 }
