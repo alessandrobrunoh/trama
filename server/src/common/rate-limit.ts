@@ -85,6 +85,8 @@ export function rateLimitRules(env: NodeJS.ProcessEnv = process.env): { strict: 
     { name: 'signup', method: 'POST', path: /^\/api\/auth\/signup\/?$/, limit: intEnv(env, 'TRAMA_RATE_LIMIT_SIGNUP_PER_HOUR', 10), windowMs: HOUR },
     { name: 'invite', method: null, path: /^\/api\/invites\/[^/]+(\/accept)?\/?$/, limit: intEnv(env, 'TRAMA_RATE_LIMIT_INVITE_PER_15MIN', 30), windowMs: 15 * MINUTE },
     { name: 'public-view', method: 'GET', path: /^\/api\/public\/views\/[^/]+\/?$/, limit: intEnv(env, 'TRAMA_RATE_LIMIT_PUBLIC_VIEW_PER_MIN', 30), windowMs: MINUTE },
+    // inbound customer-request webhooks (Intercom, Zendesk, Front, Slack, email): public, signed, one source per URL
+    { name: 'intake-webhook', method: 'POST', path: /^\/api\/webhooks\/intake\/[^/]+\/?$/, limit: intEnv(env, 'TRAMA_RATE_LIMIT_INTAKE_PER_MIN', 300), windowMs: MINUTE },
     // token and agent creation mint credentials
     { name: 'credentials', method: 'POST', path: /^\/api\/w\/[^/]+\/(tokens|agents)\/?$/, limit: intEnv(env, 'TRAMA_RATE_LIMIT_CREDENTIALS_PER_HOUR', 30), windowMs: HOUR },
   ];
