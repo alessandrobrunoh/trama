@@ -1408,7 +1408,7 @@
   "method": "GET",
   "path": "/insights",
   "permission": "insights:read",
-  "description": "Where are the problems? Health signals (blocked workstreams and for how long, open questions and who is the bottleneck, stale work, delivered-but-outcome-open, overdue milestones, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle/lead time p50/p85, throughput, WIP per person and agent, aging WIP, cumulative flow) and agent vs people contribution with agent failure signals. Every signal lists the items that cause it.",
+  "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
   "params": {
     "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
     "teamId": "query string Only this team's work",
