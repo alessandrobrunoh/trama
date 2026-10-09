@@ -18,6 +18,14 @@ import { NablaStore } from './nabla.store';
 
 const PAGE = 100;
 
+/** Notification kinds that the attention queue already surfaces. */
+const NEEDS_YOU_KINDS: ReadonlySet<NotificationKind> = new Set([
+  'input_requested',
+  'decision_proposed',
+  'review_requested',
+  'ci_failed',
+]);
+
 @Injectable({ providedIn: 'root' })
 export class NotificationsStore {
   private readonly api = inject(ApiClient);
@@ -37,6 +45,15 @@ export class NotificationsStore {
   readonly emailAvailable = signal(false);
 
   readonly hasUnread = computed(() => this.unread() > 0);
+
+  /**
+   * Unread notifications that are not already a "needs you" item in the Inbox (a question or a review request
+   * shows up there as attention too), so the Inbox badge does not count the same thing twice.
+   */
+  readonly updatesUnread = computed(() => {
+    const dup = this.items().filter((n) => !n.readAt && NEEDS_YOU_KINDS.has(n.kind)).length;
+    return Math.max(0, this.unread() - dup);
+  });
 
   // ───────── push (system notifications on this device) ─────────
 

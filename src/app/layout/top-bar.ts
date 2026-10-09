@@ -10,7 +10,7 @@ import { NablaStore } from '../core/stores/nabla.store';
 import { FavoriteButton } from '../shared/favorite-button';
 import { SyncStatus } from '../core/sync/sync-status';
 import { PageChrome, type Crumb } from './page-chrome';
-import { MAIN_NAV, PERSONAL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
+import { ALL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 
 /** Top bar: sidebar toggle, breadcrumb trail, live-sync dot and the page's action slot. */
 @Component({
@@ -95,7 +95,7 @@ export class TopBar {
 
   protected readonly sectionIcon = computed(() => {
     const seg = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
-    return [...PERSONAL_NAV, ...MAIN_NAV].find((n) => n.segment === seg)?.icon ?? null;
+    return ALL_NAV.find((n) => n.segment === seg)?.icon ?? null;
   });
 
   protected readonly favoriteTarget = this.favorites.current;

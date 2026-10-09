@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import {
   LucideActivity,
@@ -15,7 +15,8 @@ import {
 } from '@lucide/angular';
 import { AssistantStore } from '../core/ai/assistant.store';
 import { NablaStore } from '../core/stores/nabla.store';
-import { MAIN_NAV, PERSONAL_NAV, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, type NavItem } from './nav';
+import { NotificationsStore } from '../core/stores/notifications.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
 
@@ -85,8 +86,8 @@ import { SessionStore } from '../core/session/session.store';
         >
           <svg [lucideIcon]="item.icon" [size]="22" aria-hidden="true"></svg>
           <span class="sr-only">{{ item.label }}</span>
-          @if (item.badge === 'attention' && store.attentionCount() > 0) {
-            <span class="mobile-nav__badge" aria-hidden="true">{{ store.attentionCount() > 99 ? '99+' : store.attentionCount() }}</span>
+          @if (item.badge === 'inbox' && inboxCount() > 0) {
+            <span class="mobile-nav__badge" aria-hidden="true">{{ inboxCount() > 99 ? '99+' : inboxCount() }}</span>
           }
         </a>
       }
@@ -124,13 +125,15 @@ export class MobileNav {
   protected readonly ui = inject(UiStore);
   protected readonly session = inject(SessionStore);
   protected readonly items: Pick<NavItem, 'segment' | 'label' | 'icon' | 'badge'>[] = [
-    PERSONAL_NAV[0],
+    PRIMARY_NAV[0],
     { segment: 'issues', label: 'Issues', icon: LucideCircleDot },
     { segment: 'activity', label: 'Activity', icon: LucideActivity },
     { segment: 'projects', label: 'Projects', icon: LucideBox },
   ];
   protected readonly store = inject(NablaStore);
   protected readonly slug = this.store.slug;
+  private readonly notifications = inject(NotificationsStore);
+  protected readonly inboxCount = computed(() => this.store.attentionCount() + this.notifications.updatesUnread());
   protected readonly assistantIcon = LucideMessageSquare;
   protected readonly menuIcon = LucideMenu;
   protected readonly closeIcon = LucideX;
@@ -138,11 +141,8 @@ export class MobileNav {
   protected readonly checkIcon = LucideCheck;
   protected readonly plusIcon = LucidePlus;
   protected readonly menuItems = [
-    PERSONAL_NAV[0],
-    PERSONAL_NAV[1],
-    PERSONAL_NAV[3],
-    { segment: 'activity', label: 'Activity', icon: LucideActivity },
-    ...MAIN_NAV.filter((item) => item.segment !== 'activity'),
+    ...PRIMARY_NAV,
+    ...MORE_NAV.filter((item) => item.segment !== 'assistant'),
     { segment: 'settings', label: 'Settings', icon: LucideSettings },
   ];
   protected get accountName(): string {
