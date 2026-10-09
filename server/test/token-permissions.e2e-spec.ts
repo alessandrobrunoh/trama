@@ -120,4 +120,31 @@ describe('custom API tokens: permissions and limits', () => {
     expect(token.permissions).toBeUndefined();
     await client.post(`${w}/issues`, { kind: 'bug', title: 'legacy' }).expect(201);
   });
+
+  it('nested artifact routes need artifacts:*, not the parent resource permission', async () => {
+    const { owner, w, mint } = await setup();
+    const issue = (await owner.post(`${w}/issues`, { kind: 'bug', title: 'Has artifacts' }).expect(201)).body;
+    const body = { kind: 'document', title: 'Notes' };
+    const issuesOnly = await mint({ permissions: ['issues:write'] });
+    await issuesOnly.client.post(`${w}/issues/${issue.key}/artifacts`, body).expect(403);
+    await issuesOnly.client.get(`${w}/issues/${issue.key}/artifacts`).expect(403);
+    const artifactsOnly = await mint({ permissions: ['artifacts:write'] });
+    await artifactsOnly.client.post(`${w}/issues/${issue.key}/artifacts`, body).expect(201);
+    await artifactsOnly.client.get(`${w}/issues/${issue.key}/artifacts`).expect(200);
+  });
+
+  it('account-level routes are closed to workspace-bound API tokens', async () => {
+    const { w, slug, mint } = await setup();
+    const { client } = await mint({ scope: 'write' });
+    await client.post('/api/workspaces', { name: 'Escape Hatch' }).expect(403);
+    await client.post('/api/invites/nope/accept').expect(403);
+    await client.get('/api/me/notification-settings').expect(403);
+    await client.get('/api/me/push').expect(403);
+    // listing only reveals the workspace the token belongs to
+    const listed = (await client.get('/api/workspaces').expect(200)).body as { slug: string }[];
+    expect(listed.map((x) => x.slug)).toEqual([slug]);
+    const me = (await client.get('/api/auth/me').expect(200)).body as { workspaces: { slug: string }[] };
+    expect(me.workspaces.map((x) => x.slug)).toEqual([slug]);
+    await client.get(`${w}/issues`).expect(200);
+  });
 });

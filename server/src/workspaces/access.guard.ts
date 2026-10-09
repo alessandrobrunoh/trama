@@ -18,6 +18,7 @@ import {
   REQUIRE_USER_KEY,
   TEAM_SCOPE_KEY,
   ROLES_KEY,
+  SESSION_ONLY_KEY,
   hasRole,
   type AppRequest,
   type AuthInfo,
@@ -63,7 +64,8 @@ function hasBody(req: AppRequest): boolean {
  *     or the httpOnly `nabla_session` cookie. → 401 otherwise. Sets `req.auth`.
  *  3. CSRF for cookie sessions: mutating requests need `X-Requested-With` or `X-Client-Id`
  *     (forces a CORS preflight, so only allow-listed origins can send them); bodies must be JSON.
- *  4. API token scopes: `read` tokens can only call safe (GET) routes; the effective role of a
+ *  4. `@SessionOnly()` account routes (create workspace, accept invite, personal settings) refuse API tokens.
+ *     API token scopes: `read` tokens can only call safe (GET) routes; the effective role of a
  *     `read` token is capped at viewer and of a `write` token at member, so neither can reach
  *     workspace-admin routes. `admin` tokens keep the full role of the user they act as.
  *  5. For routes with a `:slug` param: resolves the workspace + the caller's role → `req.ctx`.
@@ -107,6 +109,9 @@ export class AccessGuard implements CanActivate {
       if (!req.headers['x-requested-with'] && !req.headers['x-client-id'])
         throw new ForbiddenException('Missing X-Requested-With or X-Client-Id header');
     }
+
+    if (auth.token && this.reflector.getAllAndOverride<boolean>(SESSION_ONLY_KEY, targets))
+      throw new ForbiddenException('This account-level route is only available to signed-in browser sessions, not API tokens');
 
     if (auth.token) {
       await this.tokens.enforceLimits(auth.token, mutating);
