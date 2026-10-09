@@ -1,3 +1,5 @@
+> **Background document, not the source of truth.** [`VISION.md`](../VISION.md) is the authoritative, short statement of what Trama is, and [`NON-GOALS.md`](../NON-GOALS.md) says what it will not do. This file is the original long-form write-up, kept for its reasoning and examples. It was written before several parts of the product existed and it is Delta-centric; where it disagrees with `VISION.md`, `VISION.md` wins. Short *Editor's notes* below flag the known contradictions. The text itself is unchanged.
+
 # Trama Vision
 
 > **Issues describe problems. Workstreams organize outcomes. Shared workspaces preserve implementation context. Artifacts show what was delivered.**
@@ -207,6 +209,8 @@ This keeps Workstreams meaningful for the rest of the team.
 ---
 
 # 6. A Workstream is not a Delta Thread
+
+> *Editor's note (2026-10):* The standalone `Execution` object that earlier drafts of the product had no longer exists (the `executions` table was dropped). A workstream now carries an optional `deltaThreadUrl`, and agents are actors on the workstream. Delta is one integration among others; read "Delta" below as "any execution environment".
 
 Trama is designed around workflows enabled by collaborative environments such as Delta, but a Workstream is not equivalent to a Delta Thread.
 
@@ -607,6 +611,8 @@ A team should eventually be able to answer:
 
 # 16. Workstream lifecycle
 
+> *Editor's note:* Superseded. The implemented statuses are `draft`, `planned`, `working`, `needs_input`, `in_review`, `blocked`, `ready_to_land`, `shipped`, `canceled`, and they are derived from facts (see the note on the next section).
+
 The Workstream lifecycle should be simpler than the implementation lifecycle.
 
 A reasonable initial model is:
@@ -648,6 +654,8 @@ That distinction keeps Trama truthful.
 ---
 
 # 17. Manual first, automation second
+
+> *Editor's note:* Contradicted by the product and by `VISION.md`: workstream status is derived from facts (criteria, artifacts, input requests, dependencies, decisions) by the status engine and can only be pinned manually as an override. "Manual first" now applies to grouping, owners and decisions only.
 
 Trama should prefer truthful manual state over fake automation.
 
@@ -1303,6 +1311,8 @@ When confidence is uncertain, Trama should suggest rather than silently guess.
 
 # 34. External Issue trackers
 
+> *Editor's note:* Not built. There is no importer and no way to link Jira, Linear or GitHub issues today. `VISION.md` keeps incremental adoption as a principle; the gap is listed in `NON-GOALS.md`.
+
 Long term, Issues do not necessarily have to originate inside Trama.
 
 A Workstream could organize Issues from:
@@ -1370,6 +1380,8 @@ The product should reveal complexity only when necessary.
 ---
 
 # 36. My Work
+
+> *Editor's note:* Superseded. Input requests and the Attention queue exist and are core to the product (they are where a human is needed). This document never mentions them.
 
 Traditional trackers have:
 
@@ -1487,6 +1499,8 @@ The execution environment already owns that detail.
 
 # 40. Product principles
 
+> *Editor's note:* "Be useful without AI" still holds for the core model, but the app also ships an optional assistant (off by default). See the scope freeze in `NON-GOALS.md`.
+
 ## Keep the Issue
 
 The Issue workflow remains useful and widely understood.
@@ -1547,6 +1561,8 @@ Teams should be able to run Trama on infrastructure they control.
 
 # 41. What Trama is not
 
+> *Editor's note:* The product has drifted from this list: it contains Customers, Statistics, Timeline, Roadmap, Views and an assistant. `NON-GOALS.md` records, per surface, whether it is core, frozen or a candidate for removal.
+
 Trama is not:
 
 - a replacement for Delta;
@@ -1605,6 +1621,8 @@ Analytics can come later.
 ---
 
 # 43. Conceptual data model
+
+> *Editor's note:* Incomplete. Missing from this model: input requests, attention items, milestones, dependencies, acceptance criteria, agents as members, API tokens, customers. See `VISION.md` for the current core model.
 
 The exact schema will evolve, but the concepts should remain stable.
 
@@ -2216,6 +2234,8 @@ Only then should Trama aggressively expand into deeper automation, analytics, or
 
 # 61. Near-term non-priorities
 
+> *Editor's note:* Several items listed here were built anyway (statistics, an assistant, a large permission matrix). See the scope freeze in `NON-GOALS.md`.
+
 These should not distract from proving the core workflow:
 
 - detailed agent telemetry;
@@ -2232,6 +2252,8 @@ These should not distract from proving the core workflow:
 ---
 
 # 62. Long-term opportunity
+
+> *Editor's note:* The diagram's `NABLA` label is the pre-rename product name; it means Trama.
 
 If Workstreams prove useful, Trama can become a coordination layer across the modern software toolchain.
 
