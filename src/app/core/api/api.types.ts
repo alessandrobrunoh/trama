@@ -377,6 +377,18 @@ export interface UpdateIssueInput {
   /** Workspace label ids. Replaces the whole list. */
   labels?: ID[];
 }
+/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+export interface BulkIssuePatch {
+  status?: IssueStatus;
+  priority?: Priority;
+  assigneeId?: ID | null;
+  teamId?: ID | null;
+  projectId?: ID | null;
+  addLabels?: ID[];
+  removeLabels?: ID[];
+  addWorkstreamIds?: ID[];
+  removeWorkstreamIds?: ID[];
+}
 export interface LinkIssueInput {
   workstreamIds?: ID[];
   /** Create a workstream from this issue (title + ownerTeamId required). */
@@ -482,6 +494,16 @@ export interface EventsQuery {
   type?: string;
   /** ISO date cursor: events strictly older than this. */
   before?: ISODate;
+  limit?: number;
+}
+export interface InsightsQuery {
+  /** 7, 30 or 90 (default 30). */
+  days?: number;
+  teamId?: ID;
+  projectId?: ID;
+  /** Days without activity before in-flight work is stale (default 7). */
+  staleDays?: number;
+  /** Items kept per signal (counts always cover everything). */
   limit?: number;
 }
 export interface AttentionQuery {

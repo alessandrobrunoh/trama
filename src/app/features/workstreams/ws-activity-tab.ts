@@ -29,7 +29,7 @@ const PAGE = 30;
   template: `
     <div class="mx-auto max-w-3xl px-4 py-5 sm:px-6">
       @if (canEdit()) {
-        <app-comment-composer #composer class="mb-6" placeholder="Comment on this workstream…" (submitted)="send($event, composer)" />
+        <app-comment-composer #composer class="mb-6" placeholder="Comment on this workstream…" [draftKey]="'comment:workstream:' + ws().id" (submitted)="send($event, composer)" />
       }
 
       @for (d of days(); track d.label) {

@@ -1,8 +1,10 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, input, resource, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import {
+  ApiClient,
+  INSIGHT_SIGNAL_IDS,
   ISSUE_STATUS_META,
   ISSUE_STATUSES,
   NablaStore,
@@ -10,12 +12,17 @@ import {
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
   WORKSTREAM_STATUS_META,
+  type InsightSignalId,
+  type InsightsQuery,
 } from '../../core';
 import { BarList } from './charts/bar-list';
 import { ChartCard } from './charts/chart-card';
 import type { ChartSlice } from './charts/chart-utils';
+import { ContributorsView } from './contributors-view';
 import { DonutChart } from './charts/donut-chart';
 import { EstimatesView } from './estimates-view';
+import { FlowView, type FlowDrill } from './flow-view';
+import { HealthView } from './health-view';
 import { IssueExtras } from './issue-extras';
 import { KpiTile } from './charts/kpi-tile';
 import { Sparkline } from './charts/sparkline';
@@ -29,10 +36,17 @@ import { EMPTY_TIMELINE, type Timeline } from './timeline';
 import { EMPTY_WORK } from './work';
 import { WsExtras } from './ws-extras';
 
-export type StatsScope = 'issues' | 'workstreams' | 'estimates';
-const SCOPES: readonly StatsScope[] = ['issues', 'workstreams', 'estimates'];
+export type StatsScope = 'health' | 'flow' | 'contributors' | 'issues' | 'workstreams' | 'estimates';
+const SCOPES: readonly StatsScope[] = ['health', 'flow', 'contributors', 'issues', 'workstreams', 'estimates'];
+/** Scopes backed by the insights API (health signals, flow metrics, people and agents). */
+const INSIGHT_SCOPES: readonly StatsScope[] = ['health', 'flow', 'contributors'];
+const FLOW_DRILLS: readonly FlowDrill[] = ['cycle', 'lead', 'workstream', 'aging'];
+const STALE_CHOICES = [3, 7, 14, 30] as const;
 
 const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
+  health: { label: 'Health', blurb: 'Where the problems are right now: stuck, stale and overdue work, and who everything waits on.' },
+  flow: { label: 'Flow', blurb: 'How work moves: cycle and lead time, throughput, aging work in progress and cumulative flow.' },
+  contributors: { label: 'People & agents', blurb: 'Who changes things, and where agents get stuck. Agents are actors, never assignees.' },
   issues: { label: 'Issues', blurb: 'Demand: what comes in, how fast it clears, and what is waiting.' },
   workstreams: { label: 'Workstreams', blurb: 'Outcomes: what gets delivered, how long it takes, and where it stalls.' },
   estimates: { label: 'Estimates & time', blurb: 'How long work really takes, and how well estimates predict it.' },
@@ -45,7 +59,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
 @Component({
   selector: 'app-stats-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, BarList, ChartCard, DonutChart, EstimatesView, IssueExtras, KpiTile, Sparkline, StackBar, TimeChart, WsExtras],
+  imports: [NgTemplateOutlet, RouterLink, BarList, ChartCard, ContributorsView, DonutChart, EstimatesView, FlowView, HealthView, IssueExtras, KpiTile, Sparkline, StackBar, TimeChart, WsExtras],
   host: { class: 'block' },
   template: `
     @if (variant() === 'strip') {
@@ -80,11 +94,11 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
           <div class="bg-background/90 sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6">
             <div class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
               @if (scopes().length > 1) {
-                <div class="inline-flex rounded-md border p-0.5" role="group" aria-label="Scope">
+                <div class="inline-flex max-w-full overflow-x-auto rounded-md border p-0.5 scrollbar-none" role="group" aria-label="Scope">
                   @for (s of scopes(); track s) {
                     <button
                       type="button"
-                      class="h-6 rounded px-2.5 text-xs transition-colors"
+                      class="h-6 shrink-0 rounded px-2.5 text-xs whitespace-nowrap transition-colors"
                       [class]="scope() === s ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
                       [attr.aria-pressed]="scope() === s"
                       (click)="setScope(s)"
@@ -94,6 +108,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
                   }
                 </div>
               }
+              @if (!insightScope()) {
               <select
                 class="border-input bg-background h-7 max-w-40 rounded-md border px-1.5 text-xs"
                 aria-label="Person"
@@ -107,6 +122,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
                   <option [value]="m.user.id" [selected]="person() === m.user.id">{{ m.user.name }}</option>
                 }
               </select>
+              }
               @if (store.teams().length) {
                 <select
                   class="border-input bg-background h-7 max-w-40 rounded-md border px-1.5 text-xs"
@@ -119,12 +135,36 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
                   }
                 </select>
               }
-              @if (filtered()) {
+              @if (insightScope() && store.projects().length) {
+                <select
+                  class="border-input bg-background h-7 max-w-40 rounded-md border px-1.5 text-xs"
+                  aria-label="Project"
+                  (change)="setProject($any($event.target).value)"
+                >
+                  <option value="all" [selected]="project() === 'all'">All projects</option>
+                  @for (p of store.projects(); track p.id) {
+                    <option [value]="p.id" [selected]="project() === p.id">{{ p.name }}</option>
+                  }
+                </select>
+              }
+              @if (scope() === 'health') {
+                <select
+                  class="border-input bg-background h-7 rounded-md border px-1.5 text-xs"
+                  aria-label="Stale after"
+                  title="Days without activity before in-flight work counts as stale"
+                  (change)="setStale($any($event.target).value)"
+                >
+                  @for (d of staleChoices; track d) {
+                    <option [value]="d" [selected]="stale() === d">Stale after {{ d }}d</option>
+                  }
+                </select>
+              }
+              @if (filtered() || (insightScope() && project() !== 'all')) {
                 <button type="button" class="text-meta hover:text-foreground text-xs" (click)="clearFilters()">Clear filters</button>
               }
             </div>
             <div class="inline-flex rounded-md border p-0.5" role="group" aria-label="Period">
-              @for (p of periods; track p.id) {
+              @for (p of visiblePeriods(); track p.id) {
                 <button
                   type="button"
                   class="h-6 min-w-9 rounded px-2 text-xs tabular-nums transition-colors"
@@ -140,6 +180,34 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
           </div>
           @if (scope(); as sc) {
             <p class="text-meta -mt-3 text-xs">{{ scopeMeta[sc].blurb }}</p>
+          }
+        }
+
+        @if (insightScope()) {
+          @if (report.error()) {
+            <div class="bg-card flex flex-col items-start gap-2 rounded-lg border px-4 py-5" role="alert">
+              <p class="text-sm font-medium">Could not load the insights</p>
+              <p class="text-meta">Check your connection and try again.</p>
+              <button type="button" class="border-input hover:bg-hover h-7 rounded-md border px-2.5 text-xs" (click)="report.reload()">Retry</button>
+            </div>
+          } @else if (report.value(); as rep) {
+            @switch (scope()) {
+              @case ('health') {
+                <app-health-view [report]="rep" [slug]="slug()" [query]="insightQuery()" [selected]="signal()" (selectedChange)="setSignal($event)" />
+              }
+              @case ('flow') {
+                <app-flow-view [report]="rep" [slug]="slug()" [drill]="drill()" (drillChange)="setDrill($event)" />
+              }
+              @case ('contributors') {
+                <app-contributors-view [report]="rep" [slug]="slug()" />
+              }
+            }
+          } @else {
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-busy="true" aria-label="Loading insights">
+              @for (n of [1, 2, 3, 4, 5, 6, 7, 8]; track n) {
+                <div class="bg-muted/60 h-24 animate-pulse rounded-lg"></div>
+              }
+            </div>
           }
         }
 
@@ -336,7 +404,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
           <p class="text-meta rounded-lg border border-dashed py-12 text-center">Nothing to chart yet. Statistics appear once issues or workstreams exist.</p>
         }
 
-        @if (model().cards.length && !filtered() && scope() !== 'estimates') {
+        @if (model().cards.length && !filtered() && !insightScope() && scope() !== 'estimates') {
           <section aria-label="Snapshot">
             <h2 class="text-muted-foreground mb-2 text-xs font-medium">Snapshot</h2>
             <ul class="grid grid-cols-2 overflow-hidden rounded-lg border sm:grid-cols-4">
@@ -383,8 +451,11 @@ export class StatsBoard {
   readonly onlyScopes = input<readonly StatsScope[] | undefined>(undefined, { alias: 'scopes' });
   /** Keep scope, period, person and team in the URL query (the statistics page). */
   readonly syncUrl = input(false);
+  /** Offer the Health, Flow and People & agents scopes (the workspace statistics page). */
+  readonly insights = input(false);
 
   protected readonly store = inject(NablaStore);
+  private readonly api = inject(ApiClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly query = toSignal(this.route.queryParamMap, { initialValue: this.route.snapshot.queryParamMap });
@@ -397,6 +468,13 @@ export class StatsBoard {
   protected readonly person = signal<string>('all');
   /** `all` | a team id. */
   protected readonly team = signal<string>('all');
+  /** `all` | a project id (insight scopes). */
+  protected readonly project = signal<string>('all');
+  protected readonly stale = signal<number>(7);
+  /** Health tile or flow figure whose items are open. */
+  protected readonly signal = signal<InsightSignalId | null>(null);
+  protected readonly drill = signal<FlowDrill | null>(null);
+  protected readonly staleChoices = STALE_CHOICES;
 
   constructor() {
     effect(() => {
@@ -409,6 +487,13 @@ export class StatsBoard {
         this.period.set(PERIODS.some((p) => p.id === period) ? (period as Period) : '30d');
         this.person.set(q.get('person') || 'all');
         this.team.set(q.get('team') || 'all');
+        this.project.set(q.get('project') || 'all');
+        const stale = Number(q.get('stale'));
+        this.stale.set((STALE_CHOICES as readonly number[]).includes(stale) ? stale : 7);
+        const sig = q.get('signal');
+        this.signal.set(INSIGHT_SIGNAL_IDS.includes(sig as InsightSignalId) ? (sig as InsightSignalId) : null);
+        const drill = q.get('drill');
+        this.drill.set(FLOW_DRILLS.includes(drill as FlowDrill) ? (drill as FlowDrill) : null);
       });
     });
   }
@@ -444,12 +529,31 @@ export class StatsBoard {
 
   protected readonly scopes = computed<StatsScope[]>(() => {
     const raw = this.rawTimeline();
-    const out: StatsScope[] = [];
+    const out: StatsScope[] = this.insights() && this.variant() === 'full' ? [...INSIGHT_SCOPES] : [];
     if (raw.issues.length) out.push('issues');
     if (raw.workstreams.length) out.push('workstreams');
     if (this.work().issues.length) out.push('estimates');
     const only = this.onlyScopes();
     return only ? out.filter((s) => only.includes(s)) : out;
+  });
+  protected readonly insightScope = computed(() => INSIGHT_SCOPES.includes(this.scope() as StatsScope));
+  protected readonly visiblePeriods = computed(() => (this.insightScope() ? this.periods.filter((p) => p.id !== 'all') : this.periods));
+  protected readonly slug = computed(() => this.store.slug() ?? '');
+
+  protected readonly insightDays = computed(() => {
+    const p = this.period();
+    return p === '7d' ? 7 : p === '30d' ? 30 : 90;
+  });
+  protected readonly insightQuery = computed<InsightsQuery>(() => ({
+    days: this.insightDays(),
+    staleDays: this.stale(),
+    ...(this.teamId() ? { teamId: this.teamId()! } : {}),
+    ...(this.project() !== 'all' ? { projectId: this.project() } : {}),
+  }));
+  /** Health signals, flow metrics and contributors: one request, only while an insight scope is open. */
+  protected readonly report = resource({
+    params: () => (this.insightScope() && this.slug() ? { slug: this.slug(), query: this.insightQuery() } : undefined),
+    loader: ({ params }) => this.api.insights.report(params.slug, params.query),
   });
   protected readonly scope = computed<StatsScope | null>(() => {
     const pick = this.picked();
@@ -507,7 +611,7 @@ export class StatsBoard {
   );
   /** Artifacts & decisions belong to delivery: show them with workstreams, or when there is no workstream scope. */
   protected readonly showDelivery = computed(
-    () => this.variant() === 'full' && this.deliveryDists().length > 0 && (this.scope() === 'workstreams' || !this.scopes().includes('workstreams')),
+    () => this.variant() === 'full' && !this.insightScope() && this.deliveryDists().length > 0 && (this.scope() === 'workstreams' || !this.scopes().includes('workstreams')),
   );
 
   protected setScope(s: StatsScope): void {
@@ -526,10 +630,27 @@ export class StatsBoard {
     this.team.set(v);
     this.sync({ team: v === 'all' ? null : v });
   }
+  protected setProject(v: string): void {
+    this.project.set(v);
+    this.sync({ project: v === 'all' ? null : v, signal: null });
+  }
+  protected setStale(v: string): void {
+    this.stale.set(Number(v));
+    this.sync({ stale: Number(v) === 7 ? null : v });
+  }
+  protected setSignal(id: InsightSignalId | null): void {
+    this.signal.set(id);
+    this.sync({ signal: id });
+  }
+  protected setDrill(id: FlowDrill | null): void {
+    this.drill.set(id);
+    this.sync({ drill: id });
+  }
   protected clearFilters(): void {
     this.person.set('all');
     this.team.set('all');
-    this.sync({ person: null, team: null });
+    this.project.set('all');
+    this.sync({ person: null, team: null, project: null });
   }
 
   private sync(params: Record<string, string | null>): void {
