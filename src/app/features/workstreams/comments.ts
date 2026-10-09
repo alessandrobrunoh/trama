@@ -33,7 +33,7 @@ import { CommentInput } from './comment-input';
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, Kbd, CommentInput],
-  host: { class: 'block min-w-0' },
+  host: { class: 'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:border-t max-md:px-4 max-md:py-2' },
   template: `
     <div class="bg-card overflow-hidden rounded-lg border">
       <app-comment-input
@@ -42,8 +42,8 @@ import { CommentInput } from './comment-input';
         [(value)]="draft"
         (keyed)="onKeydown($event)"
       />
-      <div class="flex items-center justify-between gap-2 border-t px-3 py-2">
-        <span class="text-meta"
+      <div class="flex items-center justify-between gap-2 border-t px-3 py-2 max-md:justify-end">
+        <span class="text-meta max-md:hidden"
           >Markdown · @ to mention, # to link{{
             prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''
           }}</span

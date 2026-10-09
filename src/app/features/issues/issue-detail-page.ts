@@ -204,6 +204,12 @@ import { LabelPicker } from '../../shared/label-picker';
               <div class="mt-3">
                 <app-issue-description #desc [value]="i.body ?? ''" [canEdit]="canEdit()" (save)="store.updateIssue(i.id, { body: $event || null })" />
               </div>
+              <!-- Phones: the properties panel sits below the activity; the three that matter most are one tap away here. -->
+              <div class="prop-chips mt-4 flex flex-wrap gap-2 lg:hidden" role="group" aria-label="Properties">
+                <app-issue-prop [issue]="i" field="status" showLabel />
+                <app-issue-prop [issue]="i" field="priority" showLabel />
+                <app-issue-prop [issue]="i" field="assignee" showLabel />
+              </div>
             </div>
 
             <app-issue-workstreams [issue]="i" />

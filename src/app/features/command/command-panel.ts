@@ -313,7 +313,7 @@ export const COMMAND_DIALOG_CLASS =
       [(search)]="query"
     >
       <div class="border-border shrink-0 border-b">
-        <div class="flex h-12 items-center gap-2.5 px-4">
+        <div class="flex h-12 items-center gap-2.5 px-4 max-md:h-14">
           @if (mode() === 'palette' && context(); as ctx) {
             <button
               type="button"
@@ -351,9 +351,22 @@ export const COMMAND_DIALOG_CLASS =
             class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-hidden"
             [placeholder]="placeholder()"
             [attr.aria-label]="placeholder()"
+            enterkeyhint="search"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
             (keydown.meta.enter)="askAssistant($event)"
             (keydown.control.enter)="askAssistant($event)"
           />
+          <button
+            type="button"
+            class="text-primary -mr-2 flex h-11 shrink-0 items-center px-3 text-base md:hidden"
+            (mousedown)="$event.preventDefault()"
+            (click)="ui.closeModal()"
+          >
+            Cancel
+          </button>
           @if (canAsk()) {
             <button
               type="button"
@@ -578,7 +591,7 @@ export const COMMAND_DIALOG_CLASS =
 export class CommandPanel {
   readonly mode = input<'palette' | 'search'>('palette');
 
-  private readonly ui = inject(UiStore);
+  protected readonly ui = inject(UiStore);
   private readonly store = inject(NablaStore);
   private readonly favorites = inject(FavoritesStore);
   private readonly customerSubs = inject(CustomerSubscriptionsStore);

@@ -2,17 +2,28 @@
 // property glyphs sit above it and open inline pickers.
 import { ChangeDetectionStrategy, Component, Directive, computed, inject, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideBuilding2, LucideCheck, LucideDynamicIcon } from '@lucide/angular';
+import {
+  LucideBuilding2,
+  LucideCheck,
+  LucideDynamicIcon,
+  LucideFlag,
+  LucideRotateCcw,
+  LucideUserPlus,
+  LucideUserRoundX,
+} from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, fullDate, issueProjectIds, shortDate, type Issue } from '../../core';
+import { NablaStore, Viewport, fullDate, haptic, issueProjectIds, shortDate, type Issue } from '../../core';
 import { EntityChip } from '../../shared/entity-chip';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
+import { PriorityIcon } from '../../shared/priority-icon';
+import { SwipeRow } from '../../shared/swipe-row';
 import { LabelChips } from '../../shared/label-chip';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue } from './issue-model';
 import { describeDemand } from '../customers/customer-model';
+import { IssueActions } from './issue-actions';
 import { IssueProp } from './issue-prop';
 
 /** Shared bits of row + card. */
@@ -88,11 +99,86 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
     @let s = show();
+    @if (vp.isMobile()) {
+      <!-- Phone row: two lines, 44px+ targets, swipe actions that mirror the tappable pickers. -->
+      <app-swipe-row
+        [disabled]="!canEdit()"
+        [startWidth]="canEdit() ? 104 : 0"
+        [endWidth]="canEdit() ? 176 : 0"
+        (startCommit)="toggleMe()"
+        (endCommit)="toggleDone()"
+      >
+        <button swipeStart type="button" class="swipe-action swipe-action--blue" (click)="toggleMe()">
+          <svg [lucideIcon]="mine() ? unassignIcon : assignIcon" [size]="20" aria-hidden="true"></svg>
+          <span>{{ mine() ? 'Unassign' : 'Assign me' }}</span>
+        </button>
+        <button swipeEnd type="button" class="swipe-action swipe-action--grey" (click)="actions.openPrompt('priority', [i.id])">
+          <svg [lucideIcon]="flagIcon" [size]="20" aria-hidden="true"></svg>
+          <span>Priority</span>
+        </button>
+        <button swipeEnd type="button" class="swipe-action swipe-action--green" (click)="toggleDone()">
+          <svg [lucideIcon]="quiet() ? reopenIcon : check" [size]="20" aria-hidden="true"></svg>
+          <span>{{ quiet() ? 'Reopen' : 'Done' }}</span>
+        </button>
+        <div
+          class="issue-m relative flex items-center gap-1 border-b border-border/60 pl-1 pr-3"
+          [class.bg-selected]="selected()"
+          [attr.data-row-id]="i.id"
+          (pointerdown)="pressStart($event)"
+          (pointermove)="pressMove($event)"
+          (pointerup)="pressEnd()"
+          (pointercancel)="pressEnd()"
+        >
+          <a
+            [routerLink]="['/', slug(), 'issues', i.key]"
+            class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
+            [attr.aria-label]="i.key + ' ' + i.title"
+            (click)="onPressedLinkClick($event)"
+          ></a>
+          @if (selectable() && selecting()) {
+            <button
+              type="button"
+              role="checkbox"
+              class="issue-m__check relative"
+              [attr.aria-checked]="selected()"
+              [attr.aria-label]="'Select ' + i.key"
+              (click)="onCheck($event)"
+            >
+              <span
+                class="border-border-strong flex size-5 items-center justify-center rounded-full border"
+                [class]="selected() ? 'bg-primary border-primary text-primary-foreground' : 'bg-background'"
+              >
+                @if (selected()) {
+                  <svg [lucideIcon]="check" [size]="12" [strokeWidth]="3"></svg>
+                }
+              </span>
+            </button>
+          }
+          <app-issue-prop class="issue-m__tap relative" [issue]="i" field="status" [size]="20" />
+          <span class="pointer-events-none flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
+            <span class="line-clamp-2 text-[15px] leading-snug" [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
+            <span class="text-muted-foreground flex min-w-0 items-center gap-2 text-xs">
+              <span class="font-mono">{{ i.key }}</span>
+              @if (i.priority !== 'none') {
+                <app-priority-icon [priority]="i.priority" />
+              }
+              @if (wsShown()[0]; as id) {
+                <app-entity-chip class="min-w-0" type="workstream" [ref]="id" compact />
+              }
+              <span class="ml-auto shrink-0 tabular-nums">{{ date() }}</span>
+            </span>
+          </span>
+          @if (s.assignee) {
+            <app-issue-prop class="issue-m__tap relative" [issue]="i" field="assignee" [avatarSize]="24" />
+          }
+        </div>
+      </app-swipe-row>
+    } @else {
     <div
       [attr.data-row-id]="i.id"
       class="group/row relative flex items-center gap-2 border-b border-border/60 pr-3 pl-1.5 text-[13px] sm:pr-5 sm:pl-2.5"
@@ -180,10 +266,77 @@ abstract class IssueItemBase {
         <span class="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums max-sm:hidden" [attr.aria-label]="dateTitle()">{{ date() }}</span>
       }
     </div>
+    }
   `,
 })
 export class IssueRow extends IssueItemBase {
   readonly compact = input(false);
+  protected readonly vp = inject(Viewport);
+  protected readonly actions = inject(IssueActions);
+  protected readonly canEdit = computed(() => this.store.can('member'));
+  protected readonly mine = computed(() => this.issue().assigneeId === this.store.me()?.id);
+  protected readonly assignIcon = LucideUserPlus;
+  protected readonly unassignIcon = LucideUserRoundX;
+  protected readonly flagIcon = LucideFlag;
+  protected readonly reopenIcon = LucideRotateCcw;
+
+  protected toggleMe(): void {
+    this.actions.toggleAssignMe([this.issue().id]);
+  }
+
+  protected toggleDone(): void {
+    this.actions.setStatus([this.issue().id], this.quiet() ? 'todo' : 'done');
+  }
+
+  // Long press selects the row (touch has no hover checkbox).
+  private press: { x: number; y: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  private pressed = false;
+
+  protected pressStart(ev: PointerEvent): void {
+    if (!this.selectable() || ev.pointerType === 'mouse') return;
+    this.pressEnd();
+    this.pressed = false;
+    this.press = {
+      x: ev.clientX,
+      y: ev.clientY,
+      timer: setTimeout(() => {
+        this.pressed = true;
+        haptic('success');
+        this.toggleSelect.emit(new MouseEvent('click'));
+        // The finger lifts after this: swallow the click it produces so the issue does not open.
+        const swallow = (e: Event): void => {
+          e.preventDefault();
+          e.stopPropagation();
+        };
+        document.addEventListener('click', swallow, { capture: true, once: true });
+        setTimeout(() => document.removeEventListener('click', swallow, true), 1500);
+      }, 480),
+    };
+  }
+
+  protected pressMove(ev: PointerEvent): void {
+    const p = this.press;
+    if (p && Math.hypot(ev.clientX - p.x, ev.clientY - p.y) > 8) this.pressEnd();
+  }
+
+  protected pressEnd(): void {
+    if (this.press) clearTimeout(this.press.timer);
+    this.press = null;
+  }
+
+  protected onPressedLinkClick(e: MouseEvent): void {
+    if (this.pressed) {
+      // the lift after a long press must not open the issue
+      e.preventDefault();
+      this.pressed = false;
+      return;
+    }
+    if (this.selecting()) {
+      e.preventDefault();
+      this.toggleSelect.emit(e);
+    }
+  }
+
   protected readonly rowState = computed(
     () =>
       (this.compact() ? 'min-h-8 ' : 'min-h-10 ') +

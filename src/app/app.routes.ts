@@ -1,7 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type Route, type Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
-import { authGuard, guestGuard, workspaceGuard } from './core/session/guards';
+import { authGuard, guestGuard, launchGuard, workspaceGuard } from './core/session/guards';
 
 /** `/:workspace/<old path>` → `/:workspace/inbox?tab=<tab>`; other query params are dropped. */
 function redirectInbox(path: string, tab: string): Route {
@@ -98,6 +98,8 @@ export const routes: Routes = [
     title: 'Not found · Trama',
     loadComponent: () => import('./features/not-found/not-found-page').then((m) => m.NotFoundPage),
   },
+  // PWA entry point (start_url and home-screen shortcuts), see launchGuard.
+  { path: 'a/launch', canActivate: [launchGuard], children: [] },
   // `/` is always the public landing page, regardless of session state.
   {
     path: '',

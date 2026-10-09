@@ -25,14 +25,17 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
     <svg
       [lucideIcon]="searchIcon"
       [size]="14"
-      class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"
+      class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2 max-md:left-3"
     ></svg>
     <input
       #box
       hlmInput
       type="text"
-      class="h-7 w-full pl-8 text-xs max-sm:h-9"
+      class="h-7 w-full pl-8 text-xs max-md:h-11 max-md:pl-9"
       autocomplete="off"
+      autocapitalize="off"
+      enterkeyhint="search"
+      inputmode="search"
       [placeholder]="placeholder() || 'Search ' + noun() + '…'"
       [attr.aria-label]="'Search ' + noun()"
       [value]="value()"
