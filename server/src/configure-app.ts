@@ -1,4 +1,4 @@
-import { ValidationPipe, type INestApplication } from '@nestjs/common';
+import { BadRequestException, ValidationPipe, type ArgumentMetadata, type INestApplication, type PipeTransform } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { captureWebhookRawBody } from './webhooks/raw-body.js';
 
@@ -12,6 +12,18 @@ export const DEFAULT_CORS_ORIGINS = [
 
 export const JSON_BODY_LIMIT = '2mb';
 
+/**
+ * A JSON array is not a valid body for any route that expects a DTO: left alone it passes
+ * validation (no property is wrong) and its methods (`sort`, `filter`…) shadow missing fields.
+ */
+export class RejectArrayBodyPipe implements PipeTransform {
+  transform(value: unknown, metadata: ArgumentMetadata): unknown {
+    if (metadata.type === 'body' && Array.isArray(value) && metadata.metatype !== Array)
+      throw new BadRequestException('Request body must be a JSON object');
+    return value;
+  }
+}
+
 /** Shared by main.ts and the e2e tests. */
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
@@ -22,6 +34,7 @@ export function configureApp(app: INestApplication): void {
     verify: captureWebhookRawBody,
   } as Parameters<NestExpressApplication['useBodyParser']>[1]);
   app.useGlobalPipes(
+    new RejectArrayBodyPipe(),
     new ValidationPipe({
       whitelist: true,
       transform: true,
