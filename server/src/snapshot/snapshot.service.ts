@@ -1,13 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import type { WorkspaceContext } from '../auth/request-context.js';
-import type { Role } from '../contracts/domain.js';
+import type { Role, SnapshotCommentsMode } from '../contracts/domain.js';
+import { CommentsService } from '../comments/comments.service.js';
 import { AttentionService } from '../attention/attention.service.js';
 import { CustomersService } from '../customers/customers.service.js';
 import {
   AgentEntity,
   ArtifactEntity,
-  CommentEntity,
   CustomerEntity,
   CustomerRequestEntity,
   DecisionEntity,
@@ -35,16 +35,18 @@ export class SnapshotService {
     private readonly views: ViewsService,
     private readonly attention: AttentionService,
     private readonly customers: CustomersService,
+    private readonly comments: CommentsService,
   ) {}
 
   /** Everything the client needs to boot a workspace (see WorkspaceSnapshot in contracts/domain.ts). */
-  async build(ctx: WorkspaceContext, me: UserEntity, myRole: Role) {
+  async build(ctx: WorkspaceContext, me: UserEntity, myRole: Role, opts: { comments?: SnapshotCommentsMode } = {}) {
+    const slimComments = opts.comments === 'index';
     const workspaceId = ctx.workspace.id;
     const where = { workspaceId };
     const all = <T extends object>(e: new () => T, order?: Record<string, 'ASC' | 'DESC'>) =>
       this.ds.getRepository(e).find({ where: where as never, order: order as never });
     const memberships = await all(MembershipEntity, { createdAt: 'ASC' });
-    const [users, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, events, views, integrations, attention] =
+    const [users, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, commentIndex, events, views, integrations, attention] =
       await Promise.all([
         this.ds.getRepository(UserEntity).findBy({ id: In(memberships.map((m) => m.userId)) }),
         all(AgentEntity, { createdAt: 'ASC' }),
@@ -60,9 +62,10 @@ export class SnapshotService {
         all(ArtifactEntity, { createdAt: 'ASC' }),
         all(DecisionEntity, { number: 'ASC' }),
         all(DependencyEntity, { createdAt: 'ASC' }),
-        all(CommentEntity, { createdAt: 'ASC' }),
+        slimComments ? Promise.resolve([]) : this.comments.listAll(workspaceId),
+        slimComments ? this.comments.index(workspaceId) : Promise.resolve(undefined),
         this.ds.getRepository(DomainEventEntity).find({ where, order: { at: 'DESC', id: 'DESC' }, take: SNAPSHOT_EVENTS }),
-        this.views.list(workspaceId, ctx.userId),
+        this.views.list(ctx),
         this.ds.getRepository(IntegrationConnectionEntity).find({ where, order: { createdAt: 'ASC' } }),
         this.attention.forUser(ctx),
       ]);
@@ -86,6 +89,7 @@ export class SnapshotService {
       decisions,
       dependencies,
       comments,
+      ...(commentIndex ? { commentIndex } : {}),
       events,
       attention,
       views,

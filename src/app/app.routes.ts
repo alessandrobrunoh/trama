@@ -12,7 +12,7 @@ import { authGuard, guestGuard, workspaceGuard } from './core/session/guards';
  * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
  * overview (default) | artifacts | decisions | graph | activity | context | stats.
  *
- * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, blog, roadmap,
+ * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, shared, blog, roadmap,
  * changelog, brand, new-workspace, 404.
  */
 export const routes: Routes = [
@@ -35,6 +35,12 @@ export const routes: Routes = [
     path: 'invite/:token',
     title: 'Join a workspace · Trama',
     loadComponent: () => import('./features/auth/invite-page').then((m) => m.InvitePage),
+  },
+  {
+    // Public on purpose: a saved view shared by link ("anyone with the link"). Read-only, no app chrome.
+    path: 'shared/:token',
+    title: 'Shared view · Trama',
+    loadComponent: () => import('./features/views/public-view-page').then((m) => m.PublicViewPage),
   },
   {
     path: 'blog',

@@ -18,6 +18,7 @@ import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { toast } from '@spartan-ng/brain/sonner';
 import {
   ApiClient,
+  ListStateStore,
   NablaStore,
   UiStore,
   SEVERITY_ORDER,
@@ -193,14 +194,16 @@ export class AttentionPage {
   readonly workspaceSlug = input<string>();
 
   protected readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly api = inject(ApiClient);
 
   protected readonly checkIcon = LucideCheckCheck;
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
 
-  protected readonly tab = signal<Tab>('open');
-  protected readonly scope = signal<Scope>('mine');
+  // Tab and scope survive navigation inside the app (see ListStateStore).
+  protected readonly tab = this.listState.remember<Tab>('attention.tab', 'open');
+  protected readonly scope = this.listState.remember<Scope>('attention.scope', 'mine');
   protected readonly canSeeAll = computed(() => this.store.can('admin'));
   protected readonly answeringId = signal<string | null>(null);
 

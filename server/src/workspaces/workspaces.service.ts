@@ -38,6 +38,7 @@ export const RESERVED_SLUGS = new Set([
   'auth',
   'workspaces',
   'invite',
+  'shared',
 ]);
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;

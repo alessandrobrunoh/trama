@@ -4,6 +4,7 @@ import { LucideBuilding2, LucideDynamicIcon, LucidePlus, LucideSearch } from '@l
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, normalizeCustomerDomains, usePageShortcuts } from '../../core';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
@@ -112,11 +113,13 @@ export class CustomerListPage {
   readonly workspaceSlug = input<string>();
 
   private readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly plus = LucidePlus;
   protected readonly searchIcon = LucideSearch;
   protected readonly building = LucideBuilding2;
-  protected readonly search = signal('');
-  protected readonly showArchived = signal(false);
+  // Filters survive navigation inside the app (see ListStateStore).
+  protected readonly search = this.listState.remember('customers.search', '');
+  protected readonly showArchived = this.listState.remember('customers.showArchived', false);
   protected readonly open = signal(false);
   protected readonly saving = signal(false);
   protected readonly formError = signal('');

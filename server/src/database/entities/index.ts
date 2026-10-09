@@ -31,6 +31,7 @@ import type {
   ReviewState,
   Role,
   SavedView,
+  SharingSettings,
   SubjectRef,
   TeamEditPolicy,
   TokenScope,
@@ -40,6 +41,7 @@ import type {
   ViewFilter,
   ViewLayout,
   WorkspaceSettings,
+  DeliveryState,
   WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
@@ -300,6 +302,8 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'varchar', default: 'draft' }) status: WorkstreamStatus;
   @Column({ type: 'varchar', default: 'draft' })
   derivedStatus: WorkstreamStatus;
+  /** Delivery evidence (PR / release / deployment); separate from the outcome `status`. */
+  @Column({ type: 'varchar', default: 'none' }) delivery: DeliveryState;
   @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
   @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
@@ -595,6 +599,7 @@ export class DomainEventEntity extends Wire {
 
 @Entity('saved_views')
 @Index('IDX_views_workspace', ['workspaceId'])
+@Index('UQ_views_public_token', ['publicTokenHash'], { unique: true })
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
@@ -609,9 +614,19 @@ export class SavedViewEntity extends Wire {
   @Column({ type: 'jsonb', nullable: true }) sort: SavedView['sort'] | null;
   @Column({ type: 'varchar', nullable: true }) groupBy: string | null;
   @Column({ type: 'varchar', default: 'list' }) layout: ViewLayout;
+  /** Mirror of `sharing.visibility !== 'private'` (legacy flag); `sharing` is the source of truth. */
   @Column({ type: 'boolean', default: false }) shared: boolean;
+  @Column({ type: 'jsonb', default: () => `'{"visibility":"private","grants":[]}'` }) sharing: SharingSettings;
+  /** sha256 (hex) of the public link token: the only thing the public endpoint looks up by. */
+  @Column({ type: 'varchar', nullable: true }) publicTokenHash: string | null;
+  /** The token itself, encrypted at rest, so managers can copy the link again. */
+  @Column({ type: 'text', nullable: true }) publicTokenEnc: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+
+  protected override hidden() {
+    return ['publicTokenHash', 'publicTokenEnc'];
+  }
 }
 
 /** Only the sha256 of the secret is stored; `prefix` is for display. */

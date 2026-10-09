@@ -260,6 +260,7 @@ export class SeedBuilder {
       labels: o.labels ?? [],
       status: o.override ?? current,
       derivedStatus: current,
+      delivery: 'none',
       statusOverride: o.override ?? null,
       startDate: o.start !== undefined ? this.at(o.start) : null,
       targetDate: o.target !== undefined ? this.at(-o.target) : null,
@@ -471,7 +472,7 @@ export class SeedBuilder {
     if (entity === 'execution') return;
     this.data.views.push({
       id: uid('vw'), workspaceId: this.workspaceId, ownerId: owner, name, entity, filters: o.filters ?? [], sort: o.sort ?? null,
-      groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, createdAt: this.at(o.created), updatedAt: this.at(o.created),
+      groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, sharing: { visibility: o.shared ? 'workspace' : 'private', grants: [] }, publicTokenHash: null, publicTokenEnc: null, createdAt: this.at(o.created), updatedAt: this.at(o.created),
     });
   }
 }

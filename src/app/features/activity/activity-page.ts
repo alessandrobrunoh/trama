@@ -4,6 +4,7 @@ import { LucideActivity, LucideBot, LucideDynamicIcon, LucideUser, LucideUsers, 
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { NablaStore, type DomainEvent } from '../../core';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
 import { EVENT_CATEGORY_LABEL, EventLine, eventCategory, type EventCategory } from '../overview/event-line';
@@ -176,6 +177,7 @@ export class ActivityPage {
   readonly teamParam = input<string | undefined>(undefined, { alias: 'team' });
 
   protected readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   private readonly router = inject(Router);
 
   protected readonly activityIcon = LucideActivity;
@@ -186,10 +188,11 @@ export class ActivityPage {
   protected readonly typeTabs = TYPE_TABS;
 
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
-  protected readonly type = signal<TypeFilter>('all');
-  protected readonly actors = signal<string[]>([]);
-  protected readonly teams = signal<string[]>([]);
-  protected readonly showSystem = signal(true);
+  // Filters survive navigation inside the app (see ListStateStore); query params still win.
+  protected readonly type = this.listState.remember<TypeFilter>('activity.type', 'all');
+  protected readonly actors = this.listState.remember<string[]>('activity.actors', []);
+  protected readonly teams = this.listState.remember<string[]>('activity.teams', []);
+  protected readonly showSystem = this.listState.remember('activity.showSystem', true);
   protected readonly loading = signal(false);
   protected readonly exhausted = signal(false);
 

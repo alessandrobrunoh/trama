@@ -43,13 +43,13 @@ update_criterion { idOrKey, criterionId, state: "in_progress" }
 
 That is the signal Trama uses to show the workstream as `working`. Do not touch `statusOverride`.
 
-When the work is an issue and you are actually starting it, set that issue to `in_progress` if it is not already. If it has no assignee and `whoami.actor.type` is `user`, set `assigneeId` to that id. The server does this on the status change and on `link_issue` (which moves `draft`, `backlog` and `todo` to `in_progress`). An `agent` actor is not assigned. Do not replace an assignee who is already set. Filing an issue you are not starting leaves the assignee empty.
+When the work is an issue and you are actually starting it, set that issue to `in_progress` if it is not already. If it has no assignee and `whoami.actor.type` is `user`, set `assigneeId` to that id. The server does this on the status change (and on `link_issue` only when you pass `status: in_progress`; linking alone never changes the status). An `agent` actor is not assigned. Do not replace an assignee who is already set. Filing an issue you are not starting leaves the assignee empty.
 
 ## 5. Work where the code lives
 
 Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` (empty when the workspace does not use Delta threads) and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.
 
-If you are the parent of this Delta thread, look for a workstream that already has this thread's `deltaThreadUrl` and continue that one. If none exists, create one and link the issues. Never create a second workstream that points at the same parent thread. Subagents you spawn stay inside Delta; point them at the issues of this workstream.
+The thread is the execution context, not the boundary of the work. If a workstream already exists for this outcome, continue it, whether or not its `deltaThreadUrl` is this thread. If this thread later takes on an unrelated outcome, use or create another workstream for it (search first); do not widen the current one. Subagents you spawn stay inside Delta; point them at the issues they serve.
 
 ## 6. Leave a short trail
 
@@ -66,5 +66,5 @@ Then continue with `trama-report-progress` as you make progress.
 - Starting from the issue title alone. The workstream objective and criteria are the real brief.
 - Treating a `draft` workstream as approved scope. Drafts are unfinished; ask.
 - Changing `deltaThreadUrl`, owner team or accountable user. Those are the team's decisions.
-- Creating one workstream per issue, or per subagent, because the issues look unrelated. In the parent thread they are one effort.
-- Treating "Workstream is not defined as a Delta thread" as permission to hang several workstreams off the thread you are the parent of.
+- Creating one workstream per subagent, or per trivial issue. Group issues that serve the same outcome.
+- Adding an unrelated issue to the current workstream because it came up in the same thread. A workstream is an outcome, not a Delta thread.

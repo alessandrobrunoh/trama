@@ -34,6 +34,9 @@ import type {
   ProjectStatus,
   ReviewState,
   Role,
+  ShareGrant,
+  ShareLevel,
+  ShareVisibility,
   SubjectRef,
   User,
   ViewEntity,
@@ -277,7 +280,7 @@ export interface CreateWorkstreamInput {
   description?: string;
   objective?: string;
   context?: string;
-  /** https link on delta.dev. Required unless the workstream is a draft or the workspace turned Delta threads off. */
+  /** https link on delta.dev. Optional: a workstream can exist before its Delta thread. A supplied value must be valid. */
   deltaThreadUrl?: string;
   ownerTeamId: ID;
   participatingTeamIds?: ID[];
@@ -491,6 +494,17 @@ export interface CreateViewInput {
   groupBy?: string;
   layout?: ViewLayout;
   shared?: boolean;
+  sharing?: SharingInput;
+}
+/** Who can open a view. `grants` replaces the whole list of invited workspace members. */
+export interface SharingInput {
+  visibility?: ShareVisibility;
+  grants?: ShareGrant[];
+}
+export interface InviteViewInput {
+  /** Existing workspace members, by email. */
+  emails: string[];
+  level?: ShareLevel;
 }
 export interface UpdateViewInput {
   name?: string;
@@ -500,6 +514,7 @@ export interface UpdateViewInput {
   groupBy?: string | null;
   layout?: ViewLayout;
   shared?: boolean;
+  sharing?: SharingInput;
 }
 
 // ───── graph / search ─────

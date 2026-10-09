@@ -101,6 +101,8 @@ interface Cmd {
   keywords?: string;
   icon: LucideIcon;
   keys?: string;
+  /** AI action: shown in the AI group with the accent sparkle. */
+  ai?: boolean;
   /** Right-aligned muted text. */
   hint?: string;
   /** Status glyph instead of the icon (status page). */
@@ -217,11 +219,12 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
   a.updatedAt < b.updatedAt ? 1 : -1;
 
 /**
- * Floating command surface. Compact on phones; desktop uses the app's popover width and surfaces.
+ * Floating command surface. Compact on phones, 40rem on desktop, pinned near the top.
  * Height comes from the panel, which grows with its rows up to a cap.
  */
 export const COMMAND_DIALOG_CLASS =
-  'w-[min(30rem,calc(100%-1.5rem))] sm:w-[min(42rem,calc(100%-2rem))] max-w-none sm:max-w-none top-[min(14vh,5.5rem)] translate-y-0 overflow-hidden rounded-md border border-border-strong p-0';
+  // Widths use viewport units: the CDK pane shrink-wraps its content, so a `%` width collapses to the content width.
+  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-md border border-border-strong p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.
@@ -277,21 +280,69 @@ export const COMMAND_DIALOG_CLASS =
       }
     </ng-template>
 
-    <hlm-command class="h-auto max-h-[min(28rem,70svh)]" [filter]="filter" [(search)]="query">
-      <div class="shrink-0 border-b border-border-strong">
-        <div
-          class="focus-within:border-ring/60 mx-3 mt-3 flex h-10 items-center gap-2.5 rounded-md border border-input bg-background px-3 transition-colors"
-        >
-          <svg
-            [lucideIcon]="searchIcon"
-            [size]="15"
-            aria-hidden="true"
-            class="text-muted-foreground shrink-0"
-          ></svg>
+    <ng-template #cmdRow let-c>
+      @if (c.status) {
+        <app-status-icon [status]="c.status" [entity]="c.entity ?? 'auto'" />
+      } @else {
+        <svg
+          [lucideIcon]="c.icon"
+          [size]="16"
+          class="shrink-0"
+          [class]="c.ai ? 'text-primary' : 'text-muted-foreground'"
+        ></svg>
+      }
+      <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
+      @if (c.keys) {
+        <hlm-command-shortcut class="max-sm:hidden"
+          ><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)"
+        /></hlm-command-shortcut>
+      } @else if (c.hint) {
+        <span class="text-muted-foreground shrink-0 text-xs">{{ c.hint }}</span>
+      }
+    </ng-template>
+
+    <hlm-command
+      class="h-auto max-h-[min(34rem,78svh)] rounded-none p-0"
+      [filter]="filter"
+      [(search)]="query"
+    >
+      <div class="border-border shrink-0 border-b">
+        <div class="flex h-12 items-center gap-2.5 px-4">
+          @if (mode() === 'palette' && context(); as ctx) {
+            <button
+              type="button"
+              class="border-border-strong bg-muted text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md border px-2 font-mono text-xs transition-colors"
+              [attr.aria-label]="page() === 'status' ? 'Back to ' + ctx.key + ' actions' : ctx.key"
+              [disabled]="page() === 'root'"
+              (mousedown)="$event.preventDefault()"
+              (click)="backToRoot()"
+            >
+              <svg [lucideIcon]="contextIcon()" [size]="12" aria-hidden="true"></svg>
+              {{ ctx.key }}
+            </button>
+            @if (page() === 'status') {
+              <svg
+                [lucideIcon]="chevron"
+                [size]="12"
+                aria-hidden="true"
+                class="text-muted-foreground -mx-1 shrink-0"
+              ></svg>
+              <span class="text-foreground shrink-0 text-xs font-medium max-sm:hidden"
+                >Change status</span
+              >
+            }
+          } @else {
+            <svg
+              [lucideIcon]="searchIcon"
+              [size]="16"
+              aria-hidden="true"
+              class="text-muted-foreground shrink-0"
+            ></svg>
+          }
           <input
             brnCommandInput
             data-slot="command-input"
-            class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-sm outline-hidden"
+            class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-hidden"
             [placeholder]="placeholder()"
             [attr.aria-label]="placeholder()"
             (keydown.meta.enter)="askAssistant($event)"
@@ -300,10 +351,16 @@ export const COMMAND_DIALOG_CLASS =
           @if (canAsk()) {
             <button
               type="button"
-              class="text-muted-foreground hover:bg-hover hover:text-primary flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors max-sm:hidden"
+              class="text-muted-foreground hover:bg-hover hover:text-foreground -mr-1.5 flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors max-sm:hidden"
               (mousedown)="$event.preventDefault()"
               (click)="askAssistant()"
             >
+              <svg
+                [lucideIcon]="sparkles"
+                [size]="13"
+                aria-hidden="true"
+                class="text-primary"
+              ></svg>
               Ask Trama <app-kbd keys="mod+enter" />
             </button>
           }
@@ -311,101 +368,93 @@ export const COMMAND_DIALOG_CLASS =
 
         @if (showScopes()) {
           <div
-            class="scrollbar-none flex items-center gap-1 overflow-x-auto px-3 pb-2.5 pt-2"
+            class="scrollbar-none flex items-center gap-1 overflow-x-auto px-3 pb-2"
             role="tablist"
             aria-label="Search scope"
           >
-            @if (page() === 'status' && context(); as ctx) {
+            @for (s of scopes; track s.id) {
               <button
                 type="button"
-                class="text-muted-foreground hover:bg-hover hover:text-foreground flex h-7 shrink-0 items-center gap-1 rounded-md border border-border-strong px-2 text-xs transition-colors"
-                (click)="backToRoot()"
+                role="tab"
+                class="flex h-6 shrink-0 items-center rounded-md px-2 text-xs transition-colors"
+                [class]="
+                  scope() === s.id
+                    ? 'bg-selected text-foreground font-medium'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-hover'
+                "
+                [attr.aria-selected]="scope() === s.id"
+                (mousedown)="$event.preventDefault()"
+                (click)="setScope(s.id)"
               >
-                <span class="font-mono">{{ ctx.key }}</span>
+                {{ s.label }}
               </button>
-              <svg [lucideIcon]="chevron" [size]="12" class="text-muted-foreground shrink-0"></svg>
-              <span
-                class="bg-selected text-foreground flex h-7 shrink-0 items-center rounded-md border border-primary/25 px-2 text-xs font-medium"
-                >Change status</span
-              >
-            } @else {
-              @for (s of scopes; track s.id) {
-                <button
-                  type="button"
-                  role="tab"
-                  class="flex h-7 shrink-0 items-center rounded-md border px-2.5 text-xs transition-colors"
-                  [class]="
-                    scope() === s.id
-                      ? 'bg-selected text-foreground border-primary/25 font-medium'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-hover border-transparent'
-                  "
-                  [attr.aria-selected]="scope() === s.id"
-                  (mousedown)="$event.preventDefault()"
-                  (click)="setScope(s.id)"
-                >
-                  {{ s.label }}
-                </button>
-              }
             }
           </div>
         }
       </div>
 
-      <div *hlmCommandEmptyState hlmCommandEmpty>
+      <div
+        *hlmCommandEmptyState
+        hlmCommandEmpty
+        class="text-muted-foreground flex flex-col items-center gap-1 px-6 py-10"
+      >
+        <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5" class="mb-1"></svg>
         @if (loading()) {
-          Searching…
+          <p>Searching…</p>
         } @else if (query().trim()) {
-          No results for “{{ query().trim() }}”.
+          <p class="text-foreground">No results for “{{ query().trim() }}”</p>
+          <p class="text-xs">Try another keyword, or press Tab to change the scope.</p>
         } @else {
-          Nothing here yet.
+          <p>Nothing here yet.</p>
         }
       </div>
 
       <hlm-command-list
-        class="max-h-[min(18rem,calc(70svh-6.5rem))] px-2 py-1.5 sm:[&_[data-slot=command-item]]:min-h-10 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-2 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-xs"
+        class="max-h-[min(26rem,calc(78svh-7.5rem))] overscroll-contain px-2 pt-1 pb-2 [&_[data-slot=command-group]]:p-0 [&_[data-slot=command-group]]:pb-1 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-3 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-[11px] [&_[data-slot=command-item]]:min-h-9 [&_[data-slot=command-item]]:gap-2.5"
       >
         @if (page() === 'status') {
           <hlm-command-group>
             <hlm-command-group-label>Status</hlm-command-group-label>
             @for (c of statusCommands(); track c.id) {
               <button hlmCommandItem [value]="'status ' + c.label" (selected)="exec(c)">
-                @if (c.status) {
-                  <app-status-icon [status]="c.status" [entity]="c.entity ?? 'auto'" />
-                } @else {
-                  <svg
-                    [lucideIcon]="c.icon"
-                    [size]="14"
-                    class="text-muted-foreground shrink-0"
-                  ></svg>
-                }
-                <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
-                @if (c.hint) {
-                  <span class="text-muted-foreground shrink-0 text-xs">{{ c.hint }}</span>
-                }
+                <ng-container
+                  [ngTemplateOutlet]="cmdRow"
+                  [ngTemplateOutletContext]="{ $implicit: c }"
+                />
               </button>
             }
           </hlm-command-group>
         } @else {
-          @if (contextCommands().length) {
+          @if (contextMain().length) {
             <hlm-command-group>
               <hlm-command-group-label>{{ contextLabel() }}</hlm-command-group-label>
-              @for (c of contextCommands(); track c.id) {
+              @for (c of contextMain(); track c.id) {
                 <button
                   hlmCommandItem
                   [value]="'context ' + c.label + ' ' + (c.keywords ?? '')"
                   (selected)="exec(c)"
                 >
-                  <svg
-                    [lucideIcon]="c.icon"
-                    [size]="14"
-                    class="text-muted-foreground shrink-0"
-                  ></svg>
-                  <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
-                  @if (c.hint) {
-                    <span class="text-muted-foreground shrink-0 font-mono text-xs">{{
-                      c.hint
-                    }}</span>
-                  }
+                  <ng-container
+                    [ngTemplateOutlet]="cmdRow"
+                    [ngTemplateOutletContext]="{ $implicit: c }"
+                  />
+                </button>
+              }
+            </hlm-command-group>
+          }
+          @if (contextAi().length) {
+            <hlm-command-group>
+              <hlm-command-group-label>AI</hlm-command-group-label>
+              @for (c of contextAi(); track c.id) {
+                <button
+                  hlmCommandItem
+                  [value]="'context ai ' + c.label + ' ' + (c.keywords ?? '')"
+                  (selected)="exec(c)"
+                >
+                  <ng-container
+                    [ngTemplateOutlet]="cmdRow"
+                    [ngTemplateOutletContext]="{ $implicit: c }"
+                  />
                 </button>
               }
             </hlm-command-group>
@@ -463,39 +512,25 @@ export const COMMAND_DIALOG_CLASS =
                   [value]="'action ' + c.label + ' ' + (c.keywords ?? '')"
                   (selected)="exec(c)"
                 >
-                  <svg
-                    [lucideIcon]="c.icon"
-                    [size]="14"
-                    class="text-muted-foreground shrink-0"
-                  ></svg>
-                  <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
-                  @if (c.keys) {
-                    <hlm-command-shortcut
-                      ><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)"
-                    /></hlm-command-shortcut>
-                  }
+                  <ng-container
+                    [ngTemplateOutlet]="cmdRow"
+                    [ngTemplateOutletContext]="{ $implicit: c }"
+                  />
                 </button>
               }
             </hlm-command-group>
             <hlm-command-group>
-              <hlm-command-group-label>Go to</hlm-command-group-label>
+              <hlm-command-group-label>Navigation</hlm-command-group-label>
               @for (c of navCommands(); track c.id) {
                 <button
                   hlmCommandItem
                   [value]="'go ' + c.label + ' ' + (c.keywords ?? '')"
                   (selected)="exec(c)"
                 >
-                  <svg
-                    [lucideIcon]="c.icon"
-                    [size]="14"
-                    class="text-muted-foreground shrink-0"
-                  ></svg>
-                  <span class="min-w-0 flex-1 truncate">{{ c.label }}</span>
-                  @if (c.keys) {
-                    <hlm-command-shortcut
-                      ><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)"
-                    /></hlm-command-shortcut>
-                  }
+                  <ng-container
+                    [ngTemplateOutlet]="cmdRow"
+                    [ngTemplateOutletContext]="{ $implicit: c }"
+                  />
                 </button>
               }
             </hlm-command-group>
@@ -518,15 +553,14 @@ export const COMMAND_DIALOG_CLASS =
       </hlm-command-list>
 
       <div
-        class="bg-muted/30 text-muted-foreground flex h-9 shrink-0 items-center gap-3 border-t border-border-strong px-3 text-xs max-sm:hidden"
+        class="border-border text-muted-foreground flex h-9 shrink-0 items-center gap-4 border-t px-4 text-[11px] max-sm:hidden"
       >
-        <span class="flex items-center gap-1"><app-kbd keys="up down" /> navigate</span>
-        <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
+        <span class="flex items-center gap-1.5"><app-kbd keys="up down" /> navigate</span>
+        <span class="flex items-center gap-1.5"><app-kbd keys="enter" /> select</span>
         @if (page() === 'root') {
-          <span class="flex items-center gap-1"><app-kbd keys="tab" /> scope</span>
-          <span class="flex items-center gap-1"><app-kbd keys="esc" /> close</span>
+          <span class="flex items-center gap-1.5"><app-kbd keys="tab" /> scope</span>
         } @else {
-          <span class="flex items-center gap-1"><app-kbd keys="esc" /> back</span>
+          <span class="flex items-center gap-1.5"><app-kbd keys="esc" /> back</span>
         }
         @if (loading()) {
           <span class="ml-auto">Searching…</span>
@@ -558,6 +592,7 @@ export class CommandPanel {
   protected readonly scopes = SCOPES;
   protected readonly searchIcon = LucideSearch;
   protected readonly chevron = LucideChevronRight;
+  protected readonly sparkles = LucideSparkles;
 
   protected readonly query = signal('');
   protected readonly scope = signal<Scope>('all');
@@ -581,10 +616,8 @@ export class CommandPanel {
   /** The scope chips stay out of the way until you search or narrow the scope (the `/` dialog always shows them). */
   protected readonly showScopes = computed(
     () =>
-      this.mode() === 'search' ||
-      this.page() !== 'root' ||
-      this.isSearching() ||
-      this.scope() !== 'all',
+      this.page() === 'root' &&
+      (this.mode() === 'search' || this.isSearching() || this.scope() !== 'all'),
   );
   protected readonly canAsk = computed(
     () => this.mode() === 'palette' && this.page() === 'root' && this.assistant.ready(),
@@ -715,8 +748,15 @@ export class CommandPanel {
 
   protected readonly contextLabel = computed(() => {
     const c = this.context();
-    return c ? `${c.type === 'issue' ? 'Issue' : 'Workstream'} ${c.key}` : '';
+    return c ? `${c.type === 'issue' ? 'Issue' : 'Workstream'} actions` : '';
   });
+
+  protected readonly contextIcon = computed(() =>
+    this.context()?.type === 'workstream' ? HIT_ICON.workstream : HIT_ICON.issue,
+  );
+
+  protected readonly contextMain = computed(() => this.contextCommands().filter((c) => !c.ai));
+  protected readonly contextAi = computed(() => this.contextCommands().filter((c) => c.ai));
 
   protected readonly contextCommands = computed<Cmd[]>(() => {
     const c = this.context();
@@ -729,6 +769,7 @@ export class CommandPanel {
         label: 'Change status…',
         keywords: 'state move',
         icon: LucideCircleDot,
+        keys: c.issue ? 's' : undefined,
         run: () => this.openStatusPage(),
       });
       const me = this.store.me()?.id;
@@ -738,6 +779,7 @@ export class CommandPanel {
           label: 'Assign to me',
           keywords: 'assignee take',
           icon: LucideUserRoundCheck,
+          keys: 'i',
           run: () => void this.store.updateIssue(c.id, { assigneeId: me }),
         });
       }
@@ -748,25 +790,28 @@ export class CommandPanel {
       if (c.issue) {
         out.push({
           id: 'ctx:ai-summarize',
-          label: 'AI: Summarize this issue',
+          label: 'Summarize this issue',
           keywords: 'ai tldr summary explain',
           icon: LucideSparkles,
+          ai: true,
           run: ask('summarize'),
         });
         if (this.ai.canEditIssue(c.issue)) {
           out.push(
             {
               id: 'ctx:ai-triage',
-              label: 'AI: Suggest properties',
+              label: 'Suggest properties',
               keywords: 'ai triage priority estimate type workstream',
               icon: LucideSparkles,
+              ai: true,
               run: ask('triage'),
             },
             {
               id: 'ctx:ai-improve',
-              label: 'AI: Improve description',
+              label: 'Improve description',
               keywords: 'ai rewrite clearer title',
               icon: LucideSparkles,
+              ai: true,
               run: ask('improve'),
             },
           );
@@ -774,17 +819,19 @@ export class CommandPanel {
       } else if (c.ws) {
         out.push({
           id: 'ctx:ai-update',
-          label: 'AI: Draft status update',
+          label: 'Draft status update',
           keywords: 'ai report stakeholder summary',
           icon: LucideSparkles,
+          ai: true,
           run: ask('update'),
         });
         if (this.ai.canEditWorkstream(c.ws)) {
           out.push({
             id: 'ctx:ai-breakdown',
-            label: 'AI: Break down into issues',
+            label: 'Break down into issues',
             keywords: 'ai plan split tasks',
             icon: LucideSparkles,
+            ai: true,
             run: ask('breakdown'),
           });
         }
@@ -797,6 +844,7 @@ export class CommandPanel {
         keywords: 'id',
         icon: LucideHash,
         hint: c.key,
+        keys: c.issue ? 'mod+.' : undefined,
         run: () => void this.clipboard.copy(c.key, 'Key copied'),
       },
       {
@@ -804,6 +852,7 @@ export class CommandPanel {
         label: 'Copy git branch name',
         keywords: 'git branch checkout',
         icon: LucideGitBranch,
+        keys: 'mod+shift+g',
         run: () => void this.branches.copy(c.key, (c.issue ?? c.ws)!.title),
       },
       {
@@ -811,6 +860,7 @@ export class CommandPanel {
         label: `Copy ${c.type} link`,
         keywords: 'url share',
         icon: LucideLink,
+        keys: c.issue ? 'mod+shift+l' : undefined,
         run: () => void this.clipboard.copy(this.document.location.href, 'Link copied'),
       },
     );
@@ -875,8 +925,8 @@ export class CommandPanel {
     const nav = [...PERSONAL_NAV, ...MAIN_NAV];
     const out: Cmd[] = nav.map((n) => ({
       id: 'nav:' + n.segment,
-      label: `Go to ${n.label}`,
-      keywords: n.segment === 'repositories' ? 'repository repositories repo git' : undefined,
+      label: n.label,
+      keywords: n.segment === 'repositories' ? 'go to repository repositories repo git' : 'go to',
       icon: n.icon,
       keys: n.keys,
       run: go(n.segment),
@@ -888,13 +938,13 @@ export class CommandPanel {
     ];
     for (const [segment, label, icon, keys] of extra) {
       if (!nav.some((n) => n.segment === segment))
-        out.push({ id: 'nav:' + segment, label: `Go to ${label}`, icon, keys, run: go(segment) });
+        out.push({ id: 'nav:' + segment, label, keywords: 'go to', icon, keys, run: go(segment) });
     }
     for (const t of this.store.teams()) {
       out.push({
         id: 'team:' + t.id,
-        label: `Go to team ${t.name}`,
-        keywords: t.key,
+        label: `Team ${t.name}`,
+        keywords: `go to ${t.key}`,
         icon: LucideUsers,
         run: go('teams', t.key),
       });
@@ -902,7 +952,8 @@ export class CommandPanel {
     for (const v of this.store.views()) {
       out.push({
         id: 'view:' + v.id,
-        label: `Go to view ${v.name}`,
+        label: `View ${v.name}`,
+        keywords: 'go to',
         icon: LucideLayers,
         run: go('views', v.id),
       });

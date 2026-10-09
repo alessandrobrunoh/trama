@@ -75,7 +75,7 @@ export interface CreateWorkstreamDefaults {
           </div>
           @if (deltaEnabled()) {
             <div class="grid gap-1.5">
-              <label hlmLabel for="cw-delta">Delta thread</label>
+              <label hlmLabel for="cw-delta">Delta thread <span class="text-muted-foreground font-normal">(optional)</span></label>
               <input
                 hlmInput
                 id="cw-delta"
@@ -219,7 +219,7 @@ export class CreateWorkstreamDialog {
   );
   protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   protected readonly canSubmit = computed(
-    () => this.title().trim().length > 0 && !!this.ownerTeamId() && (!this.deltaEnabled() || isDeltaThreadUrl(this.deltaUrl().trim())),
+    () => this.title().trim().length > 0 && !!this.ownerTeamId() && (!this.deltaEnabled() || !this.deltaUrl().trim() || isDeltaThreadUrl(this.deltaUrl().trim())),
   );
 
   constructor() {
@@ -273,7 +273,7 @@ export class CreateWorkstreamDialog {
     const ws = await this.store.createWorkstream({
       title: this.title().trim(),
       description: this.description().trim() || undefined,
-      deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() : undefined,
+      deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() || undefined : undefined,
       objective: this.objective().trim() || undefined,
       ownerTeamId: this.ownerTeamId(),
       participatingTeamIds: this.participating(),

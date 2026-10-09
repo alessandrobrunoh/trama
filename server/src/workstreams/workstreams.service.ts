@@ -5,7 +5,6 @@ import {
   isDeltaThreadUrl,
   type AcceptanceCriterion,
   type ActorRef,
-  resolveWorkspaceSettings,
   type CriterionState,
   type Priority,
   type WorkstreamStatus,
@@ -14,7 +13,7 @@ import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
 import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
-import { TeamEntity, WorkspaceEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { LabelsService } from '../workspaces/labels.service.js';
@@ -153,20 +152,9 @@ export class WorkstreamsService {
       const project = await this.refs.projectRepositories(workspaceId, input.projectId, repositoryIds);
       if (input.repositoryIds === undefined) repositoryIds = [...project.repositoryIds];
     }
-    const suppliedDeltaThreadUrl =
-      typeof input.deltaThreadUrl === 'string'
-        ? input.deltaThreadUrl.trim()
-        : '';
-    // The thread is optional for drafts and for workspaces that turned Delta threads off; a supplied
-    // URL is always validated.
-    const { deltaThreads } = resolveWorkspaceSettings(
-      (await this.ds.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId }))?.settings,
-    );
-    const deltaThreadUrl = suppliedDeltaThreadUrl
-      ? assertDeltaThreadUrl(suppliedDeltaThreadUrl)
-      : input.statusOverride === 'draft' || !deltaThreads
-        ? ''
-        : assertDeltaThreadUrl('');
+    // The Delta thread is optional: a workstream can exist before any execution thread does ("Delta-first,
+    // not Delta-dependent"). A supplied URL is always validated.
+    const deltaThreadUrl = optionalDeltaThreadUrl(input.deltaThreadUrl);
     const run = async (m: EntityManager) => {
       const team = await m.findOneByOrFail(TeamEntity, {
         id: input.ownerTeamId,
@@ -260,7 +248,7 @@ export class WorkstreamsService {
     if (patch.objective !== undefined) set('objective', patch.objective);
     if (patch.context !== undefined) set('context', patch.context);
     if (patch.deltaThreadUrl !== undefined)
-      set('deltaThreadUrl', assertDeltaThreadUrl(patch.deltaThreadUrl));
+      set('deltaThreadUrl', optionalDeltaThreadUrl(patch.deltaThreadUrl));
     // NOTE: changing the owner team does NOT rename the workstream: the key stays (AUTH-42 remains AUTH-42).
     if (patch.ownerTeamId !== undefined) set('ownerTeamId', patch.ownerTeamId);
     if (patch.participatingTeamIds !== undefined)
@@ -448,12 +436,10 @@ export class WorkstreamsService {
   }
 }
 
-function assertDeltaThreadUrl(value: string): string {
-  const url = value.trim();
-  if (!url)
-    throw new BadRequestException(
-      'deltaThreadUrl is required: link the workstream to its Delta thread (or turn Delta threads off in Settings → General)',
-    );
+/** Empty means "no thread (yet)"; anything else must be a Delta thread link. */
+export function optionalDeltaThreadUrl(value: string | null | undefined): string {
+  const url = typeof value === 'string' ? value.trim() : '';
+  if (!url) return '';
   if (!isDeltaThreadUrl(url)) {
     throw new BadRequestException(
       'deltaThreadUrl must be an https link on delta.dev',

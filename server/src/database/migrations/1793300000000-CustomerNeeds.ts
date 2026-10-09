@@ -14,8 +14,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * Down removes project requests and, where a customer has several requests on one issue, keeps the oldest one
  * (it has to restore the unique pair). Everything else survives.
  */
-export class CustomerNeeds1793100000000 implements MigrationInterface {
-  name = 'CustomerNeeds1793100000000';
+export class CustomerNeeds1793300000000 implements MigrationInterface {
+  name = 'CustomerNeeds1793300000000';
 
   public async up(q: QueryRunner): Promise<void> {
     await q.query(`ALTER TABLE "customers" ADD "domains" jsonb NOT NULL DEFAULT '[]'`);

@@ -4,6 +4,7 @@ import { LucideDownload, LucideDynamicIcon, LucideFolderGit2, LucidePlus, Lucide
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { NablaStore, UiStore } from '../../core';
+import { ListStateStore } from '../../core/stores/list-state.store';
 import { GIT_PROVIDERS, GIT_PROVIDER_META } from '../../core/contracts/domain';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -145,6 +146,7 @@ export class RepositoryListPage {
   readonly workspaceSlug = input<string>();
 
   private readonly store = inject(NablaStore);
+  private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 
   protected readonly plus = LucidePlus;
@@ -155,9 +157,10 @@ export class RepositoryListPage {
   protected readonly importOpen = signal(false);
   protected readonly providers = PROVIDERS;
 
-  protected readonly search = signal('');
-  protected readonly providerFilter = signal<string[]>([]);
-  protected readonly teamFilter = signal<string[]>([]);
+  // Filters survive navigation inside the app (see ListStateStore).
+  protected readonly search = this.listState.remember('repositories.search', '');
+  protected readonly providerFilter = this.listState.remember<string[]>('repositories.provider', []);
+  protected readonly teamFilter = this.listState.remember<string[]>('repositories.team', []);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canAdmin = computed(() => this.store.allowed('manageRepositories'));

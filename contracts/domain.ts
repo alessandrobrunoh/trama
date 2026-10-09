@@ -380,7 +380,9 @@ export type ProjectAiResult = ProjectAiUpdateDraft | ProjectAiSummary | ProjectA
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
 /**
- * Derived from artifacts / input requests / decisions / dependencies.
+ * Outcome status, derived from artifacts / input requests / decisions / dependencies / criteria.
+ * `shipped` means the outcome is achieved (criteria met, no blockers, nothing waiting on a person),
+ * not merely that code landed: see {@link DeliveryState} for that.
  * Any status can be pinned manually via `statusOverride` (the board does this). `null` clears it.
  */
 export type WorkstreamStatus =
@@ -393,6 +395,15 @@ export type WorkstreamStatus =
   | 'ready_to_land'
   | 'shipped'
   | 'canceled';
+
+/**
+ * How far the code got, derived from artifacts only (highest evidence wins):
+ * `deployed` (healthy deployment) > `released` (published release) > `merged` (every live PR
+ * merged) > `in_review` (an open PR) > `none`. This is delivery evidence, not the outcome:
+ * a merged PR never makes a workstream `shipped` unless its criteria are met and nothing
+ * blocks it or waits on a person.
+ */
+export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
 export type CriterionState = 'pending' | 'in_progress' | 'met';
 export interface AcceptanceCriterion {
@@ -434,6 +445,11 @@ export interface Workstream {
   status: WorkstreamStatus;
   /** The derived status, ignoring the override. Computed by the server. */
   derivedStatus: WorkstreamStatus;
+  /**
+   * Delivery state (PR / release / deployment evidence), separate from the outcome `status`.
+   * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
+   */
+  delivery: DeliveryState;
   statusOverride?: WorkstreamStatus;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;
@@ -495,7 +511,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
 
 /**
  * Tracker status, independent of workstream status.
- * `backlog` is unscheduled demand; linking an issue into a workstream usually moves it to `in_progress`.
+ * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
 export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'email' | 'api' | 'agent';
@@ -834,6 +850,28 @@ export interface Comment {
   updatedAt: ISODate;
 }
 
+/** Page size of GET /comments/page: `limit` defaults to `default` and may not exceed `max`. */
+export const COMMENT_PAGE_SIZE = { default: 50, max: 100 } as const;
+
+/**
+ * GET /api/w/:slug/comments/page — one page of the comments of a single subject, newest first.
+ * `nextCursor` is opaque; pass it back as `cursor` to get the next (older) page, `null` on the last page.
+ */
+export interface CommentPage {
+  items: Comment[];
+  nextCursor: string | null;
+}
+
+/**
+ * Compact comment summary the slim snapshot carries instead of the comments themselves: how many comments
+ * each author left on each subject. Enough for counts and "who contributed" without loading any body.
+ */
+export interface CommentIndexEntry {
+  subject: SubjectRef;
+  author: ActorRef;
+  count: number;
+}
+
 /**
  * Append-only activity log (event-based activity model). Written by the server
  * on every mutation and by integrations/agents. `type` examples:
@@ -912,10 +950,84 @@ export interface SavedView {
   sort?: { field: string; direction: 'asc' | 'desc' };
   groupBy?: string;
   layout: ViewLayout;
-  /** Visible to the whole workspace vs. only the owner. */
+  /**
+   * Visible beyond the owner (`sharing.visibility` is `workspace` or `link`). Kept for older clients;
+   * `sharing` is the source of truth.
+   */
   shared: boolean;
+  /** Who can see and edit this view. */
+  sharing: SharingSettings;
+  /**
+   * Secret token of the public link (`/shared/<token>`). Only sent to people who can manage the
+   * view's sharing, and only while `sharing.visibility` is `link`.
+   */
+  publicToken?: string;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+/** Who may open a shareable object: only the invited, every workspace member, or anyone holding the link. */
+export type ShareVisibility = 'private' | 'workspace' | 'link';
+/** What an invited person may do. The owner always has full control. */
+export type ShareLevel = 'view' | 'edit';
+
+export interface ShareGrant {
+  /** A member of the workspace. */
+  userId: ID;
+  level: ShareLevel;
+}
+
+/**
+ * Generic permission settings for a shareable object (saved views today). `private` = owner and
+ * `grants` only; `workspace` = every workspace member can view, `grants` may add edit rights;
+ * `link` = like `workspace`, and anyone with the public link can read it (read-only, no login).
+ */
+export interface SharingSettings {
+  visibility: ShareVisibility;
+  grants: ShareGrant[];
+}
+
+/**
+ * One row of a publicly shared view. A deliberately small projection: only what a list row shows,
+ * never descriptions, bodies, emails, ids of other objects or anything the view does not display.
+ */
+export interface PublicViewItem {
+  id: ID;
+  key?: string;
+  title: string;
+  kind?: string;
+  status?: string;
+  priority?: Priority;
+  health?: string;
+  team?: string;
+  assignee?: string;
+  project?: string;
+  labels?: string[];
+  startDate?: ISODate;
+  targetDate?: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface PublicViewGroup {
+  /** Raw group value (`''` = no value). */
+  key: string;
+  /** Display name (resolved server-side for teams, people and projects). */
+  label: string;
+  items: PublicViewItem[];
+}
+
+/** `GET /api/public/views/:token`: the fixed result of a view shared by link. Read-only. */
+export interface PublicView {
+  name: string;
+  entity: ViewEntity;
+  layout: ViewLayout;
+  groupBy?: string;
+  workspaceName: string;
+  groups: PublicViewGroup[];
+  total: number;
+  /** True when more rows matched than are returned. */
+  truncated: boolean;
+  generatedAt: ISODate;
 }
 
 /** API token (for agents, MCP clients, scripts). The secret is only returned once on creation. */
@@ -1346,6 +1458,13 @@ export function webhookEventMatches(patterns: readonly string[], type: string): 
 
 // ───────────────────────────── Snapshot ─────────────────────────────
 
+/**
+ * `?comments=` on GET /snapshot. `full` (default, kept for MCP/CLI consumers) inlines every comment;
+ * `index` returns `comments: []` plus `commentIndex`, and the client loads threads via GET /comments/page.
+ */
+export type SnapshotCommentsMode = 'full' | 'index';
+export const SNAPSHOT_COMMENTS_MODES: readonly SnapshotCommentsMode[] = ['full', 'index'];
+
 /** GET /api/w/:slug/snapshot — everything the client needs to boot a workspace. */
 export interface WorkspaceSnapshot {
   workspace: Workspace;
@@ -1368,7 +1487,10 @@ export interface WorkspaceSnapshot {
   artifacts: Artifact[];
   decisions: Decision[];
   dependencies: Dependency[];
+  /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
+  /** Present only in `index` mode. */
+  commentIndex?: CommentIndexEntry[];
   /** Most recent events (e.g. last 500); older ones via GET /events?before=. */
   events: DomainEvent[];
   attention: AttentionItem[];

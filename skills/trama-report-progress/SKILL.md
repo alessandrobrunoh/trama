@@ -10,8 +10,8 @@ Trama derives a workstream's status from **facts you record**. Recording them co
 ## How the status is derived (first match wins)
 
 1. A manual `statusOverride` (do not set it).
-2. **shipped**: a healthy `deployment` or `published` `release` artifact, every non-closed PR/MR is `merged`, or every linked issue that is not canceled is `done`.
-3. **blocked**: an unshipped workstream it depends on.
+2. **shipped**: the outcome is achieved. It needs delivery evidence (a healthy `deployment`, a `published` `release`, every non-closed PR/MR `merged`, or every linked issue that is not canceled `done`) **and** every acceptance criterion `met` (when any exist) **and** none of the rules 3 and 4 below applies. Delivery evidence alone never ships a workstream.
+3. **blocked**: a failing-CI or conflicting open PR, or an unshipped workstream it depends on.
 4. **needs_input**: an open input request or a `proposed` decision.
 5. **ready_to_land**: an open PR with `review: approved`, `ci: passing` and `hasConflicts: false`.
 6. **in_review**: any open PR, or a linked issue is `in_review` and none is `in_progress`.
@@ -19,7 +19,9 @@ Trama derives a workstream's status from **facts you record**. Recording them co
 8. **planned**: has acceptance criteria.
 9. **draft**: nothing yet.
 
-Canceled issues do not count. So: moving an issue to in progress makes the workstream working; moving the issues to in review (with none still in progress) makes it in review; completing every linked issue ships it. Opening a PR also moves it to in review; CI and review state on that PR decide ready to land; merging every PR ships it.
+Delivery is reported separately as `delivery`: `none`, `in_review` (an open PR), `merged` (every non-closed PR merged), `released` or `deployed`. A merged PR sets `delivery: merged`, not `status: shipped`. When code is delivered but the outcome is open (criteria not met), the status stays `working`, or `blocked` / `needs_input` when something waits on a person. Never read `merged` as "done"; check `status` and the criteria.
+
+Canceled issues do not count. So: moving an issue to in progress makes the workstream working; moving the issues to in review (with none still in progress) makes it in review; completing every linked issue ships it once all criteria are met and nothing blocks it. Opening a PR also moves it to in review; CI and review state on that PR decide ready to land; merging every PR sets delivery to merged; it ships only once every criterion is met.
 
 ## What to record, and when
 

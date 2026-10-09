@@ -17,6 +17,8 @@ import type {
   Artifact,
   ApiToken,
   Comment,
+  CommentPage,
+  SnapshotCommentsMode,
   Decision,
   Dependency,
   DomainEvent,
@@ -43,6 +45,7 @@ import type {
   ProjectUpdate,
   Repository,
   Role,
+  PublicView,
   SavedView,
   Team,
   User,
@@ -87,6 +90,7 @@ import type {
   CreateTokenInput,
   CreatedToken,
   CreateViewInput,
+  InviteViewInput,
   CreateWorkspaceInput,
   CreateWorkstreamInput,
   CriterionInput,
@@ -226,7 +230,9 @@ export class ApiClient {
     deleteCustomerTier: (slug: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
     /** Owner only. */
     remove: (slug: string) => this.del(this.w(slug)),
-    snapshot: (slug: string) => this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`),
+    /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
+    snapshot: (slug: string, comments: SnapshotCommentsMode = 'full') =>
+      this.get<WorkspaceSnapshot>(`${this.w(slug)}/snapshot`, comments === 'full' ? undefined : { comments }),
   };
 
   readonly members = {
@@ -514,6 +520,14 @@ export class ApiClient {
   };
 
   readonly comments = {
+    /** One page of the comments of a subject, newest first; pass `nextCursor` back as `cursor` for older ones. */
+    page: (slug: string, subject: { type: string; id: ID }, page: { cursor?: string; limit?: number } = {}) =>
+      this.get<CommentPage>(`${this.w(slug)}/comments/page`, {
+        subjectType: subject.type,
+        subjectId: subject.id,
+        cursor: page.cursor,
+        limit: page.limit,
+      }),
     list: (slug: string, subject?: { type: string; id: ID }) =>
       this.get<Comment[]>(`${this.w(slug)}/comments`, {
         subjectType: subject?.type,
@@ -551,6 +565,18 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateViewInput) =>
       this.patch<SavedView>(`${this.w(slug)}/views/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/views/${id}`),
+    /** Invite existing workspace members by email. */
+    invite: (slug: string, id: ID, input: InviteViewInput) =>
+      this.post<SavedView>(`${this.w(slug)}/views/${id}/invite`, input),
+    /** New public link; the old one stops working. */
+    rotateLink: (slug: string, id: ID) =>
+      this.post<SavedView>(`${this.w(slug)}/views/${id}/rotate-link`),
+  };
+
+  /** Anonymous, read-only: the fixed result of a view shared by link. */
+  readonly publicViews = {
+    get: (token: string) =>
+      this.get<PublicView>(`/public/views/${encodeURIComponent(token)}`, undefined, { quiet: true }),
   };
 
   graph = (slug: string) => this.get<GraphResponse>(`${this.w(slug)}/graph`);
