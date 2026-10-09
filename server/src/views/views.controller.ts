@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { Allow, ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEmail, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength, ValidateBy, ValidateNested } from 'class-validator';
 import { Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import type { SavedView, ShareLevel, ShareVisibility, ViewEntity, ViewFilter, ViewLayout } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
@@ -11,10 +11,23 @@ const ENTITIES = [...VIEW_ENTITIES];
 const LAYOUTS = [...VIEW_LAYOUTS];
 const OPS = ['is', 'is_not', 'in', 'not_in', 'contains', 'before', 'after'];
 
+/** A filter value is a string or a list of strings; anything else breaks the evaluators (client and public link). */
+const IsFilterValue = () =>
+  ValidateBy({
+    name: 'isFilterValue',
+    validator: {
+      validate: (v: unknown) =>
+        typeof v === 'string'
+          ? v.length <= 500
+          : Array.isArray(v) && v.length <= 200 && v.every((x) => typeof x === 'string' && x.length <= 500),
+      defaultMessage: () => 'value must be a string or an array of strings',
+    },
+  });
+
 class FilterDto {
   @IsString() @MaxLength(100) field: string;
   @IsIn(OPS) op: ViewFilter['op'];
-  @Allow() value: string | string[];
+  @IsFilterValue() value: string | string[];
 }
 
 class SortDto {
