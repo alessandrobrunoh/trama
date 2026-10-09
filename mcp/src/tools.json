@@ -1010,7 +1010,7 @@
   "method": "GET",
   "path": "/customers/{id}/requests",
   "permission": "customers:read",
-  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl), each with its issue (key, title, status) or project (name, status).",
+  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl, source/externalId/requester when they came from Intercom, Zendesk…), each with its issue or project.",
   "params": {
    "id": "path string! Customer id"
   }
@@ -1066,6 +1066,113 @@
   "params": {
    "id": "path string! Customer id",
    "requestId": "path string! Customer request id"
+  }
+ },
+ {
+  "name": "list_intake_sources",
+  "method": "GET",
+  "path": "/intake-sources",
+  "permission": "integrations:read",
+  "description": "Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook) with their webhookUrl, hasSecret and lastReceivedAt. Never the secret. Admin.",
+  "params": {}
+ },
+ {
+  "name": "create_intake_source",
+  "method": "POST",
+  "path": "/intake-sources",
+  "permission": "integrations:write",
+  "description": "Add a source of inbound customer requests. Email and generic sources get a generated secret, returned once; for the others pass the provider's own signing secret now or later with update_intake_source. Admin.",
+  "params": {
+   "provider": "body string(intercom|zendesk|front|slack|email|generic)! Tool the requests come from",
+   "name": "body string! Name shown in the inbox (<= 80 chars)",
+   "autoCreateCustomers": "body boolean Create a prospect customer from the sender's company domain when none matches (default true; mailbox providers never do)",
+   "targetProjectId": "body string Attach requests from known customers straight to this project; otherwise they wait in the inbox",
+   "subdomain": "body string Zendesk only: the part before .zendesk.com, to link tickets",
+   "secret": "body string Provider-issued signing secret (not for email / generic)",
+   "enabled": "body boolean Accept deliveries (default true)"
+  }
+ },
+ {
+  "name": "update_intake_source",
+  "method": "PATCH",
+  "path": "/intake-sources/{id}",
+  "permission": "integrations:write",
+  "description": "Edit a source: name, enabled, autoCreateCustomers, targetProjectId (null clears), subdomain (null clears) or the provider-issued secret. Admin.",
+  "params": {
+   "id": "path string! Source id",
+   "name": "body string Name",
+   "enabled": "body boolean Accept deliveries",
+   "autoCreateCustomers": "body boolean Create customers from unknown domains",
+   "targetProjectId": "body string Project to attach to, null clears",
+   "subdomain": "body string Zendesk subdomain, null clears",
+   "secret": "body string Provider-issued signing secret (not for email / generic, use rotate_intake_source)"
+  }
+ },
+ {
+  "name": "delete_intake_source",
+  "method": "DELETE",
+  "path": "/intake-sources/{id}",
+  "permission": "integrations:delete",
+  "description": "Delete a source. Requests still waiting in the inbox from it are removed; requests already linked stay. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "rotate_intake_source",
+  "method": "POST",
+  "path": "/intake-sources/{id}/rotate-secret",
+  "permission": "integrations:write",
+  "description": "Generate a new secret for an email or generic source (returned once). The old one stops working at once. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "test_intake_source",
+  "method": "POST",
+  "path": "/intake-sources/{id}/test",
+  "permission": "integrations:write",
+  "description": "Dry run: a sample delivery signed with the stored secret goes through verification, parsing and customer matching. Reports what would happen; nothing is saved. Admin.",
+  "params": {
+   "id": "path string! Source id"
+  }
+ },
+ {
+  "name": "list_intake_items",
+  "method": "GET",
+  "path": "/customer-intake",
+  "permission": "customers:read",
+  "description": "The triage inbox of inbound customer requests, newest first: source, external ticket id and URL, requester, subject, body, matched customerId, status. Default status is pending.",
+  "params": {
+   "status": "query string(pending|linked|dismissed|all) Inbox state (default pending)",
+   "limit": "query integer 1-500 (default 200)"
+  }
+ },
+ {
+  "name": "link_intake_item",
+  "method": "POST",
+  "path": "/customer-intake/{id}/link",
+  "permission": "customers:write",
+  "description": "Turn a pending inbox item into a customer request on exactly one issue (issueId) or project (projectId). Without a matched customer pass customerId, or createCustomer to create one from the sender's company domain.",
+  "params": {
+   "id": "path string! Inbox item id",
+   "issueId": "body string Issue id (exactly one of issueId / projectId)",
+   "projectId": "body string Project id (exactly one of issueId / projectId)",
+   "customerId": "body string Customer id (overrides the matched one)",
+   "createCustomer": "body boolean Create the customer from the sender's email domain",
+   "customerName": "body string Name for the new customer",
+   "important": "body boolean Flag the request as important"
+  }
+ },
+ {
+  "name": "dismiss_intake_item",
+  "method": "POST",
+  "path": "/customer-intake/{id}/dismiss",
+  "permission": "customers:write",
+  "description": "Dismiss a pending inbox item (spam, not a request). POST /customer-intake/{id}/restore brings it back.",
+  "params": {
+   "id": "path string! Inbox item id"
   }
  },
  {

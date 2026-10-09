@@ -5,6 +5,7 @@ import {
   LucideArrowUp,
   LucideBuilding2,
   LucideDynamicIcon,
+  LucideInbox,
   LucidePlus,
   LucideSearch,
   LucideStar,
@@ -12,7 +13,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { CUSTOMER_STATUSES, CustomerSubscriptionsStore, ListStateStore, NablaStore, UiStore, usePageShortcuts, type CustomerStatus } from '../../core';
+import { CUSTOMER_STATUSES, CustomerIntakeStore, CustomerSubscriptionsStore, ListStateStore, NablaStore, UiStore, usePageShortcuts, type CustomerStatus } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -83,6 +84,13 @@ const COLUMNS: { sort: CustomerSort; label: string; width: string; hideBelow?: '
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
+      <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'customers', 'inbox']">
+        <svg [lucideIcon]="inboxIcon" [size]="14"></svg>
+        <span>Inbox</span>
+        @if (intake.pending()) {
+          <span class="bg-primary text-primary-foreground rounded-full px-1.5 text-[10px] leading-4 tabular-nums">{{ intake.pending() }}</span>
+        }
+      </a>
       @if (canManage()) {
         <button hlmBtn size="sm" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -235,6 +243,8 @@ export class CustomerListPage {
   private readonly subs = inject(CustomerSubscriptionsStore);
 
   protected readonly plus = LucidePlus;
+  protected readonly inboxIcon = LucideInbox;
+  protected readonly intake = inject(CustomerIntakeStore);
   protected readonly searchIcon = LucideSearch;
   protected readonly building = LucideBuilding2;
   protected readonly xIcon = LucideX;

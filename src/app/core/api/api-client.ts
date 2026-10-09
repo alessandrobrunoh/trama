@@ -35,6 +35,9 @@ import type {
   InvitePreview,
   Customer,
   CustomerRequest,
+  IntakeItem,
+  IntakeItemStatus,
+  IntakeSource,
   Issue,
   Membership,
   Milestone,
@@ -77,7 +80,12 @@ import type {
   CreateCustomerTierInput,
   UpdateCustomerRequestInput,
   UpdateCustomerTierInput,
+  CreateIntakeSourceInput,
   CreateIntegrationInput,
+  IntakeSourceWithSecret,
+  IntakeTestResult,
+  LinkIntakeItemInput,
+  UpdateIntakeSourceInput,
   IntegrationDetail,
   IntegrationWithWebhook,
   LinkRepositoryInput,
@@ -631,6 +639,32 @@ export class ApiClient {
     test: (slug: string, id: ID) => this.post<WebhookDeliveryLog>(`${this.w(slug)}/outgoing-webhooks/${id}/test`),
     deliveries: (slug: string, id: ID, limit = 20) =>
       this.get<WebhookDeliveryLog[]>(`${this.w(slug)}/outgoing-webhooks/${id}/deliveries`, { limit }),
+  };
+
+  /** Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook). Needs manageIntegrations. */
+  readonly intakeSources = {
+    list: (slug: string, o?: RequestOptions) => this.get<IntakeSource[]>(`${this.w(slug)}/intake-sources`, undefined, o),
+    /** Trama-signed sources (email, generic) return their secret once. */
+    create: (slug: string, input: CreateIntakeSourceInput) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources`, input),
+    update: (slug: string, id: ID, input: UpdateIntakeSourceInput) =>
+      this.patch<IntakeSource>(`${this.w(slug)}/intake-sources/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/intake-sources/${id}`),
+    rotateSecret: (slug: string, id: ID) =>
+      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources/${id}/rotate-secret`),
+    /** Dry run of a sample delivery: nothing is saved. */
+    test: (slug: string, id: ID) => this.post<IntakeTestResult>(`${this.w(slug)}/intake-sources/${id}/test`),
+  };
+
+  /** The triage inbox: inbound customer requests waiting to be linked to an issue or project. */
+  readonly customerIntake = {
+    list: (slug: string, status: IntakeItemStatus | 'all' = 'pending', o?: RequestOptions) =>
+      this.get<IntakeItem[]>(`${this.w(slug)}/customer-intake`, { status }, o),
+    count: (slug: string, o?: RequestOptions) => this.get<{ pending: number }>(`${this.w(slug)}/customer-intake/count`, undefined, o),
+    link: (slug: string, id: ID, input: LinkIntakeItemInput) =>
+      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/link`, input),
+    dismiss: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/dismiss`),
+    restore: (slug: string, id: ID) => this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/restore`),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */
