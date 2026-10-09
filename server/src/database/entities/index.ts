@@ -88,6 +88,7 @@ export class SessionEntity {
 }
 
 @Entity('workspaces')
+@ForeignKey(() => UserEntity, ['primaryOwnerId'], ['id'], { onDelete: 'SET NULL' })
 export class WorkspaceEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) name: string;
@@ -96,6 +97,8 @@ export class WorkspaceEntity extends Wire {
   slug: string;
   /** Stored partially (only what was customized); `toJSON` and `resolved()` fill in the defaults. */
   @Column({ type: 'jsonb', default: EMPTY_OBJECT }) settings: Partial<WorkspaceSettings>;
+  /** The user who owns the workspace (its creator until ownership is transferred); see `member-rules.ts`. */
+  @Column({ type: 'varchar', nullable: true }) primaryOwnerId: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   /** Settings with defaults applied. */
