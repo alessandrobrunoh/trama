@@ -1,4 +1,17 @@
-import { pushPayload } from './push.service.js';
+import { pushEndpointProblem, pushPayload } from './push.service.js';
+
+describe('pushEndpointProblem', () => {
+  it.each(['https://10.0.0.5:8443/x', 'https://127.0.0.1/x', 'https://localhost/x', 'https://169.254.169.254/x', 'https://[::1]/x', 'http://fcm.googleapis.com/x'])(
+    'rejects %s',
+    async (endpoint) => {
+      expect(await pushEndpointProblem(endpoint), endpoint).not.toBeNull();
+    },
+  );
+
+  it('accepts a public https push service address', async () => {
+    expect(await pushEndpointProblem('https://8.8.8.8/push/abc')).toBeNull();
+  });
+});
 
 describe('pushPayload', () => {
   it('uses the shape Angular\'s service worker shows and opens the page on click', () => {

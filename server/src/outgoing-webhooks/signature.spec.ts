@@ -1,5 +1,4 @@
 import { signBody, verifySignature } from './signature.js';
-import { webhookUrlProblem } from './url-policy.js';
 import { webhookEventMatches } from '../contracts/domain.js';
 
 describe('outgoing webhook signature', () => {
@@ -31,17 +30,3 @@ describe('webhookEventMatches', () => {
   });
 });
 
-describe('webhookUrlProblem', () => {
-  it('accepts http(s), rejects other schemes and credentials', () => {
-    expect(webhookUrlProblem('https://example.com/hook', { allowPrivate: false })).toBeNull();
-    expect(webhookUrlProblem('ftp://example.com', { allowPrivate: false })).toMatch(/https/);
-    expect(webhookUrlProblem('not a url')).toMatch(/valid/);
-    expect(webhookUrlProblem('https://user:pw@example.com/')).toMatch(/credentials/);
-  });
-  it('blocks internal hosts unless private targets are allowed', () => {
-    for (const host of ['http://localhost:3000/x', 'http://127.0.0.1/x', 'http://10.1.2.3/x', 'http://192.168.0.5/x', 'http://172.20.0.1/x', 'http://169.254.169.254/x', 'http://[::1]/x', 'http://db.internal/x'])
-      expect(webhookUrlProblem(host, { allowPrivate: false }), host).toMatch(/internal/);
-    expect(webhookUrlProblem('http://172.32.0.1/x', { allowPrivate: false })).toBeNull();
-    expect(webhookUrlProblem('http://localhost:3000/x', { allowPrivate: true })).toBeNull();
-  });
-});

@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { safeRequest } from '../common/safe-fetch.js';
 
 export interface HttpRequest {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
@@ -8,6 +9,10 @@ export interface HttpRequest {
   /** Exact bytes to send (already serialized); wins over `body`. Needed when the body is signed. */
   rawBody?: string;
   timeoutMs?: number;
+  /** Response body cap in bytes (default 10 MB). */
+  maxBytes?: number;
+  /** With `maxBytes`: cut the body instead of failing; for callers that only need the status. */
+  truncate?: boolean;
 }
 
 export interface HttpResponse {
@@ -27,14 +32,18 @@ export abstract class HttpClient {
 @Injectable()
 export class FetchHttpClient extends HttpClient {
   async request(req: HttpRequest): Promise<HttpResponse> {
-    const res = await fetch(req.url, {
+    // Every URL here is user-influenced (webhook target, integration baseUrl): go through the SSRF guard.
+    const res = await safeRequest({
+      url: req.url,
       method: req.method ?? 'GET',
       headers: { ...(req.body !== undefined || req.rawBody !== undefined ? { 'Content-Type': 'application/json' } : {}), ...req.headers },
       body: req.rawBody ?? (req.body !== undefined ? JSON.stringify(req.body) : undefined),
-      signal: AbortSignal.timeout(req.timeoutMs ?? 15_000),
-      redirect: 'error',
+      timeoutMs: req.timeoutMs ?? 15_000,
+      maxBytes: req.maxBytes,
+      truncate: req.truncate,
     });
-    const text = await res.text();
+    if (res.status >= 300 && res.status < 400) throw new Error(`Redirects are not followed (HTTP ${res.status})`);
+    const text = res.body.toString('utf8');
     let json: unknown = null;
     if (text) {
       try {
@@ -43,9 +52,7 @@ export class FetchHttpClient extends HttpClient {
         json = null;
       }
     }
-    const headers: Record<string, string> = {};
-    res.headers.forEach((v, k) => (headers[k.toLowerCase()] = v));
-    return { status: res.status, headers, json };
+    return { status: res.status, headers: res.headers, json };
   }
 }
 

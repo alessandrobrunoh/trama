@@ -219,6 +219,8 @@ export class OutgoingWebhooksService implements OnModuleInit, OnModuleDestroy {
         url: hook.url,
         rawBody: body,
         timeoutMs: DELIVERY_TIMEOUT_MS,
+        maxBytes: 64 * 1024,
+        truncate: true,
         headers: {
           'User-Agent': 'Nabla-Webhooks/1',
           'X-Nabla-Event': payload.event,

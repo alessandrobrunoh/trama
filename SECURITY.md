@@ -122,6 +122,17 @@ New integrations should follow these principles:
 - no implicit trust based only on URLs, labels, branch names, or agent-provided metadata;
 - auditable actions for privileged operations.
 
+## Outbound requests (SSRF)
+
+The API calls URLs that users choose: outgoing webhooks, Web Push endpoints and the base URL of self-hosted GitHub / GitLab integrations. All of them go through one guard (`server/src/common/safe-fetch.ts`), in every environment:
+
+- only `http(s)` without credentials in the URL, and `https` only in production;
+- the host is resolved by the connection itself and **every** address is checked: loopback, private, link-local, CGNAT, multicast, reserved, IPv4-mapped IPv6 and cloud metadata ranges are refused, and the socket connects to the address that was checked (no DNS rebinding window);
+- redirects are not followed, requests have a deadline and responses a size cap;
+- URLs are also validated when saved (`400`), and again on every delivery, because a name can start pointing inward later.
+
+Operators who need internal targets (webhooks to localhost during development, a GitLab on a private network) opt in explicitly with `TRAMA_OUTBOUND_ALLOW_PRIVATE=true` or an allowlist in `TRAMA_OUTBOUND_ALLOWED_HOSTS`; see `server/.env.example`. Cloud metadata addresses (`169.254.169.254`, `fd00:ec2::254`) stay blocked even then. The old `NABLA_ALLOW_PRIVATE_WEBHOOKS=true` is still read as an alias of `TRAMA_OUTBOUND_ALLOW_PRIVATE`. For defence in depth, still run the API behind an egress policy where you can.
+
 ## Agent security
 
 Coding agents and external execution providers must be treated as potentially untrusted actors.
