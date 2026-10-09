@@ -13,11 +13,24 @@ describe('requiredPermission', () => {
     expect(requiredPermission('GET', '/api/w/:slug/outgoing-webhooks/:id/deliveries')).toBe('outgoing-webhooks:read');
   });
 
+  it('maps insights, including the per-signal drill-down, to insights:read', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/insights')).toBe('insights:read');
+    expect(requiredPermission('GET', '/api/w/:slug/insights/signals/:id')).toBe('insights:read');
+  });
+
   it('maps the workspace itself and its settings', () => {
     expect(requiredPermission('GET', '/api/w/:slug')).toBe('workspace:read');
     expect(requiredPermission('PATCH', '/api/w/:slug')).toBe('workspace:write');
     expect(requiredPermission('PATCH', '/api/w/:slug/settings')).toBe('workspace:write');
     expect(requiredPermission('DELETE', '/api/w/:slug')).toBe('workspace:delete');
+  });
+
+  it('maps the customer-request inbox to customers and its sources to integrations', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/customer-intake')).toBe('customers:read');
+    expect(requiredPermission('POST', '/api/w/:slug/customer-intake/:id/link')).toBe('customers:write');
+    expect(requiredPermission('GET', '/api/w/:slug/intake-sources')).toBe('integrations:read');
+    expect(requiredPermission('POST', '/api/w/:slug/intake-sources/:id/rotate-secret')).toBe('integrations:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug/intake-sources/:id')).toBe('integrations:delete');
   });
 
   it('maps customer tiers to workspace settings and the flat request list to customers', () => {

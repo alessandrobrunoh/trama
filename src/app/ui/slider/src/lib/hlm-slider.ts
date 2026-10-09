@@ -49,7 +49,7 @@ import { classes } from '@spartan-ng/helm/utils';
 
       @for (i of _slider.thumbIndexes(); track i) {
         <span
-          class="border-ring ring-ring/50 size-3 rounded-full border bg-white transition-[color,box-shadow] hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 absolute block shrink-0 select-none after:absolute after:-inset-2"
+          class="border-ring ring-ring/50 size-3 rounded-full border bg-white transition-[color,box-shadow] hover:ring-3 focus-visible:ring-2 focus-visible:outline-hidden active:ring-3 absolute block shrink-0 select-none after:absolute after:-inset-2"
           brnSliderThumb
         ></span>
       }

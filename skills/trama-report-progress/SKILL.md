@@ -31,7 +31,7 @@ update_criterion { idOrKey, criterionId, state: "met",
   evidence: { artifactIds: ["art_…"], note: "tested on staging" } }   // pending → in_progress → met
 ```
 
-Set `met` only with evidence: an artifact of this workstream (test report, deployment, PR) and/or a short note saying what you verified. The server records that **you** declared it (shown as "declared by agent"); a person can still verify it. `met` without evidence is allowed but shows as "senza prova", so do not do it. Do not set `met` just because a PR is open or merged, and say in a comment what you did not verify. Changing a criterion's text resets it to `pending`. Do not delete criteria you could not meet; leave them and say why in a comment.
+Set `met` only with evidence: an artifact of this workstream (test report, deployment, PR) and/or a short note saying what you verified. The server records that **you** declared it (shown as "declared by agent"); a person can still verify it. `met` without evidence is allowed but shows as "no evidence", so do not do it. Do not set `met` just because a PR is open or merged, and say in a comment what you did not verify. Changing a criterion's text resets it to `pending`. Do not delete criteria you could not meet; leave them and say why in a comment.
 
 ### Pull requests and builds
 

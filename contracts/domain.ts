@@ -32,6 +32,11 @@ export interface Workspace {
   slug: string;
   /** Always fully resolved by the server (defaults filled in). */
   settings: WorkspaceSettings;
+  /**
+   * The user who owns the workspace: its creator until ownership is transferred. Nobody else can remove
+   * or demote them, and only they can remove or demote other owners. Absent on legacy rows.
+   */
+  primaryOwnerId?: ID;
   createdAt: ISODate;
 }
 
@@ -718,6 +723,13 @@ export interface CustomerRequest {
   important: boolean;
   /** Where the request came from (ticket, email thread, call notes): an http(s) URL. */
   sourceUrl?: string;
+  /** Set when the request arrived through a customer-request source (Intercom, Zendesk, Front, Slack, email, generic webhook). */
+  source?: IntakeProvider;
+  /** The ticket / conversation / message id in the source system (with `source`). */
+  externalId?: string;
+  /** Who asked, as reported by the source. */
+  requesterEmail?: string;
+  requesterName?: string;
   /** Who recorded the request. */
   createdBy: ActorRef;
   createdAt: ISODate;
@@ -766,6 +778,87 @@ export function normalizeCustomerDomains(inputs: readonly string[]): { domains: 
     else if (!domains.includes(domain)) domains.push(domain);
   }
   return { domains, invalid };
+}
+
+// ───────────────────────────── Customer intake ─────────────────────────────
+
+/**
+ * Where inbound customer requests come from. Each source of a workspace has its own webhook URL and secret.
+ * `generic` is a signed JSON webhook, `email` takes a parsed inbound email (Postmark / SendGrid style JSON).
+ */
+export type IntakeProvider = 'intercom' | 'zendesk' | 'front' | 'slack' | 'email' | 'generic';
+export const INTAKE_PROVIDERS: IntakeProvider[] = ['intercom', 'zendesk', 'front', 'slack', 'email', 'generic'];
+
+export interface IntakeProviderMeta {
+  label: string;
+  /** Trama generates the secret (shown once). Otherwise the provider issues it and an admin pastes it. */
+  generatesSecret: boolean;
+  /** Where the secret comes from, for the setup instructions. */
+  secretName: string;
+}
+
+export const INTAKE_PROVIDER_META: Record<IntakeProvider, IntakeProviderMeta> = {
+  intercom: { label: 'Intercom', generatesSecret: false, secretName: 'the app client secret (Developer Hub → your app → Basic information)' },
+  zendesk: { label: 'Zendesk', generatesSecret: false, secretName: 'the webhook signing secret (Admin Center → the webhook → Signing secret)' },
+  front: { label: 'Front', generatesSecret: false, secretName: 'the application secret (Settings → Developers → your app → Basic information)' },
+  slack: { label: 'Slack', generatesSecret: false, secretName: 'the signing secret (api.slack.com/apps → Basic Information)' },
+  email: { label: 'Email forward', generatesSecret: true, secretName: 'the secret Trama generates' },
+  generic: { label: 'Signed webhook', generatesSecret: true, secretName: 'the secret Trama generates' },
+};
+
+export const INTAKE_SOURCE_NAME_MAX = 80;
+export const INTAKE_ITEM_STATUSES = ['pending', 'linked', 'dismissed'] as const;
+export type IntakeItemStatus = (typeof INTAKE_ITEM_STATUSES)[number];
+
+/**
+ * An endpoint that turns a provider's tickets or messages into inbound customer requests.
+ * The secret is never returned except once, when Trama generates it (create / rotate).
+ */
+export interface IntakeSource {
+  /** `isrc_…` */
+  id: ID;
+  workspaceId: ID;
+  provider: IntakeProvider;
+  name: string;
+  enabled: boolean;
+  /** False until the provider's secret has been pasted in: deliveries are refused until then. */
+  hasSecret: boolean;
+  /** Create the customer from the sender's email domain when none matches. Free mail domains never do. */
+  autoCreateCustomers: boolean;
+  /** Requests are attached straight to this project; without one they wait in the triage inbox. */
+  targetProjectId?: ID;
+  /** Provider settings that are not secret (Zendesk: `subdomain`, used to build ticket links). */
+  subdomain?: string;
+  /** Where the provider should POST. */
+  webhookUrl: string;
+  lastReceivedAt?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+/** A request that came in through an {@link IntakeSource}; `pending` ones wait in the triage inbox. */
+export interface IntakeItem {
+  /** `cin_…` */
+  id: ID;
+  workspaceId: ID;
+  sourceId: ID;
+  provider: IntakeProvider;
+  /** Ticket / conversation / message id in the source system. Unique per source: a second delivery is ignored. */
+  externalId: string;
+  externalUrl?: string;
+  requesterEmail?: string;
+  requesterName?: string;
+  subject?: string;
+  body: string;
+  status: IntakeItemStatus;
+  /** The customer matched (or created) from the sender's email domain. */
+  customerId?: ID;
+  /** Set once linked. */
+  issueId?: ID;
+  projectId?: ID;
+  customerRequestId?: ID;
+  receivedAt: ISODate;
+  resolvedAt?: ISODate;
 }
 
 /**
@@ -1116,6 +1209,277 @@ export interface AttentionItem {
   snoozedUntil?: ISODate;
 }
 
+// ───────────────────────────── Insights ─────────────────────────────
+
+/** Time windows offered by GET /insights, in days. */
+export const INSIGHT_RANGES = [7, 30, 90] as const;
+export type InsightRange = (typeof INSIGHT_RANGES)[number];
+
+/**
+ * A health signal: something that is going wrong right now. Every signal lists the items that
+ * cause it, so a lead (or an agent) can act on them. Definitions live in {@link INSIGHT_SIGNALS}.
+ */
+export type InsightSignalId =
+  | 'blocked_workstreams'
+  | 'needs_input'
+  | 'stale_workstreams'
+  | 'stale_issues'
+  | 'delivered_outcome_open'
+  | 'overdue_milestones'
+  | 'overdue_workstreams'
+  | 'scope_creep'
+  | 'prs_stuck_in_review'
+  | 'ci_failing'
+  | 'undecided_decisions'
+  | 'customer_demand_waiting';
+
+export interface InsightSignalMeta {
+  label: string;
+  /** What exactly is counted. Shown in the UI and returned to agents. */
+  definition: string;
+  /** Singular noun of an item, for "3 workstreams". */
+  unit: string;
+}
+
+export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
+  blocked_workstreams: {
+    label: 'Blocked workstreams',
+    definition: 'Open workstreams whose status is Blocked, with the time since they entered it.',
+    unit: 'workstream',
+  },
+  needs_input: {
+    label: 'Waiting for input',
+    definition: 'Open input requests, by how long they have waited and who has to answer.',
+    unit: 'question',
+  },
+  stale_workstreams: {
+    label: 'Stale workstreams',
+    definition: 'In-flight workstreams (working, in review, blocked, needs input, ready to land) with no activity by a person or an agent for the stale threshold.',
+    unit: 'workstream',
+  },
+  stale_issues: {
+    label: 'Stale issues',
+    definition: 'Issues In Progress or In Review that were not updated for the stale threshold.',
+    unit: 'issue',
+  },
+  delivered_outcome_open: {
+    label: 'Delivered, outcome open',
+    definition: 'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
+    unit: 'workstream',
+  },
+  overdue_milestones: {
+    label: 'Overdue milestones',
+    definition: 'Milestones past their target date that still have open issues, in projects that are not completed or canceled.',
+    unit: 'milestone',
+  },
+  overdue_workstreams: {
+    label: 'Overdue workstreams',
+    definition: 'Open workstreams past their target date.',
+    unit: 'workstream',
+  },
+  scope_creep: {
+    label: 'Scope creep',
+    definition: 'Open workstreams that gained at least two issues after they started (first move out of Draft or Planned) inside the selected range.',
+    unit: 'workstream',
+  },
+  prs_stuck_in_review: {
+    label: 'PRs stuck in review',
+    definition: 'Open, non-draft pull requests without an approval and without an update for 3 days or more.',
+    unit: 'pull request',
+  },
+  ci_failing: {
+    label: 'CI failing',
+    definition: 'Open pull requests whose latest CI result is failing.',
+    unit: 'pull request',
+  },
+  undecided_decisions: {
+    label: 'Undecided decisions',
+    definition: 'Decisions that are Proposed and still wait for a person to accept or reject them.',
+    unit: 'decision',
+  },
+  customer_demand_waiting: {
+    label: 'Customer demand waiting',
+    definition: 'Issues and projects that customers asked for and that are still open, longest-waiting first.',
+    unit: 'request target',
+  },
+};
+
+export const INSIGHT_SIGNAL_IDS = Object.keys(INSIGHT_SIGNALS) as InsightSignalId[];
+
+export type InsightItemType = 'workstream' | 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
+
+/** One thing that causes a signal (or sits in a flow list). Enough to render a row and link to it. */
+export interface InsightItem {
+  type: InsightItemType;
+  id: ID;
+  /** Human key (AUTH-42, BUG-7, ADR-3) when the type has one. */
+  key?: string;
+  title: string;
+  /** Workstream the item belongs to, so the UI can link to the right page. */
+  workstreamKey?: string;
+  /** Project of a milestone or project item. */
+  projectId?: ID;
+  /** When the condition started. */
+  since?: ISODate;
+  /** Days since `since` (rounded to one decimal). */
+  ageDays?: number;
+  /** Who has to act, when that is known. */
+  waitingOn?: InsightActor;
+  /** Metric-specific number (customers asking, issues added, ...), see `detail`. */
+  value?: number;
+  /** One sentence that says why the item is in the list. */
+  detail: string;
+}
+
+export interface InsightActor {
+  type: 'user' | 'agent' | 'unassigned';
+  id?: ID;
+  name: string;
+}
+
+export type InsightSeverity = 'ok' | 'info' | 'warning' | 'critical';
+
+export interface InsightSignal {
+  id: InsightSignalId;
+  label: string;
+  definition: string;
+  unit: string;
+  /** `ok` when nothing is wrong. */
+  severity: InsightSeverity;
+  /** All matching items (before the item limit). */
+  count: number;
+  /** Age in days of the oldest item. */
+  oldestDays?: number;
+  /** The worst items first, at most the requested `limit`. */
+  items: InsightItem[];
+  truncated: boolean;
+}
+
+/** Who is the bottleneck: open questions, decisions and reviews waiting on one actor. */
+export interface InsightBottleneck {
+  actor: InsightActor;
+  inputRequests: number;
+  decisions: number;
+  reviews: number;
+  oldestDays: number;
+  /** Sum of waiting days over everything waiting on this actor. */
+  totalWaitDays: number;
+}
+
+export interface DurationStats {
+  count: number;
+  p50?: number;
+  p85?: number;
+  p95?: number;
+  mean?: number;
+  max?: number;
+}
+
+export interface HistogramBucket {
+  label: string;
+  /** Inclusive lower bound, days. */
+  from: number;
+  /** Exclusive upper bound, days. Omitted on the last bucket. */
+  to?: number;
+  count: number;
+}
+
+export interface FlowDuration {
+  stats: DurationStats;
+  /** Same measure over the period before, for comparison. */
+  previous?: DurationStats;
+  histogram: HistogramBucket[];
+  /** Slowest finished items in the range: what stretches the tail. */
+  slowest: InsightItem[];
+}
+
+export interface ThroughputBucket {
+  start: ISODate;
+  end: ISODate;
+  issuesDone: number;
+  workstreamsShipped: number;
+}
+
+export interface InsightWipRow {
+  actor: InsightActor;
+  /** Issues In Progress or In Review assigned to the person (people only). */
+  issues: number;
+  /** Open workstreams: accountable (people) or touched in the last 7 days (agents). */
+  workstreams: number;
+  overloaded: boolean;
+  items: InsightItem[];
+}
+
+export interface AgingItem extends InsightItem {
+  status: IssueStatus;
+  /** Days in progress. */
+  inProgressDays: number;
+  /** Older than the p85 cycle time of recent work. */
+  overBaseline: boolean;
+}
+
+export interface CumulativeFlow {
+  /** One ISO day per column, oldest first. */
+  days: ISODate[];
+  series: { status: IssueStatus; values: number[] }[];
+}
+
+export interface InsightFlow {
+  issueCycle: FlowDuration;
+  issueLead: FlowDuration;
+  workstreamLead: FlowDuration;
+  throughput: ThroughputBucket[];
+  previousThroughput: { issuesDone: number; workstreamsShipped: number };
+  wip: { people: InsightWipRow[]; agents: InsightWipRow[]; limits: { issues: number; workstreams: number } };
+  aging: { baselineDays?: number; baselineSamples: number; items: AgingItem[] };
+  cumulativeFlow?: CumulativeFlow;
+}
+
+export interface InsightContributor {
+  actor: InsightActor;
+  /** Events recorded by this actor in the range (everything they changed). */
+  events: number;
+  issuesDone: number;
+  comments: number;
+  pullRequests: number;
+  decisionsProposed: number;
+  inputRequestsRaised: number;
+  lastActiveAt?: ISODate;
+}
+
+export interface AgentFailureRow {
+  agent: InsightActor;
+  inputRequestsRaised: number;
+  inputRequestsOpen: number;
+  /** Median hours from raising a question to the answer. */
+  medianAnswerHours?: number;
+  pullRequests: number;
+  /** Closed without being merged. */
+  pullRequestsAbandoned: number;
+  pullRequestsCiFailing: number;
+  /** Issues this agent moved to Done that someone moved out of Done again. */
+  issuesReopened: number;
+}
+
+export interface InsightActors {
+  people: InsightContributor[];
+  agents: InsightContributor[];
+  /** Share of recorded events: people vs agents. */
+  share: { people: number; agents: number };
+  failures: AgentFailureRow[];
+}
+
+export interface InsightsReport {
+  generatedAt: ISODate;
+  range: { days: number; from: ISODate; to: ISODate };
+  scope: { teamId?: ID; projectId?: ID };
+  staleDays: number;
+  signals: InsightSignal[];
+  bottlenecks: InsightBottleneck[];
+  flow: InsightFlow;
+  actors: InsightActors;
+}
+
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
 export type ViewEntity = 'workstream' | 'issue' | 'decision' | 'project';
@@ -1282,7 +1646,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
   | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
-  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
+  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot' | 'insights'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
 
@@ -1310,6 +1674,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   graph: { label: 'Graph', group: 'Insight', actions: ['read'] },
   events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
   snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
+  insights: { label: 'Insights', group: 'Insight', actions: ['read'] },
   teams: { label: 'Teams', group: 'Organization', actions: RWD },
   repositories: { label: 'Repositories', group: 'Organization', actions: RWD },
   workspace: { label: 'Workspace & settings', group: 'Organization', actions: RWD },

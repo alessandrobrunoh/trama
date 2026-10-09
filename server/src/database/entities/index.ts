@@ -20,6 +20,7 @@ import type {
   FavoriteType,
   GitProvider,
   InputRequestState,
+  IntakeProvider,
   IssueKind,
   IssueSource,
   IssueStatus,
@@ -89,6 +90,7 @@ export class SessionEntity {
 }
 
 @Entity('workspaces')
+@ForeignKey(() => UserEntity, ['primaryOwnerId'], ['id'], { onDelete: 'SET NULL' })
 export class WorkspaceEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) name: string;
@@ -97,6 +99,8 @@ export class WorkspaceEntity extends Wire {
   slug: string;
   /** Stored partially (only what was customized); `toJSON` and `resolved()` fill in the defaults. */
   @Column({ type: 'jsonb', default: EMPTY_OBJECT }) settings: Partial<WorkspaceSettings>;
+  /** The user who owns the workspace (its creator until ownership is transferred); see `member-rules.ts`. */
+  @Column({ type: 'varchar', nullable: true }) primaryOwnerId: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   /** Settings with defaults applied. */
@@ -461,6 +465,11 @@ export class CustomerRequestEntity extends Wire {
   @Column({ type: 'text', nullable: true }) body: string | null;
   @Column({ type: 'boolean', default: false }) important: boolean;
   @Column({ type: 'varchar', nullable: true }) sourceUrl: string | null;
+  /** Provenance when the request came through a customer-request source (see customer-intake). */
+  @Column({ type: 'varchar', nullable: true }) source: IntakeProvider | null;
+  @Column({ type: 'varchar', nullable: true }) externalId: string | null;
+  @Column({ type: 'varchar', nullable: true }) requesterEmail: string | null;
+  @Column({ type: 'varchar', nullable: true }) requesterName: string | null;
   @Column({ type: 'jsonb' }) createdBy: ActorRef;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;

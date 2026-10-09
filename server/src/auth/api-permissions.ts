@@ -9,6 +9,9 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   labels: 'workspace',
   'customer-tiers': 'workspace',
   'customer-requests': 'customers',
+  // the triage inbox is customer work; the sources behind it are integrations (admin)
+  'customer-intake': 'customers',
+  'intake-sources': 'integrations',
 };
 
 /**
