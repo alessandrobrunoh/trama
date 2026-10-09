@@ -1,7 +1,7 @@
 import 'reflect-metadata';
 import { BadRequestException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
-import { RejectUnsafeInputPipe, hasNulChar } from './configure-app.js';
+import { MAX_BODY_ARRAY, RejectUnsafeInputPipe, hasNulChar } from './configure-app.js';
 
 class Dto {}
 
@@ -33,5 +33,20 @@ describe('NUL characters', () => {
 
   it('do not affect ordinary text, unicode or non-string values', () => {
     expect(hasNulChar({ title: 'caffè ☕', n: 1, ok: true, nothing: null, list: ['a', { b: 'c' }] })).toBe(false);
+  });
+});
+
+describe('oversized lists', () => {
+  const pipe = new RejectUnsafeInputPipe();
+  const ids = (n: number) => Array.from({ length: n }, (_, i) => `id_${i}`);
+
+  it('are a 400 at any depth (70k ids used to exceed the Postgres bind limit and answer 500)', () => {
+    expect(() => pipe.transform({ teamIds: ids(MAX_BODY_ARRAY + 1) }, { type: 'body', metatype: Dto })).toThrow(BadRequestException);
+    expect(() => pipe.transform({ a: { b: ids(70_000) } }, { type: 'body', metatype: Dto })).toThrow(BadRequestException);
+  });
+
+  it('allow a list at the limit', () => {
+    const body = { teamIds: ids(MAX_BODY_ARRAY) };
+    expect(pipe.transform(body, { type: 'body', metatype: Dto })).toBe(body);
   });
 });

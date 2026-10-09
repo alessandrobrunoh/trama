@@ -19,10 +19,20 @@ export function hasNulChar(value: unknown, depth = 0): boolean {
   return Object.entries(value).some(([k, v]) => k.includes('\u0000') || hasNulChar(v, depth + 1));
 }
 
+/** Longest array accepted anywhere in a body: ids end up in SQL lookups, and past 65535 bind parameters Postgres answers 500. */
+export const MAX_BODY_ARRAY = 1000;
+
+export function hasOversizedArray(value: unknown, depth = 0): boolean {
+  if (depth > 20 || value === null || typeof value !== 'object') return false;
+  if (Array.isArray(value) && value.length > MAX_BODY_ARRAY) return true;
+  return Object.values(value).some((v) => hasOversizedArray(v, depth + 1));
+}
+
 /**
  * Input checks that apply to every route before DTO validation:
  *  - a JSON array is not a valid body where a DTO is expected: left alone it passes validation (no
  *    property is wrong) and its methods (`sort`, `filter`…) shadow missing fields;
+ *  - lists longer than MAX_BODY_ARRAY are refused;
  *  - PostgreSQL cannot store NUL (`\u0000`) in text or jsonb, so it would surface as a 500 from the
  *    database: it is a 400 here.
  */
@@ -32,6 +42,8 @@ export class RejectUnsafeInputPipe implements PipeTransform {
       throw new BadRequestException('Request body must be a JSON object');
     if ((metadata.type === 'body' || metadata.type === 'query' || metadata.type === 'param') && hasNulChar(value))
       throw new BadRequestException('Text must not contain NUL characters');
+    if (metadata.type === 'body' && hasOversizedArray(value))
+      throw new BadRequestException(`Lists are limited to ${MAX_BODY_ARRAY} items`);
     return value;
   }
 }
