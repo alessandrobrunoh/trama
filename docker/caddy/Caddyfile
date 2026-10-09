@@ -1,0 +1,28 @@
+# Reverse proxy of docker-compose.selfhost.yml: one public origin, three upstreams.
+#   /api/* -> api (NestJS)   /mcp* -> mcp (Rust MCP server)   everything else -> web (static Angular app)
+#
+# TRAMA_PUBLIC_URL is the site address:
+#   https://trama.example.com  Caddy obtains and renews a Let's Encrypt certificate (ports 80 and 443 must be reachable)
+#   http://localhost           plain HTTP, for a local trial
+#   http://localhost:8080      same on another port (also set TRAMA_HTTP_PORT=8080)
+{$TRAMA_PUBLIC_URL} {
+	# No response compression here: the web image serves pre-gzipped assets, and gzip would buffer the
+	# live-update event stream under /api.
+
+	handle /api/* {
+		reverse_proxy api:3000 {
+			# server-sent events (live updates) must not be buffered
+			flush_interval -1
+		}
+	}
+
+	handle /mcp* {
+		reverse_proxy mcp:8080 {
+			flush_interval -1
+		}
+	}
+
+	handle {
+		reverse_proxy web:8080
+	}
+}
