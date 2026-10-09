@@ -202,3 +202,58 @@ describe('WorkstreamsService.create key allocation', () => {
     await expect(create('tm_a')).rejects.toBeInstanceOf(ConflictException);
   });
 });
+
+describe('WorkstreamsService.updateCriterion evidence', () => {
+  const actor = { type: 'agent', id: 'agt_1' } as never;
+  function build(artifactsOfWorkstream: string[]) {
+    const row = {
+      id: 'wk_1',
+      key: 'CORE-1',
+      workspaceId: 'ws_1',
+      acceptanceCriteria: [{ id: 'ac_1', text: 'Works', state: 'pending' }],
+    } as unknown as WorkstreamEntity;
+    const repo = { findOne: async () => row, save: vi.fn(async (x: unknown) => x) };
+    const ds = {
+      getRepository: () => ({
+        find: async ({ where }: { where: { id: { _value: string[] }; workstreamId: string } }) =>
+          where.id._value.filter((id) => artifactsOfWorkstream.includes(id)).map((id) => ({ id })),
+      }),
+    };
+    const events = { record: vi.fn() };
+    const service = new WorkstreamsService(
+      ds as unknown as DataSource,
+      {} as RefsService,
+      {} as CountersService,
+      events as unknown as EventsService,
+      { touch: vi.fn() } as unknown as WorkstreamBus,
+      {} as LabelsService,
+      repo as unknown as Repository<WorkstreamEntity>,
+    );
+    return { service, row, repo };
+  }
+
+  it('rejects evidence that points at an artifact of another workstream with a 400', async () => {
+    const { service, repo } = build(['art_mine']);
+    await expect(
+      service.updateCriterion('ws_1', actor, 'CORE-1', 'ac_1', { evidence: { artifactIds: ['art_mine', 'art_other'] } }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
+  it('accepts evidence from the same workstream and does not change the state', async () => {
+    const { service, row } = build(['art_pr']);
+    await service.updateCriterion('ws_1', actor, 'CORE-1', 'ac_1', { evidence: { artifactIds: ['art_pr'], note: 'CI green' } });
+    expect(row.acceptanceCriteria[0]).toEqual({
+      id: 'ac_1',
+      text: 'Works',
+      state: 'pending',
+      evidence: { artifactIds: ['art_pr'], note: 'CI green' },
+    });
+  });
+
+  it('sets verifiedBy to the acting agent when the criterion becomes met', async () => {
+    const { service, row } = build([]);
+    await service.updateCriterion('ws_1', actor, 'CORE-1', 'ac_1', { state: 'met' });
+    expect(row.acceptanceCriteria[0]).toMatchObject({ state: 'met', verifiedBy: { type: 'agent', id: 'agt_1' } });
+  });
+});

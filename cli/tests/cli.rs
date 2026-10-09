@@ -967,7 +967,10 @@ fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
     .map(Value::to_string)
     .collect::<Vec<_>>()
     .join("\n");
-    let o = Run::new().with_key(&mock.api()).run_stdin(&["mcp"], &input);
+    // `--tools full` lists every catalog tool; the default is the curated core set (next test).
+    let o = Run::new()
+        .with_key(&mock.api())
+        .run_stdin(&["mcp", "--tools", "full"], &input);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     let replies: Vec<Value> = stdout(&o)
         .lines()
@@ -988,6 +991,74 @@ fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
             .unwrap()
             .contains("BUG-1")
     );
+}
+
+#[test]
+fn mcp_stdio_lists_the_curated_core_tools_by_default_and_full_on_request() {
+    let mock = Mock::start(vec![
+        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route(
+            "GET",
+            "/api/w/acme/issues",
+            200,
+            json!([{ "key": "BUG-1", "title": "t", "status": "todo" }]),
+        ),
+    ]);
+    let input = [
+        json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
+        json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "find_work", "arguments": { "scope": "issues" } } }),
+        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "run_tool", "arguments": { "name": "list_issues" } } }),
+    ]
+    .iter()
+    .map(Value::to_string)
+    .collect::<Vec<_>>()
+    .join("\n");
+    let tool_names = |reply: &Value| -> Vec<String> {
+        reply["result"]["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|t| t["name"].as_str().unwrap().to_string())
+            .collect()
+    };
+    let replies = |o: &Output| -> Vec<Value> {
+        stdout(o)
+            .lines()
+            .map(|l| serde_json::from_str(l).expect("stdout carries only JSON-RPC"))
+            .collect()
+    };
+
+    // default: the core profile, from the same shared protocol layer
+    let o = Run::new().with_key(&mock.api()).run_stdin(&["mcp"], &input);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert!(stderr(&o).contains("core profile"), "{}", stderr(&o));
+    let r = replies(&o);
+    let names = tool_names(&r[0]);
+    assert!(names.len() < 25, "{names:?}");
+    assert!(names.contains(&"get_context".to_string()) && names.contains(&"find_work".to_string()));
+    assert!(!names.contains(&"list_issues".to_string()));
+    assert!(r[1]["result"]["content"][0]["text"].as_str().unwrap().contains("BUG-1"));
+    assert!(r[2]["result"]["content"][0]["text"].as_str().unwrap().contains("BUG-1"), "run_tool reaches the long tail");
+
+    // the environment switches the profile too, and the flag beats it
+    let o = Run::new()
+        .with_key(&mock.api())
+        .env("TRAMA_MCP_PROFILE", "full")
+        .run_stdin(&["mcp"], &input);
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert!(tool_names(&replies(&o)[0]).contains(&"list_issues".to_string()));
+    let o = Run::new()
+        .with_key(&mock.api())
+        .env("TRAMA_MCP_PROFILE", "full")
+        .run_stdin(&["mcp", "--tools", "core"], &input);
+    assert!(!tool_names(&replies(&o)[0]).contains(&"list_issues".to_string()));
+
+    // a typo is a usage error, not a silent fallback
+    let o = Run::new()
+        .with_key(&mock.api())
+        .env("TRAMA_MCP_PROFILE", "everything")
+        .run_stdin(&["mcp"], &input);
+    assert_eq!(code(&o), 2, "{}", stderr(&o));
 }
 
 /// The mock answers `/auth/token` according to which key asked, so two workspaces can share one server.
@@ -1240,7 +1311,7 @@ fn mcp_stdio_reads_across_every_saved_profile() {
     .map(Value::to_string)
     .collect::<Vec<_>>()
     .join("\n");
-    let o = run.run_stdin(&["mcp"], &input);
+    let o = run.run_stdin(&["mcp", "--tools", "full"], &input);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     let replies: Vec<Value> = stdout(&o)
         .lines()

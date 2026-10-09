@@ -6,6 +6,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { CRITERION_STATE_META, NablaStore, type AcceptanceCriterion, type CriterionState, type Workstream } from '../../core';
+import { CriterionEvidence } from './criterion-evidence';
 import { InlineText } from './inline-edit';
 
 const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', in_progress: 'met', met: 'pending' };
@@ -13,7 +14,7 @@ const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', i
 @Component({
   selector: 'app-criteria-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, HlmTooltip, LucideDynamicIcon, InlineText],
+  imports: [HlmButtonImports, HlmInputImports, HlmTooltip, LucideDynamicIcon, InlineText, CriterionEvidence],
   host: { class: 'block' },
   template: `
     <div class="mb-2 flex items-center gap-2">
@@ -27,7 +28,8 @@ const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', i
     </div>
     <ul class="flex flex-col">
       @for (c of ws().acceptanceCriteria; track c.id) {
-        <li class="group hover:bg-hover -mx-1.5 flex items-center gap-1 rounded-md px-1.5">
+        <li class="group hover:bg-hover -mx-1.5 rounded-md px-1.5">
+          <div class="flex items-center gap-1">
           <button
             type="button"
             class="hover:bg-accent focus-visible:ring-ring flex size-8 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
@@ -61,6 +63,10 @@ const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', i
             <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:opacity-100" aria-label="Remove criterion" (click)="remove(c)">
               <svg [lucideIcon]="xIcon" [size]="13"></svg>
             </button>
+          }
+          </div>
+          @if (c.state === 'met' || c.evidence) {
+            <app-criterion-evidence class="mb-1 pl-9" [ws]="ws()" [c]="c" />
           }
         </li>
       } @empty {

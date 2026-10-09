@@ -2,10 +2,10 @@ name: CLI
 
 on:
   pull_request:
-    paths: ['cli/**', 'mcp/src/**', 'skills/trama-cli/**', '.github/workflows/cli-*.yml']
+    paths: ['cli/**', 'mcp/src/**', 'skills/**', 'README.md', 'mcp/README.md', '.github/workflows/cli-*.yml']
   push:
     branches: [main]
-    paths: ['cli/**', 'mcp/src/**', 'skills/trama-cli/**', '.github/workflows/cli-*.yml']
+    paths: ['cli/**', 'mcp/src/**', 'skills/**', 'README.md', 'mcp/README.md', '.github/workflows/cli-*.yml']
 
 permissions:
   contents: read
@@ -26,7 +26,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: cli
-      # The CLI shares mcp/src/{catalog,generic,protocol,upstream}.rs and tools.json with the MCP server.
+      # The CLI shares mcp/src/{catalog,composite,generic,profile,protocol,upstream}.rs, tools.json and curated.json with the MCP server.
       - run: cargo test --locked
         working-directory: cli
       - run: cargo build --locked

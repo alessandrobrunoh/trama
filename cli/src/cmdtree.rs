@@ -467,6 +467,15 @@ mod tests {
     }
 
     #[test]
+    fn criterion_update_carries_evidence_without_touching_state() {
+        let evidence = r#"{"artifactIds":["art_1"],"note":"tested on staging"}"#;
+        let (e, m) = parse(&["criterion", "update", "AUTH-42", "crit_1", "--evidence", evidence]);
+        let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();
+        assert_eq!(call.path, "/workstreams/AUTH-42/criteria/crit_1");
+        assert_eq!(call.body, Some(json!({ "evidence": { "artifactIds": ["art_1"], "note": "tested on staging" } })));
+    }
+
+    #[test]
     fn lists_filters_booleans_and_arrays() {
         let (e, m) = parse(&["issue", "list", "--open", "--priority", "urgent,high", "--q", "login"]);
         let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();

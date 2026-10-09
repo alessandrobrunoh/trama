@@ -95,6 +95,12 @@ export interface CreateLabelInput {
 export interface UpdateLabelInput {
   name?: string;
   color?: string;
+  /** `true` archives (hidden from pickers, kept where used), `false` restores. */
+  archived?: boolean;
+}
+export interface MergeLabelInput {
+  /** Label id that takes over everything labelled with the one being merged away. */
+  into: ID;
 }
 export interface CreateInviteInput {
   email: string;
@@ -320,7 +326,10 @@ export interface CriterionInput {
   text: string;
   state?: CriterionState;
 }
-export type CriterionPatch = Partial<CriterionInput>;
+export interface CriterionPatch extends Partial<CriterionInput> {
+  /** Proof for the criterion; `null` clears it. Never changes the state. */
+  evidence?: { artifactIds?: ID[]; note?: string | null } | null;
+}
 
 // ───── input requests ─────
 export interface CreateInputRequestInput {

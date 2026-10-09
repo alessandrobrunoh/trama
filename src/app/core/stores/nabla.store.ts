@@ -109,6 +109,7 @@ import type {
   WebhookDeliveryLog,
   Workspace,
   WorkspaceSettings,
+  WorkspaceLabel,
   WorkspaceSnapshot,
   Workstream,
 } from '../contracts/domain';
@@ -228,6 +229,28 @@ const PROJECT_CONTEXT_ENTITIES: ReadonlySet<string> = new Set([
 /** A shallow copy without `undefined` values (so spreading a PATCH body does not wipe fields). */
 function definedOnly<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
+}
+
+/** Optimistic view of a criterion edit; mirrors the server rules (verification and proof follow the state and text). */
+function previewCriterion(c: AcceptanceCriterion, patch: CriterionPatch): AcceptanceCriterion {
+  const { evidence, ...rest } = patch;
+  const next: AcceptanceCriterion = { ...c, ...rest };
+  if (rest.text !== undefined) next.text = rest.text.trim();
+  if (next.text !== c.text && c.state === 'met' && rest.state === undefined) {
+    next.state = 'pending';
+    delete next.evidence;
+  }
+  if (next.state !== 'met') {
+    delete next.verifiedBy;
+    delete next.verifiedAt;
+  }
+  if (evidence !== undefined) {
+    const ids = [...new Set(evidence?.artifactIds ?? [])];
+    const note = evidence?.note?.trim();
+    if (ids.length || note) next.evidence = { artifactIds: ids, ...(note ? { note } : {}) };
+    else delete next.evidence;
+  }
+  return next;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -1093,9 +1116,16 @@ export class NablaStore {
     if (!ws) return false;
     const tx = this.tx();
     tx.patch(this._workstreams, ws.id, {
-      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? { ...c, ...patch } : c)),
+      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? previewCriterion(c, patch) : c)),
     });
-    return this.ok('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), { tx });
+    // The server stamps who verified a `met` criterion, so take its answer back.
+    return this.write('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), {
+      tx,
+      onResult: (res) => {
+        const r = res as Rec | null;
+        if (r && Array.isArray(r['acceptanceCriteria'])) this.upsert(this._workstreams, r as unknown as Workstream);
+      },
+    }).then((r) => r !== undefined);
   }
 
   async removeCriterion(ref: string, criterionId: ID): Promise<boolean> {
@@ -2194,16 +2224,25 @@ export class NablaStore {
     this._workspace.update((cur) => (cur ? { ...cur, settings: ws.settings } : cur));
   }
 
-  /** Add a custom workspace label (admin). */
-  async createLabel(input: CreateLabelInput): Promise<boolean> {
-    return this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+  /** Add a custom workspace label (members and above). Resolves the new label, or `undefined` when the API refused. */
+  async createLabel(input: CreateLabelInput): Promise<WorkspaceLabel | undefined> {
+    const ws = await this.write('add label', (s) => this.api.workspaces.createLabel(s, input), {
+      onResult: (w) => this.applyWorkspace(w),
+    });
+    const name = input.name.trim().toLowerCase();
+    return ws?.settings.labels.find((label) => label.name.toLowerCase() === name);
+  }
+
+  /** Rename, recolor, archive or restore a workspace label (admin). Templates can only be recolored. */
+  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
+    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
 
-  /** Rename or recolor a workspace label (admin). Templates can only be recolored. */
-  async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
-    return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
+  /** Move everything labelled `id` onto `into` and remove `id` (admin). */
+  async mergeLabel(id: ID, into: ID): Promise<boolean> {
+    return this.write('merge label', (s) => this.api.workspaces.mergeLabel(s, id, { into }), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
   }
