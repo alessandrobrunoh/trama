@@ -518,7 +518,10 @@ export interface Issue {
   /** Free-text reporter (customer, email…) when not a workspace user. */
   reporterName?: string;
   reporterId?: ID;
-  /** Person responsible for this issue. Distinct from workstream accountability. */
+  /**
+   * Person responsible for this issue. Distinct from workstream accountability.
+   * When a user moves an unassigned issue to `in_progress`, the server sets this to that user.
+   */
   assigneeId?: ID;
   teamId?: ID;
   priority: Priority;
@@ -557,17 +560,62 @@ export interface Issue {
 
 // ───────────────────────────── Customers ─────────────────────────────
 
+export type CustomerStatus = 'prospect' | 'active' | 'churned';
+export const CUSTOMER_STATUSES: CustomerStatus[] = ['prospect', 'active', 'churned'];
+
+/** A tier defined once for the workspace (settings) and assigned to customers by id. */
+export interface CustomerTier {
+  /** `ct_…` */
+  id: ID;
+  name: string;
+  /** `#rrggbb`. */
+  color: string;
+}
+
+export const CUSTOMER_TIER_NAME_MAX = 40;
+export const CUSTOMER_TIERS_MAX = 20;
+export const CUSTOMER_DOMAINS_MAX = 20;
+export const CUSTOMER_REVENUE_MAX = 1_000_000_000_000;
+export const CUSTOMER_SIZE_MAX = 10_000_000;
+export const CUSTOMER_REQUEST_BODY_MAX = 20_000;
+const TIER_COLOR = /^#[0-9a-f]{6}$/;
+
+/** Stored tiers that are well-formed, unique by id and capped. Nothing is invented: a workspace starts with none. */
+export function resolveCustomerTiers(stored?: readonly CustomerTier[] | null): CustomerTier[] {
+  const out: CustomerTier[] = [];
+  for (const item of Array.isArray(stored) ? stored : []) {
+    if (!item || typeof item.id !== 'string' || out.some((t) => t.id === item.id)) continue;
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!name || name.length > CUSTOMER_TIER_NAME_MAX || !TIER_COLOR.test(item.color ?? '')) continue;
+    out.push({ id: item.id, name, color: item.color });
+    if (out.length >= CUSTOMER_TIERS_MAX) break;
+  }
+  return out;
+}
+
 /**
  * A company that asked for something, not a contact and not a CRM account.
- * `domain` is the identity inside the workspace: stored lower-case, without a scheme,
- * path, port or leading `www.`. Two customers cannot share one.
+ * `domains` are its identity inside the workspace: each is stored lower-case, without a scheme,
+ * path, port or leading `www.`, and no two customers share one. `domain` is the primary one (`domains[0]`).
  */
 export interface Customer {
   /** `cus_…` */
   id: ID;
   workspaceId: ID;
   name: string;
+  /** Primary domain, always `domains[0]`. */
   domain: string;
+  /** Every domain of the company, primary first (1-20). */
+  domains: string[];
+  /** `http(s)` image URL shown as the company logo. */
+  logoUrl?: string;
+  /** Annual revenue as a whole number in the workspace's own currency (>= 0). */
+  revenue?: number;
+  /** Company size in people (>= 0). */
+  size?: number;
+  /** Workspace tier id (`WorkspaceSettings.customerTiers`). */
+  tierId?: ID;
+  status: CustomerStatus;
   /** Who created the record. */
   createdBy: ActorRef;
   createdAt: ISODate;
@@ -577,19 +625,29 @@ export interface Customer {
 }
 
 /**
- * One piece of feedback: a customer linked to an existing issue.
- * The pair is unique. Deleting the customer or the issue removes the link and nothing else.
+ * One customer request: what a customer asked for, attached to exactly one issue or one project.
+ * A customer can have several requests on the same issue. Deleting the customer, the issue or the
+ * project removes its requests and nothing else.
  */
 export interface CustomerRequest {
   /** `crq_…` */
   id: ID;
   workspaceId: ID;
   customerId: ID;
-  issueId: ID;
-  /** Optional note about what this customer asked for. */
+  /** Set when the request lives on an issue. Exactly one of `issueId` / `projectId` is set. */
+  issueId?: ID;
+  /** Set when the request lives on a project. */
+  projectId?: ID;
+  /** What the customer asked for, in markdown. */
   body?: string;
+  /** Flagged by the team as important. */
+  important: boolean;
+  /** Where the request came from (ticket, email thread, call notes): an http(s) URL. */
+  sourceUrl?: string;
+  /** Who recorded the request. */
   createdBy: ActorRef;
   createdAt: ISODate;
+  updatedAt: ISODate;
 }
 
 const CUSTOMER_DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
@@ -606,6 +664,34 @@ export function normalizeCustomerDomain(input: string): string | null {
   if (raw.startsWith('www.')) raw = raw.slice(4);
   raw = raw.replace(/\.+$/, '');
   return CUSTOMER_DOMAIN.test(raw) ? raw : null;
+}
+
+/**
+ * Normalizes a list of domains (see {@link normalizeCustomerDomain}), keeping the first occurrence of each
+ * and the given order. `invalid` lists the inputs that are not domains; empty entries are skipped.
+ */
+export function normalizeCustomerDomains(inputs: readonly string[]): { domains: string[]; invalid: string[] } {
+  const domains: string[] = [];
+  const invalid: string[] = [];
+  for (const input of inputs) {
+    if (!input.trim()) continue;
+    const domain = normalizeCustomerDomain(input);
+    if (!domain) invalid.push(input);
+    else if (!domains.includes(domain)) domains.push(domain);
+  }
+  return { domains, invalid };
+}
+
+/** The URL when it is a plain `http(s)` URL of at most 2000 characters, otherwise `null`. Never `javascript:` or `data:`. */
+export function normalizeHttpUrl(input: string): string | null {
+  const raw = input.trim();
+  if (!raw || raw.length > 2000) return null;
+  try {
+    const url = new URL(raw);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname ? raw : null;
+  } catch {
+    return null;
+  }
 }
 
 // ───────────────────────────── Artifacts ─────────────────────────────
@@ -1171,6 +1257,8 @@ export interface WorkspaceSettings {
   deltaThreads: boolean;
   /** Template labels plus any custom labels. Assign these ids; do not invent names. */
   labels: WorkspaceLabel[];
+  /** Customer tiers configured for this workspace, in display order. Empty until an admin adds some. */
+  customerTiers: CustomerTier[];
 }
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
@@ -1180,6 +1268,7 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   timeZone: 'auto',
   deltaThreads: true,
   labels: LABEL_TEMPLATES.map((label) => ({ ...label })),
+  customerTiers: [],
 };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
@@ -1190,6 +1279,7 @@ export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, '
     ...r,
     permissions: { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) },
     labels: resolveLabelCatalog(r.labels),
+    customerTiers: resolveCustomerTiers(r.customerTiers),
   } as WorkspaceSettings;
 }
 
@@ -1240,7 +1330,7 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   { entity: 'project_update', label: 'Project updates', events: ['project_update.created', 'project_update.updated', 'project_update.deleted'] },
   { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
   { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
-  { entity: 'customer', label: 'Customers', events: ['customer.created', 'customer.updated', 'customer.archived', 'customer.restored', 'customer.deleted', 'customer_request.linked', 'customer_request.unlinked'] },
+  { entity: 'customer', label: 'Customers', events: ['customer.created', 'customer.updated', 'customer.archived', 'customer.restored', 'customer.deleted', 'customer_request.linked', 'customer_request.updated', 'customer_request.unlinked'] },
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
@@ -1274,7 +1364,7 @@ export interface WorkspaceSnapshot {
   issues: Issue[];
   /** Companies whose feedback is linked to issues. Includes archived customers. */
   customers: Customer[];
-  /** Customer ↔ issue links. Deleting either side removes the row. */
+  /** Customer requests on issues and projects. Deleting the customer, issue or project removes the row. */
   customerRequests: CustomerRequest[];
   artifacts: Artifact[];
   decisions: Decision[];

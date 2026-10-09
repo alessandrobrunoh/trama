@@ -20,6 +20,13 @@ describe('requiredPermission', () => {
     expect(requiredPermission('DELETE', '/api/w/:slug')).toBe('workspace:delete');
   });
 
+  it('maps customer tiers to workspace settings and the flat request list to customers', () => {
+    expect(requiredPermission('POST', '/api/w/:slug/customer-tiers')).toBe('workspace:write');
+    expect(requiredPermission('DELETE', '/api/w/:slug/customer-tiers/:id')).toBe('workspace:delete');
+    expect(requiredPermission('GET', '/api/w/:slug/customer-requests')).toBe('customers:read');
+    expect(requiredPermission('PATCH', '/api/w/:slug/customers/:id/requests/:requestId')).toBe('customers:write');
+  });
+
   it('gives decision verdicts their own permission', () => {
     expect(requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/accept')).toBe('decisions:accept');
     expect(requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/supersede')).toBe('decisions:accept');

@@ -31,7 +31,27 @@ describe('customers', () => {
     expect(issue.customerCount).toBe(0);
   });
 
-  it('links a customer to an issue once, and unlinking keeps the issue', async () => {
+  it('keeps several domains and company attributes, and configurable tiers', async () => {
+    const ws = (await owner.post(`${base()}/customer-tiers`, { name: 'Enterprise' }).expect(201)).body;
+    const tier = ws.settings.customerTiers[0];
+    const c = (await owner.post(`${base()}/customers`, { name: 'Multi', domains: ['multi.com', 'multi.io'], size: 40, revenue: 1000, tierId: tier.id }).expect(201)).body;
+    expect(c).toMatchObject({ domain: 'multi.com', domains: ['multi.com', 'multi.io'], size: 40, revenue: 1000, tierId: tier.id, status: 'active' });
+    await owner.post(`${base()}/customers`, { name: 'Clash', domains: ['fresh.com', 'multi.io'] }).expect(409);
+    await owner.patch(`${base()}/customers/${c.id}`, { tierId: 'ct_unknown' }).expect(400);
+    await owner.delete(`${base()}/customer-tiers/${tier.id}`).expect(200);
+    expect((await owner.get(`${base()}/customers/${c.id}`).expect(200)).body.tierId).toBeUndefined();
+  });
+
+  it('attaches a request to a project', async () => {
+    const customer = (await owner.post(`${base()}/customers`, { name: 'Proj', domain: 'proj.dev' }).expect(201)).body;
+    const project = (await owner.post(`${base()}/projects`, { name: 'Onboarding' }).expect(201)).body;
+    const req = (await owner.post(`${base()}/customers/${customer.id}/requests`, { projectId: project.id, body: 'Faster setup' }).expect(201)).body;
+    expect(req).toMatchObject({ projectId: project.id, project: { name: 'Onboarding' } });
+    expect(req.issueId).toBeUndefined();
+    expect((await owner.get(`${base()}/customer-requests?projectId=${project.id}`).expect(200)).body).toHaveLength(1);
+  });
+
+  it('links a customer to an issue, and unlinking keeps the issue', async () => {
     const customer = (await owner.post(`${base()}/customers`, { name: 'Beta', domain: 'beta.io' }).expect(201)).body;
     const issue = (await owner.post(`${base()}/issues`, { title: 'Export', kind: 'feature' }).expect(201)).body;
 
@@ -39,9 +59,16 @@ describe('customers', () => {
     expect(link).toMatchObject({ customerId: customer.id, issueId: issue.id, body: 'Asked in the QBR' });
     expect(link.issue).toMatchObject({ id: issue.id, key: issue.key, status: 'backlog', title: 'Export' });
 
-    await owner.post(`${base()}/customers/${customer.id}/requests`, { issueId: issue.id }).expect(409);
+    // several requests from one customer on the same issue are allowed; the customer counts once
+    const second = (await owner.post(`${base()}/customers/${customer.id}/requests`, { issueId: issue.id, body: 'Again', important: true, sourceUrl: 'https://beta.example/ticket/1' }).expect(201)).body;
+    expect(second).toMatchObject({ important: true, sourceUrl: 'https://beta.example/ticket/1' });
     const requests = (await owner.get(`${base()}/customers/${customer.id}/requests`).expect(200)).body;
-    expect(requests).toHaveLength(1);
+    expect(requests).toHaveLength(2);
+    const edited = (await owner.patch(`${base()}/customers/${customer.id}/requests/${second.id}`, { body: 'Edited', important: false }).expect(200)).body;
+    expect(edited).toMatchObject({ body: 'Edited', important: false });
+    await owner.post(`${base()}/customers/${customer.id}/requests`, {}).expect(400);
+    await owner.post(`${base()}/customers/${customer.id}/requests`, { issueId: issue.id, sourceUrl: 'javascript:alert(1)' }).expect(400);
+    await owner.post(`${base()}/customers/${customer.id}/requests/${second.id}/unlink`).expect(204);
 
     const listed = (await owner.get(`${base()}/issues?customerId=${customer.id}`).expect(200)).body;
     expect(listed.map((i: { id: string }) => i.id)).toEqual([issue.id]);
