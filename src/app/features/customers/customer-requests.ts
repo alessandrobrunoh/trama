@@ -9,6 +9,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { CustomerAvatar } from './customer-avatar';
+import { IntakeSourceBadge } from './intake-source-badge';
 import { requestsOn } from './customer-model';
 
 /**
@@ -19,7 +20,7 @@ import { requestsOn } from './customer-model';
 @Component({
   selector: 'app-customer-requests',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, Markdown, ActorAvatar, CustomerAvatar, RelativeTimePipe],
+  imports: [IntakeSourceBadge, RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, Markdown, ActorAvatar, CustomerAvatar, RelativeTimePipe],
   host: { class: 'block' },
   template: `
     @if (rows().length || canManage()) {
@@ -106,7 +107,12 @@ import { requestsOn } from './customer-model';
                   @if (r.request.updatedAt > r.request.createdAt) {
                     <span>edited {{ r.request.updatedAt | relativeTime }}</span>
                   }
-                  @if (safeSource(r.request); as href) {
+                  @if (r.request.source; as provider) {
+                    <app-intake-source-badge [provider]="provider" [url]="r.request.sourceUrl" [ticket]="r.request.externalId" />
+                    @if (r.request.requesterEmail || r.request.requesterName) {
+                      <span class="truncate">from {{ r.request.requesterName || r.request.requesterEmail }}</span>
+                    }
+                  } @else if (safeSource(r.request); as href) {
                     <a [href]="href" target="_blank" rel="noopener noreferrer nofollow" class="hover:text-foreground inline-flex items-center gap-1 underline underline-offset-2">
                       <svg [lucideIcon]="external" [size]="12"></svg> Source
                     </a>
