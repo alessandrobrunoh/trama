@@ -9,6 +9,7 @@ import { ApiError } from '../api/api-error';
 import type { Favorite, FavoriteType, ID } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { LiveSync } from '../sync/live-sync.service';
+import { LatestIntent, mergePending, reconcileSaved, withPinned } from './latest-intent';
 import { NablaStore } from './nabla.store';
 
 /** A favorite resolved against the loaded workspace, ready to render. */
@@ -105,39 +106,71 @@ export class FavoritesStore {
     if (!slug) return;
     try {
       const list = await this.api.favorites.list(slug);
-      if (this.nabla.slug() === slug) this.items.set(list);
+      if (this.nabla.slug() !== slug) return;
+      // Subjects mid-toggle keep what the person just chose; the list may predate it.
+      this.items.update((local) => mergePending(list, local, (f) => this.intent.busy(this.syncKey(slug, f.type, f.subjectId))));
     } catch {
       /* favorites are a convenience; the app works without them */
     }
   }
 
-  /** Pin or unpin, updating the sidebar immediately and rolling back if the server refuses. */
+  /**
+   * Pin or unpin, updating the sidebar immediately. Toggles on one subject are serialised and the
+   * last click wins: a click while a request is in flight only updates the wish, and the request
+   * that follows brings the server to it. A failure rolls back that subject alone.
+   */
   async toggle(type: FavoriteType, subjectId: ID): Promise<void> {
     const slug = this.nabla.slug();
     if (!slug) return;
-    const before = this.items();
-    const existing = before.find((f) => f.type === type && f.subjectId === subjectId);
+    const key = this.syncKey(slug, type, subjectId);
+    const subject = { type, subjectId };
+    const current = this.items().find((f) => f.type === type && f.subjectId === subjectId);
+    // The state the server has confirmed, to roll back to; remembered when a burst of clicks starts.
+    if (!this.intent.busy(key)) this.confirmed.set(key, current ?? null);
+    const pin = !current;
+    this.items.update((list) => withPinned(list, subject, pin, () => this.pending(type, subjectId)));
     try {
-      if (existing) {
-        this.items.set(before.filter((f) => f !== existing));
-        await this.api.favorites.remove(slug, type, subjectId);
-      } else {
-        const temp: Favorite = {
-          id: `fav_pending_${Date.now()}`,
-          workspaceId: this.nabla.workspace()?.id ?? '',
-          type,
-          subjectId,
-          createdAt: new Date().toISOString(),
-        };
-        this.items.set([...before, temp]);
-        const saved = await this.api.favorites.add(slug, type, subjectId);
-        this.items.update((list) => list.map((f) => (f === temp ? saved : f)));
-      }
+      await this.intent.push(key, pin, async (want) => {
+        if (want) {
+          const saved = await this.api.favorites.add(slug, type, subjectId);
+          this.confirmed.set(key, saved);
+          if (this.nabla.slug() === slug) this.items.update((list) => reconcileSaved(list, subject, saved));
+        } else {
+          await this.api.favorites.remove(slug, type, subjectId);
+          this.confirmed.set(key, null);
+        }
+      });
     } catch (e) {
-      this.items.set(before);
+      const back = this.confirmed.get(key) ?? null;
+      if (this.nabla.slug() === slug) {
+        this.items.update((list) => {
+          const without = withPinned(list, subject, false, () => this.pending(type, subjectId));
+          return back ? [...without, back] : without;
+        });
+      }
       const err = ApiError.from(e);
       if (!err.isForbidden) this.notifier.error('Could not update favorites', { description: err.message });
+    } finally {
+      if (!this.intent.busy(key)) this.confirmed.delete(key);
     }
+  }
+
+  private readonly intent = new LatestIntent();
+  private readonly confirmed = new Map<string, Favorite | null>();
+
+  private syncKey(slug: string, type: FavoriteType, subjectId: ID): string {
+    return `${slug}::${keyOf(type, subjectId)}`;
+  }
+
+  /** The optimistic row shown until the server answers. */
+  private pending(type: FavoriteType, subjectId: ID): Favorite {
+    return {
+      id: `fav_pending_${Date.now()}`,
+      workspaceId: this.nabla.workspace()?.id ?? '',
+      type,
+      subjectId,
+      createdAt: new Date().toISOString(),
+    };
   }
 
   private resolve(favorite: Favorite): FavoriteEntry | null {
