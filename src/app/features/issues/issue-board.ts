@@ -83,6 +83,7 @@ import {
   type IssueProp,
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
+import { LabelPicker } from '../../shared/label-picker';
 import { SearchInput } from '../../shared/search-input';
 
 interface Column {
@@ -97,6 +98,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
+    LabelPicker,
     HlmButtonImports,
     HlmPopoverImports,
     HlmContextMenuImports,
@@ -131,6 +133,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
         <app-picker variant="chip" label="Assignee" [multiple]="true" [options]="assigneeFilter()" [value]="fv('assigneeId')" (valueChange)="setF('assigneeId', $event)" />
         <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
+        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
         <app-picker variant="chip" label="Workstream" [multiple]="true" [options]="wsFilter()" [value]="fv('workstreamIds')" (valueChange)="setF('workstreamIds', $event)" />
         @if (projectFilter().length > 1) {
           <app-picker variant="chip" label="Project" [multiple]="true" [icon]="projectIcon" [options]="projectFilter()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />

@@ -10,6 +10,7 @@ import {
   type IssueStatus,
   type NablaStore,
   type Priority,
+  type WorkspaceLabel,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -40,7 +41,8 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
   duplicate: 'Mark as duplicate of…',
 };
 
-export function promptOptions(store: NablaStore, field: IssuePromptField, issues: readonly Issue[]): IssueOption[] {
+/** `labels` is the already ordered label list (see `LabelCatalog.arrange`); without it the catalog order is used. */
+export function promptOptions(store: NablaStore, field: IssuePromptField, issues: readonly Issue[], labels?: readonly WorkspaceLabel[]): IssueOption[] {
   switch (field) {
     case 'status':
       return ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, glyph: 'status', status: s, search: ISSUE_STATUS_META[s].label }));
@@ -70,7 +72,7 @@ export function promptOptions(store: NablaStore, field: IssuePromptField, issues
         ...store.projects().map((p) => ({ value: p.id, label: p.name, glyph: 'project' as const, search: p.name })),
       ];
     case 'label':
-      return store.settings().labels.map((l) => ({ value: l.id, label: l.name, glyph: 'label' as const, color: l.color, search: l.name }));
+      return (labels ?? store.settings().labels.filter((l) => !l.archived)).map((l) => ({ value: l.id, label: l.name, glyph: 'label' as const, color: l.color, search: l.name }));
     case 'workstream': {
       const linked = new Set(issues.flatMap((i) => i.workstreamIds));
       return store

@@ -9,6 +9,7 @@ import { EntityChip } from '../../shared/entity-chip';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
+import { LabelChips } from '../../shared/label-chip';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue } from './issue-model';
 import { describeDemand } from '../customers/customer-model';
@@ -44,7 +45,7 @@ abstract class IssueItemBase {
   });
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
-    return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
+    return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), labels: !h.has('labels'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
   });
   protected readonly team = computed(() => {
     const id = this.issue().teamId;
@@ -87,7 +88,7 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -166,6 +167,9 @@ abstract class IssueItemBase {
           }
         </span>
       }
+      @if (s.labels && i.labels.length) {
+        <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
+      }
       @if (s.team && team(); as t) {
         <span class="text-muted-foreground w-12 shrink-0 truncate text-right font-mono text-[11px] max-md:hidden">{{ t.key }}</span>
       }
@@ -191,7 +195,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -253,6 +257,9 @@ export class IssueRow extends IssueItemBase {
           @if (projectMore(); as m) {
             <span class="text-muted-foreground border-border-strong relative rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.names">+{{ m.n }}</span>
           }
+        }
+        @if (s.labels && i.labels.length) {
+          <app-label-chips class="relative" [ids]="i.labels" [max]="2" />
         }
         @if (hasEstimate()) {
           <app-estimate class="border-border relative inline-flex h-6 items-center rounded-md border px-1.5 text-[11px]" [value]="i.estimate" />

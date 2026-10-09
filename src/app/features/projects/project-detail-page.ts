@@ -53,7 +53,7 @@ import { EventLine } from '../overview/event-line';
 import { CommentThread } from '../workstreams/comments';
 import { EditableMarkdown, InlineText } from '../workstreams/inline-edit';
 import { Picker } from '../workstreams/picker';
-import { labelOptions, priorityOptions, repoOptions, teamOptions, userOptions } from '../workstreams/ws-model';
+import { priorityOptions, repoOptions, teamOptions, userOptions } from '../workstreams/ws-model';
 import { WsDatePicker } from '../workstreams/ws-parts';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
@@ -66,6 +66,7 @@ import { ProjectHealthBadge } from './project-health';
 import { canPostUpdate, isOverdue, isUpdateOverdue, projectStatusOptions } from './project-model';
 import { ProjectStatsTab } from './project-stats-tab';
 import { ProjectUpdatesTab } from './project-updates-tab';
+import { LabelPicker } from '../../shared/label-picker';
 
 const TABS = ['overview', 'updates', 'issues', 'context', 'stats'] as const;
 type Tab = (typeof TABS)[number];
@@ -82,7 +83,7 @@ const ACTIVITY_CAP = 20;
 @Component({
   selector: 'app-project-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
+  imports: [LabelPicker, 
     RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -513,16 +514,7 @@ const ACTIVITY_CAP = 20;
                 />
               </app-property-row>
               <app-property-row label="Labels">
-                <app-picker
-                  variant="field"
-                  label="Labels"
-                  placeholder="None"
-                  [multiple]="true"
-                  [disabled]="!canManage()"
-                  [options]="labels()"
-                  [value]="p.labels"
-                  (valueChange)="update({ labels: $event })"
-                />
+                <app-label-picker [disabled]="!canManage()" [value]="p.labels" (valueChange)="update({ labels: $event })" />
               </app-property-row>
               <app-property-row label="Repositories">
                 <app-picker
@@ -629,7 +621,6 @@ export class ProjectDetailPage {
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly teams = computed(() => teamOptions(this.store));
-  protected readonly labels = computed(() => labelOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly repoChoices = computed(() => repoOptions(this.store));
   protected readonly overdue = computed(() => {
