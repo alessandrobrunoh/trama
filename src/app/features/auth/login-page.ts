@@ -1,13 +1,23 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, input, isDevMode, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  OnInit,
+  computed,
+  inject,
+  input,
+  isDevMode,
+  signal,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { LucideCircleAlert, LucideDynamicIcon } from '@lucide/angular';
+import { LucideCircleAlert, LucideDynamicIcon, LucideSparkles } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { ApiError } from '../../core/api/api-error';
 import { SessionStore } from '../../core/session/session.store';
+import { environment } from '../../../environments/environment';
 import { AuthShell } from './auth-shell';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -15,10 +25,64 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 @Component({
   selector: 'app-login-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [FormsModule, RouterLink, HlmButtonImports, HlmFieldImports, HlmInputImports, HlmSpinner, LucideDynamicIcon, AuthShell],
+  imports: [
+    FormsModule,
+    RouterLink,
+    HlmButtonImports,
+    HlmFieldImports,
+    HlmInputImports,
+    HlmSpinner,
+    LucideDynamicIcon,
+    AuthShell,
+  ],
   template: `
-    <app-auth-shell title="Sign in to Trama" subtitle="Coordination for teams of humans and coding agents.">
+    <app-auth-shell
+      title="Sign in to Trama"
+      subtitle="Coordination for teams of humans and coding agents."
+    >
       <form (submit)="submit($event)" novalidate class="flex flex-col gap-4">
+        @if (demo) {
+          <aside
+            aria-labelledby="demo-login-title"
+            class="border-primary/20 bg-primary/5 mb-1 rounded-xl border p-3.5"
+          >
+            <div class="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                class="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-lg"
+              >
+                <svg [lucideIcon]="demoIcon" [size]="16"></svg>
+              </span>
+              <div class="min-w-0 flex-1">
+                <h2 id="demo-login-title" class="text-sm font-medium">Try the sample workspace</h2>
+                <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">
+                  No sign-up needed. Use the shared demo account to explore Trama.
+                </p>
+                <div
+                  class="bg-background/70 mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md px-2.5 py-2 text-xs"
+                >
+                  <span class="text-muted-foreground">Email</span>
+                  <code class="text-foreground font-mono">demo@nabla.dev</code>
+                  <span class="text-muted-foreground">Password</span>
+                  <code class="text-foreground font-mono">nabla-demo</code>
+                </div>
+              </div>
+            </div>
+            <p class="text-muted-foreground mt-2 text-[11px] leading-relaxed">
+              Shared workspace: please don't add personal or sensitive data.
+            </p>
+            <button
+              hlmBtn
+              type="button"
+              size="sm"
+              variant="outline"
+              class="mt-3 w-full"
+              (click)="fillDemo()"
+            >
+              Fill in demo credentials
+            </button>
+          </aside>
+        }
         @if (error(); as e) {
           <div
             role="alert"
@@ -35,11 +99,12 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             id="login-email"
             name="email"
             type="email"
-            autocomplete="email"
+            autocomplete="username"
             inputmode="email"
             placeholder="you@company.com"
             [(ngModel)]="email"
             [attr.aria-invalid]="emailError() ? 'true' : null"
+            required
             autofocus
           />
           @if (emailError(); as m) {
@@ -57,6 +122,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
             placeholder="••••••••"
             [(ngModel)]="password"
             [attr.aria-invalid]="passwordError() ? 'true' : null"
+            required
           />
           @if (passwordError(); as m) {
             <p class="text-destructive text-xs">{{ m }}</p>
@@ -68,11 +134,6 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
           }
           Sign in
         </button>
-        @if (demo) {
-          <button hlmBtn type="button" variant="ghost" class="text-muted-foreground w-full" (click)="fillDemo()">
-            Use the demo account
-          </button>
-        }
       </form>
       <ng-container footer>
         New to Trama?
@@ -103,7 +164,8 @@ export class LoginPage implements OnInit {
   });
 
   protected readonly alertIcon = LucideCircleAlert;
-  protected readonly demo = isDevMode();
+  protected readonly demoIcon = LucideSparkles;
+  protected readonly demo = isDevMode() && environment.demoLoginEnabled;
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly busy = signal(false);
@@ -143,7 +205,11 @@ export class LoginPage implements OnInit {
     } catch (e) {
       const err = ApiError.from(e);
       this.error.set(
-        err.status === 401 ? 'Incorrect email or password.' : err.isNetwork ? 'Cannot reach the server. Try again in a moment.' : err.message,
+        err.status === 401
+          ? 'Incorrect email or password.'
+          : err.isNetwork
+            ? 'Cannot reach the server. Try again in a moment.'
+            : err.message,
       );
     } finally {
       this.busy.set(false);

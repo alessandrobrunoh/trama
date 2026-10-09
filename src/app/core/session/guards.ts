@@ -21,15 +21,9 @@ export const guestGuard: CanActivateFn = async (route) => {
   await session.init();
   if (!session.isAuthenticated()) return true;
   const next = route.queryParamMap.get('next');
-  return router.parseUrl(next && next.startsWith('/') && !next.startsWith('//') ? next : session.defaultWorkspaceUrl());
-};
-
-/** `/`: signed out → the landing page; signed in → last used (or first) workspace, or /new-workspace. */
-export const landingGuard: CanActivateFn = async () => {
-  const session = inject(SessionStore);
-  const router = inject(Router);
-  await session.init();
-  return session.isAuthenticated() ? router.parseUrl(session.defaultWorkspaceUrl()) : true;
+  return router.parseUrl(
+    next && next.startsWith('/') && !next.startsWith('//') ? next : session.defaultWorkspaceUrl(),
+  );
 };
 
 /**
