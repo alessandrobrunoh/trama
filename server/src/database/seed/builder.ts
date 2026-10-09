@@ -235,7 +235,7 @@ export class SeedBuilder {
   }) {
     const [prefix, numStr] = o.key.split('-');
     const number = Number(numStr);
-    this.bump(`ws:${o.owner}`, number);
+    this.bump(`wskey:${prefix}`, number);
     const id = uid('wk');
     const current = o.path[o.path.length - 1];
     const createdAt = this.at(o.created);

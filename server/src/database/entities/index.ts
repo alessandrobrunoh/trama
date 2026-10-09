@@ -754,7 +754,7 @@ export class AttentionStateEntity {
   @Column({ type: 'timestamptz' }) since: Date;
 }
 
-/** Atomic per-workspace sequences: `ws:<teamId>`, `issue:<kind>`, `adr`. */
+/** Atomic per-workspace sequences: `wskey:<teamKey>`, `issue:<kind>`, `adr`. */
 @Entity('workspace_counters')
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',

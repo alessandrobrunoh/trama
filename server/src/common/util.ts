@@ -38,3 +38,9 @@ export function toDate(value: string | Date | null | undefined): Date | null | u
   if (value === null || value === undefined) return value;
   return value instanceof Date ? value : new Date(value);
 }
+
+/** True for a Postgres unique-constraint violation (SQLSTATE 23505), as thrown through TypeORM. */
+export function isUniqueViolation(e: unknown): boolean {
+  const err = e as { code?: unknown; driverError?: { code?: unknown } } | null;
+  return err?.code === '23505' || err?.driverError?.code === '23505';
+}

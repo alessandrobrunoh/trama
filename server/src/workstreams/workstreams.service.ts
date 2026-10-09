@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
 import {
@@ -11,7 +11,7 @@ import {
 } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
-import { notFound, toDate, uid, unique } from '../common/util.js';
+import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
 import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
 import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -127,7 +127,9 @@ export class WorkstreamsService {
 
   /**
    * Creates a workstream; its key is `${ownerTeam.key}-${n}` with `n` from the
-   * owner team's counter. Pass `manager` to run inside a caller transaction
+   * counter of that team key (not of the team row, so it survives deleting and
+   * recreating a team) and always above the highest number the key already uses
+   * (a workstream keeps its key when another team takes it over). Pass `manager` to run inside a caller transaction
    * (linking an issue); events/bus then fire after the caller commits via the
    * returned `after()` callback — when no manager is passed they fire here.
    */
@@ -160,7 +162,11 @@ export class WorkstreamsService {
         id: input.ownerTeamId,
         workspaceId,
       });
-      const number = await this.counters.next(m, workspaceId, `ws:${team.id}`);
+      const [{ top }] = await m.query<{ top: number }[]>(
+        `SELECT COALESCE(MAX("number"), 0)::int AS top FROM "workstreams" WHERE "workspaceId" = $1 AND "key" LIKE $2`,
+        [workspaceId, `${team.key}-%`],
+      );
+      const number = await this.counters.nextAbove(m, workspaceId, `wskey:${team.key}`, top);
       const acceptanceCriteria = criteria(input.acceptanceCriteria);
       const derived: WorkstreamStatus = acceptanceCriteria.length
         ? 'planned'
@@ -208,11 +214,20 @@ export class WorkstreamsService {
       });
       await this.bus.touch(workspaceId, row.id, 'workstream.created');
     };
+    // Allocation cannot collide, but a unique violation (key or anything else racing) is a 409, not a 500.
+    const guarded = async (m: EntityManager) => {
+      try {
+        return await run(m);
+      } catch (e) {
+        if (isUniqueViolation(e)) throw new ConflictException('Workstream key already exists; retry');
+        throw e;
+      }
+    };
     if (options.manager) {
-      const row = await run(options.manager);
+      const row = await guarded(options.manager);
       return Object.assign(row, { after: () => after(row) });
     }
-    const row = await this.ds.transaction(run);
+    const row = await this.ds.transaction(guarded);
     await after(row);
     return row;
   }
