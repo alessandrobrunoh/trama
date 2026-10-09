@@ -9,6 +9,7 @@ import { CustomersModule } from './customers/customers.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DecisionsModule } from './decisions/decisions.module.js';
+import { DocumentsModule } from './documents/documents.module.js';
 import { DependenciesModule } from './dependencies/dependencies.module.js';
 import { EventsModule } from './events/events.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
@@ -56,6 +57,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     CustomersModule,
     MilestonesModule,
     ArtifactsModule,
+    DocumentsModule,
     DecisionsModule,
     DependenciesModule,
     CommentsModule,

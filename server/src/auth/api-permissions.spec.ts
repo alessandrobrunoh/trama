@@ -47,6 +47,21 @@ describe('requiredPermission', () => {
     for (const [method, route, expected] of table) expect(requiredPermission(method, route), `${method} ${route}`).toBe(expected);
   });
 
+  it('maps documents to documents:*, revisions included; attaching needs artifacts:write', () => {
+    const table: [string, string, string][] = [
+      ['GET', '/api/w/:slug/documents', 'documents:read'],
+      ['GET', '/api/w/:slug/documents/:id/revisions', 'documents:read'],
+      ['POST', '/api/w/:slug/documents', 'documents:write'],
+      ['PATCH', '/api/w/:slug/documents/:id', 'documents:write'],
+      ['POST', '/api/w/:slug/documents/:id/attach', 'artifacts:write'],
+      ['POST', '/api/w/:slug/documents/:id/detach', 'artifacts:write'],
+      ['POST', '/api/w/:slug/documents/:id/revisions/:version/restore', 'documents:write'],
+      ['DELETE', '/api/w/:slug/documents/:id', 'documents:delete'],
+    ];
+    for (const [method, route, expected] of table) expect(requiredPermission(method, route), `${method} ${route}`).toBe(expected);
+    expect(normalizePermissions(['documents:write'])).toEqual(['documents:read', 'documents:write']);
+  });
+
   it('keeps the other nested routes under their parent resource', () => {
     const table: [string, string, string][] = [
       ['POST', '/api/w/:slug/projects/:projectId/updates', 'projects:write'],

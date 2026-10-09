@@ -916,6 +916,8 @@ export interface Artifact {
   provider: ArtifactProvider;
   title: string;
   url?: string;
+  /** Set on a `document` artifact that points to a Trama document (`Document.id`); its title follows the document. */
+  documentId?: ID;
   /** e.g. "#182", a commit sha, "ADR-021", "staging/auth-2026-10-07". */
   externalId?: string;
   state: ArtifactState;
@@ -930,6 +932,81 @@ export interface Artifact {
   authorRef?: ActorRef;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+// ───────────────────────────── Documents ─────────────────────────────
+
+/** Hard limits of a document (also enforced by the API). */
+export const DOCUMENT_LIMITS = {
+  titleMax: 200,
+  /** Markdown characters. Also bounded by the 2 MB JSON body limit. */
+  bodyMax: 150_000,
+  /** Revisions kept per document; the oldest are dropped. */
+  revisionsKept: 50,
+  /** Edits by the same person within this window update the newest revision instead of adding one. */
+  revisionWindowMs: 5 * 60 * 1000,
+} as const;
+
+/**
+ * A page of markdown that lives in Trama (specs, plans, notes that are not in a repository). It belongs to the
+ * workspace; it is linked to projects, workstreams and issues by `document` artifacts (`links`), so it shows up
+ * in their Artifacts and there is no second "parent" to keep in sync. Edits are optimistic: every change names the
+ * `version` it was based on and a stale write is refused with 409.
+ */
+export interface Document {
+  id: ID;
+  workspaceId: ID;
+  title: string;
+  /** Markdown source. Only returned by the single-document endpoints. */
+  body: string;
+  /** One emoji or a Lucide icon name. */
+  icon?: string;
+  /** Starts at 1 and grows by one on every change to the title, body or icon. */
+  version: number;
+  author: ActorRef;
+  lastEditor: ActorRef;
+  /** Set while the document is archived (hidden from lists, still readable and restorable). */
+  archivedAt?: ISODate;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+  /** The projects / workstreams / issues the document is attached to. Set on single reads. */
+  links?: DocumentLink[];
+}
+
+/** One attachment of a document: the `document` artifact and its owner. */
+export interface DocumentLink {
+  artifactId: ID;
+  projectId?: ID;
+  workstreamId?: ID;
+  issueId?: ID;
+}
+
+/** A document as listed: no body, but the start of it (and, for a search, the matching passage). */
+export type DocumentSummary = Omit<Document, 'body'> & {
+  excerpt: string;
+  /** Search only: passage around the match with `<mark>` around the terms (HTML-escaped otherwise). */
+  snippet?: string;
+};
+
+/** An earlier state of a document. The newest revision is the current state. */
+export interface DocumentRevision {
+  id: ID;
+  documentId: ID;
+  /** The document version this revision holds (the last one it covers when saves were merged). */
+  version: number;
+  title: string;
+  /** Left out of lists. */
+  body?: string;
+  editor: ActorRef;
+  createdAt: ISODate;
+}
+
+/** Body of a 409 on a stale write: the version in the database, so the client can merge or reload. */
+export interface DocumentConflict {
+  statusCode: 409;
+  code: 'document_conflict';
+  message: string;
+  current: Document;
 }
 
 // ───────────────────────────── Decisions ─────────────────────────────
@@ -988,7 +1065,8 @@ export type SubjectType =
   | 'team'
   | 'project'
   | 'project_update'
-  | 'milestone';
+  | 'milestone'
+  | 'document';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -1248,7 +1326,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts'
+  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts' | 'documents'
   | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot'
   | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
@@ -1269,6 +1347,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
+  documents: { label: 'Documents', group: 'Work', actions: RWD },
   dependencies: { label: 'Dependencies', group: 'Work', actions: RWD },
   'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
   views: { label: 'Views', group: 'Work', actions: RWD },
@@ -1293,7 +1372,7 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOUR
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'documents', 'dependencies', 'input-requests', 'views', 'attention'];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
 export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
@@ -1601,6 +1680,7 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
   { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
   { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
+  { entity: 'document', label: 'Documents', events: ['document.created', 'document.updated', 'document.archived', 'document.restored', 'document.deleted'] },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
   { entity: 'dependency', label: 'Dependencies', events: ['dependency.added', 'dependency.removed'] },
   { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },

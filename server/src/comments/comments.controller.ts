@@ -5,7 +5,7 @@ import { Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
 import { COMMENT_PAGE_SIZE, type SubjectType } from '../contracts/domain.js';
 import { CommentsService } from './comments.service.js';
 
-const SUBJECTS: SubjectType[] = ['workstream', 'issue', 'artifact', 'decision', 'input_request', 'repository', 'team', 'project', 'project_update'];
+const SUBJECTS: SubjectType[] = ['workstream', 'issue', 'artifact', 'decision', 'input_request', 'repository', 'team', 'project', 'project_update', 'document'];
 
 class SubjectDto {
   @IsIn(SUBJECTS) type: SubjectType;

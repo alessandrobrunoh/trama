@@ -11,6 +11,7 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
+  DocumentEntity,
   ProjectUpdateEntity,
   RepositoryEntity,
   TeamEntity,
@@ -118,6 +119,8 @@ export class RefsService {
         return { exists: await db.getRepository(ProjectEntity).existsBy(where) };
       case 'project_update':
         return { exists: await db.getRepository(ProjectUpdateEntity).existsBy(where) };
+      case 'document':
+        return { exists: await db.getRepository(DocumentEntity).existsBy(where) };
     }
   }
 }
