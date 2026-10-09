@@ -60,7 +60,7 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `POST /workspaces` | user | `{ name, slug? }`. Creator becomes `owner`. Slug auto-derived from the name (unique; reserved: `login`, `signup`, `new-workspace`, `settings`, …). `409` if an explicit slug is taken. |
 | `GET /w/:slug` | viewer | `Workspace & { role }` |
 | `PATCH /w/:slug` | admin | `{ name?, slug? }` |
-| `DELETE /w/:slug` | owner | `204`, cascades everything |
+| `DELETE /w/:slug` | owner | `{ confirm }`: the exact slug or name of the workspace (`400` when missing or different, nothing is deleted). `204`, cascades everything and cannot be undone. A token needs `workspace:delete`; neither the MCP server nor the CLI has a command for it, use `trama api DELETE /w/<slug> -d '{"confirm":"<slug>"}'`. |
 | `GET /w/:slug/members` | viewer | `Array<Membership & { user: User }>` |
 | `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
 | `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Only owners can grant `owner`. Demoting an owner is treated like removing them, see *Owners* below (`403`/`409`). |

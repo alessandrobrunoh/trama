@@ -1,10 +1,12 @@
 import 'reflect-metadata';
-import { ConflictException, ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { describe, expect, it, vi } from 'vitest';
 import { SESSION_ONLY_KEY } from '../auth/request-context.js';
 import type { Role } from '../contracts/domain.js';
 import { MembershipEntity, WorkspaceEntity } from '../database/entities/index.js';
-import { WorkspaceController } from './workspaces.controller.js';
+import { plainToInstance } from 'class-transformer';
+import { validate } from 'class-validator';
+import { DeleteWorkspaceDto, WorkspaceController } from './workspaces.controller.js';
 import { WorkspacesService } from './workspaces.service.js';
 
 function setup(roles: Record<string, Role>, primaryOwnerId: string | null = 'u_primary') {
@@ -37,6 +39,36 @@ function setup(roles: Record<string, Role>, primaryOwnerId: string | null = 'u_p
 
 const ROLES = { u_primary: 'owner', u_owner2: 'owner', u_admin: 'admin', u_member: 'member' } as const;
 const as = (userId: string, role: Role) => ({ userId, role });
+
+describe('deleting a workspace needs the slug or name', () => {
+  it('refuses a missing, empty or wrong confirmation (400) and deletes nothing', async () => {
+    const { service, ws, workspaces } = setup(ROLES);
+    for (const typed of ['', '   ', 'acm', 'ACME', 'acme-inc', 'Acme']) {
+      await expect(service.remove(ws, typed)).rejects.toThrow(BadRequestException);
+    }
+    await expect(service.remove(ws, undefined as never)).rejects.toThrow(BadRequestException);
+    expect(workspaces.delete).not.toHaveBeenCalled();
+  });
+
+  it('deletes when the slug or the exact name is given', async () => {
+    const a = setup(ROLES);
+    await a.service.remove(a.ws, 'acme');
+    expect(a.workspaces.delete).toHaveBeenCalledWith({ id: 'ws_1' });
+    const b = setup(ROLES);
+    await b.service.remove(b.ws, ' Acme Inc ');
+    expect(b.workspaces.delete).toHaveBeenCalledWith({ id: 'ws_1' });
+  });
+});
+
+describe('DELETE /w/:slug body', () => {
+  const errors = (body: object) => validate(plainToInstance(DeleteWorkspaceDto, body));
+  it('requires a non-empty string `confirm` (400 before the service runs)', async () => {
+    expect(await errors({})).not.toHaveLength(0);
+    expect(await errors({ confirm: '' })).not.toHaveLength(0);
+    expect(await errors({ confirm: 42 })).not.toHaveLength(0);
+    expect(await errors({ confirm: 'acme' })).toHaveLength(0);
+  });
+});
 
 describe('members through the service', () => {
   it('another owner cannot remove or demote the primary owner (403), nothing is written', async () => {

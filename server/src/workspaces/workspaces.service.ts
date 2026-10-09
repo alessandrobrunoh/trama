@@ -169,7 +169,11 @@ export class WorkspacesService {
     return saved;
   }
 
-  async remove(ws: WorkspaceEntity): Promise<void> {
+  /** Irreversible: the caller must repeat the workspace slug or name so a stray request cannot delete it. */
+  async remove(ws: WorkspaceEntity, confirm: string): Promise<void> {
+    const typed = (confirm ?? '').trim();
+    if (typed !== ws.slug && typed !== ws.name)
+      throw new BadRequestException('confirm must be the exact slug or name of the workspace you are deleting');
     await this.workspaces.delete({ id: ws.id });
   }
 

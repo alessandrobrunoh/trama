@@ -53,8 +53,11 @@ describe('workspaces, RBAC and tenancy', () => {
     await admin.post(`/api/w/${slug}/repositories`, { provider: 'github', fullName: 'acme/api' }).expect(201);
     await admin.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'codex' }).expect(201);
     await admin.patch(`/api/w/${slug}`, { name: 'Renamed' }).expect(200);
-    await admin.delete(`/api/w/${slug}`).expect(403);
-    await owner.client.delete(`/api/w/${slug}`).expect(204);
+    await admin.delete(`/api/w/${slug}`, { confirm: slug }).expect(403);
+    // the owner must repeat the slug or name
+    await owner.client.delete(`/api/w/${slug}`).expect(400);
+    await owner.client.delete(`/api/w/${slug}`, { confirm: 'not-this-one' }).expect(400);
+    await owner.client.delete(`/api/w/${slug}`, { confirm: slug }).expect(204);
     await owner.client.get(`/api/w/${slug}`).expect(404);
   });
 

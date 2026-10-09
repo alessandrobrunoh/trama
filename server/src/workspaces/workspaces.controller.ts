@@ -73,6 +73,11 @@ class UpdateSettingsDto {
   @OptionalNotNull() @IsBoolean() deltaThreads?: boolean;
 }
 
+/** Deleting a workspace is irreversible: repeat its slug or name. */
+export class DeleteWorkspaceDto {
+  @IsString() @MinLength(1) @MaxLength(200) confirm: string;
+}
+
 class TransferOwnershipDto {
   /** Membership id of the new owner. */
   @IsString() @MinLength(1) membershipId: string;
@@ -177,8 +182,8 @@ export class WorkspaceController {
   @Delete()
   @Roles('owner')
   @HttpCode(204)
-  async remove(@Ctx() ctx: WorkspaceContext): Promise<void> {
-    await this.service.remove(ctx.workspace);
+  async remove(@Ctx() ctx: WorkspaceContext, @Body() dto: DeleteWorkspaceDto): Promise<void> {
+    await this.service.remove(ctx.workspace, dto.confirm);
   }
 }
 
