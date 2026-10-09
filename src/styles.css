@@ -1255,6 +1255,24 @@ html {
   hlm-dialog-content[data-variant='fullscreen'] > .sheet-handle {
     display: none;
   }
+  hlm-dialog-content[data-variant='fullscreen'] {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  hlm-dialog-content[data-variant='fullscreen'] > form {
+    flex: 1 1 0;
+    min-block-size: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  hlm-dialog-content[data-variant='fullscreen'] [data-slot='dialog-footer'] {
+    position: sticky;
+    inset-block-end: 0;
+    margin-block-start: auto;
+    background: var(--popover);
+    padding-block-end: max(0.75rem, env(safe-area-inset-bottom));
+  }
 }
 
 /* ───────────────────── Swipe rows + phone lists (shared/swipe-row.ts, issue rows) ───────────────────── */
