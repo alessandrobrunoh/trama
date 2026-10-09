@@ -72,10 +72,11 @@ Issue status (`draft, backlog, todo, in_progress, in_review, done, canceled`) an
 - Picking up work on a workstream → `trama-start-work`
 - Reporting progress, PRs, CI → `trama-report-progress`
 - Blocked, or a choice needs recording → `trama-ask-and-decide`
+- "Where are the problems?" (blocked or stale work, who everything waits on, cycle time, agent failure signals) → `get_insights`, then `get_insight_signal` for the full list behind one signal
 - Filing and grouping issues → `trama-triage-issues`
 
 ## Tool map
 
-`whoami` · `get_workspace` · `list_accounts` (only when several keys are connected) · `search` · `list_repositories` `get_repository` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph`.
+`whoami` · `get_workspace` · `list_accounts` (only when several keys are connected) · `search` · `list_repositories` `get_repository` · `list_issues` `get_issue` `create_issue` `update_issue` `link_issue` · `list_workstreams` `get_workstream` `get_workstream_context` `create_workstream` `update_workstream` `add_criterion` `update_criterion` · `list_projects` `get_project` `get_project_context` `update_project` `list_project_updates` `create_project_update` `update_project_update` `delete_project_update` · `list_artifacts` `list_project_artifacts` `list_issue_artifacts` `create_artifact` `update_artifact` · `create_decision` `update_decision` · `create_input_request` `answer_input_request` · `create_comment` `list_comments` · `list_milestones` `create_milestone` · `create_dependency` · `list_events` `get_graph` · `get_insights` `get_insight_signal`.
 
 `api_request` is an escape hatch for workspace routes with no dedicated tool. Prefer the dedicated tools; it only takes plain workspace-relative paths.

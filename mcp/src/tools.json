@@ -1511,6 +1511,35 @@
   }
  },
  {
+  "name": "get_insights",
+  "method": "GET",
+  "path": "/insights",
+  "permission": "insights:read",
+  "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
+  "params": {
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items kept per signal, 1-500 (default 25); counts always cover everything"
+  }
+ },
+ {
+  "name": "get_insight_signal",
+  "method": "GET",
+  "path": "/insights/signals/{id}",
+  "permission": "insights:read",
+  "description": "The full item list behind one health signal (what a tile of get_insights drills into).",
+  "params": {
+    "id": "path string(blocked_workstreams|needs_input|stale_workstreams|stale_issues|delivered_outcome_open|overdue_milestones|overdue_workstreams|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
+    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+    "teamId": "query string Only this team's work",
+    "projectId": "query string Only this project's work",
+    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+    "limit": "query integer Items returned, 1-500 (default 100)"
+  }
+ },
+ {
   "name": "list_attention",
   "method": "GET",
   "path": "/attention",

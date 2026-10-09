@@ -484,6 +484,16 @@ export interface EventsQuery {
   before?: ISODate;
   limit?: number;
 }
+export interface InsightsQuery {
+  /** 7, 30 or 90 (default 30). */
+  days?: number;
+  teamId?: ID;
+  projectId?: ID;
+  /** Days without activity before in-flight work is stale (default 7). */
+  staleDays?: number;
+  /** Items kept per signal (counts always cover everything). */
+  limit?: number;
+}
 export interface AttentionQuery {
   /** `all` is admin/owner only. */
   scope?: 'mine' | 'all';
