@@ -1,0 +1,81 @@
+name: Server
+
+on:
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'contracts/**'
+      - 'scripts/sync-contracts.mjs'
+      - '.github/workflows/server-ci.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'server/**'
+      - 'contracts/**'
+      - 'scripts/sync-contracts.mjs'
+      - '.github/workflows/server-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: server-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: server
+
+jobs:
+  check:
+    name: lint, unit tests, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+
+  e2e:
+    name: e2e (postgres)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: trama
+          POSTGRES_PASSWORD: trama
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trama"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    env:
+      # The suite drops and recreates the `trama_e2e` database on every run (test/global-setup.ts);
+      # the role is a superuser, so it can.
+      TEST_DATABASE_URL: postgres://trama:trama@localhost:5432/trama_e2e
+      NODE_ENV: test
+      # vitest.config.e2e.ts already sets these for the test process; repeated here so a change in
+      # the config cannot silently turn the admin-reset specs into skips.
+      TRAMA_ENABLE_ADMIN_RESET: 'true'
+      SEED_DEMO: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: server/package-lock.json
+      - run: npm ci
+      - run: npm run test:e2e

@@ -182,7 +182,7 @@ cp server/.env.production.example server/.env.production   # fill in the CHANGE_
 docker compose -f server/docker-compose.yml up -d
 ```
 
-All containers run as non-root with `cap_drop: ALL`, `no-new-privileges` and a read-only filesystem. In production the API refuses to boot without `DATABASE_URL` and `TRAMA_ENCRYPTION_KEY` (integration secrets are encrypted at rest with AES-256). See [docker/README.md](docker/README.md) for the full deployment guide, and [server/AI.md](server/AI.md) to enable the optional AI features.
+All containers run as non-root with `cap_drop: ALL`, `no-new-privileges` and a read-only filesystem. In production the API refuses to boot without `DATABASE_URL` and `TRAMA_ENCRYPTION_KEY` (integration secrets are encrypted at rest with AES-256). To run it yourself without Traefik or a fixed domain, follow [docs/self-hosting.md](docs/self-hosting.md) (`docker-compose.selfhost.yml`). See [docker/README.md](docker/README.md) for the images and the author's own deployment, and [server/AI.md](server/AI.md) to enable the optional AI features.
 
 ## Tech stack
 
@@ -237,6 +237,7 @@ npm run lint && npm run build
 | [mcp/README.md](mcp/README.md) | MCP tools, configuration, security notes |
 | [cli/README.md](cli/README.md) | The `trama` command line: install, connect, agent mode |
 | [skills/README.md](skills/README.md) | Agent skills and how to install them |
+| [docs/self-hosting.md](docs/self-hosting.md) | Self-hosting: install, configure, upgrade, backup, rollback |
 | [docker/README.md](docker/README.md) | Images, production stack, registry |
 | [DESIGN.md](DESIGN.md) | Design language and tokens |
 
