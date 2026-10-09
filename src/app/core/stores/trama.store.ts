@@ -1,4 +1,4 @@
-// NablaStore — the client-side copy of the current workspace (WorkspaceSnapshot) in signals,
+// TramaStore — the client-side copy of the current workspace (WorkspaceSnapshot) in signals,
 // with lookup selectors and optimistic mutations. See ../CONTRACT.md for the full API.
 //
 // Write model
@@ -254,7 +254,7 @@ function previewCriterion(c: AcceptanceCriterion, patch: CriterionPatch): Accept
 }
 
 @Injectable({ providedIn: 'root' })
-export class NablaStore {
+export class TramaStore {
   private readonly api = inject(ApiClient);
   private readonly notifier = inject(Notifier);
   private readonly sync = inject(SyncStatus);
@@ -1194,7 +1194,7 @@ export class NablaStore {
     return this.ok('delete request', (s) => this.api.inputRequests.remove(s, id), { tx });
   }
 
-  private hideAttentionWhere(tx: ReturnType<NablaStore['tx']>, test: (a: AttentionItem) => boolean): void {
+  private hideAttentionWhere(tx: ReturnType<TramaStore['tx']>, test: (a: AttentionItem) => boolean): void {
     for (const a of this._attention().filter(test)) tx.patch(this._attention, a.id, { state: 'dismissed' });
   }
 
@@ -1473,7 +1473,7 @@ export class NablaStore {
     }).then((r) => !!r);
   }
 
-  private dropMilestones(tx: ReturnType<NablaStore['tx']>, ids: readonly ID[]): void {
+  private dropMilestones(tx: ReturnType<TramaStore['tx']>, ids: readonly ID[]): void {
     if (!ids.length) return;
     const gone = new Set(ids);
     for (const i of this._issues().filter((x) => x.milestoneIds?.some((m) => gone.has(m))))

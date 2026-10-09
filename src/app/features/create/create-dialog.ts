@@ -57,7 +57,7 @@ import {
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
 import { DraftStore } from '../../core/stores/draft.store';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { StatusIcon } from '../../shared/status';
 import { issueEstimateOptions } from '../issues/issue-model';
@@ -715,7 +715,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 })
 export class CreateDialog {
   protected readonly ui = inject(UiStore);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   /** Workspace default team (Settings → General), if it still exists. */
   private defaultTeam(): string {

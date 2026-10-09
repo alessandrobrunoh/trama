@@ -12,7 +12,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, UiStore, WORKSTREAM_STATUS_META, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
+import { TramaStore, UiStore, WORKSTREAM_STATUS_META, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { KeyChip } from '../../shared/key-chip';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -107,7 +107,7 @@ export const ROW_PROP_LABELS: { key: keyof WsRowProps; label: string }[] = [
   `,
 })
 export class OverrideMenu {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   readonly size = input<'icon-xs' | 'icon-sm'>('icon-sm');
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -124,7 +124,7 @@ export class OverrideMenu {
 /** Shared behaviour of row + card: inline editors, selection, intents. */
 @Directive()
 abstract class WsItemBase {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(WsActions);
   private readonly router = inject(Router);

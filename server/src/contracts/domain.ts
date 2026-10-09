@@ -1,6 +1,6 @@
 // GENERATED — copied from contracts/domain.ts by scripts/sync-contracts.mjs. Do not edit.
 /**
- * Nabla domain contract — SINGLE SOURCE OF TRUTH for entity shapes shared by
+ * Trama domain contract — SINGLE SOURCE OF TRUTH for entity shapes shared by
  * the NestJS API (server/) and the Angular client (src/).
  *
  * Do not edit the synced copies (server/src/contracts/domain.ts,
@@ -1670,7 +1670,7 @@ export interface ApiToken {
   id: ID;
   workspaceId: ID;
   name: string;
-  /** First chars of the token for display, e.g. "nbl_3f9a…". */
+  /** First chars of the token for display, e.g. "trm_3f9a…". */
   prefix: string;
   /** Token acts as this actor (a user or an agent). */
   actor: ActorRef;
@@ -2071,9 +2071,9 @@ export function roleAtLeast(role: Role, min: Role): boolean {
 // ───────────────────────────── Outgoing webhooks ─────────────────────────────
 
 /**
- * A custom integration: Nabla POSTs a signed JSON body to `url` for every domain event that matches `events`.
+ * A custom integration: Trama POSTs a signed JSON body to `url` for every domain event that matches `events`.
  * Body: `{ id, event, workspace, at, actor, subject, workstreamId?, data }`.
- * Headers: `X-Nabla-Event`, `X-Nabla-Delivery`, `X-Nabla-Signature: sha256=<hex hmac of the raw body with the secret>`.
+ * Headers: `X-Trama-Event`, `X-Trama-Delivery`, `X-Trama-Signature: sha256=<hex hmac of the raw body with the secret>`.
  */
 export interface OutgoingWebhook {
   id: ID;

@@ -4,7 +4,7 @@
  * when it is over the limit, so regressions show up before the Angular budget (angular.json,
  * warning 1.75 MB, error 2 MB) fails a merge.
  *
- *   node scripts/check-bundle-size.mjs [--dist dist/delta/browser] [--limit 1750000] [--top 8]
+ *   node scripts/check-bundle-size.mjs [--dist dist/trama/browser] [--limit 1750000] [--top 8]
  *
  * "Initial" is what Angular's budget counts: the scripts and stylesheets referenced by index.html plus
  * every chunk they import statically (dynamic `import()` chunks are lazy and not counted).
@@ -20,7 +20,7 @@ const option = (name, fallback) => {
   const i = args.indexOf(`--${name}`);
   return i >= 0 ? args[i + 1] : fallback;
 };
-const dist = resolve(root, option('dist', 'dist/delta/browser'));
+const dist = resolve(root, option('dist', 'dist/trama/browser'));
 const limit = Number(option('limit', 1_750_000));
 const top = Number(option('top', 8));
 

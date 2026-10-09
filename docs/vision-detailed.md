@@ -2253,8 +2253,6 @@ These should not distract from proving the core workflow:
 
 # 62. Long-term opportunity
 
-> *Editor's note:* The diagram's `NABLA` label is the pre-rename product name; it means Trama.
-
 If Workstreams prove useful, Trama can become a coordination layer across the modern software toolchain.
 
 ```text
@@ -2262,7 +2260,7 @@ If Workstreams prove useful, Trama can become a coordination layer across the mo
        Jira / Linear / GitHub
                │
                ▼
-             NABLA
+             TRAMA
            Workstream
                │
       ┌────────┼────────┐

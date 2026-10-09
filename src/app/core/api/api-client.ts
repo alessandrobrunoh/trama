@@ -1,4 +1,4 @@
-// ApiClient — typed wrapper over the Nabla REST API (PLAN.md §4). Promise-based.
+// ApiClient — typed wrapper over the Trama REST API (PLAN.md §4). Promise-based.
 //
 // - Base URL `/api` (API_BASE_URL); cookie session; `X-Client-Id` on writes (apiInterceptor).
 // - Every call rejects with `ApiError`. Side effects of failures (done once, here):

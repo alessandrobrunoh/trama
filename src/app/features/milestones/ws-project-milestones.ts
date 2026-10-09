@@ -2,7 +2,7 @@
 // they are planned. Shown on the workstream page and in the timeline panel.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { NablaStore, type Workstream } from '../../core';
+import { TramaStore, type Workstream } from '../../core';
 import { MilestoneIcon } from './milestone-icon';
 import { ProjectMilestones } from './project-milestones';
 
@@ -32,7 +32,7 @@ import { ProjectMilestones } from './project-milestones';
   `,
 })
 export class WsProjectMilestones {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly project = computed(() => this.store.getProject(this.ws().projectId));

@@ -26,7 +26,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Clipboard,
   FIELD_DEFS,
-  NablaStore,
+  TramaStore,
   Notifier,
   UiStore,
   filterValues,
@@ -467,7 +467,7 @@ export class ViewDetailPage {
   readonly workspaceSlug = input<string>();
   readonly id = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
@@ -650,7 +650,7 @@ export class ViewDetailPage {
   }
 
   // ── edits (persisted immediately) ──
-  private patch(p: Parameters<NablaStore['updateView']>[1]): void {
+  private patch(p: Parameters<TramaStore['updateView']>[1]): void {
     const v = this.view();
     if (v && this.canEdit()) void this.store.updateView(v.id, p);
   }

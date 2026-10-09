@@ -95,10 +95,13 @@ describe('outgoing webhooks (custom integrations)', () => {
     const body = JSON.parse(call.rawBody!);
     expect(body).toMatchObject({ event: 'issue.created', subject: { type: 'issue', id: issue.id }, actor: { type: 'user' } });
     expect(body.id).toMatch(/^ev_/);
+    expect(call.headers!['X-Trama-Event']).toBe('issue.created');
+    expect(call.headers!['X-Trama-Delivery']).toBe(body.id);
+    // the pre-rename headers are still sent for existing receivers
     expect(call.headers!['X-Nabla-Event']).toBe('issue.created');
-    expect(call.headers!['X-Nabla-Delivery']).toBe(body.id);
-    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Nabla-Signature'])).toBe(true);
-    expect(verifySignature('whsec_wrong', call.rawBody!, call.headers!['X-Nabla-Signature'])).toBe(false);
+    expect(call.headers!['X-Nabla-Signature']).toBe(call.headers!['X-Trama-Signature']);
+    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(true);
+    expect(verifySignature('whsec_wrong', call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(false);
 
     const log = (await owner.get(`${w}/${webhook.id}/deliveries`).expect(200)).body;
     expect(log).toHaveLength(1);
@@ -114,7 +117,7 @@ describe('outgoing webhooks (custom integrations)', () => {
     const { webhook } = await create(owner, w, '/ok', ['*']);
     await owner.post(`${base}/teams`, { name: 'Core', key: 'CORE' }).expect(201);
     await svc.idle();
-    expect(http.to('/ok').map((c) => c.headers!['X-Nabla-Event'])).toEqual(['team.created']);
+    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['team.created']);
 
     await owner.patch(`${w}/${webhook.id}`, { enabled: false }).expect(200);
     await owner.post(`${base}/teams`, { name: 'Two', key: 'TWO' }).expect(201);
@@ -124,7 +127,7 @@ describe('outgoing webhooks (custom integrations)', () => {
     await owner.patch(`${w}/${webhook.id}`, { enabled: true, events: ['team.deleted'] }).expect(200);
     await owner.delete(`${base}/teams/TWO`).expect(204);
     await svc.idle();
-    expect(http.to('/ok').map((c) => c.headers!['X-Nabla-Event'])).toEqual(['team.created', 'team.deleted']);
+    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['team.created', 'team.deleted']);
   });
 
   it('retries once on 5xx / network errors / timeouts, never on 4xx, and records every attempt', async () => {
@@ -162,8 +165,8 @@ describe('outgoing webhooks (custom integrations)', () => {
     expect(res).toMatchObject({ event: 'ping', status: 200, ok: true, attempt: 1 });
     const call = http.to('/ok')[0];
     expect(JSON.parse(call.rawBody!).event).toBe('ping');
-    expect(call.headers!['X-Nabla-Event']).toBe('ping');
-    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Nabla-Signature'])).toBe(true);
+    expect(call.headers!['X-Trama-Event']).toBe('ping');
+    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(true);
 
     const bad = await create(owner, w, '/fail');
     const failed = (await owner.post(`${w}/${bad.webhook.id}/test`).expect(200)).body;
@@ -180,8 +183,8 @@ describe('outgoing webhooks (custom integrations)', () => {
     await owner.post(`${base}/issues`, { kind: 'bug', title: 'After rotation' }).expect(201);
     await svc.idle();
     const call = http.to('/ok').at(-1)!;
-    expect(verifySignature(rotated.secret, call.rawBody!, call.headers!['X-Nabla-Signature'])).toBe(true);
-    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Nabla-Signature'])).toBe(false);
+    expect(verifySignature(rotated.secret, call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(true);
+    expect(verifySignature(secret, call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(false);
 
     const patched = (await owner.patch(`${w}/${webhook.id}`, { name: 'Renamed', url: 'https://hooks.example.com/other' }).expect(200)).body;
     expect(patched).toMatchObject({ name: 'Renamed', url: 'https://hooks.example.com/other' });

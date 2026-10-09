@@ -7,7 +7,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, fullDate, type AcceptanceCriterion, type Workstream } from '../../core';
+import { TramaStore, fullDate, type AcceptanceCriterion, type Workstream } from '../../core';
 import { ArtifactIcon } from '../../shared/artifact';
 
 /** Number of proofs a criterion has: artifacts that still belong to the workstream, plus the note. */
@@ -96,7 +96,7 @@ export function proofCount(c: AcceptanceCriterion, liveArtifactIds: ReadonlySet<
   `,
 })
 export class CriterionEvidence {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   readonly c = input.required<AcceptanceCriterion>();
 

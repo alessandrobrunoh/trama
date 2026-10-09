@@ -140,7 +140,7 @@ npm start              # http://localhost:4300
 Open <http://localhost:4300> and sign in with the seeded demo account:
 
 ```text
-demo@nabla.dev  /  nabla-demo      (workspace: acme)
+demo@trama.dev  /  trama-demo      (workspace: acme)
 ```
 
 Set `SEED_DEMO=false` to start with an empty database instead.
@@ -152,7 +152,7 @@ Create a key in **Settings → API tokens**, then:
 ```bash
 # MCP server (local: cd mcp && TRAMA_API_URL=http://localhost:3000/api cargo run)
 claude mcp add --transport http trama http://localhost:8787/mcp \
-  --header "Authorization: Bearer nbl_…"
+  --header "Authorization: Bearer trm_…"
 
 # Teach the agent how to work in Trama
 mkdir -p ~/.claude/skills && cp -R skills/trama* ~/.claude/skills/

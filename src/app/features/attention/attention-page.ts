@@ -18,7 +18,7 @@ import { toast } from '@spartan-ng/brain/sonner';
 import {
   ApiClient,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   SEVERITY_ORDER,
   shortDate,
@@ -183,7 +183,7 @@ export class AttentionPage {
   /** Which list the Inbox shows: what is open, or what was snoozed or dismissed. */
   readonly tab = input<Tab>('open');
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly api = inject(ApiClient);

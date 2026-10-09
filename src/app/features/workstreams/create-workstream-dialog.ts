@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { NablaStore, WORKSTREAM_STATUS_META, isDeltaThreadUrl, type Priority, type WorkstreamStatus } from '../../core';
+import { TramaStore, WORKSTREAM_STATUS_META, isDeltaThreadUrl, type Priority, type WorkstreamStatus } from '../../core';
 import { Notifier } from '../../core/notify/notifier';
 import { Kbd } from '../../shared/kbd';
 import { Picker } from './picker';
@@ -201,7 +201,7 @@ export interface CreateWorkstreamDefaults {
   `,
 })
 export class CreateWorkstreamDialog {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
 

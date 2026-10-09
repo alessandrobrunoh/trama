@@ -1,11 +1,11 @@
-// "Copy git branch name": the per-user format preference (localStorage 'nabla.prefs.v1' → branchFormat)
+// "Copy git branch name": the per-user format preference (localStorage 'trama.prefs.v1' → branchFormat)
 // and the entry point every menu / shortcut / palette action calls.
 import { Injectable, inject, signal } from '@angular/core';
 import { BRANCH_FORMATS, DEFAULT_BRANCH_FORMAT, branchName, branchUser, type BranchFormat } from './branch-name';
 import { Clipboard } from './notify/notifier';
-import { NablaStore } from './stores/nabla.store';
+import { TramaStore } from './stores/trama.store';
 
-export const PREFS_STORAGE_KEY = 'nabla.prefs.v1';
+export const PREFS_STORAGE_KEY = 'trama.prefs.v1';
 
 function readPrefs(): Record<string, unknown> {
   try {
@@ -26,7 +26,7 @@ function writePrefs(patch: Record<string, unknown>): void {
 
 @Injectable({ providedIn: 'root' })
 export class BranchNames {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
 
   readonly format = signal<BranchFormat>(this.initialFormat());

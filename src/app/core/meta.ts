@@ -1,4 +1,4 @@
-// Display metadata for the Nabla domain enums: labels, ordering, semantic tone.
+// Display metadata for the Trama domain enums: labels, ordering, semantic tone.
 // `tone` is a semantic colour role the UI maps to its status tokens; `cssVar()` gives the
 // conventional CSS custom property (`--status-needs-input`, ...). Verify names in src/styles.
 import type {

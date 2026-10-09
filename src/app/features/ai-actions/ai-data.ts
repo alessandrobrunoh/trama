@@ -5,7 +5,7 @@ import {
   ISSUE_KINDS,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   PRIORITIES,
   PRIORITY_META,
   WORKSTREAM_STATUS_META,
@@ -36,7 +36,7 @@ const dayStr = (iso: string): string => iso.slice(0, 10);
 const daysBetween = (a: string, b: string | number): number => Math.round((new Date(b).getTime() - new Date(a).getTime()) / DAY);
 
 /** Workspace estimate scale as prompt choices, or `null` when estimates are off. */
-export function estimateChoices(store: NablaStore): EstimateChoice[] | null {
+export function estimateChoices(store: TramaStore): EstimateChoice[] | null {
   const scale = store.estimateScale();
   if (scale === 'none') return null;
   const list = estimateOptions(scale).map((o) => ({ value: o.value, label: o.label }));
@@ -49,7 +49,7 @@ export const PRIORITY_LIST: readonly string[] = PRIORITIES;
 // ───────────────────────────── issues ─────────────────────────────
 
 /** Recent comments and status changes of one issue, oldest first, at most ~3500 characters. */
-export function issueDigest(store: NablaStore, issue: Issue): string {
+export function issueDigest(store: TramaStore, issue: Issue): string {
   const rows: { at: string; line: string }[] = [];
   for (const c of store.commentsFor({ type: 'issue', id: issue.id })) {
     rows.push({ at: c.createdAt, line: `${dayStr(c.createdAt)} ${store.actorName(c.author)} commented: ${oneLine(c.body, 380)}` });
@@ -66,7 +66,7 @@ export function issueDigest(store: NablaStore, issue: Issue): string {
   return boundedLines(rows.map((r) => r.line));
 }
 
-export function issuePromptData(store: NablaStore, issue: Issue): PromptIssue {
+export function issuePromptData(store: TramaStore, issue: Issue): PromptIssue {
   return {
     key: issue.key,
     title: issue.title,
@@ -92,7 +92,7 @@ export interface TriageInputs {
 }
 
 /** ≤8 active workstreams and ≤4 finished issues ranked by word overlap with `issue`. */
-export function triageInputs(store: NablaStore, issue: Issue): TriageInputs {
+export function triageInputs(store: TramaStore, issue: Issue): TriageInputs {
   const query = `${issue.title}\n${issue.body ?? ''}`;
 
   const linked = new Set(issue.workstreamIds);
@@ -122,7 +122,7 @@ export function triageInputs(store: NablaStore, issue: Issue): TriageInputs {
 
 const keyTitle = (i: Pick<Issue, 'key' | 'title'>): string => `${i.key} ${i.title}`;
 
-export function workstreamPromptData(store: NablaStore, info: MilestoneInfo, ws: Workstream): PromptWorkstream {
+export function workstreamPromptData(store: TramaStore, info: MilestoneInfo, ws: Workstream): PromptWorkstream {
   const today = new Date().toISOString();
   const issues = (store.issuesByWorkstream().get(ws.id) ?? []).filter((i) => i.status !== 'canceled');
   const counts = issueCounts(issues);
@@ -181,7 +181,7 @@ export function workstreamPromptData(store: NablaStore, info: MilestoneInfo, ws:
 
 /** Plain-language risk signals: blocked, overdue, failing CI, stale work, old questions. */
 function workstreamSignals(
-  store: NablaStore,
+  store: TramaStore,
   ws: Workstream,
   issues: readonly Issue[],
   milestones: readonly { name: string; state: string; percent: number }[],
@@ -212,7 +212,7 @@ function workstreamSignals(
   return out;
 }
 
-export function breakdownInputs(store: NablaStore, ws: Workstream) {
+export function breakdownInputs(store: TramaStore, ws: Workstream) {
   return {
     ws: { key: ws.key, title: ws.title, objective: ws.objective, description: ws.description, context: ws.context },
     existingTitles: (store.issuesByWorkstream().get(ws.id) ?? []).map((i) => i.title),
@@ -225,7 +225,7 @@ export function breakdownInputs(store: NablaStore, ws: Workstream) {
 // ───────────────────────────── standup digest ─────────────────────────────
 
 /** Workspace-wide facts for the standup digest: windows 24h / 7d, at-risk, overdue, waiting longest. */
-export function digestData(store: NablaStore, info: MilestoneInfo): PromptDigest {
+export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest {
   const now = Date.now();
   const ageDays = (iso: string) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / DAY));
   const within = (iso: string | undefined, days: number) => !!iso && now - new Date(iso).getTime() <= days * DAY;

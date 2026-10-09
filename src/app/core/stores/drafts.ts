@@ -11,7 +11,7 @@ interface Entry {
   value: unknown;
 }
 
-export const DRAFTS_STORAGE_KEY = 'nabla.drafts.v1';
+export const DRAFTS_STORAGE_KEY = 'trama.drafts.v1';
 /** Drafts older than this are dropped. */
 export const DRAFT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 /** The most recently touched drafts are kept; older ones make room. */

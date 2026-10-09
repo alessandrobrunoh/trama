@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { ApiClient } from '../../core/api/api-client';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { fuzzyScore } from './fuzzy';
 
 export type HitType = 'workstream' | 'project' | 'issue' | 'customer' | 'decision' | 'artifact' | 'repository' | 'team';
@@ -71,11 +71,11 @@ function asHit(raw: unknown, forcedType?: HitType): SearchHit | null {
   };
 }
 
-/** Server search (`GET /w/:slug/search`) with a client-side fuzzy fallback over the NablaStore. */
+/** Server search (`GET /w/:slug/search`) with a client-side fuzzy fallback over the TramaStore. */
 @Injectable({ providedIn: 'root' })
 export class SearchService {
   private readonly api = inject(ApiClient);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   /** Rejects on network / server errors; callers fall back to {@link local}. */
   async remote(q: string, limit = 24, types?: readonly HitType[]): Promise<SearchHit[]> {

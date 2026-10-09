@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject,
 import { Router } from '@angular/router';
 import { LucideCheck, LucideChevronDown, LucideDynamicIcon, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { OnboardingStore, type OnboardingStep } from '../../core/stores/onboarding.store';
 import { UiStore } from '../../core/stores/ui.store';
 
@@ -131,7 +131,7 @@ import { UiStore } from '../../core/stores/ui.store';
 export class OnboardingChecklist {
   protected readonly onboarding = inject(OnboardingStore);
   private readonly ui = inject(UiStore);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
 
   /** A one-line bar (the Inbox) instead of the full card; "All steps" opens the card. */

@@ -118,10 +118,10 @@ pub fn snippet(client: &str, transport: &str, api_url: &str) -> String {
     if transport == "http" {
         let url = mcp_url(api_url);
         return match client {
-            "claude" => format!("claude mcp add --transport http trama {url} \\\n  --header \"Authorization: Bearer nbl_YOUR_TOKEN\"\n# several workspaces: --header \"Authorization: Bearer nbl_ONE,nbl_TWO\""),
-            "cursor" | "json" => serde_json::to_string_pretty(&json!({ "mcpServers": { "trama": { "url": url, "headers": { "Authorization": "Bearer nbl_YOUR_TOKEN" } } } })).unwrap_or_default(),
-            "vscode" => serde_json::to_string_pretty(&json!({ "servers": { "trama": { "type": "http", "url": url, "headers": { "Authorization": "Bearer nbl_YOUR_TOKEN" } } } })).unwrap_or_default(),
-            _ => format!("[mcp_servers.trama]\nurl = \"{url}\"\nhttp_headers = {{ Authorization = \"Bearer nbl_YOUR_TOKEN\" }}"),
+            "claude" => format!("claude mcp add --transport http trama {url} \\\n  --header \"Authorization: Bearer trm_YOUR_TOKEN\"\n# several workspaces: --header \"Authorization: Bearer trm_ONE,trm_TWO\""),
+            "cursor" | "json" => serde_json::to_string_pretty(&json!({ "mcpServers": { "trama": { "url": url, "headers": { "Authorization": "Bearer trm_YOUR_TOKEN" } } } })).unwrap_or_default(),
+            "vscode" => serde_json::to_string_pretty(&json!({ "servers": { "trama": { "type": "http", "url": url, "headers": { "Authorization": "Bearer trm_YOUR_TOKEN" } } } })).unwrap_or_default(),
+            _ => format!("[mcp_servers.trama]\nurl = \"{url}\"\nhttp_headers = {{ Authorization = \"Bearer trm_YOUR_TOKEN\" }}"),
         };
     }
     match client {
@@ -146,7 +146,7 @@ pub fn config_snippet(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             "(`trama mcp` uses your saved login; run `trama login` first. For CI set TRAMA_API_KEY and TRAMA_API_URL instead.)"
         );
     } else {
-        eprintln!("(Create the token in Settings → API tokens and replace nbl_YOUR_TOKEN.)");
+        eprintln!("(Create the token in Settings → API tokens and replace trm_YOUR_TOKEN.)");
     }
     Ok(())
 }
@@ -175,7 +175,7 @@ mod tests {
         );
         let http = snippet("claude", "http", "https://x/api");
         assert!(http.contains("--transport http trama https://x/mcp"));
-        assert!(http.contains("nbl_ONE,nbl_TWO"));
+        assert!(http.contains("trm_ONE,trm_TWO"));
         let v: Value = serde_json::from_str(&snippet("cursor", "stdio", "")).unwrap();
         assert_eq!(v["mcpServers"]["trama"]["args"][0], "mcp");
         let v: Value = serde_json::from_str(&snippet("vscode", "http", "https://x/api")).unwrap();

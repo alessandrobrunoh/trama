@@ -5,7 +5,7 @@ import { LucideArrowUpRight, LucideDynamicIcon, LucidePlus, LucideX } from '@luc
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import {
   ARTIFACT_KIND_META,
-  NablaStore,
+  TramaStore,
   Notifier,
   type Artifact,
   type Workstream,
@@ -244,7 +244,7 @@ export interface DetailLink {
   `,
 })
 export class GraphNodeDetail {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   readonly node = input.required<GraphNode>();
   readonly blockedBy = input<readonly DetailLink[]>([]);

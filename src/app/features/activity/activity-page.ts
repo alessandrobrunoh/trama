@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { LucideActivity, LucideBot, LucideDynamicIcon, LucideUser, LucideUsers, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
-import { NablaStore, type DomainEvent } from '../../core';
+import { TramaStore, type DomainEvent } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
@@ -176,7 +176,7 @@ export class ActivityPage {
   readonly actorParam = input<string | undefined>(undefined, { alias: 'actor' });
   readonly teamParam = input<string | undefined>(undefined, { alias: 'team' });
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   private readonly router = inject(Router);
 

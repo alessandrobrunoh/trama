@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { LucideArrowUpRight, LucideDynamicIcon, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, type Workstream } from '../../core';
+import { TramaStore, type Workstream } from '../../core';
 import { FullDatePipe } from '../../shared/pipes';
 import { KeyChip } from '../../shared/key-chip';
 import { PropertyRow } from '../../shared/property-row';
@@ -94,7 +94,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
   `,
 })
 export class TimelinePanel {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   protected readonly actions = inject(WsActions);
   readonly ws = input.required<Workstream>();

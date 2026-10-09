@@ -6,7 +6,7 @@ import {
   type ProjectStatus,
 } from '../../core/contracts/domain';
 import { PROJECT_HEALTH_META } from '../../core/meta';
-import type { NablaStore } from '../../core/stores/nabla.store';
+import type { TramaStore } from '../../core/stores/trama.store';
 import type { PickOption } from '../workstreams/picker';
 
 export interface ProjectStatusMeta {
@@ -96,6 +96,6 @@ export const healthRank = (h: ProjectHealth | undefined): number =>
 
 /** Who may post an update: the project lead, or anyone allowed to manage projects. */
 export const canPostUpdate = (
-  store: Pick<NablaStore, 'me' | 'allowed'>,
+  store: Pick<TramaStore, 'me' | 'allowed'>,
   p: Pick<Project, 'leadId'>,
 ): boolean => (!!p.leadId && p.leadId === store.me()?.id) || store.allowed('manageProjects');

@@ -17,7 +17,7 @@ import {
   type Issue,
   type IssueKind,
   type IssueStatus,
-  type NablaStore,
+  type TramaStore,
   type Priority,
   type Workstream,
   type WorkstreamStatus,
@@ -72,7 +72,7 @@ const isOpenIssue = (i: Issue): boolean => i.status !== 'done' && i.status !== '
 const isPr = (a: Artifact): boolean => a.kind === 'pull_request' || a.kind === 'merge_request';
 const isOpenPr = (a: Artifact): boolean => isPr(a) && (a.state === 'open' || a.state === 'draft');
 
-export function workspaceStats(store: NablaStore, now = new Date()): StatsModel {
+export function workspaceStats(store: TramaStore, now = new Date()): StatsModel {
   const workstreams = store.workstreams();
   const issues = store.issues();
   const artifacts = store.artifacts();
@@ -86,7 +86,7 @@ export function workspaceStats(store: NablaStore, now = new Date()): StatsModel 
   });
 }
 
-export function workstreamStats(store: NablaStore, workstreamId: string, now = new Date()): StatsModel {
+export function workstreamStats(store: TramaStore, workstreamId: string, now = new Date()): StatsModel {
   const ws = store.workstreams().find((w) => w.id === workstreamId);
   const workstreams = ws ? [ws] : [];
   const issues = store.issuesByWorkstream().get(workstreamId) ?? [];
@@ -119,7 +119,7 @@ export function workstreamStats(store: NablaStore, workstreamId: string, now = n
   });
 }
 
-export function repositoryStats(store: NablaStore, repositoryId: string, now = new Date()): StatsModel {
+export function repositoryStats(store: TramaStore, repositoryId: string, now = new Date()): StatsModel {
   const workstreams = store.workstreamsByRepository().get(repositoryId) ?? [];
   const wsIds = new Set(workstreams.map((w) => w.id));
   const issues = store.issues().filter((i) => i.workstreamIds.some((id) => wsIds.has(id)));
@@ -140,7 +140,7 @@ export function repositoryStats(store: NablaStore, repositoryId: string, now = n
 }
 
 /** Compact counts for the issues list. The full breakdown lives on the statistics page. */
-export function issuesStrip(store: NablaStore, now = new Date()): StatsModel {
+export function issuesStrip(store: TramaStore, now = new Date()): StatsModel {
   const issues = store.issues();
   const count = (s: IssueStatus) => issues.filter((i) => i.status === s).length;
   return {
@@ -156,7 +156,7 @@ export function issuesStrip(store: NablaStore, now = new Date()): StatsModel {
   };
 }
 
-export function issueFacts(store: NablaStore, issueId: string, now = new Date()): StatFact[] {
+export function issueFacts(store: TramaStore, issueId: string, now = new Date()): StatFact[] {
   const issue = store.issues().find((i) => i.id === issueId);
   if (!issue) return [];
   const comments = store.commentCountFor({ type: 'issue', id: issue.id });
@@ -180,7 +180,7 @@ export function issueFacts(store: NablaStore, issueId: string, now = new Date())
 }
 
 function scopeCards(
-  store: NablaStore,
+  store: TramaStore,
   workstreams: readonly Workstream[],
   issues: readonly Issue[],
   artifacts: readonly Artifact[],
@@ -206,7 +206,7 @@ function scopeCards(
 }
 
 function assemble(
-  store: NablaStore,
+  store: TramaStore,
   input: {
     workstreams: readonly Workstream[];
     issues: readonly Issue[];

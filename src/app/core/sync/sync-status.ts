@@ -3,7 +3,7 @@ import { Injectable, computed, signal } from '@angular/core';
 /** Live-update channel (SSE) state. */
 export type LiveState = 'idle' | 'connecting' | 'open' | 'reconnecting';
 
-/** Read-only connection status for the UI (sidebar / status chip). Written by NablaStore + LiveSync. */
+/** Read-only connection status for the UI (sidebar / status chip). Written by TramaStore + LiveSync. */
 @Injectable({ providedIn: 'root' })
 export class SyncStatus {
   readonly live = signal<LiveState>('idle');

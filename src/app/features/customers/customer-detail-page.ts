@@ -19,7 +19,7 @@ import {
   CustomerSubscriptionsStore,
   ISSUE_STATUS_META,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   normalizeCustomerDomains,
   normalizeHttpUrl,
@@ -410,7 +410,7 @@ export class CustomerDetailPage {
   /** Query `?tab=work|activity|details`; the requests are the default. */
   readonly tab = input<string>();
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly subs = inject(CustomerSubscriptionsStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);

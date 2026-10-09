@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideChartGantt, LucideDynamicIcon, LucideKanban, LucideLayers, LucideList, LucideLock, LucidePlus, LucideUsers } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, UiStore, type SavedView } from '../../core';
+import { TramaStore, UiStore, type SavedView } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
@@ -98,7 +98,7 @@ interface ViewSection {
 export class ViewListPage {
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly plus = LucidePlus;
   protected readonly layers = LucideLayers;

@@ -7,7 +7,7 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { ApiError } from '../../core/api/api-error';
 import type { RemoteRepository } from '../../core/api/api.types';
 import type { Repository } from '../../core/contracts/domain';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 
 /**
  * Lists the repositories a git host connection can see (`GET /integrations/:id/remote-repositories`)
@@ -95,7 +95,7 @@ import { NablaStore } from '../../core/stores/nabla.store';
   `,
 })
 export class RemoteRepoBrowser {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly connectionId = input.required<string>();
   /** Teams assigned to newly created repositories. */

@@ -77,7 +77,7 @@ export class GithubClient implements GitProviderClient {
         Authorization: `Bearer ${this.token}`,
         Accept: 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28',
-        'User-Agent': 'nabla',
+        'User-Agent': 'trama',
       },
     });
     ensureOk(res);
@@ -124,7 +124,7 @@ export class GitlabClient implements GitProviderClient {
   private async get(path: string): Promise<HttpResponse> {
     const res = await this.http.request({
       url: `${this.api}${path}`,
-      headers: { 'PRIVATE-TOKEN': this.token, Accept: 'application/json', 'User-Agent': 'nabla' },
+      headers: { 'PRIVATE-TOKEN': this.token, Accept: 'application/json', 'User-Agent': 'trama' },
     });
     ensureOk(res);
     return res;
@@ -177,7 +177,7 @@ export class BitbucketClient implements GitProviderClient {
   private async get(path: string): Promise<HttpResponse> {
     const res = await this.http.request({
       url: `${this.api}${path}`,
-      headers: { Authorization: this.authorization(), Accept: 'application/json', 'User-Agent': 'nabla' },
+      headers: { Authorization: this.authorization(), Accept: 'application/json', 'User-Agent': 'trama' },
     });
     ensureOk(res);
     return res;

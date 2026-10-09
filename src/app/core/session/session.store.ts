@@ -11,16 +11,16 @@ import { Notifier } from '../notify/notifier';
 import { Preferences } from '../preferences';
 import { readJson, writeJson } from '../stores/storage';
 import { ListStateStore } from '../stores/list-state.store';
-import { NablaStore } from '../stores/nabla.store';
+import { TramaStore } from '../stores/trama.store';
 
-const LAST_WORKSPACE_KEY = 'nabla.session.v1';
+const LAST_WORKSPACE_KEY = 'trama.session.v1';
 
 export type EnterResult = 'ok' | 'not-found' | 'error';
 
 @Injectable({ providedIn: 'root' })
 export class SessionStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
@@ -66,7 +66,7 @@ export class SessionStore {
       this._user.set(null);
       this._workspaces.set([]);
       // 401 = signed out (normal). Anything else (server down) also leaves us signed out.
-      if (err.status !== 401) console.warn('[nabla] session check failed:', err.message);
+      if (err.status !== 401) console.warn('[trama] session check failed:', err.message);
     } finally {
       this._ready.set(true);
     }
@@ -134,7 +134,7 @@ export class SessionStore {
         this.remember(ws.slug);
         await this.router.navigate(['/', ws.slug, 'settings', 'workspace']);
       } else {
-        this.nabla.scheduleRefetch(0);
+        this.trama.scheduleRefetch(0);
       }
       return true;
     } catch (e) {
@@ -157,7 +157,7 @@ export class SessionStore {
       return false;
     }
     this._workspaces.update((list) => list.filter((w) => w.id !== current.id));
-    this.nabla.reset();
+    this.trama.reset();
     this._workspace.set(null);
     this._role.set(null);
     this.forgetIf(current.slug);
@@ -186,17 +186,17 @@ export class SessionStore {
   }
 
   /**
-   * Make `slug` the active workspace: loads its snapshot into NablaStore. Used by
+   * Make `slug` the active workspace: loads its snapshot into TramaStore. Used by
    * `workspaceGuard`. `not-found` = unknown workspace or not a member.
    */
   async enterWorkspace(slug: string): Promise<EnterResult> {
     await this.init();
-    const result = await this.nabla.load(slug);
+    const result = await this.trama.load(slug);
     if (result !== 'ok') return result;
-    const ws = this.nabla.workspace();
+    const ws = this.trama.workspace();
     if (ws) {
       this._workspace.set(ws);
-      this._role.set(this.nabla.myRole());
+      this._role.set(this.trama.myRole());
       this._workspaces.update((list) => (list.some((w) => w.id === ws.id) ? list : [...list, ws]));
       this.remember(ws.slug);
     }
@@ -218,7 +218,7 @@ export class SessionStore {
     this._workspaces.set([]);
     this._workspace.set(null);
     this._role.set(null);
-    this.nabla.reset();
+    this.trama.reset();
     this.listState.clear();
     this.initPromise = Promise.resolve();
     this._ready.set(true);

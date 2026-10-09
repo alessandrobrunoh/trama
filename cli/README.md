@@ -62,7 +62,7 @@ Plain `http://` is refused except for localhost (the key travels in every reques
 
 | Variable | |
 |---|---|
-| `TRAMA_API_KEY` | the key (`nbl_…`); wins over any saved profile |
+| `TRAMA_API_KEY` | the key (`trm_…`); wins over any saved profile |
 | `TRAMA_API_URL` | site or API URL (default `http://localhost:3000/api`) |
 | `TRAMA_WORKSPACE` | workspace slug, to skip one lookup per run |
 | `TRAMA_PROFILE`, `TRAMA_OUTPUT`, `TRAMA_NO_INPUT`, `TRAMA_YES` | profile name, default `-o`, never prompt, never confirm |
@@ -95,7 +95,7 @@ results; each row gains `workspace` and `profile`, so a key that exists in two w
 distinguishable. A workspace that fails is reported and skipped. Writes stay on exactly one workspace:
 a create or update with more than one match is refused, so nothing is ever created twice. `trama mcp`
 uses the same selection (`trama mcp --account work`), and the hosted MCP server accepts several keys in
-one header (`Authorization: Bearer nbl_one,nbl_two`). `TRAMA_API_KEY` is still a single key and wins
+one header (`Authorization: Bearer trm_one,trm_two`). `TRAMA_API_KEY` is still a single key and wins
 over every selection.
 
 ## Use

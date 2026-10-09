@@ -12,7 +12,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { NablaStore, UiStore, type Artifact, type DomainEvent, type Issue } from '../../core';
+import { TramaStore, UiStore, type Artifact, type DomainEvent, type Issue } from '../../core';
 import { Clipboard } from '../../core/notify/notifier';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -292,7 +292,7 @@ export class RepositoryDetailPage {
   readonly workspaceSlug = input<string>();
   readonly id = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);

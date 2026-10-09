@@ -1,11 +1,11 @@
-# Nabla client data layer — contract
+# Trama client data layer — contract
 
 Everything under `src/app/core/**` (except `theme/`, `contracts/`). Feature agents rely on this file only; read it before touching data.
 Authoritative inputs: `server/API.md` (API), `src/app/app.routes.ts` (routes), `contracts/domain.ts` (types; synced copy at `core/contracts/domain.ts`, never edit). The former `PLAN.md` no longer exists.
 
 > **Stale parts:** this file still describes the removed `Execution` concept (routes, store methods, `executions` tab). The `executions` table was dropped by the `DropExecutions` migration; check `contracts/domain.ts` and `app.routes.ts` before relying on anything execution-related below.
 
-Import from the barrel: `import { NablaStore, SessionStore, KeyboardShortcuts, type Workstream } from '../../core';`
+Import from the barrel: `import { TramaStore, SessionStore, KeyboardShortcuts, type Workstream } from '../../core';`
 (barrel = `core/index.ts`; it re-exports the domain types too).
 
 Conventions: Angular 22 zoneless, standalone, signals, `inject()`, OnPush, built-in control flow. Route params bind to `input()`s.
@@ -18,7 +18,7 @@ core/
   meta.ts                  labels / tone / order for every enum (WORKSTREAM_STATUS_META, ...)
   api/                     ApiClient, ApiError, apiInterceptor, request DTO types (api.types.ts)
   session/                 SessionStore, authGuard, guestGuard, workspaceGuard, landingGuard, roleGuard
-  stores/nabla.store.ts    NablaStore  (workspace data + mutations)
+  stores/trama.store.ts    TramaStore  (workspace data + mutations)
   stores/ui.store.ts       UiStore     (modals, sidebar, list focus/selection)
   sync/                    LiveSync (SSE), SyncStatus, reconcile, CLIENT_ID
   query/                   filter / sort / group utilities driven by ViewFilter
@@ -45,7 +45,7 @@ Top level (reserved, cannot be workspace slugs): `login`, `register`, `signup` (
 | `/` | `LandingPage` (features/landing/landing-page.ts) when signed out; signed in → last-used or first workspace `/<slug>/overview`, `/new-workspace` if none | landingGuard |
 | `/:workspaceSlug` | `AppShell` (layout/app-shell.ts) | authGuard, workspaceGuard |
 
-Children of `/:workspaceSlug` (all lazy, title `<Page> · Nabla`):
+Children of `/:workspaceSlug` (all lazy, title `<Page> · Trama`):
 
 | path | class (file under features/) | inputs besides `workspaceSlug` |
 |---|---|---|
@@ -75,7 +75,7 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 
 - `withComponentInputBinding()` is on and `paramsInheritanceStrategy: 'always'`: **any page can declare `readonly workspaceSlug = input<string>()`** plus its own params and query params (`readonly tab = input<string>()`).
 - **Workstream detail tabs use the `tab` query param**, not child routes: `?tab=` one of `overview` (default, param absent), `executions`, `artifacts`, `decisions`, `graph`, `activity`, `context`. Change tab with `router.navigate([], { queryParams: { tab }, queryParamsHandling: 'merge' })`.
-- Link helper: `['/', workspaceSlug, 'workstreams', ws.key]`. There is no global "current slug" other than `nabla.slug()` / `session.workspace()?.slug`.
+- Link helper: `['/', workspaceSlug, 'workstreams', ws.key]`. There is no global "current slug" other than `trama.slug()` / `session.workspace()?.slug`.
 - Guards re-run when `:workspaceSlug` changes, so switching workspace reloads the snapshot.
 - Not a member / unknown workspace: guard redirects to `/404?workspace=<slug>` (server unreachable: `/404?error=1`).
 
@@ -83,9 +83,9 @@ The files above currently hold PLACEHOLDERS (title + params). Replace the body, 
 
 ## 2. ApiClient (`core/api`)
 
-`inject(ApiClient)`. Promise-based; base URL `/api` (`API_BASE_URL`, proxied to the Nest server). Features should normally use `NablaStore` mutations; use ApiClient directly for endpoints that are not part of the snapshot (search, graph, agent context, attention for `scope=all`, events with filters, comments of a subject).
+`inject(ApiClient)`. Promise-based; base URL `/api` (`API_BASE_URL`, proxied to the Nest server). Features should normally use `TramaStore` mutations; use ApiClient directly for endpoints that are not part of the snapshot (search, graph, agent context, attention for `scope=all`, events with filters, comments of a subject).
 
-Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
+Cross-cutting behavior (HttpInterceptor `apiInterceptor`, registered in app.config.ts): `withCredentials: true` (cookie `trama_session`; the API still accepts the pre-rename `nabla_session`); every non-GET/HEAD gets `X-Client-Id: <per-tab id>` (so SSE echoes can be ignored).
 
 Errors: every call rejects with `ApiError { status, message, code?, details?, isUnauthorized/isForbidden/isNotFound/isConflict/isValidation/isNetwork }` (`status 0` = unreachable).
 - 401 other than `POST /auth/login`, `POST /auth/signup` or `POST /auth/logout`: `api.sessionExpired` emits; SessionStore clears the session and redirects to `/login?next=<url>` (toast "Your session expired"). A 401 from `GET /auth/me` is a dead session too. Wrong-password and logout 401s do not.
@@ -151,13 +151,13 @@ Extras: `goAfterAuth(next?)` (after login/signup: navigate to `next` if it is a 
 
 Guards (`core/session/guards.ts`): `authGuard` (-> `/login?next=`), `guestGuard`, `landingGuard`, `workspaceGuard`, `roleGuard(minRole)` (use on a route to hide an admin screen; redirects to overview).
 
-In templates, hide admin-only controls with `nabla.can('admin')` (works in `computed`/templates; viewers are read-only; the server enforces anyway and a 403 toasts).
+In templates, hide admin-only controls with `trama.can('admin')` (works in `computed`/templates; viewers are read-only; the server enforces anyway and a 403 toasts).
 
 ---
 
-## 4. NablaStore (`core/stores/nabla.store.ts`)
+## 4. TramaStore (`core/stores/trama.store.ts`)
 
-`inject(NablaStore)`. Holds the current workspace's `WorkspaceSnapshot` in signals. Everything is readonly outside the store.
+`inject(TramaStore)`. Holds the current workspace's `WorkspaceSnapshot` in signals. Everything is readonly outside the store.
 
 **Lifecycle**: `workspaceGuard` loads it, so inside `/:workspaceSlug/**` the store is always `ready`. `status: 'idle'|'loading'|'ready'|'error'`, `ready`, `loadError`, `slug` (active slug), `load(slug): Promise<'ok'|'not-found'|'error'>`, `reset()`, `refetch()`, `scheduleRefetch(ms?)`.
 
@@ -182,7 +182,7 @@ commentAuthorsFor(subject): readonly ActorRef[]
 loadComments(subject, {force?,quiet?}): Promise<void>     // newest page; call when a detail view opens (<app-comments-loader>)
 loadMoreComments(subject): Promise<void>                  // next (older) page; commentThread(subject) -> {state,nextCursor,loadingMore}
 resolveActor(ref?: ActorRef): ResolvedActor   // { type, id?, name, hue? (user), color?/key? (team), provider? (agent), known }
-actorName(ref?: ActorRef): string             // 'Nabla' for system / missing
+actorName(ref?: ActorRef): string             // 'Trama' for system / missing
 userRef(id): ActorRef
 can(minRole: Role): boolean                   // same as session.can, available without SessionStore
 loadOlderEvents(query?: {workstreamId?, subject?, limit?}): Promise<number>   // activity "load more"
@@ -293,7 +293,7 @@ Status chip: `inject(SyncStatus)`: `live` (`'idle'|'connecting'|'open'|'reconnec
 
 ## 5. LiveSync (`core/sync`)
 
-`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `NablaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `NablaStore.handleLiveEvent(event)`, which refreshes the on-demand project data and reloads the newest page of every opened comment thread on `comment` events (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
+`SSE GET /api/w/:slug/events/stream` (cookie auth). Created by an app initializer (app.config.ts), it connects automatically whenever `TramaStore` has a ready workspace and disconnects on workspace switch / logout. Events carrying this tab's `X-Client-Id` are ignored; any other event triggers a debounced (300 ms) snapshot refetch and is passed to `TramaStore.handleLiveEvent(event)`, which refreshes the on-demand project data and reloads the newest page of every opened comment thread on `comment` events (updates feeds and `/context` caches, see "Project data"); the snapshot's artifacts (including project / issue owned ones) refresh with the refetch. Reconnect with exponential backoff (1 s .. 30 s + jitter), refetch after reconnect, refetch when the tab becomes visible / the browser goes online. Connection state: `inject(SyncStatus).live` (or `LiveSync.state`); `LiveSync.retryNow()` forces a reconnect.
 
 ---
 
@@ -377,9 +377,9 @@ private readonly _keys = usePageShortcuts([
 
 ## 10. Rules of the road
 
-- Read data from `NablaStore` signals/computeds; never copy entities into component state. Use `computed()` over lookups.
-- Mutate only through `NablaStore` (or `ApiClient` for non-snapshot endpoints, then `store.scheduleRefetch(0)`).
+- Read data from `TramaStore` signals/computeds; never copy entities into component state. Use `computed()` over lookups.
+- Mutate only through `TramaStore` (or `ApiClient` for non-snapshot endpoints, then `store.scheduleRefetch(0)`).
 - Do not catch mutation errors; they never throw. Do catch `ApiError` from SessionStore auth methods and direct `ApiClient` calls.
 - Do not create new entity types or edit `contracts/`; ask the orchestrator.
 - Optional fields are omitted (never null) in entities; compare with `=== undefined`.
-- Viewer role: hide mutating controls with `nabla.can('member')`.
+- Viewer role: hide mutating controls with `trama.can('member')`.

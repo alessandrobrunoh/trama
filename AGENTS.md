@@ -8,7 +8,7 @@ The Angular frontend lives in `src/`: `app/core` contains shared state and servi
 
 Install frontend dependencies with `npm install`. Use `npm start` to run the Angular app at `http://localhost:4300`, and `npm run build` for a production build. `npm test` runs Angular tests.
 
-The API has its own dependencies and scripts: run `cd server && npm install`, then `npm run db:up` and `npm run start:dev` for local development. Run API unit tests with `npm test`, end-to-end tests with `npm run test:e2e`, and checks with `npm run lint` or `npm run build`. End-to-end tests recreate the `nabla_core_test` database; do not point that test configuration at data you need to keep.
+The API has its own dependencies and scripts: run `cd server && npm install`, then `npm run db:up` and `npm run start:dev` for local development. Run API unit tests with `npm test`, end-to-end tests with `npm run test:e2e`, and checks with `npm run lint` or `npm run build`. End-to-end tests recreate the `trama_core_test` database; do not point that test configuration at data you need to keep.
 
 ## Coding Style
 

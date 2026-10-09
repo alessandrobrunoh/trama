@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideInbox, LucideRefreshCw, LucideSettings2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { CustomerIntakeStore, NablaStore, normalizeCustomerDomain, type IntakeItem, type IntakeItemStatus } from '../../core';
+import { CustomerIntakeStore, TramaStore, normalizeCustomerDomain, type IntakeItem, type IntakeItemStatus } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
@@ -165,7 +165,7 @@ interface Draft {
   `,
 })
 export class CustomerInboxPage {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly inbox = inject(CustomerIntakeStore);
 
   protected readonly tabs = TABS;

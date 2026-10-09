@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { LucideBell, LucideCheck, LucideCheckCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
-import { NablaStore, NotificationsStore, UiStore, usePageShortcuts, type Notification } from '../../core';
+import { TramaStore, NotificationsStore, UiStore, usePageShortcuts, type Notification } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { RelativeTimePipe } from '../../shared/pipes';
@@ -102,7 +102,7 @@ type Filter = 'all' | 'unread';
 })
 export class NotificationsPage {
   protected readonly store = inject(NotificationsStore);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly router = inject(Router);
 
   protected readonly visual = NOTIFICATION_KIND_VISUAL;
@@ -159,10 +159,10 @@ export class NotificationsPage {
 
   protected open(n: Notification): void {
     if (!n.readAt) void this.store.markRead([n.id]);
-    void this.router.navigate(['/', this.nabla.slug(), ...n.link.split('/')]);
+    void this.router.navigate(['/', this.trama.slug(), ...n.link.split('/')]);
   }
 
   protected openSettings(): void {
-    void this.router.navigate(['/', this.nabla.slug(), 'settings', 'notifications']);
+    void this.router.navigate(['/', this.trama.slug(), 'settings', 'notifications']);
   }
 }

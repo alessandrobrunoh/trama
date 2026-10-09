@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, output } f
 import { LucideDynamicIcon, LucideTrendingUp } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { NablaStore, filterValues, setFilter, type ViewFilter } from '../../core';
+import { TramaStore, filterValues, setFilter, type ViewFilter } from '../../core';
 import { Picker, type PickOption } from '../workstreams/picker';
 
 /** The customer fields this control owns inside a list's filters. */
@@ -87,7 +87,7 @@ export function withoutDemandFilters(filters: readonly ViewFilter[]): ViewFilter
   `,
 })
 export class DemandFilters {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
 
   readonly filters = input.required<readonly ViewFilter[]>();
   readonly filtersChange = output<ViewFilter[]>();

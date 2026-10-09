@@ -112,7 +112,7 @@ fn unauthorized(message: &str) -> Response {
         .into_response()
 }
 
-/// The keys a request brought. One, as `Authorization: Bearer nbl_…`, or several, separated by
+/// The keys a request brought. One, as `Authorization: Bearer trm_…`, or several, separated by
 /// commas or in repeated headers. `X-Trama-Api-Keys` carries the rest when a client can only send
 /// one Authorization header. Each key is still bound to one workspace.
 fn bearer_keys(headers: &HeaderMap) -> Vec<String> {
@@ -142,7 +142,7 @@ fn bearer_keys(headers: &HeaderMap) -> Vec<String> {
 }
 
 fn valid_key(key: &str) -> bool {
-    key.starts_with("nbl_") && key.len() <= 256 && !key.contains(char::is_whitespace)
+    (key.starts_with("trm_") || key.starts_with("nbl_")) && key.len() <= 256 && !key.contains(char::is_whitespace)
 }
 
 async fn mcp_post(State(app): State<Arc<App>>, Query(query): Query<HashMap<String, String>>, headers: HeaderMap, body: Bytes) -> Response {
@@ -158,7 +158,7 @@ async fn mcp_post(State(app): State<Arc<App>>, Query(query): Query<HashMap<Strin
     let keys = bearer_keys(&headers);
     if keys.is_empty() || keys.iter().any(|k| !valid_key(k)) {
         return unauthorized(
-            "Missing API key: send 'Authorization: Bearer nbl_…' (create one in Trama → Settings → API tokens). Send several, comma-separated, to cover more than one workspace.",
+            "Missing API key: send 'Authorization: Bearer trm_…' (create one in Trama → Settings → API tokens). Send several, comma-separated, to cover more than one workspace.",
         );
     }
     let accounts = match resolve_keys(&app.server, &keys).await {
@@ -248,7 +248,7 @@ fn stdio_keys() -> Result<Vec<String>, String> {
     }
     if let Some(bad) = keys.iter().find(|k| !valid_key(k)) {
         return Err(format!(
-            "an API key must start with nbl_ (got {})",
+            "an API key must start with trm_ or nbl_ (got {})",
             &bad.chars().take(12).collect::<String>()
         ));
     }

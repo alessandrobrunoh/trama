@@ -10,7 +10,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideGitBranch } from '@lucide/angular';
 import { HlmHoverCardImports } from '@spartan-ng/helm/hover-card';
 import type { Decision, Issue, Repository, Workstream } from '../core/contracts/domain';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { ActorAvatar, ActorLabel } from './actor-avatar';
 import { IssueKindLabel } from './issue';
 import type { TextLinker } from './markdown';
@@ -38,7 +38,7 @@ function escapeRegExp(s: string): string {
  */
 @Injectable({ providedIn: 'root' })
 export class EntityRefs {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   resolve(token: string): ResolvedRef | null {
     const slug = this.store.slug() ?? '';
@@ -214,7 +214,7 @@ export class EntityRefs {
   `,
 })
 export class EntityPreview {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ref = input.required<ResolvedRef>();
   protected readonly gitIcon = LucideGitBranch;
   protected readonly team = computed(() => {

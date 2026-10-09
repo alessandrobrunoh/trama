@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, computed, inject, input } from '@an
 import { RouterLink } from '@angular/router';
 import { LucideCircleCheck, LucideDynamicIcon, LucideStar, LucideUsers } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, type Demand } from '../../core';
+import { TramaStore, type Demand } from '../../core';
 import { CustomerAvatar } from './customer-avatar';
 import { compactNumber, type RequestState } from './customer-model';
 
@@ -60,7 +60,7 @@ import { compactNumber, type RequestState } from './customer-model';
   `,
 })
 export class DemandSummary {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly demand = input<Demand | undefined>();
   /** open: customers are waiting; delivered: the work is done; dropped: the work was canceled. */

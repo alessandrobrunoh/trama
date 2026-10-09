@@ -5,7 +5,7 @@ import { LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { ISSUE_STATUS_META, NablaStore, PRIORITY_META, type Issue } from '../../core';
+import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, type Issue } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -71,7 +71,7 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
   `,
 })
 export class IssueProp {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly issue = input.required<Issue>();
   readonly field = input.required<PropField>();
   readonly showLabel = input(false, { transform: booleanAttribute });

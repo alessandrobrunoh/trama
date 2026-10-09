@@ -32,7 +32,7 @@ function setup(auth: 'token' | 'session') {
   const run = (handler: () => void, method: string) => {
     const req = {
       method,
-      headers: auth === 'token' ? { authorization: 'Bearer nbl_x' } : { cookie: 'nabla_session=raw', 'x-requested-with': 'test' },
+      headers: auth === 'token' ? { authorization: 'Bearer trm_x' } : { cookie: 'trama_session=raw', 'x-requested-with': 'test' },
       params: {},
       route: { path: '/api/workspaces' },
       is: () => true,

@@ -8,7 +8,10 @@ import { ApiTokenEntity } from '../database/entities/index.js';
 import { sha256 } from '../common/crypto.js';
 import { uid } from '../common/util.js';
 
-export const TOKEN_PREFIX = 'nbl_';
+/** New tokens are issued with this prefix. */
+export const TOKEN_PREFIX = 'trm_';
+/** Tokens minted before the rename to Trama keep working. */
+export const LEGACY_TOKEN_PREFIX = 'nbl_';
 
 /** Clamps a partial limits object to the allowed range, filling gaps with the defaults. */
 export function resolveLimits(input?: Partial<TokenLimits> | null): TokenLimits {
@@ -94,7 +97,7 @@ export class TokensService {
 
   /** Resolves a bearer secret to its (unexpired) token row, touching `lastUsedAt` at most once a minute. */
   async authenticate(secret: string): Promise<ApiTokenEntity | null> {
-    if (!secret.startsWith(TOKEN_PREFIX)) return null;
+    if (!secret.startsWith(TOKEN_PREFIX) && !secret.startsWith(LEGACY_TOKEN_PREFIX)) return null;
     const token = await this.repo.findOne({
       where: {
         tokenHash: sha256(secret),

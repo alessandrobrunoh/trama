@@ -1,7 +1,7 @@
 // Shared, memoised milestone progress: one computed over the store so lists, chips and the
 // timeline never recompute it per row.
 import { Injectable, computed, inject } from '@angular/core';
-import { NablaStore, type Milestone } from '../../core';
+import { TramaStore, type Milestone } from '../../core';
 import { milestoneStats, milestoneState, usesPoints, todayDay, type MilestoneState, type MilestoneStats } from './milestone-model';
 
 export interface NextMilestone {
@@ -14,7 +14,7 @@ export interface NextMilestone {
 
 @Injectable({ providedIn: 'root' })
 export class MilestoneInfo {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   /** Whether a workstream measures progress in points (else issue counts). */
   readonly pointsByWorkstream = computed(() => {

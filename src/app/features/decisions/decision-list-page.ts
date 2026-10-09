@@ -6,7 +6,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   DECISION_STATUSES,
   DECISION_STATUS_META,
-  NablaStore,
+  TramaStore,
   UiStore,
   type Decision,
   type DecisionStatus,
@@ -24,7 +24,7 @@ import { StatusIcon } from '../../shared/status';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { SearchInput } from '../../shared/search-input';
 
-const PREFS_KEY = 'nabla.decisions.list.v1';
+const PREFS_KEY = 'trama.decisions.list.v1';
 type GroupMode = 'status' | 'none';
 
 interface DecisionGroup {
@@ -155,7 +155,7 @@ interface DecisionGroup {
 export class DecisionListPage {
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
 

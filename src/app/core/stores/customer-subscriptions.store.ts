@@ -7,12 +7,12 @@ import { ApiError } from '../api/api-error';
 import type { CustomerSubscription, ID } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { LiveSync } from '../sync/live-sync.service';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 @Injectable({ providedIn: 'root' })
 export class CustomerSubscriptionsStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   private readonly live = inject(LiveSync);
 
@@ -21,8 +21,8 @@ export class CustomerSubscriptionsStore {
 
   constructor() {
     effect(() => {
-      const slug = this.nabla.slug();
-      const ready = this.nabla.ready();
+      const slug = this.trama.slug();
+      const ready = this.trama.ready();
       untracked(() => {
         if (slug && ready) void this.load();
         else this.items.set([]);
@@ -37,11 +37,11 @@ export class CustomerSubscriptionsStore {
   }
 
   async load(): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       const list = await this.api.customerSubscriptions.list(slug);
-      if (this.nabla.slug() === slug) this.items.set(list);
+      if (this.trama.slug() === slug) this.items.set(list);
     } catch {
       /* following is a convenience; the app works without it */
     }
@@ -49,7 +49,7 @@ export class CustomerSubscriptionsStore {
 
   /** Follow or unfollow, updating at once and rolling back if the server refuses. */
   async toggle(customerId: ID): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     const before = this.items();
     const existing = before.find((s) => s.customerId === customerId);
@@ -60,7 +60,7 @@ export class CustomerSubscriptionsStore {
       } else {
         const temp: CustomerSubscription = {
           id: `csub_pending_${Date.now()}`,
-          workspaceId: this.nabla.workspace()?.id ?? '',
+          workspaceId: this.trama.workspace()?.id ?? '',
           customerId,
           createdAt: new Date().toISOString(),
         };

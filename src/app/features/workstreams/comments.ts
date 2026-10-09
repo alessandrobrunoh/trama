@@ -15,7 +15,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   DraftStore,
-  NablaStore,
+  TramaStore,
   Preferences,
   UiStore,
   fullDate,
@@ -204,7 +204,7 @@ export class CommentComposer {
   `,
 })
 export class CommentItem {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   protected readonly refs = inject(EntityRefs);
   protected readonly full = fullDate;
@@ -281,7 +281,7 @@ export class CommentItem {
   `,
 })
 export class CommentsLoader {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly subject = input.required<SubjectRef>();
   protected readonly thread = computed(() => this.store.commentThread(this.subject()));
 
@@ -325,7 +325,7 @@ export class CommentsLoader {
   `,
 })
 export class CommentThread {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly subject = input.required<SubjectRef>();
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly comments = computed(() =>

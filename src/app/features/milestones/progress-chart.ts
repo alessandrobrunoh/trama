@@ -7,7 +7,7 @@
 // an estimate count as 1 point.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { format } from 'date-fns';
-import { NablaStore, type Milestone, type Project, type Workstream } from '../../core';
+import { TramaStore, type Milestone, type Project, type Workstream } from '../../core';
 import { ChartTip } from '../stats/charts/chart-tip';
 import { compact, niceScale, trackWidth } from '../stats/charts/chart-utils';
 import { MilestoneInfo } from './milestone-stats';
@@ -144,7 +144,7 @@ let seq = 0;
   `,
 })
 export class ProgressChart {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly info = inject(MilestoneInfo);
 
   /** The workstream to chart (give this or `project`). */

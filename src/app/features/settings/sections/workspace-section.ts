@@ -8,7 +8,7 @@ import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type 
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
@@ -261,11 +261,11 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 })
 export class WorkspaceSection {
   private readonly session = inject(SessionStore);
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
 
-  protected readonly host = typeof location !== 'undefined' ? location.host : 'nabla';
+  protected readonly host = typeof location !== 'undefined' ? location.host : 'trama';
   protected readonly name = signal('');
   protected readonly slugValue = signal('');
   protected readonly busy = signal(false);

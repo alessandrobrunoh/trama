@@ -1,8 +1,8 @@
 import { addMockHistoryToSeed } from '../mock-history.js';
 import { SeedBuilder, SYSTEM, agent, team, user, type SeedData } from './builder.js';
 
-export const DEMO_EMAIL = 'demo@nabla.dev';
-export const DEMO_PASSWORD = 'nabla-demo';
+export const DEMO_EMAIL = 'demo@trama.dev';
+export const DEMO_PASSWORD = 'trama-demo';
 
 /**
  * The "Acme" demo workspace: 14 workstreams covering every derived status, executions with

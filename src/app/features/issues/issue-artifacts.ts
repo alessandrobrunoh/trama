@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { LucidePackage, LucidePlus, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore, type Artifact, type Issue } from '../../core';
+import { TramaStore, type Artifact, type Issue } from '../../core';
 import { DocumentActions } from '../documents/document-attach';
 import { ProjectArtifactDialog } from '../projects/project-artifact-dialog';
 import { ProjectArtifactRow } from '../projects/project-artifact-row';
@@ -62,7 +62,7 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
   `,
 })
 export class IssueArtifacts {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly issue = input.required<Issue>();
 

@@ -10,7 +10,7 @@ import {
 import { Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { AuthService, SESSION_COOKIE } from '../auth/auth.service.js';
+import { AuthService, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth/auth.service.js';
 import {
   ALLOW_CUSTOM_TOKEN_KEY,
   CAPABILITY_KEY,
@@ -60,8 +60,8 @@ function hasBody(req: AppRequest): boolean {
 /**
  * The single global guard. In order:
  *  1. `@Public()` routes pass through (but mutating ones with a body must be JSON).
- *  2. Authenticates: `Authorization: Bearer nbl_…` (API token, acting as a user or an agent)
- *     or the httpOnly `nabla_session` cookie. → 401 otherwise. Sets `req.auth`.
+ *  2. Authenticates: `Authorization: Bearer trm_… (or a legacy nbl_… token)` (API token, acting as a user or an agent)
+ *     or the httpOnly `trama_session` cookie (or the legacy `nabla_session`). → 401 otherwise. Sets `req.auth`.
  *  3. CSRF for cookie sessions: mutating requests need `X-Requested-With` or `X-Client-Id`
  *     (forces a CORS preflight, so only allow-listed origins can send them); bodies must be JSON.
  *  4. `@SessionOnly()` account routes (create workspace, accept invite, personal settings) refuse API tokens.
@@ -175,7 +175,8 @@ export class AccessGuard implements CanActivate {
       }
       return { actor: token.actor, token, method: 'token' };
     }
-    const raw = parseCookies(req.headers.cookie)[SESSION_COOKIE];
+    const cookies = parseCookies(req.headers.cookie);
+    const raw = cookies[SESSION_COOKIE] || cookies[LEGACY_SESSION_COOKIE];
     if (!raw) return null;
     const found = await this.auth.authenticateSession(raw);
     if (!found) return null;

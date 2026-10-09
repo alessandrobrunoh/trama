@@ -9,7 +9,7 @@ import { HlmLabelImports } from '@spartan-ng/helm/label';
 import {
   ARTIFACT_KINDS,
   ARTIFACT_KIND_META,
-  NablaStore,
+  TramaStore,
   UiStore,
   type Artifact,
   type ArtifactKind,
@@ -229,7 +229,7 @@ const DEFAULT_PROVIDER: Partial<Record<ArtifactKind, ArtifactProvider>> = {
   `,
 })
 export class WsArtifactsTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   readonly ws = input.required<Workstream>();
 

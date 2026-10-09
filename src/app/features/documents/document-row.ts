@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideFileText } from '@lucide/angular';
-import { NablaStore, type DocumentSummary } from '../../core';
+import { TramaStore, type DocumentSummary } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { isEmojiIcon } from '../projects/project-glyph';
@@ -73,7 +73,7 @@ import { OWNER_ICONS, describeLink } from './document-attach';
   `,
 })
 export class DocumentRow {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly doc = input.required<DocumentSummary>();
   /** Show where the document is attached (off on a project page, where it is obvious). */

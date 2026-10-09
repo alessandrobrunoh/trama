@@ -16,7 +16,9 @@ import {
 import type { Role } from '../contracts/domain.js';
 import { uid } from '../common/util.js';
 
-export const SESSION_COOKIE = 'nabla_session';
+export const SESSION_COOKIE = 'trama_session';
+/** Cookie name before the rename: still read, so nobody is signed out; cleared whenever a session is set or cleared. */
+export const LEGACY_SESSION_COOKIE = 'nabla_session';
 export const SESSION_TTL_MS = 30 * 24 * 3600 * 1000;
 
 const DUMMY_HASH_REF = () => DUMMY_HASH;
@@ -108,4 +110,4 @@ export class AuthService {
 }
 
 /** Real argon2 hash used to equalize timing for unknown emails. */
-const DUMMY_HASH = argon2.hash('nabla-timing-equalizer');
+const DUMMY_HASH = argon2.hash('trama-timing-equalizer');

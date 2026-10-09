@@ -15,7 +15,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { Clipboard, DECISION_STATUS_META, NablaStore, Notifier, UiStore } from '../../core';
+import { Clipboard, DECISION_STATUS_META, TramaStore, Notifier, UiStore } from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
@@ -342,7 +342,7 @@ export class DecisionDetailPage {
   readonly workspaceSlug = input<string>();
   readonly key = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);

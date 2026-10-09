@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { format } from 'date-fns';
-import { NablaStore } from '../../core';
+import { TramaStore } from '../../core';
 import { ChartCard } from './charts/chart-card';
 import { ProgressChart } from '../milestones/progress-chart';
 import { milestoneRows, type MilestoneRow, type MilestoneState } from './perf';
@@ -100,7 +100,7 @@ export class WsExtras {
   readonly wsIds = input<ReadonlySet<string> | null>(null);
   readonly now = input.required<number>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly meta = STATE_META;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly pick = signal<string | null>(null);

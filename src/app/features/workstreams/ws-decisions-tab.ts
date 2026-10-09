@@ -6,7 +6,7 @@ import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { NablaStore, type Decision, type Workstream } from '../../core';
+import { TramaStore, type Decision, type Workstream } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { KeyChip } from '../../shared/key-chip';
@@ -103,7 +103,7 @@ import { StatusBadge } from '../../shared/status';
   `,
 })
 export class WsDecisionsTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly open = signal(false);
   protected readonly busy = signal(false);

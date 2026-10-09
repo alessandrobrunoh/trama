@@ -6,6 +6,7 @@ import {
 } from 'node:crypto';
 
 import { SecretsService } from '../integrations/secrets.service.js';
+import { envWithLegacy } from './env.js';
 
 /**
  * AES-256-GCM helpers for secrets at rest (public view links). The key is the same one the
@@ -15,7 +16,7 @@ import { SecretsService } from '../integrations/secrets.service.js';
  */
 function key(): Buffer {
   return SecretsService.resolveKey(
-    process.env.TRAMA_ENCRYPTION_KEY ?? process.env.NABLA_ENCRYPTION_KEY ?? process.env.SECRETS_KEY,
+    envWithLegacy('TRAMA_ENCRYPTION_KEY', 'NABLA_ENCRYPTION_KEY') ?? process.env.SECRETS_KEY,
   );
 }
 

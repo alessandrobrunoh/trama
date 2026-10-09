@@ -29,7 +29,7 @@ import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
-  NablaStore,
+  TramaStore,
   PRIORITY_META,
   WORKSTREAM_STATUS_META,
   isTypingTarget,
@@ -419,7 +419,7 @@ const TAB_LABEL: Record<Tab, string> = {
   `,
 })
 export class WorkstreamDetailPage {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly actions = inject(WsActions);
   private readonly router = inject(Router);
 

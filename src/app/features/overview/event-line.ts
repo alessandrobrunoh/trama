@@ -29,7 +29,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ARTIFACT_KIND_META,
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   type DomainEvent,
   type IssueStatus,
   type WorkstreamStatus,
@@ -116,7 +116,7 @@ function fieldsText(d: Record<string, unknown>): string | undefined {
 }
 
 /** Turn a DomainEvent into a short, human-readable description (actor is rendered separately). */
-export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): EventView {
+export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): EventView {
   const d = e.data ?? {};
   const ws = e.workstreamId ? store.workstreamById().get(e.workstreamId) : undefined;
   const wsRef: EntityRef | undefined = ws
@@ -414,7 +414,7 @@ export function describeEvent(e: DomainEvent, store: NablaStore, slug: string): 
   `,
 })
 export class EventLine {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly event = input.required<DomainEvent>();
   readonly slug = input.required<string>();
   /** Chips show the key only. */

@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import { LucideDynamicIcon, LucideFilePlus, LucideFileText } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { ApiError, NablaStore, type DocumentSummary, type Project } from '../../core';
+import { ApiError, TramaStore, type DocumentSummary, type Project } from '../../core';
 import { EmptyState } from '../../shared/empty-state';
 import { DocumentRow } from './document-row';
 import { DocumentActions } from './document-attach';
@@ -67,7 +67,7 @@ import { Documents } from './documents.service';
   `,
 })
 export class ProjectDocumentsTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly documents = inject(Documents);
 
   readonly project = input.required<Project>();

@@ -4,7 +4,7 @@ import {
   type Issue,
   type IssueKind,
   type IssueStatus,
-  type NablaStore,
+  type TramaStore,
   type Priority,
   type Workstream,
   type WorkstreamStatus,
@@ -60,7 +60,7 @@ export interface Timeline {
 
 export const EMPTY_TIMELINE: Timeline = { now: 0, coverageStart: -Infinity, issues: [], workstreams: [] };
 
-function changesOf(store: NablaStore, key: string, type: string): Change[] {
+function changesOf(store: TramaStore, key: string, type: string): Change[] {
   const events = store.eventsBySubject().get(key) ?? [];
   return events
     .filter((e) => e.type === type)
@@ -74,7 +74,7 @@ function changesOf(store: NablaStore, key: string, type: string): Change[] {
     .sort((a, b) => a.at - b.at);
 }
 
-function coverage(store: NablaStore): number {
+function coverage(store: TramaStore): number {
   const times = store.events().map((e) => Date.parse(e.at)).filter((t) => !Number.isNaN(t));
   if (!times.length) return Infinity;
   const oldest = Math.min(...times);
@@ -87,7 +87,7 @@ function coverage(store: NablaStore): number {
 }
 
 export function buildTimeline(
-  store: NablaStore,
+  store: TramaStore,
   workstreams: readonly Workstream[],
   issues: readonly Issue[],
   now: Date,

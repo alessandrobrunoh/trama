@@ -32,7 +32,7 @@ import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import {
   ARTIFACT_KIND_META,
   Clipboard,
-  NablaStore,
+  TramaStore,
   type Artifact,
   type ArtifactKind,
   type ArtifactTreeNode,
@@ -488,7 +488,7 @@ type TreeRow =
   `,
 })
 export class ProjectContextTab {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly clipboard = inject(Clipboard);
 
   readonly project = input.required<Project>();

@@ -7,7 +7,7 @@ import {
   Clipboard,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   Notifier,
   PRIORITY_META,
   UiStore,
@@ -30,7 +30,7 @@ export interface IssuePrompt {
 
 @Injectable({ providedIn: 'root' })
 export class IssueActions {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);

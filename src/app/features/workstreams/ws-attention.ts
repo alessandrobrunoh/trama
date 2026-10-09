@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
 import { LucideAlarmClock, LucideArrowUpRight, LucideBellRing, LucideDynamicIcon, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { ATTENTION_KIND_META, NablaStore, type AttentionItem, type Workstream } from '../../core';
+import { ATTENTION_KIND_META, TramaStore, type AttentionItem, type Workstream } from '../../core';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { InputRequestItem } from './ws-input-requests';
 
@@ -72,7 +72,7 @@ import { InputRequestItem } from './ws-input-requests';
   `,
 })
 export class WsAttention {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
 
   protected readonly bell = LucideBellRing;

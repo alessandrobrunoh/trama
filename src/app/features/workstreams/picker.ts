@@ -12,7 +12,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { NablaStore, type ActorRef } from '../../core';
+import { TramaStore, type ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -369,7 +369,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
   `,
 })
 export class Picker {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly options = input.required<readonly PickOption[]>();
   /** Selected values. */
   readonly value = input<readonly string[]>([]);

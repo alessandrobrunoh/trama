@@ -17,7 +17,7 @@ import { HlmLabelImports } from '@spartan-ng/helm/label';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import {
   ARTIFACT_KIND_META,
-  NablaStore,
+  TramaStore,
   type Artifact,
   type ArtifactKind,
   type ArtifactProvider,
@@ -200,7 +200,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
   `,
 })
 export class ProjectArtifactDialog {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
 
   readonly open = model(false);
   readonly target = input.required<ArtifactTarget>();

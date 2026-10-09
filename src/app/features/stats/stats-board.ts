@@ -7,7 +7,7 @@ import {
   INSIGHT_SIGNAL_IDS,
   ISSUE_STATUS_META,
   ISSUE_STATUSES,
-  NablaStore,
+  TramaStore,
   PRIORITIES,
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
@@ -454,7 +454,7 @@ export class StatsBoard {
   /** Offer the Health, Flow and People & agents scopes (the workspace statistics page). */
   readonly insights = input(false);
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly api = inject(ApiClient);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideExternalLink, LucidePencil, LucideStar, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { NablaStore, UiStore, type CustomerRequest } from '../../core';
+import { TramaStore, UiStore, type CustomerRequest } from '../../core';
 import { normalizeHttpUrl } from '../../core/contracts/domain';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { Markdown } from '../../shared/markdown';
@@ -162,7 +162,7 @@ import { requestsOn } from './customer-model';
   `,
 })
 export class CustomerRequests {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** Exactly one of these. */

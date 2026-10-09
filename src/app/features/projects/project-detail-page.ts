@@ -27,7 +27,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
-  NablaStore,
+  TramaStore,
   UiStore,
   usePageShortcuts,
   type DomainEvent,
@@ -602,7 +602,7 @@ export class ProjectDetailPage {
   /** `?tab=` query param (bound by the router), default overview. */
   readonly tab = input<string>();
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly workState = projectWorkState;
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
@@ -738,7 +738,7 @@ export class ProjectDetailPage {
     if (id) this.ui.openCreate('issue', { projectId: id });
   }
 
-  protected update(patch: Parameters<NablaStore['updateProject']>[1]): void {
+  protected update(patch: Parameters<TramaStore['updateProject']>[1]): void {
     const p = this.project();
     if (p) void this.store.updateProject(p.id, patch);
   }

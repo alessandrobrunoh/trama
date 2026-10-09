@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, computed, effect, inject, untracked
 import { LucideCalendar, LucideCopy, LucideDynamicIcon, LucideTrash2, LucideUserRound, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, UiStore, type Priority, type WorkstreamStatus } from '../../core';
+import { TramaStore, UiStore, type Priority, type WorkstreamStatus } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -63,7 +63,7 @@ import { priorityOptions, statusOptions, userOptions } from './ws-model';
   `,
 })
 export class WsBulkBar {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(WsActions);
 

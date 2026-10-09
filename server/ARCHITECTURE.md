@@ -21,7 +21,7 @@ src/
 
 1. `requestStoreMiddleware` stores `X-Client-Id` in an AsyncLocalStorage (so `EventsService.publish` can echo it).
 2. **`AccessGuard`** (global `APP_GUARD`, `workspaces/access.guard.ts`) runs for every route except `@Public()`:
-   authenticates (`Authorization: Bearer nbl_…` → `TokensService`, else the `nabla_session` cookie → `AuthService`) → `req.auth: AuthInfo`;
+   authenticates (`Authorization: Bearer trm_…` → `TokensService`, else the `trama_session` cookie (or the legacy `nabla_session`) → `AuthService`) → `req.auth: AuthInfo`;
    CSRF checks for cookie mutations (custom header + JSON);
    if the route has a `:slug` param resolves the workspace and the caller's role → `req.ctx: WorkspaceContext` (404 for non-members, 403 for a too-low role).
 3. `ValidationPipe` (whitelist, transform) validates the DTO, the controller calls a service.
@@ -79,7 +79,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Database
 
-- Entities: `database/entities/index.ts` (every table, `ENTITIES` array). Migration: `database/migrations/*-NablaBaseline.ts` (registered explicitly in `migrations/index.ts`). `synchronize` is off; `migrationsRun` is on.
+- Entities: `database/entities/index.ts` (every table, `ENTITIES` array). Migration: `database/migrations/*-NablaBaseline.ts` (the file and class keep the old name because TypeORM tracks applied migrations by name; do not rename them) (registered explicitly in `migrations/index.ts`). `synchronize` is off; `migrationsRun` is on.
 - The database named in `DATABASE_URL` is created on boot if missing (`database/ensure-database.ts`, connects to `postgres` first).
 - Add a table/column: edit the entity, then `npm run migration:generate -- src/database/migrations/<Name>` (builds first; generated file is `.js`, convert it to a `.ts` class like the baseline), register it in `migrations/index.ts`.
 - Polymorphic references (dependencies `from/to`, comments/events `subject`) have no FKs: services clean them up on delete. Events keep `workstreamId` without an FK so history survives deletion.
@@ -103,7 +103,7 @@ Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` bel
 
 ## Testing
 
-`npm test` (unit, `*.spec.ts`), `npm run test:e2e` (supertest against a freshly recreated `nabla_core_test` database in the same container; `SEED_DEMO=false`). `npm run lint` (oxlint type-aware), `npm run build`.
+`npm test` (unit, `*.spec.ts`), `npm run test:e2e` (supertest against a freshly recreated `trama_core_test` database in the same container; `SEED_DEMO=false`). `npm run lint` (oxlint type-aware), `npm run build`.
 
 ## Integrations and webhooks (`src/integrations`, `src/webhooks`)
 

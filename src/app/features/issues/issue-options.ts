@@ -8,7 +8,7 @@ import {
   PRIORITY_META,
   type Issue,
   type IssueStatus,
-  type NablaStore,
+  type TramaStore,
   type Priority,
   type WorkspaceLabel,
 } from '../../core';
@@ -42,7 +42,7 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
 };
 
 /** `labels` is the already ordered label list (see `LabelCatalog.arrange`); without it the catalog order is used. */
-export function promptOptions(store: NablaStore, field: IssuePromptField, issues: readonly Issue[], labels?: readonly WorkspaceLabel[]): IssueOption[] {
+export function promptOptions(store: TramaStore, field: IssuePromptField, issues: readonly Issue[], labels?: readonly WorkspaceLabel[]): IssueOption[] {
   switch (field) {
     case 'status':
       return ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, glyph: 'status', status: s, search: ISSUE_STATUS_META[s].label }));

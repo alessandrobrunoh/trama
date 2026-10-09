@@ -8,7 +8,7 @@ import { Router } from '@angular/router';
 import {
   BranchNames,
   Clipboard,
-  NablaStore,
+  TramaStore,
   Notifier,
   PRIORITY_META,
   UiStore,
@@ -42,7 +42,7 @@ let seq = 0;
 
 @Injectable({ providedIn: 'root' })
 export class WsActions {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);
   private readonly clipboard = inject(Clipboard);

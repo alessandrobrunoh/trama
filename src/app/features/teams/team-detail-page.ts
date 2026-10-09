@@ -4,7 +4,7 @@ import { LucideDynamicIcon, LucideEllipsis, LucideFolderGit2, LucideHexagon, Luc
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, ROLE_META, UiStore } from '../../core';
+import { TramaStore, ROLE_META, UiStore } from '../../core';
 import { Clipboard } from '../../core/notify/notifier';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { TEAM_EDIT_POLICIES, type TeamEditPolicy } from '../../core/contracts/domain';
@@ -255,7 +255,7 @@ export class TeamDetailPage {
   /** Query `?tab=issues`. */
   readonly tabParam = input<string>(undefined, { alias: 'tab' });
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);

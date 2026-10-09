@@ -22,7 +22,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { NablaStore, UiStore, type Artifact, type SubjectRef } from '../../core';
+import { TramaStore, UiStore, type Artifact, type SubjectRef } from '../../core';
 import { ArtifactIcon, CiChip, ConflictChip, ReviewChip } from '../../shared/artifact';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
@@ -41,7 +41,7 @@ export interface SubjectView {
 }
 
 /** Resolves a `SubjectRef` of the project tree to something renderable; `null` when it is gone or unsupported. */
-export function resolveSubject(store: NablaStore, ref: SubjectRef): SubjectView | null {
+export function resolveSubject(store: TramaStore, ref: SubjectRef): SubjectView | null {
   const slug = store.slug() ?? '';
   switch (ref.type) {
     case 'project': {
@@ -255,7 +255,7 @@ const LONG_DESCRIPTION = 140;
   `,
 })
 export class ProjectArtifactRow {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   readonly artifact = input.required<Artifact>();

@@ -12,7 +12,7 @@ import {
   LucideUserRoundX,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, Viewport, fullDate, haptic, issueProjectIds, shortDate, type Issue } from '../../core';
+import { TramaStore, Viewport, fullDate, haptic, issueProjectIds, shortDate, type Issue } from '../../core';
 import { EntityChip } from '../../shared/entity-chip';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
@@ -29,7 +29,7 @@ import { IssueProp } from './issue-prop';
 /** Shared bits of row + card. */
 @Directive()
 abstract class IssueItemBase {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   readonly issue = input.required<Issue>();
   readonly focused = input(false);
   readonly selected = input(false);

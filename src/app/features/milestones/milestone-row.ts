@@ -22,7 +22,7 @@ import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, isOverdue, shortDate, type Milestone, type Project } from '../../core';
+import { TramaStore, isOverdue, shortDate, type Milestone, type Project } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { Estimate } from '../../shared/estimate';
 import { KeyChip } from '../../shared/key-chip';
@@ -234,7 +234,7 @@ import { ProgressChart } from './progress-chart';
   `,
 })
 export class MilestoneRow {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly info = inject(MilestoneInfo);
   protected readonly actions = inject(MilestoneActions);
 

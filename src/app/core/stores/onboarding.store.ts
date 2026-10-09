@@ -6,7 +6,7 @@
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Capability } from '../contracts/domain';
 import { InvitesStore } from './invites.store';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 import { readJson, writeJson } from './storage';
 import { UiStore } from './ui.store';
 
@@ -46,7 +46,7 @@ const NEEDS: Partial<Record<OnboardingStepId, Capability>> = {
 
 @Injectable({ providedIn: 'root' })
 export class OnboardingStore {
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly invites = inject(InvitesStore);
 
@@ -54,8 +54,8 @@ export class OnboardingStore {
 
   /** One entry per person and workspace. */
   private readonly key = computed(() => {
-    const me = this.nabla.me()?.id;
-    const slug = this.nabla.slug();
+    const me = this.trama.me()?.id;
+    const slug = this.trama.slug();
     return me && slug ? `${me}:${slug}` : null;
   });
   private readonly mine = computed<Remembered>(() => {
@@ -66,7 +66,7 @@ export class OnboardingStore {
   readonly dismissed = computed(() => !!this.mine().dismissed);
 
   readonly steps = computed<OnboardingStep[]>(() => {
-    const s = this.nabla;
+    const s = this.trama;
     const mine = this.mine();
     const hasCriteria = s.workstreams().some((w) => w.acceptanceCriteria.length > 0);
     const agentConnected =
@@ -130,18 +130,18 @@ export class OnboardingStore {
   /** The first step still to do: what the checklist highlights. */
   readonly next = computed(() => this.steps().find((x) => !x.done) ?? null);
   /** Shown to people who have not dismissed it, once the workspace has loaded. */
-  readonly visible = computed(() => this.nabla.ready() && !!this.key() && !this.dismissed() && this.total() > 0);
+  readonly visible = computed(() => this.trama.ready() && !!this.key() && !this.dismissed() && this.total() > 0);
 
   constructor() {
     // Pending invitations are not part of the snapshot: load them once for people who may invite.
     effect(() => {
-      if (!this.nabla.ready() || !this.nabla.allowed('inviteMembers')) return;
+      if (!this.trama.ready() || !this.trama.allowed('inviteMembers')) return;
       untracked(() => void this.invites.load());
     });
     // Tokens are loaded on demand too; a used token is the proof that an agent is connected.
     effect(() => {
-      if (!this.nabla.ready() || !this.nabla.allowed('manageTokens') || this.dismissed()) return;
-      untracked(() => void this.nabla.loadTokens());
+      if (!this.trama.ready() || !this.trama.allowed('manageTokens') || this.dismissed()) return;
+      untracked(() => void this.trama.loadTokens());
     });
     // Opening the command bar is the whole of the last step.
     effect(() => {

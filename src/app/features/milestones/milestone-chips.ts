@@ -3,7 +3,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideDiamond } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, shortDate, type Issue, type Project } from '../../core';
+import { TramaStore, shortDate, type Issue, type Project } from '../../core';
 import { Notifier } from '../../core/notify/notifier';
 import { MilestoneActions } from './milestone-actions';
 import { PropertyRow } from '../../shared/property-row';
@@ -80,7 +80,7 @@ const date = (iso: string): string => shortDate(iso);
   `,
 })
 export class IssueMilestoneProp {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly actions = inject(MilestoneActions);
   private readonly notify = inject(Notifier);
   readonly issue = input.required<Issue>();

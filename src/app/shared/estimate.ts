@@ -2,7 +2,7 @@ import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject,
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import type { EstimateScale } from '../core/contracts/domain';
 import { estimateFraction, estimateTooltip, formatEstimate, formatEstimateLong } from '../core/estimates';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 
 /**
  * The estimate glyph on its own: a small ramp (triangle) filled from the left, proportionally to where the
@@ -50,7 +50,7 @@ export class EstimateGlyph {
   `,
 })
 export class Estimate {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly value = input<number | null | undefined>();
   /** Defaults to the workspace's estimate scale. */
   readonly scale = input<EstimateScale>();

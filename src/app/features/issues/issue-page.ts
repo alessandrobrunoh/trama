@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { NablaStore, UiStore, usePageShortcuts } from '../../core';
+import { TramaStore, UiStore, usePageShortcuts } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
@@ -113,7 +113,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   `,
 })
 export class IssuePage {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** From the parent `:workspaceSlug` route segment. */

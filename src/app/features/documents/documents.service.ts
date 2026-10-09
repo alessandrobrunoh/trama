@@ -4,7 +4,7 @@ import {
   ApiClient,
   ApiError,
   LiveSync,
-  NablaStore,
+  TramaStore,
   Notifier,
   type CreateDocumentInput,
   type Document,
@@ -30,7 +30,7 @@ export function conflictOf(e: unknown): Document | null {
 @Injectable({ providedIn: 'root' })
 export class Documents {
   private readonly api = inject(ApiClient);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
 

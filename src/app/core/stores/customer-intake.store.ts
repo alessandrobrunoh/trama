@@ -8,12 +8,12 @@ import type { LinkIntakeItemInput } from '../api/api.types';
 import type { ID, IntakeItem, IntakeItemStatus } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { LiveSync } from '../sync/live-sync.service';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 @Injectable({ providedIn: 'root' })
 export class CustomerIntakeStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   private readonly live = inject(LiveSync);
 
@@ -25,8 +25,8 @@ export class CustomerIntakeStore {
 
   constructor() {
     effect(() => {
-      const slug = this.nabla.slug();
-      const ready = this.nabla.ready();
+      const slug = this.trama.slug();
+      const ready = this.trama.ready();
       untracked(() => {
         this.items.set([]);
         this.pending.set(null);
@@ -43,25 +43,25 @@ export class CustomerIntakeStore {
   }
 
   async refreshCount(): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       const { pending } = await this.api.customerIntake.count(slug, { quiet: true });
-      if (this.nabla.slug() === slug) this.pending.set(pending);
+      if (this.trama.slug() === slug) this.pending.set(pending);
     } catch {
       /* the inbox is a convenience on the customers page; it reports its own errors when opened */
     }
   }
 
   async load(status: IntakeItemStatus = this.status()): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     this.status.set(status);
     this.loading.set(true);
     try {
       const list = await this.api.customerIntake.list(slug, status);
-      if (this.nabla.slug() === slug && this.status() === status) this.items.set(list);
-      if (status === 'pending' && this.nabla.slug() === slug) this.pending.set(list.length);
+      if (this.trama.slug() === slug && this.status() === status) this.items.set(list);
+      if (status === 'pending' && this.trama.slug() === slug) this.pending.set(list.length);
     } catch (e) {
       this.fail('Could not load the inbox', e);
     } finally {
@@ -71,13 +71,13 @@ export class CustomerIntakeStore {
 
   /** Links the item to an issue or project. Resolves true when the server accepted it. */
   async link(id: ID, input: LinkIntakeItemInput): Promise<boolean> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return false;
     try {
       const item = await this.api.customerIntake.link(slug, id, input);
       this.settle(item);
       // the new request (and maybe a new customer) belongs in the workspace data too
-      await this.nabla.refetch();
+      await this.trama.refetch();
       return true;
     } catch (e) {
       this.fail('Could not link the request', e);
@@ -94,7 +94,7 @@ export class CustomerIntakeStore {
   }
 
   private async move(id: ID, call: (slug: string) => Promise<IntakeItem>, failure: string): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       this.settle(await call(slug));

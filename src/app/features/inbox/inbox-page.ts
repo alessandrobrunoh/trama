@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { NotificationsStore } from '../../core/stores/notifications.store';
 import { PageHeader } from '../../shared/page-header';
 import { AttentionPage } from '../attention/attention-page';
@@ -68,7 +68,7 @@ export class InboxPage {
   /** From `?tab=`. */
   readonly tab = input<string>();
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly notifications = inject(NotificationsStore);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);

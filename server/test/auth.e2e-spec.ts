@@ -24,7 +24,7 @@ describe('auth', () => {
     expect(res.body.user).toMatchObject({ name: 'Ada', email });
     expect(res.body.user.passwordHash).toBeUndefined();
     const cookie = (res.headers['set-cookie'] as unknown as string[])[0];
-    expect(cookie).toMatch(/^nabla_session=/);
+    expect(cookie).toMatch(/^trama_session=/);
     expect(cookie).toMatch(/HttpOnly/i);
     expect(cookie).toMatch(/SameSite=Lax/i);
     await request(app.getHttpServer())
@@ -43,7 +43,8 @@ describe('auth', () => {
     expect(me.body.user.email).toBe(email);
     const logout = await client.post('/api/auth/logout').expect(204);
     const cleared = (logout.headers['set-cookie'] as unknown as string[]).join('\n');
-    expect(cleared).toMatch(/nabla_session=/);
+    expect(cleared).toMatch(/trama_session=/);
+    expect(cleared).toMatch(/nabla_session=/); // the pre-rename cookie is cleared too
     expect(cleared).toMatch(/HttpOnly/i);
     expect(cleared).toMatch(/SameSite=Lax/i);
     expect(cleared).toMatch(/Max-Age=0|Expires=/i);
@@ -74,7 +75,7 @@ describe('auth', () => {
 
     const created = (await client.post(`/api/w/${slug}/tokens`, { name: 'my laptop', scope: 'admin' }).expect(201)).body;
     expect(created.token.scope).toBe('admin');
-    expect(created.secret).toMatch(/^nbl_/);
+    expect(created.secret).toMatch(/^trm_/);
     expect(created.token.prefix).toBe(`${created.secret.slice(0, 8)}…`);
     expect(created.token.tokenHash).toBeUndefined();
     const listed = (await client.get(`/api/w/${slug}/tokens`).expect(200)).body;

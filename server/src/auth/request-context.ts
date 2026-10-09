@@ -16,7 +16,7 @@ export interface AuthInfo {
   actor: ActorRef;
   /** Present for browser sessions and user-actor API tokens; absent for agent tokens. */
   user?: UserEntity;
-  /** Present when authenticated with `Authorization: Bearer nbl_…`. */
+  /** Present when authenticated with `Authorization: Bearer trm_…` (or a legacy `nbl_…` token). */
   token?: ApiTokenEntity;
   method: 'session' | 'token';
   /** sha256 id of the cookie session (method = session). */
@@ -53,13 +53,13 @@ export function hasRole(role: Role, min: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
 
-export const IS_PUBLIC_KEY = 'nabla:public';
-export const ROLES_KEY = 'nabla:roles';
-export const REQUIRE_USER_KEY = 'nabla:require-user';
-export const CAPABILITY_KEY = 'nabla:capability';
-export const TEAM_SCOPE_KEY = 'nabla:team-scope';
-export const ALLOW_CUSTOM_TOKEN_KEY = 'nabla:allow-custom-token';
-export const SESSION_ONLY_KEY = 'nabla:session-only';
+export const IS_PUBLIC_KEY = 'trama:public';
+export const ROLES_KEY = 'trama:roles';
+export const REQUIRE_USER_KEY = 'trama:require-user';
+export const CAPABILITY_KEY = 'trama:capability';
+export const TEAM_SCOPE_KEY = 'trama:team-scope';
+export const ALLOW_CUSTOM_TOKEN_KEY = 'trama:allow-custom-token';
+export const SESSION_ONLY_KEY = 'trama:session-only';
 
 /** Skip authentication (login, signup, health, webhooks…). */
 export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);

@@ -44,7 +44,7 @@ import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { FavoritesStore } from '../core/stores/favorites.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
 import { ThemeService, type ThemeMode } from '../core/theme';
@@ -636,7 +636,7 @@ export class AppSidebar {
   protected readonly ui = inject(UiStore);
   protected readonly favorites = inject(FavoritesStore);
   protected readonly notifications = inject(NotificationsStore);
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
   private readonly router = inject(Router);

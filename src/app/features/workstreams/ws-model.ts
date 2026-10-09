@@ -16,7 +16,7 @@ import {
   type Artifact,
   type Issue,
   type IssueStatus,
-  type NablaStore,
+  type TramaStore,
   type DeliveryState,
   type Workstream,
   type WorkstreamStatus,
@@ -61,7 +61,7 @@ function uniqueActors(list: ActorRef[]): ActorRef[] {
   return out;
 }
 
-export function buildSummary(store: NablaStore, ws: Workstream): WsSummary {
+export function buildSummary(store: TramaStore, ws: Workstream): WsSummary {
   const arts = store.artifactsByWorkstream().get(ws.id) ?? [];
   const people: ActorRef[] = ws.accountableUserId
     ? [{ type: 'user', id: ws.accountableUserId }]
@@ -131,7 +131,7 @@ export function issueBreakdown(
  * artifact authors, commenters, input requesters / answerers and assignees of linked issues.
  * Teams and the system actor are left out.
  */
-export function contributors(store: NablaStore, ws: Workstream): ActorRef[] {
+export function contributors(store: TramaStore, ws: Workstream): ActorRef[] {
   const out: ActorRef[] = [];
   if (ws.accountableUserId) out.push({ type: 'user', id: ws.accountableUserId });
   for (const a of store.artifactsByWorkstream().get(ws.id) ?? [])
@@ -224,28 +224,28 @@ export const priorityOptions = (): PickOption[] =>
 export const providerOptions = (): PickOption[] =>
   PROVIDERS.map((p) => ({ value: p, label: PROVIDER_META[p].label, kind: 'provider' }));
 
-export const teamOptions = (store: NablaStore): PickOption[] =>
+export const teamOptions = (store: TramaStore): PickOption[] =>
   store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team', hint: t.key }));
 
-export const userOptions = (store: NablaStore): PickOption[] =>
+export const userOptions = (store: TramaStore): PickOption[] =>
   store
     .users()
     .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` }));
 
-export const repoOptions = (store: NablaStore): PickOption[] =>
+export const repoOptions = (store: TramaStore): PickOption[] =>
   store
     .repositories()
     .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
 
 /** Open projects (plus `currentId` even when closed), for the Project picker. */
-export const projectOptions = (store: NablaStore, currentId?: string | null): PickOption[] =>
+export const projectOptions = (store: TramaStore, currentId?: string | null): PickOption[] =>
   store
     .projects()
     .filter((p) => (p.status !== 'completed' && p.status !== 'canceled') || p.id === currentId)
     .map((p) => ({ value: p.id, label: p.name, kind: 'project' }));
 
 /** Projects as filter options ("No project" first), closed ones included so old issues stay findable. */
-export function projectFilterOptions(store: NablaStore): PickOption[] {
+export function projectFilterOptions(store: TramaStore): PickOption[] {
   return [
     { value: '', label: 'No project' },
     ...store
@@ -257,14 +257,14 @@ export function projectFilterOptions(store: NablaStore): PickOption[] {
 }
 
 /** Repositories a workstream of `projectId` may use: the project's own; everything when it has no project. */
-export const repoOptionsIn = (store: NablaStore, projectId?: string | null): PickOption[] => {
+export const repoOptionsIn = (store: TramaStore, projectId?: string | null): PickOption[] => {
   const project = store.getProject(projectId);
   const all = repoOptions(store);
   return project ? all.filter((o) => project.repositoryIds.includes(o.value)) : all;
 };
 
 /** Users + agents + teams as performer options (`type:id` values). */
-export const performerOptions = (store: NablaStore): PickOption[] => [
+export const performerOptions = (store: TramaStore): PickOption[] => [
   ...store
     .users()
     .map((u) => ({ value: `user:${u.id}`, label: u.name, kind: 'actor' as const, hint: 'person' })),
@@ -297,7 +297,7 @@ const prLabel = (a: Artifact): string => (a.externalId ? `${a.externalId}` : a.t
  * evaluated client-side from executions / artifacts / input requests / decisions / dependencies).
  */
 export function explainStatus(
-  store: NablaStore,
+  store: TramaStore,
   ws: Workstream,
 ): { headline: string; reasons: string[] } {
   const arts = store.artifactsByWorkstream().get(ws.id) ?? [];

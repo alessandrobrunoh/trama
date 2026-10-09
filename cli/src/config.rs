@@ -218,7 +218,7 @@ pub fn check_transport(url: &str) -> Result<()> {
     }
 }
 
-/// `nbl_3f9a…` – enough to recognise a key, never the secret.
+/// `trm_3f9a…` – enough to recognise a key, never the secret.
 pub fn redact(token: &str) -> String {
     let head: String = token.chars().take(8).collect();
     format!("{head}…")
@@ -255,11 +255,12 @@ pub fn split_list(input: &str) -> Vec<String> {
 }
 
 pub fn check_token_format(token: &str) -> Result<()> {
-    if token.starts_with("nbl_") && token.len() <= 256 && !token.contains(char::is_whitespace) {
+    // `nbl_` is the prefix of tokens minted before the rename; they keep working.
+    if (token.starts_with("trm_") || token.starts_with("nbl_")) && token.len() <= 256 && !token.contains(char::is_whitespace) {
         Ok(())
     } else {
         Err(CliError::auth(
-            "the API key must start with nbl_ (create one in Trama → Settings → API tokens)",
+            "the API key must start with trm_ (or nbl_ for older keys; create one in Trama → Settings → API tokens)",
         ))
     }
 }
@@ -550,9 +551,12 @@ mod tests {
 
     #[test]
     fn validates_and_redacts_tokens() {
+        assert!(check_token_format("trm_abc123").is_ok());
+        // tokens minted before the rename keep working
         assert!(check_token_format("nbl_abc123").is_ok());
         assert!(check_token_format("ghp_abc").is_err());
         assert!(check_token_format("nbl_a b").is_err());
+        assert!(check_token_format("trm_a b").is_err());
         assert_eq!(redact("nbl_3f9a1c2d4e5f"), "nbl_3f9a…");
     }
 

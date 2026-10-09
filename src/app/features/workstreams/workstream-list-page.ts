@@ -28,7 +28,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   Notifier,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
@@ -78,8 +78,8 @@ type Layout = 'list' | 'board';
 type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
 type SortField = 'updatedAt' | 'priority' | 'targetDate' | 'createdAt' | 'title' | 'status';
 
-const DISPLAY_KEY = 'nabla.workstreams.display.v2';
-const LEGACY_LAYOUT_KEY = 'nabla.workstreams.layout';
+const DISPLAY_KEY = 'trama.workstreams.display.v2';
+const LEGACY_LAYOUT_KEY = 'trama.workstreams.layout';
 const GROUPS: GroupField[] = ['status', 'ownerTeamId', 'priority', 'accountableUserId', 'projectId', 'none'];
 const SORTS: SortField[] = ['updatedAt', 'priority', 'targetDate', 'createdAt', 'title', 'status'];
 const GROUP_OPTIONS: PickOption[] = [
@@ -408,7 +408,7 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
   `,
 })
 export class WorkstreamListPage {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly notify = inject(Notifier);

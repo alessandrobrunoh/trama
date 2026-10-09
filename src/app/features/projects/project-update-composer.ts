@@ -1,7 +1,7 @@
 // Composer of the Updates tab: pick a health, write markdown (with preview), post.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { NablaStore, type Project, type ProjectHealth } from '../../core';
+import { TramaStore, type Project, type ProjectHealth } from '../../core';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
@@ -92,7 +92,7 @@ import { ProjectHealthPicker } from './project-health';
   `,
 })
 export class ProjectUpdateComposer {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly refs = inject(EntityRefs);
 
   readonly project = input.required<Project>();

@@ -14,7 +14,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { ROLE_DETAILS, ROLE_META, ROLES } from '../../../core/meta';
 import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import type { InviteLink, Membership, Role, WorkspaceInvite } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
@@ -220,7 +220,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   `,
 })
 export class MembersSection {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly invites = inject(InvitesStore);
   private readonly live = inject(LiveSync);

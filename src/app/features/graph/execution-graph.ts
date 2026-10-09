@@ -26,7 +26,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
-  NablaStore,
+  TramaStore,
   statusVar,
   usePageShortcuts,
   type ArtifactState,
@@ -288,7 +288,7 @@ let uidCounter = 0;
   `,
 })
 export class ExecutionGraph {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly graph = input.required<ExecutionGraphData>();

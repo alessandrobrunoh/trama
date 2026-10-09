@@ -2,7 +2,7 @@ import pg from 'pg';
 
 export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
-  'postgres://delta:delta@localhost:5434/nabla_core_test';
+  'postgres://delta:delta@localhost:5434/trama_core_test';
 
 /** (Re)creates the e2e database in the dev container so every run starts from an empty schema. */
 export default async function setup(): Promise<void> {

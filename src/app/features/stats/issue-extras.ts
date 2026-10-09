@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { Router } from '@angular/router';
-import { ISSUE_KIND_META, NablaStore, PRIORITIES, PRIORITY_META, type EstimateScale, type IssueKind } from '../../core';
+import { ISSUE_KIND_META, TramaStore, PRIORITIES, PRIORITY_META, type EstimateScale, type IssueKind } from '../../core';
 import { BarList, type BarRow } from './charts/bar-list';
 import { ChartCard } from './charts/chart-card';
 import { ColumnChart } from './charts/column-chart';
@@ -66,7 +66,7 @@ export class IssueExtras {
   readonly now = input.required<number>();
   readonly scale = input<EstimateScale>('fibonacci');
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   protected readonly by = signal<'kind' | 'team'>('kind');
   protected readonly groups = [

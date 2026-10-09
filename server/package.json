@@ -1,7 +1,7 @@
 {
-  "name": "nabla-server",
+  "name": "trama-server",
   "version": "0.0.1",
-  "description": "NestJS + PostgreSQL API for Nabla (coordination for human + AI engineering teams)",
+  "description": "NestJS + PostgreSQL API for Trama (coordination for human + AI engineering teams)",
   "author": "",
   "private": true,
   "license": "PolyForm-Shield-1.0.0",

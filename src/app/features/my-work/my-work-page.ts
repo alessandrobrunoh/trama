@@ -18,7 +18,7 @@ import {
   ATTENTION_KINDS,
   ISSUE_STATUS_META,
   ListStateStore,
-  NablaStore,
+  TramaStore,
   UiStore,
   usePageShortcuts,
   type AttentionKind,
@@ -369,7 +369,7 @@ export class MyWorkPage {
   /** `?tab=` query param. */
   readonly tabParam = input<string | undefined>(undefined, { alias: 'tab' });
 
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
   protected readonly ui = inject(UiStore);
   private readonly router = inject(Router);

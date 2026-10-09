@@ -21,7 +21,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import {
-  NablaStore,
+  TramaStore,
   type AttentionSeverity,
   type Project,
   type ProjectAiIssueSuggestion,
@@ -80,7 +80,7 @@ function injectAiAvailability() {
   `,
 })
 export class ProjectAiDraftButton {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ai = injectAiAvailability();
 
   readonly project = input.required<Project>();
@@ -192,7 +192,7 @@ export class ProjectAiDraftButton {
   `,
 })
 export class ProjectAiSummaryButton {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ai = injectAiAvailability();
 
   readonly project = input.required<Project>();
@@ -378,7 +378,7 @@ export class ProjectAiCard {
   `,
 })
 export class ProjectIssueSuggestions {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ai = injectAiAvailability();
 
   readonly project = input.required<Project>();
@@ -550,7 +550,7 @@ const SEVERITY_STYLE: Record<AttentionSeverity, { label: string; classes: string
   `,
 })
 export class ProjectRisksCard {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ai = injectAiAvailability();
 
   readonly project = input.required<Project>();

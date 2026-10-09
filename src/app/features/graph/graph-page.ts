@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { LucideUsers, LucideWorkflow } from '@lucide/angular';
-import { NablaStore, usePageShortcuts } from '../../core';
+import { TramaStore, usePageShortcuts } from '../../core';
 import { PageHeader } from '../../shared/page-header';
 import { OptionMenu, type PickOption } from '../views/option-controls';
 import { ExecutionGraph } from './execution-graph';
@@ -42,7 +42,7 @@ export class GraphPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   protected readonly usersIcon = LucideUsers;
   protected readonly flowIcon = LucideWorkflow;
 

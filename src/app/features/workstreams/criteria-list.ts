@@ -5,7 +5,7 @@ import { LucideCircle, LucideCircleCheck, LucideCircleDot, LucideDynamicIcon, Lu
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { CRITERION_STATE_META, NablaStore, type AcceptanceCriterion, type CriterionState, type Workstream } from '../../core';
+import { CRITERION_STATE_META, TramaStore, type AcceptanceCriterion, type CriterionState, type Workstream } from '../../core';
 import { CriterionEvidence } from './criterion-evidence';
 import { InlineText } from './inline-edit';
 
@@ -90,7 +90,7 @@ const NEXT: Record<CriterionState, CriterionState> = { pending: 'in_progress', i
   `,
 })
 export class CriteriaList {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   readonly ws = input.required<Workstream>();
   protected readonly draft = signal('');
   protected readonly meta = CRITERION_STATE_META;

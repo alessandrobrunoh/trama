@@ -13,7 +13,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { CUSTOMER_STATUSES, CustomerIntakeStore, CustomerSubscriptionsStore, ListStateStore, NablaStore, UiStore, usePageShortcuts, type CustomerStatus } from '../../core';
+import { CUSTOMER_STATUSES, CustomerIntakeStore, CustomerSubscriptionsStore, ListStateStore, TramaStore, UiStore, usePageShortcuts, type CustomerStatus } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -32,7 +32,7 @@ import {
 } from './customer-model';
 import { SearchInput } from '../../shared/search-input';
 
-const DISPLAY_KEY = 'nabla.customers.display.v1';
+const DISPLAY_KEY = 'trama.customers.display.v1';
 const SORTS: readonly CustomerSort[] = ['name', 'tier', 'revenue', 'size', 'requests', 'important', 'open', 'last'];
 const GROUPS: readonly CustomerGroup[] = ['none', 'tier', 'status'];
 
@@ -237,7 +237,7 @@ const COLUMNS: { sort: CustomerSort; label: string; width: string; hideBelow?: '
 export class CustomerListPage {
   readonly workspaceSlug = input<string>();
 
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly listState = inject(ListStateStore);
   private readonly subs = inject(CustomerSubscriptionsStore);

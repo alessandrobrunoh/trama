@@ -4,7 +4,7 @@ import { LucideChevronRight, LucideDynamicIcon, LucidePencil, LucidePlus, Lucide
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { PROVIDER_META, PROVIDERS } from '../../../core/meta';
-import { NablaStore } from '../../../core/stores/nabla.store';
+import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import type { Agent, ExecutionProvider } from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
@@ -138,7 +138,7 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
   `,
 })
 export class AgentsSection {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** `?agent=<id>` opens that agent's page. */

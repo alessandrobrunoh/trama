@@ -6,7 +6,7 @@ import { addDays, differenceInCalendarDays, format, parseISO, startOfDay } from 
 import {
   ATTENTION_KIND_META,
   ATTENTION_KINDS,
-  NablaStore,
+  TramaStore,
   PRIORITY_META,
   WORKSTREAM_STATUS_META,
   isOverdue,
@@ -134,7 +134,7 @@ const plural = (n: number, one: string, many = `${one}s`): string => `${n} ${n =
 
 @Injectable()
 export class OverviewModel {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ms = inject(MilestoneInfo);
 
   readonly slug = computed(() => this.store.slug() ?? '');

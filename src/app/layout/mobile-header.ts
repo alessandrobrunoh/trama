@@ -14,7 +14,7 @@ import { NavigationEnd, NavigationStart, Router } from '@angular/router';
 import { LucideChevronLeft, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { filter, map, startWith } from 'rxjs';
 import { FavoritesStore } from '../core/stores/favorites.store';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport, haptic } from '../core/viewport';
@@ -103,7 +103,7 @@ export class MobileHeader {
   protected readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly location = inject(Location);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
   private readonly el = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly destroyRef = inject(DestroyRef);

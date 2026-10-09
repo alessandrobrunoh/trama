@@ -11,7 +11,7 @@ import { ApiError } from '../../core/api/api-error';
 import { AiApi, type AiSuggestion, type ChatContext } from '../../core/ai/ai-api';
 import {
   Notifier,
-  NablaStore,
+  TramaStore,
   type CreateIssueInput,
   type ID,
   type Issue,
@@ -27,7 +27,7 @@ import { breakdownPrompt, digestPrompt, summarizePrompt, triagePrompt, updatePro
 /** Requests the server allows per user and minute. */
 export const RATE_LIMIT = 10;
 const WINDOW_MS = 60_000;
-const NOTED_KEY = 'nabla.ai.noted';
+const NOTED_KEY = 'trama.ai.noted';
 
 function readNoted(): boolean {
   try {
@@ -138,7 +138,7 @@ export class AiJob<T> {
 @Injectable({ providedIn: 'root' })
 export class AiActions {
   private readonly api = inject(AiApi);
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly info = inject(MilestoneInfo);
   private readonly notify = inject(Notifier);
 

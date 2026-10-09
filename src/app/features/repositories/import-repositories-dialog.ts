@@ -5,7 +5,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import type { Repository } from '../../core/contracts/domain';
 import { Notifier } from '../../core/notify/notifier';
-import { NablaStore } from '../../core/stores/nabla.store';
+import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore } from '../../core/stores/ui.store';
 import { ProviderIcon } from '../../shared/provider-icon';
 import { Picker } from '../workstreams/picker';
@@ -98,7 +98,7 @@ import { RemoteRepoBrowser } from './remote-repo-browser';
   `,
 })
 export class ImportRepositoriesDialog {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);

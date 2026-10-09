@@ -2,7 +2,7 @@
 // Compact and read-only: milestones belong to the project, which is where they are planned and edited.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { NablaStore, shortDate, type Workstream } from '../../core';
+import { TramaStore, shortDate, type Workstream } from '../../core';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AiButton } from '../ai-actions/ai-button';
 import { EventLine } from '../overview/event-line';
@@ -105,7 +105,7 @@ import { ProgressChart } from './progress-chart';
   `,
 })
 export class WsSideCards {
-  protected readonly store = inject(NablaStore);
+  protected readonly store = inject(TramaStore);
   protected readonly info = inject(MilestoneInfo);
   protected readonly ai = inject(AiActions);
   private readonly router = inject(Router);

@@ -7,7 +7,7 @@ import {
   signal,
 } from '@angular/core';
 import { LucideArrowDown, LucideDynamicIcon, LucideLoaderCircle } from '@lucide/angular';
-import { NablaStore } from '../core/stores/nabla.store';
+import { TramaStore } from '../core/stores/trama.store';
 import { haptic } from '../core/viewport';
 
 const TRIGGER = 72;
@@ -15,7 +15,7 @@ const MAX_PULL = 110;
 
 /**
  * Pull-to-refresh for the shell's scrolling area (phones). Pulling down while the content is at its top
- * re-reads the workspace (`NablaStore.refetch`, the same call live-sync uses). Touch only; the page is not
+ * re-reads the workspace (`TramaStore.refetch`, the same call live-sync uses). Touch only; the page is not
  * moved, only a small indicator follows the finger.
  */
 @Component({
@@ -46,7 +46,7 @@ const MAX_PULL = 110;
   `,
 })
 export class PullToRefresh {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly arrow = LucideArrowDown;

@@ -1,5 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
+import { envWithLegacy } from '../common/env.js';
 
 const DEV_KEY_MATERIAL = 'nabla-dev-only-integration-key';
 
@@ -18,7 +19,7 @@ export class SecretsService {
   private readonly key: Buffer;
 
   constructor() {
-    this.key = SecretsService.resolveKey(process.env.TRAMA_ENCRYPTION_KEY ?? process.env.NABLA_ENCRYPTION_KEY ?? process.env.SECRETS_KEY, (m) =>
+    this.key = SecretsService.resolveKey(envWithLegacy('TRAMA_ENCRYPTION_KEY', 'NABLA_ENCRYPTION_KEY') ?? process.env.SECRETS_KEY, (m) =>
       this.logger.warn(m),
     );
   }

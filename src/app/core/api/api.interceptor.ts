@@ -4,7 +4,7 @@ import { API_BASE_URL } from '../config';
 import { CLIENT_ID } from '../sync/client-id';
 
 /**
- * For requests to the Nabla API: send the session cookie (`withCredentials`) and tag every
+ * For requests to the Trama API: send the session cookie (`withCredentials`) and tag every
  * write with `X-Client-Id` so the server echoes it back on the SSE stream and this tab can
  * ignore its own changes.
  */

@@ -40,7 +40,7 @@ export class SeedService implements OnApplicationBootstrap {
     if (process.env.NODE_ENV === 'production' || process.env.SEED_DEMO === 'false') return;
     if ((await this.ds.getRepository(UserEntity).count()) > 0) return;
     await this.reset();
-    this.logger.log('Empty database: seeded demo workspace "Acme" (demo@nabla.dev / nabla-demo)');
+    this.logger.log('Empty database: seeded demo workspace "Acme" (demo@trama.dev / trama-demo)');
   }
 
   /** Wipes every table and re-inserts the demo workspace (dates relative to now). */

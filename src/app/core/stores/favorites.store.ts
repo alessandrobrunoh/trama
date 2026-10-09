@@ -10,7 +10,7 @@ import type { Favorite, FavoriteType, ID } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { LiveSync } from '../sync/live-sync.service';
 import { LatestIntent, mergePending, reconcileSaved, withPinned } from './latest-intent';
-import { NablaStore } from './nabla.store';
+import { TramaStore } from './trama.store';
 
 /** A favorite resolved against the loaded workspace, ready to render. */
 export interface FavoriteEntry {
@@ -36,7 +36,7 @@ const keyOf = (type: FavoriteType, id: ID): string => `${type}:${id}`;
 @Injectable({ providedIn: 'root' })
 export class FavoritesStore {
   private readonly api = inject(ApiClient);
-  private readonly nabla = inject(NablaStore);
+  private readonly trama = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   private readonly live = inject(LiveSync);
   private readonly router = inject(Router);
@@ -56,7 +56,7 @@ export class FavoritesStore {
     const [, section, ref, ...more] = path.split('/').filter(Boolean);
     if (!section || !ref || more.length) return null;
     const key = decodeURIComponent(ref);
-    const n = this.nabla;
+    const n = this.trama;
     const found = (type: FavoriteType, id: ID | undefined) => (id ? { type, id } : null);
     switch (section) {
       case 'issues': return found('issue', n.getIssue(key)?.id);
@@ -86,8 +86,8 @@ export class FavoritesStore {
 
   constructor() {
     effect(() => {
-      const slug = this.nabla.slug();
-      const ready = this.nabla.ready();
+      const slug = this.trama.slug();
+      const ready = this.trama.ready();
       untracked(() => {
         if (slug && ready) void this.load();
         else this.items.set([]);
@@ -102,11 +102,11 @@ export class FavoritesStore {
   }
 
   async load(): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     try {
       const list = await this.api.favorites.list(slug);
-      if (this.nabla.slug() !== slug) return;
+      if (this.trama.slug() !== slug) return;
       // Subjects mid-toggle keep what the person just chose; the list may predate it.
       this.items.update((local) => mergePending(list, local, (f) => this.intent.busy(this.syncKey(slug, f.type, f.subjectId))));
     } catch {
@@ -120,7 +120,7 @@ export class FavoritesStore {
    * that follows brings the server to it. A failure rolls back that subject alone.
    */
   async toggle(type: FavoriteType, subjectId: ID): Promise<void> {
-    const slug = this.nabla.slug();
+    const slug = this.trama.slug();
     if (!slug) return;
     const key = this.syncKey(slug, type, subjectId);
     const subject = { type, subjectId };
@@ -134,7 +134,7 @@ export class FavoritesStore {
         if (want) {
           const saved = await this.api.favorites.add(slug, type, subjectId);
           this.confirmed.set(key, saved);
-          if (this.nabla.slug() === slug) this.items.update((list) => reconcileSaved(list, subject, saved));
+          if (this.trama.slug() === slug) this.items.update((list) => reconcileSaved(list, subject, saved));
         } else {
           await this.api.favorites.remove(slug, type, subjectId);
           this.confirmed.set(key, null);
@@ -142,7 +142,7 @@ export class FavoritesStore {
       });
     } catch (e) {
       const back = this.confirmed.get(key) ?? null;
-      if (this.nabla.slug() === slug) {
+      if (this.trama.slug() === slug) {
         this.items.update((list) => {
           const without = withPinned(list, subject, false, () => this.pending(type, subjectId));
           return back ? [...without, back] : without;
@@ -166,7 +166,7 @@ export class FavoritesStore {
   private pending(type: FavoriteType, subjectId: ID): Favorite {
     return {
       id: `fav_pending_${Date.now()}`,
-      workspaceId: this.nabla.workspace()?.id ?? '',
+      workspaceId: this.trama.workspace()?.id ?? '',
       type,
       subjectId,
       createdAt: new Date().toISOString(),
@@ -177,35 +177,35 @@ export class FavoritesStore {
     const base = { favorite, type: favorite.type, subjectId: favorite.subjectId };
     switch (favorite.type) {
       case 'issue': {
-        const i = this.nabla.getIssue(favorite.subjectId);
+        const i = this.trama.getIssue(favorite.subjectId);
         return i ? { ...base, label: i.title, key: i.key, link: ['issues', i.key], status: i.status } : null;
       }
       case 'workstream': {
-        const w = this.nabla.getWorkstream(favorite.subjectId);
+        const w = this.trama.getWorkstream(favorite.subjectId);
         return w ? { ...base, label: w.title, key: w.key, link: ['workstreams', w.key], status: w.status } : null;
       }
       case 'decision': {
-        const d = this.nabla.getDecision(favorite.subjectId);
+        const d = this.trama.getDecision(favorite.subjectId);
         return d ? { ...base, label: d.title, key: d.key, link: ['decisions', d.key] } : null;
       }
       case 'team': {
-        const t = this.nabla.getTeam(favorite.subjectId);
+        const t = this.trama.getTeam(favorite.subjectId);
         return t ? { ...base, label: t.name, key: t.key, link: ['teams', t.key], color: t.color } : null;
       }
       case 'project': {
-        const p = this.nabla.getProject(favorite.subjectId);
+        const p = this.trama.getProject(favorite.subjectId);
         return p ? { ...base, label: p.name, link: ['projects', p.id], color: p.color } : null;
       }
       case 'repository': {
-        const r = this.nabla.getRepository(favorite.subjectId);
+        const r = this.trama.getRepository(favorite.subjectId);
         return r ? { ...base, label: r.fullName, link: ['repositories', r.id] } : null;
       }
       case 'view': {
-        const v = this.nabla.getView(favorite.subjectId);
+        const v = this.trama.getView(favorite.subjectId);
         return v ? { ...base, label: v.name, link: ['views', v.id] } : null;
       }
       case 'customer': {
-        const c = this.nabla.getCustomer(favorite.subjectId);
+        const c = this.trama.getCustomer(favorite.subjectId);
         return c ? { ...base, label: c.name, link: ['customers', c.id], ...(c.logoUrl ? { logoUrl: c.logoUrl } : {}) } : null;
       }
     }

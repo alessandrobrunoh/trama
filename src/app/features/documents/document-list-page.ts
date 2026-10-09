@@ -21,7 +21,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   ApiError,
-  NablaStore,
+  TramaStore,
   Notifier,
   usePageShortcuts,
   type DocumentSummary,
@@ -229,7 +229,7 @@ const SORT_LABEL: Record<Sort, string> = {
   `,
 })
 export class DocumentListPage {
-  private readonly store = inject(NablaStore);
+  private readonly store = inject(TramaStore);
   private readonly documents = inject(Documents);
   private readonly notifier = inject(Notifier);
   private readonly searchBox = viewChild<ElementRef<HTMLInputElement>>('searchBox');
