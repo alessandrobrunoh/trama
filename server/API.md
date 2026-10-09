@@ -89,7 +89,7 @@ Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP
 
 ## Workspace snapshot
 
-`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. Needs a user principal (not an agent token).
+`GET /w/:slug/snapshot` → `WorkspaceSnapshot` (workspace, me, myRole, users, memberships, agents, teams, repositories, projects, workstreams, milestones, inputRequests, issues, customers, customerRequests, artifacts, decisions, dependencies, comments, last 500 `events`, `attention`, views, integrations). `views` = shared ones plus your private ones. `integrations` is empty unless the caller has the `manageIntegrations` capability (same gate as `/integrations`). Needs a user principal (not an agent token).
 
 ## Domain routes (all under `/w/:slug`)
 
