@@ -1407,6 +1407,45 @@ html {
 
 /* ───────────────────── Detail pages on phones ───────────────────── */
 @media (max-width: 47.999rem) {
+  /* Compact desktop controls (h-6/h-7/h-8 pills, size-6/size-7 icon buttons, menu triggers): 40px+ on touch. */
+  :is(a, button, [role='tab'], [role='button'], summary)[class~='h-6'],
+  :is(a, button, [role='tab'], [role='button'], summary)[class~='h-7'],
+  :is(a, button, [role='tab'], [role='button'], summary)[class~='h-8'],
+  [data-slot='dropdown-menu-trigger'],
+  [data-slot='popover-trigger'] {
+    min-block-size: 2.5rem;
+  }
+  :is(a, button, [role='button'])[class~='size-5'],
+  :is(a, button, [role='button'])[class~='size-6'],
+  :is(a, button, [role='button'])[class~='size-7'],
+  [data-slot='dropdown-menu-trigger'][aria-label] {
+    min-block-size: 2.5rem;
+    min-inline-size: 2.5rem;
+  }
+  /* Scrollable tab strips start at the left edge (a centred overflowing flex row clips its first tab). */
+  [data-slot='tabs-list'] {
+    justify-content: flex-start;
+    scrollbar-width: none;
+  }
+  [data-slot='tabs-trigger'] {
+    min-block-size: 2.75rem;
+    flex-shrink: 0;
+  }
+  /* Switches and checkboxes keep their look; the finger gets a bigger hit area around them. */
+  :is([role='switch'], [role='checkbox']) {
+    position: relative;
+  }
+  :is([role='switch'], [role='checkbox'])::after {
+    content: '';
+    position: absolute;
+    inset: -0.75rem;
+  }
+  .mobile-header__end [data-slot='dropdown-menu-trigger'],
+  .mobile-header__end [data-slot='popover-trigger'] {
+    min-inline-size: 2.75rem;
+    min-block-size: 2.75rem;
+  }
+
   /* Properties: one comfortable row per property, the value is a full-height tap target. */
   app-property-row {
     min-block-size: 3rem;
