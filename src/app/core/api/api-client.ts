@@ -243,6 +243,9 @@ export class ApiClient {
     update: (slug: string, membershipId: ID, input: UpdateMemberInput) =>
       this.patch<Membership>(`${this.w(slug)}/members/${membershipId}`, input),
     remove: (slug: string, membershipId: ID) => this.del(`${this.w(slug)}/members/${membershipId}`),
+    /** Primary owner only: the target becomes owner and primary owner. */
+    transferOwnership: (slug: string, membershipId: ID) =>
+      this.post<Workspace>(`${this.w(slug)}/transfer-ownership`, { membershipId }),
   };
 
   /** Invitations by email (admins). `create` and `resend` return the secret link once. */

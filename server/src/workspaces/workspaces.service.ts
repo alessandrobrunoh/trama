@@ -20,6 +20,13 @@ import {
 } from '../database/entities/index.js';
 import { notFound, slugify, uid } from '../common/util.js';
 import { EventsService } from '../events/events.service.js';
+import {
+  assertCanChangeRole,
+  assertCanRemoveMember,
+  assertCanTransferOwnership,
+  type MemberActor,
+  type MemberRuleContext,
+} from './member-rules.js';
 
 /** Slugs that would collide with client routes. */
 export const RESERVED_SLUGS = new Set([
@@ -78,7 +85,7 @@ export class WorkspacesService {
     }
     const ws = await this.ds.transaction(async (m) => {
       const workspace = await m.save(
-        m.create(WorkspaceEntity, { id: uid('ws'), name: input.name.trim(), slug }),
+        m.create(WorkspaceEntity, { id: uid('ws'), name: input.name.trim(), slug, primaryOwnerId: user.id }),
       );
       await m.save(
         m.create(MembershipEntity, { id: uid('mb'), workspaceId: workspace.id, userId: user.id, role: 'owner' }),
@@ -194,25 +201,20 @@ export class WorkspacesService {
     return Object.assign(m, { user });
   }
 
-  async changeRole(workspaceId: string, callerRole: Role, id: string, role: Role) {
-    const m = await this.getMembership(workspaceId, id);
-    this.assertCanGrant(callerRole, role);
-    if (m.role === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can change an owner');
-    if (m.role === 'owner' && role !== 'owner') await this.assertNotLastOwner(workspaceId, m);
+  async changeRole(ws: WorkspaceEntity, caller: MemberActor, id: string, role: Role) {
+    const m = await this.getMembership(ws.id, id);
+    this.assertCanGrant(caller.role, role);
+    if (m.role !== role) assertCanChangeRole(await this.ruleContext(ws), caller, m, role);
     m.role = role;
     await this.memberships.save(m);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'membership', id: m.id });
+    this.events.publish(ws.id, { type: 'updated', entity: 'membership', id: m.id });
     return Object.assign(m, { user: await this.users.findOneBy({ id: m.userId }) });
   }
 
-  async removeMember(workspaceId: string, callerRole: Role, callerUserId: string | undefined, id: string) {
+  async removeMember(ws: WorkspaceEntity, caller: MemberActor, id: string) {
+    const workspaceId = ws.id;
     const m = await this.getMembership(workspaceId, id);
-    const self = m.userId === callerUserId;
-    if (!self && !hasRole(callerRole, 'admin')) throw new ForbiddenException('Requires role admin or higher');
-    if (m.role === 'owner') {
-      if (callerRole !== 'owner') throw new ForbiddenException('Only an owner can remove an owner');
-      await this.assertNotLastOwner(workspaceId, m);
-    }
+    assertCanRemoveMember(await this.ruleContext(ws), caller, m);
     await this.ds.transaction(async (tx) => {
       await tx.delete(MembershipEntity, { id });
       const teams = await tx.findBy(TeamEntity, { workspaceId });
@@ -227,14 +229,31 @@ export class WorkspacesService {
     this.events.publish(workspaceId, { type: 'deleted', entity: 'membership', id });
   }
 
+  /** The primary owner hands the workspace over: the target becomes owner and primary owner; the caller stays an owner. */
+  async transferOwnership(ws: WorkspaceEntity, caller: MemberActor, membershipId: string) {
+    const target = await this.getMembership(ws.id, membershipId);
+    assertCanTransferOwnership(ws, caller, target.userId);
+    if (target.role !== 'owner') {
+      target.role = 'owner';
+      await this.memberships.save(target);
+      this.events.publish(ws.id, { type: 'updated', entity: 'membership', id: target.id });
+    }
+    ws.primaryOwnerId = target.userId;
+    await this.workspaces.save(ws);
+    this.events.publish(ws.id, { type: 'updated', entity: 'workspace', id: ws.id });
+    return Object.assign(ws, { role: caller.role });
+  }
+
+  private async ruleContext(ws: WorkspaceEntity): Promise<MemberRuleContext> {
+    return {
+      primaryOwnerId: ws.primaryOwnerId,
+      ownerCount: await this.memberships.countBy({ workspaceId: ws.id, role: 'owner' }),
+    };
+  }
+
   private assertCanGrant(callerRole: Role, target: Role) {
     if (target === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can grant owner');
     if (!hasRole(callerRole, target)) throw new ForbiddenException(`You cannot grant a role above your own (${callerRole})`);
-  }
-
-  private async assertNotLastOwner(workspaceId: string, m: MembershipEntity) {
-    const owners = await this.memberships.countBy({ workspaceId, role: 'owner' });
-    if (owners <= 1 && m.role === 'owner') throw new ConflictException('A workspace needs at least one owner');
   }
 
   // ───────── agents

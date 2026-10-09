@@ -63,8 +63,9 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `DELETE /w/:slug` | owner | `204`, cascades everything |
 | `GET /w/:slug/members` | viewer | `Array<Membership & { user: User }>` |
 | `POST /w/:slug/members` | admin | `{ email, role }`. The user must already exist (`404`), not already be a member (`409`). Only owners can grant `owner`. |
-| `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Last owner cannot be demoted (`409`). |
-| `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Last owner → `409`. |
+| `PATCH /w/:slug/members/:id` | admin | `{ role }` (`:id` = membership id). Only owners can grant `owner`. Demoting an owner is treated like removing them, see *Owners* below (`403`/`409`). |
+| `DELETE /w/:slug/members/:id` | admin (anyone may remove themselves) | Also removes the user from teams. Removing an owner follows the *Owners* rules below (`403`/`409`). |
+| `POST /w/:slug/transfer-ownership` | owner (session only) | `{ membershipId }`: the primary owner hands the workspace to another member, who becomes `owner` and the new `primaryOwnerId`; the caller stays an owner and may then leave. Not available to API tokens. `403` unless you are the primary owner, `409` if the target already is. |
 | `GET /w/:slug/invites` | `inviteMembers` | Pending invitations (`WorkspaceInvite[]`), expired ones included so they can be resent. |
 | `POST /w/:slug/invites` | `inviteMembers` | `{ email, role }` → `{ invite, url, emailed }`. The person does not need an account yet. Same address again refreshes the invite (new link and expiry, the old link stops working). Already a member → `409`; a role above your own → `403`. `url` is the only time the secret link is returned (only its hash is stored). |
 | `POST /w/:slug/invites/:id/resend` | `inviteMembers` | New link and expiry, emailed again. Same response as create. |
@@ -79,6 +80,13 @@ A caller who is not a member of `:slug` (or whose token belongs to another works
 | `PUT /me/push/subscription`, `DELETE /me/push/subscription` | user | `PUT` a browser `PushSubscription` (`{ endpoint (https), keys: { p256dh, auth } }`), idempotent per endpoint; `400` when push is off. `DELETE { endpoint }` → `204`, unknown endpoints are fine. |
 | `GET /invites/:token` | public | `InvitePreview` (`workspaceName`, `role`, `email`, `invitedByName`, `expiresAt`). `404` when unknown, used, revoked or expired. |
 | `POST /invites/:token/accept` | signed-in user | Joins the workspace; the account email must equal the invited one (`403` otherwise). → `{ workspace: { slug, name }, role }`. Single use; an existing member keeps their role. |
+
+**Owners.** `Workspace.primaryOwnerId` is the workspace owner: its creator until ownership is transferred. Rules, enforced on `PATCH`/`DELETE /members/:id` and `POST /transfer-ownership`:
+
+- Nobody else can remove or demote the primary owner (`403`). To leave or step down they must transfer ownership first (`409`).
+- Only the primary owner can remove or demote other owners (`403` for other owners and for admins). Any owner can leave or step down on their own, unless they are the primary owner.
+- A workspace always keeps at least one owner (`409`).
+- Workspaces created before this rule get their longest-standing owner as primary owner; one without a primary owner falls back to "any owner may act on owners".
 
 Invitation links are `APP_URL/invite/<token>` and last 7 days. Emails need `SMTP_URL`; without it `emailed` is `false` and the UI shows the link to share by hand. Not exposed to API tokens with custom permissions.
 | `GET/POST /w/:slug/agents`, `GET/PATCH/DELETE /w/:slug/agents/:id` | read: viewer, write: admin | `{ name, provider, description?, ownerUserId? }`. Deleting an agent revokes its tokens. |

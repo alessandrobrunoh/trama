@@ -17,6 +17,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
 
   // ───────── people
   const ale = b.user('Alessandro Bruno', DEMO_EMAIL, 212, passwordHash, 'owner', 60);
+  b.data.workspace.primaryOwnerId = ale;
   const maya = b.user('Maya Chen', 'maya@acme.dev', 158, passwordHash, 'admin', 60);
   const jonas = b.user('Jonas Weber', 'jonas@acme.dev', 28, passwordHash, 'member', 58);
   const priya = b.user('Priya Nair', 'priya@acme.dev', 320, passwordHash, 'member', 58);
