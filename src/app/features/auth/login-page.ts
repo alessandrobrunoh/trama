@@ -5,7 +5,6 @@ import {
   computed,
   inject,
   input,
-  isDevMode,
   signal,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
@@ -165,7 +164,7 @@ export class LoginPage implements OnInit {
 
   protected readonly alertIcon = LucideCircleAlert;
   protected readonly demoIcon = LucideSparkles;
-  protected readonly demo = isDevMode() && environment.demoLoginEnabled;
+  protected readonly demo = environment.demoLoginEnabled;
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly busy = signal(false);

@@ -4,6 +4,6 @@ export const environment = {
   apiBaseUrl: '/api',
   /** Where the MCP server is reachable (the reverse proxy forwards it to the trama-mcp container). */
   mcpPath: '/mcp',
-  /** Dev-only toggle for the shared seed account (not created by the API in production). */
+  /** Shows the shared demo credentials on the sign-in page. Set to false to hide them. */
   demoLoginEnabled: true,
 };
