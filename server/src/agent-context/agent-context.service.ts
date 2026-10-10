@@ -1,12 +1,14 @@
 import { Injectable } from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState, CompletionGap, WorkstreamCompletion, WorkstreamStatus, StatusSource } from '../contracts/domain.js';
+import { DataSource, In } from 'typeorm';
+import { resolveWorkstreamPlans } from '../contracts/domain.js';
+import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState, CompletionGap, WorkstreamCompletion, WorkstreamPlan, WorkstreamStatus, StatusSource } from '../contracts/domain.js';
 import { statusSourceOf } from '../status/completion-proof.js';
 import {
   AgentEntity,
   ArtifactEntity,
   DecisionEntity,
   DependencyEntity,
+  DocumentEntity,
   DomainEventEntity,
   InputRequestEntity,
   IssueEntity,
@@ -37,6 +39,20 @@ function criterionProof(a: AgentCriterion): string {
     : '';
   if (!proof.length) return ` _(${[by, 'met without proof'].filter(Boolean).join('; ')})_`;
   return ` _(${[by, `proof: ${proof.join('; ')}`].filter(Boolean).join('; ')})_`;
+}
+/** One line of the Plan section: the plan, its revision and where its approval stands. */
+export function planLine(p: WorkstreamPlan): string {
+  const where = p.documentId ? `Trama document ${p.documentId}` : (p.url ?? 'no link');
+  const rev = p.revision ? ` · rev ${p.revision}` : '';
+  const state = p.changedSinceApproval
+    ? `plan changed since approval (approved ${p.approved?.revision} in ${p.approved?.decisionKey}) — propose a new decision`
+    : p.approved
+      ? `approved${p.approved.revision ? ` at ${p.approved.revision}` : ''} (${p.approved.decisionKey})`
+      : p.proposedDecisionKey
+        ? `not approved yet: ${p.proposedDecisionKey} is proposed and waits for a person`
+        : 'not approved: propose a decision "Plan for <KEY> approved at <revision>" for a person to accept';
+  const pending = p.changedSinceApproval && p.proposedDecisionKey ? `; ${p.proposedDecisionKey} proposed and waiting for a person` : '';
+  return `- ${p.title} — ${where}${rev} · ${state}${pending}`;
 }
 const str = (v: unknown): string => (typeof v === 'string' ? v : v == null ? '' : JSON.stringify(v));
 
@@ -69,6 +85,8 @@ export interface AgentContext {
   context?: string;
   deltaThreadUrl: string;
   acceptanceCriteria: AgentCriterion[];
+  /** Plan documents attached to the workstream and whether an accepted decision approves their current revision. */
+  plans: WorkstreamPlan[];
   accountable?: string;
   teams: { owner: { key: string; name: string }; participating: { key: string; name: string }[] };
   repositories: { fullName: string; url: string; defaultBranch: string; provider: string }[];
@@ -178,6 +196,15 @@ export class AgentContextService {
       return { at: e.at.toISOString(), by: nameOf(e.actor), text };
     });
 
+    const docIds = artifacts.flatMap((a) => (a.documentId ? [a.documentId] : []));
+    const docs = docIds.length ? await repo(DocumentEntity).find({ where: { workspaceId, id: In(docIds) }, select: { id: true, version: true } }) : [];
+    const plans = resolveWorkstreamPlans({
+      workstreamId: ws.id,
+      artifacts,
+      decisions,
+      documentVersions: new Map(docs.map((d) => [d.id, d.version])),
+    });
+
     const owner = teamById.get(ws.ownerTeamId);
     return {
       key: ws.key,
@@ -207,6 +234,7 @@ export class AgentContextService {
             }
           : {}),
       })),
+      plans,
       ...(ws.accountableUserId && names.get(ws.accountableUserId) ? { accountable: names.get(ws.accountableUserId) } : {}),
       teams: {
         owner: { key: owner?.key ?? '', name: owner?.name ?? '' },
@@ -269,6 +297,7 @@ export class AgentContextService {
       'Acceptance Criteria',
       c.acceptanceCriteria.map((a) => `- [${a.state === 'met' ? 'x' : ' '}] ${a.text}${a.state === 'in_progress' ? ' _(in progress)_' : ''}${a.state === 'met' ? criterionProof(a) : ''}`),
     );
+    section('Plan', c.plans.map(planLine));
     if (c.context?.trim()) section('Context', [c.context.trim()]);
     section('Repositories', c.repositories.map((r) => `- ${r.fullName} — ${r.url} (default branch: ${r.defaultBranch})`));
     section('Teams', [

@@ -46,6 +46,10 @@ report_progress { workstream, addCriteria: ["Refresh tokens rotate on every use"
 
 Set `met` only with evidence: an artifact of this workstream (test report, deployment, PR) and/or a short note saying what you verified. The server records that **you** declared it (shown as "declared by agent"); a person can still verify it. `met` without evidence is allowed but shows as "no evidence" (the reply carries a warning), so do not do it. Do not set `met` just because a PR is open or merged, and say in a comment what you did not verify. Changing a criterion's text resets it to `pending`. Do not delete criteria you could not meet; leave them and say why in a comment.
 
+### The plan
+
+If the workstream has a plan (the **Plan** section of `get_context`), link it when you report: name it and its revision in the comment ("Step 2 of 'Plan: rotate refresh tokens' (v3) done"), and cite the PR's plan in its description. If you changed the plan, say so, and propose a new approval decision (`record_decision`, see `trama-start-work`); do not carry on silently past "plan changed since approval". A plan that is a file in the repository: attach it once with `attach_artifact { workstream, kind: "document", title: "Plan: …", url, externalId: "<commit sha>" }` and call it again with the new `externalId` when the file changes.
+
 ### Pull requests and builds
 
 Create the artifact **once** when the PR opens, then call again as it changes. `report_progress` (and `attach_artifact`) finds the existing artifact by `externalId` or `url` and updates it in place, so you never duplicate it:

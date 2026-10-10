@@ -14,7 +14,7 @@ whoami
 get_context { id: "AUTH-42" }
 ```
 
-`get_context` returns the briefing: the outcome status and what is still missing (`completion.gaps`), the objective, acceptance criteria (with who declared each `met` and its proof), decisions, dependencies, artifacts, open questions and recent progress. Read all of it. Use it alone when the user only asks what is left or what the state is.
+`get_context` returns the briefing: the outcome status and what is still missing (`completion.gaps`), the objective, acceptance criteria (with who declared each `met` and its proof), the plan and its approval, decisions, dependencies, artifacts, open questions and recent progress. Read all of it. Use it alone when the user only asks what is left or what the state is.
 
 If `whoami` returned more than one workspace, call `list_accounts` and pass `workspace` (the slug) on every call below; a key like `AUTH-42` is only unique inside one workspace. If the user gave an **issue** key, `get_context` returns the issue with the workstreams it belongs to; `start_work` below loads the briefing of the workstream for you.
 
@@ -42,7 +42,25 @@ When it proceeds it returns `cautions` and the workstream's `completion`. Read t
 
 Accepted decisions are binding unless the user says otherwise; follow them, and cite the key (`ADR-21`) in your commit or PR text. `superseded` and `rejected` decisions are history, not instructions.
 
-## 4. What the start records
+## 4. Plan before non-trivial work
+
+The plan is a convention, not a gate. It is a `document` artifact on the workstream whose title starts with "Plan": a Trama document (preferred) or a link to a file in the repository (put the commit sha in `externalId`). Its approval is an ordinary decision, titled `Plan for AUTH-42 approved at v3` (the Trama document `version`) or `... approved at 3f2a9c1` (the sha), proposed by you and accepted by a person. The briefing's **Plan** section (`plans` in the JSON) lists each plan, its revision, the approving decision and whether the plan changed since.
+
+- **Approved plan:** follow it and cite the decision key in your PR. Do not re-ask.
+- **"plan changed since approval":** the plan moved on after a person approved it. Propose a new decision for the current revision and wait.
+- **Scope changes** (you need something the plan does not cover): update the plan, then propose a new decision for the new revision. Never edit an accepted decision.
+- **No plan, or not approved, and the work is non-trivial** (several areas, a design or data-model choice, a migration, or the user asks for a plan): do not code yet. Draft the plan, propose the approval and stop with a question:
+
+```
+run_tool { name: "create_document", arguments: { title: "Plan: rotate refresh tokens", body: "## Approach\n…\n## Steps\n…", workstreamId: "AUTH-42" } }
+record_decision { title: "Plan for AUTH-42 approved at v1", statement: "Implement 'Plan: rotate refresh tokens' as written at v1.", workstream: "AUTH-42", tags: ["plan"] }
+ask_human { workstream: "AUTH-42", question: "Plan for AUTH-42 is ready at v1 (ADR-23). Approve it, or what should change?", options: ["Approve", "Change the plan"] }
+```
+
+`create_document` attaches the document to the workstream in the same call; read its `version` from the reply or `run_tool { name: "get_document", arguments: { id } }`. After you edit the document the version grows, so name the new one in the new decision. With several plans on one workstream, put the plan's title in the decision statement. A proposed decision already makes the workstream `needs_input`; the question tells the person where to look.
+- **Trivial work** (one small change, a typo, a bug with an obvious fix): no plan needed. Do not add ceremony.
+
+## 5. What the start records
 
 `start_work` sets the criteria you target (default: the first one not met) to `in_progress`. That is the signal Trama uses to show the workstream as `working`. Do not touch `statusOverride`.
 
@@ -50,7 +68,7 @@ When the work is an issue, it also sets that issue to `in_progress` if it is not
 
 The `plan` you pass becomes one comment on the workstream (the issue when it has no workstream): what you will do and which criteria you target. Skip it when you have nothing to add.
 
-## 5. Work where the code lives
+## 6. Work where the code lives
 
 Trama does not hold your code or conversation. The workstream links the shared workspace via `deltaThreadUrl` (empty when the workspace does not use Delta threads) and the repositories via `repositoryIds`. Use those; do not paste transcripts into Trama.
 
@@ -65,4 +83,5 @@ Then continue with `trama-report-progress` as you make progress.
 - Changing `deltaThreadUrl`, owner team or accountable user. Those are the team's decisions.
 - Creating one workstream per subagent, or per trivial issue. Group issues that serve the same outcome.
 - Adding an unrelated issue to the current workstream because it came up in the same thread. A workstream is an outcome, not a Delta thread.
+- Coding on a non-trivial change while the plan is missing, unapproved, or changed since approval.
 - Starting anyway after `ready: false`. The call refused for a reason; say so to the user.
