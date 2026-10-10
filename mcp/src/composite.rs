@@ -294,7 +294,7 @@ fn has_evidence(evidence: Option<&Value>) -> bool {
 fn workstream_summary(ws: &Value) -> Value {
     let criteria = criteria_of(ws);
     let met = criteria.iter().filter(|c| c["state"] == "met").count();
-    let mut v = pick(ws, &["key", "id", "title", "status", "derivedStatus", "delivery", "completion", "priority", "projectId", "ownerTeamId"]);
+    let mut v = pick(ws, &["key", "id", "title", "status", "derivedStatus", "statusSource", "delivery", "completion", "priority", "projectId", "ownerTeamId"]);
     v["criteria"] = json!({ "met": met, "total": criteria.len() });
     v
 }

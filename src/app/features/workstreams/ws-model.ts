@@ -419,7 +419,9 @@ export function explainStatus(
     reasons.push(
       'Computed from this workstream’s criteria, artifacts, input requests and dependencies.',
     );
-  const headline = ws.statusOverride
+  const headline = ws.statusSource === 'legacy'
+    ? 'Shipped before acceptance criteria were required. Nothing proves the outcome; it stays shipped.'
+    : ws.statusOverride
     ? `Manually set to ${WORKSTREAM_STATUS_META[ws.statusOverride].label}. Derived status would be ${WORKSTREAM_STATUS_META[s].label}.`
     : `${WORKSTREAM_STATUS_META[s].label}, derived from the work.`;
   return { headline, reasons: reasons.slice(0, 4) };

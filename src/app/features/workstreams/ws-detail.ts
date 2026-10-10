@@ -63,6 +63,7 @@ import {
   statusOptions,
   userOptions,
 } from './ws-model';
+import { statusSourceInfo } from './status-source';
 import { WsOverviewTab } from './ws-overview-tab';
 import { CriteriaCount, IssueProgress, TargetDate, WsDatePicker } from './ws-parts';
 
@@ -217,7 +218,7 @@ const TAB_LABEL: Record<Tab, string> = {
               <span class="font-medium">{{ statusLabel() }}</span>
               <span class="text-muted-foreground inline-flex items-center gap-1">
                 <svg [lucideIcon]="info" [size]="12"></svg
-                >{{ w.statusOverride ? 'manual' : 'derived' }}
+                >{{ sourceLabel() }}
               </span>
             </button>
             <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-80 gap-2">
@@ -463,6 +464,10 @@ export class WorkstreamDetailPage {
   protected readonly statusLabel = computed(
     () => WORKSTREAM_STATUS_META[this.ws()?.status ?? 'draft'].label,
   );
+  protected readonly sourceLabel = computed(() => {
+    const w = this.ws();
+    return w ? statusSourceInfo(w).label : 'derived';
+  });
   protected readonly priorityLabel = computed(
     () => PRIORITY_META[this.ws()?.priority ?? 'none'].label,
   );

@@ -218,7 +218,13 @@ export const ATTENTION_KIND_META: Record<
     defaultSeverity: 'low',
     order: 9,
   },
-  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 10 },
+  proof_missing: {
+    label: 'Proof missing',
+    groupTitle: 'Proof missing',
+    defaultSeverity: 'low',
+    order: 10,
+  },
+  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 11 },
 };
 export const ATTENTION_KINDS = sortedKeys(ATTENTION_KIND_META);
 export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, low: 2 };

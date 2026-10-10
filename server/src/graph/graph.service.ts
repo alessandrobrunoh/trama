@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { notFound } from '../common/util.js';
+import { statusSourceOf } from '../status/completion-proof.js';
 import {
   ArtifactEntity,
   DependencyEntity,
@@ -73,6 +74,7 @@ export class GraphService {
           title: w.title,
           priority: w.priority,
           derivedStatus: w.derivedStatus,
+          statusSource: statusSourceOf(w),
           delivery: w.delivery,
           ownerTeamId: w.ownerTeamId,
           participatingTeamIds: w.participatingTeamIds,

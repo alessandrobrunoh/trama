@@ -43,7 +43,11 @@ const SINCE_SQL = `
   SELECT 'ready_to_ship:' || "workstreamId", max(at) FROM domain_events
     WHERE "workspaceId" = $1 AND "workstreamId" IS NOT NULL AND (
       (type = 'criterion.updated' AND data->>'state' = 'met')
-      OR (type = 'artifact.updated' AND data->'changes'->'state'->>1 = 'merged')) GROUP BY 1`;
+      OR (type = 'artifact.updated' AND data->'changes'->'state'->>1 = 'merged')) GROUP BY 1
+  UNION ALL
+  SELECT 'proof_missing:' || "workstreamId", min(at) FROM domain_events
+    WHERE "workspaceId" = $1 AND "workstreamId" IS NOT NULL AND type = 'artifact.updated'
+      AND data->'changes'->'state'->>1 IN ('merged', 'healthy', 'published') GROUP BY 1`;
 
 @Injectable()
 export class AttentionService {

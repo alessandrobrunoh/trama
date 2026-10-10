@@ -1,7 +1,7 @@
 // Properties sidebar of a workstream: every row is an inline popover editor.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { DELIVERY_STATE_META, TramaStore, WORKSTREAM_STATUS_META, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
+import { DELIVERY_STATE_META, TramaStore, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
@@ -9,6 +9,7 @@ import { isoFromDate } from '../milestones/milestone-actions';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
+import { statusSourceInfo } from './status-source';
 import { contributors, isDeliveredState, issueCounts, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
 import { LabelPicker } from '../../shared/label-picker';
@@ -33,7 +34,7 @@ import { LabelPicker } from '../../shared/label-picker';
           [value]="[w.status]"
           (valueChange)="setStatus($event[0])"
         />
-        <span class="text-muted-foreground shrink-0 text-[11px]" [hlmTooltip]="w.statusOverride ? 'Set manually. Derived: ' + derivedLabel() : 'Derived from the work'">{{ w.statusOverride ? 'manual' : 'auto' }}</span>
+        <span class="text-muted-foreground shrink-0 text-[11px]" [hlmTooltip]="source().hint">{{ w.statusSource === 'derived' ? 'auto' : source().label }}</span>
       </app-property-row>
       @if (w.delivery !== 'none') {
         <app-property-row label="Delivery">
@@ -152,7 +153,7 @@ export class WsProperties {
 
   protected readonly statuses = statusOptions();
   protected readonly showAll = signal(false);
-  protected readonly derivedLabel = computed(() => WORKSTREAM_STATUS_META[this.ws().derivedStatus].label);
+  protected readonly source = computed(() => statusSourceInfo(this.ws()));
   protected readonly deliveryLabel = computed(() => DELIVERY_STATE_META[this.ws().delivery].label);
   protected readonly delivered = computed(() => isDeliveredState(this.ws().delivery));
   protected readonly deliveryHint = computed(() =>

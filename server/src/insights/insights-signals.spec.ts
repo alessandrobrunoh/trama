@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { INSIGHT_SIGNAL_IDS } from '../contracts/domain.js';
-import { NOW, ago, decision, demand, emptyData, issue, milestone, pr, question, ws } from './insights-fixtures-spec.js';
+import { NOW, ago, decision, demand, emptyData, issue, milestone, pr, question, shipped, ws } from './insights-fixtures-spec.js';
 import { buildSignals, computeBottlenecks, computeSignalItems, severityOf, type WorkstreamFacts } from './insights-signals.js';
 
 const facts = (entries: [string, WorkstreamFacts][]) => new Map(entries);
@@ -195,6 +195,60 @@ describe('delivered_outcome_open', () => {
     const [i] = computeSignalItems(emptyData({ workstreams: [w] })).delivered_outcome_open;
     expect(i.ageDays).toBe(3);
     expect(i.detail).toContain('outcome not confirmed');
+  });
+});
+
+describe('shipped_without_proof', () => {
+  const run = (...rows: ReturnType<typeof shipped>[]) => computeSignalItems(emptyData({ shippedHistory: rows })).shipped_without_proof;
+
+  it('lists a historic shipped with no criteria, even though it keeps shipping', () => {
+    const w = shipped({ legacyShipped: true, acceptanceCriteria: [], shippedAt: ago(100) });
+    const [i] = run(w);
+    expect(i).toMatchObject({ type: 'workstream', id: w.id, key: w.key, workstreamKey: w.key, ageDays: 100 });
+    expect(i.detail).toContain('historic, no acceptance criteria');
+    expect(i.waitingOn).toMatchObject({ type: 'user', id: 'u_ada' });
+  });
+
+  it('lists zero criteria that are not grandfathered, and met criteria without evidence', () => {
+    const none = shipped({ acceptanceCriteria: [] });
+    const unproven = shipped({ acceptanceCriteria: [{ state: 'met' }, { state: 'met', evidence: { artifactIds: ['a'] } }, { state: 'met' }] });
+    const items = run(none, unproven);
+    expect(items).toHaveLength(2);
+    expect(items.find((i) => i.id === none.id)!.detail).toContain('no acceptance criteria');
+    const u = items.find((i) => i.id === unproven.id)!;
+    expect(u.detail).toContain('2 met criteria without evidence');
+    expect(u.value).toBe(2);
+  });
+
+  it('treats a note as evidence, a blank note as none, and ignores pending criteria', () => {
+    expect(run(shipped({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: [], note: 'checked by hand' } }] }))).toEqual([]);
+    expect(run(shipped({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: [], note: ' ' } }] }))).toHaveLength(1);
+    expect(run(shipped({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: ['a'] } }, { state: 'pending' }] }))).toEqual([]);
+  });
+
+  it('skips a shipped workstream whose proof is complete, and anything that is not shipped', () => {
+    expect(run(shipped(), shipped({ status: 'working', derivedStatus: 'working', acceptanceCriteria: [] }))).toEqual([]);
+  });
+
+  it('lists a status pinned to Shipped while the facts say otherwise, but not a harmless pin', () => {
+    const lie = shipped({ statusOverride: 'shipped', derivedStatus: 'working' });
+    const harmless = shipped({ statusOverride: 'shipped', derivedStatus: 'shipped' });
+    const items = run(lie, harmless);
+    expect(items.map((i) => i.id)).toEqual([lie.id]);
+    expect(items[0].detail).toContain('pinned to Shipped');
+  });
+
+  it('falls back to updatedAt without shippedAt and lists the oldest first', () => {
+    const old = shipped({ acceptanceCriteria: [], shippedAt: ago(90) });
+    const noDate = shipped({ acceptanceCriteria: [], shippedAt: null, updatedAt: ago(10) });
+    const recent = shipped({ acceptanceCriteria: [], shippedAt: ago(2) });
+    expect(run(recent, noDate, old).map((i) => i.ageDays)).toEqual([90, 10, 2]);
+  });
+
+  it('is info at most: history never escalates', () => {
+    const items = computeSignalItems(emptyData({ shippedHistory: [shipped({ acceptanceCriteria: [], shippedAt: ago(900) })] }));
+    const sig = buildSignals(items, 7, 25).find((s) => s.id === 'shipped_without_proof')!;
+    expect(sig).toMatchObject({ count: 1, severity: 'info' });
   });
 });
 

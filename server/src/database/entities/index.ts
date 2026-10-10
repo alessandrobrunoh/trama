@@ -48,6 +48,7 @@ import type {
   WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
+import { statusSourceOf } from '../../status/completion-proof.js';
 import { Wire } from './wire.js';
 
 export { Wire };
@@ -375,6 +376,11 @@ export class WorkstreamEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) shippedAt: Date | null;
+
+  /** `statusSource` is computed from the stored fields, never persisted, so it cannot go stale. */
+  override toJSON(): Record<string, unknown> {
+    return { ...super.toJSON(), statusSource: statusSourceOf(this) };
+  }
 }
 
 @Entity('milestones')
