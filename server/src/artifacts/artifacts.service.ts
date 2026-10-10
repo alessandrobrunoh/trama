@@ -11,6 +11,7 @@ import type {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
+import { applyProjectScope, currentAccess, projectHidden } from '../auth/member-access.js';
 import { ArtifactEntity, DocumentEntity, IssueEntity, ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
@@ -100,12 +101,13 @@ export class ArtifactsService {
     if (f.repositoryId) qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
+    applyProjectScope(qb, 'a', 'projectId');
     return qb.getMany();
   }
 
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
-    if (!row) throw notFound('Artifact', id);
+    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Artifact', id);
     return row;
   }
 

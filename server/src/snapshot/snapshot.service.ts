@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { canDo, type WorkspaceContext } from '../auth/request-context.js';
+import { scopeSnapshot } from '../auth/member-access.js';
 import type { Role, SnapshotCommentsMode } from '../contracts/domain.js';
 import { CommentsService } from '../comments/comments.service.js';
 import { AttentionService } from '../attention/attention.service.js';
@@ -73,7 +74,7 @@ export class SnapshotService {
           : Promise.resolve([]),
         this.attention.forUser(ctx),
       ]);
-    return {
+    const built = {
       workspace: ctx.workspace,
       me,
       myRole,
@@ -99,5 +100,6 @@ export class SnapshotService {
       views,
       integrations,
     };
+    return scopeSnapshot(built, ctx.access ?? null);
   }
 }

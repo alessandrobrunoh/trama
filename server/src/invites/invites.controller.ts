@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
-import { IsEmail, IsIn } from 'class-validator';
+import { IsEmail, IsIn, IsOptional } from 'class-validator';
 import type { Role } from '../contracts/domain.js';
 import {
   Auth,
@@ -18,6 +18,8 @@ const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
 class CreateInviteDto {
   @IsEmail() email: string;
   @IsIn(ROLES) role: Role;
+  /** Omitted or null: the role in full. An object narrows projects and actions. */
+  @IsOptional() access?: unknown;
 }
 
 /** Managing a workspace's invitations (same permission as adding members). */

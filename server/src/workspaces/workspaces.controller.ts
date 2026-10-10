@@ -71,6 +71,8 @@ class UpdateSettingsDto {
   @Clearable() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'iconColor must be #rrggbb' }) iconColor?: string | null;
   @Clearable() @IsString() @MaxLength(2) iconInitial?: string | null;
   @OptionalNotNull() @IsBoolean() deltaThreads?: boolean;
+  /** Replaces the work permissions of the roles included. Owner is ignored. */
+  @IsOptional() @IsObject() roleGrants?: Record<string, string[]>;
 }
 
 /** Deleting a workspace is irreversible: repeat its slug or name. */
@@ -89,7 +91,9 @@ class AddMemberDto {
 }
 
 class ChangeRoleDto {
-  @IsIn(ROLES) role: Role;
+  @IsOptional() @IsIn(ROLES) role?: Role;
+  /** `null` clears a custom access and restores the role. Omitted leaves it unchanged. */
+  @IsOptional() access?: unknown;
 }
 
 class CreateAgentDto {
@@ -205,7 +209,7 @@ export class MembersController {
   @Patch(':id')
   @Roles('admin')
   change(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: ChangeRoleDto) {
-    return this.service.changeRole(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id, dto.role);
+    return this.service.updateMember(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id, dto);
   }
 
   /**

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { memberAccessStore } from '../auth/member-access.js';
 
 export interface WorkstreamTouched {
   workspaceId: string;
@@ -32,13 +33,16 @@ export class WorkstreamBus {
 
   async touch(workspaceId: string, workstreamId: string, reason: string): Promise<void> {
     const event: WorkstreamTouched = { workspaceId, workstreamId, reason };
-    for (const handler of this.handlers) {
-      try {
-        await handler(event);
-      } catch (error) {
-        this.logger.error(`WorkstreamTouched handler failed: ${(error as Error).message}`);
+    // Handlers recompute derived state. They must not inherit the caller's project limits.
+    await memberAccessStore.run(null, async () => {
+      for (const handler of this.handlers) {
+        try {
+          await handler(event);
+        } catch (error) {
+          this.logger.error(`WorkstreamTouched handler failed: ${(error as Error).message}`);
+        }
       }
-    }
+    });
   }
 
   async touchMany(workspaceId: string, workstreamIds: Iterable<string>, reason: string): Promise<void> {

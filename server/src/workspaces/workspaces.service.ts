@@ -8,8 +8,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service.js';
 import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
-import { CAPABILITIES, CAPABILITY_ROLES } from '../contracts/domain.js';
-import type { Capability, PermissionMap, Role, WorkspaceSettings } from '../contracts/domain.js';
+import { accessWithin, CAPABILITIES, CAPABILITY_ROLES, effectiveMemberAccess, normalizeGrantList, normalizeMemberAccess, resolveRoleGrants } from '../contracts/domain.js';
+import type { Capability, MemberAccess, MemberGrant, PermissionMap, Role, WorkspaceSettings } from '../contracts/domain.js';
 import {
   AgentEntity,
   ApiTokenEntity,
@@ -118,6 +118,7 @@ export class WorkspacesService {
       iconColor?: string | null;
       iconInitial?: string | null;
       deltaThreads?: boolean;
+      roleGrants?: Partial<Record<Role, readonly unknown[]>>;
     },
   ) {
     const ws = ctx.workspace;
@@ -132,6 +133,15 @@ export class WorkspacesService {
         perms[cap as Capability] = role as Role;
       }
       next.permissions = perms as PermissionMap;
+    }
+    if (patch.roleGrants !== undefined) {
+      if (!hasRole(ctx.role, 'owner')) throw new ForbiddenException('Only an owner can change roles and permissions');
+      const current = resolveRoleGrants(next.roleGrants);
+      for (const role of ['admin', 'member', 'viewer'] as const) {
+        const listed = patch.roleGrants[role];
+        if (Array.isArray(listed)) current[role] = normalizeGrantList(listed);
+      }
+      next.roleGrants = current;
     }
     if (patch.defaultTeamId !== undefined) {
       if (patch.defaultTeamId === null) delete next.defaultTeamId;
@@ -206,10 +216,31 @@ export class WorkspacesService {
   }
 
   async changeRole(ws: WorkspaceEntity, caller: MemberActor, id: string, role: Role) {
+    return this.updateMember(ws, caller, id, { role });
+  }
+
+  /** Change the role, the custom access, or both. Access can only narrow, and only within what the caller has. */
+  async updateMember(
+    ws: WorkspaceEntity,
+    caller: MemberActor,
+    id: string,
+    patch: { role?: Role; access?: unknown },
+  ) {
+    if (patch.role === undefined && patch.access === undefined) throw new BadRequestException('Nothing to change');
     const m = await this.getMembership(ws.id, id);
-    this.assertCanGrant(caller.role, role);
-    if (m.role !== role) assertCanChangeRole(await this.ruleContext(ws), caller, m, role);
-    m.role = role;
+    const nextRole = patch.role ?? m.role;
+    if (patch.role !== undefined) {
+      this.assertCanGrant(caller.role, patch.role);
+      if (m.role !== patch.role) assertCanChangeRole(await this.ruleContext(ws), caller, m, patch.role);
+      m.role = patch.role;
+    }
+    const baseline = ws.resolved().roleGrants[nextRole];
+    if (nextRole === 'owner') m.access = null;
+    else if (patch.access !== undefined) {
+      const access = this.parseAccess(patch.access, baseline);
+      await this.assertCanGrantAccess(ws, caller, access, baseline);
+      m.access = access;
+    } else if (patch.role !== undefined) m.access = normalizeMemberAccess(m.access, baseline);
     await this.memberships.save(m);
     this.events.publish(ws.id, { type: 'updated', entity: 'membership', id: m.id });
     return Object.assign(m, { user: await this.users.findOneBy({ id: m.userId }) });
@@ -253,6 +284,28 @@ export class WorkspacesService {
       primaryOwnerId: ws.primaryOwnerId,
       ownerCount: await this.memberships.countBy({ workspaceId: ws.id, role: 'owner' }),
     };
+  }
+
+  private parseAccess(input: unknown, baseline: readonly MemberGrant[]): MemberAccess | null {
+    if (input == null) return null;
+    if (typeof input !== 'object') throw new BadRequestException('access must be an object');
+    return normalizeMemberAccess(input, baseline);
+  }
+
+  private async assertCanGrantAccess(
+    ws: WorkspaceEntity,
+    caller: MemberActor,
+    access: MemberAccess | null,
+    baseline: readonly MemberGrant[],
+  ): Promise<void> {
+    if (!caller.userId) {
+      if (access) throw new ForbiddenException('Only a person can set access limits');
+      return;
+    }
+    if (caller.role === 'owner') return;
+    const mine = await this.memberships.findOneBy({ workspaceId: ws.id, userId: caller.userId });
+    const callerAccess = effectiveMemberAccess(caller.role, mine?.access ?? null, ws.resolved().roleGrants);
+    if (!accessWithin(access, callerAccess, baseline)) throw new ForbiddenException('You cannot grant access wider than your own');
   }
 
   private assertCanGrant(callerRole: Role, target: Role) {

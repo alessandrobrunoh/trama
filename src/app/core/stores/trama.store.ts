@@ -14,6 +14,7 @@ import { ApiClient } from '../api/api-client';
 import { ApiError } from '../api/api-error';
 import type {
   AddMemberInput,
+  UpdateMemberInput,
   CreateAgentInput,
   CreateArtifactInput,
   CreateOwnedArtifactInput,
@@ -2187,9 +2188,14 @@ export class TramaStore {
   }
 
   async updateMemberRole(membershipId: ID, role: Role): Promise<boolean> {
+    return this.updateMember(membershipId, { role });
+  }
+
+  /** Change a member's role, their project and action limits, or both. */
+  async updateMember(membershipId: ID, input: UpdateMemberInput): Promise<boolean> {
     const tx = this.tx();
-    tx.patch(this._memberships, membershipId, { role });
-    return this.ok('change role', (s) => this.api.members.update(s, membershipId, { role }), { tx });
+    tx.patch(this._memberships, membershipId, input);
+    return this.ok('update member', (s) => this.api.members.update(s, membershipId, input), { tx });
   }
 
   async removeMember(membershipId: ID): Promise<boolean> {

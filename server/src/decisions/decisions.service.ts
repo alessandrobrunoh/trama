@@ -10,6 +10,7 @@ import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
+import { applyWorkstreamScope } from '../auth/member-access.js';
 import { DecisionEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
@@ -64,6 +65,7 @@ export class DecisionsService {
         '(d.title ILIKE :q OR d.statement ILIKE :q OR d.key ILIKE :q)',
         { q: `%${f.q}%` },
       );
+    applyWorkstreamScope(qb, 'd', 'originWorkstreamId');
     return qb.getMany();
   }
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon, LucideMinus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -10,10 +10,13 @@ import {
   TEAM_EDIT_POLICIES,
   type Capability,
   type CapabilityMeta,
+  emptyMemberAccess,
+  type MemberAccess,
   type Role,
 } from '../../../core/contracts/domain';
 import { ROLES, ROLE_DETAILS, ROLE_META } from '../../../core/meta';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT } from './section-kit';
 
 interface Group {
@@ -31,7 +34,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access 
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, ...SECTION_KIT],
+  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, MemberAccessEditor, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -115,11 +118,30 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access 
       </div>
     </div>
 
+    <div>
+      <div class="mb-2 px-0.5">
+        <h3 class="text-[13px] font-medium">What each role can do</h3>
+        <p class="text-muted-foreground mt-0.5 text-xs leading-snug">
+          View, create, edit and delete, per kind of work. A person starts from their role. When you invite them you can add actions, not remove the ones checked here. Owners always have all of them.
+        </p>
+      </div>
+      <div class="mb-3 flex flex-wrap gap-1.5">
+        @for (r of grantRoles; track r) {
+          <button type="button" hlmBtn size="sm" class="h-7" [variant]="grantRole() === r ? 'default' : 'outline'" (click)="pickGrantRole(r)">{{ label(r) }}</button>
+        }
+      </div>
+      <app-member-access-editor [showProjects]="false" [role]="grantRole()" [disabled]="!isOwner() || busy()" [(value)]="roleDraft" />
+      @if (isOwner()) {
+        <button type="button" hlmBtn size="sm" class="mt-3" [disabled]="busy()" (click)="saveRoleGrants()">Save {{ label(grantRole()) }}</button>
+      }
+    </div>
+
     <app-settings-group title="Always true" description="These rules are fixed, whatever the matrix says.">
-      <app-settings-row label="Owners hold the keys" description="Only owners change this matrix, grant the owner role or delete the workspace." />
+      <app-settings-row label="Owners hold the keys" description="Only owners change these permissions, grant the owner role or delete the workspace. Owners themselves always keep every action." />
       <app-settings-row label="Roles are not escalated" description="Nobody can grant a role above their own, and a workspace always keeps at least one owner." />
       <app-settings-row label="Agents act as members" description="An agent can never go above member, and can never accept or reject a decision: that stays a human call." />
       <app-settings-row label="API tokens can only be narrower" description="A token has a scope (read, write, admin) that caps what it can do, never raises it." />
+      <app-settings-row label="A person starts from their role" description="An invitation can add actions the role does not have, and can hide projects. It cannot take away an action the role already gives." />
     </app-settings-group>
 
     <app-settings-group title="Team roles" description="On top of the workspace role, each team has its own roles and a policy.">
@@ -141,7 +163,16 @@ export class RolesSection {
   private readonly store = inject(TramaStore);
 
   protected readonly roles = ROLES;
+  protected readonly grantRoles: Role[] = ['admin', 'member', 'viewer'];
+  protected readonly grantRole = signal<Role>('member');
+  protected readonly roleDraft = signal<MemberAccess>({ ...emptyMemberAccess(), grants: [] });
   protected readonly details = ROLE_DETAILS;
+
+  private readonly syncRoleDraft = effect(() => {
+    const role = this.grantRole();
+    const grants = this.store.settings().roleGrants?.[role] ?? [];
+    untracked(() => this.roleDraft.set({ ...emptyMemberAccess(), grants: [...grants] }));
+  });
   protected readonly policyA = TEAM_EDIT_POLICIES.workspace.label;
   protected readonly policyB = TEAM_EDIT_POLICIES.members.label.toLowerCase();
   protected readonly check = LucideCheck;
@@ -189,6 +220,17 @@ export class RolesSection {
   protected async reset(): Promise<void> {
     this.busy.set(true);
     await this.store.updateSettings({ permissions: { ...DEFAULT_PERMISSIONS } });
+    this.busy.set(false);
+  }
+
+  protected pickGrantRole(role: Role): void {
+    this.grantRole.set(role);
+  }
+
+  protected async saveRoleGrants(): Promise<void> {
+    if (!this.isOwner() || this.busy()) return;
+    this.busy.set(true);
+    await this.store.updateSettings({ roleGrants: { [this.grantRole()]: [...this.roleDraft().grants] } });
     this.busy.set(false);
   }
 }

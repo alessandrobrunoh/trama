@@ -4,6 +4,7 @@ import { DataSource, type EntityManager, type Repository } from 'typeorm';
 import { canDo, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, ProjectHealth } from '../contracts/domain.js';
 import { notFound, uid } from '../common/util.js';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
 import {
   ProjectEntity,
   ProjectUpdateEntity,
@@ -32,7 +33,7 @@ export class ProjectUpdatesService {
 
   private async project(workspaceId: string, projectId: string) {
     const row = await this.projects.findOneBy({ workspaceId, id: projectId });
-    if (!row) throw notFound('Project', projectId);
+    if (!row || projectHidden(currentAccess(), row.id)) throw notFound('Project', projectId);
     return row;
   }
 

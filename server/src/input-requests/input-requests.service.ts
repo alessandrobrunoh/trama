@@ -4,6 +4,7 @@ import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, InputRequestState } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
+import { applyWorkstreamScope, assertCanUseProject } from '../auth/member-access.js';
 import { InputRequestEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
@@ -30,6 +31,7 @@ export class InputRequestsService {
     if (f.state) qb.andWhere('r.state = :s', { s: f.state });
     if (f.workstreamId) qb.andWhere('r.workstreamId = :w', { w: f.workstreamId });
     if (f.assigneeUserId) qb.andWhere('r.assigneeUserId = :a', { a: f.assigneeUserId });
+    applyWorkstreamScope(qb, 'r', 'workstreamId');
     return qb.getMany();
   }
 
@@ -42,8 +44,9 @@ export class InputRequestsService {
   async create(workspaceId: string, actor: ActorRef, input: InputRequestInput & { question: string; workstreamId: string }) {
     const workstreamId = input.workstreamId;
     if (!workstreamId) throw new BadRequestException('workstreamId is required');
-    if (!(await this.ds.getRepository(WorkstreamEntity).existsBy({ id: workstreamId, workspaceId })))
-      throw new BadRequestException(`Unknown workstream "${workstreamId}"`);
+    const workstream = await this.ds.getRepository(WorkstreamEntity).findOneBy({ id: workstreamId, workspaceId });
+    if (!workstream) throw new BadRequestException(`Unknown workstream "${workstreamId}"`);
+    assertCanUseProject(workstream.projectId);
     await this.refs.users(workspaceId, [input.assigneeUserId]);
     const row = await this.repo.save(
       this.repo.create({

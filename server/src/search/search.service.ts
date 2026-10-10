@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
+import type { MemberResource } from '../contracts/domain.js';
+import { canView, currentAccess, projectHidden } from '../auth/member-access.js';
 
 export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'customer', 'decision', 'artifact', 'document', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
@@ -29,21 +31,21 @@ const SPECS: Spec[] = [
   {
     type: 'workstream',
     from: `"workstreams" x JOIN "teams" t ON t."id" = x."ownerTeamId"`,
-    select: `x."id" AS id, x."key" AS key, x."title" AS title, x."status" || ' · ' || t."name" AS subtitle, NULL AS "workstreamKey", COALESCE(x."description", x."objective") AS body`,
+    select: `x."id" AS id, x."key" AS key, x."title" AS title, x."status" || ' · ' || t."name" AS subtitle, NULL AS "workstreamKey", COALESCE(x."description", x."objective") AS body, x."projectId" AS "projectId"`,
     fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."description"', 'body'], ['x."objective"', 'body']],
     rank: 0,
   },
   {
     type: 'project',
     from: `"projects" x`,
-    select: `x."id", NULL AS key, x."name" AS title, x."status" AS subtitle, NULL AS "workstreamKey", COALESCE(x."summary", x."description") AS body`,
+    select: `x."id", NULL AS key, x."name" AS title, x."status" AS subtitle, NULL AS "workstreamKey", COALESCE(x."summary", x."description") AS body, x."id" AS "projectId"`,
     fields: [['x."name"', 'title'], ['x."summary"', 'body'], ['x."description"', 'body']],
     rank: 1,
   },
   {
     type: 'issue',
     from: `"issues" x`,
-    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body`,
+    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body, x."projectId" AS "projectId"`,
     fields: [['x."key"', 'key'], ['x."aliases"::text', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
     rank: 3,
   },
@@ -56,15 +58,15 @@ const SPECS: Spec[] = [
   },
   {
     type: 'decision',
-    from: `"decisions" x`,
-    select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "workstreamKey", x."statement" AS body`,
+    from: `"decisions" x LEFT JOIN "workstreams" dw ON dw."id" = x."originWorkstreamId"`,
+    select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "workstreamKey", x."statement" AS body, dw."projectId" AS "projectId"`,
     fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."statement"', 'body']],
     rank: 2,
   },
   {
     type: 'artifact',
     from: `"artifacts" x LEFT JOIN "workstreams" w ON w."id" = x."workstreamId"`,
-    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", COALESCE(x."url", x."description") AS body`,
+    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", COALESCE(x."url", x."description") AS body, COALESCE(x."projectId", w."projectId") AS "projectId"`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
     rank: 4,
   },
@@ -100,7 +102,19 @@ interface Row {
   subtitle: string;
   workstreamKey: string | null;
   body: string | null;
+  projectId?: string | null;
 }
+
+const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
+  workstream: 'workstreams',
+  project: 'projects',
+  issue: 'issues',
+  customer: 'customers',
+  decision: 'decisions',
+  artifact: 'artifacts',
+  document: 'documents',
+};
+const PROJECT_SCOPED = new Set<SearchType>(['workstream', 'project', 'issue', 'decision', 'artifact']);
 
 /** Scores a row: exact key 100, key prefix 80, key contains 60, title exact 70, prefix 55, contains 40, body 20. */
 export function scoreRow(q: string, row: Pick<Row, 'key' | 'title' | 'body'>): number {
@@ -128,7 +142,10 @@ export class SearchService {
     if (!query) return { results: [] };
     const limit = Math.min(Math.max(opts.limit ?? 20, 1), 100);
     const terms = query.split(/\s+/).slice(0, 6);
-    const specs = SPECS.filter((s) => !opts.types?.length || opts.types.includes(s.type));
+    const specs = SPECS.filter((s) => {
+      const resource = RESOURCE[s.type];
+      return (!resource || canView(resource)) && (!opts.types?.length || opts.types.includes(s.type));
+    });
 
     const perType = await Promise.all(
       specs.map(async (spec) => {
@@ -142,7 +159,8 @@ export class SearchService {
           `SELECT ${spec.select} FROM ${spec.from} WHERE x."workspaceId" = $1 AND ${termClauses.join(' AND ')} LIMIT 200`,
           params,
         );
-        return rows.map((r): SearchResult & { rank: number } => ({
+        const access = currentAccess();
+        return rows.filter((r) => !PROJECT_SCOPED.has(spec.type) || !projectHidden(access, r.projectId)).map((r): SearchResult & { rank: number } => ({
           type: spec.type,
           id: r.id,
           ...(r.key ? { key: r.key } : {}),
