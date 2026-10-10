@@ -21,6 +21,7 @@ import { WsAttention } from './ws-attention';
 import { WsDependencies } from './ws-dependencies';
 import { WsInputRequests } from './ws-input-requests';
 import { WsIssuesSection } from './ws-issues-section';
+import { WsPlan } from './ws-plan';
 import { WsProperties } from './ws-properties';
 
 @Component({
@@ -43,6 +44,7 @@ import { WsProperties } from './ws-properties';
     DemandSummary,
     WsProjectMilestones,
     WsSideCards,
+    WsPlan,
     WsProperties,
     RelativeTimePipe,
   ],
@@ -69,6 +71,7 @@ import { WsProperties } from './ws-properties';
 
         <section>
           <app-ws-completion-line [ws]="ws()" />
+          <app-ws-plan [ws]="ws()" />
           <app-criteria-list [ws]="ws()" />
         </section>
 

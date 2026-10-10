@@ -13,6 +13,7 @@ const ctx = (p: Partial<AgentContext> = {}): AgentContext => ({
   objective: 'o',
   deltaThreadUrl: '',
   acceptanceCriteria: [],
+  plans: [],
   teams: { owner: { key: 'AUTH', name: 'Auth' }, participating: [] },
   repositories: [],
   dependencies: { blockedBy: [], blocking: [] },
