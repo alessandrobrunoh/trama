@@ -61,4 +61,5 @@ Write the **statement** as a rule (what is now true) and the **rationale** as th
 | "Which of these should I do?" | input request |
 | "I chose X because Y" and it will matter later | decision (proposed) |
 | Both: you need approval for a lasting choice | create the decision, and mention it in your summary; the proposed decision already needs a person |
+| "May I build it this way?" for non-trivial work | the plan as a document plus a decision `Plan for AUTH-42 approved at v3`, then `ask_human` (see `trama-start-work`) |
 | Small, reversible, local choice | neither; put it in the PR description |

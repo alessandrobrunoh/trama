@@ -1164,6 +1164,128 @@ export interface Decision {
   updatedAt: ISODate;
 }
 
+// ───────────────────────────── Plans (a convention, not a gate) ─────────────────────────────
+
+/**
+ * A workstream's implementation plan is a `document` artifact attached to it whose title starts with "Plan":
+ * a Trama document (preferred; its `version` is the revision) or a link to a file in the repository (the
+ * artifact's `externalId` is the commit sha). Nothing is stored on the workstream and nothing blocks work.
+ */
+export function isPlanArtifact(a: Pick<Artifact, 'kind' | 'title'>): boolean {
+  return a.kind === 'document' && /^\s*plan\b/i.test(a.title);
+}
+
+/**
+ * The approval of a plan is an ordinary decision with the workstream as origin whose title starts with "Plan"
+ * (or that is tagged `plan`) and that cites the revision: "Plan for AUTH-42 approved at v3" (Trama document) or
+ * "... approved at 3f2a9c1" (commit sha). The agent proposes it, a person accepts it; while it is `proposed`
+ * the workstream is already `needs_input`.
+ */
+export function isPlanDecision(d: Pick<Decision, 'title' | 'tags'>): boolean {
+  return /^\s*plan\b/i.test(d.title) || d.tags.some((t) => t.toLowerCase() === 'plan');
+}
+
+/** One plan of a workstream, with the revision a person approved (if any) and whether it moved on since. */
+export interface WorkstreamPlan {
+  artifactId: ID;
+  title: string;
+  /** Repository file or page the plan lives at (absent for a Trama document). */
+  url?: string;
+  /** Set when the plan is a Trama document. */
+  documentId?: ID;
+  /** Current revision: "v3" (Trama document version) or a commit sha; null when it cannot be told. */
+  revision: string | null;
+  /** The accepted approval decision that cites a revision of this plan; the latest one wins. */
+  approved: { decisionKey: string; revision: string | null } | null;
+  /** The plan is on a newer revision than the approved one: a new decision must be proposed. */
+  changedSinceApproval: boolean;
+  /** A plan decision of this plan that a person has not accepted yet. */
+  proposedDecisionKey?: string;
+}
+
+/** The fields the plan lookup reads; database rows (nullable columns, `Date` times) fit too. */
+type PlanArtifact = Pick<Artifact, 'id' | 'kind' | 'title'> & {
+  url?: string | null;
+  documentId?: string | null;
+  externalId?: string | null;
+};
+type PlanDecision = Pick<Decision, 'key' | 'title' | 'statement' | 'tags' | 'status'> & {
+  originWorkstreamId?: string | null;
+  createdAt: ISODate | Date;
+  decidedAt?: ISODate | Date | null;
+};
+
+const timeOf = (d: PlanDecision): number => new Date(d.decidedAt ?? d.createdAt).getTime();
+
+/** Versions cited as "v3", "rev 3", "revision 3" or "version 3". */
+function citedVersions(text: string): number[] {
+  return [...text.matchAll(/\b(?:v|rev\.?\s?|revision\s|version\s)(\d+)\b/gi)].map((m) => Number(m[1]));
+}
+
+/** Commit shas cited in the text: 7 to 40 hex characters with at least one digit. */
+function citedShas(text: string): string[] {
+  return [...text.matchAll(/\b[0-9a-f]{7,40}\b/gi)].map((m) => m[0].toLowerCase()).filter((s) => /\d/.test(s));
+}
+
+const sameSha = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
+
+/**
+ * Finds the plans among a workstream's artifacts and matches the approval decisions to them. Pure, so the
+ * server (briefing, `get_context`) and the app show the same facts. `documentVersions` holds the current
+ * `version` of each Trama document plan; `decisions` may hold any decisions, only those that originate in
+ * `workstreamId` count.
+ */
+export function resolveWorkstreamPlans(input: {
+  workstreamId: ID;
+  artifacts: readonly PlanArtifact[];
+  decisions: readonly PlanDecision[];
+  documentVersions: ReadonlyMap<ID, number>;
+}): WorkstreamPlan[] {
+  const plans = input.artifacts.filter(isPlanArtifact);
+  const decisions = input.decisions
+    .filter((d) => d.originWorkstreamId === input.workstreamId && isPlanDecision(d))
+    .sort((a, b) => timeOf(b) - timeOf(a));
+  return plans.map((a): WorkstreamPlan => {
+    const docVersion = a.documentId ? input.documentVersions.get(a.documentId) : undefined;
+    const sha = !a.documentId && a.externalId && /^[0-9a-f]{7,40}$/i.test(a.externalId) ? a.externalId.toLowerCase() : null;
+    const revision = docVersion !== undefined ? `v${docVersion}` : sha;
+    const title = a.title.trim().toLowerCase();
+    /** With one plan every plan decision is about it; with several, the decision must name it or cite its sha. */
+    const concerns = (d: PlanDecision) =>
+      plans.length === 1 ||
+      `${d.title} ${d.statement}`.toLowerCase().includes(title) ||
+      (sha !== null && citedShas(`${d.title} ${d.statement}`).some((c) => sameSha(c, sha)));
+    const mine = decisions.filter(concerns);
+    const cited = (d: PlanDecision): string | null => {
+      const text = `${d.title} ${d.statement}`;
+      if (a.documentId) {
+        const v = citedVersions(text)[0];
+        return v === undefined ? null : `v${v}`;
+      }
+      return citedShas(text)[0] ?? null;
+    };
+    // A plan with no known revision (a repository link without a sha) is approved by any accepted decision.
+    const accepted = mine.find((d) => d.status === 'accepted' && (revision === null || cited(d) !== null));
+    const approvedRevision = accepted ? cited(accepted) : null;
+    const changed =
+      !!accepted &&
+      approvedRevision !== null &&
+      revision !== null &&
+      (docVersion !== undefined ? docVersion > Number(approvedRevision.slice(1)) : !sameSha(approvedRevision, revision));
+    const proposed = mine.find((d) => d.status === 'proposed');
+    return {
+      artifactId: a.id,
+      title: a.title,
+      ...(a.url ? { url: a.url } : {}),
+      ...(a.documentId ? { documentId: a.documentId } : {}),
+      revision,
+      approved: accepted ? { decisionKey: accepted.key, revision: approvedRevision } : null,
+      changedSinceApproval: changed,
+      ...(proposed ? { proposedDecisionKey: proposed.key } : {}),
+    };
+  });
+}
+
 // ───────────────────────────── Dependencies ─────────────────────────────
 
 export type DependencyNodeType = 'workstream';
