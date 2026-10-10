@@ -70,7 +70,11 @@ describe('intelligence: status, attention, graph, search, context', () => {
       const shipped = await ws(w.key);
       expect(shipped.completion).toEqual({ achieved: true, gaps: [] });
       expect(shipped.status).toBe('shipped');
+      expect(shipped.statusSource).toBe('derived');
       expect(shipped.shippedAt).toBeTruthy();
+      // met without evidence: the historic report lists it, and nothing changes status
+      const unproven = (await get('/insights/signals/shipped_without_proof')) as { items: { key: string; detail: string }[] };
+      expect(unproven.items.find((i) => i.key === w.key)?.detail).toContain('without evidence');
 
       const evs = (await get(`/events?workstreamId=${w.id}&type=workstream.status&limit=50`)) as Ev[];
       expect(evs.every((e) => e.actor.type === 'system')).toBe(true);
@@ -79,7 +83,7 @@ describe('intelligence: status, attention, graph, search, context', () => {
 
       // override wins but derivedStatus follows reality
       await c.patch(`${base()}/workstreams/${w.key}`, { statusOverride: 'canceled' }).expect(200);
-      expect(await ws(w.key)).toMatchObject({ status: 'canceled', derivedStatus: 'shipped' });
+      expect(await ws(w.key)).toMatchObject({ status: 'canceled', derivedStatus: 'shipped', statusSource: 'override' });
     });
 
     it('re-derives dependents when the blocker ships', async () => {

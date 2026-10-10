@@ -6,6 +6,7 @@ import type {
   IInputRequest,
   IIssue,
   IMilestone,
+  IShippedWorkstream,
   IWorkstream,
   SignalData,
 } from './insights-signals.js';
@@ -42,6 +43,25 @@ export function ws(over: Partial<IWorkstream> = {}): IWorkstream {
     updatedAt: ago(1),
     shippedAt: null,
     acceptanceCriteria: [],
+    ...over,
+  };
+}
+
+/** A shipped workstream as the proof check reads it: derived by default, with one proven criterion. */
+export function shipped(over: Partial<IShippedWorkstream> = {}): IShippedWorkstream {
+  const k = ++n;
+  return {
+    id: `wk_${k}`,
+    key: `AUTH-${k}`,
+    title: `Shipped ${k}`,
+    status: 'shipped',
+    derivedStatus: 'shipped',
+    statusOverride: null,
+    legacyShipped: false,
+    accountableUserId: 'u_ada',
+    shippedAt: ago(60),
+    updatedAt: ago(60),
+    acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: ['ar_1'] } }],
     ...over,
   };
 }
@@ -146,6 +166,7 @@ export function emptyData(over: Partial<SignalData> = {}): SignalData {
     staleDays: 7,
     names: NAMES,
     workstreams: [],
+    shippedHistory: [],
     facts: new Map(),
     issues: [],
     inputRequests: [],

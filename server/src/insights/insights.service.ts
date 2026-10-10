@@ -27,6 +27,7 @@ import {
   type IIssue,
   type IIssueLink,
   type IMilestone,
+  type IShippedWorkstream,
   type IWorkstream,
   type SignalData,
 } from './insights-signals.js';
@@ -138,6 +139,22 @@ export class InsightsService {
         wp.values,
       )
     ).map((r): IWorkstream => ({ ...(r as IWorkstream) }));
+    // every shipped workstream in scope, whenever it shipped: the historic proof check is not windowed
+    const sp = new Params();
+    const shippedWhere = [`"workspaceId" = ${sp.add(workspaceId)}`, `status = 'shipped'`];
+    if (q.teamId) {
+      const t = sp.add(q.teamId);
+      shippedWhere.push(`("ownerTeamId" = ${t} OR "participatingTeamIds" ? ${t}::text)`);
+    }
+    if (q.projectId) shippedWhere.push(`"projectId" = ${sp.add(q.projectId)}`);
+    const shippedHistory = (
+      await db.query<Row[]>(
+        `SELECT id, key, title, status, "derivedStatus", "statusOverride", "legacyShipped", "accountableUserId", "shippedAt", "updatedAt",
+                "acceptanceCriteria"
+           FROM workstreams WHERE ${shippedWhere.join(' AND ')}`,
+        sp.values,
+      )
+    ).map((r): IShippedWorkstream => ({ ...(r as IShippedWorkstream) }));
     const wsIds = workstreams.map((w) => w.id);
     const openWsIds = workstreams.filter((w) => w.status !== 'shipped' && w.status !== 'canceled').map((w) => w.id);
 
@@ -330,6 +347,7 @@ export class InsightsService {
       staleDays: q.staleDays,
       names,
       workstreams,
+      shippedHistory,
       facts: buildFacts(
         workstreams,
         statusRows as StatusEventRow[],

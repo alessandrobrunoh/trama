@@ -185,7 +185,7 @@ export function projectContextMarkdown(ctx: ProjectContextData, opts: ProjectCon
     'Workstreams',
     capped(ctx.workstreams, CONTEXT_CAPS.workstreams, (w) => {
       const linked = ctx.issues.filter((i) => i.workstreamIds.includes(w.id));
-      return `- ${w.key} ${w.title} (${words(w.status)}${w.delivery && w.delivery !== 'none' ? `, delivery ${words(w.delivery)}` : ''}${w.targetDate ? `, target ${day(w.targetDate)}` : ''}${linked.length ? `, ${linked.length} issues` : ''})${w.objective.trim() ? ` — ${oneLine(w.objective, 160)}` : ''}`;
+      return `- ${w.key} ${w.title} (${words(w.status)}${w.statusOverride ? ' (pinned manually)' : ''}${w.delivery && w.delivery !== 'none' ? `, delivery ${words(w.delivery)}` : ''}${w.targetDate ? `, target ${day(w.targetDate)}` : ''}${linked.length ? `, ${linked.length} issues` : ''})${w.objective.trim() ? ` — ${oneLine(w.objective, 160)}` : ''}`;
     }),
   );
 

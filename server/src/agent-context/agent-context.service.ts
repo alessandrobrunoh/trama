@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { resolveWorkstreamPlans } from '../contracts/domain.js';
-import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState, CompletionGap, WorkstreamCompletion, WorkstreamPlan, WorkstreamStatus } from '../contracts/domain.js';
+import type { AcceptanceCriterion, ActorRef, ArtifactKind, CiState, DeliveryState, ReviewState, CompletionGap, WorkstreamCompletion, WorkstreamPlan, WorkstreamStatus, StatusSource } from '../contracts/domain.js';
+import { statusSourceOf } from '../status/completion-proof.js';
 import {
   AgentEntity,
   ArtifactEntity,
@@ -73,6 +74,8 @@ export interface AgentContext {
   derivedStatus: WorkstreamStatus;
   /** Present when a person pinned the status by hand; that is not evidence the outcome is achieved. */
   statusOverride?: WorkstreamStatus;
+  /** Where `status` comes from: the facts (`derived`), a manual pin (`override`) or a historic shipped without criteria (`legacy`). */
+  statusSource: StatusSource;
   /** Whether the outcome is achieved and what is missing. Computed by the server, never re-derive it. */
   completion: WorkstreamCompletion;
   priority: string;
@@ -211,6 +214,7 @@ export class AgentContextService {
       delivery: ws.delivery,
       derivedStatus: ws.derivedStatus,
       ...(ws.statusOverride ? { statusOverride: ws.statusOverride } : {}),
+      statusSource: statusSourceOf(ws),
       completion: ws.completion,
       priority: ws.priority,
       ...(ws.targetDate ? { targetDate: ws.targetDate.toISOString().slice(0, 10) } : {}),
@@ -273,7 +277,12 @@ export class AgentContextService {
     };
     const status = c.status.replace('_', ' ');
     const delivery = c.delivery.replace('_', ' ');
-    const overridden = c.statusOverride ? ` (pinned manually; the facts say ${c.derivedStatus.replace('_', ' ')})` : '';
+    const overridden =
+      c.statusSource === 'override'
+        ? ` (pinned manually; the facts say ${c.derivedStatus.replace('_', ' ')})`
+        : c.statusSource === 'legacy'
+          ? ' (historic: shipped before acceptance criteria were required, not backed by proof)'
+          : '';
     out.push(`# ${c.key} — ${c.title}`, '', `Outcome status: ${status}${overridden} · Delivery: ${delivery} · Priority: ${c.priority}${c.targetDate ? ` · Target: ${c.targetDate}` : ''}`, '');
     out.push(
       c.completion.achieved

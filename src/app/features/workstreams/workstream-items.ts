@@ -22,8 +22,9 @@ import { NextMilestoneChip } from '../milestones/milestone-chips';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
 import { WsMenu } from './ws-menu';
-import { CriteriaCount, IssueProgress, PrChip, TargetDate, TeamDots, WsDatePicker } from './ws-parts';
+import { CriteriaCount, IssueProgress, PrChip, StatusSourceBadge, TargetDate, TeamDots, WsDatePicker } from './ws-parts';
 import { priorityOptions, statusOptions, userOptions, type WsSummary } from './ws-model';
+import { statusSourceInfo } from './status-source';
 import { LabelChips } from '../../shared/label-chip';
 
 /** Which properties a row shows (display options of the list). */
@@ -233,6 +234,7 @@ abstract class WsItemBase {
     TeamDots,
     IssueProgress,
     CriteriaCount,
+    StatusSourceBadge,
     TargetDate,
     WsDatePicker,
     NextMilestoneChip,
@@ -303,6 +305,7 @@ abstract class WsItemBase {
       }
       <span class="flex min-w-0 flex-1 items-center gap-2">
         <span class="truncate" [class.text-muted-foreground]="w.status === 'canceled'" [class.line-through]="w.status === 'canceled'">{{ w.title }}</span>
+        <app-status-source-badge [ws]="w" />
         @if (s.openInputs) {
           <span class="text-status-needs-input bg-status-needs-input/10 shrink-0 rounded-full px-1.5 text-[11px] font-medium" [hlmTooltip]="s.openInputs + ' open question(s) need an answer'" position="bottom">{{ s.openInputs }} ?</span>
         }
@@ -379,7 +382,7 @@ export class WorkstreamRow extends WsItemBase {
   protected readonly statusTip = computed(() => {
     const w = this.summary().ws;
     const label = WORKSTREAM_STATUS_META[w.status].label;
-    return w.statusOverride ? `${label} (set manually)` : `${label} (derived)`;
+    return `${label} (${statusSourceInfo(w).label})`;
   });
 }
 

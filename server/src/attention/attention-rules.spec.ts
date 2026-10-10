@@ -116,6 +116,74 @@ describe('computeAttention', () => {
     expect(computeAttention(data({ workstreams: [done], artifacts: [{ ...pr({ state: 'pending' }), kind: 'deployment' as const }] })).some((i) => i.kind === 'ready_to_ship')).toBe(false);
   });
 
+  describe('proof_missing', () => {
+    const merged = (extra: object = {}) => pr({ state: 'merged', createdAt: day(-5), ...extra });
+    const delivered = (p: Partial<AWorkstream> = {}) =>
+      ws({ delivery: 'merged', acceptanceCriteria: [{ state: 'met' }, { state: 'pending' }], ...p });
+    const proof = (items: RawAttentionItem[]) => items.filter((i) => i.kind === 'proof_missing');
+
+    it('fires for the accountable person when delivered work has met criteria without evidence', () => {
+      const [i] = proof(computeAttention(data({ workstreams: [delivered()], artifacts: [merged()] })));
+      expect(i).toMatchObject({ id: 'proof_missing:w1', severity: 'low', workstreamId: 'w1' });
+      expect(i.title).toContain('1 met criterion has no evidence');
+      expect([...i.audience]).toEqual(['alice']);
+    });
+
+    it('falls back to the owner side when nobody is accountable', () => {
+      const [i] = proof(computeAttention(data({ workstreams: [delivered({ accountableUserId: null })], artifacts: [merged()] })));
+      expect([...i.audience]).toEqual(['bob']);
+    });
+
+    it('does not fire before delivery, when nothing is met, or when every met criterion has evidence', () => {
+      const at = (w: AWorkstream) => proof(computeAttention(data({ workstreams: [w], artifacts: [merged()] })));
+      expect(at(delivered({ delivery: 'in_review' }))).toEqual([]);
+      expect(at(delivered({ delivery: 'none' }))).toEqual([]);
+      expect(at(delivered({ delivery: undefined }))).toEqual([]);
+      expect(at(delivered({ acceptanceCriteria: [{ state: 'pending' }, { state: 'in_progress' }] }))).toEqual([]);
+      expect(at(delivered({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: ['a1'] } }, { state: 'pending' }] }))).toEqual([]);
+    });
+
+    it('counts an evidence note (an agent may have set it) as evidence; a blank note is none', () => {
+      const withNote = delivered({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: [], note: 'checked on staging' } }, { state: 'pending' }] });
+      expect(proof(computeAttention(data({ workstreams: [withNote], artifacts: [merged()] })))).toEqual([]);
+      const blank = delivered({ acceptanceCriteria: [{ state: 'met', evidence: { artifactIds: [], note: '  ' } }, { state: 'pending' }] });
+      expect(proof(computeAttention(data({ workstreams: [blank], artifacts: [merged()] })))).toHaveLength(1);
+    });
+
+    it('is one item per workstream, whatever the number of criteria or agent actions', () => {
+      const w = delivered({ acceptanceCriteria: [{ state: 'met' }, { state: 'met' }, { state: 'met' }, { state: 'pending' }] });
+      const items = proof(computeAttention(data({ workstreams: [w], artifacts: [merged()] })));
+      expect(items).toHaveLength(1);
+      expect(items[0].title).toContain('3 met criteria have no evidence');
+    });
+
+    it('keeps a stable id and since, so a dismissal survives more agent activity', () => {
+      const first = proof(computeAttention(data({ workstreams: [delivered({ updatedAt: day(-2) })], artifacts: [merged()] })))[0];
+      const later = proof(
+        computeAttention(
+          data({ workstreams: [delivered({ updatedAt: day(-1), acceptanceCriteria: [{ state: 'met' }, { state: 'met' }] })], artifacts: [merged()] }),
+        ),
+      )[0];
+      expect(later.id).toBe(first.id);
+      expect(later.since).toEqual(first.since);
+      expect(first.since).toEqual(day(-5));
+      expect(itemState(later, { state: 'dismissed', since: first.since }, NOW)).toEqual({ state: 'dismissed' });
+    });
+
+    it('uses the event-log timestamp when there is one', () => {
+      const since = new Map([['proof_missing:w1', day(-9)]]);
+      const [i] = proof(computeAttention(data({ workstreams: [delivered()], artifacts: [merged()], since })));
+      expect(i.since).toEqual(day(-9));
+    });
+
+    it('raises nothing for shipped or pinned workstreams (the insight covers history)', () => {
+      const shipped = delivered({ status: 'shipped', derivedStatus: 'shipped' });
+      expect(proof(computeAttention(data({ workstreams: [shipped], artifacts: [merged()] })))).toEqual([]);
+      const pinned = delivered({ statusOverride: 'working' });
+      expect(proof(computeAttention(data({ workstreams: [pinned], artifacts: [merged()] })))).toEqual([]);
+    });
+  });
+
   it('triage: one item per team with a count, for that team\'s members', () => {
     const mk = (id: string, teamId: string | null, at: number) => ({ id, key: id.toUpperCase(), title: id, teamId, status: 'backlog' as const, createdAt: day(at) });
     const items = computeAttention(data({ workstreams: [], issues: [mk('bug1', 't1', -3), mk('bug2', 't1', -1), mk('fb1', 't3', -2), mk('x', null, -1)] }));

@@ -54,7 +54,7 @@
     "name": "get_insights",
     "summary": "Where the problems are: blocked or stale work, bottlenecks, stuck PRs, flow metrics, agent failures",
     "kind": "catalog",
-    "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting), flow metrics (cycle and lead time, throughput, WIP) and agent failure signals, each with counts and its top items. Use it to decide what needs attention before picking work, or to answer 'what is stuck?'. Narrow with projectId or teamId; days is 7, 30 or 90. The full list behind one signal: run_tool {name:'get_insight_signal', arguments:{id:'<signal>'}}."
+    "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting, shipped workstreams without proof: read-only history), flow metrics (cycle and lead time, throughput, WIP) and agent failure signals, each with counts and its top items. Use it to decide what needs attention before picking work, or to answer 'what is stuck?'. Narrow with projectId or teamId; days is 7, 30 or 90. The full list behind one signal: run_tool {name:'get_insight_signal', arguments:{id:'<signal>'}}."
   },
   {
     "name": "get_workspace",

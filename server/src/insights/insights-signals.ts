@@ -16,6 +16,7 @@ import {
   type ReviewState,
   type WorkstreamStatus,
 } from '../contracts/domain.js';
+import { shippedProofGaps, unprovenCriteria, type ProofCriterion, type ProofGap } from '../status/completion-proof.js';
 import { DAY, UNASSIGNED, actorOf, daysBetween, plural, round1, short, span, type NameIndex } from './insights-util.js';
 
 // ───── input rows (narrow projections; the service fills them with SQL)
@@ -35,6 +36,21 @@ export interface IWorkstream {
   updatedAt: Date;
   shippedAt: Date | null;
   acceptanceCriteria: { state: string }[];
+}
+
+/** A shipped workstream of any age, with what the proof check needs (not limited to the look-back window). */
+export interface IShippedWorkstream {
+  id: string;
+  key: string;
+  title: string;
+  status: WorkstreamStatus;
+  derivedStatus: WorkstreamStatus;
+  statusOverride: WorkstreamStatus | null;
+  legacyShipped: boolean;
+  accountableUserId: string | null;
+  shippedAt: Date | null;
+  updatedAt: Date;
+  acceptanceCriteria: (ProofCriterion & { state: string })[];
 }
 
 /** Facts that come from the event log, per workstream. */
@@ -141,6 +157,8 @@ export interface SignalData {
   staleDays: number;
   names: NameIndex;
   workstreams: IWorkstream[];
+  /** Every shipped workstream in scope, whenever it shipped (for `shipped_without_proof`). */
+  shippedHistory: IShippedWorkstream[];
   facts: ReadonlyMap<string, WorkstreamFacts>;
   issues: IIssue[];
   inputRequests: IInputRequest[];
@@ -160,6 +178,19 @@ const CLOSED_WS: readonly WorkstreamStatus[] = ['shipped', 'canceled'];
 const isOpenWs = (w: IWorkstream): boolean => !CLOSED_WS.includes(w.status);
 const isPr = (a: IArtifact): boolean => a.kind === 'pull_request' || a.kind === 'merge_request';
 
+const PROOF_GAP_TEXT = (gap: ProofGap, unproven: number): string => {
+  switch (gap) {
+    case 'legacy':
+      return 'historic, no acceptance criteria';
+    case 'no_criteria':
+      return 'no acceptance criteria';
+    case 'unproven_criteria':
+      return `${plural(unproven, 'met criterion', 'met criteria')} without evidence`;
+    case 'pinned':
+      return 'status pinned to Shipped, the facts say otherwise';
+  }
+};
+
 type Found = { item: InsightItem; sortAge: number };
 
 function age(since: Date, now: Date): number {
@@ -171,9 +202,9 @@ export function computeSignalItems(d: SignalData): Record<InsightSignalId, Insig
   const now = d.now;
   const wsById = new Map(d.workstreams.map((w) => [w.id, w]));
   const nameOfActor = (a: ActorRef): string => (a.id ? (d.names.get(a.id)?.name ?? a.id) : 'system');
-  const accountable = (w: IWorkstream | undefined) => actorOf(w?.accountableUserId, d.names);
+  const accountable = (w: Pick<IWorkstream, 'accountableUserId'> | undefined) => actorOf(w?.accountableUserId, d.names);
   const out = Object.fromEntries(INSIGHT_SIGNAL_IDS.map((id) => [id, [] as InsightItem[]])) as Record<InsightSignalId, InsightItem[]>;
-  const wsBase = (w: IWorkstream) => ({ type: 'workstream' as const, id: w.id, key: w.key, title: w.title, workstreamKey: w.key });
+  const wsBase = (w: Pick<IWorkstream, 'id' | 'key' | 'title'>) => ({ type: 'workstream' as const, id: w.id, key: w.key, title: w.title, workstreamKey: w.key });
   const finish = (id: InsightSignalId, found: Found[]) => {
     out[id] = found
       .sort((a, b) => b.sortAge - a.sortAge || (a.item.key ?? a.item.id).localeCompare(b.item.key ?? b.item.id))
@@ -328,6 +359,31 @@ export function computeSignalItems(d: SignalData): Record<InsightSignalId, Insig
       });
     }
     finish('delivered_outcome_open', found);
+  }
+
+  // shipped_without_proof: shipped workstreams that would not ship under today's rules. Read-only:
+  // nothing here changes a status, and historic workstreams stay shipped.
+  {
+    const found: Found[] = [];
+    for (const w of d.shippedHistory) {
+      const gaps = shippedProofGaps(w);
+      if (!gaps.length) continue;
+      const since = w.shippedAt ?? w.updatedAt;
+      const days = age(since, now);
+      const unproven = unprovenCriteria(w.acceptanceCriteria).length;
+      found.push({
+        sortAge: days,
+        item: {
+          ...wsBase(w),
+          since: since.toISOString(),
+          ageDays: days,
+          waitingOn: accountable(w),
+          value: gaps.includes('unproven_criteria') ? unproven : undefined,
+          detail: `Shipped ${span(days)} ago: ${gaps.map((g) => PROOF_GAP_TEXT(g, unproven)).join('; ')}`,
+        },
+      });
+    }
+    finish('shipped_without_proof', found);
   }
 
   // overdue_milestones: a date-only target (midnight UTC) means "by the end of that day"
@@ -537,6 +593,8 @@ export function severityRules(staleDays: number): Record<InsightSignalId, Severi
     stale_workstreams: { base: 'warning', critAt: staleDays * 3 },
     stale_issues: { base: 'warning', critAt: staleDays * 3 },
     delivered_outcome_open: { base: 'info', warnAt: 7 },
+    // History, not a live problem: it never escalates.
+    shipped_without_proof: { base: 'info' },
     overdue_milestones: { base: 'warning', critAt: 7 },
     overdue_workstreams: { base: 'warning', critAt: 7 },
     scope_creep: { base: 'warning' },

@@ -426,6 +426,15 @@ export type WorkstreamStatus =
  */
 export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
 
+/**
+ * Where a workstream's effective `status` comes from, so a `shipped` is never mistaken for proof:
+ * - `derived`: computed from the facts (criteria, delivery, blockers, people);
+ * - `override`: pinned by hand through `statusOverride`; the facts may say otherwise (`derivedStatus`);
+ * - `legacy`: a historic `shipped` with no acceptance criteria, kept as it was when "no criteria never
+ *   ships" was introduced (see `legacyShipped`).
+ */
+export type StatusSource = 'derived' | 'override' | 'legacy';
+
 export type CriterionState = 'pending' | 'in_progress' | 'met';
 
 /**
@@ -510,6 +519,8 @@ export interface Workstream {
   legacyShipped?: boolean;
   /** A manual pin. When set, `status` is this value and `derivedStatus` is what the facts say. */
   statusOverride?: WorkstreamStatus;
+  /** Whether `status` is derived from the facts, pinned by hand, or a historic shipped (see {@link StatusSource}). Computed by the server. */
+  statusSource: StatusSource;
   /** When work is planned to begin (timeline start). */
   startDate?: ISODate;
   targetDate?: ISODate;
@@ -1388,6 +1399,7 @@ export type AttentionKind =
   | 'deadline'
   | 'ready_to_land'
   | 'ready_to_ship'
+  | 'proof_missing'
   | 'triage';
 
 export type AttentionSeverity = 'high' | 'medium' | 'low';
@@ -1428,6 +1440,7 @@ export type InsightSignalId =
   | 'stale_workstreams'
   | 'stale_issues'
   | 'delivered_outcome_open'
+  | 'shipped_without_proof'
   | 'overdue_milestones'
   | 'overdue_workstreams'
   | 'scope_creep'
@@ -1468,6 +1481,11 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
   delivered_outcome_open: {
     label: 'Delivered, outcome open',
     definition: 'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
+    unit: 'workstream',
+  },
+  shipped_without_proof: {
+    label: 'Shipped without proof',
+    definition: 'Shipped workstreams that would not ship under today\'s rules: a historic shipped with no acceptance criteria, a criterion that is met without evidence, or a status pinned to Shipped while the facts say otherwise. Read-only: nothing changes status.',
     unit: 'workstream',
   },
   overdue_milestones: {

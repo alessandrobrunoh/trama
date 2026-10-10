@@ -6,11 +6,13 @@ import type {
   AttentionSeverity,
   CiState,
   DecisionStatus,
+  DeliveryState,
   InputRequestState,
   IssueStatus,
   ReviewState,
   WorkstreamStatus,
 } from '../contracts/domain.js';
+import { unprovenCriteria, type ProofCriterion } from '../status/completion-proof.js';
 
 // ───── input shapes (entities satisfy these structurally)
 
@@ -21,8 +23,10 @@ export interface AWorkstream {
   ownerTeamId: string;
   participatingTeamIds: string[];
   accountableUserId?: string | null;
-  acceptanceCriteria: { state: string }[];
+  acceptanceCriteria: (ProofCriterion & { state: string })[];
   status: WorkstreamStatus;
+  /** Delivery evidence (PR / release / deployment); optional so rows without it never raise `proof_missing`. */
+  delivery?: DeliveryState;
   derivedStatus: WorkstreamStatus;
   statusOverride?: WorkstreamStatus | null;
   targetDate?: Date | null;
@@ -299,6 +303,37 @@ export function computeAttention(d: AttentionData): RawAttentionItem[] {
       workstreamId: w.id,
       since: sinceOf(`ready_to_ship:${w.id}`, w.updatedAt),
       audience: relevant(w),
+    });
+  }
+
+  // proof_missing: the code is delivered, but criteria marked met carry no evidence. One item per
+  // workstream (stable id and `since`), so more agent actions never raise another notification; the
+  // accountable person gets it, and dismiss/snooze work as for every other kind. Shipped or pinned
+  // workstreams raise nothing here: the "Shipped without proof" insight covers history.
+  for (const w of live) {
+    if (w.delivery !== 'merged' && w.delivery !== 'released' && w.delivery !== 'deployed') continue;
+    const unproven = unprovenCriteria(w.acceptanceCriteria);
+    if (!unproven.length) continue;
+    const delivering = d.artifacts.filter(
+      (a) =>
+        a.workstreamId === w.id &&
+        ((isPr(a) && a.state === 'merged') ||
+          (a.kind === 'release' && a.state === 'published') ||
+          (a.kind === 'deployment' && a.state === 'healthy')),
+    );
+    // Stable fallback: when the first delivery happened. `updatedAt` would move on every edit.
+    const delivered = delivering.length
+      ? new Date(Math.min(...delivering.map((a) => a.createdAt.getTime())))
+      : w.updatedAt;
+    items.push({
+      id: `proof_missing:${w.id}`,
+      kind: 'proof_missing',
+      severity: 'low',
+      title: `${w.key} is delivered, but ${unproven.length === 1 ? '1 met criterion has' : `${unproven.length} met criteria have`} no evidence`,
+      detail: `${w.title} — link a PR, build or note to what you verified`,
+      workstreamId: w.id,
+      since: sinceOf(`proof_missing:${w.id}`, delivered),
+      audience: w.accountableUserId ? new Set([w.accountableUserId]) : ownerSide(w),
     });
   }
 

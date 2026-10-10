@@ -17,6 +17,29 @@ import { TramaStore, isOverdue, shortDate, type Artifact, type Workstream } from
 import { ActorAvatar, AvatarStack } from '../../shared/actor-avatar';
 import { ArtifactIcon } from '../../shared/artifact';
 import { StatusIcon } from '../../shared/status';
+import { statusSourceInfo } from './status-source';
+
+/** "pinned" / "historic" next to a status; nothing for a derived one. */
+@Component({
+  selector: 'app-status-source-badge',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTooltip],
+  host: { class: 'inline-flex shrink-0' },
+  template: `
+    @if (ws().statusSource !== 'derived') {
+      <span
+        class="text-muted-foreground bg-muted rounded-full px-1.5 text-[11px] leading-4 font-medium whitespace-nowrap"
+        [hlmTooltip]="info().hint"
+        position="bottom"
+        >{{ info().label }}</span
+      >
+    }
+  `,
+})
+export class StatusSourceBadge {
+  readonly ws = input.required<Pick<Workstream, 'statusSource' | 'derivedStatus'>>();
+  protected readonly info = computed(() => statusSourceInfo(this.ws()));
+}
 
 /** Compact PR / MR chip: `#182 ● ✓` (CI, review, conflicts). */
 @Component({

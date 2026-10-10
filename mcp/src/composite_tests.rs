@@ -756,6 +756,7 @@ async fn get_context_on_an_issue_carries_each_workstreams_completion() {
         ("GET", "/workstreams/wk_1") => {
             let mut w = workstream();
             w["completion"] = json!({ "achieved": false, "gaps": ["no_delivery"] });
+            w["statusSource"] = json!("override");
             j(w)
         }
         ("GET", "/issues/OPS-7/artifacts") => j(json!([])),
@@ -764,4 +765,5 @@ async fn get_context_on_an_issue_carries_each_workstreams_completion() {
     let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "OPS-7", "type": "issue" })).await;
     assert!(!err, "{text}");
     assert_eq!(parsed(&text)["workstreams"][0]["completion"]["gaps"], json!(["no_delivery"]));
+    assert_eq!(parsed(&text)["workstreams"][0]["statusSource"], json!("override"), "a pin is never mistaken for a derived status");
 }

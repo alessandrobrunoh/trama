@@ -7,6 +7,7 @@ const ctx = (p: Partial<AgentContext> = {}): AgentContext => ({
   title: 'Login',
   status: 'working',
   derivedStatus: 'working',
+  statusSource: 'derived',
   delivery: 'merged',
   completion: { achieved: false, gaps: ['criteria_pending'] },
   priority: 'none',
@@ -39,8 +40,19 @@ describe('agent briefing completion', () => {
   });
 
   it('marks a pinned status as not derived', () => {
-    const md = AgentContextService.toMarkdown(ctx({ status: 'shipped', statusOverride: 'shipped', derivedStatus: 'working' }));
+    const md = AgentContextService.toMarkdown(ctx({ status: 'shipped', statusOverride: 'shipped', statusSource: 'override', derivedStatus: 'working' }));
     expect(md).toContain('Outcome status: shipped (pinned manually; the facts say working)');
+  });
+
+  it('marks a historic shipped without criteria as not backed by proof', () => {
+    const md = AgentContextService.toMarkdown(ctx({ status: 'shipped', statusSource: 'legacy', derivedStatus: 'shipped', completion: { achieved: true, gaps: [] } }));
+    expect(md).toContain('Outcome status: shipped (historic: shipped before acceptance criteria were required');
+  });
+
+  it('says nothing about the source of a derived status', () => {
+    const md = AgentContextService.toMarkdown(ctx({ status: 'shipped', derivedStatus: 'shipped' }));
+    expect(md).not.toContain('pinned');
+    expect(md).not.toContain('historic');
   });
 
   it('shows who vouched for a met criterion and its proof, or that it has none', () => {
