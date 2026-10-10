@@ -199,7 +199,13 @@ export class ApiClient {
       )) as T;
     } catch (e) {
       const err = ApiError.from(e);
-      if (err.status === 401 && path !== '/auth/login' && path !== '/auth/signup' && path !== '/auth/logout') {
+      if (
+        err.status === 401 &&
+        path !== '/auth/login' &&
+        path !== '/auth/signup' &&
+        path !== '/auth/logout' &&
+        path !== '/config'
+      ) {
         this.sessionExpired.next();
       }
       else if (err.status === 403 && !init.quiet) this.notifier.error("You don't have permission");
@@ -223,6 +229,8 @@ export class ApiClient {
   // ───────────────────────── health & auth ─────────────────────────
 
   health = () => this.get<{ ok: boolean }>('/health');
+  /** Public sign-in settings, including whether `DEMO_LOGIN` is enabled. */
+  publicConfig = () => this.get<{ demoLogin: boolean }>('/config');
 
   readonly auth = {
     login: async (input: LoginInput): Promise<User> =>

@@ -17,6 +17,7 @@ import { requestStoreMiddleware } from './events/request-store.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
 import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
+import { PublicConfigController } from './public-config.controller.js';
 import { ImportersModule } from './importers/importers.module.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
 import { InsightsModule } from './insights/insights.module.js';
@@ -79,7 +80,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     WebhooksModule,
     OutgoingWebhooksModule,
   ],
-  controllers: [HealthController],
+  controllers: [HealthController, PublicConfigController],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {

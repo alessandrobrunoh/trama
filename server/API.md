@@ -18,7 +18,7 @@ Dev server: `http://localhost:3000/api` (`PORT` to change). Demo login after fir
 
 ## Authentication
 
-Two ways, accepted on every route except the public ones (`/health`, `/auth/signup`, `/auth/login`):
+Two ways, accepted on every route except the public ones (`/health`, `/config`, `/auth/signup`, `/auth/login`):
 
 1. **Cookie session** (browser). `POST /auth/login` or `/auth/signup` set an httpOnly `trama_session` cookie (sessions started under the old name `nabla_session` stay valid) (`SameSite=Lax`, `Secure` in production, 30 days; stored in Postgres as a sha256). The SPA must send credentials (`withCredentials: true`) and, on every **mutating** request (POST/PUT/PATCH/DELETE), a custom header **`X-Client-Id`** (or `X-Requested-With`) — requests without it get `403`. Bodies must be `application/json` (`415` otherwise). CORS allows `http://localhost:4300` and `:4301` (and `CORS_ORIGIN`) with credentials.
 2. **API token**: `Authorization: Bearer trm_…`. Tokens minted before the rename to Trama start with `nbl_` and keep working. Tokens belong to one workspace and act either as a **user** (same role as that user) or as an **agent** (role `member`). No CSRF header needed. Tokens are created via `POST /w/:slug/tokens`; the secret is returned once, only its sha256 and a display prefix are stored.
@@ -311,7 +311,9 @@ Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](.
 
 ## Configuration
 
-`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/trama`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
+`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/trama`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `DEMO_LOGIN` (`1`/`true`/`yes`/`on` or `0`/`false`/`no`/`off`; unset shows the sign-in demo panel outside production and hides it in production), `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
+
+`GET /api/config` (unauthenticated) returns `{ demoLogin: boolean }` for the sign-in page.
 
 ## Integrations — `/w/:slug/integrations` (admin and above)
 

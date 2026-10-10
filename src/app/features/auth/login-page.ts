@@ -14,9 +14,9 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmFieldImports } from '@spartan-ng/helm/field';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
+import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import { SessionStore } from '../../core/session/session.store';
-import { environment } from '../../../environments/environment';
 import { AuthShell } from './auth-shell';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -40,7 +40,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       subtitle="Coordination for teams of humans and coding agents."
     >
       <form (submit)="submit($event)" novalidate class="flex flex-col gap-4">
-        @if (demo) {
+        @if (demo()) {
           <aside
             aria-labelledby="demo-login-title"
             class="border-primary/20 bg-primary/5 mb-1 rounded-xl border p-3.5"
@@ -148,6 +148,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 })
 export class LoginPage implements OnInit {
   private readonly session = inject(SessionStore);
+  private readonly api = inject(ApiClient);
 
   /** Query param `?next=` (a same-origin path to return to). */
   readonly next = input<string>();
@@ -164,7 +165,8 @@ export class LoginPage implements OnInit {
 
   protected readonly alertIcon = LucideCircleAlert;
   protected readonly demoIcon = LucideSparkles;
-  protected readonly demo = environment.demoLoginEnabled;
+  /** Set from `GET /api/config`, which reads the API's `DEMO_LOGIN` variable. */
+  protected readonly demo = signal(false);
   protected readonly email = signal('');
   protected readonly password = signal('');
   protected readonly busy = signal(false);
@@ -174,6 +176,15 @@ export class LoginPage implements OnInit {
   ngOnInit(): void {
     const hint = this.emailHint();
     if (hint) this.email.set(hint);
+    void this.loadDemoLogin();
+  }
+
+  private async loadDemoLogin(): Promise<void> {
+    try {
+      this.demo.set((await this.api.publicConfig()).demoLogin);
+    } catch {
+      this.demo.set(false);
+    }
   }
 
   protected emailError(): string | null {
