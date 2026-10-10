@@ -16,9 +16,19 @@ import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import type { InviteLink, Membership, Role, WorkspaceInvite } from '../../../core/contracts/domain';
+import {
+  emptyMemberAccess,
+  normalizeMemberAccess,
+  type InviteLink,
+  type MemberAccess,
+  type MemberGrant,
+  type Membership,
+  type Role,
+  type WorkspaceInvite,
+} from '../../../core/contracts/domain';
 import { ActorAvatar } from '../../../shared/actor-avatar';
 import { AppSelect, type Option } from '../../create/form-kit';
+import { MemberAccessEditor } from './member-access-editor';
 import { memberRules, type MemberUiRules } from './member-permissions';
 import { SECTION_KIT } from './section-kit';
 
@@ -34,6 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     LucideDynamicIcon,
     ActorAvatar,
     AppSelect,
+    MemberAccessEditor,
     ...SECTION_KIT,
   ],
   host: { class: 'flex flex-col gap-10' },
@@ -46,27 +57,48 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
       @if (canInvite()) {
         <app-settings-group title="Invite by email">
-          <form class="flex flex-wrap items-center gap-2 px-4 pt-3" (submit)="invite($event)">
-            <input
-              hlmInput
-              type="email"
-              class="h-8 min-w-48 flex-1 text-[13px]"
-              placeholder="email@company.com"
-              aria-label="Email"
-              [value]="email()"
-              (input)="email.set($any($event.target).value)"
-            />
-            <div class="w-32">
-              <app-select size="sm" [options]="inviteOptions()" [(value)]="role" label="Role" />
+          <form (submit)="invite($event)">
+            <div class="flex flex-wrap items-center gap-2 px-4 pt-3">
+              <input
+                hlmInput
+                type="email"
+                class="h-8 min-w-48 flex-1 text-[13px]"
+                placeholder="email@company.com"
+                aria-label="Email"
+                [value]="email()"
+                (input)="email.set($any($event.target).value)"
+              />
+              <div class="w-32">
+                <app-select size="sm" [options]="inviteOptions()" [(value)]="role" label="Role" />
+              </div>
+              <button hlmBtn size="sm" type="submit" [disabled]="!email().trim() || busy()">
+                Send invite
+              </button>
             </div>
-            <button hlmBtn size="sm" type="submit" [disabled]="!email().trim() || busy()">
-              Send invite
-            </button>
+            <p class="text-muted-foreground px-4 pt-2 text-xs leading-snug">
+              <strong class="text-foreground font-medium">{{ roleName(roleValue()) }}.</strong>
+              {{ roleDetail(roleValue()) }}
+            </p>
+            @if (roleValue() !== 'owner') {
+              <div class="px-4 pt-2 pb-3">
+                <label class="flex items-start gap-2 text-[13px]">
+                  <input
+                    type="checkbox"
+                    class="accent-primary mt-0.5 size-4 cursor-pointer"
+                    [checked]="custom()"
+                    (change)="setCustom($any($event.target).checked)"
+                  />
+                  <span>
+                    <span class="font-medium">Adjust this invitation</span>
+                    <span class="text-muted-foreground block text-xs leading-snug">They start from the {{ roleName(roleValue()) }} role. You can hide projects, and add actions that role does not include.</span>
+                  </span>
+                </label>
+                @if (custom()) {
+                  <app-member-access-editor class="mt-3" [role]="roleValue()" [locked]="baseline(roleValue())" [projects]="projectChoices()" [(value)]="access" />
+                }
+              </div>
+            }
           </form>
-          <p class="text-muted-foreground px-4 pt-2 pb-3 text-xs leading-snug">
-            <strong class="text-foreground font-medium">{{ roleName(roleValue()) }}.</strong>
-            {{ roleDetail(roleValue()) }}
-          </p>
           @if (sent(); as s) {
             <div class="bg-muted/30 px-4 py-3" role="status">
               <p class="text-[13px] leading-snug">
@@ -97,7 +129,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             <div class="min-w-0 flex-1">
               <div class="truncate text-[13px] font-medium">{{ i.email }}</div>
               <div class="text-muted-foreground text-xs" [class.text-destructive]="expired(i)">
-                {{ roleName(i.role) }} · {{ expiry(i) }}
+                {{ roleName(i.role) }}{{ i.access ? ' · Limited' : '' }} · {{ expiry(i) }}
               </div>
             </div>
             <button hlmBtn variant="outline" size="sm" [disabled]="busy()" (click)="resend(i)">
@@ -148,7 +180,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               }
             </div>
             <div class="text-muted-foreground truncate text-xs">
-              {{ m.user.email }}{{ teamsOf(m.user.id) ? ' · ' + teamsOf(m.user.id) : '' }}
+              {{ m.user.email }}{{ teamsOf(m.user.id) ? ' · ' + teamsOf(m.user.id) : '' }}{{ m.membership.access ? ' · Limited' : '' }}
             </div>
           </div>
           @if (canAdmin()) {
@@ -183,6 +215,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
                 Transfer ownership
               </button>
             }
+            @if (m.membership.role !== 'owner' && !rules.roleLocked) {
+              <button
+                hlmBtn
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground h-7 text-xs"
+                (click)="openAccess(m.membership)"
+              >
+                Access
+              </button>
+            }
             <span [attr.title]="rules.removeLocked">
               <button
                 hlmBtn
@@ -200,6 +243,29 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             <span class="text-muted-foreground text-xs">{{ roleName(m.membership.role) }}</span>
           }
         </div>
+        @if (editingId() === m.membership.id) {
+          <div class="bg-muted/20 border-t px-4 py-3">
+            <label class="flex items-start gap-2 text-[13px]">
+              <input
+                type="checkbox"
+                class="accent-primary mt-0.5 size-4 cursor-pointer"
+                [checked]="draftCustom()"
+                (change)="setDraftCustom(m.membership, $any($event.target).checked)"
+              />
+              <span>
+                <span class="font-medium">Adjust {{ m.user.name }}</span>
+                <span class="text-muted-foreground block text-xs leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you hide projects or add actions.</span>
+              </span>
+            </label>
+            @if (draftCustom()) {
+              <app-member-access-editor class="mt-3" [role]="m.membership.role" [locked]="baseline(m.membership.role)" [projects]="projectChoices()" [disabled]="busy()" [(value)]="draft" />
+            }
+            <div class="mt-3 flex gap-2">
+              <button hlmBtn size="sm" type="button" [disabled]="busy()" (click)="saveAccess(m.membership.id)">Save access</button>
+              <button hlmBtn size="sm" variant="ghost" type="button" (click)="editingId.set(null)">Cancel</button>
+            </div>
+          </div>
+        }
       } @empty {
         <div class="text-muted-foreground px-4 py-6 text-center text-[13px]">
           No member matches “{{ query().trim() }}”.
@@ -234,6 +300,11 @@ export class MembersSection {
   }));
   protected readonly email = signal('');
   protected readonly role = signal<string>('member');
+  protected readonly custom = signal(false);
+  protected readonly access = signal<MemberAccess>(emptyMemberAccess());
+  protected readonly editingId = signal<string | null>(null);
+  protected readonly draftCustom = signal(false);
+  protected readonly draft = signal<MemberAccess>(emptyMemberAccess());
   protected readonly query = signal('');
   protected readonly busy = signal(false);
   protected readonly canAdmin = computed(() => this.store.can('admin'));
@@ -268,6 +339,9 @@ export class MembersSection {
     );
   }
   protected readonly roleValue = computed(() => this.role() as Role);
+  protected readonly projectChoices = computed(() =>
+    [...this.store.projects()].map((project) => ({ id: project.id, name: project.name })).sort((a, b) => a.name.localeCompare(b.name)),
+  );
   protected readonly meId = computed(() => this.store.me()?.id);
   protected readonly shown = computed(() => {
     const q = this.query().trim().toLowerCase();
@@ -287,6 +361,15 @@ export class MembersSection {
   constructor() {
     effect(() => {
       if (this.canInvite() && this.store.slug()) untracked(() => void this.invites.load());
+    });
+    effect(() => {
+      const role = this.roleValue();
+      if (role === 'owner') {
+        untracked(() => this.custom.set(false));
+        return;
+      }
+      const next = this.clamp(this.access(), role);
+      if (JSON.stringify(next) !== JSON.stringify(this.access())) untracked(() => this.access.set(next));
     });
     // Someone else invited, revoked or accepted: keep the list current.
     this.live.events$.pipe(takeUntilDestroyed()).subscribe((e) => {
@@ -318,12 +401,48 @@ export class MembersSection {
     return n === 1 ? '1 person' : `${n} people`;
   }
 
+  protected baseline(role: Role): MemberGrant[] {
+    return this.store.settings().roleGrants?.[role] ?? [];
+  }
+
+  protected setCustom(on: boolean): void {
+    this.custom.set(on);
+    if (on) this.access.set(this.clamp(this.access(), this.roleValue()));
+  }
+
+  protected openAccess(membership: Membership): void {
+    this.editingId.set(membership.id);
+    this.draftCustom.set(!!membership.access);
+    this.draft.set(membership.access ?? emptyMemberAccess());
+  }
+
+  protected setDraftCustom(membership: Membership, on: boolean): void {
+    this.draftCustom.set(on);
+    if (on) this.draft.set(this.clamp(membership.access ?? emptyMemberAccess(), membership.role));
+  }
+
+  protected async saveAccess(membershipId: string): Promise<void> {
+    this.busy.set(true);
+    const ok = await this.store.updateMember(membershipId, { access: this.draftCustom() ? this.draft() : null });
+    this.busy.set(false);
+    if (ok) this.editingId.set(null);
+  }
+
+  private clamp(access: MemberAccess, role: Role): MemberAccess {
+    return normalizeMemberAccess(access, this.baseline(role)) ?? emptyMemberAccess();
+  }
+
   protected async invite(event: Event): Promise<void> {
     event.preventDefault();
     const email = this.email().trim();
     if (!email) return;
+    const role = this.roleValue();
     this.busy.set(true);
-    const link = await this.invites.create({ email, role: this.role() as Role });
+    const link = await this.invites.create({
+      email,
+      role,
+      access: role !== 'owner' && this.custom() ? this.access() : null,
+    });
     this.busy.set(false);
     if (!link) return;
     this.email.set('');

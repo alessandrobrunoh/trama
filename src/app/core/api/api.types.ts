@@ -17,6 +17,8 @@ import type {
   ImportMapping,
   ImportOptions,
   ImportSource,
+  MemberAccess,
+  MemberGrant,
   PermissionMap,
   TeamEditPolicy,
   TokenScope,
@@ -84,6 +86,8 @@ export interface UpdateWorkspaceInput {
 export interface UpdateWorkspaceSettingsInput {
   /** Partial: only the capabilities you send change. */
   permissions?: Partial<PermissionMap>;
+  /** Replaces the work permissions of each role included (viewer, member, admin). */
+  roleGrants?: Partial<Record<Role, MemberGrant[]>>;
   defaultTeamId?: ID | null;
   estimateScale?: EstimateScale;
   weekStart?: WeekStart;
@@ -110,6 +114,8 @@ export interface MergeLabelInput {
 export interface CreateInviteInput {
   email: string;
   role: Role;
+  /** Narrower than `role`. Omit for the role in full. */
+  access?: MemberAccess | null;
 }
 export interface AddMemberInput {
   /** The person must already have an account. */
@@ -117,7 +123,9 @@ export interface AddMemberInput {
   role: Role;
 }
 export interface UpdateMemberInput {
-  role: Role;
+  role?: Role;
+  /** `null` restores the role in full. Omit to leave access unchanged. */
+  access?: MemberAccess | null;
 }
 export interface CreateAgentInput {
   name: string;

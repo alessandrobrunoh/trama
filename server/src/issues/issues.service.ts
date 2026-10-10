@@ -22,6 +22,7 @@ import {
   type WorkstreamInput,
 } from '../workstreams/workstreams.service.js';
 import { LabelsService } from '../workspaces/labels.service.js';
+import { applyProjectScope, assertCanUseProject, currentAccess, projectHidden } from '../auth/member-access.js';
 
 export interface IssueInput {
   title?: string;
@@ -178,6 +179,7 @@ export class IssuesService {
         m: JSON.stringify([f.milestoneId]),
       });
     for (const c of demandConditions('i', 'issueId', f)) qb.andWhere(c.sql, c.params);
+    applyProjectScope(qb, 'i', 'projectId');
     if (f.q)
       qb.andWhere(
         '(i.title ILIKE :q OR i.key ILIKE :q OR i.aliases::text ILIKE :q)',
@@ -202,7 +204,7 @@ export class IssuesService {
     } else {
       row = await this.repo.findOneBy({ workspaceId, id: idOrKey });
     }
-    if (!row) throw notFound('Issue', idOrKey);
+    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Issue', idOrKey);
     return row;
   }
 
@@ -258,6 +260,7 @@ export class IssuesService {
     actor: ActorRef,
     input: IssueInput & { kind: IssueKind; title: string },
   ) {
+    assertCanUseProject(input.projectId ?? null);
     await this.refs.teams(
       workspaceId,
       [input.teamId].filter((x): x is string => !!x),
@@ -325,6 +328,7 @@ export class IssuesService {
     patch: IssueInput,
   ) {
     const row = await this.get(workspaceId, idOrKey);
+    if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
     const prepared = await this.prepareUpdate(workspaceId, actor, row, patch);
     await this.ds.transaction(async (m) => {
       await this.rekey(m, workspaceId, prepared);

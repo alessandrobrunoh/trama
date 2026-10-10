@@ -24,8 +24,10 @@ import {
   type AuthInfo,
 } from '../auth/request-context.js';
 import { requiredPermission } from '../auth/api-permissions.js';
+import { effectiveMemberAccess } from '../contracts/domain.js';
+import { requiredMemberGrant } from '../auth/member-access.js';
 import { TokensService } from '../auth/tokens.service.js';
-import type { Capability, Role, TokenScope } from '../contracts/domain.js';
+import type { Capability, MemberAccess, Role, TokenScope } from '../contracts/domain.js';
 import { PermissionsService } from './permissions.service.js';
 import {
   AgentEntity,
@@ -127,20 +129,28 @@ export class AccessGuard implements CanActivate {
     const slug = (req.params as Record<string, string | undefined>).slug;
     if (slug) {
       const workspace = await this.workspaces.findOneBy({ slug });
-      const memberRole = workspace ? await this.roleIn(auth, workspace.id) : null;
-      if (!workspace || !memberRole) throw new NotFoundException(`Workspace "${slug}" not found`);
+      const membership = workspace ? await this.membershipIn(auth, workspace.id) : null;
+      if (!workspace || !membership) throw new NotFoundException(`Workspace "${slug}" not found`);
+      const memberRole = membership.role;
       const capability = this.reflector.getAllAndOverride<Capability | undefined>(CAPABILITY_KEY, targets);
       const min: Role = capability
         ? workspace.resolved().permissions[capability]
         : (this.reflector.getAllAndOverride<Role | undefined>(ROLES_KEY, targets) ?? (mutating ? 'member' : 'viewer'));
       const scope = auth.token?.scope;
       const role = capRole(memberRole, scope);
+      const stored = membership.kind === 'user' ? membership.access : null;
+      const access = effectiveMemberAccess(role, stored, workspace.resolved().roleGrants);
       if (!hasRole(role, min)) {
-        if (scope && hasRole(memberRole, min))
-          throw new ForbiddenException(`This route needs role ${min}: use an admin-scoped token (this one is "${scope}")`);
-        throw new ForbiddenException(`Requires role ${min} or higher`);
+        const needed = requiredMemberGrant(req.method, (req.route as { path?: string } | undefined)?.path ?? '');
+        const covered = !!needed && !!access?.grants.includes(needed);
+        if (!covered) {
+          if (scope && hasRole(memberRole, min))
+            throw new ForbiddenException(`This route needs role ${min}: use an admin-scoped token (this one is "${scope}")`);
+          throw new ForbiddenException(`Requires role ${min} or higher`);
+        }
       }
-      req.ctx = { workspace, actor: auth.actor, userId: auth.user?.id, role, memberRole, tokenScope: scope };
+      if (access) this.enforceMemberGrant(req, access);
+      req.ctx = { workspace, actor: auth.actor, userId: auth.user?.id, role, memberRole, tokenScope: scope, access };
       const teamScope = this.reflector.getAllAndOverride<'workstream' | 'issue' | undefined>(TEAM_SCOPE_KEY, targets);
       if (teamScope) await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }
@@ -188,16 +198,27 @@ export class AccessGuard implements CanActivate {
     };
   }
 
-  /** The caller's role in a workspace, or null when they have no access to it. */
-  private async roleIn(auth: AuthInfo, workspaceId: string): Promise<Role | null> {
+  /** `custom` is not the only narrowing: a person's own access can refuse a route their role would allow. */
+  private enforceMemberGrant(req: AppRequest, access: MemberAccess): void {
+    const path = (req.route as { path?: string } | undefined)?.path ?? '';
+    const needed = requiredMemberGrant(req.method, path);
+    if (needed && !access.grants.includes(needed))
+      throw new ForbiddenException(`Your access does not include "${needed}"`);
+  }
+
+  /** The caller's membership, or a synthetic agent membership. Null when they have no access. */
+  private async membershipIn(
+    auth: AuthInfo,
+    workspaceId: string,
+  ): Promise<{ kind: 'user'; role: Role; access: MemberAccess | null } | { kind: 'agent'; role: Role; access: null } | null> {
     if (auth.token && auth.token.workspaceId !== workspaceId) return null;
     if (auth.user) {
       const m = await this.memberships.findOneBy({ workspaceId, userId: auth.user.id });
-      return m?.role ?? null;
+      return m ? { kind: 'user', role: m.role, access: m.access } : null;
     }
-    // Agent token: valid only while the agent still exists in this workspace.
+    // Agent token: valid only while the agent still exists in this workspace. Agents are not narrowed per person.
     if (auth.actor.type === 'agent' && auth.actor.id) {
-      return (await this.agents.existsBy({ id: auth.actor.id, workspaceId })) ? 'member' : null;
+      return (await this.agents.existsBy({ id: auth.actor.id, workspaceId })) ? { kind: 'agent', role: 'member', access: null } : null;
     }
     return null;
   }

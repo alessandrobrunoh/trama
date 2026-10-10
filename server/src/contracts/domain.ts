@@ -47,6 +47,208 @@ export interface Membership {
   userId: ID;
   role: Role;
   createdAt: ISODate;
+  /**
+   * Added on top of the role: extra actions, and an optional project limit.
+   * Absent means the role as configured, on every project. Ignored for owners.
+   */
+  access?: MemberAccess | null;
+}
+
+/** What a person can be allowed to do, independently, inside the workspace role. */
+export type MemberAction = 'view' | 'create' | 'update' | 'delete';
+
+/** Work a person's access can see and change. Workspace administration stays with the role. */
+export type MemberResource =
+  | 'projects'
+  | 'milestones'
+  | 'workstreams'
+  | 'issues'
+  | 'documents'
+  | 'artifacts'
+  | 'views'
+  | 'comments'
+  | 'decisions'
+  | 'dependencies'
+  | 'input-requests'
+  | 'customers';
+
+export type MemberGrant = `${MemberResource}:${MemberAction}`;
+
+export interface MemberProjectScope {
+  /** Every project, including ones created later. */
+  all: boolean;
+  /** Used when `all` is false. */
+  projectIds: ID[];
+}
+
+/**
+ * What one person has beyond their role. `grants` are added to the role;
+ * they never remove a permission the role already gives. Create, edit and delete imply view.
+ * `projects` can still hide projects the role would otherwise see.
+ */
+export interface MemberAccess {
+  projects: MemberProjectScope;
+  /** When `projects.all` is false, work with no project stays visible only if this is true. */
+  includeUnassigned: boolean;
+  /** Actions added on top of the role. Permissions the role already has are not repeated. */
+  grants: MemberGrant[];
+}
+
+/** The granular work permissions of each role. Owners are always full and ignore this. */
+export type RoleGrantMap = Record<Role, MemberGrant[]>;
+
+export interface MemberResourceMeta {
+  label: string;
+  description: string;
+  group: 'Planning' | 'Work' | 'Collaboration';
+  actions: readonly MemberAction[];
+}
+
+const MEMBER_ACTIONS = ['view', 'create', 'update', 'delete'] as const;
+
+export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
+  projects: { group: 'Planning', label: 'Projects', description: 'The planning container: name, status, dates, lead.', actions: MEMBER_ACTIONS },
+  milestones: { group: 'Planning', label: 'Milestones', description: 'Targets inside a project.', actions: MEMBER_ACTIONS },
+  workstreams: { group: 'Work', label: 'Workstreams', description: 'Create them, or only change the ones this person can see.', actions: MEMBER_ACTIONS },
+  issues: { group: 'Work', label: 'Issues', description: 'File an issue without being able to edit or delete it, or the other way around.', actions: MEMBER_ACTIONS },
+  documents: { group: 'Work', label: 'Documents', description: 'Workspace documents.', actions: MEMBER_ACTIONS },
+  artifacts: { group: 'Work', label: 'Artifacts', description: 'Pull requests, builds and other proof attached to work.', actions: MEMBER_ACTIONS },
+  views: { group: 'Work', label: 'Views', description: 'Saved filters. Sharing a view with the workspace still follows Roles & permissions.', actions: MEMBER_ACTIONS },
+  comments: { group: 'Collaboration', label: 'Comments', description: 'Read a thread, write in it, or edit and delete comments.', actions: MEMBER_ACTIONS },
+  decisions: { group: 'Collaboration', label: 'Decisions', description: 'Propose or edit a decision. Accepting one still follows Roles & permissions.', actions: MEMBER_ACTIONS },
+  dependencies: { group: 'Collaboration', label: 'Dependencies', description: 'Links between workstreams and issues.', actions: MEMBER_ACTIONS },
+  'input-requests': { group: 'Collaboration', label: 'Input requests', description: 'Questions asked on a workstream.', actions: MEMBER_ACTIONS },
+  customers: { group: 'Collaboration', label: 'Customers', description: 'Companies and the requests they file. Deleting one still follows Roles & permissions.', actions: MEMBER_ACTIONS },
+};
+
+export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
+  'projects', 'milestones', 'workstreams', 'issues', 'documents', 'artifacts', 'views',
+  'comments', 'decisions', 'dependencies', 'input-requests', 'customers',
+];
+
+export const MEMBER_ACTION_META: readonly { id: MemberAction; label: string }[] = [
+  { id: 'view', label: 'View' },
+  { id: 'create', label: 'Create' },
+  { id: 'update', label: 'Edit' },
+  { id: 'delete', label: 'Delete' },
+];
+
+export const MEMBER_GRANTS: readonly MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((resource) =>
+  MEMBER_RESOURCES[resource].actions.map((action) => `${resource}:${action}` as MemberGrant),
+);
+
+const MEMBER_GRANT_SET = new Set<string>(MEMBER_GRANTS);
+const MEMBER_ID = /^[A-Za-z0-9_-]{1,80}$/;
+
+/** Default work permissions of a role, before an owner customizes them. Viewer is view-only; the others can do all four actions. */
+export function roleGrants(role: Role): MemberGrant[] {
+  if (role === 'viewer') return MEMBER_GRANTS.filter((grant) => grant.endsWith(':view'));
+  return [...MEMBER_GRANTS];
+}
+
+export function defaultRoleGrantMap(): RoleGrantMap {
+  return { owner: roleGrants('owner'), admin: roleGrants('admin'), member: roleGrants('member'), viewer: roleGrants('viewer') };
+}
+
+/** Keeps known grants, in catalog order, and makes every other action imply view. */
+export function normalizeGrantList(input: readonly unknown[]): MemberGrant[] {
+  const chosen = new Set<MemberGrant>();
+  for (const grant of input) {
+    if (typeof grant === 'string' && MEMBER_GRANT_SET.has(grant)) chosen.add(grant as MemberGrant);
+  }
+  for (const grant of [...chosen]) chosen.add(`${grant.split(':')[0]}:view` as MemberGrant);
+  return MEMBER_GRANTS.filter((grant) => chosen.has(grant));
+}
+
+/** Fills missing roles with the defaults. Stored lists replace a role entirely. */
+export function resolveRoleGrants(raw?: Partial<Record<Role, readonly unknown[]>> | null): RoleGrantMap {
+  const defaults = defaultRoleGrantMap();
+  const out: RoleGrantMap = { ...defaults };
+  if (!raw) return out;
+  for (const role of ['owner', 'admin', 'member', 'viewer'] as const) {
+    const listed = raw[role];
+    if (Array.isArray(listed)) out[role] = normalizeGrantList(listed);
+  }
+  return out;
+}
+
+/** No extras and every project: the person is exactly their role. */
+export function emptyMemberAccess(): MemberAccess {
+  return { projects: { all: true, projectIds: [] }, includeUnassigned: true, grants: [] };
+}
+
+/**
+ * `grants` on `input` are extras on top of `baseline` (the role). Grants the role already has are dropped.
+ * Returns null when nothing is added and every project stays visible.
+ */
+export function normalizeMemberAccess(input: unknown, baseline: readonly MemberGrant[] = []): MemberAccess | null {
+  if (input == null || typeof input !== 'object') return null;
+  const raw = input as Record<string, unknown>;
+  const scope = raw['projects'];
+  let all = true;
+  let projectIds: ID[] = [];
+  if (scope && typeof scope === 'object') {
+    const projects = scope as Record<string, unknown>;
+    all = projects['all'] !== false;
+    const listedIds = projects['projectIds'];
+    if (!all && Array.isArray(listedIds)) {
+      projectIds = [...new Set(listedIds.filter((id): id is string => typeof id === 'string' && MEMBER_ID.test(id)))];
+    }
+  }
+  const includeUnassigned = all || raw['includeUnassigned'] !== false;
+  const base = new Set(baseline);
+  const rawGrants = raw['grants'];
+  const chosen = new Set<MemberGrant>();
+  if (Array.isArray(rawGrants)) {
+    for (const grant of rawGrants) {
+      if (typeof grant === 'string' && MEMBER_GRANT_SET.has(grant) && !base.has(grant as MemberGrant)) chosen.add(grant as MemberGrant);
+    }
+  }
+  for (const grant of [...chosen]) {
+    const view = `${grant.split(':')[0]}:view` as MemberGrant;
+    if (!base.has(view)) chosen.add(view);
+  }
+  const grants = MEMBER_GRANTS.filter((grant) => chosen.has(grant));
+  if (all && includeUnassigned && grants.length === 0) return null;
+  return { projects: { all, projectIds: all ? [] : projectIds }, includeUnassigned, grants };
+}
+
+/** Role grants plus this person's extras. Null for owners, and when the result is every action on every project. */
+export function effectiveMemberAccess(
+  role: Role,
+  stored: MemberAccess | null | undefined,
+  grantsByRole: RoleGrantMap,
+): MemberAccess | null {
+  if (role === 'owner') return null;
+  const base = new Set(grantsByRole[role] ?? roleGrants(role));
+  for (const grant of stored?.grants ?? []) base.add(grant);
+  const grants = MEMBER_GRANTS.filter((grant) => base.has(grant));
+  const projects = stored?.projects ?? { all: true, projectIds: [] };
+  const includeUnassigned = projects.all || (stored?.includeUnassigned ?? true);
+  if (projects.all && includeUnassigned && grants.length === MEMBER_GRANTS.length) return null;
+  return { projects: projects.all ? { all: true, projectIds: [] } : { all: false, projectIds: projects.projectIds }, includeUnassigned, grants };
+}
+
+/**
+ * `requested` null means the role itself, on every project. `caller` null means the caller is not limited.
+ * A limited caller can only invite someone whose role, extras and projects are inside what they already have.
+ */
+export function accessWithin(
+  requested: MemberAccess | null,
+  caller: MemberAccess | null,
+  baseline: readonly MemberGrant[] = [],
+): boolean {
+  if (!caller) return true;
+  const grants = new Set<MemberGrant>([...baseline, ...(requested?.grants ?? [])]);
+  if (![...grants].every((grant) => caller.grants.includes(grant))) return false;
+  const projects = requested?.projects ?? { all: true, projectIds: [] };
+  if (projects.all) return caller.projects.all;
+  if (!caller.projects.all) {
+    const includeUnassigned = requested?.includeUnassigned ?? true;
+    if (includeUnassigned && !caller.includeUnassigned) return false;
+    if (projects.projectIds.some((id) => !caller.projects.projectIds.includes(id))) return false;
+  }
+  return true;
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────
@@ -153,6 +355,8 @@ export interface WorkspaceInvite {
   workspaceId: ID;
   email: string;
   role: Role;
+  /** Same shape as a membership. Absent means the role applies in full once they join. */
+  access?: MemberAccess | null;
   invitedByUserId?: ID;
   createdAt: ISODate;
   expiresAt: ISODate;
@@ -2158,6 +2362,8 @@ export const WEEK_STARTS: WeekStart[] = ['monday', 'sunday', 'saturday'];
 
 export interface WorkspaceSettings {
   permissions: PermissionMap;
+  /** Granular work permissions for each role. A member starts here; extras on the person are added on top. */
+  roleGrants: RoleGrantMap;
   /** Team preselected when creating issues and workstreams. */
   defaultTeamId?: ID;
   /** Scale offered for issue estimates. Estimates are stored as numbers either way. */
@@ -2182,6 +2388,7 @@ export interface WorkspaceSettings {
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   permissions: DEFAULT_PERMISSIONS,
+  roleGrants: defaultRoleGrantMap(),
   estimateScale: 'fibonacci',
   weekStart: 'monday',
   timeZone: 'auto',
@@ -2191,12 +2398,13 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
 };
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
-export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, 'permissions'>> & { permissions?: Partial<PermissionMap> } | null): WorkspaceSettings {
+export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, 'permissions' | 'roleGrants'>> & { permissions?: Partial<PermissionMap>; roleGrants?: Partial<Record<Role, readonly unknown[]>> } | null): WorkspaceSettings {
   const r = raw ?? {};
   return {
     ...DEFAULT_WORKSPACE_SETTINGS,
     ...r,
     permissions: { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) },
+    roleGrants: resolveRoleGrants(r.roleGrants),
     labels: resolveLabelCatalog(r.labels),
     customerTiers: resolveCustomerTiers(r.customerTiers),
   } as WorkspaceSettings;

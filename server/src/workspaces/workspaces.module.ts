@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
+import { MemberAccessInterceptor } from '../auth/member-access.interceptor.js';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module.js';
 import {
@@ -57,6 +58,7 @@ import { WorkspacesService } from './workspaces.service.js';
     CustomerTiersService,
     PermissionsService,
     { provide: APP_GUARD, useClass: AccessGuard },
+    { provide: APP_INTERCEPTOR, useClass: MemberAccessInterceptor },
   ],
   exports: [WorkspacesService, LabelsService, PermissionsService],
 })

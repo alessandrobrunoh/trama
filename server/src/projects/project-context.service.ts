@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
 import { notFound } from '../common/util.js';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
 import {
   AgentEntity,
   ArtifactEntity,
@@ -35,7 +36,7 @@ export class ProjectContextService {
   async build(workspaceId: string, projectId: string): Promise<ProjectContextData> {
     const repo = <T extends object>(e: new () => T) => this.ds.getRepository(e);
     const project = await repo(ProjectEntity).findOneBy({ workspaceId, id: projectId });
-    if (!project) throw notFound('Project', projectId);
+    if (!project || projectHidden(currentAccess(), project.id)) throw notFound('Project', projectId);
 
     const [milestones, workstreams, updates] = await Promise.all([
       repo(MilestoneEntity).find({ where: { workspaceId, projectId }, order: { sortOrder: 'ASC' } }),

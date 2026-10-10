@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef } from '../contracts/domain.js';
 import { notFound, toDate, uid } from '../common/util.js';
+import { applyProjectScope, assertCanUseProject, currentAccess, projectHidden } from '../auth/member-access.js';
 import { MilestoneEntity, ProjectEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
@@ -30,16 +31,18 @@ export class MilestonesService {
       .addOrderBy('m.sortOrder', 'ASC')
       .addOrderBy('m.createdAt', 'ASC');
     if (f.projectId) qb.andWhere('m.projectId = :w', { w: f.projectId });
+    applyProjectScope(qb, 'm', 'projectId');
     return qb.getMany();
   }
 
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
-    if (!row) throw notFound('Milestone', id);
+    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Milestone', id);
     return row;
   }
 
   async create(workspaceId: string, actor: ActorRef, input: MilestoneInput & { projectId: string; name: string }) {
+    assertCanUseProject(input.projectId);
     if (!(await this.ds.getRepository(ProjectEntity).existsBy({ id: input.projectId, workspaceId })))
       throw new BadRequestException(`Unknown project "${input.projectId}"`);
     let sortOrder = input.sortOrder;

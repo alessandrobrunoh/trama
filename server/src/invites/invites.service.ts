@@ -1,5 +1,6 @@
 import { createHash, randomBytes } from 'node:crypto';
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -10,9 +11,14 @@ import { DataSource, IsNull, type Repository } from 'typeorm';
 import { appUrl } from '../common/app-url.js';
 import { notFound, uid } from '../common/util.js';
 import {
+  accessWithin,
+  effectiveMemberAccess,
   INVITE_TTL_DAYS,
+  normalizeMemberAccess,
   type InviteLink,
   type InvitePreview,
+  type MemberAccess,
+  type MemberGrant,
   type Role,
 } from '../contracts/domain.js';
 import {
@@ -62,9 +68,12 @@ export class InvitesService {
   async create(
     workspace: WorkspaceEntity,
     inviter: { userId?: string; role: Role },
-    input: { email: string; role: Role },
+    input: { email: string; role: Role; access?: unknown },
   ): Promise<InviteLink> {
     this.assertCanGrant(inviter.role, input.role);
+    const baseline = workspace.resolved().roleGrants[input.role];
+    const access = input.role === 'owner' ? null : this.parseAccess(input.access, baseline);
+    await this.assertCanGrantAccess(workspace, inviter, access, baseline);
     const email = input.email.trim().toLowerCase();
     const existing = await this.users.findOneBy({ email });
     if (existing && (await this.memberships.existsBy({ workspaceId: workspace.id, userId: existing.id })))
@@ -87,6 +96,7 @@ export class InvitesService {
       revokedAt: null,
     });
     invite.role = input.role;
+    invite.access = access;
     const link = await this.issueLink(workspace, invite);
     this.events.publish(workspace.id, { type: created ? 'created' : 'updated', entity: 'invite', id: invite.id });
     return link;
@@ -139,7 +149,13 @@ export class InvitesService {
       if (current) role = current.role;
       else {
         const saved = await m.save(
-          m.create(MembershipEntity, { id: uid('mb'), workspaceId: workspace.id, userId: user.id, role: invite.role }),
+          m.create(MembershipEntity, {
+            id: uid('mb'),
+            workspaceId: workspace.id,
+            userId: user.id,
+            role: invite.role,
+            access: invite.role === 'owner' ? null : invite.access,
+          }),
         );
         membershipId = saved.id;
       }
@@ -193,5 +209,30 @@ export class InvitesService {
   private assertCanGrant(callerRole: Role, target: Role): void {
     if (target === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can grant owner');
     if (!hasRole(callerRole, target)) throw new ForbiddenException(`You cannot grant a role above your own (${callerRole})`);
+  }
+
+  /** `undefined` means no custom access. Anything else is normalized and clamped to the role. */
+  private parseAccess(input: unknown, baseline: readonly MemberGrant[]): MemberAccess | null {
+    if (input == null) return null;
+    if (typeof input !== 'object') throw new BadRequestException('access must be an object');
+    return normalizeMemberAccess(input, baseline);
+  }
+
+  /** A limited inviter can only hand out projects and actions they already have, including the target role. */
+  private async assertCanGrantAccess(
+    workspace: WorkspaceEntity,
+    inviter: { userId?: string; role: Role },
+    access: MemberAccess | null,
+    baseline: readonly MemberGrant[],
+  ): Promise<void> {
+    if (!inviter.userId) {
+      if (access) throw new ForbiddenException('Only a person can set access limits');
+      return;
+    }
+    if (inviter.role === 'owner') return;
+    const mine = await this.memberships.findOneBy({ workspaceId: workspace.id, userId: inviter.userId });
+    const callerAccess = effectiveMemberAccess(inviter.role, mine?.access ?? null, workspace.resolved().roleGrants);
+    if (!accessWithin(access, callerAccess, baseline))
+      throw new ForbiddenException('You cannot grant access wider than your own');
   }
 }

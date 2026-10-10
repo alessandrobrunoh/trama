@@ -17,6 +17,7 @@ import { ArtifactEntity, TeamEntity, WorkstreamEntity } from '../database/entiti
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { LabelsService } from '../workspaces/labels.service.js';
+import { applyProjectScope, assertCanUseProject, currentAccess, projectHidden } from '../auth/member-access.js';
 
 import {
   applyCriterionChange,
@@ -102,6 +103,7 @@ export class WorkstreamsService {
       qb.andWhere('w.labels @> :lb::jsonb', { lb: JSON.stringify([f.label]) });
     if (f.q)
       qb.andWhere('(w.title ILIKE :q OR w.key ILIKE :q)', { q: `%${f.q}%` });
+    applyProjectScope(qb, 'w', 'projectId');
     return qb.getMany();
   }
 
@@ -117,7 +119,7 @@ export class WorkstreamsService {
         ? { workspaceId, key: idOrKey.toUpperCase() }
         : { workspaceId, id: idOrKey },
     });
-    if (!row) throw notFound('Workstream', idOrKey);
+    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Workstream', idOrKey);
     return row;
   }
 
@@ -138,6 +140,7 @@ export class WorkstreamsService {
     },
     options: { manager?: EntityManager; data?: Record<string, unknown> } = {},
   ): Promise<WorkstreamEntity & { after?: () => Promise<void> }> {
+    assertCanUseProject(input.projectId ?? null);
     await this.refs.teams(workspaceId, [
       input.ownerTeamId,
       ...(input.participatingTeamIds ?? []),
@@ -235,6 +238,7 @@ export class WorkstreamsService {
     patch: WorkstreamInput,
   ) {
     const ws = await this.get(workspaceId, idOrKey);
+    if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
     if (patch.ownerTeamId !== undefined)
       await this.refs.teams(workspaceId, [patch.ownerTeamId]);
     await this.refs.teams(workspaceId, patch.participatingTeamIds);

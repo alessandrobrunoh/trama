@@ -4,7 +4,7 @@ import {
   type ExecutionContext,
 } from '@nestjs/common';
 import type { Request } from 'express';
-import type { ActorRef, Capability, Role, TokenScope } from '../contracts/domain.js';
+import type { ActorRef, Capability, MemberAccess, Role, TokenScope } from '../contracts/domain.js';
 import type {
   ApiTokenEntity,
   UserEntity,
@@ -35,6 +35,11 @@ export interface WorkspaceContext {
   memberRole?: Role;
   /** Scope of the API token used for this request (undefined for browser sessions). */
   tokenScope?: TokenScope;
+  /**
+   * Present only when this person is narrower than their role. Owners are never narrowed.
+   * Absent or null: the role applies in full.
+   */
+  access?: MemberAccess | null;
 }
 
 export interface AppRequest extends Request {

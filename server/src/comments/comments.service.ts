@@ -5,7 +5,8 @@ import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, CommentIndexEntry, CommentPage, SubjectRef, SubjectType } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { CommentEntity } from '../database/entities/index.js';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
+import { CommentEntity, IssueEntity, MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { decodeCommentCursor, encodeCommentCursor, parseCommentLimit } from './comment-cursor.js';
@@ -19,7 +20,11 @@ export class CommentsService {
     @InjectRepository(CommentEntity) private readonly repo: Repository<CommentEntity>,
   ) {}
 
-  list(workspaceId: string, f: { subjectType?: string; subjectId?: string } = {}) {
+  async list(workspaceId: string, f: { subjectType?: string; subjectId?: string } = {}) {
+    if (currentAccess()) {
+      if (!f.subjectType || !f.subjectId) throw new ForbiddenException('List comments for one subject you can access');
+      await this.assertSubjectVisible(workspaceId, f.subjectType, f.subjectId);
+    }
     const qb = this.repo.createQueryBuilder('c').where('c.workspaceId = :workspaceId', { workspaceId }).orderBy('c.createdAt', 'ASC');
     if (f.subjectId) qb.andWhere("c.subject->>'id' = :sid", { sid: f.subjectId });
     if (f.subjectType) qb.andWhere("c.subject->>'type' = :st", { st: f.subjectType });
@@ -40,6 +45,7 @@ export class CommentsService {
     workspaceId: string,
     f: { subjectType: SubjectType; subjectId: string; limit?: number; cursor?: string },
   ): Promise<{ items: CommentEntity[]; nextCursor: CommentPage['nextCursor'] }> {
+    await this.assertSubjectVisible(workspaceId, f.subjectType, f.subjectId);
     const limit = parseCommentLimit(f.limit);
     const rows = await this.pageQuery(workspaceId, f, limit).getMany();
     const items = rows.slice(0, limit);
@@ -90,10 +96,12 @@ export class CommentsService {
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
     if (!row) throw notFound('Comment', id);
+    await this.assertSubjectVisible(workspaceId, row.subject.type, row.subject.id);
     return row;
   }
 
   async create(ctx: WorkspaceContext, subject: SubjectRef, body: string) {
+    await this.assertSubjectVisible(ctx.workspace.id, subject.type, subject.id);
     const resolved = await this.refs.resolveSubject(ctx.workspace.id, subject);
     if (!resolved.exists) throw new BadRequestException(`Unknown ${subject.type} "${subject.id}"`);
     const row = await this.repo.save(
@@ -131,5 +139,18 @@ export class CommentsService {
     if (!own && !hasRole(ctx.role, 'admin')) throw new ForbiddenException('Only the author or an admin can delete a comment');
     await this.repo.delete({ id });
     this.events.publish(ctx.workspace.id, { type: 'deleted', entity: 'comment', id });
+  }
+
+  /** A limited person can only read or write comments on work they are allowed to see. */
+  private async assertSubjectVisible(workspaceId: string, type: string, id: string): Promise<void> {
+    if (!currentAccess()) return;
+    if (type === 'project') {
+      if (projectHidden(currentAccess(), id)) throw notFound('Project', id);
+      return;
+    }
+    const entity = type === 'issue' ? IssueEntity : type === 'workstream' ? WorkstreamEntity : type === 'milestone' ? MilestoneEntity : null;
+    if (!entity) return;
+    const row = await this.repo.manager.getRepository(entity).findOne({ where: { workspaceId, id }, select: { id: true, projectId: true } });
+    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound(type, id);
   }
 }

@@ -25,6 +25,7 @@ import type {
   IssueKind,
   IssueSource,
   IssueStatus,
+  MemberAccess,
   NotificationChannels,
   NotificationKind,
   Priority,
@@ -130,6 +131,8 @@ export class MembershipEntity extends Wire {
   @Column({ type: 'varchar' })
   userId: string;
   @Column({ type: 'varchar' }) role: Role;
+  /** Null = the role applies in full. See `MemberAccess`. */
+  @Column({ type: 'jsonb', nullable: true }) access: MemberAccess | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 }
 
@@ -147,6 +150,8 @@ export class InviteEntity extends Wire {
   @Column({ type: 'varchar' })
   email: string;
   @Column({ type: 'varchar' }) role: Role;
+  /** Copied onto the membership when the invitation is accepted. Null = the role in full. */
+  @Column({ type: 'jsonb', nullable: true }) access: MemberAccess | null;
   @Index('UQ_invites_token', { unique: true })
   @Column({ type: 'varchar' })
   tokenHash: string;

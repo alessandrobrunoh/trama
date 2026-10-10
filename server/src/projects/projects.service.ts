@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, Priority, ProjectStatus } from '../contracts/domain.js';
@@ -9,6 +9,7 @@ import { EventsService } from '../events/events.service.js';
 import { demandConditions, type DemandFilter } from '../customers/demand-filter.js';
 import { LabelsService } from '../workspaces/labels.service.js';
 import { isProjectIcon } from './project-icon.js';
+import { applyProjectScope, currentAccess, projectHidden } from '../auth/member-access.js';
 
 export interface ProjectInput {
   name?: string;
@@ -58,16 +59,19 @@ export class ProjectsService {
     if (f.repositoryId) qb.andWhere('p.repositoryIds @> :rid::jsonb', { rid: JSON.stringify([f.repositoryId]) });
     for (const c of demandConditions('p', 'projectId', f)) qb.andWhere(c.sql, c.params);
     if (f.q) qb.andWhere('p.name ILIKE :q', { q: `%${f.q}%` });
+    applyProjectScope(qb, 'p', 'id');
     return qb.getMany();
   }
 
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
-    if (!row) throw notFound('Project', id);
+    if (!row || projectHidden(currentAccess(), row.id)) throw notFound('Project', id);
     return row;
   }
 
   async create(workspaceId: string, actor: ActorRef, input: ProjectInput & { name: string }) {
+    const access = currentAccess();
+    if (access && !access.projects.all) throw new ForbiddenException('Your access cannot add projects outside its list');
     await this.validate(workspaceId, input);
     const status = input.status ?? 'backlog';
     const row = await this.repo.save(
