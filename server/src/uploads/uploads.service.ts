@@ -272,13 +272,15 @@ export class UploadsService {
     >(
       documentId
         ? `SELECT "id", "uploadId" FROM "artifacts"
-           WHERE "workspaceId" = $1 AND "documentId" = $5`
+           WHERE "workspaceId" = $1 AND "documentId" = $2`
         : `SELECT "id", "uploadId" FROM "artifacts"
            WHERE "workspaceId" = $1
              AND "issueId" IS NOT DISTINCT FROM $2
              AND "workstreamId" IS NOT DISTINCT FROM $3
              AND "projectId" IS NOT DISTINCT FROM $4`,
-      [workspaceId, issueId, workstreamId, projectId, documentId],
+      documentId
+        ? [workspaceId, documentId]
+        : [workspaceId, issueId, workstreamId, projectId],
     );
     const subjects = [
       issueId,
