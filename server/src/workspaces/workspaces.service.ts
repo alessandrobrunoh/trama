@@ -9,6 +9,7 @@ import { DataSource, In, IsNull, type Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service.js';
 import { isOwner, type WorkspaceContext } from '../auth/request-context.js';
 import {
+  CAPABILITIES,
   accessWithin,
   applyTokenScope,
   canGrantRole,
@@ -199,6 +200,7 @@ export class WorkspacesService {
     if (!name || name.length > ROLE_NAME_MAX) throw new BadRequestException(`A role name is required (at most ${ROLE_NAME_MAX} characters)`);
     const roles = ctx.workspace.resolved().roles;
     if (roles.some((role) => role.name.toLowerCase() === name.toLowerCase())) throw new ConflictException(`A role named "${name}" already exists`);
+    this.assertKnownCapabilities(input.capabilities);
     const created: WorkspaceRole = {
       id: uid('role').toLowerCase(),
       name,
@@ -222,9 +224,20 @@ export class WorkspacesService {
       if (roles.some((item) => item.id !== role.id && item.name.toLowerCase() === name.toLowerCase())) throw new ConflictException(`A role named "${name}" already exists`);
       role.name = name;
     }
-    if (patch.capabilities !== undefined) role.capabilities = normalizeCapabilities(patch.capabilities, role.owner);
+    if (patch.capabilities !== undefined) {
+      this.assertKnownCapabilities(patch.capabilities);
+      role.capabilities = normalizeCapabilities(patch.capabilities, role.owner);
+    }
     if (patch.grants !== undefined && !role.owner) role.grants = normalizeGrantList(patch.grants);
     return this.writeRoles(ctx.workspace, roles);
+  }
+
+  private assertKnownCapabilities(input: readonly unknown[] | undefined): void {
+    if (!input) return;
+    for (const cap of input) {
+      if (typeof cap !== 'string' || !(CAPABILITIES as readonly string[]).includes(cap))
+        throw new BadRequestException(`Unknown capability "${String(cap)}"`);
+    }
   }
 
   /** Owner only. The owner role cannot be deleted, and neither can a role someone still holds. */

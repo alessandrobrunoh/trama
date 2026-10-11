@@ -26,31 +26,41 @@ describe('permission policies, team roles and token scopes', () => {
   }
 
   describe('workspace permission policy', () => {
-    it('exposes resolved defaults on the workspace and only owners may change them', async () => {
+    async function roleCaps(client: Client, w: string, roleId: string): Promise<string[]> {
+      const ws = (await client.get(w).expect(200)).body;
+      return ws.settings.roles.find((role: { id: string }) => role.id === roleId).capabilities;
+    }
+    async function setCaps(client: Client, w: string, roleId: string, capabilities: string[]) {
+      await client.patch(`${w}/roles/${roleId}`, { capabilities }).expect(200);
+    }
+
+    it('exposes the seeded roles and only owners may change them', async () => {
       const { owner, admin, member, w } = await setup();
       const ws = (await owner.get(w).expect(200)).body;
-      expect(ws.settings.permissions).toMatchObject({ createTeams: 'admin', createIssues: 'member', manageIntegrations: 'admin', manageTokens: 'member' });
+      const caps = (id: string) => ws.settings.roles.find((role: { id: string }) => role.id === id).capabilities as string[];
+      expect(caps('admin')).toContain('createTeams');
+      expect(caps('member')).not.toContain('createTeams');
+      expect(caps('member')).toContain('createIssues');
+      expect(caps('member')).toContain('manageTokens');
+      expect(caps('member')).not.toContain('manageIntegrations');
       expect(ws.settings).toMatchObject({ estimateScale: 'fibonacci', weekStart: 'monday', timeZone: 'auto' });
 
-      await admin.patch(`${w}/settings`, { permissions: { createTeams: 'member' } }).expect(403);
+      await admin.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'createTeams'] }).expect(403);
       await member.patch(`${w}/settings`, { estimateScale: 'linear' }).expect(403);
-      await owner.patch(`${w}/settings`, { permissions: { nope: 'member' } }).expect(400);
-      await owner.patch(`${w}/settings`, { permissions: { createTeams: 'viewer' } }).expect(400);
-      const res = (await owner.patch(`${w}/settings`, { permissions: { createTeams: 'member' } }).expect(200)).body;
-      expect(res.settings.permissions.createTeams).toBe('member');
-      expect(res.settings.permissions.createIssues).toBe('member');
-      // partial: untouched capabilities keep their value and the snapshot carries the policy
+      await owner.patch(`${w}/roles/member`, { capabilities: ['not-a-capability'] }).expect(400);
+      const res = (await owner.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'createTeams'] }).expect(200)).body;
+      expect(res.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createTeams');
+      expect(res.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createIssues');
       const snap = (await owner.get(`${w}/snapshot`).expect(200)).body;
-      expect(snap.workspace.settings.permissions.createTeams).toBe('member');
+      expect(snap.workspace.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createTeams');
     });
 
     it('capabilities are enforced on the routes (members can create teams once allowed; viewers never)', async () => {
       const { owner, member, viewer, w } = await setup();
       await member.post(`${w}/teams`, { name: 'Nope', key: 'NOPE' }).expect(403);
-      await owner.patch(`${w}/settings`, { permissions: { createTeams: 'member' } }).expect(200);
+      await setCaps(owner, w, 'member', [...(await roleCaps(owner, w, 'member')), 'createTeams']);
       await member.post(`${w}/teams`, { name: 'Yes', key: 'YES' }).expect(201);
       await viewer.post(`${w}/teams`, { name: 'No', key: 'NO' }).expect(403);
-      // editing / deleting teams is a separate capability
       const t = (await owner.post(`${w}/teams`, { name: 'Core', key: 'CORE' }).expect(201)).body;
       await member.patch(`${w}/teams/CORE`, { name: 'Renamed' }).expect(403);
       await member.delete(`${w}/teams/${t.id}`).expect(403);
@@ -63,7 +73,9 @@ describe('permission policies, team roles and token scopes', () => {
       const decision = (await member.post(`${w}/decisions`, { title: 'Use X', statement: 'We use X' }).expect(201)).body;
       const ws = (await member.post(`${w}/workstreams`, { title: 'W', ownerTeamId: team.id, deltaThreadUrl: DELTA }).expect(201)).body;
 
-      await owner.patch(`${w}/settings`, { permissions: { deleteIssues: 'admin', acceptDecisions: 'admin', deleteWorkstreams: 'owner', createIssues: 'admin' } }).expect(200);
+      const drop = new Set(['deleteIssues', 'acceptDecisions', 'deleteWorkstreams', 'createIssues']);
+      await setCaps(owner, w, 'member', (await roleCaps(owner, w, 'member')).filter((cap) => !drop.has(cap)));
+      await setCaps(owner, w, 'admin', (await roleCaps(owner, w, 'admin')).filter((cap) => cap !== 'deleteWorkstreams'));
       await member.delete(`${w}/issues/${issue.key}`).expect(403);
       await member.post(`${w}/decisions/${decision.key}/accept`).expect(403);
       await member.delete(`${w}/workstreams/${ws.key}`).expect(403);
@@ -74,12 +86,12 @@ describe('permission policies, team roles and token scopes', () => {
       await owner.delete(`${w}/workstreams/${ws.key}`).expect(204);
     });
 
-    it('only admins+ invite by default; invitees cannot exceed the inviter role; shared views follow manageSharedViews', async () => {
+    it('only roles with inviteMembers can invite, and not into a stronger role; shared views follow manageSharedViews', async () => {
       const { owner, admin, member, w } = await setup();
       await member.post(`${w}/members`, { email: 'x@y.dev', role: 'viewer' }).expect(403);
-      await owner.patch(`${w}/settings`, { permissions: { inviteMembers: 'member', manageSharedViews: 'admin' } }).expect(200);
+      await setCaps(owner, w, 'member', [...(await roleCaps(owner, w, 'member')), 'inviteMembers']);
       const other = await Client.signup(server, 'Newbie');
-      await member.post(`${w}/members`, { email: other.email, role: 'admin' }).expect(403); // above own role
+      await member.post(`${w}/members`, { email: other.email, role: 'admin' }).expect(403);
       await member.post(`${w}/members`, { email: other.email, role: 'viewer' }).expect(201);
       await member.post(`${w}/views`, { name: 'Mine', entity: 'issue', shared: true }).expect(403);
       await member.post(`${w}/views`, { name: 'Private', entity: 'issue' }).expect(201);
@@ -195,16 +207,16 @@ describe('permission policies, team roles and token scopes', () => {
 
       // read: GET only
       await read.client.get(`${w}/snapshot`).expect(200);
-      expect((await read.client.get(`${w}/snapshot`)).body.myRole).toBe('viewer');
+      expect((await read.client.get(`${w}/snapshot`)).body.myRole).toBe('owner');
       const denied = await read.client.post(`${w}/issues`, { kind: 'bug', title: 'x' }).expect(403);
       expect(denied.body.message).toMatch(/read/);
       await read.client.get(`${w}/integrations`).expect(403);
 
       // write: everyday work yes, admin routes no (even though the user is an owner)
       await write.client.post(`${w}/issues`, { kind: 'bug', title: 'from token' }).expect(201);
-      expect((await write.client.get(`${w}/snapshot`)).body.myRole).toBe('member');
+      expect((await write.client.get(`${w}/snapshot`)).body.myRole).toBe('owner');
       const noTeam = await write.client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(403);
-      expect(noTeam.body.message).toMatch(/admin-scoped token/);
+      expect(noTeam.body.message).toMatch(/write/);
       await write.client.patch(w, { name: 'Renamed' }).expect(403);
       await dflt.client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(403);
 

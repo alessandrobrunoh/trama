@@ -435,7 +435,10 @@ describe('artifacts with several owners, project context and project AI risks', 
       await viewer.client.post(`${w}/projects/${p.id}/ai/risks`).expect(403);
       await member.client.post(`${w}/projects/${p.id}/ai/risks`).expect(200);
 
-      await c.patch(`${w}/settings`, { permissions: { manageProjects: 'admin' } }).expect(200);
+      const memberRole = (await c.get(w).expect(200)).body.settings.roles.find((role: { id: string }) => role.id === 'member');
+      await c
+        .patch(`${w}/roles/member`, { capabilities: memberRole.capabilities.filter((cap: string) => cap !== 'manageProjects') })
+        .expect(200);
       const notLead = await mkProject('Someone else leads');
       await member.client.post(`${w}/projects/${notLead.id}/ai/risks`).expect(403);
       await member.client.post(`${w}/projects/${p.id}/ai/risks`).expect(200); // the lead keeps access
