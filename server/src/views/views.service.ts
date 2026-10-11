@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import { canDo, type WorkspaceContext } from '../auth/request-context.js';
+import { canDo, hasAdminPower, type WorkspaceContext } from '../auth/request-context.js';
 import { decryptSecret, encryptSecret } from '../common/crypto.js';
 import { notFound, uid } from '../common/util.js';
 import type { SavedView, ShareGrant, ShareLevel, ShareVisibility, SharingSettings, ViewEntity, ViewFilter, ViewLayout } from '../contracts/domain.js';
@@ -32,9 +32,18 @@ export interface ViewInput {
   sharing?: SharingInput;
 }
 
-type ViewCtx = Pick<WorkspaceContext, 'workspace' | 'userId' | 'role'>;
+type ViewCtx = Pick<WorkspaceContext, 'workspace' | 'userId' | 'role' | 'owner' | 'capabilities' | 'access'>;
 
-const actorOf = (ctx: ViewCtx): ViewActor => ({ userId: ctx.userId, role: ctx.role });
+const actorOf = (ctx: ViewCtx): ViewActor => {
+  if (ctx.capabilities === undefined && ctx.owner === undefined) return { userId: ctx.userId, role: ctx.role };
+  const grantWrite = ctx.access === null || !!ctx.access?.grants.some((grant) => !grant.endsWith(':view'));
+  return {
+    userId: ctx.userId,
+    role: ctx.role,
+    canWrite: !!ctx.owner || (ctx.capabilities?.length ?? 0) > 0 || grantWrite,
+    canAdmin: hasAdminPower(ctx),
+  };
+};
 
 @Injectable()
 export class ViewsService {

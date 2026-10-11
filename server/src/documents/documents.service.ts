@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
+import { hasAdminPower, type WorkspaceContext } from '../auth/request-context.js';
 import {
   DOCUMENT_LIMITS,
   type ActorRef,
@@ -481,7 +481,7 @@ export class DocumentsService {
   async remove(ctx: WorkspaceContext, id: string) {
     const workspaceId = ctx.workspace.id;
     const row = await this.load(workspaceId, id);
-    if (!sameActor(row.author, ctx.actor) && !hasRole(ctx.role, 'admin'))
+    if (!sameActor(row.author, ctx.actor) && !hasAdminPower(ctx))
       throw new ForbiddenException(
         'Only the author or an admin can delete a document (archive it instead)',
       );

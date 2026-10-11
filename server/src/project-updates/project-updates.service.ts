@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type EntityManager, type Repository } from 'typeorm';
 import { canDo, type WorkspaceContext } from '../auth/request-context.js';
 import type { ActorRef, ProjectHealth } from '../contracts/domain.js';
+import { loadStatusCatalog, requireStatus } from '../status/status-catalog.js';
 import { notFound, uid } from '../common/util.js';
 import { currentAccess, projectHidden } from '../auth/member-access.js';
 import {
@@ -12,7 +13,8 @@ import {
 import { EventsService } from '../events/events.service.js';
 
 export interface ProjectUpdateInput {
-  health?: ProjectHealth;
+  /** Catalog id, or a legacy enum (the seeded health of that type). */
+  health?: string;
   body?: string;
   aiDrafted?: boolean;
 }
@@ -30,6 +32,10 @@ export class ProjectUpdatesService {
     @InjectRepository(ProjectEntity)
     private readonly projects: Repository<ProjectEntity>,
   ) {}
+
+  private async healthOf(workspaceId: string, stored: string) {
+    return requireStatus((await loadStatusCatalog(this.ds, workspaceId)).projectHealth, stored, 'health');
+  }
 
   private async project(workspaceId: string, projectId: string) {
     const row = await this.projects.findOneBy({ workspaceId, id: projectId });
@@ -56,7 +62,7 @@ export class ProjectUpdatesService {
   async create(
     ctx: WorkspaceContext,
     projectId: string,
-    input: ProjectUpdateInput & { health: ProjectHealth; body: string },
+    input: ProjectUpdateInput & { health: string; body: string },
   ) {
     const workspaceId = ctx.workspace.id;
     const project = await this.project(workspaceId, projectId);
@@ -71,7 +77,7 @@ export class ProjectUpdatesService {
           id: uid('pu'),
           workspaceId,
           projectId,
-          health: input.health,
+          health: (await this.healthOf(workspaceId, input.health)).id as ProjectHealth,
           body: input.body.trim(),
           author: ctx.actor,
           aiDrafted: input.aiDrafted ?? false,
@@ -102,9 +108,12 @@ export class ProjectUpdatesService {
     const row = await this.get(workspaceId, projectId, id);
     this.assertCanChange(ctx, row);
     const fields: string[] = [];
-    if (patch.health !== undefined && patch.health !== row.health) {
-      row.health = patch.health;
-      fields.push('health');
+    if (patch.health !== undefined) {
+      const health = (await this.healthOf(workspaceId, patch.health)).id as ProjectHealth;
+      if (health !== row.health) {
+        row.health = health;
+        fields.push('health');
+      }
     }
     if (patch.body !== undefined && patch.body.trim() !== row.body) {
       row.body = patch.body.trim();

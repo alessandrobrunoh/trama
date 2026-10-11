@@ -8,6 +8,7 @@ import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   TramaStore,
+  resolveStatusEntry,
   Notifier,
   PRIORITY_META,
   UiStore,
@@ -64,8 +65,9 @@ export class IssueActions {
 
   // ───────────────────────── properties ─────────────────────────
 
-  setStatus(ids: readonly string[], status: IssueStatus): void {
-    this.patchMany(ids, (i) => (i.status === status ? null : { status }), `Status set to ${ISSUE_STATUS_META[status].label}`);
+  setStatus(ids: readonly string[], status: string): void {
+    const name = resolveStatusEntry(this.store.settings().statuses.issue, status)?.name ?? status;
+    this.patchMany(ids, (i) => (i.status === status ? null : { status }), `Status set to ${name}`);
   }
 
   setPriority(ids: readonly string[], priority: Priority): void {

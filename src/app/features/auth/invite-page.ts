@@ -6,7 +6,6 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import type { InvitePreview } from '../../core/contracts/domain';
-import { ROLE_META } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
 import { SessionStore } from '../../core/session/session.store';
 import { AuthShell } from './auth-shell';
@@ -91,8 +90,8 @@ export class InvitePage implements OnInit {
   protected readonly error = signal<string | null>(null);
 
   protected readonly roleLabel = computed(() => {
-    const role = this.invite()?.role;
-    return role ? ROLE_META[role].label : '';
+    const preview = this.invite();
+    return preview?.roleName || preview?.role || '';
   });
   protected readonly subtitle = computed(() => {
     const by = this.invite()?.invitedByName;

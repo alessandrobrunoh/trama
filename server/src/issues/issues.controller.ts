@@ -23,6 +23,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   Max,
   MaxLength,
   Min,
@@ -42,7 +43,6 @@ import type {
   ActorRef,
   IssueKind,
   IssueSource,
-  IssueStatus,
   Priority,
 } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
@@ -63,15 +63,6 @@ const KINDS: IssueKind[] = [
   'idea',
   'security',
 ];
-const STATUSES: IssueStatus[] = [
-  'draft',
-  'backlog',
-  'todo',
-  'in_progress',
-  'in_review',
-  'done',
-  'canceled',
-];
 const SOURCES: IssueSource[] = [
   'manual',
   'github',
@@ -81,6 +72,10 @@ const SOURCES: IssueSource[] = [
   'api',
   'agent',
 ];
+
+/** A seeded issue status, or an id created in workspace settings (`st_…`). */
+const ISSUE_STATUS_INPUT =
+  /^(draft|backlog|todo|in_progress|in_review|done|canceled|st_[a-z0-9]+)$/;
 
 class CreateIssueDto {
   @IsIn(KINDS) kind: IssueKind;
@@ -92,7 +87,7 @@ class CreateIssueDto {
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
-  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
+  @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
   /** Workspace label ids. */
@@ -112,7 +107,7 @@ class UpdateIssueDto {
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
-  @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
+  @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
   @OptionalNotNull()
   @IsArray()
@@ -145,7 +140,7 @@ class IssueRefsDto {
 
 /** One change applied to every issue. Labels and workstreams are added / removed, not replaced. */
 export class BulkIssuePatchDto {
-  @OptionalNotNull() @IsIn(STATUSES) status?: IssueStatus;
+  @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() assigneeId?: string | null;
   @Clearable() @IsString() teamId?: string | null;
@@ -172,12 +167,12 @@ class LinkIssueDto {
   @ValidateNested()
   @Type(() => CreateWorkstreamDto)
   createWorkstream?: CreateWorkstreamDto;
-  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
+  @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
 }
 
 class ListIssueQuery {
   @IsOptional() @IsIn(KINDS) kind?: IssueKind;
-  @IsOptional() @IsIn(STATUSES) status?: IssueStatus;
+  @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() projectId?: string;

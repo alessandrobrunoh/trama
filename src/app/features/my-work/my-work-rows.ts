@@ -6,6 +6,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUS_META,
   TramaStore,
+  resolveStatusEntry,
   Notifier,
   PRIORITY_META,
   isOverdue,
@@ -69,11 +70,12 @@ export class MyIssueRow {
   });
   protected readonly teamKey = computed(() => this.store.getTeam(this.issue().teamId)?.key ?? '');
 
-  protected async setStatus(status: IssueStatus): Promise<void> {
+  protected async setStatus(status: string): Promise<void> {
     const i = this.issue();
     const prev = i.status;
+    const name = resolveStatusEntry(this.store.settings().statuses.issue, status)?.name ?? status;
     if (await this.store.updateIssue(i.id, { status })) {
-      this.notifier.success(`${i.key} → ${ISSUE_STATUS_META[status].label}`, {
+      this.notifier.success(`${i.key} → ${name}`, {
         action: { label: 'Undo', run: () => void this.store.updateIssue(i.id, { status: prev }) },
       });
     }

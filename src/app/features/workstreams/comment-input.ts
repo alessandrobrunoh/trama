@@ -1,5 +1,17 @@
 // Comment textarea with `@person` and `#record` suggestions and optional `:emoji:` conversion.
-import { ChangeDetectionStrategy, Component, computed, ElementRef, afterNextRender, inject, input, model, output, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  ElementRef,
+  afterNextRender,
+  inject,
+  input,
+  model,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { TramaStore, Preferences, type ActorRef } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
@@ -102,10 +114,24 @@ export class CommentInput {
     const out: Suggestion[] = [];
     if (t.char === '@') {
       for (const m of this.store.members()) {
-        if (match(m.user.name)) out.push({ id: m.user.id, insert: `@${m.user.name}`, label: m.user.name, hint: m.membership.role, actor: { type: 'user', id: m.user.id } });
+        if (match(m.user.name))
+          out.push({
+            id: m.user.id,
+            insert: `@${m.user.name}`,
+            label: m.user.name,
+            hint: m.membership.role,
+            actor: { type: 'user', id: m.user.id },
+          });
       }
       for (const a of this.store.agents()) {
-        if (match(a.name)) out.push({ id: a.id, insert: `@${a.name}`, label: a.name, hint: 'agent', actor: { type: 'agent', id: a.id } });
+        if (match(a.name))
+          out.push({
+            id: a.id,
+            insert: `@${a.name}`,
+            label: a.name,
+            hint: 'agent',
+            actor: { type: 'agent', id: a.id },
+          });
       }
       return out.slice(0, MAX_SUGGESTIONS);
     }
@@ -120,10 +146,18 @@ export class CommentInput {
         }
       }
     };
-    take(this.store.workstreams(), (w) => (match(w.key, w.title) ? { id: w.id, insert: w.key, label: w.title, hint: w.key } : null));
-    take(this.store.issues(), (i) => (match(i.key, i.title) ? { id: i.id, insert: i.key, label: i.title, hint: i.key } : null));
-    take(this.store.decisions(), (d) => (match(d.key, d.title) ? { id: d.id, insert: d.key, label: d.title, hint: d.key } : null));
-    take(this.store.repositories(), (r) => (match(r.fullName) ? { id: r.id, insert: r.fullName, label: r.fullName, hint: 'repo' } : null));
+    take(this.store.workstreams(), (w) =>
+      match(w.key, w.title) ? { id: w.id, insert: w.key, label: w.title, hint: w.key } : null,
+    );
+    take(this.store.issues(), (i) =>
+      match(i.key, i.title) ? { id: i.id, insert: i.key, label: i.title, hint: i.key } : null,
+    );
+    take(this.store.decisions(), (d) =>
+      match(d.key, d.title) ? { id: d.id, insert: d.key, label: d.title, hint: d.key } : null,
+    );
+    take(this.store.repositories(), (r) =>
+      match(r.fullName) ? { id: r.id, insert: r.fullName, label: r.fullName, hint: 'repo' } : null,
+    );
     return out.slice(0, MAX_SUGGESTIONS);
   });
 
@@ -140,6 +174,18 @@ export class CommentInput {
 
   focus(): void {
     this.field().nativeElement.focus();
+  }
+
+  /** Insert text at the caret (an uploaded image or file). */
+  insert(text: string): void {
+    const el = this.field().nativeElement;
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const next = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`;
+    el.value = next;
+    el.setSelectionRange(start + text.length, start + text.length);
+    this.value.set(next);
+    el.focus();
   }
 
   protected onInput(): void {
@@ -163,7 +209,9 @@ export class CommentInput {
     const el = this.field().nativeElement;
     const upto = el.value.slice(0, el.selectionStart);
     const m = TRIGGER.exec(upto);
-    const next = m ? { char: m[2] as '@' | '#', query: m[3], start: upto.length - m[3].length - 1 } : null;
+    const next = m
+      ? { char: m[2] as '@' | '#', query: m[3], start: upto.length - m[3].length - 1 }
+      : null;
     const prev = this.trigger();
     if (next?.char !== prev?.char || next?.query !== prev?.query) this.active.set(0);
     this.trigger.set(next);

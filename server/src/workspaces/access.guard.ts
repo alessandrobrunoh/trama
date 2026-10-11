@@ -10,24 +10,44 @@ import {
 import { Reflector } from '@nestjs/core';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { AuthService, LEGACY_SESSION_COOKIE, SESSION_COOKIE } from '../auth/auth.service.js';
+import {
+  AuthService,
+  LEGACY_SESSION_COOKIE,
+  SESSION_COOKIE,
+} from '../auth/auth.service.js';
 import {
   ALLOW_CUSTOM_TOKEN_KEY,
   CAPABILITY_KEY,
   IS_PUBLIC_KEY,
+  MULTIPART_KEY,
   REQUIRE_USER_KEY,
   TEAM_SCOPE_KEY,
   ROLES_KEY,
   SESSION_ONLY_KEY,
-  hasRole,
   type AppRequest,
   type AuthInfo,
 } from '../auth/request-context.js';
-import { requiredPermission } from '../auth/api-permissions.js';
-import { effectiveMemberAccess } from '../contracts/domain.js';
+import {
+  isUploadBytesRoute,
+  requiredPermission,
+} from '../auth/api-permissions.js';
+import {
+  CAPABILITY_META,
+  agentWorkspaceRole,
+  applyTokenScope,
+  effectiveMemberAccess,
+  findWorkspaceRole,
+  roleAllows,
+} from '../contracts/domain.js';
 import { requiredMemberGrant } from '../auth/member-access.js';
 import { TokensService } from '../auth/tokens.service.js';
-import type { Capability, MemberAccess, Role, TokenScope } from '../contracts/domain.js';
+import type {
+  Capability,
+  MemberAccess,
+  Role,
+  TokenScope,
+  WorkspaceRole,
+} from '../contracts/domain.js';
 import { PermissionsService } from './permissions.service.js';
 import {
   AgentEntity,
@@ -36,13 +56,48 @@ import {
   WorkspaceEntity,
 } from '../database/entities/index.js';
 
-/** Effective role of a token: read -> viewer, write -> member (never above the member's own role). */
-export function capRole(role: Role, scope: TokenScope | undefined): Role {
-  const cap: Role | undefined = scope === 'read' ? 'viewer' : scope === 'write' ? 'member' : undefined;
-  return cap && !hasRole(cap, role) ? cap : role;
+/**
+ * Effective role of a token. `read` keeps view grants only. `write` drops admin capabilities and the
+ * owner flag. `admin` and `custom` keep the role. Never raises what the role already has.
+ */
+export function capRole(
+  role: WorkspaceRole,
+  scope: TokenScope | undefined,
+): WorkspaceRole {
+  return applyTokenScope(role, scope);
+}
+
+function rankGate(min: Role): 'viewer' | 'member' | 'admin' | 'owner' {
+  if (
+    min === 'owner' ||
+    min === 'admin' ||
+    min === 'member' ||
+    min === 'viewer'
+  )
+    return min;
+  return 'member';
+}
+
+function capabilityLabel(capability: Capability): string {
+  return CAPABILITY_META[capability].label.toLowerCase();
 }
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+/**
+ * Cookie-session writes must be JSON so a cross-site form cannot submit them. A handler marked
+ * multipart may also accept `multipart/form-data`; the CSRF header check still applies to both.
+ */
+export function sessionAllowsContentType(opts: {
+  hasBody: boolean;
+  json: boolean;
+  multipart: boolean;
+  multipartRoute: boolean;
+}): boolean {
+  if (!opts.hasBody) return true;
+  if (opts.json) return true;
+  return opts.multipartRoute && opts.multipart;
+}
 
 function parseCookies(header: string | undefined): Record<string, string> {
   const out: Record<string, string> = {};
@@ -56,7 +111,10 @@ function parseCookies(header: string | undefined): Record<string, string> {
 
 function hasBody(req: AppRequest): boolean {
   const len = req.headers['content-length'];
-  return (len !== undefined && len !== '0') || req.headers['transfer-encoding'] !== undefined;
+  return (
+    (len !== undefined && len !== '0') ||
+    req.headers['transfer-encoding'] !== undefined
+  );
 }
 
 /**
@@ -67,14 +125,15 @@ function hasBody(req: AppRequest): boolean {
  *  3. CSRF for cookie sessions: mutating requests need `X-Requested-With` or `X-Client-Id`
  *     (forces a CORS preflight, so only allow-listed origins can send them); bodies must be JSON.
  *  4. `@SessionOnly()` account routes (create workspace, accept invite, personal settings) refuse API tokens.
- *     API token scopes: `read` tokens can only call safe (GET) routes; the effective role of a
- *     `read` token is capped at viewer and of a `write` token at member, so neither can reach
- *     workspace-admin routes. `admin` tokens keep the full role of the user they act as.
+ *     API token scopes: `read` tokens can only call safe (GET) routes and lose every capability.
+ *     A `write` token drops admin capabilities and the owner role, so it cannot reach workspace-admin
+ *     routes. `admin` tokens keep the full role of the user they act as.
  *  5. For routes with a `:slug` param: resolves the workspace + the caller's role → `req.ctx`.
- *     Non-members get 404 (existence is not leaked), too-low role gets 403.
- *     The minimum role is `@Can(capability)` (workspace permission settings), else `@Roles(min)`,
- *     else viewer for reads / member for writes.
- *     Agent tokens get role `member` in the workspace the token belongs to.
+ *     Non-members get 404 (existence is not leaked). A role without the capability, or without the
+ *     grant a write needs, gets 403.
+ *     The gate is `@Can(capability)` (that role's own set), else `@Roles(min)`, else viewer for reads
+ *     and member for writes. There is no rank ladder.
+ *     Agent tokens act with the historical member permissions, never as owner.
  */
 @Injectable()
 export class AccessGuard implements CanActivate {
@@ -82,10 +141,14 @@ export class AccessGuard implements CanActivate {
     private readonly reflector: Reflector,
     private readonly auth: AuthService,
     private readonly tokens: TokensService,
-    @InjectRepository(WorkspaceEntity) private readonly workspaces: Repository<WorkspaceEntity>,
-    @InjectRepository(MembershipEntity) private readonly memberships: Repository<MembershipEntity>,
-    @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
-    @InjectRepository(AgentEntity) private readonly agents: Repository<AgentEntity>,
+    @InjectRepository(WorkspaceEntity)
+    private readonly workspaces: Repository<WorkspaceEntity>,
+    @InjectRepository(MembershipEntity)
+    private readonly memberships: Repository<MembershipEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
+    @InjectRepository(AgentEntity)
+    private readonly agents: Repository<AgentEntity>,
     private readonly permissions: PermissionsService,
   ) {}
 
@@ -97,7 +160,9 @@ export class AccessGuard implements CanActivate {
 
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, targets)) {
       if (mutating && hasBody(req) && !req.is('application/json'))
-        throw new UnsupportedMediaTypeException('Content-Type must be application/json');
+        throw new UnsupportedMediaTypeException(
+          'Content-Type must be application/json',
+        );
       return true;
     }
 
@@ -106,68 +171,151 @@ export class AccessGuard implements CanActivate {
     req.auth = auth;
 
     if (mutating && auth.method === 'session') {
-      if (hasBody(req) && !req.is('application/json'))
-        throw new UnsupportedMediaTypeException('Content-Type must be application/json');
+      const multipartRoute =
+        this.reflector.getAllAndOverride<boolean>(MULTIPART_KEY, targets) ===
+        true;
+      if (
+        !sessionAllowsContentType({
+          hasBody: hasBody(req),
+          json: Boolean(req.is('application/json')),
+          multipart: Boolean(req.is('multipart/form-data')),
+          multipartRoute,
+        })
+      ) {
+        throw new UnsupportedMediaTypeException(
+          'Content-Type must be application/json',
+        );
+      }
       if (!req.headers['x-requested-with'] && !req.headers['x-client-id'])
-        throw new ForbiddenException('Missing X-Requested-With or X-Client-Id header');
+        throw new ForbiddenException(
+          'Missing X-Requested-With or X-Client-Id header',
+        );
     }
 
-    if (auth.token && this.reflector.getAllAndOverride<boolean>(SESSION_ONLY_KEY, targets))
-      throw new ForbiddenException('This account-level route is only available to signed-in browser sessions, not API tokens');
+    if (
+      auth.token &&
+      this.reflector.getAllAndOverride<boolean>(SESSION_ONLY_KEY, targets)
+    )
+      throw new ForbiddenException(
+        'This account-level route is only available to signed-in browser sessions, not API tokens',
+      );
 
     if (auth.token) {
       await this.tokens.enforceLimits(auth.token, mutating);
-      if (auth.token.scope === 'custom') this.enforceCustomPermission(req, targets, mutating);
+      if (auth.token.scope === 'custom')
+        this.enforceCustomPermission(req, targets, mutating);
     }
 
     if (auth.token?.scope === 'read' && mutating)
-      throw new ForbiddenException('This API token has the "read" scope and can only call GET routes');
+      throw new ForbiddenException(
+        'This API token has the "read" scope and can only call GET routes',
+      );
 
-    if (this.reflector.getAllAndOverride<boolean>(REQUIRE_USER_KEY, targets) && !auth.user)
-      throw new ForbiddenException('This endpoint requires a user, not an agent token');
+    if (
+      this.reflector.getAllAndOverride<boolean>(REQUIRE_USER_KEY, targets) &&
+      !auth.user
+    )
+      throw new ForbiddenException(
+        'This endpoint requires a user, not an agent token',
+      );
 
     const slug = (req.params as Record<string, string | undefined>).slug;
     if (slug) {
       const workspace = await this.workspaces.findOneBy({ slug });
-      const membership = workspace ? await this.membershipIn(auth, workspace.id) : null;
-      if (!workspace || !membership) throw new NotFoundException(`Workspace "${slug}" not found`);
+      const membership = workspace
+        ? await this.membershipIn(auth, workspace.id)
+        : null;
+      if (!workspace || !membership)
+        throw new NotFoundException(`Workspace "${slug}" not found`);
       const memberRole = membership.role;
-      const capability = this.reflector.getAllAndOverride<Capability | undefined>(CAPABILITY_KEY, targets);
-      const min: Role = capability
-        ? workspace.resolved().permissions[capability]
-        : (this.reflector.getAllAndOverride<Role | undefined>(ROLES_KEY, targets) ?? (mutating ? 'member' : 'viewer'));
+      const settings = workspace.resolved();
+      const baseRole =
+        membership.kind === 'agent'
+          ? agentWorkspaceRole()
+          : findWorkspaceRole(settings.roles, memberRole);
+      if (!baseRole)
+        throw new ForbiddenException('This role is no longer available');
+      const capability = this.reflector.getAllAndOverride<
+        Capability | undefined
+      >(CAPABILITY_KEY, targets);
+      const min =
+        this.reflector.getAllAndOverride<Role | undefined>(
+          ROLES_KEY,
+          targets,
+        ) ?? (mutating ? 'member' : 'viewer');
       const scope = auth.token?.scope;
-      const role = capRole(memberRole, scope);
+      const effective = capRole(baseRole, scope);
       const stored = membership.kind === 'user' ? membership.access : null;
-      const access = effectiveMemberAccess(role, stored, workspace.resolved().roleGrants);
-      if (!hasRole(role, min)) {
-        const needed = requiredMemberGrant(req.method, (req.route as { path?: string } | undefined)?.path ?? '');
-        const covered = !!needed && !!access?.grants.includes(needed);
-        if (!covered) {
-          if (scope && hasRole(memberRole, min))
-            throw new ForbiddenException(`This route needs role ${min}: use an admin-scoped token (this one is "${scope}")`);
-          throw new ForbiddenException(`Requires role ${min} or higher`);
-        }
+      const access = effectiveMemberAccess(effective, stored);
+      const needed = requiredMemberGrant(
+        req.method,
+        (req.route as { path?: string } | undefined)?.path ?? '',
+      );
+      const gate = { capability, min: rankGate(min), neededGrant: needed };
+      if (!roleAllows(effective, gate, access)) {
+        const uncapped = effectiveMemberAccess(baseRole, stored);
+        if (scope && scope !== 'admin' && roleAllows(baseRole, gate, uncapped))
+          throw new ForbiddenException(
+            `This route needs more than the "${scope}" token scope allows`,
+          );
+        if (capability)
+          throw new ForbiddenException(
+            `You are not allowed to ${capabilityLabel(capability)}`,
+          );
+        throw new ForbiddenException('You are not allowed to do that');
       }
-      if (access) this.enforceMemberGrant(req, access);
-      req.ctx = { workspace, actor: auth.actor, userId: auth.user?.id, role, memberRole, tokenScope: scope, access };
-      const teamScope = this.reflector.getAllAndOverride<'workstream' | 'issue' | undefined>(TEAM_SCOPE_KEY, targets);
-      if (teamScope) await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
+      // A capability is the permission for this route. Grants still narrow routes that are not capability-gated.
+      if (access && !capability) this.enforceMemberGrant(req, access);
+      const role = membership.kind === 'agent' ? 'member' : memberRole;
+      req.ctx = {
+        workspace,
+        actor: auth.actor,
+        userId: auth.user?.id,
+        role,
+        memberRole: role,
+        tokenScope: scope,
+        access,
+        owner: effective.owner,
+        capabilities: effective.capabilities,
+      };
+      const teamScope = this.reflector.getAllAndOverride<
+        'workstream' | 'issue' | undefined
+      >(TEAM_SCOPE_KEY, targets);
+      if (teamScope)
+        await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }
     return true;
   }
 
   /** `custom` tokens: the route's `<resource>:<action>` must be in the token's explicit list. */
-  private enforceCustomPermission(req: AppRequest, targets: Parameters<Reflector['getAllAndOverride']>[1], mutating: boolean): void {
+  private enforceCustomPermission(
+    req: AppRequest,
+    targets: Parameters<Reflector['getAllAndOverride']>[1],
+    mutating: boolean,
+  ): void {
     const token = req.auth!.token!;
     const path = (req.route as { path?: string } | undefined)?.path ?? '';
     const needed = requiredPermission(req.method, path);
     if (!needed) {
-      if (this.reflector.getAllAndOverride<boolean>(ALLOW_CUSTOM_TOKEN_KEY, targets) && !mutating) return;
-      throw new ForbiddenException('This route is not available to custom API tokens');
+      // File bytes are not their own permission. UploadsService checks the parent record, and
+      // whether this token may write, before anything is stored or returned.
+      if (isUploadBytesRoute(path)) return;
+      if (
+        this.reflector.getAllAndOverride<boolean>(
+          ALLOW_CUSTOM_TOKEN_KEY,
+          targets,
+        ) &&
+        !mutating
+      )
+        return;
+      throw new ForbiddenException(
+        'This route is not available to custom API tokens',
+      );
     }
     if (!token.permissions?.includes(needed))
-      throw new ForbiddenException(`This API token lacks the "${needed}" permission`);
+      throw new ForbiddenException(
+        `This API token lacks the "${needed}" permission`,
+      );
   }
 
   private async authenticate(req: AppRequest): Promise<AuthInfo | null> {
@@ -181,7 +329,14 @@ export class AccessGuard implements CanActivate {
       if (!token) return null;
       if (token.actor.type === 'user') {
         const user = await this.users.findOneBy({ id: token.actor.id });
-        return user ? { actor: { type: 'user', id: user.id }, user, token, method: 'token' } : null;
+        return user
+          ? {
+              actor: { type: 'user', id: user.id },
+              user,
+              token,
+              method: 'token',
+            }
+          : null;
       }
       return { actor: token.actor, token, method: 'token' };
     }
@@ -210,15 +365,24 @@ export class AccessGuard implements CanActivate {
   private async membershipIn(
     auth: AuthInfo,
     workspaceId: string,
-  ): Promise<{ kind: 'user'; role: Role; access: MemberAccess | null } | { kind: 'agent'; role: Role; access: null } | null> {
+  ): Promise<
+    | { kind: 'user'; role: Role; access: MemberAccess | null }
+    | { kind: 'agent'; role: Role; access: null }
+    | null
+  > {
     if (auth.token && auth.token.workspaceId !== workspaceId) return null;
     if (auth.user) {
-      const m = await this.memberships.findOneBy({ workspaceId, userId: auth.user.id });
+      const m = await this.memberships.findOneBy({
+        workspaceId,
+        userId: auth.user.id,
+      });
       return m ? { kind: 'user', role: m.role, access: m.access } : null;
     }
     // Agent token: valid only while the agent still exists in this workspace. Agents are not narrowed per person.
     if (auth.actor.type === 'agent' && auth.actor.id) {
-      return (await this.agents.existsBy({ id: auth.actor.id, workspaceId })) ? { kind: 'agent', role: 'member', access: null } : null;
+      return (await this.agents.existsBy({ id: auth.actor.id, workspaceId }))
+        ? { kind: 'agent', role: 'member', access: null }
+        : null;
     }
     return null;
   }

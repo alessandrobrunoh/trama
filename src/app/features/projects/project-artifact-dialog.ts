@@ -24,6 +24,7 @@ import {
   type ArtifactState,
 } from '../../core';
 import { statusLabel } from '../../shared/status';
+import { UploadFile } from '../../shared/upload-file';
 import { Picker, type PickOption } from '../workstreams/picker';
 
 /** What a new artifact gets attached to. */
@@ -87,6 +88,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
     HlmLabelImports,
     HlmTextareaImports,
     Picker,
+    UploadFile,
   ],
   host: { class: 'contents' },
   template: `
@@ -173,6 +175,28 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
             }
           </div>
 
+          @if (!editing()) {
+            <div class="flex min-w-0 items-center gap-2">
+              <app-upload-file label="Upload a file" [busy]="busy()" (file)="pickFile($event)" />
+              @if (fileName()) {
+                <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs">{{
+                  fileName()
+                }}</span>
+                <button
+                  type="button"
+                  class="text-muted-foreground text-xs underline"
+                  (click)="clearFile()"
+                >
+                  Remove
+                </button>
+              }
+            </div>
+            <p class="text-muted-foreground -mt-1 text-xs">
+              Images, PDF, text and Office documents, up to 8 MB. Executables are rejected. A URL
+              still works.
+            </p>
+          }
+
           <div class="grid gap-1.5">
             <label hlmLabel for="pad-desc">
               Description
@@ -225,6 +249,8 @@ export class ProjectArtifactDialog {
   protected readonly state = signal<ArtifactState>('published');
   protected readonly busy = signal(false);
   protected readonly touched = signal(false);
+  protected readonly fileName = signal('');
+  private file: File | null = null;
 
   protected readonly editing = computed(() => !!this.artifact());
   /** Items with their own state vocabulary (a PR, a build…) keep it; the picker only covers draft / published. */
@@ -252,6 +278,7 @@ export class ProjectArtifactDialog {
         this.state.set(a && DOC_STATES.includes(a.state) ? a.state : 'published');
         this.busy.set(false);
         this.touched.set(false);
+        this.clearFile();
       });
     });
   }
@@ -260,14 +287,41 @@ export class ProjectArtifactDialog {
     if (k) this.kind.set(k as ArtifactKind);
   }
 
+  protected pickFile(file: File): void {
+    this.file = file;
+    this.fileName.set(file.name);
+    if (!this.title().trim()) this.title.set(file.name);
+  }
+
+  protected clearFile(): void {
+    this.file = null;
+    this.fileName.set('');
+  }
+
   protected async submit(): Promise<void> {
     if (this.busy()) return;
     this.touched.set(true);
     const title = this.title().trim();
-    if (!title || this.urlError()) return;
+    const uploaded = this.file;
+    if (!uploaded && (!title || this.urlError())) return;
     this.busy.set(true);
     const url = this.url().trim();
     try {
+      if (uploaded && !this.artifact()) {
+        const target = this.target();
+        const created = await this.store.uploadArtifactFile(
+          target.type === 'project'
+            ? { type: 'project', id: target.id }
+            : { type: 'issue', id: target.key },
+          uploaded,
+        );
+        if (created) {
+          this.saved.emit(created);
+          this.open.set(false);
+        }
+        return;
+      }
+      if (!title || this.urlError()) return;
       const current = this.artifact();
       if (current) {
         const patch = {

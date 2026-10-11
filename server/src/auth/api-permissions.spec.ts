@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import { normalizePermissions, requiredPermission } from './api-permissions.js';
+import { isUploadBytesRoute, normalizePermissions, requiredPermission } from './api-permissions.js';
 
 describe('requiredPermission', () => {
   it('maps method + resource', () => {
@@ -70,8 +70,14 @@ describe('requiredPermission', () => {
       ['POST', '/api/w/:slug/projects/:id/artifacts', 'artifacts:write'],
       ['GET', '/api/w/:slug/artifacts/:id', 'artifacts:read'],
       ['DELETE', '/api/w/:slug/artifacts/:id', 'artifacts:delete'],
+      ['POST', '/api/w/:slug/issues/:idOrKey/artifacts/upload', 'artifacts:write'],
+      ['POST', '/api/w/:slug/workstreams/:idOrKey/artifacts/upload', 'artifacts:write'],
+      ['POST', '/api/w/:slug/projects/:id/artifacts/upload', 'artifacts:write'],
     ];
     for (const [method, route, expected] of table) expect(requiredPermission(method, route), `${method} ${route}`).toBe(expected);
+    expect(requiredPermission('GET', '/api/w/:slug/uploads/:id')).toBeNull();
+    expect(isUploadBytesRoute('/api/w/:slug/uploads/:id')).toBe(true);
+    expect(isUploadBytesRoute('/api/w/:slug/issues/:idOrKey/artifacts/upload')).toBe(false);
   });
 
   it('maps documents to documents:*, revisions included; attaching needs artifacts:write', () => {

@@ -31,6 +31,8 @@ import type {
   GitProvider,
   ID,
   ISODate,
+  Capability,
+  LabelScope,
   Issue,
   IssueKind,
   IssueSource,
@@ -100,12 +102,40 @@ export interface UpdateWorkspaceSettingsInput {
 export interface CreateLabelInput {
   name: string;
   color?: string;
+  scope: LabelScope;
 }
 export interface UpdateLabelInput {
   name?: string;
   color?: string;
   /** `true` archives (hidden from pickers, kept where used), `false` restores. */
   archived?: boolean;
+  /** Custom labels only. Templates stay `issue`. */
+  scope?: LabelScope;
+}
+
+export interface RoleInput {
+  name: string;
+  capabilities?: Capability[];
+  grants?: MemberGrant[];
+}
+
+export interface UpdateRoleInput {
+  name?: string;
+  capabilities?: Capability[];
+  grants?: MemberGrant[];
+}
+
+export interface CreateStatusInput {
+  name?: string;
+  icon: string;
+  color: string;
+  type: string;
+}
+
+export interface UpdateStatusInput {
+  name?: string;
+  icon?: string;
+  color?: string;
 }
 export interface MergeLabelInput {
   /** Label id that takes over everything labelled with the one being merged away. */
@@ -314,7 +344,7 @@ export interface CreateWorkstreamInput {
   labels?: string[];
   startDate?: ISODate;
   targetDate?: ISODate;
-  statusOverride?: WorkstreamStatus;
+  statusOverride?: string;
 }
 export interface UpdateWorkstreamInput {
   title?: string;
@@ -333,7 +363,7 @@ export interface UpdateWorkstreamInput {
   labels?: string[];
   startDate?: ISODate | null;
   targetDate?: ISODate | null;
-  statusOverride?: WorkstreamStatus | null;
+  statusOverride?: string | null;
 }
 export interface CriterionInput {
   text: string;
@@ -370,7 +400,7 @@ export interface CreateIssueInput {
   /** Project the issue is planned under. */
   projectId?: ID;
   priority?: Priority;
-  status?: IssueStatus;
+  status?: string;
   externalUrl?: string;
   estimate?: number;
   /** Workspace label ids. */
@@ -388,7 +418,7 @@ export interface UpdateIssueInput {
   /** `null` clears it and drops that project's milestone. */
   projectId?: ID | null;
   priority?: Priority;
-  status?: IssueStatus;
+  status?: string;
   reporterName?: string | null;
   externalUrl?: string | null;
   workstreamIds?: ID[];
@@ -401,7 +431,7 @@ export interface UpdateIssueInput {
 }
 /** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
 export interface BulkIssuePatch {
-  status?: IssueStatus;
+  status?: string;
   priority?: Priority;
   assigneeId?: ID | null;
   teamId?: ID | null;

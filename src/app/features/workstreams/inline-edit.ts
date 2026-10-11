@@ -1,11 +1,23 @@
 // Click-to-edit primitives: single-line text and markdown.
-import { ChangeDetectionStrategy, Component, ElementRef, effect, input, output, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { LucidePencil, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
+import { TramaStore } from '../../core';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
+import { UploadFile } from '../../shared/upload-file';
 
 /** Single line of text that turns into an input on click (Enter saves, Esc cancels, blur saves). */
 @Component({
@@ -101,7 +113,7 @@ export class InlineText {
 @Component({
   selector: 'app-editable-markdown',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon],
+  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon, UploadFile],
   host: { class: 'block' },
   template: `
     @if (editing()) {
@@ -118,8 +130,20 @@ export class InlineText {
         (keydown.escape)="cancel($event)"
       ></textarea>
       <div class="mt-2 flex items-center gap-2">
-        <button hlmBtn size="sm" type="button" (click)="commit()">Save <app-kbd keys="mod+enter" class="opacity-70" /></button>
-        <button hlmBtn size="sm" variant="ghost" type="button" (click)="editing.set(false)">Cancel</button>
+        <button hlmBtn size="sm" type="button" (click)="commit()">
+          Save <app-kbd keys="mod+enter" class="opacity-70" />
+        </button>
+        <button hlmBtn size="sm" variant="ghost" type="button" (click)="cancel()">
+          Cancel
+        </button>
+        @if (uploads()) {
+          <app-upload-file
+            label="Image or file"
+            variant="ghost"
+            [busy]="uploading()"
+            (file)="addFile($event)"
+          />
+        }
         <span class="text-meta ml-auto">Markdown supported</span>
       </div>
     } @else {
@@ -149,14 +173,18 @@ export class InlineText {
   `,
 })
 export class EditableMarkdown {
+  private readonly store = inject(TramaStore);
   readonly value = input('');
   readonly label = input('text');
   readonly placeholder = input('Click to add…');
   readonly canEdit = input(true);
+  /** Offer an upload that inserts a workspace image or file into this markdown. */
+  readonly uploads = input(false);
   readonly save = output<string>();
 
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
+  protected readonly uploading = signal(false);
   protected readonly pencil = LucidePencil;
   private readonly ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
 
@@ -182,14 +210,38 @@ export class EditableMarkdown {
     this.editing.set(true);
   }
 
+  protected async addFile(file: File): Promise<void> {
+    if (this.uploading()) return;
+    this.uploading.set(true);
+    try {
+      const markdown = await this.store.stageUpload(file);
+      if (!markdown) return;
+      const el = this.ta()?.nativeElement;
+      const text = this.draft().trim() ? `\n\n${markdown}\n` : `${markdown}\n`;
+      if (!el) {
+        this.draft.update((v) => v + text);
+        return;
+      }
+      const start = el.selectionStart ?? el.value.length;
+      const next = `${el.value.slice(0, start)}${text}${el.value.slice(el.selectionEnd ?? start)}`;
+      el.value = next;
+      el.setSelectionRange(start + text.length, start + text.length);
+      this.draft.set(next);
+      el.focus();
+    } finally {
+      this.uploading.set(false);
+    }
+  }
+
   protected commit(): void {
     const v = this.draft().trim();
     this.editing.set(false);
     if (v !== this.value().trim()) this.save.emit(v);
   }
 
-  protected cancel(e: Event): void {
-    e.stopPropagation();
+  protected cancel(e?: Event): void {
+    e?.stopPropagation();
+    if (this.uploads()) this.store.discardDraftUploads(this.value(), this.draft());
     this.editing.set(false);
   }
 }

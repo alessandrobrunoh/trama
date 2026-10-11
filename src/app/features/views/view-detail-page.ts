@@ -1,5 +1,13 @@
 import { NgTemplateOutlet } from '@angular/common';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideArrowDownWideNarrow,
@@ -72,6 +80,7 @@ import {
   isNumberField,
   valueColor,
   valueGlyph,
+  statusColumnIds,
   valueLabel,
   type ViewGroup,
 } from './view-model';
@@ -119,12 +128,26 @@ type PageLayout = 'list' | 'board' | 'timeline';
     @if (view(); as v) {
       <ng-template appTopBarActions>
         @if (!canEdit()) {
-          <button hlmBtn variant="outline" size="sm" (click)="duplicate()" hlmTooltip="Save a copy you can change" position="bottom">
+          <button
+            hlmBtn
+            variant="outline"
+            size="sm"
+            (click)="duplicate()"
+            hlmTooltip="Save a copy you can change"
+            position="bottom"
+          >
             <svg [lucideIcon]="copyIcon" [size]="14"></svg>
             <span class="max-sm:hidden">Duplicate to edit</span>
           </button>
         }
-        <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="View actions">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
+          [hlmDropdownMenuTrigger]="more"
+          aria-label="View actions"
+        >
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
         </button>
         <ng-template #more>
@@ -146,7 +169,12 @@ type PageLayout = 'list' | 'board' | 'timeline';
       </ng-template>
 
       <app-page-header [title]="v.name" [description]="description()">
-        <svg leading [lucideIcon]="entityIcon()" [size]="15" class="text-muted-foreground shrink-0"></svg>
+        <svg
+          leading
+          [lucideIcon]="entityIcon()"
+          [size]="15"
+          class="text-muted-foreground shrink-0"
+        ></svg>
         <span meta class="flex min-w-0 items-center gap-2">
           <app-inline-text
             class="-mx-1.5 w-56 max-w-full"
@@ -169,14 +197,35 @@ type PageLayout = 'list' | 'board' | 'timeline';
             [disabled]="!canEdit()"
             aria-label="Layout"
           >
-            <button hlmToggleGroupItem value="list" aria-label="List" class="h-7 px-2" hlmTooltip="List" position="bottom">
+            <button
+              hlmToggleGroupItem
+              value="list"
+              aria-label="List"
+              class="h-7 px-2"
+              hlmTooltip="List"
+              position="bottom"
+            >
               <svg [lucideIcon]="listIcon" [size]="14"></svg>
             </button>
-            <button hlmToggleGroupItem value="board" aria-label="Board" class="h-7 px-2" hlmTooltip="Board" position="bottom">
+            <button
+              hlmToggleGroupItem
+              value="board"
+              aria-label="Board"
+              class="h-7 px-2"
+              hlmTooltip="Board"
+              position="bottom"
+            >
               <svg [lucideIcon]="boardIcon" [size]="14"></svg>
             </button>
             @if (supportsTimeline()) {
-              <button hlmToggleGroupItem value="timeline" aria-label="Timeline" class="h-7 px-2" hlmTooltip="Timeline" position="bottom">
+              <button
+                hlmToggleGroupItem
+                value="timeline"
+                aria-label="Timeline"
+                class="h-7 px-2"
+                hlmTooltip="Timeline"
+                position="bottom"
+              >
                 <svg [lucideIcon]="timelineIcon" [size]="14"></svg>
               </button>
             }
@@ -187,7 +236,9 @@ type PageLayout = 'list' | 'board' | 'timeline';
         <div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 sm:px-6">
           @for (f of activeFilters(); track f.field) {
             @if (f.numeric) {
-              <span class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs">
+              <span
+                class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs"
+              >
                 <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
                 <span class="text-muted-foreground flex items-center px-2">at least</span>
                 <input
@@ -213,9 +264,13 @@ type PageLayout = 'list' | 'board' | 'timeline';
               </span>
             } @else if (f.editable) {
               <!-- Linear-style chip: field · operator · value · × -->
-              <span class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs">
+              <span
+                class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs"
+              >
                 <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
-                <span class="text-muted-foreground flex items-center px-2">{{ f.values.length > 1 ? 'is any of' : 'is' }}</span>
+                <span class="text-muted-foreground flex items-center px-2">{{
+                  f.values.length > 1 ? 'is any of' : 'is'
+                }}</span>
                 <app-option-menu
                   variant="segment"
                   [label]="f.label"
@@ -237,7 +292,9 @@ type PageLayout = 'list' | 'board' | 'timeline';
                 }
               </span>
             } @else {
-              <span class="border-border-strong bg-secondary/60 inline-flex h-7 items-center gap-1 rounded-md border ps-2 pe-1 text-xs">
+              <span
+                class="border-border-strong bg-secondary/60 inline-flex h-7 items-center gap-1 rounded-md border ps-2 pe-1 text-xs"
+              >
                 {{ f.text }}
                 @if (canEdit()) {
                   <button
@@ -267,7 +324,9 @@ type PageLayout = 'list' | 'board' | 'timeline';
               <hlm-dropdown-menu class="w-56">
                 <hlm-dropdown-menu-label>Filter by</hlm-dropdown-menu-label>
                 @for (fd of addableFields(); track fd.field) {
-                  <button hlmDropdownMenuItem (triggered)="addPending(fd.field)">{{ fd.label }}</button>
+                  <button hlmDropdownMenuItem (triggered)="addPending(fd.field)">
+                    {{ fd.label }}
+                  </button>
                 }
               </hlm-dropdown-menu>
             </ng-template>
@@ -292,15 +351,27 @@ type PageLayout = 'list' | 'board' | 'timeline';
           </button>
           <ng-template #groupMenu>
             <hlm-dropdown-menu class="w-52">
-              <hlm-dropdown-menu-label>{{ layout() === 'board' ? 'Columns by' : 'Group by' }}</hlm-dropdown-menu-label>
+              <hlm-dropdown-menu-label>{{
+                layout() === 'board' ? 'Columns by' : 'Group by'
+              }}</hlm-dropdown-menu-label>
               @if (layout() !== 'board') {
-                <button hlmDropdownMenuRadio [checked]="!v.groupBy" [keepOpen]="false" (triggered)="setGroup(null)">
+                <button
+                  hlmDropdownMenuRadio
+                  [checked]="!v.groupBy"
+                  [keepOpen]="false"
+                  (triggered)="setGroup(null)"
+                >
                   No grouping
                   <hlm-dropdown-menu-radio-indicator />
                 </button>
               }
               @for (fd of groupableFields(); track fd.field) {
-                <button hlmDropdownMenuRadio [checked]="effectiveGroup() === fd.field" [keepOpen]="false" (triggered)="setGroup(fd.field)">
+                <button
+                  hlmDropdownMenuRadio
+                  [checked]="effectiveGroup() === fd.field"
+                  [keepOpen]="false"
+                  (triggered)="setGroup(fd.field)"
+                >
                   {{ fd.label }}
                   <hlm-dropdown-menu-radio-indicator />
                 </button>
@@ -316,19 +387,32 @@ type PageLayout = 'list' | 'board' | 'timeline';
             [disabled]="!canEdit()"
             [hlmDropdownMenuTrigger]="sortMenu"
           >
-            <svg [lucideIcon]="v.sort?.direction === 'asc' ? sortAscIcon : sortDescIcon" [size]="13"></svg>
+            <svg
+              [lucideIcon]="v.sort?.direction === 'asc' ? sortAscIcon : sortDescIcon"
+              [size]="13"
+            ></svg>
             <span class="max-sm:hidden">Sort:</span>
             <span class="text-foreground">{{ sortLabel() }}</span>
           </button>
           <ng-template #sortMenu>
             <hlm-dropdown-menu class="w-52">
               <hlm-dropdown-menu-label>Order by</hlm-dropdown-menu-label>
-              <button hlmDropdownMenuRadio [checked]="!v.sort" [keepOpen]="false" (triggered)="setSort(null)">
+              <button
+                hlmDropdownMenuRadio
+                [checked]="!v.sort"
+                [keepOpen]="false"
+                (triggered)="setSort(null)"
+              >
                 Default
                 <hlm-dropdown-menu-radio-indicator />
               </button>
               @for (fd of sortableFields(); track fd.field) {
-                <button hlmDropdownMenuRadio [checked]="v.sort?.field === fd.field" [keepOpen]="false" (triggered)="setSort(fd.field)">
+                <button
+                  hlmDropdownMenuRadio
+                  [checked]="v.sort?.field === fd.field"
+                  [keepOpen]="false"
+                  (triggered)="setSort(fd.field)"
+                >
                   {{ fd.label }}
                   <hlm-dropdown-menu-radio-indicator />
                 </button>
@@ -336,7 +420,10 @@ type PageLayout = 'list' | 'board' | 'timeline';
               @if (v.sort) {
                 <hlm-dropdown-menu-separator />
                 <button hlmDropdownMenuItem (triggered)="flipDirection()">
-                  <svg [lucideIcon]="v.sort.direction === 'asc' ? sortDescIcon : sortAscIcon" [size]="14"></svg>
+                  <svg
+                    [lucideIcon]="v.sort.direction === 'asc' ? sortDescIcon : sortAscIcon"
+                    [size]="14"
+                  ></svg>
                   {{ v.sort.direction === 'asc' ? 'Descending' : 'Ascending' }}
                 </button>
               }
@@ -349,10 +436,16 @@ type PageLayout = 'list' | 'board' | 'timeline';
         <app-empty-state
           [icon]="layers"
           title="Nothing in this view"
-          [description]="v.filters.length ? 'The filters do not match anything right now.' : 'There are no ' + entityLabel().toLowerCase() + ' yet.'"
+          [description]="
+            v.filters.length
+              ? 'The filters do not match anything right now.'
+              : 'There are no ' + entityLabel().toLowerCase() + ' yet.'
+          "
         >
           @if (canEdit() && v.filters.length) {
-            <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
+            <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">
+              Clear filters
+            </button>
           }
         </app-empty-state>
       } @else if (layout() === 'board') {
@@ -368,13 +461,22 @@ type PageLayout = 'list' | 'board' | 'timeline';
                 @for (item of g.items; track item.id) {
                   @switch (v.entity) {
                     @case ('workstream') {
-                      <app-workstream-card [summary]="summary(item)" [focused]="ui.focusedRowId() === item.id" />
+                      <app-workstream-card
+                        [summary]="summary(item)"
+                        [focused]="ui.focusedRowId() === item.id"
+                      />
                     }
                     @case ('issue') {
-                      <app-issue-card [issue]="asIssue(item)" [focused]="ui.focusedRowId() === item.id" />
+                      <app-issue-card
+                        [issue]="asIssue(item)"
+                        [focused]="ui.focusedRowId() === item.id"
+                      />
                     }
                     @case ('project') {
-                      <app-view-project-card [project]="asProject(item)" [focused]="ui.focusedRowId() === item.id" />
+                      <app-view-project-card
+                        [project]="asProject(item)"
+                        [focused]="ui.focusedRowId() === item.id"
+                      />
                     }
                     @default {
                       @let d = asDecision(item);
@@ -388,7 +490,9 @@ type PageLayout = 'list' | 'board' | 'timeline';
                           <app-status-icon [status]="d.status" entity="other" />
                           <app-key-chip [value]="d.key" />
                         </span>
-                        <span class="mt-1.5 line-clamp-2 text-sm leading-snug font-medium">{{ d.title }}</span>
+                        <span class="mt-1.5 line-clamp-2 text-sm leading-snug font-medium">{{
+                          d.title
+                        }}</span>
                       </a>
                     }
                   }
@@ -400,12 +504,18 @@ type PageLayout = 'list' | 'board' | 'timeline';
           }
         </div>
       } @else if (layout() === 'timeline') {
-        <app-timeline-view [entity]="v.entity === 'project' ? 'project' : 'workstream'" [groups]="groups()" [grouped]="grouped()" />
+        <app-timeline-view
+          [entity]="v.entity === 'project' ? 'project' : 'workstream'"
+          [groups]="groups()"
+          [grouped]="grouped()"
+        />
       } @else {
         <div class="min-h-0 flex-1 overflow-y-auto">
           @for (g of groups(); track g.key) {
             @if (grouped()) {
-              <div class="bg-muted/40 sticky top-0 z-10 flex h-8 items-center gap-2 border-b px-4 backdrop-blur sm:px-6">
+              <div
+                class="bg-muted/40 sticky top-0 z-10 flex h-8 items-center gap-2 border-b px-4 backdrop-blur sm:px-6"
+              >
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
                 <span class="text-xs font-medium">{{ g.label }}</span>
                 <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
@@ -414,13 +524,22 @@ type PageLayout = 'list' | 'board' | 'timeline';
             @for (item of g.items; track item.id) {
               @switch (v.entity) {
                 @case ('workstream') {
-                  <app-workstream-row [summary]="summary(item)" [focused]="ui.focusedRowId() === item.id" />
+                  <app-workstream-row
+                    [summary]="summary(item)"
+                    [focused]="ui.focusedRowId() === item.id"
+                  />
                 }
                 @case ('issue') {
-                  <app-issue-row [issue]="asIssue(item)" [focused]="ui.focusedRowId() === item.id" />
+                  <app-issue-row
+                    [issue]="asIssue(item)"
+                    [focused]="ui.focusedRowId() === item.id"
+                  />
                 }
                 @case ('project') {
-                  <app-view-project-row [project]="asProject(item)" [focused]="ui.focusedRowId() === item.id" />
+                  <app-view-project-row
+                    [project]="asProject(item)"
+                    [focused]="ui.focusedRowId() === item.id"
+                  />
                 }
                 @default {
                   @let d = asDecision(item);
@@ -434,9 +553,15 @@ type PageLayout = 'list' | 'board' | 'timeline';
                     <app-key-chip [value]="d.key" class="w-14" />
                     <span class="min-w-0 flex-1 truncate text-sm">{{ d.title }}</span>
                     @for (t of d.tags.slice(0, 2); track t) {
-                      <span class="border-border-strong text-muted-foreground hidden h-5 items-center rounded-full border px-1.5 text-[11px] md:inline-flex">{{ t }}</span>
+                      <span
+                        class="border-border-strong text-muted-foreground hidden h-5 items-center rounded-full border px-1.5 text-[11px] md:inline-flex"
+                        >{{ t }}</span
+                      >
                     }
-                    <span class="text-meta w-24 text-end whitespace-nowrap tabular-nums max-sm:hidden">{{ d.updatedAt | relativeTime }}</span>
+                    <span
+                      class="text-meta w-24 text-end whitespace-nowrap tabular-nums max-sm:hidden"
+                      >{{ d.updatedAt | relativeTime }}</span
+                    >
                   </a>
                 }
               }
@@ -457,8 +582,14 @@ type PageLayout = 'list' | 'board' | 'timeline';
         }
       </ng-template>
     } @else {
-      <app-empty-state [icon]="layers" title="View not found" description="It may have been deleted, or it is private to someone else.">
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'views']">Back to views</a>
+      <app-empty-state
+        [icon]="layers"
+        title="View not found"
+        description="It may have been deleted, or it is private to someone else."
+      >
+        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'views']"
+          >Back to views</a
+        >
       </app-empty-state>
     }
   `,
@@ -491,19 +622,28 @@ export class ViewDetailPage {
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly view = computed(() => this.store.getView(this.id()));
+  private viewPower() {
+    return { canWrite: this.store.can('member'), canAdmin: this.store.can('admin') };
+  }
   protected readonly canEdit = computed(() => {
     const v = this.view();
-    return !!v && canEditSavedView(v, this.store.me()?.id, this.store.myRole());
+    return !!v && canEditSavedView(v, this.store.me()?.id, this.store.myRole(), this.viewPower());
   });
   /** Delete the view / change who has access. */
   protected readonly canManage = computed(() => {
     const v = this.view();
-    return !!v && canManageViewSharing(v, this.store.me()?.id, this.store.myRole());
+    return (
+      !!v && canManageViewSharing(v, this.store.me()?.id, this.store.myRole(), this.viewPower())
+    );
   });
 
   protected readonly entityIcon = computed(() => ENTITY_ICON[this.view()?.entity ?? 'workstream']);
-  protected readonly entityLabel = computed(() => ENTITY_LABEL[this.view()?.entity ?? 'workstream']);
-  protected readonly statusEntity = computed(() => STATUS_ENTITY[this.view()?.entity ?? 'workstream']);
+  protected readonly entityLabel = computed(
+    () => ENTITY_LABEL[this.view()?.entity ?? 'workstream'],
+  );
+  protected readonly statusEntity = computed(
+    () => STATUS_ENTITY[this.view()?.entity ?? 'workstream'],
+  );
   /** Workstreams and projects have dates, so they can be drawn as a timeline. */
   protected readonly supportsTimeline = computed(() => {
     const e = this.view()?.entity;
@@ -520,15 +660,23 @@ export class ViewDetailPage {
 
   // ── query ──
   /** An issue's project filter / grouping also counts the projects of its workstreams. */
-  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById(), demand: this.store.demand() }));
+  private readonly queryCtx = computed(() => ({
+    workstreamById: this.store.workstreamById(),
+    demand: this.store.demand(),
+  }));
   protected readonly rows = computed<Queryable[]>(() => {
     const v = this.view();
     if (!v) return [];
     // A timeline reads left to right: without an explicit order, earliest start first.
-    const sort = v.sort ?? (this.layout() === 'timeline' ? { field: 'startDate', direction: 'asc' as const } : undefined);
+    const sort =
+      v.sort ??
+      (this.layout() === 'timeline'
+        ? { field: 'startDate', direction: 'asc' as const }
+        : undefined);
     const spec = { filters: v.filters, sort };
     const ctx = this.queryCtx();
-    if (v.entity === 'workstream') return queryItems('workstream', this.store.workstreams(), spec, ctx);
+    if (v.entity === 'workstream')
+      return queryItems('workstream', this.store.workstreams(), spec, ctx);
     if (v.entity === 'issue') return queryItems('issue', this.store.issues(), spec, ctx);
     if (v.entity === 'project') return queryItems('project', this.store.projects(), spec, ctx);
     return queryItems('decision', this.store.decisions(), spec, ctx);
@@ -548,7 +696,12 @@ export class ViewDetailPage {
     const field = this.effectiveGroup();
     if (!field) return [{ key: '__all', label: '', items: this.rows() }];
     const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
-    const include = this.layout() === 'board' && def?.kind === 'enum' ? def.values : undefined;
+    const include =
+      this.layout() === 'board' && (field === 'status' || field === 'health')
+        ? statusColumnIds(this.store, v.entity, field)
+        : this.layout() === 'board' && def?.kind === 'enum'
+          ? def.values
+          : undefined;
     const raw = groupItems(v.entity, this.rows() as never[], field, this.queryCtx(), include) as { key: string; items: Queryable[] }[];
     return raw.map((g) => {
       const glyph = valueGlyph(v.entity, field, g.key, this.store);
@@ -557,7 +710,9 @@ export class ViewDetailPage {
         label: valueLabel(this.store, v.entity, field, g.key),
         status: glyph.status,
         priority: field === 'priority' && g.key ? (g.key as Priority) : undefined,
-        actor: glyph.actor?.id ? { type: glyph.actor.type as 'team' | 'user', id: glyph.actor.id } : undefined,
+        actor: glyph.actor?.id
+          ? { type: glyph.actor.type as 'team' | 'user', id: glyph.actor.id }
+          : undefined,
         color: valueColor(v.entity, field, g.key),
         items: g.items,
       };
@@ -587,8 +742,12 @@ export class ViewDetailPage {
     const used = new Set(this.activeFilters().map((f) => f.field));
     return filterableFields(v.entity).filter((f) => !used.has(f.field));
   });
-  protected readonly groupableFields = computed(() => FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.groupable));
-  protected readonly sortableFields = computed(() => FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.sortable));
+  protected readonly groupableFields = computed(() =>
+    FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.groupable),
+  );
+  protected readonly sortableFields = computed(() =>
+    FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.sortable),
+  );
   protected readonly groupLabel = computed(() => {
     const v = this.view();
     const g = this.effectiveGroup();
@@ -603,7 +762,9 @@ export class ViewDetailPage {
     const v = this.view();
     if (!v) return '';
     const n = this.rows().length;
-    const access = { private: 'Private', workspace: 'Shared', link: 'Public' }[v.sharing.visibility];
+    const access = { private: 'Private', workspace: 'Shared', link: 'Public' }[
+      v.sharing.visibility
+    ];
     return `${access} view · ${n} ${ENTITY_LABEL[v.entity].toLowerCase()}`;
   });
 
@@ -658,7 +819,12 @@ export class ViewDetailPage {
     if (name.trim()) this.patch({ name: name.trim() });
   }
   protected setLayout(value: unknown): void {
-    const next: ViewLayout = value === 'board' ? 'board' : value === 'timeline' && this.supportsTimeline() ? 'timeline' : 'list';
+    const next: ViewLayout =
+      value === 'board'
+        ? 'board'
+        : value === 'timeline' && this.supportsTimeline()
+          ? 'timeline'
+          : 'list';
     if (!value || next === this.layout()) return;
     this.patch({ layout: next });
   }
@@ -670,12 +836,18 @@ export class ViewDetailPage {
     if (!v) return;
     if (!field) return this.patch({ sort: null });
     const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
-    const direction = v.sort?.field === field ? v.sort.direction : def?.kind === 'date' || def?.kind === 'number' ? 'desc' : 'asc';
+    const direction =
+      v.sort?.field === field
+        ? v.sort.direction
+        : def?.kind === 'date' || def?.kind === 'number'
+          ? 'desc'
+          : 'asc';
     this.patch({ sort: { field, direction } });
   }
   protected flipDirection(): void {
     const s = this.view()?.sort;
-    if (s) this.patch({ sort: { field: s.field, direction: s.direction === 'asc' ? 'desc' : 'asc' } });
+    if (s)
+      this.patch({ sort: { field: s.field, direction: s.direction === 'asc' ? 'desc' : 'asc' } });
   }
   protected addPending(field: string): void {
     this.pending.update((p) => (p.includes(field) ? p : [...p, field]));
@@ -697,7 +869,8 @@ export class ViewDetailPage {
   protected removeFilter(field: string): void {
     const v = this.view();
     this.pending.update((p) => p.filter((x) => x !== field));
-    if (v?.filters.some((f) => f.field === field)) this.patch({ filters: v.filters.filter((f) => f.field !== field) });
+    if (v?.filters.some((f) => f.field === field))
+      this.patch({ filters: v.filters.filter((f) => f.field !== field) });
   }
   protected clearFilters(): void {
     this.pending.set([]);

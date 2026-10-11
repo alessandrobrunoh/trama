@@ -85,7 +85,8 @@ const ACTIVITY_CAP = 20;
 @Component({
   selector: 'app-project-detail-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LabelPicker, 
+  imports: [
+    LabelPicker,
     RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -348,6 +349,7 @@ const ACTIVITY_CAP = 20;
                   placeholder="Describe the outcome, scope and why it matters…"
                   [value]="p.description ?? ''"
                   [canEdit]="canManage()"
+                  [uploads]="true"
                   (save)="update({ description: $event.trim() || null })"
                 />
               </section>
@@ -357,7 +359,10 @@ const ACTIVITY_CAP = 20;
                 <app-project-issue-suggestions [project]="p" />
               }
 
-              <app-demand-summary [demand]="store.demand().get(p.id)" [state]="workState(p.status)" />
+              <app-demand-summary
+                [demand]="store.demand().get(p.id)"
+                [state]="workState(p.status)"
+              />
               <app-customer-requests [projectId]="p.id" />
 
               <app-project-milestones [project]="p" />
@@ -522,7 +527,12 @@ const ACTIVITY_CAP = 20;
                 />
               </app-property-row>
               <app-property-row label="Labels">
-                <app-label-picker [disabled]="!canManage()" [value]="p.labels" (valueChange)="update({ labels: $event })" />
+                <app-label-picker
+                  scope="project"
+                  [disabled]="!canManage()"
+                  [value]="p.labels"
+                  (valueChange)="update({ labels: $event })"
+                />
               </app-property-row>
               <app-property-row label="Repositories">
                 <app-picker
@@ -619,7 +629,9 @@ export class ProjectDetailPage {
   protected readonly issueIcon = LucideCircleDot;
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
-  protected readonly statuses = projectStatusOptions();
+  protected get statuses() {
+    return projectStatusOptions(this.store.settings().statuses.project);
+  }
   protected readonly priorities = priorityOptions();
   protected readonly activityCap = ACTIVITY_CAP;
   protected readonly allActivity = signal(false);
@@ -679,7 +691,9 @@ export class ProjectDetailPage {
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
     updates: this.updatesState() === 'ready' ? this.updates().length : 0,
     issues: this.issues().length,
-    documents: (this.store.artifactsByProject().get(this.project()?.id ?? '') ?? []).filter((a) => a.documentId).length,
+    documents: (this.store.artifactsByProject().get(this.project()?.id ?? '') ?? []).filter(
+      (a) => a.documentId,
+    ).length,
   }));
   protected readonly canCreateWorkstream = computed(() => this.store.allowed('createWorkstreams'));
   protected readonly workstreams = computed(() => {

@@ -1,7 +1,7 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import { hasRole, type AppRequest, type WorkspaceContext } from '../auth/request-context.js';
+import { hasAdminPower, type AppRequest, type WorkspaceContext } from '../auth/request-context.js';
 import { AgentEntity, IssueEntity, TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -36,7 +36,7 @@ export class PermissionsService {
 
   async canEditTeamWork(ctx: WorkspaceContext, team: TeamEntity): Promise<boolean> {
     if (team.editPolicy !== 'members') return true;
-    if (hasRole(ctx.role, 'admin')) return true;
+    if (hasAdminPower(ctx)) return true;
     return this.isOnTeam(ctx, team);
   }
 

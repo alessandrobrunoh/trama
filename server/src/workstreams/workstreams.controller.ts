@@ -28,12 +28,7 @@ import {
   EditsTeamWork,
   type WorkspaceContext,
 } from '../auth/request-context.js';
-import type {
-  ActorRef,
-  CriterionState,
-  Priority,
-  WorkstreamStatus,
-} from '../contracts/domain.js';
+import type { ActorRef, Priority, WorkstreamStatus } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { WorkstreamsService } from './workstreams.service.js';
 
@@ -55,12 +50,11 @@ export const STATUSES: WorkstreamStatus[] = [
   'shipped',
   'canceled',
 ];
-const CRITERION_STATES: CriterionState[] = ['pending', 'in_progress', 'met'];
 
 export class CriterionDto {
   @IsOptional() @IsString() id?: string;
   @IsString() @MinLength(1) @MaxLength(500) text: string;
-  @IsOptional() @IsIn(CRITERION_STATES) state?: CriterionState;
+  @IsOptional() @IsString() @MaxLength(80) state?: string;
 }
 
 class CriterionEvidenceDto {
@@ -71,7 +65,7 @@ class CriterionEvidenceDto {
 
 class UpdateCriterionDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(500) text?: string;
-  @OptionalNotNull() @IsIn(CRITERION_STATES) state?: CriterionState;
+  @OptionalNotNull() @IsString() @MaxLength(80) state?: string;
   /** Proof for the criterion; `null` clears it. Never changes `state`. */
   @Clearable() @ValidateNested() @Type(() => CriterionEvidenceDto) evidence?: CriterionEvidenceDto | null;
 }
@@ -100,7 +94,7 @@ export class CreateWorkstreamDto {
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   /** Workspace label ids. */
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
-  @IsOptional() @IsIn(STATUSES) statusOverride?: WorkstreamStatus;
+  @IsOptional() @IsString() @MaxLength(80) statusOverride?: string;
   @IsOptional() @IsISO8601() startDate?: string;
   @IsOptional() @IsISO8601() targetDate?: string;
 }
@@ -132,13 +126,13 @@ export class UpdateWorkstreamDto {
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   /** Workspace label ids. Replaces the whole list. */
   @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
-  @Clearable() @IsIn(STATUSES) statusOverride?: WorkstreamStatus | null;
+  @Clearable() @IsString() @MaxLength(80) statusOverride?: string | null;
   @Clearable() @IsISO8601() startDate?: string | null;
   @Clearable() @IsISO8601() targetDate?: string | null;
 }
 
 class ListWorkstreamsQuery {
-  @IsOptional() @IsIn(STATUSES) status?: WorkstreamStatus;
+  @IsOptional() @IsString() @MaxLength(80) status?: string;
   @IsOptional() @IsString() ownerTeamId?: string;
   /** owner or participating team */
   @IsOptional() @IsString() teamId?: string;

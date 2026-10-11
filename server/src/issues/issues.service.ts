@@ -1,9 +1,20 @@
-import { demandConditions, type DemandFilter } from '../customers/demand-filter.js';
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  demandConditions,
+  type DemandFilter,
+} from '../customers/demand-filter.js';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  NotFoundException,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import {
   ISSUE_KEY_PREFIX,
+  statusIdsForTypes,
   type ExternalRef,
   type ActorRef,
   type IssueKind,
@@ -14,15 +25,26 @@ import {
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
-import { IssueEntity, MilestoneEntity, WorkstreamEntity } from '../database/entities/index.js';
+import {
+  IssueEntity,
+  MilestoneEntity,
+  WorkstreamEntity,
+} from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import {
   WorkstreamsService,
   type WorkstreamInput,
 } from '../workstreams/workstreams.service.js';
+import { loadStatusCatalog, requireStatus, statusFilterIds } from '../status/status-catalog.js';
 import { LabelsService } from '../workspaces/labels.service.js';
-import { applyProjectScope, assertCanUseProject, currentAccess, projectHidden } from '../auth/member-access.js';
+import {
+  applyProjectScope,
+  assertCanUseProject,
+  currentAccess,
+  projectHidden,
+} from '../auth/member-access.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 
 export interface IssueInput {
   title?: string;
@@ -37,7 +59,8 @@ export interface IssueInput {
   /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
   projectId?: string | null;
   priority?: Priority;
-  status?: IssueStatus;
+  /** Catalog id, or a legacy enum (the seeded status of that type). */
+  status?: string;
   externalUrl?: string | null;
   workstreamIds?: string[];
   milestoneIds?: string[];
@@ -48,7 +71,8 @@ export interface IssueInput {
 
 /** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
 export interface BulkIssuePatch {
-  status?: IssueStatus;
+  /** Catalog id, or a legacy enum (the seeded status of that type). */
+  status?: string;
   priority?: Priority;
   assigneeId?: string | null;
   teamId?: string | null;
@@ -80,8 +104,8 @@ export interface LinkIssueInput {
     ownerTeamId: string;
     deltaThreadUrl?: string;
   };
-  /** Optional explicit status. Without it, linking leaves the status unchanged. */
-  status?: IssueStatus;
+  /** Optional explicit status (catalog id or legacy enum). Without it, linking leaves the status unchanged. */
+  status?: string;
 }
 
 const KEY_RE = /^[A-Za-z]+-\d+$/;
@@ -116,7 +140,13 @@ export function claimAssignee(
   assigneeWasSet: boolean,
 ): string | null {
   if (assigneeWasSet) return assigneeId;
-  if (to === 'in_progress' && from !== 'in_progress' && !assigneeId && actor.type === 'user' && actor.id) {
+  if (
+    to === 'in_progress' &&
+    from !== 'in_progress' &&
+    !assigneeId &&
+    actor.type === 'user' &&
+    actor.id
+  ) {
     return actor.id;
   }
   return assigneeId;
@@ -134,34 +164,54 @@ export class IssuesService {
     private readonly labels: LabelsService,
     @InjectRepository(IssueEntity)
     private readonly repo: Repository<IssueEntity>,
+    @Optional()
+    @Inject(UploadsService)
+    private readonly uploads?: UploadsService,
   ) {}
 
-  list(
+  private async resolveIssueStatus(workspaceId: string, stored: string) {
+    const catalog = (await loadStatusCatalog(this.ds, workspaceId)).issue;
+    return requireStatus(catalog, stored, 'status');
+  }
+
+  private async issueStatusType(workspaceId: string, stored: string): Promise<IssueStatus> {
+    return (await this.resolveIssueStatus(workspaceId, stored)).type;
+  }
+
+  async list(
     workspaceId: string,
     f: {
       kind?: IssueKind;
-      status?: IssueStatus;
+      /** Catalog id, or a legacy enum (the seeded status of that type). */
+      status?: string;
       teamId?: string;
       assigneeId?: string;
       projectId?: string;
       workstreamId?: string;
       milestoneId?: string;
     } & DemandFilter & {
-      q?: string;
-      priority?: Priority[];
-      /** Only issues still in play: backlog, todo, in progress, in review. */
-      open?: boolean;
-      limit?: number;
-    } = {},
+        q?: string;
+        priority?: Priority[];
+        /** Only issues still in play: backlog, todo, in progress, in review. */
+        open?: boolean;
+        limit?: number;
+      } = {},
   ) {
     const qb = this.repo
       .createQueryBuilder('i')
       .where('i.workspaceId = :workspaceId', { workspaceId })
       .orderBy('i.createdAt', 'DESC');
     if (f.kind) qb.andWhere('i.kind = :k', { k: f.kind });
-    if (f.status) qb.andWhere('i.status = :s', { s: f.status });
+    if (f.status || f.open) {
+      const catalog = (await loadStatusCatalog(this.ds, workspaceId)).issue;
+      if (f.status) qb.andWhere('i.status IN (:...st)', { st: statusFilterIds(catalog, f.status) });
+      if (f.open) {
+        qb.andWhere('i.status IN (:...open)', {
+          open: statusIdsForTypes(catalog, ['backlog', 'todo', 'in_progress', 'in_review']),
+        });
+      }
+    }
     if (f.priority?.length) qb.andWhere('i.priority IN (:...pr)', { pr: f.priority });
-    if (f.open) qb.andWhere("i.status IN ('backlog', 'todo', 'in_progress', 'in_review')");
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
     // Same meaning as the client's `issuesByProject`: planned under the project, or linked to one of its workstreams.
@@ -178,7 +228,8 @@ export class IssuesService {
       qb.andWhere('i.milestoneIds @> :m::jsonb', {
         m: JSON.stringify([f.milestoneId]),
       });
-    for (const c of demandConditions('i', 'issueId', f)) qb.andWhere(c.sql, c.params);
+    for (const c of demandConditions('i', 'issueId', f))
+      qb.andWhere(c.sql, c.params);
     applyProjectScope(qb, 'i', 'projectId');
     if (f.q)
       qb.andWhere(
@@ -204,7 +255,8 @@ export class IssuesService {
     } else {
       row = await this.repo.findOneBy({ workspaceId, id: idOrKey });
     }
-    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Issue', idOrKey);
+    if (!row || projectHidden(currentAccess(), row.projectId))
+      throw notFound('Issue', idOrKey);
     return row;
   }
 
@@ -215,9 +267,13 @@ export class IssuesService {
     workstreamIds: readonly string[],
   ) {
     const streams = workstreamIds.length
-      ? await this.ds.getRepository(WorkstreamEntity).findBy({ workspaceId, id: In([...workstreamIds]) })
+      ? await this.ds
+          .getRepository(WorkstreamEntity)
+          .findBy({ workspaceId, id: In([...workstreamIds]) })
       : [];
-    const projects = new Set(streams.map((w) => w.projectId).filter((p): p is string => !!p));
+    const projects = new Set(
+      streams.map((w) => w.projectId).filter((p): p is string => !!p),
+    );
     if (projectId) projects.add(projectId);
     return projects;
   }
@@ -240,7 +296,11 @@ export class IssuesService {
       throw new BadRequestException(
         `Unknown milestone in: ${milestoneIds.join(', ')}`,
       );
-    const projects = await this.milestoneProjects(workspaceId, projectId, workstreamIds);
+    const projects = await this.milestoneProjects(
+      workspaceId,
+      projectId,
+      workstreamIds,
+    );
     const seen = new Set<string>();
     for (const m of rows) {
       if (!projects.has(m.projectId))
@@ -266,14 +326,16 @@ export class IssuesService {
       [input.teamId].filter((x): x is string => !!x),
     );
     await this.refs.projects(workspaceId, [input.projectId].filter((x): x is string => !!x));
-    const status = input.status ?? 'backlog';
-    const assigneeId = claimAssignee(actor, null, status, input.assigneeId ?? null, input.assigneeId !== undefined);
+    const resolved = await this.resolveIssueStatus(workspaceId, input.status ?? 'backlog');
+    const status = resolved.id as IssueStatus;
+    const assigneeId = claimAssignee(actor, null, resolved.type, input.assigneeId ?? null, input.assigneeId !== undefined);
     await this.refs.users(workspaceId, [assigneeId]);
+    await this.uploads?.assertAttachable(workspaceId, input.body);
     const facts: Pick<IssueEntity, 'startedAt' | 'completedAt'> = {
       startedAt: null,
       completedAt: null,
     };
-    applyStatusFacts(facts, status);
+    applyStatusFacts(facts, resolved.type);
     const row = await this.ds.transaction(async (m) => {
       const number = await this.counters.next(
         m,
@@ -301,10 +363,13 @@ export class IssuesService {
           startedAt: facts.startedAt,
           completedAt: facts.completedAt,
           externalUrl: input.externalUrl ?? null,
-          labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
+          labels:
+            (await this.labels.assign(workspaceId, input.labels, 'issue')) ??
+            [],
         }),
       );
     });
+    await this.uploads?.retained(workspaceId, null, row.body);
     await this.events.record({
       workspaceId,
       actor,
@@ -329,11 +394,16 @@ export class IssuesService {
   ) {
     const row = await this.get(workspaceId, idOrKey);
     if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
+    const previousBody = row.body;
     const prepared = await this.prepareUpdate(workspaceId, actor, row, patch);
+    if (patch.body !== undefined)
+      await this.uploads?.assertAttachable(workspaceId, row.body);
     await this.ds.transaction(async (m) => {
       await this.rekey(m, workspaceId, prepared);
       await m.save(row);
     });
+    if (patch.body !== undefined)
+      await this.uploads?.retained(workspaceId, previousBody, row.body);
     await this.recordUpdate(workspaceId, actor, prepared);
     return row;
   }
@@ -342,7 +412,10 @@ export class IssuesService {
    * Resolve ids / keys / aliases to issue rows of this workspace (input order, duplicates folded).
    * 404 naming every reference that does not exist, so nothing is half-applied.
    */
-  async getMany(workspaceId: string, refs: readonly string[]): Promise<IssueEntity[]> {
+  async getMany(
+    workspaceId: string,
+    refs: readonly string[],
+  ): Promise<IssueEntity[]> {
     const wanted = unique(refs);
     const rows: IssueEntity[] = [];
     const missing: string[] = [];
@@ -354,8 +427,11 @@ export class IssuesService {
         missing.push(ref);
       }
     }
-    if (missing.length) throw new NotFoundException(`Issue not found: ${missing.join(', ')}`);
-    return unique(rows.map((r) => r.id)).map((id) => rows.find((r) => r.id === id)!);
+    if (missing.length)
+      throw new NotFoundException(`Issue not found: ${missing.join(', ')}`);
+    return unique(rows.map((r) => r.id)).map((id) =>
+      rows.find((r) => r.id === id)!,
+    );
   }
 
   /**
@@ -370,11 +446,14 @@ export class IssuesService {
     patch: BulkIssuePatch,
   ): Promise<IssueEntity[]> {
     const touchesAnything = Object.values(patch).some((v) => v !== undefined);
-    if (!touchesAnything) throw new BadRequestException('patch must change at least one field');
+    if (!touchesAnything)
+      throw new BadRequestException('patch must change at least one field');
     const add = unique(patch.addWorkstreamIds);
     const remove = unique(patch.removeWorkstreamIds);
     if (add.some((id) => remove.includes(id)))
-      throw new BadRequestException('A workstream cannot be both added and removed');
+      throw new BadRequestException(
+        'A workstream cannot be both added and removed',
+      );
     const addLabels = unique(patch.addLabels);
     const removeLabels = unique(patch.removeLabels);
     if (addLabels.some((id) => removeLabels.includes(id)))
@@ -387,11 +466,22 @@ export class IssuesService {
         );
     }
     // One lookup per reference for the whole batch instead of one per issue.
-    await this.refs.teams(workspaceId, [patch.teamId].filter((x): x is string => !!x));
+    await this.refs.teams(
+      workspaceId,
+      [patch.teamId].filter((x): x is string => !!x),
+    );
     await this.refs.users(workspaceId, [patch.assigneeId]);
-    await this.refs.projects(workspaceId, [patch.projectId].filter((x): x is string => !!x));
+    await this.refs.projects(
+      workspaceId,
+      [patch.projectId].filter((x): x is string => !!x),
+    );
     await this.refs.workstreams(workspaceId, add);
-    await this.labels.assign(workspaceId, [...addLabels, ...removeLabels]);
+    await this.labels.assign(
+      workspaceId,
+      [...addLabels, ...removeLabels],
+      'issue',
+      removeLabels,
+    );
 
     const prepared: PreparedUpdate[] = [];
     for (const row of rows) {
@@ -402,10 +492,17 @@ export class IssuesService {
       if (patch.teamId !== undefined) next.teamId = patch.teamId;
       if (patch.projectId !== undefined) next.projectId = patch.projectId;
       if (addLabels.length || removeLabels.length)
-        next.labels = unique([...row.labels, ...addLabels]).filter((l) => !removeLabels.includes(l));
+        next.labels = unique([...row.labels, ...addLabels]).filter(
+          (l) => !removeLabels.includes(l),
+        );
       if (add.length || remove.length)
-        next.workstreamIds = unique([...row.workstreamIds, ...add]).filter((w) => !remove.includes(w));
-      prepared.push({ ...(await this.prepareUpdate(workspaceId, actor, row, next, true)), announceLinks: true });
+        next.workstreamIds = unique([...row.workstreamIds, ...add]).filter(
+          (w) => !remove.includes(w),
+        );
+      prepared.push({
+        ...(await this.prepareUpdate(workspaceId, actor, row, next, true)),
+        announceLinks: true,
+      });
     }
     await this.ds.transaction(async (m) => {
       await m.save(rows.map((r) => r));
@@ -429,7 +526,10 @@ export class IssuesService {
         [patch.teamId].filter((x): x is string => !!x),
       );
       await this.refs.users(workspaceId, [patch.assigneeId]);
-      await this.refs.projects(workspaceId, [patch.projectId].filter((x): x is string => !!x));
+      await this.refs.projects(
+        workspaceId,
+        [patch.projectId].filter((x): x is string => !!x),
+      );
       await this.refs.workstreams(workspaceId, patch.workstreamIds);
     }
     const before = new Set(row.workstreamIds);
@@ -441,7 +541,7 @@ export class IssuesService {
       if (patch.duplicateOfId === null) {
         duplicateOfId = null;
       } else {
-        if (patch.status !== undefined && patch.status !== 'canceled')
+        if (patch.status !== undefined && (await this.resolveIssueStatus(workspaceId, patch.status)).type !== 'canceled')
           throw new BadRequestException(
             'Marking an issue as a duplicate sets its status to "canceled"',
           );
@@ -461,7 +561,8 @@ export class IssuesService {
       patch.workstreamIds !== undefined
         ? unique(patch.workstreamIds)
         : row.workstreamIds;
-    const nextProjectId = patch.projectId !== undefined ? patch.projectId : row.projectId;
+    const nextProjectId =
+      patch.projectId !== undefined ? patch.projectId : row.projectId;
     let nextMilestoneIds =
       patch.milestoneIds !== undefined
         ? unique(patch.milestoneIds)
@@ -478,7 +579,11 @@ export class IssuesService {
       row.milestoneIds.length
     ) {
       // Leaving a project (clearing it, or unlinking its last workstream) drops that project's milestone.
-      const projects = await this.milestoneProjects(workspaceId, nextProjectId, nextWorkstreamIds);
+      const projects = await this.milestoneProjects(
+        workspaceId,
+        nextProjectId,
+        nextWorkstreamIds,
+      );
       const kept = new Set(
         (
           await this.ds
@@ -503,12 +608,23 @@ export class IssuesService {
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
     if (patch.workstreamIds !== undefined)
       row.workstreamIds = unique(patch.workstreamIds);
-    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels)) ?? [];
+    if (patch.labels !== undefined)
+      row.labels =
+        (await this.labels.assign(
+          workspaceId,
+          patch.labels,
+          'issue',
+          row.labels,
+        )) ?? [];
+    const fromType = await this.issueStatusType(workspaceId, from);
+    let toType = fromType;
     if (patch.status !== undefined) {
-      row.status = patch.status;
-      if (row.status !== from) applyStatusFacts(row, row.status);
+      const resolved = await this.resolveIssueStatus(workspaceId, patch.status);
+      row.status = resolved.id as IssueStatus;
+      toType = resolved.type;
+      if (resolved.id !== from) applyStatusFacts(row, resolved.type);
     }
-    const claimed = claimAssignee(actor, from, row.status, row.assigneeId, patch.assigneeId !== undefined);
+    const claimed = claimAssignee(actor, fromType, toType, row.assigneeId, patch.assigneeId !== undefined);
     if (claimed !== row.assigneeId) {
       await this.refs.users(workspaceId, [claimed]);
       row.assigneeId = claimed;
@@ -528,22 +644,35 @@ export class IssuesService {
   }
 
   /** The key prefix follows the kind: take the next number of the new kind, keep the old key as an alias. */
-  private async rekey(m: EntityManager, workspaceId: string, p: PreparedUpdate) {
+  private async rekey(
+    m: EntityManager,
+    workspaceId: string,
+    p: PreparedUpdate,
+  ) {
     if (!p.rekey) return;
     const { row, patch } = p;
-    const number = await this.counters.next(m, workspaceId, `issue:${patch.kind}`);
+    const number = await this.counters.next(
+      m,
+      workspaceId,
+      `issue:${patch.kind}`,
+    );
     row.aliases = unique([...row.aliases, p.fromKey]);
     row.kind = patch.kind!;
     row.number = number;
     row.key = `${ISSUE_KEY_PREFIX[row.kind]}-${number}`;
   }
 
-  private async recordUpdate(workspaceId: string, actor: ActorRef, p: PreparedUpdate) {
+  private async recordUpdate(
+    workspaceId: string,
+    actor: ActorRef,
+    p: PreparedUpdate,
+  ) {
     const { row, patch, from, fromKey, fromKind, previousAssigneeId } = p;
     const fields = Object.keys(patch)
       .filter((k) => (patch as Record<string, unknown>)[k] !== undefined)
       .filter((k) => k !== 'status' && k !== 'kind');
-    if (row.assigneeId !== previousAssigneeId && !fields.includes('assigneeId')) fields.push('assigneeId');
+    if (row.assigneeId !== previousAssigneeId && !fields.includes('assigneeId'))
+      fields.push('assigneeId');
     if (p.rekey)
       await this.events.record({
         workspaceId,
@@ -582,7 +711,9 @@ export class IssuesService {
         data: { key: row.key, from, to: row.status },
       });
     if (p.announceLinks)
-      for (const workstreamId of row.workstreamIds.filter((w) => !p.before.has(w)))
+      for (const workstreamId of row.workstreamIds.filter(
+        (w) => !p.before.has(w),
+      ))
         await this.events.record({
           workspaceId,
           actor,
@@ -615,7 +746,10 @@ export class IssuesService {
       throw new BadRequestException(
         'workstreamIds or createWorkstream is required',
       );
-    if (input.status === 'canceled')
+    if (
+      input.status !== undefined &&
+      (await this.resolveIssueStatus(workspaceId, input.status)).type === 'canceled'
+    )
       throw new BadRequestException(
         'Cancel the issue with PATCH instead of linking it',
       );
@@ -625,8 +759,10 @@ export class IssuesService {
     const previous = row.workstreamIds;
     const from = row.status;
     const previousAssigneeId = row.assigneeId;
-    const nextStatus = input.status ?? row.status;
-    const nextAssignee = claimAssignee(actor, from, nextStatus, row.assigneeId, false);
+    const next = input.status !== undefined ? await this.resolveIssueStatus(workspaceId, input.status) : null;
+    const nextStatus = (next?.id ?? row.status) as IssueStatus;
+    const fromType = await this.issueStatusType(workspaceId, from);
+    const nextAssignee = claimAssignee(actor, fromType, next?.type ?? fromType, row.assigneeId, false);
     if (nextAssignee !== row.assigneeId) await this.refs.users(workspaceId, [nextAssignee]);
     await this.ds.transaction(async (m) => {
       const ids = unique([
@@ -648,7 +784,7 @@ export class IssuesService {
       row.workstreamIds = ids;
       row.assigneeId = nextAssignee;
       row.status = nextStatus;
-      if (row.status !== from) applyStatusFacts(row, row.status);
+      if (row.status !== from) applyStatusFacts(row, next?.type ?? fromType);
       row.updatedAt = new Date();
       await m.save(row);
     });
@@ -683,7 +819,11 @@ export class IssuesService {
         type: 'issue.updated',
         subject: { type: 'issue', id: row.id },
         workstreamId: row.workstreamIds[0] ?? null,
-        data: { key: row.key, fields: ['assigneeId'], assignee: { from: previousAssigneeId, to: row.assigneeId } },
+        data: {
+          key: row.key,
+          fields: ['assigneeId'],
+          assignee: { from: previousAssigneeId, to: row.assigneeId },
+        },
       });
     await this.bus.touchMany(
       workspaceId,
@@ -697,12 +837,18 @@ export class IssuesService {
    * Attach (or, with `null`, detach) the external tracker issue this one mirrors. The pointer is a read-only
    * mirror: it never changes the status. One external issue belongs to one Trama issue (409 otherwise).
    */
-  async setExternalRef(workspaceId: string, actor: ActorRef, idOrKey: string, ref: ExternalRef | null) {
+  async setExternalRef(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    ref: ExternalRef | null,
+  ) {
     const row = await this.get(workspaceId, idOrKey);
     const previous = row.externalRef;
     row.externalRef = ref;
     if (ref && !row.externalUrl) row.externalUrl = ref.url;
-    if (!ref && previous && row.externalUrl === previous.url) row.externalUrl = null;
+    if (!ref && previous && row.externalUrl === previous.url)
+      row.externalUrl = null;
     row.updatedAt = new Date();
     try {
       await this.repo.save(row);
@@ -711,9 +857,14 @@ export class IssuesService {
         const other = await this.ds
           .getRepository(IssueEntity)
           .createQueryBuilder('i')
-          .where(`i."workspaceId" = :workspaceId AND i."externalRef"->>'provider' = :p AND i."externalRef"->>'id' = :id`, { workspaceId, p: ref.provider, id: ref.id })
+          .where(
+            `i."workspaceId" = :workspaceId AND i."externalRef"->>'provider' = :p AND i."externalRef"->>'id' = :id`,
+            { workspaceId, p: ref.provider, id: ref.id },
+          )
           .getOne();
-        throw new ConflictException(`${ref.key ?? ref.id} is already ${other ? `linked to ${other.key}` : 'linked to another issue'}`);
+        throw new ConflictException(
+          `${ref.key ?? ref.id} is already ${other ? `linked to ${other.key}` : 'linked to another issue'}`,
+        );
       }
       throw e;
     }
@@ -722,23 +873,47 @@ export class IssuesService {
       actor,
       type: 'issue.updated',
       subject: { type: 'issue', id: row.id },
-      data: { key: row.key, fields: ['externalRef'], external: ref ? { provider: ref.provider, key: ref.key, origin: ref.origin } : null },
+      data: {
+        key: row.key,
+        fields: ['externalRef'],
+        external: ref
+          ? { provider: ref.provider, key: ref.key, origin: ref.origin }
+          : null,
+      },
     });
     return row;
   }
 
   /** Stores a freshly read external status. Quiet on purpose (no domain event): it is a mirror, not a change of the work. */
-  async refreshExternalRef(workspaceId: string, idOrKey: string, patch: Pick<ExternalRef, 'state' | 'stateType' | 'syncedAt' | 'key' | 'url'>) {
+  async refreshExternalRef(
+    workspaceId: string,
+    idOrKey: string,
+    patch: Pick<
+      ExternalRef,
+      'state' | 'stateType' | 'syncedAt' | 'key' | 'url'
+    >,
+  ) {
     const row = await this.get(workspaceId, idOrKey);
-    if (!row.externalRef) throw new BadRequestException('This issue is not linked to an external issue');
+    if (!row.externalRef)
+      throw new BadRequestException(
+        'This issue is not linked to an external issue',
+      );
     row.externalRef = { ...row.externalRef, ...patch };
     await this.repo.save(row);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id: row.id });
+    this.events.publish(workspaceId, {
+      type: 'updated',
+      entity: 'issue',
+      id: row.id,
+    });
     return row;
   }
 
   async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const row = await this.get(workspaceId, idOrKey);
+    const lost =
+      (await this.uploads?.idsLostWith(workspaceId, { issueId: row.id }, [
+        row.body,
+      ])) ?? [];
     await this.ds.query(
       `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = $2`,
       [workspaceId, row.id],
@@ -748,6 +923,7 @@ export class IssuesService {
       [workspaceId, row.id],
     );
     await this.repo.delete({ id: row.id });
+    await this.uploads?.releaseIds(workspaceId, lost);
     await this.events.record({
       workspaceId,
       actor,
@@ -759,7 +935,11 @@ export class IssuesService {
   }
 
   /** Delete many issues in one transaction; events and workstream refreshes follow the commit. */
-  async removeMany(workspaceId: string, actor: ActorRef, rows: readonly IssueEntity[]) {
+  async removeMany(
+    workspaceId: string,
+    actor: ActorRef,
+    rows: readonly IssueEntity[],
+  ) {
     const ids = rows.map((r) => r.id);
     if (!ids.length) return;
     await this.ds.transaction(async (m) => {
@@ -781,6 +961,10 @@ export class IssuesService {
         subject: { type: 'issue', id: row.id },
         data: { key: row.key, title: row.title },
       });
-    await this.bus.touchMany(workspaceId, rows.flatMap((r) => r.workstreamIds), 'issue.deleted');
+    await this.bus.touchMany(
+      workspaceId,
+      rows.flatMap((r) => r.workstreamIds),
+      'issue.deleted',
+    );
   }
 }

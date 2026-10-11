@@ -4,7 +4,7 @@ import { LucideDynamicIcon, LucideEllipsis, LucideFolderGit2, LucideHexagon, Luc
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { TramaStore, ROLE_META, UiStore } from '../../core';
+import { TramaStore, UiStore, workspaceRoleName } from '../../core';
 import { Clipboard } from '../../core/notify/notifier';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { TEAM_EDIT_POLICIES, type TeamEditPolicy } from '../../core/contracts/domain';
@@ -319,7 +319,7 @@ export class TeamDetailPage {
       .filter((u) => !!u)
       .map((u) => {
         const role = this.store.membershipByUserId().get(u.id)?.role;
-        return { id: u.id, name: u.name, email: u.email, role: role ? ROLE_META[role].label : '', lead: t.leadIds.includes(u.id) };
+        return { id: u.id, name: u.name, email: u.email, role: workspaceRoleName(this.store.settings().roles, role), lead: t.leadIds.includes(u.id) };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   });

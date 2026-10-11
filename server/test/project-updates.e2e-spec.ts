@@ -38,8 +38,17 @@ describe('project updates', () => {
     const project = (await owner.client.post(`${w}/projects`, { name: 'Apollo', leadId: lead.user.id }).expect(201)).body;
     const pu = `${w}/projects/${project.id}/updates`;
     const post = (c: Client, health = 'on_track', body = 'All good') => c.post(pu, { health, body });
+    const withoutManageProjects = async () => {
+      const settings = (await owner.client.get(w).expect(200)).body.settings;
+      const memberRole = settings.roles.find((role: { id: string }) => role.id === 'member');
+      await owner.client
+        .patch(`${w}/roles/member`, {
+          capabilities: memberRole.capabilities.filter((cap: string) => cap !== 'manageProjects'),
+        })
+        .expect(200);
+    };
     const getProject = async () => (await owner.client.get(`${w}/projects/${project.id}`).expect(200)).body;
-    return { owner, admin, lead, member, viewer, ws, slug: ws.slug as string, w, project, pu, post, getProject };
+    return { owner, admin, lead, member, viewer, ws, slug: ws.slug as string, w, project, pu, post, getProject, withoutManageProjects };
   }
 
   it('creates, lists newest-first, gets, and the newest drives Project.health and lastUpdateAt', async () => {
@@ -145,8 +154,8 @@ describe('project updates', () => {
 
     describe('with manageProjects raised to admin', () => {
       it('a non-lead member cannot post, the lead can, admin and owner can', async () => {
-        const { owner, admin, lead, member, w, post } = await setup();
-        await owner.client.patch(`${w}/settings`, { permissions: { manageProjects: 'admin' } }).expect(200);
+        const { owner, admin, lead, member, post, withoutManageProjects } = await setup();
+        await withoutManageProjects();
         const denied = await post(member.client).expect(403);
         expect(denied.body.message).toMatch(/lead|Manage projects/);
         await post(lead.client).expect(201);
@@ -155,8 +164,8 @@ describe('project updates', () => {
       });
 
       it('only the author or manageProjects can edit/delete', async () => {
-        const { owner, admin, lead, member, w, pu, post } = await setup();
-        await owner.client.patch(`${w}/settings`, { permissions: { manageProjects: 'admin' } }).expect(200);
+        const { owner, admin, lead, member, pu, post, withoutManageProjects } = await setup();
+        await withoutManageProjects();
         const leadUpdate = (await post(lead.client, 'on_track', 'lead says').expect(201)).body as UpdateBody;
         await member.client.patch(`${pu}/${leadUpdate.id}`, { body: 'nope' }).expect(403);
         await member.client.delete(`${pu}/${leadUpdate.id}`).expect(403);
@@ -172,8 +181,8 @@ describe('project updates', () => {
       });
 
       it('demoting the lead (changing leadId) removes their right to post', async () => {
-        const { owner, lead, member, w, project, post } = await setup();
-        await owner.client.patch(`${w}/settings`, { permissions: { manageProjects: 'admin' } }).expect(200);
+        const { owner, lead, member, w, project, post, withoutManageProjects } = await setup();
+        await withoutManageProjects();
         await post(lead.client).expect(201);
         await owner.client.patch(`${w}/projects/${project.id}`, { leadId: member.user.id }).expect(200);
         await post(lead.client).expect(403);

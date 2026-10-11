@@ -13,6 +13,7 @@ import {
   PRIORITY_META,
   UiStore,
   WORKSTREAM_STATUS_META,
+  resolveStatusEntry,
   type ID,
   type Priority,
   type UpdateWorkstreamInput,
@@ -117,8 +118,10 @@ export class WsActions {
   }
 
   /** `null` = back to the derived status. */
-  setStatus(list: readonly Workstream[], status: WorkstreamStatus | null): void {
-    const label = status ? WORKSTREAM_STATUS_META[status].label : 'automatic';
+  setStatus(list: readonly Workstream[], status: string | null): void {
+    const label = status
+      ? (resolveStatusEntry(this.store.settings().statuses.workstream, status)?.name ?? status)
+      : 'automatic';
     this.patchAll(
       list.filter((w) => (w.statusOverride ?? null) !== status),
       () => ({ statusOverride: status }),

@@ -6,7 +6,7 @@ import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTag 
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { LABEL_NAME_MAX, TramaStore, type WorkspaceLabel } from '../core';
+import { LABEL_NAME_MAX, TramaStore, type LabelScope, type WorkspaceLabel } from '../core';
 import { LabelCatalog } from './label-catalog';
 import { LabelChip, LabelChips } from './label-chip';
 
@@ -92,6 +92,8 @@ import { LabelChip, LabelChips } from './label-chip';
                     <span class="min-w-0 flex-1 truncate" [attr.aria-label]="isOn(l.id) ? l.name + ', selected' : l.name">{{ l.name }}</span>
                     @if (l.archived) {
                       <span class="text-muted-foreground text-[11px]">archived</span>
+                    } @else if (scope() && l.scope !== scope()) {
+                      <span class="text-muted-foreground text-[11px]">{{ l.scope }}</span>
                     } @else if (usageOf(l.id); as n) {
                       <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
                     }
@@ -111,10 +113,17 @@ import { LabelChip, LabelChips } from './label-chip';
             @if (archivedClash(); as a) {
               <div class="text-muted-foreground px-2 py-2 text-xs">“{{ a.name }}” exists but is archived. An admin can restore it in Settings.</div>
             }
+            @if (otherScope(); as o) {
+              <div class="text-muted-foreground px-2 py-2 text-xs">“{{ o.name }}” is a {{ o.scope }} label.</div>
+            }
           </hlm-command-list>
           <div *hlmCommandEmptyState hlmCommandEmpty class="text-muted-foreground py-4 text-center text-xs">
-            @if (catalog.active().length === 0) {
-              No labels yet.
+            @if (otherScope(); as o) {
+              “{{ o.name }}” is a {{ o.scope }} label.
+            } @else if (!scope()) {
+              Labels apply to issues, workstreams, and projects.
+            } @else if (inScope().length === 0) {
+              No {{ scope() }} labels yet.
             } @else {
               No label matches “{{ query() }}”.
             }
@@ -155,6 +164,11 @@ export class LabelPicker {
   readonly align = input<'start' | 'center' | 'end'>('start');
   /** Offer "Create “name”" when the search matches nothing. Filters turn it off. */
   readonly creatable = input(true);
+  /**
+   * Record this picker labels. Only that scope is offered; labels already selected stay so they can be removed.
+   * `null` (repositories) has no scope: nothing new can be added.
+   */
+  readonly scope = input<LabelScope | null>(null);
   /** Show the "Manage labels" link for admins. */
   readonly manageLink = input(true);
 
@@ -175,7 +189,8 @@ export class LabelPicker {
   protected readonly known = computed(() => this.value().filter((id) => this.catalog.byId().has(id)));
   protected readonly atMax = computed(() => this.value().length >= this.catalog.maxPerRecord);
 
-  private readonly arranged = computed(() => this.catalog.arrange(this.picked(), !this.query().trim()));
+  private readonly arranged = computed(() => this.catalog.arrange(this.picked(), !this.query().trim(), this.scope()));
+  protected readonly inScope = computed(() => this.catalog.active().filter((label) => label.scope === this.scope()));
   protected readonly suggested = computed(() => this.arranged().suggested);
   protected readonly listed = computed(() => this.arranged().rest);
 
@@ -194,7 +209,7 @@ export class LabelPicker {
 
   /** The name that would be created: what was typed, when no label has it yet. */
   protected readonly createName = computed(() => {
-    if (!this.creatable() || !this.catalog.canCreate()) return null;
+    if (!this.creatable() || !this.catalog.canCreate() || !this.scope()) return null;
     const name = this.query().trim();
     if (!name || name.length > LABEL_NAME_MAX || this.catalog.find(name)) return null;
     return name;
@@ -206,7 +221,17 @@ export class LabelPicker {
   });
   protected readonly archivedClash = computed(() => {
     const hit = this.catalog.find(this.query());
-    return hit?.archived && !this.picked().has(hit.id) ? hit : null;
+    const scope = this.scope();
+    if (!hit?.archived || this.picked().has(hit.id)) return null;
+    if (scope && hit.scope !== scope) return null;
+    return hit;
+  });
+  /** A label of that name exists, but for a different record type, so it cannot be added here. */
+  protected readonly otherScope = computed(() => {
+    const scope = this.scope();
+    if (!scope) return null;
+    const hit = this.catalog.find(this.query());
+    return hit && hit.scope !== scope && !this.picked().has(hit.id) ? hit : null;
   });
   protected readonly nextColor = computed(() => this.catalog.nextColor());
 
@@ -250,9 +275,10 @@ export class LabelPicker {
   }
 
   protected async create(name: string): Promise<void> {
-    if (this.busy() || this.atMax()) return;
+    const scope = this.scope();
+    if (this.busy() || this.atMax() || !scope) return;
     this.busy.set(true);
-    const made = await this.catalog.create(name);
+    const made = await this.catalog.create(name, undefined, scope);
     this.busy.set(false);
     if (!made) return;
     this.query.set('');

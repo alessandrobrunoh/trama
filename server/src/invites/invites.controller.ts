@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
-import { IsEmail, IsIn, IsOptional } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import type { Role } from '../contracts/domain.js';
 import {
   Auth,
@@ -13,11 +13,9 @@ import {
 } from '../auth/request-context.js';
 import { InvitesService } from './invites.service.js';
 
-const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
-
 class CreateInviteDto {
   @IsEmail() email: string;
-  @IsIn(ROLES) role: Role;
+  @IsString() @MinLength(1) @MaxLength(80) role: Role;
   /** Omitted or null: the role in full. An object narrows projects and actions. */
   @IsOptional() access?: unknown;
 }
@@ -36,14 +34,14 @@ export class WorkspaceInvitesController {
   @Post()
   @Can('inviteMembers')
   create(@Ctx() ctx: WorkspaceContext, @Body() dto: CreateInviteDto) {
-    return this.service.create(ctx.workspace, { userId: ctx.userId, role: ctx.role }, dto);
+    return this.service.create(ctx.workspace, { userId: ctx.userId, role: ctx.role, tokenScope: ctx.tokenScope }, dto);
   }
 
   @Post(':id/resend')
   @HttpCode(200)
   @Can('inviteMembers')
   resend(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    return this.service.resend(ctx.workspace, ctx.role, id);
+    return this.service.resend(ctx.workspace, { role: ctx.role, tokenScope: ctx.tokenScope }, id);
   }
 
   @Delete(':id')

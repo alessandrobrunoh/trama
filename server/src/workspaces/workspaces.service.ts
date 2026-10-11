@@ -5,14 +5,29 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, type Repository } from 'typeorm';
+import { DataSource, In, IsNull, type Repository } from 'typeorm';
 import { AuthService } from '../auth/auth.service.js';
-import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
-import { accessWithin, CAPABILITIES, CAPABILITY_ROLES, effectiveMemberAccess, normalizeGrantList, normalizeMemberAccess, resolveRoleGrants } from '../contracts/domain.js';
-import type { Capability, MemberAccess, MemberGrant, PermissionMap, Role, WorkspaceSettings } from '../contracts/domain.js';
+import { isOwner, type WorkspaceContext } from '../auth/request-context.js';
+import {
+  CAPABILITIES,
+  accessWithin,
+  applyTokenScope,
+  canGrantRole,
+  effectiveMemberAccess,
+  findWorkspaceRole,
+  freshWorkspaceRoles,
+  normalizeCapabilities,
+  normalizeGrantList,
+  normalizeMemberAccess,
+  normalizeWorkspaceRoles,
+  OWNER_ROLE_ID,
+  ROLE_NAME_MAX,
+} from '../contracts/domain.js';
+import type { MemberAccess, MemberGrant, Role, TokenScope, WorkspaceRole, WorkspaceSettings } from '../contracts/domain.js';
 import {
   AgentEntity,
   ApiTokenEntity,
+  InviteEntity,
   MembershipEntity,
   TeamEntity,
   UserEntity,
@@ -85,7 +100,13 @@ export class WorkspacesService {
     }
     const ws = await this.ds.transaction(async (m) => {
       const workspace = await m.save(
-        m.create(WorkspaceEntity, { id: uid('ws'), name: input.name.trim(), slug, primaryOwnerId: user.id }),
+        m.create(WorkspaceEntity, {
+          id: uid('ws'),
+          name: input.name.trim(),
+          slug,
+          primaryOwnerId: user.id,
+          settings: { roles: freshWorkspaceRoles() },
+        }),
       );
       await m.save(
         m.create(MembershipEntity, { id: uid('mb'), workspaceId: workspace.id, userId: user.id, role: 'owner' }),
@@ -106,11 +127,10 @@ export class WorkspacesService {
     return this.workspaces.save(ws);
   }
 
-  /** Partial update of the customization settings. Changing `permissions` is reserved to owners. */
+  /** Partial update of the customization settings. Roles are changed through the role endpoints. */
   async updateSettings(
     ctx: WorkspaceContext,
     patch: {
-      permissions?: Record<string, string>;
       defaultTeamId?: string | null;
       estimateScale?: WorkspaceSettings['estimateScale'];
       weekStart?: WorkspaceSettings['weekStart'];
@@ -118,31 +138,10 @@ export class WorkspacesService {
       iconColor?: string | null;
       iconInitial?: string | null;
       deltaThreads?: boolean;
-      roleGrants?: Partial<Record<Role, readonly unknown[]>>;
     },
   ) {
     const ws = ctx.workspace;
     const next: Partial<WorkspaceSettings> = { ...ws.settings };
-    if (patch.permissions !== undefined) {
-      if (!hasRole(ctx.role, 'owner')) throw new ForbiddenException('Only an owner can change roles and permissions');
-      const perms: Partial<PermissionMap> = { ...(next.permissions ?? {}) };
-      for (const [cap, role] of Object.entries(patch.permissions)) {
-        if (!CAPABILITIES.includes(cap as Capability)) throw new BadRequestException(`Unknown capability "${cap}"`);
-        if (!CAPABILITY_ROLES.includes(role as Role))
-          throw new BadRequestException(`"${role}" is not a valid minimum role for ${cap} (use ${CAPABILITY_ROLES.join(', ')})`);
-        perms[cap as Capability] = role as Role;
-      }
-      next.permissions = perms as PermissionMap;
-    }
-    if (patch.roleGrants !== undefined) {
-      if (!hasRole(ctx.role, 'owner')) throw new ForbiddenException('Only an owner can change roles and permissions');
-      const current = resolveRoleGrants(next.roleGrants);
-      for (const role of ['admin', 'member', 'viewer'] as const) {
-        const listed = patch.roleGrants[role];
-        if (Array.isArray(listed)) current[role] = normalizeGrantList(listed);
-      }
-      next.roleGrants = current;
-    }
     if (patch.defaultTeamId !== undefined) {
       if (patch.defaultTeamId === null) delete next.defaultTeamId;
       else {
@@ -179,6 +178,81 @@ export class WorkspacesService {
     return saved;
   }
 
+  private assertOwner(ctx: WorkspaceContext): void {
+    if (!isOwner(ctx)) throw new ForbiddenException('Only an owner can change roles');
+  }
+
+  private async writeRoles(ws: WorkspaceEntity, roles: readonly WorkspaceRole[]): Promise<WorkspaceEntity> {
+    const normalized = normalizeWorkspaceRoles(roles);
+    const settings: Partial<WorkspaceSettings> = { ...ws.settings, roles: normalized };
+    delete (settings as { permissions?: unknown }).permissions;
+    delete (settings as { roleGrants?: unknown }).roleGrants;
+    ws.settings = settings;
+    const saved = await this.workspaces.save(ws);
+    this.events.publish(ws.id, { type: 'updated', entity: 'workspace', id: ws.id });
+    return saved;
+  }
+
+  /** Owner only. The new role starts with exactly the capabilities and grants that were sent. */
+  async createRole(ctx: WorkspaceContext, input: { name: string; capabilities?: readonly unknown[]; grants?: readonly unknown[] }): Promise<WorkspaceEntity> {
+    this.assertOwner(ctx);
+    const name = input.name?.trim() ?? '';
+    if (!name || name.length > ROLE_NAME_MAX) throw new BadRequestException(`A role name is required (at most ${ROLE_NAME_MAX} characters)`);
+    const roles = ctx.workspace.resolved().roles;
+    if (roles.some((role) => role.name.toLowerCase() === name.toLowerCase())) throw new ConflictException(`A role named "${name}" already exists`);
+    this.assertKnownCapabilities(input.capabilities);
+    const created: WorkspaceRole = {
+      id: uid('role').toLowerCase(),
+      name,
+      owner: false,
+      capabilities: normalizeCapabilities(input.capabilities ?? [], false),
+      grants: normalizeGrantList(input.grants ?? []),
+    };
+    return this.writeRoles(ctx.workspace, [...roles, created]);
+  }
+
+  /** Owner only. The owner role stays the owner role and keeps membership management. */
+  async updateRole(ctx: WorkspaceContext, roleId: string, patch: { name?: string; capabilities?: readonly unknown[]; grants?: readonly unknown[] }): Promise<WorkspaceEntity> {
+    this.assertOwner(ctx);
+    if (patch.name === undefined && patch.capabilities === undefined && patch.grants === undefined) throw new BadRequestException('Nothing to change');
+    const roles = ctx.workspace.resolved().roles.map((role) => ({ ...role, capabilities: [...role.capabilities], grants: [...role.grants] }));
+    const role = roles.find((item) => item.id === roleId);
+    if (!role) throw notFound('Role', roleId);
+    if (patch.name !== undefined) {
+      const name = patch.name.trim();
+      if (!name || name.length > ROLE_NAME_MAX) throw new BadRequestException(`A role name is required (at most ${ROLE_NAME_MAX} characters)`);
+      if (roles.some((item) => item.id !== role.id && item.name.toLowerCase() === name.toLowerCase())) throw new ConflictException(`A role named "${name}" already exists`);
+      role.name = name;
+    }
+    if (patch.capabilities !== undefined) {
+      this.assertKnownCapabilities(patch.capabilities);
+      role.capabilities = normalizeCapabilities(patch.capabilities, role.owner);
+    }
+    if (patch.grants !== undefined && !role.owner) role.grants = normalizeGrantList(patch.grants);
+    return this.writeRoles(ctx.workspace, roles);
+  }
+
+  private assertKnownCapabilities(input: readonly unknown[] | undefined): void {
+    if (!input) return;
+    for (const cap of input) {
+      if (typeof cap !== 'string' || !(CAPABILITIES as readonly string[]).includes(cap))
+        throw new BadRequestException(`Unknown capability "${String(cap)}"`);
+    }
+  }
+
+  /** Owner only. The owner role cannot be deleted, and neither can a role someone still holds. */
+  async deleteRole(ctx: WorkspaceContext, roleId: string): Promise<WorkspaceEntity> {
+    this.assertOwner(ctx);
+    const roles = ctx.workspace.resolved().roles;
+    const role = findWorkspaceRole(roles, roleId);
+    if (!role) throw notFound('Role', roleId);
+    if (role.owner || role.id === OWNER_ROLE_ID) throw new ForbiddenException('The owner role cannot be deleted');
+    if (await this.memberships.existsBy({ workspaceId: ctx.workspace.id, role: role.id })) throw new ConflictException('Move everyone off this role before deleting it');
+    const pending = await this.ds.getRepository(InviteEntity).existsBy({ workspaceId: ctx.workspace.id, role: role.id, acceptedAt: IsNull(), revokedAt: IsNull() });
+    if (pending) throw new ConflictException('Revoke invitations for this role before deleting it');
+    return this.writeRoles(ctx.workspace, roles.filter((item) => item.id !== role.id));
+  }
+
   /** Irreversible: the caller must repeat the workspace slug or name so a stray request cannot delete it. */
   async remove(ws: WorkspaceEntity, confirm: string): Promise<void> {
     const typed = (confirm ?? '').trim();
@@ -202,16 +276,16 @@ export class WorkspacesService {
     return m;
   }
 
-  async addMember(workspaceId: string, callerRole: Role, input: { email: string; role: Role }) {
-    this.assertCanGrant(callerRole, input.role);
+  async addMember(ws: WorkspaceEntity, callerRole: Role, input: { email: string; role: Role }, tokenScope?: TokenScope) {
+    this.assertCanGrant(ws, callerRole, input.role, tokenScope);
     const user = await this.users.findOneBy({ email: input.email.trim().toLowerCase() });
     if (!user) throw notFound('User', input.email);
-    if (await this.memberships.existsBy({ workspaceId, userId: user.id }))
+    if (await this.memberships.existsBy({ workspaceId: ws.id, userId: user.id }))
       throw new ConflictException('User is already a member');
     const m = await this.memberships.save(
-      this.memberships.create({ id: uid('mb'), workspaceId, userId: user.id, role: input.role }),
+      this.memberships.create({ id: uid('mb'), workspaceId: ws.id, userId: user.id, role: input.role }),
     );
-    this.events.publish(workspaceId, { type: 'created', entity: 'membership', id: m.id });
+    this.events.publish(ws.id, { type: 'created', entity: 'membership', id: m.id });
     return Object.assign(m, { user });
   }
 
@@ -229,13 +303,14 @@ export class WorkspacesService {
     if (patch.role === undefined && patch.access === undefined) throw new BadRequestException('Nothing to change');
     const m = await this.getMembership(ws.id, id);
     const nextRole = patch.role ?? m.role;
-    if (patch.role !== undefined) {
-      this.assertCanGrant(caller.role, patch.role);
-      if (m.role !== patch.role) assertCanChangeRole(await this.ruleContext(ws), caller, m, patch.role);
+    const targetRole = patch.role !== undefined ? this.assertCanGrant(ws, caller.role, patch.role, caller.tokenScope) : findWorkspaceRole(ws.resolved().roles, nextRole);
+    if (!targetRole) throw new BadRequestException(`Unknown role "${nextRole}"`);
+    if (patch.role !== undefined && m.role !== patch.role) {
+      assertCanChangeRole(await this.ruleContext(ws), caller, m, patch.role);
       m.role = patch.role;
     }
-    const baseline = ws.resolved().roleGrants[nextRole];
-    if (nextRole === 'owner') m.access = null;
+    const baseline = targetRole.grants;
+    if (targetRole.owner) m.access = null;
     else if (patch.access !== undefined) {
       const access = this.parseAccess(patch.access, baseline);
       await this.assertCanGrantAccess(ws, caller, access, baseline);
@@ -302,15 +377,25 @@ export class WorkspacesService {
       if (access) throw new ForbiddenException('Only a person can set access limits');
       return;
     }
-    if (caller.role === 'owner') return;
+    const callerRole = this.effectiveCaller(ws, caller.role, caller.tokenScope);
+    if (callerRole?.owner) return;
     const mine = await this.memberships.findOneBy({ workspaceId: ws.id, userId: caller.userId });
-    const callerAccess = effectiveMemberAccess(caller.role, mine?.access ?? null, ws.resolved().roleGrants);
+    const callerAccess = effectiveMemberAccess(callerRole, mine?.access ?? null);
     if (!accessWithin(access, callerAccess, baseline)) throw new ForbiddenException('You cannot grant access wider than your own');
   }
 
-  private assertCanGrant(callerRole: Role, target: Role) {
-    if (target === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can grant owner');
-    if (!hasRole(callerRole, target)) throw new ForbiddenException(`You cannot grant a role above your own (${callerRole})`);
+  private effectiveCaller(ws: WorkspaceEntity, callerRole: Role, tokenScope?: TokenScope): WorkspaceRole | undefined {
+    const found = findWorkspaceRole(ws.resolved().roles, callerRole);
+    return found ? applyTokenScope(found, tokenScope) : undefined;
+  }
+
+  /** The target role, when the caller may grant it. Throws otherwise. */
+  private assertCanGrant(ws: WorkspaceEntity, callerRole: Role, targetId: Role, tokenScope?: TokenScope): WorkspaceRole {
+    const target = findWorkspaceRole(ws.resolved().roles, targetId);
+    if (!target) throw new BadRequestException(`Unknown role "${targetId}"`);
+    const caller = this.effectiveCaller(ws, callerRole, tokenScope);
+    if (!canGrantRole(caller, target)) throw new ForbiddenException('You cannot grant a role with permissions you do not have');
+    return target;
   }
 
   // ───────── agents

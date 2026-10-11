@@ -16,7 +16,15 @@ export type ISODate = string;
 
 // ───────────────────────────── Identity & workspace ─────────────────────────────
 
-export type Role = 'owner' | 'admin' | 'member' | 'viewer';
+/**
+ * Id of one workspace role: `owner`, a migrated `admin` / `member` / `viewer`, or a created `role_…`.
+ * What it can do is that role's own set. There is no rank, and a higher role does not inherit a lower one.
+ */
+export type Role = string;
+
+/** The four ranks a workspace had before roles were defined in settings. Migration only. */
+export type LegacyRole = 'owner' | 'admin' | 'member' | 'viewer';
+export const LEGACY_ROLES: readonly LegacyRole[] = ['owner', 'admin', 'member', 'viewer'];
 
 export interface User {
   id: ID;
@@ -93,8 +101,11 @@ export interface MemberAccess {
   grants: MemberGrant[];
 }
 
-/** The granular work permissions of each role. Owners are always full and ignore this. */
-export type RoleGrantMap = Record<Role, MemberGrant[]>;
+/**
+ * Granular work permissions of the four old ranks. `resolveWorkspaceSettings` copies these onto
+ * workspace roles when a stored settings object has no `roles` yet.
+ */
+export type RoleGrantMap = Record<LegacyRole, MemberGrant[]>;
 
 export interface MemberResourceMeta {
   label: string;
@@ -106,23 +117,95 @@ export interface MemberResourceMeta {
 const MEMBER_ACTIONS = ['view', 'create', 'update', 'delete'] as const;
 
 export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
-  projects: { group: 'Planning', label: 'Projects', description: 'The planning container: name, status, dates, lead.', actions: MEMBER_ACTIONS },
-  milestones: { group: 'Planning', label: 'Milestones', description: 'Targets inside a project.', actions: MEMBER_ACTIONS },
-  workstreams: { group: 'Work', label: 'Workstreams', description: 'Create them, or only change the ones this person can see.', actions: MEMBER_ACTIONS },
-  issues: { group: 'Work', label: 'Issues', description: 'File an issue without being able to edit or delete it, or the other way around.', actions: MEMBER_ACTIONS },
-  documents: { group: 'Work', label: 'Documents', description: 'Workspace documents.', actions: MEMBER_ACTIONS },
-  artifacts: { group: 'Work', label: 'Artifacts', description: 'Pull requests, builds and other proof attached to work.', actions: MEMBER_ACTIONS },
-  views: { group: 'Work', label: 'Views', description: 'Saved filters. Sharing a view with the workspace still follows Roles & permissions.', actions: MEMBER_ACTIONS },
-  comments: { group: 'Collaboration', label: 'Comments', description: 'Read a thread, write in it, or edit and delete comments.', actions: MEMBER_ACTIONS },
-  decisions: { group: 'Collaboration', label: 'Decisions', description: 'Propose or edit a decision. Accepting one still follows Roles & permissions.', actions: MEMBER_ACTIONS },
-  dependencies: { group: 'Collaboration', label: 'Dependencies', description: 'Links between workstreams and issues.', actions: MEMBER_ACTIONS },
-  'input-requests': { group: 'Collaboration', label: 'Input requests', description: 'Questions asked on a workstream.', actions: MEMBER_ACTIONS },
-  customers: { group: 'Collaboration', label: 'Customers', description: 'Companies and the requests they file. Deleting one still follows Roles & permissions.', actions: MEMBER_ACTIONS },
+  projects: {
+    group: 'Planning',
+    label: 'Projects',
+    description: 'The planning container: name, status, dates, lead.',
+    actions: MEMBER_ACTIONS,
+  },
+  milestones: {
+    group: 'Planning',
+    label: 'Milestones',
+    description: 'Targets inside a project.',
+    actions: MEMBER_ACTIONS,
+  },
+  workstreams: {
+    group: 'Work',
+    label: 'Workstreams',
+    description: 'Create them, or only change the ones this person can see.',
+    actions: MEMBER_ACTIONS,
+  },
+  issues: {
+    group: 'Work',
+    label: 'Issues',
+    description: 'File an issue without being able to edit or delete it, or the other way around.',
+    actions: MEMBER_ACTIONS,
+  },
+  documents: {
+    group: 'Work',
+    label: 'Documents',
+    description: 'Workspace documents.',
+    actions: MEMBER_ACTIONS,
+  },
+  artifacts: {
+    group: 'Work',
+    label: 'Artifacts',
+    description: 'Pull requests, builds and other proof attached to work.',
+    actions: MEMBER_ACTIONS,
+  },
+  views: {
+    group: 'Work',
+    label: 'Views',
+    description:
+      'Saved filters. Sharing a view with the workspace still follows Roles & permissions.',
+    actions: MEMBER_ACTIONS,
+  },
+  comments: {
+    group: 'Collaboration',
+    label: 'Comments',
+    description: 'Read a thread, write in it, or edit and delete comments.',
+    actions: MEMBER_ACTIONS,
+  },
+  decisions: {
+    group: 'Collaboration',
+    label: 'Decisions',
+    description: 'Propose or edit a decision. Accepting one still follows Roles & permissions.',
+    actions: MEMBER_ACTIONS,
+  },
+  dependencies: {
+    group: 'Collaboration',
+    label: 'Dependencies',
+    description: 'Links between workstreams and issues.',
+    actions: MEMBER_ACTIONS,
+  },
+  'input-requests': {
+    group: 'Collaboration',
+    label: 'Input requests',
+    description: 'Questions asked on a workstream.',
+    actions: MEMBER_ACTIONS,
+  },
+  customers: {
+    group: 'Collaboration',
+    label: 'Customers',
+    description:
+      'Companies and the requests they file. Deleting one still follows Roles & permissions.',
+    actions: MEMBER_ACTIONS,
+  },
 };
 
 export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
-  'projects', 'milestones', 'workstreams', 'issues', 'documents', 'artifacts', 'views',
-  'comments', 'decisions', 'dependencies', 'input-requests', 'customers',
+  'projects',
+  'milestones',
+  'workstreams',
+  'issues',
+  'documents',
+  'artifacts',
+  'views',
+  'comments',
+  'decisions',
+  'dependencies',
+  'input-requests',
+  'customers',
 ];
 
 export const MEMBER_ACTION_META: readonly { id: MemberAction; label: string }[] = [
@@ -139,14 +222,19 @@ export const MEMBER_GRANTS: readonly MemberGrant[] = MEMBER_RESOURCE_ORDER.flatM
 const MEMBER_GRANT_SET = new Set<string>(MEMBER_GRANTS);
 const MEMBER_ID = /^[A-Za-z0-9_-]{1,80}$/;
 
-/** Default work permissions of a role, before an owner customizes them. Viewer is view-only; the others can do all four actions. */
-export function roleGrants(role: Role): MemberGrant[] {
+/** Default work permissions of an old rank. Viewer is view-only; the others can do all four actions. */
+export function roleGrants(role: LegacyRole): MemberGrant[] {
   if (role === 'viewer') return MEMBER_GRANTS.filter((grant) => grant.endsWith(':view'));
   return [...MEMBER_GRANTS];
 }
 
 export function defaultRoleGrantMap(): RoleGrantMap {
-  return { owner: roleGrants('owner'), admin: roleGrants('admin'), member: roleGrants('member'), viewer: roleGrants('viewer') };
+  return {
+    owner: roleGrants('owner'),
+    admin: roleGrants('admin'),
+    member: roleGrants('member'),
+    viewer: roleGrants('viewer'),
+  };
 }
 
 /** Keeps known grants, in catalog order, and makes every other action imply view. */
@@ -159,12 +247,12 @@ export function normalizeGrantList(input: readonly unknown[]): MemberGrant[] {
   return MEMBER_GRANTS.filter((grant) => chosen.has(grant));
 }
 
-/** Fills missing roles with the defaults. Stored lists replace a role entirely. */
-export function resolveRoleGrants(raw?: Partial<Record<Role, readonly unknown[]>> | null): RoleGrantMap {
+/** Fills missing ranks with the defaults. Stored lists replace a rank entirely. */
+export function resolveRoleGrants(raw?: Partial<Record<LegacyRole, readonly unknown[]>> | null): RoleGrantMap {
   const defaults = defaultRoleGrantMap();
   const out: RoleGrantMap = { ...defaults };
   if (!raw) return out;
-  for (const role of ['owner', 'admin', 'member', 'viewer'] as const) {
+  for (const role of LEGACY_ROLES) {
     const listed = raw[role];
     if (Array.isArray(listed)) out[role] = normalizeGrantList(listed);
   }
@@ -180,7 +268,10 @@ export function emptyMemberAccess(): MemberAccess {
  * `grants` on `input` are extras on top of `baseline` (the role). Grants the role already has are dropped.
  * Returns null when nothing is added and every project stays visible.
  */
-export function normalizeMemberAccess(input: unknown, baseline: readonly MemberGrant[] = []): MemberAccess | null {
+export function normalizeMemberAccess(
+  input: unknown,
+  baseline: readonly MemberGrant[] = [],
+): MemberAccess | null {
   if (input == null || typeof input !== 'object') return null;
   const raw = input as Record<string, unknown>;
   const scope = raw['projects'];
@@ -191,7 +282,11 @@ export function normalizeMemberAccess(input: unknown, baseline: readonly MemberG
     all = projects['all'] !== false;
     const listedIds = projects['projectIds'];
     if (!all && Array.isArray(listedIds)) {
-      projectIds = [...new Set(listedIds.filter((id): id is string => typeof id === 'string' && MEMBER_ID.test(id)))];
+      projectIds = [
+        ...new Set(
+          listedIds.filter((id): id is string => typeof id === 'string' && MEMBER_ID.test(id)),
+        ),
+      ];
     }
   }
   const includeUnassigned = all || raw['includeUnassigned'] !== false;
@@ -200,7 +295,12 @@ export function normalizeMemberAccess(input: unknown, baseline: readonly MemberG
   const chosen = new Set<MemberGrant>();
   if (Array.isArray(rawGrants)) {
     for (const grant of rawGrants) {
-      if (typeof grant === 'string' && MEMBER_GRANT_SET.has(grant) && !base.has(grant as MemberGrant)) chosen.add(grant as MemberGrant);
+      if (
+        typeof grant === 'string' &&
+        MEMBER_GRANT_SET.has(grant) &&
+        !base.has(grant as MemberGrant)
+      )
+        chosen.add(grant as MemberGrant);
     }
   }
   for (const grant of [...chosen]) {
@@ -212,20 +312,29 @@ export function normalizeMemberAccess(input: unknown, baseline: readonly MemberG
   return { projects: { all, projectIds: all ? [] : projectIds }, includeUnassigned, grants };
 }
 
-/** Role grants plus this person's extras. Null for owners, and when the result is every action on every project. */
+/**
+ * Role grants plus this person's extras. Null for the owner role (always full), and when the result
+ * is every action on every project. Unknown role: nothing.
+ */
 export function effectiveMemberAccess(
-  role: Role,
+  role: { owner: boolean; grants: readonly MemberGrant[] } | null | undefined,
   stored: MemberAccess | null | undefined,
-  grantsByRole: RoleGrantMap,
 ): MemberAccess | null {
-  if (role === 'owner') return null;
-  const base = new Set(grantsByRole[role] ?? roleGrants(role));
+  if (!role) return { projects: { all: false, projectIds: [] }, includeUnassigned: false, grants: [] };
+  if (role.owner) return null;
+  const base = new Set(role.grants);
   for (const grant of stored?.grants ?? []) base.add(grant);
   const grants = MEMBER_GRANTS.filter((grant) => base.has(grant));
   const projects = stored?.projects ?? { all: true, projectIds: [] };
   const includeUnassigned = projects.all || (stored?.includeUnassigned ?? true);
   if (projects.all && includeUnassigned && grants.length === MEMBER_GRANTS.length) return null;
-  return { projects: projects.all ? { all: true, projectIds: [] } : { all: false, projectIds: projects.projectIds }, includeUnassigned, grants };
+  return {
+    projects: projects.all
+      ? { all: true, projectIds: [] }
+      : { all: false, projectIds: projects.projectIds },
+    includeUnassigned,
+    grants,
+  };
 }
 
 /**
@@ -267,17 +376,49 @@ export const NOTIFICATION_KINDS = [
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 
-export const NOTIFICATION_KIND_META: Record<NotificationKind, { label: string; description: string }> = {
+export const NOTIFICATION_KIND_META: Record<
+  NotificationKind,
+  { label: string; description: string }
+> = {
   assigned: { label: 'Assigned to me', description: 'An issue is assigned to you.' },
-  input_requested: { label: 'Questions for me', description: 'Someone, or an agent, asks you a question on a workstream.' },
-  decision_proposed: { label: 'Decisions to review', description: 'A decision is proposed on a workstream you are accountable for.' },
-  review_requested: { label: 'Review requested', description: 'A pull request on a workstream you are accountable for needs a review.' },
-  ci_failed: { label: 'Failing checks', description: 'CI fails on a workstream you are accountable for.' },
-  comment: { label: 'Comments', description: 'New comments on issues you are assigned or reported, and on workstreams you are accountable for.' },
-  workstream_update: { label: 'Workstream updates', description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.' },
-  customer_request: { label: 'Customer requests', description: 'A request is added for a customer you follow.' },
-  customer_important: { label: 'Important customer requests', description: 'A request of a customer you follow is flagged as important.' },
-  customer_delivered: { label: 'Delivered to customers', description: 'The issue or project behind a request is done, for a customer you follow or a request you recorded.' },
+  input_requested: {
+    label: 'Questions for me',
+    description: 'Someone, or an agent, asks you a question on a workstream.',
+  },
+  decision_proposed: {
+    label: 'Decisions to review',
+    description: 'A decision is proposed on a workstream you are accountable for.',
+  },
+  review_requested: {
+    label: 'Review requested',
+    description: 'A pull request on a workstream you are accountable for needs a review.',
+  },
+  ci_failed: {
+    label: 'Failing checks',
+    description: 'CI fails on a workstream you are accountable for.',
+  },
+  comment: {
+    label: 'Comments',
+    description:
+      'New comments on issues you are assigned or reported, and on workstreams you are accountable for.',
+  },
+  workstream_update: {
+    label: 'Workstream updates',
+    description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.',
+  },
+  customer_request: {
+    label: 'Customer requests',
+    description: 'A request is added for a customer you follow.',
+  },
+  customer_important: {
+    label: 'Important customer requests',
+    description: 'A request of a customer you follow is flagged as important.',
+  },
+  customer_delivered: {
+    label: 'Delivered to customers',
+    description:
+      'The issue or project behind a request is done, for a customer you follow or a request you recorded.',
+  },
 };
 
 export type NotificationChannel = 'inApp' | 'email' | 'push';
@@ -288,12 +429,19 @@ export type NotificationChannels = Record<NotificationChannel, boolean>;
  */
 export type NotificationSettings = Record<NotificationKind, NotificationChannels>;
 
-export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = { inApp: true, email: false, push: true };
+export const DEFAULT_NOTIFICATION_CHANNELS: NotificationChannels = {
+  inApp: true,
+  email: false,
+  push: true,
+};
 
 /** Fills the gaps of a stored (partial) settings object with the defaults. */
-export function resolveNotificationSettings(raw?: Partial<Record<string, Partial<NotificationChannels>>> | null): NotificationSettings {
+export function resolveNotificationSettings(
+  raw?: Partial<Record<string, Partial<NotificationChannels>>> | null,
+): NotificationSettings {
   const out = {} as NotificationSettings;
-  for (const kind of NOTIFICATION_KINDS) out[kind] = { ...DEFAULT_NOTIFICATION_CHANNELS, ...(raw?.[kind] ?? {}) };
+  for (const kind of NOTIFICATION_KINDS)
+    out[kind] = { ...DEFAULT_NOTIFICATION_CHANNELS, ...(raw?.[kind] ?? {}) };
   return out;
 }
 
@@ -325,7 +473,16 @@ export interface NotificationList {
 }
 
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
-export const FAVORITE_TYPES = ['issue', 'workstream', 'project', 'decision', 'team', 'repository', 'view', 'customer'] as const;
+export const FAVORITE_TYPES = [
+  'issue',
+  'workstream',
+  'project',
+  'decision',
+  'team',
+  'repository',
+  'view',
+  'customer',
+] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
 /** Most favorites one person can keep in a workspace. */
 export const MAX_FAVORITES = 100;
@@ -375,6 +532,8 @@ export interface InviteLink {
 export interface InvitePreview {
   workspaceName: string;
   role: Role;
+  /** Display name of `role`. */
+  roleName: string;
   email: string;
   invitedByName?: string;
   expiresAt: ISODate;
@@ -438,7 +597,10 @@ export const GIT_PROVIDERS: GitProvider[] = ['github', 'gitlab', 'bitbucket'];
  * add its entry here, implement a client in server/src/integrations/providers.ts and a webhook parser
  * in server/src/webhooks.
  */
-export const GIT_PROVIDER_META: Record<GitProvider, { label: string; host: string; selfHosted: boolean }> = {
+export const GIT_PROVIDER_META: Record<
+  GitProvider,
+  { label: string; host: string; selfHosted: boolean }
+> = {
   github: { label: 'GitHub', host: 'github.com', selfHosted: true },
   gitlab: { label: 'GitLab', host: 'gitlab.com', selfHosted: true },
   bitbucket: { label: 'Bitbucket', host: 'bitbucket.org', selfHosted: false },
@@ -461,8 +623,16 @@ export interface Repository {
 // ───────────────────────────── Projects ─────────────────────────────
 
 /** Linear-style project lifecycle. Planning-level: independent of workstream status. */
-export type ProjectStatus = 'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
-export const PROJECT_STATUSES: ProjectStatus[] = ['backlog', 'planned', 'in_progress', 'paused', 'completed', 'canceled'];
+export type ProjectStatus =
+  'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
+export const PROJECT_STATUSES: ProjectStatus[] = [
+  'backlog',
+  'planned',
+  'in_progress',
+  'paused',
+  'completed',
+  'canceled',
+];
 
 /**
  * A planned outcome (Linear-style): what we want to achieve, by when, in which repositories.
@@ -598,7 +768,8 @@ export interface ProjectAiRisks {
   health: ProjectHealth;
   risks: ProjectAiRisk[];
 }
-export type ProjectAiResult = ProjectAiUpdateDraft | ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
+export type ProjectAiResult =
+  ProjectAiUpdateDraft | ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
 
 // ───────────────────────────── Workstreams ─────────────────────────────
 
@@ -650,7 +821,8 @@ export type CriterionState = 'pending' | 'in_progress' | 'met';
  * - `needs_input`: an open input request or a proposed decision waits on a person.
  * - `no_delivery`: no merged/released/deployed work and not every linked issue is done.
  */
-export type CompletionGap = 'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
+export type CompletionGap =
+  'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
 export interface WorkstreamCompletion {
   /** True when the outcome is achieved by the facts (ignores any manual `statusOverride`). */
   achieved: boolean;
@@ -771,7 +943,8 @@ export interface InputRequest {
 
 // ───────────────────────────── Issues ─────────────────────────────
 
-export type IssueKind = 'bug' | 'feature' | 'incident' | 'tech_debt' | 'feedback' | 'idea' | 'security';
+export type IssueKind =
+  'bug' | 'feature' | 'incident' | 'tech_debt' | 'feedback' | 'idea' | 'security';
 /** Key prefix per kind: BUG-142, FEAT-12, INC-3, DEBT-7, FB-20, IDEA-4, SEC-2 (numbering per kind). */
 export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
   bug: 'BUG',
@@ -787,7 +960,8 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
  * Tracker status, independent of workstream status.
  * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
  */
-export type IssueStatus = 'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
+export type IssueStatus =
+  'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
 export type IssueSource = 'manual' | 'github' | 'gitlab' | 'linear' | 'email' | 'api' | 'agent';
 
 /**
@@ -882,7 +1056,8 @@ export function resolveCustomerTiers(stored?: readonly CustomerTier[] | null): C
   for (const item of Array.isArray(stored) ? stored : []) {
     if (!item || typeof item.id !== 'string' || out.some((t) => t.id === item.id)) continue;
     const name = typeof item.name === 'string' ? item.name.trim() : '';
-    if (!name || name.length > CUSTOMER_TIER_NAME_MAX || !TIER_COLOR.test(item.color ?? '')) continue;
+    if (!name || name.length > CUSTOMER_TIER_NAME_MAX || !TIER_COLOR.test(item.color ?? ''))
+      continue;
     out.push({ id: item.id, name, color: item.color });
     if (out.length >= CUSTOMER_TIERS_MAX) break;
   }
@@ -985,7 +1160,10 @@ export function normalizeCustomerDomain(input: string): string | null {
  * Normalizes a list of domains (see {@link normalizeCustomerDomain}), keeping the first occurrence of each
  * and the given order. `invalid` lists the inputs that are not domains; empty entries are skipped.
  */
-export function normalizeCustomerDomains(inputs: readonly string[]): { domains: string[]; invalid: string[] } {
+export function normalizeCustomerDomains(inputs: readonly string[]): {
+  domains: string[];
+  invalid: string[];
+} {
   const domains: string[] = [];
   const invalid: string[] = [];
   for (const input of inputs) {
@@ -1004,7 +1182,14 @@ export function normalizeCustomerDomains(inputs: readonly string[]): { domains: 
  * `generic` is a signed JSON webhook, `email` takes a parsed inbound email (Postmark / SendGrid style JSON).
  */
 export type IntakeProvider = 'intercom' | 'zendesk' | 'front' | 'slack' | 'email' | 'generic';
-export const INTAKE_PROVIDERS: IntakeProvider[] = ['intercom', 'zendesk', 'front', 'slack', 'email', 'generic'];
+export const INTAKE_PROVIDERS: IntakeProvider[] = [
+  'intercom',
+  'zendesk',
+  'front',
+  'slack',
+  'email',
+  'generic',
+];
 
 export interface IntakeProviderMeta {
   label: string;
@@ -1015,12 +1200,36 @@ export interface IntakeProviderMeta {
 }
 
 export const INTAKE_PROVIDER_META: Record<IntakeProvider, IntakeProviderMeta> = {
-  intercom: { label: 'Intercom', generatesSecret: false, secretName: 'the app client secret (Developer Hub → your app → Basic information)' },
-  zendesk: { label: 'Zendesk', generatesSecret: false, secretName: 'the webhook signing secret (Admin Center → the webhook → Signing secret)' },
-  front: { label: 'Front', generatesSecret: false, secretName: 'the application secret (Settings → Developers → your app → Basic information)' },
-  slack: { label: 'Slack', generatesSecret: false, secretName: 'the signing secret (api.slack.com/apps → Basic Information)' },
-  email: { label: 'Email forward', generatesSecret: true, secretName: 'the secret Trama generates' },
-  generic: { label: 'Signed webhook', generatesSecret: true, secretName: 'the secret Trama generates' },
+  intercom: {
+    label: 'Intercom',
+    generatesSecret: false,
+    secretName: 'the app client secret (Developer Hub → your app → Basic information)',
+  },
+  zendesk: {
+    label: 'Zendesk',
+    generatesSecret: false,
+    secretName: 'the webhook signing secret (Admin Center → the webhook → Signing secret)',
+  },
+  front: {
+    label: 'Front',
+    generatesSecret: false,
+    secretName: 'the application secret (Settings → Developers → your app → Basic information)',
+  },
+  slack: {
+    label: 'Slack',
+    generatesSecret: false,
+    secretName: 'the signing secret (api.slack.com/apps → Basic Information)',
+  },
+  email: {
+    label: 'Email forward',
+    generatesSecret: true,
+    secretName: 'the secret Trama generates',
+  },
+  generic: {
+    label: 'Signed webhook',
+    generatesSecret: true,
+    secretName: 'the secret Trama generates',
+  },
 };
 
 export const INTAKE_SOURCE_NAME_MAX = 80;
@@ -1141,7 +1350,15 @@ function finishDemand(
     revenue += c.revenue ?? 0;
     size = Math.max(size, c.size ?? 0);
   }
-  return { customerIds, customerCount: customerIds.length, requestCount, importantCount, tierIds, revenue, size };
+  return {
+    customerIds,
+    customerCount: customerIds.length,
+    requestCount,
+    importantCount,
+    tierIds,
+    revenue,
+    size,
+  };
 }
 
 /** Demand per issue and per project id (their ids never collide). Targets nobody asked for are absent. */
@@ -1222,7 +1439,8 @@ export type ArtifactKind =
   | 'deployment'
   | 'release';
 
-export type ArtifactProvider = 'github' | 'gitlab' | 'bitbucket' | 'delta' | 'figma' | 'docs' | 'ci' | 'other';
+export type ArtifactProvider =
+  'github' | 'gitlab' | 'bitbucket' | 'delta' | 'figma' | 'docs' | 'ci' | 'other';
 
 export type ArtifactState =
   | 'draft'
@@ -1434,12 +1652,16 @@ const timeOf = (d: PlanDecision): number => new Date(d.decidedAt ?? d.createdAt)
 
 /** Versions cited as "v3", "rev 3", "revision 3" or "version 3". */
 function citedVersions(text: string): number[] {
-  return [...text.matchAll(/\b(?:v|rev\.?\s?|revision\s|version\s)(\d+)\b/gi)].map((m) => Number(m[1]));
+  return [...text.matchAll(/\b(?:v|rev\.?\s?|revision\s|version\s)(\d+)\b/gi)].map((m) =>
+    Number(m[1]),
+  );
 }
 
 /** Commit shas cited in the text: 7 to 40 hex characters with at least one digit. */
 function citedShas(text: string): string[] {
-  return [...text.matchAll(/\b[0-9a-f]{7,40}\b/gi)].map((m) => m[0].toLowerCase()).filter((s) => /\d/.test(s));
+  return [...text.matchAll(/\b[0-9a-f]{7,40}\b/gi)]
+    .map((m) => m[0].toLowerCase())
+    .filter((s) => /\d/.test(s));
 }
 
 const sameSha = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
@@ -1462,7 +1684,10 @@ export function resolveWorkstreamPlans(input: {
     .sort((a, b) => timeOf(b) - timeOf(a));
   return plans.map((a): WorkstreamPlan => {
     const docVersion = a.documentId ? input.documentVersions.get(a.documentId) : undefined;
-    const sha = !a.documentId && a.externalId && /^[0-9a-f]{7,40}$/i.test(a.externalId) ? a.externalId.toLowerCase() : null;
+    const sha =
+      !a.documentId && a.externalId && /^[0-9a-f]{7,40}$/i.test(a.externalId)
+        ? a.externalId.toLowerCase()
+        : null;
     const revision = docVersion !== undefined ? `v${docVersion}` : sha;
     const title = a.title.trim().toLowerCase();
     /** With one plan every plan decision is about it; with several, the decision must name it or cite its sha. */
@@ -1480,13 +1705,17 @@ export function resolveWorkstreamPlans(input: {
       return citedShas(text)[0] ?? null;
     };
     // A plan with no known revision (a repository link without a sha) is approved by any accepted decision.
-    const accepted = mine.find((d) => d.status === 'accepted' && (revision === null || cited(d) !== null));
+    const accepted = mine.find(
+      (d) => d.status === 'accepted' && (revision === null || cited(d) !== null),
+    );
     const approvedRevision = accepted ? cited(accepted) : null;
     const changed =
       !!accepted &&
       approvedRevision !== null &&
       revision !== null &&
-      (docVersion !== undefined ? docVersion > Number(approvedRevision.slice(1)) : !sameSha(approvedRevision, revision));
+      (docVersion !== undefined
+        ? docVersion > Number(approvedRevision.slice(1))
+        : !sameSha(approvedRevision, revision));
     const proposed = mine.find((d) => d.status === 'proposed');
     return {
       artifactId: a.id,
@@ -1674,7 +1903,8 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
   },
   stale_workstreams: {
     label: 'Stale workstreams',
-    definition: 'In-flight workstreams (working, in review, blocked, needs input, ready to land) with no activity by a person or an agent for the stale threshold.',
+    definition:
+      'In-flight workstreams (working, in review, blocked, needs input, ready to land) with no activity by a person or an agent for the stale threshold.',
     unit: 'workstream',
   },
   stale_issues: {
@@ -1684,17 +1914,20 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
   },
   delivered_outcome_open: {
     label: 'Delivered, outcome open',
-    definition: 'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
+    definition:
+      'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
     unit: 'workstream',
   },
   shipped_without_proof: {
     label: 'Shipped without proof',
-    definition: 'Shipped workstreams that would not ship under today\'s rules: a historic shipped with no acceptance criteria, a criterion that is met without evidence, or a status pinned to Shipped while the facts say otherwise. Read-only: nothing changes status.',
+    definition:
+      "Shipped workstreams that would not ship under today's rules: a historic shipped with no acceptance criteria, a criterion that is met without evidence, or a status pinned to Shipped while the facts say otherwise. Read-only: nothing changes status.",
     unit: 'workstream',
   },
   overdue_milestones: {
     label: 'Overdue milestones',
-    definition: 'Milestones past their target date that still have open issues, in projects that are not completed or canceled.',
+    definition:
+      'Milestones past their target date that still have open issues, in projects that are not completed or canceled.',
     unit: 'milestone',
   },
   overdue_workstreams: {
@@ -1704,12 +1937,14 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
   },
   scope_creep: {
     label: 'Scope creep',
-    definition: 'Open workstreams that gained at least two issues after they started (first move out of Draft or Planned) inside the selected range.',
+    definition:
+      'Open workstreams that gained at least two issues after they started (first move out of Draft or Planned) inside the selected range.',
     unit: 'workstream',
   },
   prs_stuck_in_review: {
     label: 'PRs stuck in review',
-    definition: 'Open, non-draft pull requests without an approval and without an update for 3 days or more.',
+    definition:
+      'Open, non-draft pull requests without an approval and without an update for 3 days or more.',
     unit: 'pull request',
   },
   ci_failing: {
@@ -1724,14 +1959,16 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
   },
   customer_demand_waiting: {
     label: 'Customer demand waiting',
-    definition: 'Issues and projects that customers asked for and that are still open, longest-waiting first.',
+    definition:
+      'Issues and projects that customers asked for and that are still open, longest-waiting first.',
     unit: 'request target',
   },
 };
 
 export const INSIGHT_SIGNAL_IDS = Object.keys(INSIGHT_SIGNALS) as InsightSignalId[];
 
-export type InsightItemType = 'workstream' | 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
+export type InsightItemType =
+  'workstream' | 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
 
 /** One thing that causes a signal (or sits in a flow list). Enough to render a row and link to it. */
 export interface InsightItem {
@@ -1855,7 +2092,11 @@ export interface InsightFlow {
   workstreamLead: FlowDuration;
   throughput: ThroughputBucket[];
   previousThroughput: { issuesDone: number; workstreamsShipped: number };
-  wip: { people: InsightWipRow[]; agents: InsightWipRow[]; limits: { issues: number; workstreams: number } };
+  wip: {
+    people: InsightWipRow[];
+    agents: InsightWipRow[];
+    limits: { issues: number; workstreams: number };
+  };
   aging: { baselineDays?: number; baselineSamples: number; items: AgingItem[] };
   cumulativeFlow?: CumulativeFlow;
 }
@@ -2050,16 +2291,38 @@ export interface IntegrationConnection {
 
 export type TeamEditPolicy = 'workspace' | 'members';
 export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; description: string }> = {
-  workspace: { label: 'Everyone in the workspace', description: 'Any member (or above) can edit this team\'s workstreams and issues.' },
-  members: { label: 'Team members only', description: 'Only people on this team (and workspace admins) can edit its workstreams and issues.' },
+  workspace: {
+    label: 'Everyone in the workspace',
+    description: "Any member (or above) can edit this team's workstreams and issues.",
+  },
+  members: {
+    label: 'Team members only',
+    description:
+      'Only people on this team (and workspace admins) can edit its workstreams and issues.',
+  },
 };
 
 export type TokenScope = 'read' | 'write' | 'admin' | 'custom';
 export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: string }> = {
-  read: { label: 'Read', description: 'Read-only: GET requests. Good for dashboards and reporting.' },
-  write: { label: 'Write', description: 'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.' },
-  admin: { label: 'Admin', description: 'Everything the acting user\'s role allows, including members, integrations and settings. Only admins can create one.' },
-  custom: { label: 'Custom', description: 'Only the listed permissions (resource × action), always within the acting user\'s role.' },
+  read: {
+    label: 'Read',
+    description: 'Read-only: GET requests. Good for dashboards and reporting.',
+  },
+  write: {
+    label: 'Write',
+    description:
+      'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.',
+  },
+  admin: {
+    label: 'Admin',
+    description:
+      "Everything the acting user's role allows, including members, integrations and settings. Only admins can create one.",
+  },
+  custom: {
+    label: 'Custom',
+    description:
+      "Only the listed permissions (resource × action), always within the acting user's role.",
+  },
 };
 
 /**
@@ -2070,9 +2333,32 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
  */
 export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
-  | 'workspace' | 'projects' | 'workstreams' | 'issues' | 'customers' | 'decisions' | 'milestones' | 'comments' | 'artifacts' | 'documents'
-  | 'dependencies' | 'input-requests' | 'views' | 'attention' | 'search' | 'graph' | 'events' | 'snapshot' | 'insights'
-  | 'teams' | 'repositories' | 'members' | 'agents' | 'tokens' | 'integrations' | 'outgoing-webhooks';
+  | 'workspace'
+  | 'projects'
+  | 'workstreams'
+  | 'issues'
+  | 'customers'
+  | 'decisions'
+  | 'milestones'
+  | 'comments'
+  | 'artifacts'
+  | 'documents'
+  | 'dependencies'
+  | 'input-requests'
+  | 'views'
+  | 'attention'
+  | 'search'
+  | 'graph'
+  | 'events'
+  | 'snapshot'
+  | 'insights'
+  | 'teams'
+  | 'repositories'
+  | 'members'
+  | 'agents'
+  | 'tokens'
+  | 'integrations'
+  | 'outgoing-webhooks';
 export type ApiPermission = `${ApiResource}:${ApiAction}`;
 
 export interface ApiResourceMeta {
@@ -2111,23 +2397,53 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   'outgoing-webhooks': { label: 'Outgoing webhooks', group: 'Access & automation', actions: RWD },
 };
 
-export const API_PERMISSIONS: readonly ApiPermission[] = (Object.keys(API_RESOURCES) as ApiResource[]).flatMap((r) =>
-  API_RESOURCES[r].actions.map((a) => `${r}:${a}` as ApiPermission),
-);
+export const API_PERMISSIONS: readonly ApiPermission[] = (
+  Object.keys(API_RESOURCES) as ApiResource[]
+).flatMap((r) => API_RESOURCES[r].actions.map((a) => `${r}:${a}` as ApiPermission));
 
 /** Every `*:read` permission. */
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
-const WORK: ApiResource[] = ['projects', 'workstreams', 'issues', 'customers', 'decisions', 'milestones', 'comments', 'artifacts', 'documents', 'dependencies', 'input-requests', 'views', 'attention'];
+const WORK: ApiResource[] = [
+  'projects',
+  'workstreams',
+  'issues',
+  'customers',
+  'decisions',
+  'milestones',
+  'comments',
+  'artifacts',
+  'documents',
+  'dependencies',
+  'input-requests',
+  'views',
+  'attention',
+];
 
 /** Starting points offered in Settings; the final selection is always an explicit permission list. */
-export const PERMISSION_PRESETS: Record<'read-only' | 'contributor' | 'everything', { label: string; description: string; permissions: readonly ApiPermission[] }> = {
-  'read-only': { label: 'Read-only', description: 'Read every resource. Nothing can be changed.', permissions: READ_ALL },
+export const PERMISSION_PRESETS: Record<
+  'read-only' | 'contributor' | 'everything',
+  { label: string; description: string; permissions: readonly ApiPermission[] }
+> = {
+  'read-only': {
+    label: 'Read-only',
+    description: 'Read every resource. Nothing can be changed.',
+    permissions: READ_ALL,
+  },
   contributor: {
     label: 'Contributor',
-    description: 'Read everything and create/update work items. No deletes, no members, tokens or integrations.',
-    permissions: [...READ_ALL, ...WORK.filter((r) => r !== 'attention').map((r) => `${r}:write` as ApiPermission), 'attention:write'],
+    description:
+      'Read everything and create/update work items. No deletes, no members, tokens or integrations.',
+    permissions: [
+      ...READ_ALL,
+      ...WORK.filter((r) => r !== 'attention').map((r) => `${r}:write` as ApiPermission),
+      'attention:write',
+    ],
   },
-  everything: { label: 'Everything', description: 'All permissions. The acting user\'s role still applies.', permissions: API_PERMISSIONS },
+  everything: {
+    label: 'Everything',
+    description: "All permissions. The acting user's role still applies.",
+    permissions: API_PERMISSIONS,
+  },
 };
 
 /** Request budget of an API token (enforced server-side; sessions are not limited). */
@@ -2136,11 +2452,19 @@ export interface TokenLimits {
   writesPerMinute: number;
   writesPerDay: number;
 }
-export const DEFAULT_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 600, writesPerMinute: 60, writesPerDay: 2000 };
+export const DEFAULT_TOKEN_LIMITS: TokenLimits = {
+  requestsPerMinute: 600,
+  writesPerMinute: 60,
+  writesPerDay: 2000,
+};
 /** Upper bounds a token can be configured with. */
-export const MAX_TOKEN_LIMITS: TokenLimits = { requestsPerMinute: 6000, writesPerMinute: 600, writesPerDay: 20000 };
+export const MAX_TOKEN_LIMITS: TokenLimits = {
+  requestsPerMinute: 6000,
+  writesPerMinute: 600,
+  writesPerDay: 20000,
+};
 
-/** Things the workspace owner can gate behind a minimum role (Settings → Roles & permissions). */
+/** Capabilities a workspace role can include (Settings → Roles & permissions). Each role has its own set. */
 export type Capability =
   | 'manageProjects'
   | 'createWorkstreams'
@@ -2159,11 +2483,8 @@ export type Capability =
   | 'manageTokens'
   | 'manageIntegrations';
 
-/** Minimum role per capability. */
-export type PermissionMap = Record<Capability, Role>;
-
-/** Roles a capability can be set to. Viewers are read-only, so `viewer` is never offered. */
-export const CAPABILITY_ROLES: Role[] = ['member', 'admin', 'owner'];
+/** What each old rank was allowed, before workspace roles. Migration reads this; it is not the live policy. */
+export type PermissionMap = Record<Capability, LegacyRole>;
 
 export interface CapabilityMeta {
   label: string;
@@ -2203,9 +2524,9 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   createTeams: { group: 'Organization', label: 'Create teams', description: 'Add a team to the workspace.' },
   manageTeams: { group: 'Organization', label: 'Edit and delete teams', description: 'Rename, re-colour, change members or delete a team. A team lead can always edit their own team.' },
   manageRepositories: { group: 'Organization', label: 'Manage repositories', description: 'Add, edit and remove repositories.' },
-  inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. They can only be given a role up to your own.' },
+  inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. You can only invite someone into a role whose permissions you already have.' },
   manageAgents: { group: 'Access & automation', label: 'Manage agents', description: 'Register agents, edit them, and mint tokens that act as an agent.' },
-  manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). Admin-scope tokens always need an admin.' },
+  manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). A write-scoped token cannot create an admin-scoped one.' },
   manageIntegrations: { group: 'Access & automation', label: 'Manage integrations', description: 'Connect GitHub, GitLab and Delta, and manage outgoing webhooks.' },
 };
 
@@ -2229,14 +2550,32 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   manageIntegrations: 'admin',
 };
 
+/** Which records a label can be added to. */
+export type LabelScope = 'issue' | 'workstream' | 'project';
+export const LABEL_SCOPES: readonly LabelScope[] = ['issue', 'workstream', 'project'];
+
+const LABEL_SCOPE_VALUES = new Set<string>(LABEL_SCOPES);
+
+/** Missing or unknown scope is `issue`, which is also what every template uses. */
+function asLabelScope(value: unknown): LabelScope {
+  return typeof value === 'string' && LABEL_SCOPE_VALUES.has(value)
+    ? (value as LabelScope)
+    : 'issue';
+}
+
 /** A label defined once for the workspace and assigned by id. */
 export interface WorkspaceLabel {
   id: ID;
   name: string;
   /** `#rrggbb`. */
   color: string;
-  /** Templates are always present and cannot be renamed, removed, merged away or archived. */
+  /** Templates are always present and cannot be renamed, removed, merged away, archived, or moved off `issue`. */
   template: boolean;
+  /**
+   * Exactly one record type. An assignment that does not match stays on the record and still renders,
+   * but that id cannot be added again.
+   */
+  scope: LabelScope;
   /**
    * Archived labels stay on what already carries them but are no longer offered when assigning.
    * Only ever `true`; an active label omits the field.
@@ -2244,12 +2583,21 @@ export interface WorkspaceLabel {
   archived?: boolean;
 }
 
-/** Always available. Ids are stable so existing assignments survive a settings rewrite. */
+/** A stored label may predate scopes. `resolveLabelCatalog` fills the gap. */
+type StoredLabel = Omit<WorkspaceLabel, 'scope'> & { scope?: LabelScope };
+
+/** Always available. Ids are stable so existing assignments survive a settings rewrite. Scope is `issue`. */
 export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
-  { id: 'lb_bug', name: 'Bug', color: '#e11d48', template: true },
-  { id: 'lb_feature', name: 'Feature', color: '#2563eb', template: true },
-  { id: 'lb_improvement', name: 'Improvement', color: '#16a34a', template: true },
-  { id: 'lb_documentation', name: 'Documentation', color: '#7c3aed', template: true },
+  { id: 'lb_bug', name: 'Bug', color: '#e11d48', template: true, scope: 'issue' },
+  { id: 'lb_feature', name: 'Feature', color: '#2563eb', template: true, scope: 'issue' },
+  { id: 'lb_improvement', name: 'Improvement', color: '#16a34a', template: true, scope: 'issue' },
+  {
+    id: 'lb_documentation',
+    name: 'Documentation',
+    color: '#7c3aed',
+    template: true,
+    scope: 'issue',
+  },
 ];
 
 /** Swatches offered when creating or recoloring a label. */
@@ -2272,22 +2620,37 @@ export const LABEL_NAME_MAX = 40;
 export const LABEL_ASSIGN_MAX = 20;
 const LABEL_COLOR = /^#[0-9a-f]{6}$/;
 
-/** Templates first, then stored custom labels. Template names cannot drift. */
-export function resolveLabelCatalog(stored?: readonly WorkspaceLabel[] | null): WorkspaceLabel[] {
+/** Templates first, then stored custom labels. Template names and scope cannot drift. */
+export function resolveLabelCatalog(stored?: readonly StoredLabel[] | null): WorkspaceLabel[] {
   const incoming = Array.isArray(stored) ? stored : [];
-  const byId = new Map(incoming.filter((item) => item && typeof item.id === 'string').map((item) => [item.id, item]));
+  const byId = new Map(
+    incoming.filter((item) => item && typeof item.id === 'string').map((item) => [item.id, item]),
+  );
   const templates = LABEL_TEMPLATES.map((template) => {
     const saved = byId.get(template.id);
     const color = saved && LABEL_COLOR.test(saved.color) ? saved.color : template.color;
-    return { id: template.id, name: template.name, color, template: true };
+    return { id: template.id, name: template.name, color, template: true, scope: 'issue' as const };
   });
   const templateIds = new Set(templates.map((label) => label.id));
   const custom: WorkspaceLabel[] = [];
   for (const item of incoming) {
-    if (!item || item.template || templateIds.has(item.id) || custom.some((label) => label.id === item.id)) continue;
+    if (
+      !item ||
+      item.template ||
+      templateIds.has(item.id) ||
+      custom.some((label) => label.id === item.id)
+    )
+      continue;
     const name = typeof item.name === 'string' ? item.name.trim() : '';
     if (!name || name.length > LABEL_NAME_MAX || !LABEL_COLOR.test(item.color ?? '')) continue;
-    custom.push(item.archived === true ? { id: item.id, name, color: item.color, template: false, archived: true } : { id: item.id, name, color: item.color, template: false });
+    const label = {
+      id: item.id,
+      name,
+      color: item.color,
+      template: false as const,
+      scope: asLabelScope(item.scope),
+    };
+    custom.push(item.archived === true ? { ...label, archived: true } : label);
   }
   return [...templates, ...custom];
 }
@@ -2296,7 +2659,11 @@ export function resolveLabelCatalog(stored?: readonly WorkspaceLabel[] | null): 
  * The ids of one record after `from` is merged into `into` (or removed when `into` is null).
  * Keeps the order, never lists an id twice.
  */
-export function replaceLabelId(ids: readonly string[], from: string, into: string | null): string[] {
+export function replaceLabelId(
+  ids: readonly string[],
+  from: string,
+  into: string | null,
+): string[] {
   const out: string[] = [];
   for (const id of ids) {
     const next = id === from ? into : id;
@@ -2305,33 +2672,51 @@ export function replaceLabelId(ids: readonly string[], from: string, into: strin
   return out;
 }
 
-/** Unique catalog ids, in order. Throws when an id is not in the catalog or the list is too long. */
-export function assignLabelIds(catalog: readonly WorkspaceLabel[], ids: readonly string[] | null | undefined): string[] {
-  const known = new Set(catalog.map((label) => label.id));
+/**
+ * Unique catalog ids, in order.
+ * Throws when an id is unknown, the list is longer than `LABEL_ASSIGN_MAX`, or the label's scope is not
+ * `scope` and the id is not already in `current`. Ids already stored stay, even when they no longer match.
+ * `scope` null means the record is not a scoped type: only ids already in `current` are kept.
+ */
+export function assignLabelIds(
+  catalog: readonly WorkspaceLabel[],
+  ids: readonly string[] | null | undefined,
+  scope: LabelScope | null,
+  current?: readonly string[] | null,
+): string[] {
+  const known = new Map(catalog.map((label) => [label.id, label]));
+  const kept = new Set(current ?? []);
   const out: string[] = [];
   for (const id of ids ?? []) {
-    if (!known.has(id)) throw new Error(`Unknown label "${id}"`);
+    const label = known.get(id);
+    if (!label) throw new Error(`Unknown label "${id}"`);
+    const matches = scope !== null && label.scope === scope;
+    if (!matches && !kept.has(id)) {
+      const where = scope === null ? 'this record' : `${scope}s`;
+      throw new Error(`Label "${id}" does not apply to ${where}`);
+    }
     if (!out.includes(id)) out.push(id);
   }
-  if (out.length > LABEL_ASSIGN_MAX) throw new Error(`A record can have at most ${LABEL_ASSIGN_MAX} labels`);
+  if (out.length > LABEL_ASSIGN_MAX)
+    throw new Error(`A record can have at most ${LABEL_ASSIGN_MAX} labels`);
   return out;
 }
 
 /**
  * Turn free-text label lists into catalog ids.
  * A string that is already a catalog id is kept. A name that matches a label (case-insensitive) reuses it.
- * Anything else becomes a custom label. `groups` is rewritten in the same order.
+ * Anything else becomes a custom label with that group's scope. `groups` is rewritten in the same order.
  */
 export function adoptFreeTextLabels(
-  stored: readonly WorkspaceLabel[] | null | undefined,
-  groups: readonly (readonly string[])[],
+  stored: readonly StoredLabel[] | null | undefined,
+  groups: readonly { scope: LabelScope; labels: readonly string[] }[],
 ): { catalog: WorkspaceLabel[]; groups: string[][]; lookup: Map<string, string> } {
   let catalog = resolveLabelCatalog(stored);
   const byName = new Map(catalog.map((label) => [label.name.toLowerCase(), label.id]));
   const taken = new Set(catalog.map((label) => label.id));
   const lookup = new Map<string, string>();
   let colorAt = catalog.filter((label) => !label.template).length;
-  const mapOne = (raw: string): string => {
+  const mapOne = (raw: string, scope: LabelScope): string => {
     const name = raw.trim();
     if (!name) return '';
     const known = lookup.get(name) ?? (taken.has(name) ? name : byName.get(name.toLowerCase()));
@@ -2339,30 +2724,510 @@ export function adoptFreeTextLabels(
       lookup.set(name, known);
       return known;
     }
-    const slug = name.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '').slice(0, 20) || 'label';
+    const slug =
+      name
+        .toLowerCase()
+        .normalize('NFKD')
+        .replace(/[^a-z0-9]+/g, '')
+        .slice(0, 20) || 'label';
     let id = `lb_${slug}`;
     for (let n = 2; taken.has(id); n++) id = `lb_${slug}${n}`;
     const color = LABEL_SWATCHES[colorAt % LABEL_SWATCHES.length];
     colorAt += 1;
-    catalog = [...catalog, { id, name: name.slice(0, LABEL_NAME_MAX), color, template: false }];
+    catalog = [
+      ...catalog,
+      { id, name: name.slice(0, LABEL_NAME_MAX), color, template: false, scope },
+    ];
     taken.add(id);
     byName.set(name.toLowerCase(), id);
     lookup.set(name, id);
     return id;
   };
-  const rewritten = groups.map((group) => [...new Set(group.map(mapOne).filter(Boolean))]);
+  const rewritten = groups.map((group) => {
+    const scope = asLabelScope(group.scope);
+    return [...new Set(group.labels.map((raw) => mapOne(raw, scope)).filter(Boolean))];
+  });
   return { catalog, lookup, groups: rewritten };
 }
 
 export type EstimateScale = 'fibonacci' | 'linear' | 'exponential' | 'tshirt' | 'none';
-export const ESTIMATE_SCALES: EstimateScale[] = ['fibonacci', 'linear', 'exponential', 'tshirt', 'none'];
+export const ESTIMATE_SCALES: EstimateScale[] = [
+  'fibonacci',
+  'linear',
+  'exponential',
+  'tshirt',
+  'none',
+];
 export type WeekStart = 'monday' | 'sunday' | 'saturday';
 export const WEEK_STARTS: WeekStart[] = ['monday', 'sunday', 'saturday'];
 
+export const OWNER_ROLE_ID = 'owner';
+export const ROLE_NAME_MAX = 40;
+const ROLE_ID = /^[a-z][a-z0-9_]{0,48}$/;
+
+/** A role defined by the workspace. `owner` is permanent; every other role can be renamed or deleted. */
+export interface WorkspaceRole {
+  id: string;
+  name: string;
+  /** True only for the permanent owner role. It can manage roles and cannot be deleted. */
+  owner: boolean;
+  /** Capabilities this role has. Nothing is inherited from another role. */
+  capabilities: Capability[];
+  /** Base work permissions. Extras on a person are added on top. The owner role always has every grant. */
+  grants: MemberGrant[];
+}
+
+/** The owner role always keeps these, so someone can still manage members. Managing roles is the owner role itself. */
+export const OWNER_REQUIRED_CAPABILITIES: readonly Capability[] = ['inviteMembers'];
+
+/** Capabilities that used to require an admin. A write-scoped token cannot use them. Holding any of them administers the workspace. */
+export const ADMIN_CAPABILITIES: readonly Capability[] = CAPABILITIES.filter((cap) => DEFAULT_PERMISSIONS[cap] === 'admin');
+
+const LEGACY_RANK: Record<LegacyRole, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
+
+/** True when both ids are old ranks and `role` is at least `min`. Custom role ids are never ranked. */
+export function legacyRoleAtLeast(role: string, min: string): boolean {
+  const a = LEGACY_RANK[role as LegacyRole];
+  const b = LEGACY_RANK[min as LegacyRole];
+  return a !== undefined && b !== undefined && a >= b;
+}
+
+/** @deprecated Use the role's own capabilities. Still true for the four migrated rank ids. */
+export function roleAtLeast(role: string, min: string): boolean {
+  return legacyRoleAtLeast(role, min);
+}
+
+export function capabilitiesForLegacyRole(role: LegacyRole, permissions: PermissionMap = DEFAULT_PERMISSIONS): Capability[] {
+  return CAPABILITIES.filter((cap) => legacyRoleAtLeast(role, permissions[cap] ?? DEFAULT_PERMISSIONS[cap]));
+}
+
+export function normalizeCapabilities(input: readonly unknown[], owner: boolean): Capability[] {
+  const chosen = new Set<Capability>();
+  for (const cap of input) {
+    if (typeof cap === 'string' && (CAPABILITIES as readonly string[]).includes(cap)) chosen.add(cap as Capability);
+  }
+  if (owner) for (const cap of OWNER_REQUIRED_CAPABILITIES) chosen.add(cap);
+  return CAPABILITIES.filter((cap) => chosen.has(cap));
+}
+
+export function ownerWorkspaceRole(capabilities: readonly Capability[] = [...CAPABILITIES]): WorkspaceRole {
+  return { id: OWNER_ROLE_ID, name: 'Owner', owner: true, capabilities: normalizeCapabilities(capabilities, true), grants: [...MEMBER_GRANTS] };
+}
+
+/** A brand-new workspace starts with the four old ranks, as editable roles. Admin, Member and Viewer can be deleted. */
+export function freshWorkspaceRoles(): WorkspaceRole[] {
+  return migrateLegacyRoles();
+}
+
+/**
+ * Turn the old owner / admin / member / viewer matrix into editable roles with the same capabilities
+ * those ranks have under `permissions` (an admin keeps what a member could do).
+ */
+export function migrateLegacyRoles(
+  permissions?: Partial<PermissionMap> | null,
+  grants?: Partial<Record<LegacyRole, readonly unknown[]>> | null,
+): WorkspaceRole[] {
+  const perms: PermissionMap = { ...DEFAULT_PERMISSIONS };
+  for (const cap of CAPABILITIES) {
+    const value = permissions?.[cap];
+    if (value && (LEGACY_ROLES as readonly string[]).includes(value)) perms[cap] = value;
+  }
+  const byRole = resolveRoleGrants(grants);
+  const names: Record<LegacyRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
+  return LEGACY_ROLES.map((id) => ({
+    id,
+    name: names[id],
+    owner: id === OWNER_ROLE_ID,
+    capabilities: capabilitiesForLegacyRole(id, perms),
+    grants: id === OWNER_ROLE_ID ? [...MEMBER_GRANTS] : byRole[id],
+  }));
+}
+
+/** Drops unknown ids, keeps a single owner role, and puts the required capabilities back on it. */
+export function normalizeWorkspaceRoles(input: readonly unknown[]): WorkspaceRole[] {
+  const roles: WorkspaceRole[] = [];
+  const seen = new Set<string>();
+  for (const item of input) {
+    if (!item || typeof item !== 'object') continue;
+    const raw = item as Record<string, unknown>;
+    const id = typeof raw['id'] === 'string' ? raw['id'].trim() : '';
+    if (!ROLE_ID.test(id) || seen.has(id) || id === 'agent') continue;
+    const name = typeof raw['name'] === 'string' ? raw['name'].trim() : '';
+    if (!name || name.length > ROLE_NAME_MAX) continue;
+    const owner = id === OWNER_ROLE_ID;
+    seen.add(id);
+    roles.push({
+      id,
+      name,
+      owner,
+      capabilities: normalizeCapabilities(Array.isArray(raw['capabilities']) ? raw['capabilities'] : [], owner),
+      grants: owner ? [...MEMBER_GRANTS] : normalizeGrantList(Array.isArray(raw['grants']) ? raw['grants'] : []),
+    });
+  }
+  if (!roles.some((role) => role.owner)) roles.unshift(ownerWorkspaceRole());
+  return roles;
+}
+
+export function findWorkspaceRole(roles: readonly WorkspaceRole[], roleId: string | null | undefined): WorkspaceRole | undefined {
+  if (!roleId) return undefined;
+  return roles.find((role) => role.id === roleId);
+}
+
+export function workspaceRoleName(roles: readonly WorkspaceRole[] | null | undefined, roleId: string | null | undefined): string {
+  if (!roleId) return '';
+  const found = roles ? findWorkspaceRole(roles, roleId) : undefined;
+  if (found) return found.name;
+  const legacy: Record<string, string> = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
+  return legacy[roleId] ?? roleId;
+}
+
+export function roleHasCapability(roles: readonly WorkspaceRole[], roleId: string, capability: Capability): boolean {
+  return !!findWorkspaceRole(roles, roleId)?.capabilities.includes(capability);
+}
+
+/** Owner, or a role that holds a capability which used to require an admin. */
+export function roleHasAdminPower(role: Pick<WorkspaceRole, 'owner' | 'capabilities'> | null | undefined): boolean {
+  return !!role && (role.owner || ADMIN_CAPABILITIES.some((cap) => role.capabilities.includes(cap)));
+}
+
+/**
+ * Can change everyday work: the owner role, a grant that is not view-only, or a capability that is not
+ * workspace administration. An admin-only capability does not imply write access to issues and the like.
+ */
+export function roleCanWrite(role: Pick<WorkspaceRole, 'owner' | 'capabilities' | 'grants'> | null | undefined): boolean {
+  if (!role) return false;
+  if (role.owner) return true;
+  if (role.grants.some((grant) => !grant.endsWith(':view'))) return true;
+  return role.capabilities.some((cap) => !ADMIN_CAPABILITIES.includes(cap));
+}
+
+/** Agents are not a workspace role. They receive the historical member permissions and never own the workspace. */
+export function agentWorkspaceRole(): WorkspaceRole {
+  return { id: 'agent', name: 'Agent', owner: false, capabilities: capabilitiesForLegacyRole('member'), grants: roleGrants('member') };
+}
+
+/** An owner can grant any role. Anyone else can only grant a role whose capabilities and grants they already have. */
+export function canGrantRole(caller: WorkspaceRole | null | undefined, target: WorkspaceRole | null | undefined): boolean {
+  if (!caller || !target) return false;
+  if (target.owner && !caller.owner) return false;
+  if (caller.owner) return true;
+  return target.capabilities.every((cap) => caller.capabilities.includes(cap)) && target.grants.every((grant) => caller.grants.includes(grant));
+}
+
+/** `read` drops every capability and keeps view grants. `write` drops admin capabilities and the owner flag. */
+export function applyTokenScope(role: WorkspaceRole, scope: TokenScope | undefined): WorkspaceRole {
+  if (scope !== 'read' && scope !== 'write') return role;
+  return {
+    ...role,
+    owner: false,
+    capabilities: scope === 'read' ? [] : role.capabilities.filter((cap) => !ADMIN_CAPABILITIES.includes(cap)),
+    grants: scope === 'read' ? role.grants.filter((grant) => grant.endsWith(':view')) : role.grants,
+  };
+}
+
+export interface RoleGate {
+  /** Set by `@Can`. A missing capability is rejected, with no grant fallback. */
+  capability?: Capability;
+  /** `@Roles`, or the default: `member` for writes and `viewer` for reads. */
+  min: 'viewer' | 'member' | 'admin' | 'owner';
+  neededGrant: MemberGrant | null;
+}
+
+/** Whether this role may pass the gate. Personal extras can cover a write that the role itself cannot. */
+export function roleAllows(role: WorkspaceRole | null | undefined, gate: RoleGate, access: MemberAccess | null): boolean {
+  if (!role) return false;
+  if (gate.capability) return role.capabilities.includes(gate.capability);
+  if (gate.min === 'owner') return role.owner;
+  if (gate.min === 'admin') {
+    if (roleHasAdminPower(role)) return true;
+  } else if (gate.min === 'viewer') return true;
+  else if (roleCanWrite(role)) return true;
+  return !!gate.neededGrant && !!access?.grants.includes(gate.neededGrant);
+}
+
+/** One catalog per subject. The type is the semantic value boards and done/canceled already understand. */
+export type StatusSubject =
+  | 'issue'
+  | 'workstream'
+  | 'project'
+  | 'decision'
+  | 'project_health'
+  | 'delivery'
+  | 'criterion';
+
+export const STATUS_SUBJECTS: readonly StatusSubject[] = [
+  'issue',
+  'workstream',
+  'project',
+  'decision',
+  'project_health',
+  'delivery',
+  'criterion',
+];
+
+export const STATUS_SUBJECT_LABEL: Record<StatusSubject, string> = {
+  issue: 'Issues',
+  workstream: 'Workstreams',
+  project: 'Projects',
+  decision: 'Decisions',
+  project_health: 'Project health',
+  delivery: 'Delivery',
+  criterion: 'Acceptance criteria',
+};
+
+export const STATUS_NAME_MAX = 40;
+
+/** Lucide icon name (kebab-case) or one emoji. Same constraint as a project icon. */
+const STATUS_ICON_NAME = '[a-z][a-z0-9]*(?:-[a-z0-9]+)*';
+const STATUS_ICON_EMOJI =
+  '\\p{Extended_Pictographic}[\\uFE0F\\u{1F3FB}-\\u{1F3FF}]?(?:\\u200D\\p{Extended_Pictographic}[\\uFE0F\\u{1F3FB}-\\u{1F3FF}]?)*|\\p{Regional_Indicator}{2}';
+export const STATUS_ICON_MAX = 48;
+export const STATUS_ICON_PATTERN = new RegExp(`^(?:${STATUS_ICON_NAME}|${STATUS_ICON_EMOJI})$`, 'u');
+export const STATUS_COLOR = /^#[0-9a-fA-F]{6}$/;
+
+export function isStatusIcon(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.length > 0 &&
+    value.length <= STATUS_ICON_MAX &&
+    STATUS_ICON_PATTERN.test(value)
+  );
+}
+
+export interface StatusEntry<T extends string = string> {
+  /** Stable id. Seeds use the semantic type string, so rows that already store that enum keep working. */
+  id: string;
+  name: string;
+  /** Lucide icon name (kebab-case) or a single emoji. */
+  icon: string;
+  /** `#rrggbb`. */
+  color: string;
+  /** Semantic type. Several entries may share one. Derivation, open/done and workflow read this, not the id. */
+  type: T;
+}
+
+export interface StatusCatalog {
+  issue: StatusEntry<IssueStatus>[];
+  workstream: StatusEntry<WorkstreamStatus>[];
+  project: StatusEntry<ProjectStatus>[];
+  decision: StatusEntry<DecisionStatus>[];
+  projectHealth: StatusEntry<ProjectHealth>[];
+  delivery: StatusEntry<DeliveryState>[];
+  criterion: StatusEntry<CriterionState>[];
+}
+
+export const STATUS_CATALOG_KEY: Record<StatusSubject, keyof StatusCatalog> = {
+  issue: 'issue',
+  workstream: 'workstream',
+  project: 'project',
+  decision: 'decision',
+  project_health: 'projectHealth',
+  delivery: 'delivery',
+  criterion: 'criterion',
+};
+
+interface StatusSeed<T extends string> {
+  type: T;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+const NEUTRAL = '#747780';
+const SLATE = '#5f6a7a';
+const BLUE = '#3f6bd6';
+const AMBER = '#9c6712';
+const VIOLET = '#7c5cc4';
+const RED = '#c93535';
+const TEAL = '#0f7a6f';
+const GREEN = '#28793f';
+
+const ISSUE_STATUS_SEEDS: readonly StatusSeed<IssueStatus>[] = [
+  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'backlog', name: 'Backlog', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'todo', name: 'Todo', icon: 'circle', color: SLATE },
+  { type: 'in_progress', name: 'In Progress', icon: 'circle-dot', color: BLUE },
+  { type: 'in_review', name: 'In Review', icon: 'circle-ellipsis', color: VIOLET },
+  { type: 'done', name: 'Done', icon: 'circle-check', color: GREEN },
+  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
+];
+
+const WORKSTREAM_STATUS_SEEDS: readonly StatusSeed<WorkstreamStatus>[] = [
+  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'planned', name: 'Planned', icon: 'circle', color: SLATE },
+  { type: 'working', name: 'Working', icon: 'circle-dot', color: BLUE },
+  { type: 'needs_input', name: 'Needs input', icon: 'circle-help', color: AMBER },
+  { type: 'in_review', name: 'In review', icon: 'circle-ellipsis', color: VIOLET },
+  { type: 'blocked', name: 'Blocked', icon: 'circle-minus', color: RED },
+  { type: 'ready_to_land', name: 'Ready to land', icon: 'circle-arrow-up', color: TEAL },
+  { type: 'shipped', name: 'Shipped', icon: 'circle-check', color: GREEN },
+  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
+];
+
+const PROJECT_STATUS_SEEDS: readonly StatusSeed<ProjectStatus>[] = [
+  { type: 'backlog', name: 'Backlog', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'planned', name: 'Planned', icon: 'circle', color: SLATE },
+  { type: 'in_progress', name: 'In progress', icon: 'circle-dot', color: BLUE },
+  { type: 'paused', name: 'Paused', icon: 'circle-pause', color: AMBER },
+  { type: 'completed', name: 'Completed', icon: 'circle-check', color: GREEN },
+  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
+];
+
+const DECISION_STATUS_SEEDS: readonly StatusSeed<DecisionStatus>[] = [
+  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'proposed', name: 'Proposed', icon: 'circle-help', color: AMBER },
+  { type: 'accepted', name: 'Accepted', icon: 'circle-check', color: GREEN },
+  { type: 'superseded', name: 'Superseded', icon: 'circle-minus', color: NEUTRAL },
+  { type: 'rejected', name: 'Rejected', icon: 'circle-x', color: RED },
+];
+
+const PROJECT_HEALTH_SEEDS: readonly StatusSeed<ProjectHealth>[] = [
+  { type: 'on_track', name: 'On track', icon: 'circle-check', color: GREEN },
+  { type: 'at_risk', name: 'At risk', icon: 'triangle-alert', color: AMBER },
+  { type: 'off_track', name: 'Off track', icon: 'circle-alert', color: RED },
+];
+
+const DELIVERY_STATE_SEEDS: readonly StatusSeed<DeliveryState>[] = [
+  { type: 'none', name: 'Nothing delivered', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'in_review', name: 'PR in review', icon: 'git-pull-request', color: VIOLET },
+  { type: 'merged', name: 'PR merged', icon: 'git-merge', color: BLUE },
+  { type: 'released', name: 'Released', icon: 'tag', color: BLUE },
+  { type: 'deployed', name: 'Deployed', icon: 'rocket', color: GREEN },
+];
+
+const CRITERION_STATE_SEEDS: readonly StatusSeed<CriterionState>[] = [
+  { type: 'pending', name: 'Pending', icon: 'circle', color: NEUTRAL },
+  { type: 'in_progress', name: 'In progress', icon: 'circle-dot', color: BLUE },
+  { type: 'met', name: 'Met', icon: 'circle-check', color: GREEN },
+];
+
+const STATUS_TYPES: Record<StatusSubject, readonly string[]> = {
+  issue: ISSUE_STATUS_SEEDS.map((s) => s.type),
+  workstream: WORKSTREAM_STATUS_SEEDS.map((s) => s.type),
+  project: PROJECT_STATUS_SEEDS.map((s) => s.type),
+  decision: DECISION_STATUS_SEEDS.map((s) => s.type),
+  project_health: PROJECT_HEALTH_SEEDS.map((s) => s.type),
+  delivery: DELIVERY_STATE_SEEDS.map((s) => s.type),
+  criterion: CRITERION_STATE_SEEDS.map((s) => s.type),
+};
+
+function seedEntries<T extends string>(rows: readonly StatusSeed<T>[]): StatusEntry<T>[] {
+  return rows.map((row) => ({ id: row.type, name: row.name, icon: row.icon, color: row.color, type: row.type }));
+}
+
+/** Today's statuses: one entry per semantic type, id equal to that type. */
+export function defaultStatusCatalog(): StatusCatalog {
+  return {
+    issue: seedEntries(ISSUE_STATUS_SEEDS),
+    workstream: seedEntries(WORKSTREAM_STATUS_SEEDS),
+    project: seedEntries(PROJECT_STATUS_SEEDS),
+    decision: seedEntries(DECISION_STATUS_SEEDS),
+    projectHealth: seedEntries(PROJECT_HEALTH_SEEDS),
+    delivery: seedEntries(DELIVERY_STATE_SEEDS),
+    criterion: seedEntries(CRITERION_STATE_SEEDS),
+  };
+}
+
+export function isStatusSubject(value: unknown): value is StatusSubject {
+  return typeof value === 'string' && (STATUS_SUBJECTS as readonly string[]).includes(value);
+}
+
+export function statusTypes(subject: StatusSubject): readonly string[] {
+  return STATUS_TYPES[subject];
+}
+
+/** Display name of a semantic type, from the seed (not a workspace's renamed copy). */
+export function statusTypeLabel(subject: StatusSubject, type: string): string {
+  const entries = defaultStatusCatalog()[STATUS_CATALOG_KEY[subject]];
+  return entries.find((entry) => entry.type === type)?.name ?? type;
+}
+
+function normalizeStatusEntries<T extends string>(
+  subject: StatusSubject,
+  incoming: readonly StatusEntry<T>[] | undefined,
+  defaults: readonly StatusEntry<T>[],
+): StatusEntry<T>[] {
+  if (!incoming?.length) return defaults.map((entry) => ({ ...entry }));
+  const allowed = new Set(statusTypes(subject));
+  const seen = new Set<string>();
+  const entries: StatusEntry<T>[] = [];
+  for (const item of incoming) {
+    if (!item || typeof item.id !== 'string' || !item.id.trim() || seen.has(item.id)) continue;
+    const name = typeof item.name === 'string' ? item.name.trim() : '';
+    if (!name || name.length > STATUS_NAME_MAX) continue;
+    if (!isStatusIcon(item.icon)) continue;
+    if (typeof item.color !== 'string' || !STATUS_COLOR.test(item.color)) continue;
+    if (typeof item.type !== 'string' || !allowed.has(item.type)) continue;
+    seen.add(item.id);
+    entries.push({ id: item.id, name, icon: item.icon, color: item.color.toLowerCase(), type: item.type as T });
+  }
+  for (const seed of defaults) {
+    if (!entries.some((entry) => entry.type === seed.type)) entries.push({ ...seed });
+  }
+  return entries;
+}
+
+/** Stored catalog, or today's seeds when a workspace has none yet. Every semantic type keeps at least one entry. */
+export function resolveStatusCatalog(stored?: Partial<StatusCatalog> | null): StatusCatalog {
+  const defaults = defaultStatusCatalog();
+  return {
+    issue: normalizeStatusEntries('issue', stored?.issue, defaults.issue),
+    workstream: normalizeStatusEntries('workstream', stored?.workstream, defaults.workstream),
+    project: normalizeStatusEntries('project', stored?.project, defaults.project),
+    decision: normalizeStatusEntries('decision', stored?.decision, defaults.decision),
+    projectHealth: normalizeStatusEntries('project_health', stored?.projectHealth, defaults.projectHealth),
+    delivery: normalizeStatusEntries('delivery', stored?.delivery, defaults.delivery),
+    criterion: normalizeStatusEntries('criterion', stored?.criterion, defaults.criterion),
+  };
+}
+
+/**
+ * The catalog entry a stored value names. An id matches first. A legacy enum string (today's type, before ids
+ * are rewritten) is the seeded entry of that type: the one whose id is still the type, else the first of the type.
+ */
+export function resolveStatusEntry<T extends string>(
+  entries: readonly StatusEntry<T>[] | null | undefined,
+  stored: string | null | undefined,
+): StatusEntry<T> | undefined {
+  if (!stored) return undefined;
+  const list = entries ?? [];
+  const byId = list.find((entry) => entry.id === stored);
+  if (byId) return byId;
+  const ofType = list.filter((entry) => entry.type === stored);
+  return ofType.find((entry) => entry.id === entry.type) ?? ofType[0];
+}
+
+/** Semantic type of a stored id or legacy enum. Undefined when the value is not in the catalog. */
+export function statusTypeOf<T extends string>(
+  entries: readonly StatusEntry<T>[] | null | undefined,
+  stored: string | null | undefined,
+): T | undefined {
+  return resolveStatusEntry(entries, stored)?.type;
+}
+
+/** Every id of these types, plus the type strings themselves so rows that still store the enum match. */
+export function statusIdsForTypes<T extends string>(entries: readonly StatusEntry<T>[], types: readonly T[]): string[] {
+  const want = new Set<string>(types);
+  const ids = new Set<string>();
+  for (const entry of entries) if (want.has(entry.type)) ids.add(entry.id);
+  for (const type of types) ids.add(type);
+  return [...ids];
+}
+
+/**
+ * Values a record may store for this entry: its id, and the legacy enum when this entry is the seed of its type.
+ * A custom status of the same type does not claim rows that still say `todo`.
+ */
+export function statusStoredValues<T extends string>(entry: StatusEntry<T>, entries: readonly StatusEntry<T>[]): string[] {
+  const values = new Set<string>([entry.id]);
+  const seed = entries.find((item) => item.type === entry.type && item.id === item.type) ?? entries.find((item) => item.type === entry.type);
+  if (seed?.id === entry.id) values.add(entry.type);
+  return [...values];
+}
+
 export interface WorkspaceSettings {
-  permissions: PermissionMap;
-  /** Granular work permissions for each role. A member starts here; extras on the person are added on top. */
-  roleGrants: RoleGrantMap;
+  /** Roles people and invitations can hold. A new workspace stores the four old ranks; older settings without `roles` are migrated on read. */
+  roles: WorkspaceRole[];
   /** Team preselected when creating issues and workstreams. */
   defaultTeamId?: ID;
   /** Scale offered for issue estimates. Estimates are stored as numbers either way. */
@@ -2383,36 +3248,41 @@ export interface WorkspaceSettings {
   labels: WorkspaceLabel[];
   /** Customer tiers configured for this workspace, in display order. Empty until an admin adds some. */
   customerTiers: CustomerTier[];
+  /** Status catalogs. A new workspace gets today's statuses; admins can rename them and add more of the same type. */
+  statuses: StatusCatalog;
 }
 
 export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
-  permissions: DEFAULT_PERMISSIONS,
-  roleGrants: defaultRoleGrantMap(),
+  roles: freshWorkspaceRoles(),
   estimateScale: 'fibonacci',
   weekStart: 'monday',
   timeZone: 'auto',
   deltaThreads: true,
   labels: LABEL_TEMPLATES.map((label) => ({ ...label })),
   customerTiers: [],
+  statuses: defaultStatusCatalog(),
 };
 
-/** Fills the gaps of a stored (partial) settings object with the defaults. */
-export function resolveWorkspaceSettings(raw?: Partial<Omit<WorkspaceSettings, 'permissions' | 'roleGrants'>> & { permissions?: Partial<PermissionMap>; roleGrants?: Partial<Record<Role, readonly unknown[]>> } | null): WorkspaceSettings {
+/** Stored settings may still carry the old matrix. Those fields are migrated when `roles` is absent. */
+export type StoredWorkspaceSettings = Partial<Omit<WorkspaceSettings, 'roles'>> & {
+  roles?: readonly unknown[] | null;
+  permissions?: Partial<PermissionMap> | null;
+  roleGrants?: Partial<Record<LegacyRole, readonly unknown[]>> | null;
+};
+
+/** Fills the gaps of a stored (partial) settings object. Missing `roles` becomes the four old ranks. */
+export function resolveWorkspaceSettings(raw?: StoredWorkspaceSettings | null): WorkspaceSettings {
   const r = raw ?? {};
+  const roles = Array.isArray(r.roles) ? normalizeWorkspaceRoles(r.roles) : migrateLegacyRoles(r.permissions, r.roleGrants);
+  const { permissions: _permissions, roleGrants: _roleGrants, roles: _roles, ...rest } = r;
   return {
     ...DEFAULT_WORKSPACE_SETTINGS,
-    ...r,
-    permissions: { ...DEFAULT_PERMISSIONS, ...(r.permissions ?? {}) },
-    roleGrants: resolveRoleGrants(r.roleGrants),
+    ...rest,
+    roles,
     labels: resolveLabelCatalog(r.labels),
     customerTiers: resolveCustomerTiers(r.customerTiers),
-  } as WorkspaceSettings;
-}
-
-const ROLE_ORDER: Role[] = ['viewer', 'member', 'admin', 'owner'];
-/** True when `role` is at least `min`. */
-export function roleAtLeast(role: Role, min: Role): boolean {
-  return ROLE_ORDER.indexOf(role) >= ROLE_ORDER.indexOf(min);
+    statuses: resolveStatusCatalog(r.statuses),
+  };
 }
 
 // ───────────────────────────── Outgoing webhooks ─────────────────────────────
@@ -2452,25 +3322,115 @@ export interface WebhookDeliveryLog {
 
 /** Event types a webhook can subscribe to, grouped by entity (for pickers). */
 export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: string[] }[] = [
-  { entity: 'project', label: 'Projects', events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'] },
-  { entity: 'project_update', label: 'Project updates', events: ['project_update.created', 'project_update.updated', 'project_update.deleted'] },
-  { entity: 'workstream', label: 'Workstreams', events: ['workstream.created', 'workstream.updated', 'workstream.status_changed', 'workstream.deleted'] },
-  { entity: 'issue', label: 'Issues', events: ['issue.created', 'issue.updated', 'issue.status_changed', 'issue.linked', 'issue.deleted'] },
-  { entity: 'customer', label: 'Customers', events: ['customer.created', 'customer.updated', 'customer.archived', 'customer.restored', 'customer.deleted', 'customer_request.linked', 'customer_request.updated', 'customer_request.unlinked'] },
-  { entity: 'decision', label: 'Decisions', events: ['decision.draft', 'decision.proposed', 'decision.accepted', 'decision.rejected', 'decision.superseded', 'decision.updated', 'decision.deleted'] },
-  { entity: 'input', label: 'Input requests', events: ['input.requested', 'input.answered', 'input.dismissed', 'input.updated', 'input.deleted'] },
-  { entity: 'artifact', label: 'Artifacts', events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'] },
-  { entity: 'document', label: 'Documents', events: ['document.created', 'document.updated', 'document.archived', 'document.restored', 'document.deleted'] },
+  {
+    entity: 'project',
+    label: 'Projects',
+    events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'],
+  },
+  {
+    entity: 'project_update',
+    label: 'Project updates',
+    events: ['project_update.created', 'project_update.updated', 'project_update.deleted'],
+  },
+  {
+    entity: 'workstream',
+    label: 'Workstreams',
+    events: [
+      'workstream.created',
+      'workstream.updated',
+      'workstream.status_changed',
+      'workstream.deleted',
+    ],
+  },
+  {
+    entity: 'issue',
+    label: 'Issues',
+    events: [
+      'issue.created',
+      'issue.updated',
+      'issue.status_changed',
+      'issue.linked',
+      'issue.deleted',
+    ],
+  },
+  {
+    entity: 'customer',
+    label: 'Customers',
+    events: [
+      'customer.created',
+      'customer.updated',
+      'customer.archived',
+      'customer.restored',
+      'customer.deleted',
+      'customer_request.linked',
+      'customer_request.updated',
+      'customer_request.unlinked',
+    ],
+  },
+  {
+    entity: 'decision',
+    label: 'Decisions',
+    events: [
+      'decision.draft',
+      'decision.proposed',
+      'decision.accepted',
+      'decision.rejected',
+      'decision.superseded',
+      'decision.updated',
+      'decision.deleted',
+    ],
+  },
+  {
+    entity: 'input',
+    label: 'Input requests',
+    events: [
+      'input.requested',
+      'input.answered',
+      'input.dismissed',
+      'input.updated',
+      'input.deleted',
+    ],
+  },
+  {
+    entity: 'artifact',
+    label: 'Artifacts',
+    events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'],
+  },
+  {
+    entity: 'document',
+    label: 'Documents',
+    events: [
+      'document.created',
+      'document.updated',
+      'document.archived',
+      'document.restored',
+      'document.deleted',
+    ],
+  },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
-  { entity: 'dependency', label: 'Dependencies', events: ['dependency.added', 'dependency.removed'] },
+  {
+    entity: 'dependency',
+    label: 'Dependencies',
+    events: ['dependency.added', 'dependency.removed'],
+  },
   { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
-  { entity: 'repository', label: 'Repositories', events: ['repository.created', 'repository.updated', 'repository.deleted'] },
-  { entity: 'import', label: 'Imports', events: ['import.started', 'import.completed', 'import.failed', 'import.canceled'] },
+  {
+    entity: 'repository',
+    label: 'Repositories',
+    events: ['repository.created', 'repository.updated', 'repository.deleted'],
+  },
+  {
+    entity: 'import',
+    label: 'Imports',
+    events: ['import.started', 'import.completed', 'import.failed', 'import.canceled'],
+  },
 ];
 
 /** Does a webhook subscription pattern (`*`, `issue.*`, `issue.created`) match an event type? */
 export function webhookEventMatches(patterns: readonly string[], type: string): boolean {
-  return patterns.some((p) => p === '*' || p === type || (p.endsWith('.*') && type.startsWith(p.slice(0, -1))));
+  return patterns.some(
+    (p) => p === '*' || p === type || (p.endsWith('.*') && type.startsWith(p.slice(0, -1))),
+  );
 }
 
 // ───────────────────────────── Snapshot ─────────────────────────────
@@ -2518,7 +3478,20 @@ export interface WorkspaceSnapshot {
 /** Server-sent event on GET /api/w/:slug/events/stream. Clients refetch / patch on receipt. */
 export interface LiveEvent {
   type: 'created' | 'updated' | 'deleted' | 'attention';
-  entity: SubjectType | 'comment' | 'view' | 'dependency' | 'membership' | 'invite' | 'favorite' | 'customer_subscription' | 'notification' | 'agent' | 'integration' | 'workspace' | 'webhook';
+  entity:
+    | SubjectType
+    | 'comment'
+    | 'view'
+    | 'dependency'
+    | 'membership'
+    | 'invite'
+    | 'favorite'
+    | 'customer_subscription'
+    | 'notification'
+    | 'agent'
+    | 'integration'
+    | 'workspace'
+    | 'webhook';
   id: ID;
   /** X-Client-Id of the originating request, so a tab can ignore its own echoes. */
   clientId?: string;
@@ -2560,7 +3533,13 @@ export interface ExternalRef {
 }
 
 export type ImportStatus = 'queued' | 'running' | 'completed' | 'failed' | 'canceled';
-export const IMPORT_STATUSES: ImportStatus[] = ['queued', 'running', 'completed', 'failed', 'canceled'];
+export const IMPORT_STATUSES: ImportStatus[] = [
+  'queued',
+  'running',
+  'completed',
+  'failed',
+  'canceled',
+];
 export const IMPORT_ACTIVE_STATUSES: ImportStatus[] = ['queued', 'running'];
 export type ImportPhase = 'setup' | 'issues' | 'comments' | 'done';
 
@@ -2613,7 +3592,11 @@ export interface ImportOptions {
   /** Kind for issues no label points at (bug, security…). */
   defaultKind: IssueKind;
 }
-export const DEFAULT_IMPORT_OPTIONS: ImportOptions = { includeComments: false, includeClosed: true, defaultKind: 'feature' };
+export const DEFAULT_IMPORT_OPTIONS: ImportOptions = {
+  includeComments: false,
+  includeClosed: true,
+  defaultKind: 'feature',
+};
 
 export interface ImportPreviewEntity {
   id: string;

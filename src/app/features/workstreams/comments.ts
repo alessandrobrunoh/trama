@@ -9,6 +9,7 @@ import {
   untracked,
   output,
   signal,
+  viewChild,
 } from '@angular/core';
 import { LucideDynamicIcon, LucidePencil, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -27,16 +28,21 @@ import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
+import { UploadFile } from '../../shared/upload-file';
 import { CommentInput } from './comment-input';
 
 @Component({
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, Kbd, CommentInput],
-  host: { class: 'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:border-t max-md:px-4 max-md:py-2' },
+  imports: [HlmButtonImports, Kbd, CommentInput, UploadFile],
+  host: {
+    class:
+      'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:border-t max-md:px-4 max-md:py-2',
+  },
   template: `
     <div class="bg-card overflow-hidden rounded-lg border">
       <app-comment-input
+        #composer
         class="[&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
         [placeholder]="placeholder()"
         [(value)]="draft"
@@ -48,19 +54,27 @@ import { CommentInput } from './comment-input';
             prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''
           }}</span
         >
-        <button
-          hlmBtn
-          size="sm"
-          type="button"
-          [disabled]="!draft().trim() || busy()"
-          (click)="send()"
-        >
-          Comment
-          <app-kbd
-            [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'"
-            class="opacity-70 max-sm:hidden"
+        <span class="ml-auto flex items-center gap-2">
+          <app-upload-file
+            label="Attach"
+            variant="ghost"
+            [busy]="uploading()"
+            (file)="attach($event)"
           />
-        </button>
+          <button
+            hlmBtn
+            size="sm"
+            type="button"
+            [disabled]="!draft().trim() || busy()"
+            (click)="send()"
+          >
+            Comment
+            <app-kbd
+              [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'"
+              class="opacity-70 max-sm:hidden"
+            />
+          </button>
+        </span>
       </div>
     </div>
   `,
@@ -68,12 +82,28 @@ import { CommentInput } from './comment-input';
 export class CommentComposer {
   protected readonly prefs = inject(Preferences);
   private readonly drafts = inject(DraftStore);
+  private readonly store = inject(TramaStore);
+  private readonly composer = viewChild<CommentInput>('composer');
   readonly placeholder = input('Leave a comment…');
   /** Keeps the unsent text under this key, so it survives navigation and refresh (e.g. `comment:issue:in_x`). */
   readonly draftKey = input<string>();
   readonly submitted = output<string>();
   protected readonly draft = signal('');
   protected readonly busy = signal(false);
+  protected readonly uploading = signal(false);
+
+  protected async attach(file: File): Promise<void> {
+    if (this.uploading()) return;
+    this.uploading.set(true);
+    try {
+      const markdown = await this.store.stageUpload(file);
+      if (!markdown) return;
+      const text = this.draft().trim() ? `\n\n${markdown}\n` : `${markdown}\n`;
+      this.composer()?.insert(text);
+    } finally {
+      this.uploading.set(false);
+    }
+  }
 
   constructor() {
     // Order matters: restore first, then persist what is typed.
@@ -129,6 +159,7 @@ export class CommentComposer {
     LucideDynamicIcon,
     HlmTooltip,
     CommentInput,
+    UploadFile,
   ],
   host: { class: 'group/comment block min-w-0' },
   template: `
@@ -186,6 +217,7 @@ export class CommentComposer {
         </div>
         @if (editing()) {
           <app-comment-input
+            #edit
             class="mt-2"
             label="Edit comment"
             [autofocus]="true"
@@ -195,6 +227,12 @@ export class CommentComposer {
           <div class="mt-2 flex gap-2">
             <button hlmBtn size="sm" (click)="saveEdit()">Save</button>
             <button hlmBtn size="sm" variant="ghost" (click)="editing.set(false)">Cancel</button>
+            <app-upload-file
+              label="Attach"
+              variant="ghost"
+              [busy]="uploading()"
+              (file)="attach($event)"
+            />
           </div>
         } @else {
           <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-1 block" />
@@ -211,8 +249,10 @@ export class CommentItem {
   readonly comment = input.required<Comment>();
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
+  protected readonly uploading = signal(false);
   protected readonly pencil = LucidePencil;
   protected readonly trash = LucideTrash2;
+  private readonly edit = viewChild<CommentInput>('edit');
   protected readonly mine = computed(
     () => this.comment().author.type === 'user' && this.comment().author.id === this.store.me()?.id,
   );
@@ -227,6 +267,19 @@ export class CommentItem {
     else if (ev.key === 'Enter' && (ev.metaKey || ev.ctrlKey) && !ev.isComposing) {
       ev.preventDefault();
       this.saveEdit();
+    }
+  }
+
+  protected async attach(file: File): Promise<void> {
+    if (this.uploading()) return;
+    this.uploading.set(true);
+    try {
+      const markdown = await this.store.stageUpload(file);
+      if (!markdown) return;
+      const text = this.draft().trim() ? `\n\n${markdown}\n` : `${markdown}\n`;
+      this.edit()?.insert(text);
+    } finally {
+      this.uploading.set(false);
     }
   }
 
@@ -266,14 +319,22 @@ export class CommentItem {
     @if (thread().state === 'error') {
       <p class="text-muted-foreground text-xs">
         Comments could not be loaded.
-        <button type="button" class="hover:text-foreground underline" (click)="reload()">Retry</button>
+        <button type="button" class="hover:text-foreground underline" (click)="reload()">
+          Retry
+        </button>
       </p>
     } @else if (thread().state === 'loading') {
       <p class="text-muted-foreground text-xs">Loading comments…</p>
     }
     @if (thread().nextCursor !== null) {
       <div class="mt-3 flex justify-center">
-        <button hlmBtn variant="outline" size="sm" [disabled]="thread().loadingMore" (click)="more()">
+        <button
+          hlmBtn
+          variant="outline"
+          size="sm"
+          [disabled]="thread().loadingMore"
+          (click)="more()"
+        >
           {{ thread().loadingMore ? 'Loading…' : 'Load older comments' }}
         </button>
       </div>
@@ -311,7 +372,11 @@ export class CommentsLoader {
   template: `
     <div class="flex flex-col gap-5">
       @if (canEdit()) {
-        <app-comment-composer #composer [draftKey]="'comment:' + subject().type + ':' + subject().id" (submitted)="send($event, composer)" />
+        <app-comment-composer
+          #composer
+          [draftKey]="'comment:' + subject().type + ':' + subject().id"
+          (submitted)="send($event, composer)"
+        />
       }
       @for (c of comments(); track c.id) {
         <app-comment-item [comment]="c" />

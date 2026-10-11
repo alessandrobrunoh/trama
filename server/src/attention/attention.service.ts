@@ -1,6 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
-import { hasRole, type WorkspaceContext } from '../auth/request-context.js';
+import { hasAdminPower, type WorkspaceContext } from '../auth/request-context.js';
+import { findWorkspaceRole, roleHasAdminPower } from '../contracts/domain.js';
 import type { AttentionItem } from '../contracts/domain.js';
 import {
   AgentEntity,
@@ -13,6 +14,7 @@ import {
   MembershipEntity,
   TeamEntity,
   UserEntity,
+  WorkspaceEntity,
   WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -62,7 +64,7 @@ export class AttentionService {
    */
   async forUser(ctx: WorkspaceContext, opts: AttentionOptions = {}): Promise<AttentionItem[]> {
     if (!ctx.userId) return [];
-    if (opts.scope === 'all' && !hasRole(ctx.role, 'admin'))
+    if (opts.scope === 'all' && !hasAdminPower(ctx))
       throw new ForbiddenException('scope=all requires the admin role');
     const raw = await this.compute(ctx.workspace.id);
     const mine = opts.scope === 'all' ? raw : raw.filter((i) => i.audience.has(ctx.userId!));
@@ -92,7 +94,7 @@ export class AttentionService {
   private async find(ctx: WorkspaceContext, id: string): Promise<AttentionItem> {
     if (!ctx.userId) throw new ForbiddenException('Attention is for people, not agents');
     let item = (await this.forUser(ctx)).find((i) => i.id === id);
-    if (!item && hasRole(ctx.role, 'admin')) item = (await this.forUser(ctx, { scope: 'all' })).find((i) => i.id === id);
+    if (!item && hasAdminPower(ctx)) item = (await this.forUser(ctx, { scope: 'all' })).find((i) => i.id === id);
     if (!item) throw new NotFoundException(`Attention item "${id}" not found`);
     return item;
   }
@@ -159,15 +161,19 @@ export class AttentionService {
         db.getRepository(IssueEntity).find({ where: { workspaceId, status: 'backlog' } }),
         db.query<{ id: string; at: Date }[]>(SINCE_SQL, [workspaceId]),
       ]);
-    const userRows = await db.getRepository(UserEntity).find({ where: { id: In(memberships.map((m) => m.userId)) } });
+    const [userRows, workspace] = await Promise.all([
+      db.getRepository(UserEntity).find({ where: { id: In(memberships.map((m) => m.userId)) } }),
+      db.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId }),
+    ]);
     const names = new Map<string, string>();
     for (const u of userRows) names.set(u.id, u.name);
     for (const a of agents) names.set(a.id, a.name);
+    const roles = workspace?.resolved().roles ?? [];
     const data: AttentionData = {
       now: new Date(),
       teams,
       names,
-      adminIds: memberships.filter((m) => m.role === 'admin' || m.role === 'owner').map((m) => m.userId),
+      adminIds: memberships.filter((m) => roleHasAdminPower(findWorkspaceRole(roles, m.role))).map((m) => m.userId),
       workstreams,
       inputRequests,
       artifacts,

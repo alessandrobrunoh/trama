@@ -24,8 +24,8 @@ export class WorkspaceLabels1792900000000 implements MigrationInterface {
         ),
       );
       const { catalog, groups, lookup } = adoptFreeTextLabels(ws.settings?.labels, [
-        ...streams.map((row) => row.labels ?? []),
-        viewValues,
+        ...streams.map((row) => ({ scope: 'workstream' as const, labels: row.labels ?? [] })),
+        { scope: 'workstream' as const, labels: viewValues },
       ]);
       for (let i = 0; i < streams.length; i++) {
         if (JSON.stringify(streams[i].labels ?? []) === JSON.stringify(groups[i])) continue;

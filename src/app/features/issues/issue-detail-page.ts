@@ -271,7 +271,7 @@ import { LabelPicker } from '../../shared/label-picker';
               }
               <app-issue-milestone-prop [issue]="i" />
               <app-property-row label="Labels" [icon]="tagGlyph">
-                <app-label-picker #labelPicker [disabled]="!canEdit()" [value]="i.labels" (valueChange)="store.updateIssue(i.id, { labels: $event })" />
+                <app-label-picker #labelPicker scope="issue" [disabled]="!canEdit()" [value]="i.labels" (valueChange)="store.updateIssue(i.id, { labels: $event })" />
               </app-property-row>
               <app-property-row label="Type" [icon]="tagGlyph">
                 <app-picker variant="bare" label="Type" [searchable]="false" [disabled]="!canEdit()" [options]="kindOpts" [value]="[i.kind]" triggerClass="h-7 px-1.5 text-[13px]" (valueChange)="actions.changeKind(i, $any($event[0]))">

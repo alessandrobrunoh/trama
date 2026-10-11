@@ -3,7 +3,14 @@
 // with comments at the bottom and every property editable in the sidebar.
 import { ProviderIcon } from '../../shared/provider-icon';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { LucideArrowUpRight, LucideCopy, LucideDynamicIcon, LucideMessagesSquare, LucidePencil, LucideTarget } from '@lucide/angular';
+import {
+  LucideArrowUpRight,
+  LucideCopy,
+  LucideDynamicIcon,
+  LucideMessagesSquare,
+  LucidePencil,
+  LucideTarget,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
@@ -54,10 +61,18 @@ import { WsProperties } from './ws-properties';
       <div class="flex min-w-0 flex-col gap-7">
         <app-ws-attention [ws]="ws()" />
 
-        <section aria-labelledby="ws-objective-title" class="bg-card rounded-lg border border-border-strong px-4 pt-3 pb-2">
-          <h2 id="ws-objective-title" class="text-entity-workstream mb-0.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase">
+        <section
+          aria-labelledby="ws-objective-title"
+          class="bg-card rounded-lg border border-border-strong px-4 pt-3 pb-2"
+        >
+          <h2
+            id="ws-objective-title"
+            class="text-entity-workstream mb-0.5 flex items-center gap-1.5 text-xs font-semibold tracking-wide uppercase"
+          >
             <svg [lucideIcon]="target" [size]="13"></svg>Objective
-            <span class="text-muted-foreground font-normal tracking-normal normal-case">· the outcome this workstream delivers</span>
+            <span class="text-muted-foreground font-normal tracking-normal normal-case"
+              >· the outcome this workstream delivers</span
+            >
           </h2>
           <app-editable-markdown
             class="text-[15px]"
@@ -92,12 +107,15 @@ import { WsProperties } from './ws-properties';
             placeholder="Click to describe this workstream…"
             [value]="ws().description ?? ''"
             [canEdit]="canEdit()"
+            [uploads]="true"
             (save)="store.updateWorkstream(ws().id, { description: $event || null })"
           />
         </section>
 
         <section>
-          <h2 class="mb-1 text-sm font-semibold">Context <span class="text-muted-foreground font-normal">· why this exists</span></h2>
+          <h2 class="mb-1 text-sm font-semibold">
+            Context <span class="text-muted-foreground font-normal">· why this exists</span>
+          </h2>
           <app-editable-markdown
             label="context"
             placeholder="Click to add the background: what prompted this, constraints, links…"
@@ -108,48 +126,82 @@ import { WsProperties } from './ws-properties';
         </section>
 
         @if (store.deltaThreads()) {
-        <section aria-labelledby="ws-delta-title">
-          <h2 id="ws-delta-title" class="mb-2 text-sm font-semibold">Workspace</h2>
-          <div class="bg-card flex flex-wrap items-center gap-3 rounded-lg border border-border-strong px-3 py-2.5">
-            <span class="bg-accent text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"><app-provider-icon provider="delta" [size]="18" /></span>
-            @if (editingDelta()) {
-              <input
-                hlmInput
-                class="h-8 min-w-0 flex-1 font-mono text-xs"
-                aria-label="Delta thread URL"
-                placeholder="https://delta.dev/t/…"
-                [value]="deltaDraft()"
-                [class.border-destructive]="deltaDraft().trim() && !deltaValid()"
-                (input)="deltaDraft.set($any($event.target).value)"
-                (keydown.enter)="saveDelta()"
-                (keydown.escape)="editingDelta.set(false); $event.stopPropagation()"
-              />
-              <button hlmBtn size="sm" [disabled]="!deltaValid()" (click)="saveDelta()">Save</button>
-              <button hlmBtn size="sm" variant="ghost" (click)="editingDelta.set(false)">Cancel</button>
-            } @else {
-              <div class="min-w-0 flex-1">
-                <div class="text-[13px] font-medium">Delta thread</div>
-                <div class="text-muted-foreground truncate font-mono text-xs">{{ ws().deltaThreadUrl }}</div>
-              </div>
-              <span class="flex items-center gap-1">
-                <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" hlmTooltip="Copy URL" aria-label="Copy Delta thread URL" (click)="clipboard.copy(ws().deltaThreadUrl, 'Delta thread URL copied')">
-                  <svg [lucideIcon]="copy" [size]="14"></svg>
+          <section aria-labelledby="ws-delta-title">
+            <h2 id="ws-delta-title" class="mb-2 text-sm font-semibold">Workspace</h2>
+            <div
+              class="bg-card flex flex-wrap items-center gap-3 rounded-lg border border-border-strong px-3 py-2.5"
+            >
+              <span
+                class="bg-accent text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
+                ><app-provider-icon provider="delta" [size]="18"
+              /></span>
+              @if (editingDelta()) {
+                <input
+                  hlmInput
+                  class="h-8 min-w-0 flex-1 font-mono text-xs"
+                  aria-label="Delta thread URL"
+                  placeholder="https://delta.dev/t/…"
+                  [value]="deltaDraft()"
+                  [class.border-destructive]="deltaDraft().trim() && !deltaValid()"
+                  (input)="deltaDraft.set($any($event.target).value)"
+                  (keydown.enter)="saveDelta()"
+                  (keydown.escape)="editingDelta.set(false); $event.stopPropagation()"
+                />
+                <button hlmBtn size="sm" [disabled]="!deltaValid()" (click)="saveDelta()">
+                  Save
                 </button>
-                @if (canEdit()) {
-                  <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" hlmTooltip="Change thread" aria-label="Change Delta thread" (click)="startDelta()">
-                    <svg [lucideIcon]="pencil" [size]="14"></svg>
+                <button hlmBtn size="sm" variant="ghost" (click)="editingDelta.set(false)">
+                  Cancel
+                </button>
+              } @else {
+                <div class="min-w-0 flex-1">
+                  <div class="text-[13px] font-medium">Delta thread</div>
+                  <div class="text-muted-foreground truncate font-mono text-xs">
+                    {{ ws().deltaThreadUrl }}
+                  </div>
+                </div>
+                <span class="flex items-center gap-1">
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-muted-foreground"
+                    hlmTooltip="Copy URL"
+                    aria-label="Copy Delta thread URL"
+                    (click)="clipboard.copy(ws().deltaThreadUrl, 'Delta thread URL copied')"
+                  >
+                    <svg [lucideIcon]="copy" [size]="14"></svg>
                   </button>
-                }
-                <a hlmBtn size="sm" variant="outline" [href]="ws().deltaThreadUrl" target="_blank" rel="noopener noreferrer">
-                  Open thread <svg [lucideIcon]="ext" [size]="13"></svg>
-                </a>
-              </span>
+                  @if (canEdit()) {
+                    <button
+                      hlmBtn
+                      variant="ghost"
+                      size="icon-sm"
+                      class="text-muted-foreground"
+                      hlmTooltip="Change thread"
+                      aria-label="Change Delta thread"
+                      (click)="startDelta()"
+                    >
+                      <svg [lucideIcon]="pencil" [size]="14"></svg>
+                    </button>
+                  }
+                  <a
+                    hlmBtn
+                    size="sm"
+                    variant="outline"
+                    [href]="ws().deltaThreadUrl"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open thread <svg [lucideIcon]="ext" [size]="13"></svg>
+                  </a>
+                </span>
+              }
+            </div>
+            @if (editingDelta() && deltaDraft().trim() && !deltaValid()) {
+              <p class="text-destructive mt-1 text-xs">Use an https link on delta.dev.</p>
             }
-          </div>
-          @if (editingDelta() && deltaDraft().trim() && !deltaValid()) {
-            <p class="text-destructive mt-1 text-xs">Use an https link on delta.dev.</p>
-          }
-        </section>
+          </section>
         }
 
         <section aria-labelledby="ws-comments-title">
@@ -167,7 +219,10 @@ import { WsProperties } from './ws-properties';
             <app-ws-side-cards [ws]="ws()" />
           </app-ws-properties>
           <div class="text-muted-foreground mt-4 flex flex-col gap-0.5 border-t pt-3 text-xs">
-            <span>Created {{ ws().createdAt | relativeTime }} by {{ store.getUser(ws().createdById)?.name ?? 'someone' }}</span>
+            <span
+              >Created {{ ws().createdAt | relativeTime }} by
+              {{ store.getUser(ws().createdById)?.name ?? 'someone' }}</span
+            >
             <span>Updated {{ ws().updatedAt | relativeTime }}</span>
             @if (ws().shippedAt) {
               <span>Shipped {{ ws().shippedAt | relativeTime }}</span>

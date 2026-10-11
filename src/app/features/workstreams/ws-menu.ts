@@ -149,11 +149,11 @@ import { WsActions } from './ws-actions';
           }
         </button>
         <hlm-dropdown-menu-separator />
-        @for (s of statuses; track s) {
-          <button hlmDropdownMenuItem (triggered)="setStatus(s)">
-            <app-status-icon entity="workstream" [status]="s" />
-            <span class="flex-1">{{ statusMeta[s].label }}</span>
-            @if (ws().statusOverride === s) {
+        @for (s of statuses(); track s.id) {
+          <button hlmDropdownMenuItem (triggered)="setStatus(s.id)">
+            <app-status-icon entity="workstream" [status]="s.id" />
+            <span class="flex-1">{{ s.name }}</span>
+            @if (ws().statusOverride === s.id) {
               <svg [lucideIcon]="checkIcon" [size]="14" class="text-primary"></svg>
             }
           </button>
@@ -233,7 +233,7 @@ export class WsMenu {
   /** Reference this from `[hlmContextMenuTrigger]` / `[hlmDropdownMenuTrigger]`. */
   readonly template = viewChild<TemplateRef<unknown>>('menu');
 
-  protected readonly statuses = WORKSTREAM_STATUS_FLOW;
+  protected readonly statuses = computed(() => this.store.settings().statuses.workstream);
   protected readonly statusMeta = WORKSTREAM_STATUS_META;
   protected readonly priorities = PRIORITIES;
   protected readonly priorityMeta = PRIORITY_META;
@@ -261,7 +261,7 @@ export class WsMenu {
   protected readonly derivedLabel = computed(() => WORKSTREAM_STATUS_META[this.ws().derivedStatus].label);
   protected readonly deleted = (): void => this.afterDelete()?.();
 
-  protected setStatus(s: WorkstreamStatus | null): void {
+  protected setStatus(s: string | null): void {
     this.actions.setStatus(this.targets(), s);
   }
   protected setPriority(p: Priority): void {

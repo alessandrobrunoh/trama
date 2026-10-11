@@ -44,8 +44,12 @@ import type {
   CreateTokenInput,
   CreatedToken,
   CreateLabelInput,
+  CreateStatusInput,
   CreateWebhookInput,
+  RoleInput,
   UpdateLabelInput,
+  UpdateRoleInput,
+  UpdateStatusInput,
   UpdateWebhookInput,
   UpdateWorkspaceSettingsInput,
   WebhookWithSecret,
@@ -115,7 +119,8 @@ import type {
   Workstream,
 } from '../contracts/domain';
 import type { Capability, ShareLevel } from '../contracts/domain';
-import { buildDemandIndex, mergeDemand, resolveWorkspaceSettings, roleAtLeast } from '../contracts/domain';
+import { buildDemandIndex, mergeDemand, resolveWorkspaceSettings, roleHasCapability } from '../contracts/domain';
+import { uploadIdsIn } from '../upload-url';
 import type { Demand } from '../contracts/domain';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
@@ -744,7 +749,7 @@ export class TramaStore {
   /** Whether my role satisfies a capability of the workspace permission policy (Settings → Roles & permissions). */
   allowed(capability: Capability): boolean {
     const mine = this._myRole();
-    return !!mine && roleAtLeast(mine, this.settings().permissions[capability]);
+    return !!mine && roleHasCapability(this.settings().roles, mine, capability);
   }
 
   /** Am I a lead of this team? */
@@ -2239,7 +2244,7 @@ export class TramaStore {
     return ws?.settings.labels.find((label) => label.name.toLowerCase() === name);
   }
 
-  /** Rename, recolor, archive or restore a workspace label (admin). Templates can only be recolored. */
+  /** Rename, recolor, re-scope, archive or restore a workspace label (admin). Templates can only be recolored. */
   async updateLabel(id: ID, input: UpdateLabelInput): Promise<boolean> {
     return this.write('update label', (s) => this.api.workspaces.updateLabel(s, id, input), {
       onResult: (ws) => this.applyWorkspace(ws),
@@ -2251,6 +2256,76 @@ export class TramaStore {
     return this.write('merge label', (s) => this.api.workspaces.mergeLabel(s, id, { into }), {
       onResult: (ws) => this.applyWorkspace(ws),
     }).then((r) => !!r);
+  }
+
+  /** Create a workspace role (owner). Resolves the new role id, or `undefined` when the API refused. */
+  async createRole(input: RoleInput): Promise<string | undefined> {
+    const before = new Set(this._workspace()?.settings.roles.map((role) => role.id) ?? []);
+    const ws = await this.write('add role', (s) => this.api.workspaces.createRole(s, input), {
+      onResult: (w) => this.applyWorkspace(w),
+    });
+    return ws?.settings.roles.find((role) => !before.has(role.id))?.id;
+  }
+
+  /** Rename a role or replace its capabilities or grants (owner). */
+  async updateRole(id: ID, input: UpdateRoleInput): Promise<boolean> {
+    return this.write('update role', (s) => this.api.workspaces.updateRole(s, id, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Delete a role that nobody still holds (owner). The owner role cannot be deleted. */
+  async deleteRole(id: ID): Promise<boolean> {
+    return this.write('remove role', (s) => this.api.workspaces.deleteRole(s, id), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Add a status of an existing type (admin). */
+  async createStatus(subject: string, input: CreateStatusInput): Promise<boolean> {
+    return this.write('add status', (s) => this.api.workspaces.createStatus(s, subject, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Rename a status or change its icon or color (admin). */
+  async updateStatus(subject: string, id: ID, input: UpdateStatusInput): Promise<boolean> {
+    return this.write('update status', (s) => this.api.workspaces.updateStatus(s, subject, id, input), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Remove a status that nothing uses, unless it is the last of its type (admin). */
+  async deleteStatus(subject: string, id: ID): Promise<boolean> {
+    return this.write('remove status', (s) => this.api.workspaces.deleteStatus(s, subject, id), {
+      onResult: (ws) => this.applyWorkspace(ws),
+    }).then((r) => !!r);
+  }
+
+  /** Upload a file and return the markdown to insert. It stays private until that text is saved. */
+  async stageUpload(file: File): Promise<string | undefined> {
+    const staged = await this.write('upload file', (s) => this.api.uploads.stage(s, file));
+    return staged?.markdown;
+  }
+
+  /** Drop uploads that were inserted into a draft and then discarded. */
+  discardDraftUploads(saved: string, draft: string): void {
+    const slug = this.slug();
+    if (!slug) return;
+    const keep = new Set(uploadIdsIn(saved));
+    for (const id of uploadIdsIn(draft)) {
+      if (!keep.has(id)) void this.api.uploads.discard(slug, id, { quiet: true }).catch(() => undefined);
+    }
+  }
+
+  /** Attach an uploaded file as an image or file artifact. */
+  async uploadArtifactFile(
+    target: { type: 'issue' | 'workstream' | 'project'; id: string },
+    file: File,
+  ): Promise<Artifact | undefined> {
+    return this.write('upload file', (s) => this.api.uploads.attach(s, target, file), {
+      onResult: (a) => this.upsert(this._artifacts, a),
+    });
   }
 
   /** Remove a custom label and every assignment of it (admin). */

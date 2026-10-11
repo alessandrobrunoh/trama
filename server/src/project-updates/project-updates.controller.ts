@@ -11,14 +11,13 @@ import {
 import { Transform } from 'class-transformer';
 import {
   IsBoolean,
-  IsIn,
   IsOptional,
   IsString,
   MaxLength,
   MinLength,
 } from 'class-validator';
 import { Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import { PROJECT_HEALTHS, type ProjectHealth } from '../contracts/domain.js';
+
 import { OptionalNotNull } from '../common/validation.js';
 import { ProjectUpdatesService } from './project-updates.service.js';
 
@@ -26,13 +25,13 @@ import { ProjectUpdatesService } from './project-updates.service.js';
 const trimmed = Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value));
 
 class CreateProjectUpdateDto {
-  @IsIn(PROJECT_HEALTHS) health: ProjectHealth;
+  @IsString() @MaxLength(80) health: string;
   @trimmed @IsString() @MinLength(1) @MaxLength(20000) body: string;
   @IsOptional() @IsBoolean() aiDrafted?: boolean;
 }
 
 class UpdateProjectUpdateDto {
-  @OptionalNotNull() @IsIn(PROJECT_HEALTHS) health?: ProjectHealth;
+  @OptionalNotNull() @IsString() @MaxLength(80) health?: string;
   @trimmed @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(20000) body?: string;
 }
 

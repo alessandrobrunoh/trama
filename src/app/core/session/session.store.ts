@@ -6,7 +6,7 @@ import { ApiClient } from '../api/api-client';
 import { ApiError } from '../api/api-error';
 import type { UpdateWorkspaceInput } from '../api/api.types';
 import type { Role, User, Workspace } from '../contracts/domain';
-import { ROLE_META } from '../meta';
+import { legacyRoleAtLeast } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { Preferences } from '../preferences';
 import { readJson, writeJson } from '../stores/storage';
@@ -165,10 +165,11 @@ export class SessionStore {
     return true;
   }
 
-  /** True when the user's role in the active workspace is at least `minRole`. */
+  /** True when the active role may do what `minRole` used to mean. Custom roles use their own permissions. */
   can(minRole: Role): boolean {
+    if (this.trama.myRole()) return this.trama.can(minRole);
     const mine = this._role();
-    return mine !== null && ROLE_META[mine].rank >= ROLE_META[minRole].rank;
+    return !!mine && legacyRoleAtLeast(mine, minRole);
   }
 
   /** After login / signup: go to `next` (a same-origin path) or the default workspace. */
@@ -239,7 +240,8 @@ export class SessionStore {
   }
 
   private forgetIf(slug: string): void {
-    if (readJson<{ lastSlug: string }>(LAST_WORKSPACE_KEY)?.lastSlug === slug) writeJson(LAST_WORKSPACE_KEY, {});
+    if (readJson<{ lastSlug: string }>(LAST_WORKSPACE_KEY)?.lastSlug === slug)
+      writeJson(LAST_WORKSPACE_KEY, {});
   }
 
   private reportFailure(action: string, e: unknown): void {

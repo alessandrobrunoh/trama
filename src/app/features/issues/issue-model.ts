@@ -5,6 +5,10 @@ import {
   ISSUE_KINDS,
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
+  defaultStatusCatalog,
+  resolveStatusEntry,
+  statusTypeOf,
+  type StatusEntry,
   PRIORITIES,
   PRIORITY_META,
   estimateFraction,
@@ -15,6 +19,7 @@ import {
   type IssueStatus,
   type TramaStore,
   type Workstream,
+  type WorkstreamStatus,
 } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
 import type { PickOption } from '../workstreams/picker';
@@ -29,19 +34,23 @@ export const SOURCE_LABEL: Record<string, string> = {
   agent: 'Agent',
 };
 
-export const isClosedIssue = (i: Pick<Issue, 'status'>): boolean =>
-  i.status === 'done' || i.status === 'canceled';
-const CLOSED_WS = new Set(['shipped', 'canceled']);
-export const isOpenWorkstream = (w: Workstream): boolean => !CLOSED_WS.has(w.status);
+export const isClosedIssue = (i: Pick<Issue, 'status'>, entries?: readonly StatusEntry<IssueStatus>[]): boolean => {
+  const type = statusTypeOf(entries ?? defaultStatusCatalog().issue, i.status);
+  return type === 'done' || type === 'canceled';
+};
+export const isOpenWorkstream = (w: Workstream, entries?: readonly StatusEntry<WorkstreamStatus>[]): boolean => {
+  const type = statusTypeOf(entries ?? defaultStatusCatalog().workstream, w.status);
+  return type !== 'shipped' && type !== 'canceled';
+};
 
 // ───────────────────────── picker options ─────────────────────────
 
-export const issueStatusOptions = (): PickOption[] =>
-  ISSUE_STATUSES.map((s) => ({
-    value: s,
-    label: ISSUE_STATUS_META[s].label,
-    kind: 'status',
-    statusEntity: 'issue',
+export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>
+  entries.map((s) => ({
+    value: s.id,
+    label: s.name,
+    kind: 'status' as const,
+    statusEntity: 'issue' as const,
   }));
 
 /**
@@ -274,7 +283,7 @@ export function writeDisplay(key: string, value: IssueDisplay): void {
 export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | undefined {
   switch (group) {
     case 'status':
-      return [...ISSUE_STATUSES];
+      return store.settings().statuses.issue.map((entry) => entry.id);
     case 'priority':
       return [...PRIORITIES];
     case 'kind':
@@ -286,7 +295,7 @@ export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | 
     case 'workstreamIds':
       return store
         .workstreams()
-        .filter(isOpenWorkstream)
+        .filter((workstream) => isOpenWorkstream(workstream, store.settings().statuses.workstream))
         .map((w) => w.id);
     case 'projectId':
       return store
@@ -301,7 +310,7 @@ export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | 
 export function groupLabel(store: TramaStore, group: IssueGroup, key: string): string {
   switch (group) {
     case 'status':
-      return ISSUE_STATUS_META[key as IssueStatus]?.label ?? key;
+      return resolveStatusEntry(store.settings().statuses.issue, key)?.name ?? ISSUE_STATUS_META[key as IssueStatus]?.label ?? key;
     case 'priority':
       return PRIORITY_META[key as keyof typeof PRIORITY_META]?.label ?? key;
     case 'kind':

@@ -28,17 +28,9 @@ import {
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
-import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
+import type { ActorRef } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { DecisionsService } from './decisions.service.js';
-
-const STATUSES: DecisionStatus[] = [
-  'draft',
-  'proposed',
-  'accepted',
-  'superseded',
-  'rejected',
-];
 
 class CreateDecisionDto {
   @IsString() @MinLength(1) @MaxLength(300) title: string;
@@ -49,9 +41,11 @@ class CreateDecisionDto {
   statement?: string;
   @IsOptional() @IsString() @MaxLength(20000) rationale?: string;
   /** `proposed` (default) or, for people only, `accepted` / `rejected`. */
+  /** Catalog id of type draft, proposed, accepted or rejected, or that legacy enum. */
   @IsOptional()
-  @IsIn(['draft', 'proposed', 'accepted', 'rejected'])
-  status?: DecisionStatus;
+  @IsString()
+  @MaxLength(80)
+  status?: string;
   @IsOptional() @IsString() originWorkstreamId?: string;
   @IsOptional()
   @IsArray()
@@ -67,7 +61,8 @@ class UpdateDecisionDto {
   @MinLength(1)
   @MaxLength(20000)
   statement?: string;
-  @IsOptional() @IsIn(['proposed']) status?: DecisionStatus;
+  /** Catalog id of type proposed, or the legacy enum. */
+  @IsOptional() @IsString() @MaxLength(80) status?: string;
   @Clearable() @IsString() @MaxLength(20000) rationale?: string | null;
   @Clearable() @IsString() originWorkstreamId?: string | null;
   @OptionalNotNull()
@@ -83,7 +78,7 @@ class SupersedeDto {
 }
 
 class ListDecisionsQuery {
-  @IsOptional() @IsIn(STATUSES) status?: DecisionStatus;
+  @IsOptional() @IsString() @MaxLength(80) status?: string;
   @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() tag?: string;
   @IsOptional() @IsString() q?: string;

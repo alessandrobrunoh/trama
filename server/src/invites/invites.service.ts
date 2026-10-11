@@ -12,14 +12,20 @@ import { appUrl } from '../common/app-url.js';
 import { notFound, uid } from '../common/util.js';
 import {
   accessWithin,
+  applyTokenScope,
+  canGrantRole,
   effectiveMemberAccess,
+  findWorkspaceRole,
   INVITE_TTL_DAYS,
   normalizeMemberAccess,
+  workspaceRoleName,
   type InviteLink,
   type InvitePreview,
   type MemberAccess,
   type MemberGrant,
   type Role,
+  type TokenScope,
+  type WorkspaceRole,
 } from '../contracts/domain.js';
 import {
   InviteEntity,
@@ -29,7 +35,6 @@ import {
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { MailService } from '../mail/mail.service.js';
-import { hasRole } from '../auth/request-context.js';
 import { renderInviteEmail } from './invite-email.js';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -67,12 +72,12 @@ export class InvitesService {
    */
   async create(
     workspace: WorkspaceEntity,
-    inviter: { userId?: string; role: Role },
+    inviter: { userId?: string; role: Role; tokenScope?: TokenScope },
     input: { email: string; role: Role; access?: unknown },
   ): Promise<InviteLink> {
-    this.assertCanGrant(inviter.role, input.role);
-    const baseline = workspace.resolved().roleGrants[input.role];
-    const access = input.role === 'owner' ? null : this.parseAccess(input.access, baseline);
+    const target = this.assertCanGrant(workspace, inviter.role, input.role, inviter.tokenScope);
+    const baseline = target.grants;
+    const access = target.owner ? null : this.parseAccess(input.access, baseline);
     await this.assertCanGrantAccess(workspace, inviter, access, baseline);
     const email = input.email.trim().toLowerCase();
     const existing = await this.users.findOneBy({ email });
@@ -103,9 +108,9 @@ export class InvitesService {
   }
 
   /** New link and expiry for a pending invitation, emailed again. */
-  async resend(workspace: WorkspaceEntity, callerRole: Role, id: string): Promise<InviteLink> {
+  async resend(workspace: WorkspaceEntity, caller: { role: Role; tokenScope?: TokenScope }, id: string): Promise<InviteLink> {
     const invite = await this.findPending(workspace.id, id);
-    this.assertCanGrant(callerRole, invite.role);
+    this.assertCanGrant(workspace, caller.role, invite.role, caller.tokenScope);
     const link = await this.issueLink(workspace, invite);
     this.events.publish(workspace.id, { type: 'updated', entity: 'invite', id: invite.id });
     return link;
@@ -128,6 +133,7 @@ export class InvitesService {
     return {
       workspaceName: workspace.name,
       role: invite.role,
+      roleName: workspaceRoleName(workspace.resolved().roles, invite.role),
       email: invite.email,
       invitedByName: inviter?.name,
       expiresAt: invite.expiresAt.toISOString(),
@@ -142,6 +148,7 @@ export class InvitesService {
         `This invitation was sent to ${maskEmail(invite.email)}. Sign in with that account to accept it.`,
       );
     const workspace = await this.workspaces.findOneByOrFail({ id: invite.workspaceId });
+    if (!findWorkspaceRole(workspace.resolved().roles, invite.role)) throw new BadRequestException('That role no longer exists');
     let membershipId: string | undefined;
     let role = invite.role;
     await this.ds.transaction(async (m) => {
@@ -154,7 +161,7 @@ export class InvitesService {
             workspaceId: workspace.id,
             userId: user.id,
             role: invite.role,
-            access: invite.role === 'owner' ? null : invite.access,
+            access: findWorkspaceRole(workspace.resolved().roles, invite.role)?.owner ? null : invite.access,
           }),
         );
         membershipId = saved.id;
@@ -181,7 +188,7 @@ export class InvitesService {
     const message = renderInviteEmail({
       workspaceName: workspace.name,
       inviterName: inviter?.name,
-      role: invite.role,
+      role: workspaceRoleName(workspace.resolved().roles, invite.role),
       url,
       expiresAt: invite.expiresAt,
     });
@@ -206,9 +213,13 @@ export class InvitesService {
     return invite;
   }
 
-  private assertCanGrant(callerRole: Role, target: Role): void {
-    if (target === 'owner' && callerRole !== 'owner') throw new ForbiddenException('Only an owner can grant owner');
-    if (!hasRole(callerRole, target)) throw new ForbiddenException(`You cannot grant a role above your own (${callerRole})`);
+  private assertCanGrant(workspace: WorkspaceEntity, callerRole: Role, targetId: Role, tokenScope?: TokenScope): WorkspaceRole {
+    const target = findWorkspaceRole(workspace.resolved().roles, targetId);
+    if (!target) throw new BadRequestException(`Unknown role "${targetId}"`);
+    const caller = findWorkspaceRole(workspace.resolved().roles, callerRole);
+    if (!canGrantRole(caller ? applyTokenScope(caller, tokenScope) : undefined, target))
+      throw new ForbiddenException('You cannot grant a role with permissions you do not have');
+    return target;
   }
 
   /** `undefined` means no custom access. Anything else is normalized and clamped to the role. */
@@ -221,7 +232,7 @@ export class InvitesService {
   /** A limited inviter can only hand out projects and actions they already have, including the target role. */
   private async assertCanGrantAccess(
     workspace: WorkspaceEntity,
-    inviter: { userId?: string; role: Role },
+    inviter: { userId?: string; role: Role; tokenScope?: TokenScope },
     access: MemberAccess | null,
     baseline: readonly MemberGrant[],
   ): Promise<void> {
@@ -229,9 +240,11 @@ export class InvitesService {
       if (access) throw new ForbiddenException('Only a person can set access limits');
       return;
     }
-    if (inviter.role === 'owner') return;
+    const caller = findWorkspaceRole(workspace.resolved().roles, inviter.role);
+    const effective = caller ? applyTokenScope(caller, inviter.tokenScope) : undefined;
+    if (effective?.owner) return;
     const mine = await this.memberships.findOneBy({ workspaceId: workspace.id, userId: inviter.userId });
-    const callerAccess = effectiveMemberAccess(inviter.role, mine?.access ?? null, workspace.resolved().roleGrants);
+    const callerAccess = effectiveMemberAccess(effective, mine?.access ?? null);
     if (!accessWithin(access, callerAccess, baseline))
       throw new ForbiddenException('You cannot grant access wider than your own');
   }
