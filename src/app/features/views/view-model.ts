@@ -1,5 +1,11 @@
 // Pure helpers for saved views: value labels, picker options per field, filter descriptions.
-import { LucideBox, LucideCircle, LucideHexagon, LucideScale, type LucideIcon } from '@lucide/angular';
+import {
+  LucideBox,
+  LucideCircle,
+  LucideHexagon,
+  LucideScale,
+  type LucideIcon,
+} from '@lucide/angular';
 import {
   DECISION_STATUS_META,
   FIELD_DEFS,
@@ -9,6 +15,7 @@ import {
   PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
   WORKSTREAM_STATUS_META,
+  resolveStatusEntry,
   type ActorRef,
   type FieldDef,
   type TramaStore,
@@ -67,7 +74,12 @@ const SOURCE_LABEL: Record<string, string> = {
 /** Fields offered as filter chips: value sets, and numbers (customer demand) as "at least N". */
 export function filterableFields(entity: ViewEntity): FieldDef[] {
   return FIELD_DEFS[entity].filter(
-    (f) => f.kind === 'enum' || f.kind === 'id' || f.kind === 'multi-id' || f.kind === 'tags' || f.kind === 'number',
+    (f) =>
+      f.kind === 'enum' ||
+      f.kind === 'id' ||
+      f.kind === 'multi-id' ||
+      f.kind === 'tags' ||
+      f.kind === 'number',
   );
 }
 
@@ -92,7 +104,8 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
             : DECISION_STATUS_META;
     return (t as Record<string, { label: string }>)[value]?.label;
   }
-  if (field === 'health') return PROJECT_HEALTH_META[value as keyof typeof PROJECT_HEALTH_META]?.label;
+  if (field === 'health')
+    return PROJECT_HEALTH_META[value as keyof typeof PROJECT_HEALTH_META]?.label;
   if (field === 'priority') return PRIORITY_META[value as keyof typeof PRIORITY_META]?.label;
   if (field === 'kind') return ISSUE_KIND_META[value as keyof typeof ISSUE_KIND_META]?.label;
   if (field === 'source') return SOURCE_LABEL[value];
@@ -100,10 +113,35 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
 }
 
 /** Human label of one field value ('' = "No …"). */
+/** Board columns for a status or health field: the workspace catalog, in catalog order. */
+export function statusColumnIds(store: TramaStore, entity: ViewEntity, field: string): string[] {
+  const catalog = store.settings().statuses;
+  if (field === 'health') return catalog.projectHealth.map((entry) => entry.id);
+  if (entity === 'issue') return catalog.issue.map((entry) => entry.id);
+  if (entity === 'workstream') return catalog.workstream.map((entry) => entry.id);
+  if (entity === 'project') return catalog.project.map((entry) => entry.id);
+  return catalog.decision.map((entry) => entry.id);
+}
+
 export function valueLabel(store: TramaStore, entity: ViewEntity, field: string, value: string): string {
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (value === '') return `No ${(def?.label ?? field).toLowerCase()}`;
   if (field === 'labels') return store.settings().labels.find((l) => l.id === value)?.name ?? value;
+  if (field === 'status' || field === 'health') {
+    const catalog = store.settings().statuses;
+    const entries =
+      field === 'health'
+        ? catalog.projectHealth
+        : entity === 'issue'
+          ? catalog.issue
+          : entity === 'workstream'
+            ? catalog.workstream
+            : entity === 'project'
+              ? catalog.project
+              : catalog.decision;
+    const named = resolveStatusEntry(entries, value)?.name;
+    if (named) return named;
+  }
   if (def?.kind === 'enum') return enumLabel(entity, field, value) ?? value;
   switch (def?.refersTo) {
     case 'team':
@@ -140,7 +178,8 @@ export function valueGlyph(
   if (!value) return {};
   // Project statuses have their own coloured dot (see valueDot), not a status glyph.
   if (entity === 'project' && field === 'status') return {};
-  if (field === 'status') return { status: value as AnyStatus, statusEntity: STATUS_ENTITY[entity] };
+  if (field === 'status')
+    return { status: value as AnyStatus, statusEntity: STATUS_ENTITY[entity] };
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (def?.refersTo === 'team') return { actor: { type: 'team', id: value } };
   if (def?.refersTo === 'user') return { actor: { type: 'user', id: value } };
@@ -184,13 +223,33 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
     color: valueColor(entity, field, value),
     ...extra,
   });
+  if (def.kind === 'enum' && (field === 'status' || field === 'health')) {
+    const catalog = store.settings().statuses;
+    const entries =
+      field === 'health'
+        ? catalog.projectHealth
+        : entity === 'issue'
+          ? catalog.issue
+          : entity === 'workstream'
+            ? catalog.workstream
+            : entity === 'project'
+              ? catalog.project
+              : catalog.decision;
+    return entries.map((entry) => opt(entry.id));
+  }
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));
   if (field === 'labels') {
-    return store.settings().labels.filter((l) => !l.archived).map((l) => opt(l.id, { color: l.color }));
+    const scope =
+      entity === 'issue' || entity === 'workstream' || entity === 'project' ? entity : null;
+    return store
+      .settings()
+      .labels.filter((l) => !l.archived && (scope === null || l.scope === scope))
+      .map((l) => opt(l.id, { color: l.color }));
   }
   if (def.kind === 'tags') {
     const set = new Set<string>();
-    if (entity === 'decision') for (const d of store.decisions()) for (const t of d.tags) set.add(t);
+    if (entity === 'decision')
+      for (const d of store.decisions()) for (const t of d.tags) set.add(t);
     return [...set].sort().map((v) => opt(v));
   }
   const none = def.kind === 'id' ? [opt('')] : [];
@@ -204,11 +263,19 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
     case 'project':
       return [...none, ...store.projects().map((p) => opt(p.id))];
     case 'workstream':
-      return [...none, ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true }))];
+      return [
+        ...none,
+        ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true })),
+      ];
     case 'milestone':
-      return store.milestones().map((m) => opt(m.id, { hint: store.getProject(m.projectId)?.name }));
+      return store
+        .milestones()
+        .map((m) => opt(m.id, { hint: store.getProject(m.projectId)?.name }));
     case 'customer':
-      return store.customers().filter((c) => !c.archivedAt).map((c) => opt(c.id, { hint: c.domain }));
+      return store
+        .customers()
+        .filter((c) => !c.archivedAt)
+        .map((c) => opt(c.id, { hint: c.domain }));
     case 'customerTier':
       return store.settings().customerTiers.map((t) => opt(t.id));
   }
@@ -248,7 +315,9 @@ export function describeFilters(store: TramaStore, view: SavedView): string {
 /** Router commands to the workspace's timeline: its first timeline view (workstreams first), else the views list. */
 export function timelineViewLink(store: TramaStore): string[] {
   const views = store.views();
-  const view = views.find((v) => v.layout === 'timeline' && v.entity === 'workstream') ?? views.find((v) => v.layout === 'timeline');
+  const view =
+    views.find((v) => v.layout === 'timeline' && v.entity === 'workstream') ??
+    views.find((v) => v.layout === 'timeline');
   const base = ['/', store.slug() ?? '', 'views'];
   return view ? [...base, view.id] : base;
 }

@@ -34,6 +34,7 @@ import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
 import { StatusModule } from './status/status.module.js';
 import { TeamsModule } from './teams/teams.module.js';
+import { UploadsModule } from './uploads/uploads.module.js';
 import { ViewsModule } from './views/views.module.js';
 import { OutgoingWebhooksModule } from './outgoing-webhooks/outgoing-webhooks.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
@@ -62,6 +63,7 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     CustomerIntakeModule,
     MilestonesModule,
     ArtifactsModule,
+    UploadsModule,
     DocumentsModule,
     DecisionsModule,
     DependenciesModule,

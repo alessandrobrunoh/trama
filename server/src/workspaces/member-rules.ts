@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import type { Role } from '../contracts/domain.js';
+import type { Role, TokenScope } from '../contracts/domain.js';
 import { hasRole } from '../auth/request-context.js';
 
 /**
@@ -13,9 +13,13 @@ import { hasRole } from '../auth/request-context.js';
  * - Workspaces without a recorded primary owner (legacy rows) fall back to "any owner may act on owners".
  */
 export interface MemberActor {
-  /** Effective role of the caller (capped by the token scope). */
+  /** Role id of the caller. A read or write token does not change this; `canManageMembers` does. */
   role: Role;
   userId?: string;
+  /** When set, replaces the legacy admin rank for acting on someone who is not an owner. */
+  canManageMembers?: boolean;
+  /** Caps what this caller can grant. A write token cannot hand out the owner role. */
+  tokenScope?: TokenScope;
 }
 
 export interface MemberTarget {
@@ -60,7 +64,8 @@ function assertPrimaryOwnerTransfersFirst(ws: MemberRuleContext, target: MemberT
 /** Removing a membership (or leaving: caller = target). */
 export function assertCanRemoveMember(ws: MemberRuleContext, actor: MemberActor, target: MemberTarget): void {
   const self = !!actor.userId && actor.userId === target.userId;
-  if (!self && !hasRole(actor.role, 'admin')) throw new ForbiddenException('Requires role admin or higher');
+  const canManage = actor.canManageMembers ?? hasRole(actor.role, 'admin');
+  if (!self && !canManage) throw new ForbiddenException('You are not allowed to remove members');
   if (target.role !== 'owner') return;
   assertCanActOnOwner(ws, actor, target, 'remove');
   if (self) assertPrimaryOwnerTransfersFirst(ws, target, 'leave');

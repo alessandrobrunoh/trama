@@ -174,7 +174,7 @@ const TAB_LABEL: Record<Tab, string> = {
             clearLabel="Automatic (derived)"
             [disabled]="!canEdit()"
             [options]="statuses"
-            [value]="[w.status]"
+            [value]="[w.statusOverride || w.status]"
             (valueChange)="setStatus($event[0])"
           >
             <app-status-icon entity="workstream" [status]="w.status" [size]="18" />
@@ -439,7 +439,9 @@ export class WorkstreamDetailPage {
   protected readonly extIcon = LucideArrowUpRight;
   protected readonly userIcon = LucideUserRound;
   protected readonly whyState = signal<'open' | 'closed'>('closed');
-  protected readonly statuses = statusOptions();
+  protected get statuses() {
+    return statusOptions(this.store.settings().statuses.workstream);
+  }
   protected readonly priorities = priorityOptions();
   protected readonly users = computed(() => userOptions(this.store));
 

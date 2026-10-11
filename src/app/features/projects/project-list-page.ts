@@ -2,7 +2,15 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { PROJECT_HEALTH_META, TramaStore, UiStore, applyFilters, sortItems, type Project, type ViewFilter } from '../../core';
+import {
+  PROJECT_HEALTH_META,
+  TramaStore,
+  UiStore,
+  applyFilters,
+  sortItems,
+  type Project,
+  type ViewFilter,
+} from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -23,6 +31,7 @@ import {
   isOverdue,
   isUpdateOverdue,
   projectStatusOptions,
+  projectStatusView,
 } from './project-model';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
@@ -99,8 +108,19 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
           [value]="teamFilter()"
           (valueChange)="teamFilter.set($event)"
         />
-        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="labelFilter()" (valueChange)="labelFilter.set($event)" />
-        <app-demand-filters [filters]="demandFilters()" (filtersChange)="demandFilters.set($event)" />
+        <app-label-picker
+          variant="chip"
+          label="Label"
+          scope="project"
+          [creatable]="false"
+          [manageLink]="false"
+          [value]="labelFilter()"
+          (valueChange)="labelFilter.set($event)"
+        />
+        <app-demand-filters
+          [filters]="demandFilters()"
+          (filtersChange)="demandFilters.set($event)"
+        />
         @if (hasFilters()) {
           <button
             hlmBtn
@@ -194,9 +214,9 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
               <span class="flex w-24 items-center max-md:w-auto"
                 ><app-priority-icon [priority]="p.priority" [showLabel]="true"
               /></span>
-              <span class="flex w-28 items-center gap-1.5 max-md:w-auto" [class]="row.status.text">
-                <span class="size-2 shrink-0 rounded-full" [class]="row.status.dot"></span
-                >{{ row.status.label }}
+              <span class="flex w-28 items-center gap-1.5 max-md:w-auto" [style.color]="row.status.color">
+                <span class="size-2 shrink-0 rounded-full" [style.background]="row.status.color"></span>
+                {{ row.status.label }}
               </span>
               <span class="flex w-24 items-center max-md:w-auto">
                 @if (p.health) {
@@ -219,9 +239,13 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
                 {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
               </span>
               @if (showCustomers()) {
-                <span class="w-24 text-right whitespace-nowrap tabular-nums max-md:w-auto" [title]="row.demandText">
+                <span
+                  class="w-24 text-right whitespace-nowrap tabular-nums max-md:w-auto"
+                  [title]="row.demandText"
+                >
                   @if (row.demand; as d) {
-                    {{ d.customerCount }}<span class="text-muted-foreground"> · {{ compact(d.revenue) }}</span>
+                    {{ d.customerCount
+                    }}<span class="text-muted-foreground"> · {{ compact(d.revenue) }}</span>
                   } @else {
                     <span class="text-muted-foreground">—</span>
                   }
@@ -252,7 +276,9 @@ export class ProjectListPage {
   protected readonly searchIcon = LucideSearch;
   protected readonly xIcon = LucideX;
   protected readonly boxIcon = LucideBox;
-  protected readonly statuses = projectStatusOptions();
+  protected get statuses() {
+    return projectStatusOptions(this.store.settings().statuses.project);
+  }
   protected readonly healths = [
     ...HEALTH_ORDER.map((h) => ({ value: h as string, label: PROJECT_HEALTH_META[h].label })),
     { value: NO_UPDATES, label: 'No updates' },
@@ -303,7 +329,9 @@ export class ProjectListPage {
     const matching = applyFilters('project', this.store.projects(), this.demandFilters(), ctx);
     // "Most customers / revenue / requests" first; the others stay as before (open first, then by name).
     const ordered: readonly Project[] =
-      sort === 'name' ? matching : sortItems('project', matching, { field: sort, direction: 'desc' }, ctx);
+      sort === 'name'
+        ? matching
+        : sortItems('project', matching, { field: sort, direction: 'desc' }, ctx);
     return (
       ordered
         .filter((p) => {
@@ -315,10 +343,13 @@ export class ProjectListPage {
         })
         .slice()
         // Open projects first, then by name (or by demand when asked).
-        .sort((a, b) => (sort === 'name' ? Number(isClosed(a)) - Number(isClosed(b)) || a.name.localeCompare(b.name) : 0))
+        .sort((a, b) => {
+          const entries = this.store.settings().statuses.project;
+          return sort === 'name' ? Number(isClosed(a, entries)) - Number(isClosed(b, entries)) || a.name.localeCompare(b.name) : 0;
+        })
         .map((project) => ({
           project,
-          status: PROJECT_STATUS_META[project.status],
+          status: projectStatusView(project.status, this.store.settings().statuses.project),
           lead: project.leadId ? users.get(project.leadId)?.name : undefined,
           overdue: isOverdue(project),
           updateOverdue: isUpdateOverdue(project),

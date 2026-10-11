@@ -51,7 +51,7 @@ export class RepositoriesService {
         url: input.url ?? `https://${host}/${input.fullName}`,
         defaultBranch: input.defaultBranch ?? 'main',
         teamIds: unique(input.teamIds),
-        labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
+        labels: (await this.labels.assign(workspaceId, input.labels, null)) ?? [],
       }),
     );
     await this.events.record({ workspaceId, actor, type: 'repository.created', subject: { type: 'repository', id: row.id }, data: { fullName: row.fullName } });
@@ -64,7 +64,7 @@ export class RepositoriesService {
     if (patch.url !== undefined) row.url = patch.url;
     if (patch.defaultBranch !== undefined) row.defaultBranch = patch.defaultBranch;
     if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
-    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels)) ?? [];
+    if (patch.labels !== undefined) row.labels = (await this.labels.assign(workspaceId, patch.labels, null, row.labels)) ?? [];
     await this.repo.save(row);
     await this.events.record({ workspaceId, actor, type: 'repository.updated', subject: { type: 'repository', id }, data: { fields: Object.keys(patch).filter((k) => (patch as Record<string, unknown>)[k] !== undefined) } });
     return row;

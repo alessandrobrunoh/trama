@@ -3,6 +3,7 @@ import {
   Component,
   booleanAttribute,
   computed,
+  inject,
   input,
 } from '@angular/core';
 import {
@@ -19,13 +20,19 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { LucideDynamicIcon } from '@lucide/angular';
-import type {
-  ArtifactState,
-  CiState,
-  DecisionStatus,
-  IssueStatus,
-  WorkstreamStatus,
+import {
+  STATUS_CATALOG_KEY,
+  resolveStatusEntry,
+  type ArtifactState,
+  type CiState,
+  type DecisionStatus,
+  type IssueStatus,
+  type StatusEntry,
+  type StatusSubject,
+  type WorkstreamStatus,
 } from '../core/contracts/domain';
+import { TramaStore } from '../core/stores/trama.store';
+import { LucideNames, isLucideName } from './lucide-names';
 
 /** Every enum value that has a status visual. */
 export type AnyStatus = WorkstreamStatus | IssueStatus | DecisionStatus | ArtifactState | CiState;
@@ -174,11 +181,19 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
   imports: [LucideDynamicIcon],
   host: {
     class: 'inline-flex shrink-0 items-center justify-center',
-    '[class]': 'visual().text',
+    '[class]': 'entry() ? "" : visual().text',
+    '[style.color]': 'entry()?.color ?? null',
     '[attr.role]': '"img"',
-    '[attr.aria-label]': 'visual().label',
+    '[attr.aria-label]': 'entry()?.name ?? visual().label',
   },
   template: `
+    @if (entry(); as e) {
+      @if (emoji()) {
+        <span class="leading-none select-none" [style.font-size.px]="size() * 0.85">{{ e.icon }}</span>
+      } @else {
+        <svg [lucideIcon]="lucide()" [size]="size()"></svg>
+      }
+    } @else {
     @switch (shape()) {
       @case ('hex') {
         @let h = hex();
@@ -328,20 +343,31 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
         }
       }
     }
+    }
   `,
 })
 export class StatusIcon {
-  readonly status = input.required<AnyStatus>();
+  readonly status = input.required<string>();
   readonly size = input(14);
   /** Glyph family; `auto` infers it from the status value (shared values fall back to circles). */
   readonly entity = input<StatusEntity>('auto');
+  /** When set, the icon, color and name come from this subject's catalog. */
+  readonly subject = input<StatusSubject | null>(null);
 
   private static seq = 0;
   protected readonly clipId = `hexclip-${++StatusIcon.seq}`;
   protected readonly outer = HEX_OUTER;
   protected readonly inner = HEX_INNER;
+  private readonly names = inject(LucideNames);
+  private readonly store = inject(TramaStore);
   protected readonly dashed = LucideCircleDashed;
-  protected readonly visual = computed(() => STATUS_VISUALS[this.status()]);
+  protected readonly entry = computed(() => this.catalogEntry());
+  protected readonly emoji = computed(() => {
+    const icon = this.entry()?.icon;
+    return icon && !isLucideName(icon) ? icon : null;
+  });
+  protected readonly lucide = computed(() => this.names.icon(this.entry()?.icon ?? 'circle'));
+  protected readonly visual = computed(() => STATUS_VISUALS[this.status() as AnyStatus] ?? STATUS_VISUALS.draft);
   protected readonly shape = computed<Shape>(() => {
     const s = this.status();
     const e = this.entity();
@@ -354,6 +380,22 @@ export class StatusIcon {
   });
   protected readonly hex = computed(() => HEX[this.status()] ?? HEX['planned']);
   protected readonly circle = computed(() => CIRCLE[this.status()] ?? CIRCLE['todo']);
+
+  /** Catalog entry for an explicit subject/entity, or for an unambiguous auto status. */
+  private catalogEntry(): StatusEntry | undefined {
+    const status = this.status();
+    const catalog = this.store.settings().statuses;
+    const subject = this.subject();
+    if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status);
+    const entity = this.entity();
+    if (entity === 'issue') return resolveStatusEntry(catalog.issue, status);
+    if (entity === 'workstream') return resolveStatusEntry(catalog.workstream, status);
+    if (entity === 'other') return resolveStatusEntry(catalog.decision, status);
+    const lists = [catalog.issue, catalog.workstream, catalog.decision];
+    const hits = lists.filter((entries) => entries.some((entry) => entry.id === status || entry.type === status));
+    if (hits.length !== 1) return undefined;
+    return resolveStatusEntry(hits[0], status);
+  }
 
   protected piePath(f: number): string {
     // pie of radius 3.5 starting at 12 o'clock going clockwise
@@ -380,21 +422,35 @@ export class StatusIcon {
       'border-border-strong text-foreground/85 inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-1.5 text-xs font-medium',
   },
   template: `
-    <app-status-icon [status]="status()" [entity]="entity()" [size]="12" />
+    <app-status-icon [status]="status()" [entity]="entity()" [subject]="subject()" [size]="12" />
     @if (!iconOnly()) {
       <!-- the glyph carries the colour; text stays neutral (Linear-style chip) -->
-      <span>{{ label() ?? visual().label }}</span>
+      <span>{{ label() ?? name() }}</span>
     }
   `,
 })
 export class StatusBadge {
-  readonly status = input.required<AnyStatus>();
+  readonly status = input.required<string>();
   /** Override the default label (e.g. "Open · 2"). */
   readonly label = input<string>();
   readonly iconOnly = input(false, { transform: booleanAttribute });
   readonly entity = input<StatusEntity>('auto');
+  readonly subject = input<StatusSubject | null>(null);
 
-  protected readonly visual = computed(() => STATUS_VISUALS[this.status()]);
+  private readonly store = inject(TramaStore);
+  protected readonly visual = computed(() => STATUS_VISUALS[this.status() as AnyStatus] ?? STATUS_VISUALS.draft);
+  protected readonly name = computed(() => this.catalogName(this.status()) ?? this.visual().label);
+
+  private catalogName(status: string): string | undefined {
+    const catalog = this.store.settings().statuses;
+    const subject = this.subject();
+    if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status)?.name;
+    const entity = this.entity();
+    if (entity === 'issue') return resolveStatusEntry(catalog.issue, status)?.name;
+    if (entity === 'workstream') return resolveStatusEntry(catalog.workstream, status)?.name;
+    if (entity === 'other') return resolveStatusEntry(catalog.decision, status)?.name;
+    return undefined;
+  }
 }
 
 /** Icon + plain text (no pill) — for lists, property rows and menus. */
@@ -404,13 +460,28 @@ export class StatusBadge {
   imports: [StatusIcon],
   host: { class: 'inline-flex items-center gap-1.5 whitespace-nowrap' },
   template: `
-    <app-status-icon [status]="status()" [entity]="entity()" />
-    <span>{{ label() ?? visual().label }}</span>
+    <app-status-icon [status]="status()" [entity]="entity()" [subject]="subject()" />
+    <span>{{ label() ?? name() }}</span>
   `,
 })
 export class StatusLabel {
-  readonly status = input.required<AnyStatus>();
+  readonly status = input.required<string>();
   readonly label = input<string>();
   readonly entity = input<StatusEntity>('auto');
-  protected readonly visual = computed(() => STATUS_VISUALS[this.status()]);
+  readonly subject = input<StatusSubject | null>(null);
+
+  private readonly store = inject(TramaStore);
+  protected readonly visual = computed(() => STATUS_VISUALS[this.status() as AnyStatus] ?? STATUS_VISUALS.draft);
+  protected readonly name = computed(() => {
+    const catalog = this.store.settings().statuses;
+    const subject = this.subject();
+    const entries = subject
+      ? catalog[STATUS_CATALOG_KEY[subject]]
+      : this.entity() === 'workstream'
+        ? catalog.workstream
+        : this.entity() === 'issue'
+          ? catalog.issue
+          : null;
+    return (entries ? resolveStatusEntry(entries, this.status())?.name : undefined) ?? this.visual().label;
+  });
 }

@@ -195,7 +195,7 @@ export class TypeormImportSink implements ImportSink {
           else {
             const used = new Set(catalog.map((c) => c.color));
             const color = labelColor(l.color) ?? LABEL_SWATCHES.find((c) => !used.has(c)) ?? LABEL_SWATCHES[catalog.length % LABEL_SWATCHES.length];
-            const label: WorkspaceLabel = { id: uid('lb'), name, color, template: false };
+            const label: WorkspaceLabel = { id: uid('lb'), name, color, template: false, scope: 'issue' };
             catalog = [...catalog, label];
             out[l.id] = label.id;
             changed = true;

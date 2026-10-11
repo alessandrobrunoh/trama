@@ -1,6 +1,17 @@
 // Building blocks of the issue page: title + description editors, the "contributes to" workstreams
 // section and the merged activity / comments feed.
-import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
@@ -27,6 +38,7 @@ import {
   type IssueStatus,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
+import { UploadFile } from '../../shared/upload-file';
 import { EntityChip } from '../../shared/entity-chip';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
@@ -130,15 +142,45 @@ export class IssueTitle {
 @Component({
   selector: 'app-issue-description',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon],
+  imports: [HlmTextareaImports, HlmButtonImports, Markdown, Kbd, LucideDynamicIcon, UploadFile],
   host: { class: 'block' },
   template: `
     @if (editing()) {
       <div class="border-border-strong rounded-lg border">
         <div class="flex items-center gap-0.5 border-b px-1.5 py-1">
-          <button type="button" class="h-6 rounded-md px-2 text-xs" [class]="tab() === 'write' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'" (click)="tab.set('write')">Write</button>
-          <button type="button" class="h-6 rounded-md px-2 text-xs" [class]="tab() === 'preview' ? 'bg-accent text-foreground' : 'text-muted-foreground hover:text-foreground'" (click)="tab.set('preview')">Preview</button>
-          <span class="text-meta ml-auto pr-1">Markdown</span>
+          <button
+            type="button"
+            class="h-6 rounded-md px-2 text-xs"
+            [class]="
+              tab() === 'write'
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            "
+            (click)="tab.set('write')"
+          >
+            Write
+          </button>
+          <button
+            type="button"
+            class="h-6 rounded-md px-2 text-xs"
+            [class]="
+              tab() === 'preview'
+                ? 'bg-accent text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            "
+            (click)="tab.set('preview')"
+          >
+            Preview
+          </button>
+          <app-upload-file
+            class="ml-auto"
+            label="Image or file"
+            variant="ghost"
+            size="xs"
+            [busy]="uploading()"
+            (file)="addFile($event)"
+          />
+          <span class="text-meta pr-1">Markdown</span>
         </div>
         @if (tab() === 'write') {
           <textarea
@@ -162,8 +204,12 @@ export class IssueTitle {
           </div>
         }
         <div class="flex items-center justify-end gap-2 border-t px-2 py-1.5">
-          <button hlmBtn size="sm" variant="ghost" type="button" (click)="editing.set(false)">Cancel</button>
-          <button hlmBtn size="sm" type="button" (click)="commit()">Save <app-kbd keys="mod+enter" class="opacity-70" /></button>
+          <button hlmBtn size="sm" variant="ghost" type="button" (click)="cancel()">
+            Cancel
+          </button>
+          <button hlmBtn size="sm" type="button" (click)="commit()">
+            Save <app-kbd keys="mod+enter" class="opacity-70" />
+          </button>
         </div>
       </div>
     } @else {
@@ -179,22 +225,34 @@ export class IssueTitle {
         @if (value().trim()) {
           <app-markdown [source]="value()" />
         } @else {
-          <p class="text-muted-foreground text-sm">{{ canEdit() ? 'Add a description: steps to reproduce, who is affected, links…' : 'No description.' }}</p>
+          <p class="text-muted-foreground text-sm">
+            {{
+              canEdit()
+                ? 'Add a description: steps to reproduce, who is affected, links…'
+                : 'No description.'
+            }}
+          </p>
         }
         @if (canEdit()) {
-          <svg [lucideIcon]="pencil" [size]="13" class="text-muted-foreground absolute top-2 right-2 opacity-0 group-hover/md:opacity-100"></svg>
+          <svg
+            [lucideIcon]="pencil"
+            [size]="13"
+            class="text-muted-foreground absolute top-2 right-2 opacity-0 group-hover/md:opacity-100"
+          ></svg>
         }
       </div>
     }
   `,
 })
 export class IssueDescription {
+  private readonly store = inject(TramaStore);
   readonly value = input('');
   readonly canEdit = input(true);
   readonly save = output<string>();
   protected readonly editing = signal(false);
   protected readonly tab = signal<'write' | 'preview'>('write');
   protected readonly draft = signal('');
+  protected readonly uploading = signal(false);
   protected readonly pencil = LucidePencil;
   private readonly ta = viewChild<ElementRef<HTMLTextAreaElement>>('ta');
 
@@ -215,6 +273,33 @@ export class IssueDescription {
     this.editing.set(true);
   }
 
+  protected async addFile(file: File): Promise<void> {
+    if (this.uploading()) return;
+    this.tab.set('write');
+    this.uploading.set(true);
+    try {
+      const markdown = await this.store.stageUpload(file);
+      if (markdown) this.insert(this.draft().trim() ? `\n\n${markdown}\n` : `${markdown}\n`);
+    } finally {
+      this.uploading.set(false);
+    }
+  }
+
+  private insert(text: string): void {
+    const el = this.ta()?.nativeElement;
+    if (!el) {
+      this.draft.update((v) => v + text);
+      return;
+    }
+    const start = el.selectionStart ?? el.value.length;
+    const end = el.selectionEnd ?? start;
+    const next = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`;
+    el.value = next;
+    el.setSelectionRange(start + text.length, start + text.length);
+    this.draft.set(next);
+    el.focus();
+  }
+
   protected onClick(e: MouseEvent): void {
     if ((e.target as HTMLElement).closest('a, input')) return;
     this.start();
@@ -226,9 +311,10 @@ export class IssueDescription {
     if (v !== this.value().trim()) this.save.emit(v);
   }
 
-  protected cancel(e: Event): void {
-    e.stopPropagation();
-    e.preventDefault();
+  protected cancel(e?: Event): void {
+    e?.stopPropagation();
+    e?.preventDefault();
+    this.store.discardDraftUploads(this.value(), this.draft());
     this.editing.set(false);
   }
 }
@@ -239,7 +325,15 @@ export class IssueDescription {
 @Component({
   selector: 'app-issue-workstreams',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmTooltip, LucideDynamicIcon, StatusIcon, ActorAvatar, Kbd],
+  imports: [
+    RouterLink,
+    HlmButtonImports,
+    HlmTooltip,
+    LucideDynamicIcon,
+    StatusIcon,
+    ActorAvatar,
+    Kbd,
+  ],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -251,35 +345,65 @@ export class IssueDescription {
       }
       @if (canEdit() && !i.duplicateOfId) {
         <span class="ml-auto flex items-center gap-1">
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 gap-1.5 px-2 text-xs" hlmTooltip="Add to workstream · W" (click)="actions.openPrompt('workstream', [i.id])">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Add to workstream · W"
+            (click)="actions.openPrompt('workstream', [i.id])"
+          >
             <svg [lucideIcon]="plus" [size]="13"></svg> Add
           </button>
         </span>
       }
     </div>
     <p class="text-muted-foreground mb-3 text-xs">
-      This issue is the problem. Workstreams are the outcomes that resolve it; their status moves on its own.
+      This issue is the problem. Workstreams are the outcomes that resolve it; their status moves on
+      its own.
     </p>
 
     @if (rows().length) {
       <ul class="border-border flex flex-col overflow-hidden rounded-lg border">
         @for (r of rows(); track r.ws.id) {
-          <li class="group/ws hover:bg-hover relative flex min-h-11 items-center gap-2.5 border-b px-3 text-[13px] last:border-b-0">
-            <a [routerLink]="['/', slug(), 'workstreams', r.ws.key]" class="absolute inset-0" [attr.aria-label]="r.ws.key + ' ' + r.ws.title"></a>
+          <li
+            class="group/ws hover:bg-hover relative flex min-h-11 items-center gap-2.5 border-b px-3 text-[13px] last:border-b-0"
+          >
+            <a
+              [routerLink]="['/', slug(), 'workstreams', r.ws.key]"
+              class="absolute inset-0"
+              [attr.aria-label]="r.ws.key + ' ' + r.ws.title"
+            ></a>
             <app-status-icon [status]="r.ws.status" entity="workstream" />
-            <span class="text-muted-foreground w-[4.5rem] shrink-0 font-mono text-xs">{{ r.ws.key }}</span>
+            <span class="text-muted-foreground w-[4.5rem] shrink-0 font-mono text-xs">{{
+              r.ws.key
+            }}</span>
             <span class="min-w-0 flex-1 truncate font-medium">{{ r.ws.title }}</span>
-            <span class="text-muted-foreground shrink-0 text-xs max-sm:hidden">{{ r.statusLabel }}</span>
+            <span class="text-muted-foreground shrink-0 text-xs max-sm:hidden">{{
+              r.statusLabel
+            }}</span>
             @if (r.total) {
-              <span class="flex w-24 shrink-0 items-center gap-1.5 max-md:hidden" [attr.aria-label]="r.met + ' of ' + r.total + ' acceptance criteria met'">
+              <span
+                class="flex w-24 shrink-0 items-center gap-1.5 max-md:hidden"
+                [attr.aria-label]="r.met + ' of ' + r.total + ' acceptance criteria met'"
+              >
                 <span class="bg-muted h-1 flex-1 overflow-hidden rounded-full">
-                  <span class="bg-status-shipped block h-full rounded-full" [style.width.%]="(r.met / r.total) * 100"></span>
+                  <span
+                    class="bg-status-shipped block h-full rounded-full"
+                    [style.width.%]="(r.met / r.total) * 100"
+                  ></span>
                 </span>
-                <span class="text-muted-foreground text-[11px] tabular-nums">{{ r.met }}/{{ r.total }}</span>
+                <span class="text-muted-foreground text-[11px] tabular-nums"
+                  >{{ r.met }}/{{ r.total }}</span
+                >
               </span>
             }
             @if (r.ws.accountableUserId) {
-              <app-actor-avatar [actor]="{ type: 'user', id: r.ws.accountableUserId }" [size]="18" class="max-sm:hidden" />
+              <app-actor-avatar
+                [actor]="{ type: 'user', id: r.ws.accountableUserId }"
+                [size]="18"
+                class="max-sm:hidden"
+              />
             }
             @if (canEdit()) {
               <button
@@ -302,15 +426,29 @@ export class IssueDescription {
           @if (i.duplicateOfId) {
             Duplicates follow their original issue and can’t be linked.
           } @else {
-            When the team decides to act on this, add it to the workstream that will resolve it, or start a new one.
+            When the team decides to act on this, add it to the workstream that will resolve it, or
+            start a new one.
           }
         </p>
         @if (canEdit() && !i.duplicateOfId) {
           <div class="mt-3 flex flex-wrap gap-2">
-            <button hlmBtn size="sm" variant="outline" class="h-7 gap-1.5 text-xs" (click)="actions.openPrompt('workstream', [i.id])">
-              <svg [lucideIcon]="hex" [size]="13" class="text-entity-workstream"></svg> Add to workstream <app-kbd keys="w" class="opacity-70" />
+            <button
+              hlmBtn
+              size="sm"
+              variant="outline"
+              class="h-7 gap-1.5 text-xs"
+              (click)="actions.openPrompt('workstream', [i.id])"
+            >
+              <svg [lucideIcon]="hex" [size]="13" class="text-entity-workstream"></svg> Add to
+              workstream <app-kbd keys="w" class="opacity-70" />
             </button>
-            <button hlmBtn size="sm" variant="ghost" class="h-7 gap-1.5 text-xs" (click)="actions.createWorkstreamFrom(i)">
+            <button
+              hlmBtn
+              size="sm"
+              variant="ghost"
+              class="h-7 gap-1.5 text-xs"
+              (click)="actions.createWorkstreamFrom(i)"
+            >
               <svg [lucideIcon]="sparkles" [size]="13"></svg> Create workstream from issue
             </button>
           </div>
@@ -334,7 +472,14 @@ export class IssueWorkstreams {
       const ws = this.store.workstreamById().get(id);
       if (!ws) return [];
       const s = buildSummary(this.store, ws);
-      return [{ ws, met: s.criteriaMet, total: s.criteriaTotal, statusLabel: WORKSTREAM_STATUS_META[ws.status].label }];
+      return [
+        {
+          ws,
+          met: s.criteriaMet,
+          total: s.criteriaTotal,
+          statusLabel: WORKSTREAM_STATUS_META[ws.status].label,
+        },
+      ];
     }),
   );
 }
@@ -363,22 +508,38 @@ const FIELD_VERB: Record<string, string> = {
 
 function describe(ev: DomainEvent): EventView | null {
   const d = ev.data;
-  const isStatus = (v: unknown): v is IssueStatus => typeof v === 'string' && v in ISSUE_STATUS_META;
+  const isStatus = (v: unknown): v is IssueStatus =>
+    typeof v === 'string' && v in ISSUE_STATUS_META;
   switch (ev.type) {
     case 'issue.created':
       return { icon: LucideCircleDot, verb: 'created the issue' };
     case 'issue.status_changed':
-      return { icon: null, verb: 'changed status', from: isStatus(d['from']) ? d['from'] : undefined, to: isStatus(d['to']) ? d['to'] : undefined };
+      return {
+        icon: null,
+        verb: 'changed status',
+        from: isStatus(d['from']) ? d['from'] : undefined,
+        to: isStatus(d['to']) ? d['to'] : undefined,
+      };
     case 'issue.updated': {
       const fields = Array.isArray(d['fields']) ? (d['fields'] as string[]) : [];
       const verbs = fields.map((f) => FIELD_VERB[f] ?? `updated ${f}`);
       return { icon: LucidePencil, verb: verbs.length ? verbs.join(', ') : 'updated the issue' };
     }
     case 'issue.linked': {
-      const created = typeof d['createdWorkstreamId'] === 'string' ? d['createdWorkstreamId'] : undefined;
-      if (created) return { icon: LucideSparkles, verb: 'created a workstream from this issue', workstreams: [created] };
+      const created =
+        typeof d['createdWorkstreamId'] === 'string' ? d['createdWorkstreamId'] : undefined;
+      if (created)
+        return {
+          icon: LucideSparkles,
+          verb: 'created a workstream from this issue',
+          workstreams: [created],
+        };
       const ids = Array.isArray(d['workstreamIds']) ? (d['workstreamIds'] as string[]) : [];
-      return { icon: LucideHexagon, verb: 'added the issue to', workstreams: ev.workstreamId ? [ev.workstreamId] : ids };
+      return {
+        icon: LucideHexagon,
+        verb: 'added the issue to',
+        workstreams: ev.workstreamId ? [ev.workstreamId] : ids,
+      };
     }
     case 'comment.created':
       return null; // the comment itself is in the feed
@@ -387,19 +548,36 @@ function describe(ev: DomainEvent): EventView | null {
   }
 }
 
-type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: EventView } | { kind: 'comment'; id: string; at: string; c: Comment };
+type FeedItem =
+  | { kind: 'event'; id: string; at: string; ev: DomainEvent; view: EventView }
+  | { kind: 'comment'; id: string; at: string; c: Comment };
 
 /** Activity events and comments, newest first, with the composer on top. */
 @Component({
   selector: 'app-issue-activity',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ActorAvatar, LucideDynamicIcon, StatusIcon, EntityChip, RelativeTimePipe, CommentItem, CommentComposer, CommentsLoader, HlmTooltip],
+  imports: [
+    ActorAvatar,
+    LucideDynamicIcon,
+    StatusIcon,
+    EntityChip,
+    RelativeTimePipe,
+    CommentItem,
+    CommentComposer,
+    CommentsLoader,
+    HlmTooltip,
+  ],
   host: { class: 'block' },
   template: `
     <h2 class="mb-3 text-sm font-semibold">Activity</h2>
     @if (canEdit()) {
       <div class="mb-4">
-        <app-comment-composer #composer placeholder="Leave a comment…" [draftKey]="'comment:issue:' + issue().id" (submitted)="send($event, composer)" />
+        <app-comment-composer
+          #composer
+          placeholder="Leave a comment…"
+          [draftKey]="'comment:issue:' + issue().id"
+          (submitted)="send($event, composer)"
+        />
       </div>
     }
     <ol class="relative flex flex-col gap-3">
@@ -418,17 +596,27 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
               <span class="text-foreground font-medium">{{ store.actorName(f.ev.actor) }}</span>
               <span>{{ f.view.verb }}</span>
               @if (f.view.from) {
-                <span class="inline-flex items-center gap-1"><app-status-icon [status]="f.view.from" entity="issue" [size]="12" />{{ statusLabel(f.view.from) }}</span>
+                <span class="inline-flex items-center gap-1"
+                  ><app-status-icon [status]="f.view.from" entity="issue" [size]="12" />{{
+                    statusLabel(f.view.from)
+                  }}</span
+                >
                 <svg [lucideIcon]="arrow" [size]="11"></svg>
               }
               @if (f.view.to) {
-                <span class="text-foreground inline-flex items-center gap-1"><app-status-icon [status]="f.view.to" entity="issue" [size]="12" />{{ statusLabel(f.view.to) }}</span>
+                <span class="text-foreground inline-flex items-center gap-1"
+                  ><app-status-icon [status]="f.view.to" entity="issue" [size]="12" />{{
+                    statusLabel(f.view.to)
+                  }}</span
+                >
               }
               @for (w of f.view.workstreams ?? []; track w) {
                 <app-entity-chip type="workstream" [ref]="w" compact />
               }
               <span aria-hidden="true">·</span>
-              <time [attr.datetime]="f.at" [hlmTooltip]="full(f.at)">{{ f.at | relativeTime }}</time>
+              <time [attr.datetime]="f.at" [hlmTooltip]="full(f.at)">{{
+                f.at | relativeTime
+              }}</time>
             </span>
           </li>
         } @else {
@@ -441,7 +629,11 @@ type FeedItem = { kind: 'event'; id: string; at: string; ev: DomainEvent; view: 
       }
     </ol>
     @if (hiddenCount() > 0) {
-      <button type="button" class="text-muted-foreground hover:text-foreground mt-3 text-xs" (click)="all.set(true)">
+      <button
+        type="button"
+        class="text-muted-foreground hover:text-foreground mt-3 text-xs"
+        (click)="all.set(true)"
+      >
         Show {{ hiddenCount() }} older {{ hiddenCount() === 1 ? 'event' : 'events' }}
       </button>
     }
@@ -464,7 +656,8 @@ export class IssueActivity {
       const view = describe(ev);
       if (view) items.push({ kind: 'event', id: ev.id, at: ev.at, ev, view });
     }
-    for (const c of this.store.commentsFor({ type: 'issue', id: i.id })) items.push({ kind: 'comment', id: c.id, at: c.createdAt, c });
+    for (const c of this.store.commentsFor({ type: 'issue', id: i.id }))
+      items.push({ kind: 'comment', id: c.id, at: c.createdAt, c });
     return items.sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   });
 

@@ -1,19 +1,21 @@
 import { Body, Controller, Delete, Param, Patch, Post } from '@nestjs/common';
-import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { IsBoolean, IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
-import { LABEL_NAME_MAX } from '../contracts/domain.js';
+import { LABEL_NAME_MAX, LABEL_SCOPES, type LabelScope } from '../contracts/domain.js';
 import { OptionalNotNull } from '../common/validation.js';
 import { LabelsService } from './labels.service.js';
 
 class CreateLabelDto {
   @IsString() @MinLength(1) @MaxLength(LABEL_NAME_MAX) name: string;
   @IsOptional() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'color must be #rrggbb' }) color?: string;
+  @IsIn(LABEL_SCOPES) scope: LabelScope;
 }
 
 class UpdateLabelDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(LABEL_NAME_MAX) name?: string;
   @OptionalNotNull() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'color must be #rrggbb' }) color?: string;
   @OptionalNotNull() @IsBoolean() archived?: boolean;
+  @OptionalNotNull() @IsIn(LABEL_SCOPES) scope?: LabelScope;
 }
 
 class MergeLabelDto {

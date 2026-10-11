@@ -168,6 +168,10 @@ export function fieldValues(entity: ViewEntity, item: Queryable, field: string, 
     // Numbers are 0 for work nobody asked for, so "at least 1" and sorting just work. No context, no value.
     return ctx.demand ? [String(demand?.[DEMAND_NUMBER[field]] ?? 0)] : [];
   }
+  if (entity === 'workstream' && field === 'status') {
+    const override = any['statusOverride'];
+    if (typeof override === 'string' && override) return [override];
+  }
   if (entity === 'workstream' && field === 'teamId') {
     const w = item as Workstream;
     return [w.ownerTeamId, ...w.participatingTeamIds];

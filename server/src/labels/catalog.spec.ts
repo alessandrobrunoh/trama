@@ -9,16 +9,23 @@ import {
 describe('workspace labels', () => {
   it('always offers the four templates, and keeps a saved template color', () => {
     const catalog = resolveLabelCatalog([
-      { id: 'lb_bug', name: 'Renamed', color: '#111111', template: true },
+      { id: 'lb_bug', name: 'Renamed', color: '#111111', template: true, scope: 'project' },
       { id: 'lb_custom', name: 'Auth', color: '#334455', template: false },
+      { id: 'lb_road', name: 'Roadmap', color: '#0891b2', template: false, scope: 'workstream' },
+      { id: 'lb_bad', name: 'Nope', color: '#0891b2', template: false, scope: 'elsewhere' as 'issue' },
     ]);
-    expect(catalog.map((label) => label.name)).toEqual(['Bug', 'Feature', 'Improvement', 'Documentation', 'Auth']);
-    expect(catalog[0].color).toBe('#111111');
-    expect(catalog[0].template).toBe(true);
+    expect(catalog.map((label) => label.name)).toEqual(['Bug', 'Feature', 'Improvement', 'Documentation', 'Auth', 'Roadmap', 'Nope']);
+    expect(catalog[0]).toMatchObject({ color: '#111111', template: true, scope: 'issue', name: 'Bug' });
+    expect(catalog.find((label) => label.id === 'lb_custom')?.scope).toBe('issue');
+    expect(catalog.find((label) => label.id === 'lb_road')?.scope).toBe('workstream');
+    expect(catalog.find((label) => label.id === 'lb_bad')?.scope).toBe('issue');
   });
 
   it('turns free text into ids and reuses a template name', () => {
-    const { catalog, groups, lookup } = adoptFreeTextLabels(undefined, [['Bug', 'auth'], ['auth', 'auth']]);
+    const { catalog, groups, lookup } = adoptFreeTextLabels(undefined, [
+      { scope: 'issue', labels: ['Bug', 'auth'] },
+      { scope: 'issue', labels: ['auth', 'auth'] },
+    ]);
     expect(groups[0][0]).toBe('lb_bug');
     expect(groups[1]).toEqual([groups[0][1]]);
     expect(lookup.get('auth')).toBe(groups[0][1]);
@@ -26,8 +33,37 @@ describe('workspace labels', () => {
     expect(catalog.filter((label) => label.template)).toEqual(LABEL_TEMPLATES.map((label) => ({ ...label })));
   });
 
-  it('rejects an id that is not in the catalog', () => {
-    expect(() => assignLabelIds(resolveLabelCatalog(null), ['lb_missing'])).toThrow(/Unknown label/);
-    expect(assignLabelIds(resolveLabelCatalog(null), ['lb_bug', 'lb_bug'])).toEqual(['lb_bug']);
+  it('gives each new free-text label the scope of its own group', () => {
+    const { catalog, groups } = adoptFreeTextLabels(undefined, [
+      { scope: 'issue', labels: ['auth'] },
+      { scope: 'workstream', labels: ['roadmap'] },
+      { scope: 'project', labels: ['auth', 'launch'] },
+    ]);
+    expect(catalog.find((label) => label.name === 'auth')).toMatchObject({ scope: 'issue' });
+    expect(catalog.find((label) => label.name === 'roadmap')).toMatchObject({ scope: 'workstream' });
+    expect(catalog.find((label) => label.name === 'launch')).toMatchObject({ scope: 'project' });
+    expect(groups[2][0]).toBe(groups[0][0]);
+  });
+
+  it('rejects an unknown id, a label from another scope, and more than 20', () => {
+    const catalog = resolveLabelCatalog([
+      { id: 'lb_road', name: 'Roadmap', color: '#334455', template: false, scope: 'workstream' },
+      ...Array.from({ length: 21 }, (_, i) => ({
+        id: `lb_${i}`,
+        name: `L${i}`,
+        color: '#334455',
+        template: false as const,
+        scope: 'issue' as const,
+      })),
+    ]);
+    expect(() => assignLabelIds(catalog, ['lb_missing'], 'issue')).toThrow(/Unknown label/);
+    expect(assignLabelIds(catalog, ['lb_bug', 'lb_bug'], 'issue')).toEqual(['lb_bug']);
+    expect(() => assignLabelIds(catalog, ['lb_road'], 'issue')).toThrow(/does not apply to issues/);
+    expect(() => assignLabelIds(catalog, ['lb_bug'], 'workstream')).toThrow(/does not apply to workstreams/);
+    expect(assignLabelIds(catalog, ['lb_bug', 'lb_road'], 'issue', ['lb_road'])).toEqual(['lb_bug', 'lb_road']);
+    expect(() => assignLabelIds(catalog, ['lb_bug'], null)).toThrow(/does not apply to this record/);
+    expect(assignLabelIds(catalog, ['lb_bug'], null, ['lb_bug'])).toEqual(['lb_bug']);
+    const issueIds = catalog.filter((label) => label.scope === 'issue' && !label.template).map((label) => label.id);
+    expect(() => assignLabelIds(catalog, issueIds.slice(0, 21), 'issue')).toThrow(/at most 20/);
   });
 });

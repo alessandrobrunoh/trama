@@ -4,7 +4,18 @@
 // used by the sidebar team links). Display options (layout, grouping, ordering, visible properties)
 // persist in localStorage. Rows are editable in place, right-click opens the workstream menu,
 // multi-selection shows the bulk bar, and the focused row reacts to s / p / a / t / ⌘. / ⌘⇧L / ⌘⌫.
-import { ChangeDetectionStrategy, Component, DestroyRef, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  viewChild,
+} from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideArrowDownWideNarrow,
@@ -33,6 +44,7 @@ import {
   PRIORITY_META,
   WORKSTREAM_STATUS_FLOW,
   WORKSTREAM_STATUS_META,
+  statusIdsForTypes,
   filterValues,
   isTypingTarget,
   queryGroups,
@@ -70,17 +82,31 @@ import {
   type WsSummary,
   type WsViewTab,
 } from './ws-model';
-import { DEFAULT_ROW_PROPS, ROW_PROP_LABELS, WorkstreamCard, WorkstreamRow, type WsRowProps } from './workstream-items';
+import {
+  DEFAULT_ROW_PROPS,
+  ROW_PROP_LABELS,
+  WorkstreamCard,
+  WorkstreamRow,
+  type WsRowProps,
+} from './workstream-items';
 import { LabelPicker } from '../../shared/label-picker';
 import { SearchInput } from '../../shared/search-input';
 
 type Layout = 'list' | 'board';
-type GroupField = 'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
+type GroupField =
+  'status' | 'ownerTeamId' | 'priority' | 'accountableUserId' | 'projectId' | 'none';
 type SortField = 'updatedAt' | 'priority' | 'targetDate' | 'createdAt' | 'title' | 'status';
 
 const DISPLAY_KEY = 'trama.workstreams.display.v2';
 const LEGACY_LAYOUT_KEY = 'trama.workstreams.layout';
-const GROUPS: GroupField[] = ['status', 'ownerTeamId', 'priority', 'accountableUserId', 'projectId', 'none'];
+const GROUPS: GroupField[] = [
+  'status',
+  'ownerTeamId',
+  'priority',
+  'accountableUserId',
+  'projectId',
+  'none',
+];
 const SORTS: SortField[] = ['updatedAt', 'priority', 'targetDate', 'createdAt', 'title', 'status'];
 const GROUP_OPTIONS: PickOption[] = [
   { value: 'status', label: 'Status' },
@@ -128,7 +154,10 @@ function loadDisplay(): DisplayPrefs {
     groupBy: oneOf(raw?.groupBy, GROUPS, 'status'),
     sortField: oneOf(raw?.sortField, SORTS, 'updatedAt'),
     sortDir: raw?.sortDir === 'asc' ? 'asc' : 'desc',
-    props: { ...DEFAULT_ROW_PROPS, ...(raw?.props && typeof raw.props === 'object' ? raw.props : {}) },
+    props: {
+      ...DEFAULT_ROW_PROPS,
+      ...(raw?.props && typeof raw.props === 'object' ? raw.props : {}),
+    },
   };
 }
 
@@ -138,10 +167,23 @@ interface Column {
 }
 
 const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
-  active: { title: 'Nothing in flight', description: 'Active workstreams are being worked on, waiting for input, in review, blocked or ready to land.' },
-  backlog: { title: 'No planned workstreams', description: 'Drafts and planned outcomes that nobody started yet show up here.' },
-  shipped: { title: 'Nothing shipped yet', description: 'Workstreams land here once their work reaches production.' },
-  all: { title: 'No workstreams yet', description: 'A workstream is an outcome: coordinated work that resolves one or more issues.' },
+  active: {
+    title: 'Nothing in flight',
+    description:
+      'Active workstreams are being worked on, waiting for input, in review, blocked or ready to land.',
+  },
+  backlog: {
+    title: 'No planned workstreams',
+    description: 'Drafts and planned outcomes that nobody started yet show up here.',
+  },
+  shipped: {
+    title: 'Nothing shipped yet',
+    description: 'Workstreams land here once their work reaches production.',
+  },
+  all: {
+    title: 'No workstreams yet',
+    description: 'A workstream is an outcome: coordinated work that resolves one or more issues.',
+  },
 };
 
 @Component({
@@ -190,8 +232,13 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     <app-page-header [title]="pageTitle()" [description]="pageDescription()" />
 
     <!-- view tabs · scope · search · display -->
-    <div class="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-4 py-1.5 sm:px-6">
-      <nav class="scrollbar-none -ml-1 flex items-center gap-0.5 overflow-x-auto" aria-label="Workstream views">
+    <div
+      class="flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1.5 border-b px-4 py-1.5 sm:px-6"
+    >
+      <nav
+        class="scrollbar-none -ml-1 flex items-center gap-0.5 overflow-x-auto"
+        aria-label="Workstream views"
+      >
         @for (t of tabs; track t.id) {
           <button
             type="button"
@@ -211,38 +258,102 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
         }
       </nav>
       @if (team(); as t) {
-        <span class="border-border-strong bg-accent inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border pr-1 pl-1.5 text-xs">
+        <span
+          class="border-border-strong bg-accent inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border pr-1 pl-1.5 text-xs"
+        >
           <app-actor-avatar [actor]="{ type: 'team', id: t.id }" [size]="16" />
           {{ t.name }}
           <span class="text-muted-foreground">· owner or participant</span>
-          <button type="button" class="text-muted-foreground hover:text-foreground hover:bg-background rounded p-0.5" aria-label="Show all teams" (click)="clearTeam()">
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-background rounded p-0.5"
+            aria-label="Show all teams"
+            (click)="clearTeam()"
+          >
             <svg [lucideIcon]="xIcon" [size]="12"></svg>
           </button>
         </span>
       }
       <span class="flex-1"></span>
       <app-search-input noun="workstreams" [(value)]="search" />
-      <div class="border-border-strong flex h-7 items-center rounded-md border p-0.5" role="group" aria-label="Layout">
-        <button type="button" class="hover:text-foreground flex h-full items-center rounded-[4px] px-1.5" [class.bg-accent]="display().layout === 'list'" [class.text-muted-foreground]="display().layout !== 'list'" aria-label="List layout" hlmTooltip="List (v)" position="bottom" (click)="setLayout('list')">
+      <div
+        class="border-border-strong flex h-7 items-center rounded-md border p-0.5"
+        role="group"
+        aria-label="Layout"
+      >
+        <button
+          type="button"
+          class="hover:text-foreground flex h-full items-center rounded-[4px] px-1.5"
+          [class.bg-accent]="display().layout === 'list'"
+          [class.text-muted-foreground]="display().layout !== 'list'"
+          aria-label="List layout"
+          hlmTooltip="List (v)"
+          position="bottom"
+          (click)="setLayout('list')"
+        >
           <svg [lucideIcon]="listIcon" [size]="14"></svg>
         </button>
-        <button type="button" class="hover:text-foreground flex h-full items-center rounded-[4px] px-1.5" [class.bg-accent]="display().layout === 'board'" [class.text-muted-foreground]="display().layout !== 'board'" aria-label="Board layout" hlmTooltip="Board (v)" position="bottom" (click)="setLayout('board')">
+        <button
+          type="button"
+          class="hover:text-foreground flex h-full items-center rounded-[4px] px-1.5"
+          [class.bg-accent]="display().layout === 'board'"
+          [class.text-muted-foreground]="display().layout !== 'board'"
+          aria-label="Board layout"
+          hlmTooltip="Board (v)"
+          position="bottom"
+          (click)="setLayout('board')"
+        >
           <svg [lucideIcon]="boardIcon" [size]="14"></svg>
         </button>
       </div>
-      <hlm-popover align="end" sideOffset="4" [state]="displayState()" (stateChanged)="displayState.set($event)">
-        <button hlmBtn hlmPopoverTrigger variant="outline" size="sm" class="h-7 gap-1.5 px-2 text-xs font-normal">
+      <hlm-popover
+        align="end"
+        sideOffset="4"
+        [state]="displayState()"
+        (stateChanged)="displayState.set($event)"
+      >
+        <button
+          hlmBtn
+          hlmPopoverTrigger
+          variant="outline"
+          size="sm"
+          class="h-7 gap-1.5 px-2 text-xs font-normal"
+        >
           <svg [lucideIcon]="sliders" [size]="13"></svg>Display
         </button>
         <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-80 gap-3 p-3 text-[13px]">
           <div class="grid grid-cols-[6rem_1fr] items-center gap-x-3 gap-y-2">
             <span class="text-muted-foreground text-xs">Grouping</span>
-            <app-picker label="Grouping" [searchable]="false" [options]="groupOptions()" [value]="[effectiveGroup()]" [disabled]="display().layout === 'board'" (valueChange)="patchDisplay({ groupBy: $any($event[0] ?? 'status') })" />
+            <app-picker
+              label="Grouping"
+              [searchable]="false"
+              [options]="groupOptions()"
+              [value]="[effectiveGroup()]"
+              [disabled]="display().layout === 'board'"
+              (valueChange)="patchDisplay({ groupBy: $any($event[0] ?? 'status') })"
+            />
             <span class="text-muted-foreground text-xs">Ordering</span>
             <div class="flex min-w-0 items-center gap-1">
-              <app-picker class="min-w-0 flex-1" label="Ordering" [searchable]="false" [options]="sorts" [value]="[display().sortField]" (valueChange)="patchDisplay({ sortField: $any($event[0] ?? 'updatedAt') })" />
-              <button hlmBtn variant="outline" size="icon-sm" [attr.aria-label]="display().sortDir === 'asc' ? 'Ascending' : 'Descending'" [hlmTooltip]="display().sortDir === 'asc' ? 'Ascending' : 'Descending'" (click)="patchDisplay({ sortDir: display().sortDir === 'asc' ? 'desc' : 'asc' })">
-                <svg [lucideIcon]="display().sortDir === 'asc' ? ascIcon : descIcon" [size]="14"></svg>
+              <app-picker
+                class="min-w-0 flex-1"
+                label="Ordering"
+                [searchable]="false"
+                [options]="sorts"
+                [value]="[display().sortField]"
+                (valueChange)="patchDisplay({ sortField: $any($event[0] ?? 'updatedAt') })"
+              />
+              <button
+                hlmBtn
+                variant="outline"
+                size="icon-sm"
+                [attr.aria-label]="display().sortDir === 'asc' ? 'Ascending' : 'Descending'"
+                [hlmTooltip]="display().sortDir === 'asc' ? 'Ascending' : 'Descending'"
+                (click)="patchDisplay({ sortDir: display().sortDir === 'asc' ? 'desc' : 'asc' })"
+              >
+                <svg
+                  [lucideIcon]="display().sortDir === 'asc' ? ascIcon : descIcon"
+                  [size]="14"
+                ></svg>
               </button>
             </div>
           </div>
@@ -253,7 +364,11 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
                 <button
                   type="button"
                   class="h-6 rounded-md border px-2 text-xs transition-colors"
-                  [class]="display().props[p.key] ? 'bg-accent border-border-strong text-foreground' : 'border-border text-muted-foreground hover:text-foreground'"
+                  [class]="
+                    display().props[p.key]
+                      ? 'bg-accent border-border-strong text-foreground'
+                      : 'border-border text-muted-foreground hover:text-foreground'
+                  "
                   [attr.aria-pressed]="display().props[p.key]"
                   (click)="toggleProp(p.key)"
                 >
@@ -264,7 +379,15 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
           </div>
           <div class="flex items-center justify-between border-t pt-2">
             <span class="text-muted-foreground text-[11px]">Saved on this device</span>
-            <button hlmBtn variant="ghost" size="xs" class="text-muted-foreground" (click)="resetDisplay()">Reset</button>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="xs"
+              class="text-muted-foreground"
+              (click)="resetDisplay()"
+            >
+              Reset
+            </button>
           </div>
         </hlm-popover-content>
       </hlm-popover>
@@ -274,40 +397,126 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     <div class="flex items-center gap-1.5 border-b px-4 py-1.5 sm:px-6">
       <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
         <svg [lucideIcon]="filterIcon" [size]="13" class="text-muted-foreground shrink-0"></svg>
-        <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
+        <app-picker
+          variant="chip"
+          label="Status"
+          [multiple]="true"
+          [searchable]="false"
+          [options]="statuses"
+          [value]="fv('status')"
+          (valueChange)="setF('status', $event)"
+        />
         @if (!team()) {
-          <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
+          <app-picker
+            variant="chip"
+            label="Team"
+            [multiple]="true"
+            [options]="teams()"
+            [value]="fv('teamId')"
+            (valueChange)="setF('teamId', $event)"
+          />
         }
-        <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
-        <app-picker variant="chip" label="Accountable" [multiple]="true" [options]="users()" [value]="fv('accountableUserId')" (valueChange)="setF('accountableUserId', $event)" />
+        <app-picker
+          variant="chip"
+          label="Priority"
+          [multiple]="true"
+          [searchable]="false"
+          [options]="priorities"
+          [value]="fv('priority')"
+          (valueChange)="setF('priority', $event)"
+        />
+        <app-picker
+          variant="chip"
+          label="Accountable"
+          [multiple]="true"
+          [options]="users()"
+          [value]="fv('accountableUserId')"
+          (valueChange)="setF('accountableUserId', $event)"
+        />
         @if (projects().length > 1) {
-          <app-picker variant="chip" label="Project" [multiple]="true" [options]="projects()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
+          <app-picker
+            variant="chip"
+            label="Project"
+            [multiple]="true"
+            [options]="projects()"
+            [value]="fv('projectId')"
+            (valueChange)="setF('projectId', $event)"
+          />
         }
-        <app-picker variant="chip" label="Repository" [multiple]="true" [options]="repos()" [value]="fv('repositoryIds')" (valueChange)="setF('repositoryIds', $event)" />
-        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
+        <app-picker
+          variant="chip"
+          label="Repository"
+          [multiple]="true"
+          [options]="repos()"
+          [value]="fv('repositoryIds')"
+          (valueChange)="setF('repositoryIds', $event)"
+        />
+        <app-label-picker
+          variant="chip"
+          label="Label"
+          scope="workstream"
+          [creatable]="false"
+          [manageLink]="false"
+          [value]="fv('labels')"
+          (valueChange)="setF('labels', $event)"
+        />
         @if (hasFilters()) {
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs"
+            (click)="clearFilters()"
+          >
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
           </button>
         }
       </div>
       @if (hasFilters()) {
-        <hlm-popover align="end" sideOffset="4" [state]="saveState()" (stateChanged)="saveState.set($event)">
-          <button hlmBtn hlmPopoverTrigger variant="ghost" size="sm" class="h-7 shrink-0 gap-1 px-2 text-xs">
-            <svg [lucideIcon]="bookmark" [size]="13"></svg><span class="max-sm:hidden">Save view</span>
+        <hlm-popover
+          align="end"
+          sideOffset="4"
+          [state]="saveState()"
+          (stateChanged)="saveState.set($event)"
+        >
+          <button
+            hlmBtn
+            hlmPopoverTrigger
+            variant="ghost"
+            size="sm"
+            class="h-7 shrink-0 gap-1 px-2 text-xs"
+          >
+            <svg [lucideIcon]="bookmark" [size]="13"></svg
+            ><span class="max-sm:hidden">Save view</span>
           </button>
           <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72">
             <hlm-popover-header>
               <h3 hlmPopoverTitle>Save as view</h3>
-              <p hlmPopoverDescription class="text-xs">Keeps the current filters, grouping and layout.</p>
+              <p hlmPopoverDescription class="text-xs">
+                Keeps the current filters, grouping and layout.
+              </p>
             </hlm-popover-header>
             <div class="grid gap-2">
-              <input hlmInput class="h-8" placeholder="View name" aria-label="View name" [value]="viewName()" (input)="viewName.set($any($event.target).value)" (keydown.enter)="saveView()" />
+              <input
+                hlmInput
+                class="h-8"
+                placeholder="View name"
+                aria-label="View name"
+                [value]="viewName()"
+                (input)="viewName.set($any($event.target).value)"
+                (keydown.enter)="saveView()"
+              />
               <label class="flex items-center gap-2 text-xs">
-                <hlm-switch [checked]="viewShared()" (checkedChange)="viewShared.set($event)" aria-label="Share with workspace" />
+                <hlm-switch
+                  [checked]="viewShared()"
+                  (checkedChange)="viewShared.set($event)"
+                  aria-label="Share with workspace"
+                />
                 Share with the workspace
               </label>
-              <button hlmBtn size="sm" [disabled]="!viewName().trim()" (click)="saveView()">Save view</button>
+              <button hlmBtn size="sm" [disabled]="!viewName().trim()" (click)="saveView()">
+                Save view
+              </button>
             </div>
           </hlm-popover-content>
         </hlm-popover>
@@ -315,22 +524,40 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
     </div>
 
     @if (scopeTotal() === 0) {
-      <app-empty-state [icon]="flow" [title]="team() ? 'No workstreams for ' + team()!.name : 'No workstreams yet'" description="A workstream is an outcome: coordinated work that resolves one or more issues, with its PRs, decisions and acceptance criteria in one place.">
+      <app-empty-state
+        [icon]="flow"
+        [title]="team() ? 'No workstreams for ' + team()!.name : 'No workstreams yet'"
+        description="A workstream is an outcome: coordinated work that resolves one or more issues, with its PRs, decisions and acceptance criteria in one place."
+      >
         @if (canEdit()) {
-          <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New workstream</button>
+          <button hlmBtn size="sm" (click)="create()">
+            <svg [lucideIcon]="plus" [size]="14"></svg>New workstream
+          </button>
         }
         @if (!store.agents().length) {
-          <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', store.slug(), 'connect']">Connect your agent</a>
+          <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', store.slug(), 'connect']"
+            >Connect your agent</a
+          >
         }
       </app-empty-state>
     } @else if (shown() === 0) {
       @if (hasFilters()) {
-        <app-empty-state [icon]="filterIcon" title="No workstreams match" description="Try removing a filter or changing the search.">
+        <app-empty-state
+          [icon]="filterIcon"
+          title="No workstreams match"
+          description="Try removing a filter or changing the search."
+        >
           <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
         </app-empty-state>
       } @else {
-        <app-empty-state [icon]="flow" [title]="emptyCopy().title" [description]="emptyCopy().description">
-          <button hlmBtn size="sm" variant="outline" (click)="setTab('all')">Show all workstreams</button>
+        <app-empty-state
+          [icon]="flow"
+          [title]="emptyCopy().title"
+          [description]="emptyCopy().description"
+        >
+          <button hlmBtn size="sm" variant="outline" (click)="setTab('all')">
+            Show all workstreams
+          </button>
         </app-empty-state>
       }
     } @else {
@@ -344,7 +571,11 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
       >
         <ng-template kanbanItem let-s>
           @if (display().layout === 'list') {
-            <app-workstream-row [summary]="s" [props]="display().props" [focused]="ui.focusedRowId() === s.ws.id" />
+            <app-workstream-row
+              [summary]="s"
+              [props]="display().props"
+              [focused]="ui.focusedRowId() === s.ws.id"
+            />
           } @else {
             <app-workstream-card [summary]="s" [focused]="ui.focusedRowId() === s.ws.id" />
           }
@@ -392,7 +623,9 @@ const EMPTY_COPY: Record<WsViewTab, { title: string; description: string }> = {
               type="button"
               class="text-muted-foreground hover:text-foreground hover:bg-accent order-last ml-auto flex size-6 items-center justify-center rounded-md"
               [attr.aria-label]="'New workstream in ' + $any(statusMeta)[key]?.label"
-              [hlmTooltip]="'New ' + ($any(statusMeta)[key]?.label ?? '').toLowerCase() + ' workstream'"
+              [hlmTooltip]="
+                'New ' + ($any(statusMeta)[key]?.label ?? '').toLowerCase() + ' workstream'
+              "
               (click)="createIn(key)"
             >
               <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -437,7 +670,9 @@ export class WorkstreamListPage {
   protected readonly tabs = WS_VIEW_TABS;
   protected readonly statusMeta = WORKSTREAM_STATUS_META;
   protected readonly priorityMeta = PRIORITY_META;
-  protected readonly statuses = statusOptions();
+  protected get statuses() {
+    return statusOptions(this.store.settings().statuses.workstream);
+  }
   protected readonly priorities = priorityOptions();
   protected readonly sorts = SORT_OPTIONS;
   protected readonly propLabels = ROW_PROP_LABELS;
@@ -461,37 +696,57 @@ export class WorkstreamListPage {
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly canCreate = computed(() => this.store.allowed('createWorkstreams'));
   protected readonly team = computed(() => this.store.getTeam(this.teamParam()));
-  protected readonly tab = computed<WsViewTab>(() => oneOf(this.viewParam(), ['active', 'backlog', 'shipped', 'all'] as const, 'active'));
+  protected readonly tab = computed<WsViewTab>(() =>
+    oneOf(this.viewParam(), ['active', 'backlog', 'shipped', 'all'] as const, 'active'),
+  );
   protected readonly emptyCopy = computed(() => EMPTY_COPY[this.tab()]);
-  protected readonly hasFilters = computed(() => this.filters().length > 0 || this.search().trim().length > 0);
+  protected readonly hasFilters = computed(
+    () => this.filters().length > 0 || this.search().trim().length > 0,
+  );
   protected readonly groupOptions = computed(() => GROUP_OPTIONS);
-  protected readonly effectiveGroup = computed<GroupField>(() => (this.display().layout === 'board' ? 'status' : this.display().groupBy));
+  protected readonly effectiveGroup = computed<GroupField>(() =>
+    this.display().layout === 'board' ? 'status' : this.display().groupBy,
+  );
 
-  protected readonly pageTitle = computed(() => (this.team() ? `${this.team()!.name} workstreams` : 'Workstreams'));
+  protected readonly pageTitle = computed(() =>
+    this.team() ? `${this.team()!.name} workstreams` : 'Workstreams',
+  );
   protected readonly pageDescription = computed(
-    () => 'Outcomes — coordinated work that resolves issues. Each workstream tracks its issues, PRs, decisions and acceptance criteria.',
+    () =>
+      'Outcomes — coordinated work that resolves issues. Each workstream tracks its issues, PRs, decisions and acceptance criteria.',
   );
 
   /** Workstreams in the team scope (before tabs / filters). */
   private readonly scoped = computed(() => {
     const t = this.team();
     const all = this.store.workstreams();
-    return t ? all.filter((w) => w.ownerTeamId === t.id || w.participatingTeamIds.includes(t.id)) : all;
+    return t
+      ? all.filter((w) => w.ownerTeamId === t.id || w.participatingTeamIds.includes(t.id))
+      : all;
   });
   protected readonly scopeTotal = computed(() => this.scoped().length);
 
   /** Scope + filters + search (what the tabs count). */
-  private readonly filtered = computed(() =>
-    queryGroups('workstream', this.scoped() as Workstream[], { filters: this.filters(), search: this.search() })[0]?.items ?? [],
+  private readonly filtered = computed(
+    () =>
+      queryGroups('workstream', this.scoped() as Workstream[], {
+        filters: this.filters(),
+        search: this.search(),
+      })[0]?.items ?? [],
   );
   protected readonly tabCounts = computed(() => {
     const out = {} as Record<WsViewTab, number>;
-    for (const t of WS_VIEW_TABS) out[t.id] = t.statuses ? this.filtered().filter((w) => t.statuses!.includes(w.status)).length : this.filtered().length;
+    for (const t of WS_VIEW_TABS)
+      out[t.id] = t.statuses
+        ? this.filtered().filter((w) => t.statuses!.includes(w.status)).length
+        : this.filtered().length;
     return out;
   });
   private readonly inTab = computed(() => {
     const def = WS_VIEW_TABS.find((t) => t.id === this.tab());
-    return def?.statuses ? this.filtered().filter((w) => def.statuses!.includes(w.status)) : this.filtered();
+    return def?.statuses
+      ? this.filtered().filter((w) => def.statuses!.includes(w.status))
+      : this.filtered();
   });
 
   private readonly summaries = computed(() => {
@@ -506,31 +761,52 @@ export class WorkstreamListPage {
     const tabDef = WS_VIEW_TABS.find((t) => t.id === this.tab());
     // board columns: the tab's statuses (or the whole lifecycle), canceled only when it has cards
     const include =
-      group === 'status' && board ? (tabDef?.statuses ?? WORKSTREAM_STATUS_FLOW.filter((s) => s !== 'canceled')) : undefined;
+      group === 'status' && board
+        ? this.store
+            .settings()
+            .statuses.workstream.filter((entry) =>
+              (tabDef?.statuses ?? WORKSTREAM_STATUS_FLOW.filter((s) => s !== 'canceled')).includes(entry.type),
+            )
+            .map((entry) => entry.id)
+        : undefined;
     const d = this.display();
     const groups = queryGroups(
       'workstream',
       this.inTab(),
-      { sort: { field: d.sortField, direction: d.sortDir }, groupBy: group === 'none' ? null : group },
+      {
+        sort: { field: d.sortField, direction: d.sortDir },
+        groupBy: group === 'none' ? null : group,
+      },
       {},
       include,
     );
     let out = groups;
     if (group === 'status') {
-      const order = (k: string) => WORKSTREAM_STATUS_FLOW.indexOf(k as WorkstreamStatus);
+      const order = (k: string) => this.store.settings().statuses.workstream.findIndex((entry) => entry.id === k);
       out = [...groups].sort((a, b) => order(a.key) - order(b.key));
     } else if (group === 'ownerTeamId' || group === 'accountableUserId' || group === 'projectId') {
       const name = (k: string) =>
-        (group === 'ownerTeamId' ? this.store.getTeam(k)?.name : group === 'projectId' ? this.store.getProject(k)?.name : this.store.getUser(k)?.name) ?? '￿';
-      out = [...groups].sort((a, b) => (a.key === '' ? 1 : b.key === '' ? -1 : name(a.key).localeCompare(name(b.key))));
+        (group === 'ownerTeamId'
+          ? this.store.getTeam(k)?.name
+          : group === 'projectId'
+            ? this.store.getProject(k)?.name
+            : this.store.getUser(k)?.name) ?? '￿';
+      out = [...groups].sort((a, b) =>
+        a.key === '' ? 1 : b.key === '' ? -1 : name(a.key).localeCompare(name(b.key)),
+      );
     }
     const sums = this.summaries();
-    return out.map((g) => ({ key: g.key, items: g.items.map((w) => sums.get(w.id) ?? buildSummary(this.store, w)) }));
+    return out.map((g) => ({
+      key: g.key,
+      items: g.items.map((w) => sums.get(w.id) ?? buildSummary(this.store, w)),
+    }));
   });
 
   protected readonly shown = computed(() => this.inTab().length);
   /** Visible workstream ids in display order (for select-all). */
-  private readonly visibleIds = computed(() => [...new Set(this.columns().flatMap((c) => c.items.map((s) => s.ws.id)))]);
+  private readonly visibleIds = computed(() => [
+    ...new Set(this.columns().flatMap((c) => c.items.map((s) => s.ws.id))),
+  ]);
 
   /** Focused row's workstream, when the focus is on this page's list. */
   private readonly focusedWs = computed(() => {
@@ -545,34 +821,89 @@ export class WorkstreamListPage {
     return f ? [f] : [];
   }
   private notTyping = (): boolean => !isTypingTarget(globalThis.document?.activeElement ?? null);
-  private hasTarget = (): boolean => this.notTyping() && (this.actions.selected().length > 0 || !!this.focusedWs());
+  private hasTarget = (): boolean =>
+    this.notTyping() && (this.actions.selected().length > 0 || !!this.focusedWs());
   private editTarget = (): boolean => this.canEdit() && this.hasTarget();
 
   constructor() {
     effect(() => writeJson(DISPLAY_KEY, this.display()));
     // keep the team filter chip out of the way while a team scope is active
     effect(() => {
-      if (this.team()) this.filters.update((f) => (f.some((x) => x.field === 'teamId') ? setFilter(f, 'teamId', 'in', null) : f));
+      if (this.team())
+        this.filters.update((f) =>
+          f.some((x) => x.field === 'teamId') ? setFilter(f, 'teamId', 'in', null) : f,
+        );
     });
     inject(DestroyRef).onDestroy(() => this.ui.clearSelected());
   }
 
   private readonly _keys = usePageShortcuts([
     { keys: 'c', label: 'New workstream', run: () => this.canCreate() && this.create() },
-    { keys: 'v', label: 'Toggle list / board', run: () => this.setLayout(this.display().layout === 'list' ? 'board' : 'list') },
+    {
+      keys: 'v',
+      label: 'Toggle list / board',
+      run: () => this.setLayout(this.display().layout === 'list' ? 'board' : 'list'),
+    },
     { keys: 'f', label: 'Filter by text', run: () => this.searchBox()?.focus() },
     { keys: 's', label: 'Set status', when: this.editTarget, run: () => this.intent('status') },
     { keys: 'p', label: 'Set priority', when: this.editTarget, run: () => this.intent('priority') },
-    { keys: 'a', label: 'Set accountable', when: this.editTarget, run: () => this.intent('accountable') },
+    {
+      keys: 'a',
+      label: 'Set accountable',
+      when: this.editTarget,
+      run: () => this.intent('accountable'),
+    },
     { keys: 't', label: 'Set target date', when: this.editTarget, run: () => this.intent('date') },
-    { keys: 'mod+.', label: 'Copy key', when: this.hasTarget, run: () => this.actions.copyKey(this.targets()) },
-    { keys: 'mod+shift+l', label: 'Copy link', when: this.hasTarget, run: () => this.actions.copyLink(this.targets()) },
-    { keys: 'mod+shift+g', label: 'Copy git branch name', when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'mod+shift+.', label: 'Copy git branch name', hidden: true, when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'mod+shift+>', label: 'Copy git branch name', hidden: true, when: () => this.hasTarget() && this.targets().length === 1, run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'shift+o', label: 'Open Delta thread', when: () => !!this.focusedWs(), run: () => this.actions.openDelta(this.focusedWs()!) },
-    { keys: 'mod+backspace', label: 'Delete', when: this.editTarget, run: () => this.actions.confirmDelete(this.targets()) },
-    { keys: 'mod+a', label: 'Select all', when: this.notTyping, run: () => this.ui.setSelected(this.visibleIds()) },
+    {
+      keys: 'mod+.',
+      label: 'Copy key',
+      when: this.hasTarget,
+      run: () => this.actions.copyKey(this.targets()),
+    },
+    {
+      keys: 'mod+shift+l',
+      label: 'Copy link',
+      when: this.hasTarget,
+      run: () => this.actions.copyLink(this.targets()),
+    },
+    {
+      keys: 'mod+shift+g',
+      label: 'Copy git branch name',
+      when: () => this.hasTarget() && this.targets().length === 1,
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'mod+shift+.',
+      label: 'Copy git branch name',
+      hidden: true,
+      when: () => this.hasTarget() && this.targets().length === 1,
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'mod+shift+>',
+      label: 'Copy git branch name',
+      hidden: true,
+      when: () => this.hasTarget() && this.targets().length === 1,
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'shift+o',
+      label: 'Open Delta thread',
+      when: () => !!this.focusedWs(),
+      run: () => this.actions.openDelta(this.focusedWs()!),
+    },
+    {
+      keys: 'mod+backspace',
+      label: 'Delete',
+      when: this.editTarget,
+      run: () => this.actions.confirmDelete(this.targets()),
+    },
+    {
+      keys: 'mod+a',
+      label: 'Select all',
+      when: this.notTyping,
+      run: () => this.ui.setSelected(this.visibleIds()),
+    },
   ]);
 
   private intent(kind: 'status' | 'priority' | 'accountable' | 'date'): void {
@@ -601,7 +932,11 @@ export class WorkstreamListPage {
   }
 
   protected setTab(id: WsViewTab): void {
-    void this.router.navigate([], { queryParams: { view: id === 'active' ? null : id }, queryParamsHandling: 'merge', replaceUrl: true });
+    void this.router.navigate([], {
+      queryParams: { view: id === 'active' ? null : id },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected clearTeam(): void {
@@ -647,7 +982,11 @@ export class WorkstreamListPage {
     } else if (group === 'priority') {
       this.actions.setPriority([w], to as Priority);
     } else if (group === 'ownerTeamId') {
-      if (to && w.ownerTeamId !== to) void this.store.updateWorkstream(w.id, { ownerTeamId: to, participatingTeamIds: w.participatingTeamIds.filter((t) => t !== to) });
+      if (to && w.ownerTeamId !== to)
+        void this.store.updateWorkstream(w.id, {
+          ownerTeamId: to,
+          participatingTeamIds: w.participatingTeamIds.filter((t) => t !== to),
+        });
     } else if (group === 'accountableUserId') {
       this.actions.setAccountable([w], to || null);
     }
@@ -662,7 +1001,12 @@ export class WorkstreamListPage {
     const t = this.team();
     if (t) filters.push({ field: 'teamId', op: 'in', value: [t.id] });
     const tabDef = WS_VIEW_TABS.find((x) => x.id === this.tab());
-    if (tabDef?.statuses && !filters.some((f) => f.field === 'status')) filters.push({ field: 'status', op: 'in', value: tabDef.statuses });
+    if (tabDef?.statuses && !filters.some((f) => f.field === 'status'))
+      filters.push({
+        field: 'status',
+        op: 'in',
+        value: statusIdsForTypes(this.store.settings().statuses.workstream, tabDef.statuses),
+      });
     const d = this.display();
     const group = this.effectiveGroup();
     const view = await this.store.createView({
@@ -677,6 +1021,8 @@ export class WorkstreamListPage {
     if (!view) return;
     this.saveState.set('closed');
     this.viewName.set('');
-    this.notify.success(`Saved view “${view.name}”`, { description: 'Find it under Views in the sidebar.' });
+    this.notify.success(`Saved view “${view.name}”`, {
+      description: 'Find it under Views in the sidebar.',
+    });
   }
 }

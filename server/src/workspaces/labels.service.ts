@@ -3,10 +3,12 @@ import { DataSource, type EntityManager } from 'typeorm';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import {
   LABEL_NAME_MAX,
+  LABEL_SCOPES,
   LABEL_SWATCHES,
   LABEL_TEMPLATES,
   assignLabelIds,
   resolveLabelCatalog,
+  type LabelScope,
   type ViewFilter,
   type WorkspaceLabel,
 } from '../contracts/domain.js';
@@ -26,20 +28,30 @@ export class LabelsService {
     private readonly events: EventsService,
   ) {}
 
-  /** Catalog ids, de-duplicated. `undefined` when the caller did not send labels. */
-  async assign(workspaceId: string, ids: readonly string[] | null | undefined): Promise<string[] | undefined> {
+  /**
+   * Catalog ids, de-duplicated. `undefined` when the caller did not send labels.
+   * An id from another scope is rejected unless `current` already has it.
+   * `scope` null (repositories) keeps only ids already in `current`.
+   */
+  async assign(
+    workspaceId: string,
+    ids: readonly string[] | null | undefined,
+    scope: LabelScope | null,
+    current?: readonly string[] | null,
+  ): Promise<string[] | undefined> {
     if (ids === undefined) return undefined;
     const ws = await this.ds.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId });
     try {
-      return assignLabelIds(resolveLabelCatalog(ws?.settings?.labels), ids ?? []);
+      return assignLabelIds(resolveLabelCatalog(ws?.settings?.labels), ids ?? [], scope, current);
     } catch (err) {
       throw new BadRequestException(err instanceof Error ? err.message : 'Invalid labels');
     }
   }
 
-  async create(ctx: WorkspaceContext, input: { name: string; color?: string }): Promise<WorkspaceEntity> {
+  async create(ctx: WorkspaceContext, input: { name: string; color?: string; scope: LabelScope }): Promise<WorkspaceEntity> {
     const name = input.name.trim();
     if (!name || name.length > LABEL_NAME_MAX) throw new BadRequestException(`Label name must be 1-${LABEL_NAME_MAX} characters`);
+    if (!isLabelScope(input.scope)) throw new BadRequestException('scope must be issue, workstream, or project');
     const catalog = resolveLabelCatalog(ctx.workspace.settings?.labels);
     if (catalog.some((label) => label.name.toLowerCase() === name.toLowerCase()))
       throw new ConflictException(`Label "${name}" already exists`);
@@ -47,10 +59,14 @@ export class LabelsService {
       throw new BadRequestException(`A workspace can have at most ${CUSTOM_MAX} custom labels`);
     const color = (input.color ?? nextColor(catalog)).toLowerCase();
     if (!COLOR.test(color)) throw new BadRequestException('color must be #rrggbb');
-    return this.save(ctx, [...catalog, { id: uid('lb'), name, color, template: false }]);
+    return this.save(ctx, [...catalog, { id: uid('lb'), name, color, template: false, scope: input.scope }]);
   }
 
-  async update(ctx: WorkspaceContext, id: string, patch: { name?: string; color?: string; archived?: boolean }): Promise<WorkspaceEntity> {
+  async update(
+    ctx: WorkspaceContext,
+    id: string,
+    patch: { name?: string; color?: string; archived?: boolean; scope?: LabelScope },
+  ): Promise<WorkspaceEntity> {
     const catalog = resolveLabelCatalog(ctx.workspace.settings?.labels);
     const current = catalog.find((label) => label.id === id);
     if (!current) throw new BadRequestException(`Unknown label "${id}"`);
@@ -68,11 +84,18 @@ export class LabelsService {
       if (!COLOR.test(color)) throw new BadRequestException('color must be #rrggbb');
     }
     if (patch.archived === true && current.template) throw new BadRequestException('Template labels cannot be archived');
+    let scope = current.scope;
+    if (patch.scope !== undefined && patch.scope !== current.scope) {
+      if (current.template) throw new BadRequestException('Template labels cannot change scope');
+      if (!isLabelScope(patch.scope)) throw new BadRequestException('scope must be issue, workstream, or project');
+      scope = patch.scope;
+    }
     const archived = patch.archived ?? current.archived === true;
     const next = catalog.map((label): WorkspaceLabel => {
       if (label.id !== id) return label;
       const template = label.template || LABEL_TEMPLATES.some((t) => t.id === id);
-      return archived && !template ? { id, name, color, template, archived: true } : { id, name, color, template };
+      const updated = { id, name, color, template, scope: template ? ('issue' as const) : scope };
+      return archived && !template ? { ...updated, archived: true } : updated;
     });
     return this.save(ctx, next);
   }
@@ -86,6 +109,7 @@ export class LabelsService {
     const target = catalog.find((label) => label.id === into);
     if (!target) throw new BadRequestException(`Unknown label "${into}"`);
     if (target.id === id) throw new BadRequestException('A label cannot be merged into itself');
+    if (target.scope !== current.scope) throw new BadRequestException(`Label "${target.name}" does not apply to ${current.scope}s`);
     if (target.archived) throw new BadRequestException(`Label "${target.name}" is archived. Restore it before merging into it`);
     return this.drop(ctx, catalog, id, into);
   }
@@ -146,4 +170,8 @@ async function replaceInTable(m: EntityManager, table: (typeof TABLES)[number], 
 function nextColor(catalog: readonly WorkspaceLabel[]): string {
   const used = new Set(catalog.map((label) => label.color));
   return LABEL_SWATCHES.find((color) => !used.has(color)) ?? LABEL_SWATCHES[catalog.length % LABEL_SWATCHES.length];
+}
+
+function isLabelScope(value: unknown): value is LabelScope {
+  return typeof value === 'string' && (LABEL_SCOPES as readonly string[]).includes(value);
 }

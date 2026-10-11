@@ -11,14 +11,17 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideDynamicIcon, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { ROLE_DETAILS, ROLE_META, ROLES } from '../../../core/meta';
 import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import {
+  canGrantRole,
   emptyMemberAccess,
+  findWorkspaceRole,
+  MEMBER_GRANTS,
   normalizeMemberAccess,
+  workspaceRoleName,
   type InviteLink,
   type MemberAccess,
   type MemberGrant,
@@ -68,7 +71,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
                 [value]="email()"
                 (input)="email.set($any($event.target).value)"
               />
-              <div class="w-32">
+              <div class="w-40">
                 <app-select size="sm" [options]="inviteOptions()" [(value)]="role" label="Role" />
               </div>
               <button hlmBtn size="sm" type="submit" [disabled]="!email().trim() || busy()">
@@ -277,9 +280,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
       title="Roles"
       description="What each role means. Which actions need which role is set in Roles & permissions."
     >
-      @for (r of roles; track r) {
-        <app-settings-row [label]="roleName(r)" [description]="roleDetail(r)">
-          <span class="text-muted-foreground text-xs tabular-nums">{{ countFor(r) }}</span>
+      @for (r of workspaceRoles(); track r.id) {
+        <app-settings-row [label]="r.name" [description]="roleDetail(r.id)">
+          <span class="text-muted-foreground text-xs tabular-nums">{{ countFor(r.id) }}</span>
         </app-settings-row>
       }
     </app-settings-group>
@@ -293,11 +296,6 @@ export class MembersSection {
 
   protected readonly searchIcon = LucideSearch;
   protected readonly xIcon = LucideX;
-  protected readonly roles = ROLES;
-  protected readonly roleOptions: Option[] = ROLES.map((r) => ({
-    value: r,
-    label: ROLE_META[r].label,
-  }));
   protected readonly email = signal('');
   protected readonly role = signal<string>('member');
   protected readonly custom = signal(false);
@@ -312,20 +310,17 @@ export class MembersSection {
   protected readonly pending = this.invites.invites;
   /** The link of the invitation just sent or resent (the only time it is available). */
   protected readonly sent = signal<{ link: InviteLink } | null>(null);
-  /** Nobody can grant a role above their own. */
+  protected readonly workspaceRoles = computed(() => this.store.settings().roles);
+  /** A role I can grant: its permissions are inside mine. Owners can grant any role. */
   protected readonly inviteOptions = computed<Option[]>(() => {
-    const mine = this.store.myRole();
-    return this.roleOptions.filter(
-      (o) => !mine || ROLE_META[o.value as Role].rank <= ROLE_META[mine].rank,
-    );
+    const mine = findWorkspaceRole(this.workspaceRoles(), this.store.myRole() ?? '');
+    return this.workspaceRoles().filter((role) => canGrantRole(mine, role)).map((role) => ({ value: role.id, label: role.name }));
   });
-  /** Roles I may assign (never above my own); the row's current role always stays listed. */
+  /** Roles I may assign; the row's current role always stays listed. */
   protected roleOptionsFor(current: Role): Option[] {
-    return this.inviteOptions().length
-      ? this.roleOptions.filter(
-          (o) => o.value === current || this.inviteOptions().some((i) => i.value === o.value),
-        )
-      : this.roleOptions;
+    const options = this.workspaceRoles().map((role) => ({ value: role.id, label: role.name }));
+    const allowed = new Set(this.inviteOptions().map((option) => option.value));
+    return options.filter((option) => option.value === current || allowed.has(option.value));
   }
   protected rulesFor(m: Membership): MemberUiRules {
     return memberRules(
@@ -363,6 +358,12 @@ export class MembersSection {
       if (this.canInvite() && this.store.slug()) untracked(() => void this.invites.load());
     });
     effect(() => {
+      const options = this.inviteOptions();
+      if (options.length && !options.some((option) => option.value === this.role())) {
+        untracked(() => this.role.set(options.find((option) => option.value !== 'owner')?.value ?? options[0].value));
+      }
+    });
+    effect(() => {
       const role = this.roleValue();
       if (role === 'owner') {
         untracked(() => this.custom.set(false));
@@ -391,18 +392,25 @@ export class MembersSection {
     return (this.teamNamesByUser().get(userId) ?? []).join(', ');
   }
   protected roleName(role: Role): string {
-    return ROLE_META[role].label;
+    return workspaceRoleName(this.workspaceRoles(), role);
   }
-  protected roleDetail(role: Role): string {
-    return ROLE_DETAILS[role];
+  protected roleDetail(roleId: Role): string {
+    const role = findWorkspaceRole(this.workspaceRoles(), roleId);
+    if (!role) return '';
+    if (role.owner) return 'Manages roles and members. This role cannot be deleted.';
+    if (!role.capabilities.length && !role.grants.some((grant) => !grant.endsWith(':view'))) return 'Read only, unless an invitation adds actions.';
+    const caps = role.capabilities.map((cap) => cap.replace(/([A-Z])/g, ' $1').toLowerCase());
+    return caps.length ? caps.join(', ') : 'Can change the work listed on the role.';
   }
   protected countFor(role: Role): string {
     const n = this.store.memberships().filter((m) => m.role === role).length;
     return n === 1 ? '1 person' : `${n} people`;
   }
 
-  protected baseline(role: Role): MemberGrant[] {
-    return this.store.settings().roleGrants?.[role] ?? [];
+  protected baseline(roleId: Role): MemberGrant[] {
+    const role = findWorkspaceRole(this.workspaceRoles(), roleId);
+    if (!role || role.owner) return [...MEMBER_GRANTS];
+    return role.grants;
   }
 
   protected setCustom(on: boolean): void {
@@ -462,7 +470,7 @@ export class MembersSection {
   }
 
   protected setRole(membershipId: string, role: string): void {
-    if (ROLES.includes(role as Role)) void this.store.updateMemberRole(membershipId, role as Role);
+    if (this.workspaceRoles().some((item) => item.id === role)) void this.store.updateMemberRole(membershipId, role);
   }
 
   protected transfer(id: string, name: string): void {

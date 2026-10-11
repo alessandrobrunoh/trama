@@ -1,11 +1,21 @@
 import type { Role, ShareLevel, SharingSettings } from '../contracts/domain.js';
-import { hasRole } from '../auth/request-context.js';
+import { legacyRoleAtLeast } from '../contracts/domain.js';
 
 /** The caller as far as view permissions are concerned. */
 export interface ViewActor {
   /** Absent for agent tokens (they can read shared views, never own or be granted one). */
   userId?: string;
   role: Role;
+  /** When omitted, derived from the old rank of `role`. Custom roles set these from their permissions. */
+  canWrite?: boolean;
+  canAdmin?: boolean;
+}
+
+function canWrite(actor: ViewActor): boolean {
+  return actor.canWrite ?? legacyRoleAtLeast(actor.role, 'member');
+}
+function canAdmin(actor: ViewActor): boolean {
+  return actor.canAdmin ?? legacyRoleAtLeast(actor.role, 'admin');
 }
 
 /** The part of a view the access rules look at. */
@@ -37,11 +47,11 @@ export function canReadView(view: ViewAccessSubject, actor: ViewActor): boolean 
  */
 export function canEditView(view: ViewAccessSubject, actor: ViewActor): boolean {
   if (isOwner(view, actor)) return true;
-  if (grantLevel(view, actor) === 'edit' && hasRole(actor.role, 'member')) return true;
-  return view.sharing.visibility !== 'private' && hasRole(actor.role, 'admin');
+  if (grantLevel(view, actor) === 'edit' && canWrite(actor)) return true;
+  return view.sharing.visibility !== 'private' && canAdmin(actor);
 }
 
 /** Change who has access (visibility, invitations, public link) or delete the view. */
 export function canManageSharing(view: ViewAccessSubject, actor: ViewActor): boolean {
-  return isOwner(view, actor) || (view.sharing.visibility !== 'private' && hasRole(actor.role, 'admin'));
+  return isOwner(view, actor) || (view.sharing.visibility !== 'private' && canAdmin(actor));
 }

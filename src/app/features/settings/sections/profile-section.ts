@@ -4,7 +4,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { LucideDynamicIcon, LucideLogOut, LucidePlus } from '@lucide/angular';
 import { SessionStore } from '../../../core/session/session.store';
 import { TramaStore } from '../../../core/stores/trama.store';
-import { ROLE_META } from '../../../core/meta';
+import { workspaceRoleName } from '../../../core/contracts/domain';
 import { Clipboard } from '../../../core/notify/notifier';
 import { avatarColor } from '../../../core/utils';
 import type { Role, Workspace } from '../../../core/contracts/domain';
@@ -101,12 +101,12 @@ export class ProfileSection {
   protected readonly hueColor = computed(() => avatarColor(this.user()?.avatarHue ?? 0));
   protected readonly roleLabel = computed(() => {
     const r = this.session.role();
-    return r ? ROLE_META[r].label : null;
+    return r ? workspaceRoleName(this.store.settings().roles, r) : null;
   });
 
   protected roleName(w: Workspace): string {
     const role = (w as Workspace & { role?: Role }).role;
-    return role ? ROLE_META[role].label : '';
+    return role ? workspaceRoleName(w.id === this.store.workspace()?.id ? this.store.settings().roles : [], role) : '';
   }
 
   protected copyEmail(): void {

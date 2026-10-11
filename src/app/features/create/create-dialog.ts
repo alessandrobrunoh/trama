@@ -804,18 +804,22 @@ export class CreateDialog {
     label: PRIORITY_META[p].label,
     kind: 'priority',
   }));
-  protected readonly issueStatusOptions: PickOption[] = ISSUE_STATUSES.map((s) => ({
-    value: s,
-    label: ISSUE_STATUS_META[s].label,
-    kind: 'status',
-    statusEntity: 'issue',
-  }));
-  protected readonly wsStatusOptions: PickOption[] = WORKSTREAM_STATUS_FLOW.map((s) => ({
-    value: s,
-    label: WORKSTREAM_STATUS_META[s].label,
-    kind: 'status',
-    statusEntity: 'workstream',
-  }));
+  protected get issueStatusOptions(): PickOption[] {
+    return this.store.settings().statuses.issue.map((s) => ({
+      value: s.id,
+      label: s.name,
+      kind: 'status' as const,
+      statusEntity: 'issue' as const,
+    }));
+  }
+  protected get wsStatusOptions(): PickOption[] {
+    return this.store.settings().statuses.workstream.map((s) => ({
+      value: s.id,
+      label: s.name,
+      kind: 'status' as const,
+      statusEntity: 'workstream' as const,
+    }));
+  }
   protected readonly issueKindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,

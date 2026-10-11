@@ -1,10 +1,18 @@
-import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  ElementRef,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { SlugCounter, plainHeading } from './heading-slug';
 import { EntityRefChip, EntityRow } from './entity-ref';
 import { PriorityIcon } from './priority-icon';
 import { STATUS_VISUALS, StatusLabel } from './status';
+import { isWorkspaceUploadUrl } from '../core/upload-url';
 
 /* ───────────── tiny, safe markdown → AST → Angular template (no innerHTML) ───────────── */
 
@@ -15,6 +23,8 @@ type Inline =
   | { t: 'em'; c: Inline[] }
   | { t: 'del'; c: Inline[] }
   | { t: 'link'; href: string; c: Inline[] }
+  /** A workspace upload. Remote images stay links: nothing is fetched from another origin. */
+  | { t: 'image'; href: string; alt: string }
   /** A mention of a workspace record (key or repository name) found by the optional `TextLinker`. */
   | { t: 'ref'; v: string }
   /** `@Name` of a member or agent, found by the optional `TextLinker`. */
@@ -32,7 +42,13 @@ interface ListItem {
 }
 
 type Block =
-  | { t: 'heading'; level: 1 | 2 | 3 | 4; inline: Inline[]; raw: string; /** Set when `headingIds` is on. */ id?: string }
+  | {
+      t: 'heading';
+      level: 1 | 2 | 3 | 4;
+      inline: Inline[];
+      raw: string;
+      /** Set when `headingIds` is on. */ id?: string;
+    }
   | { t: 'p'; inline: Inline[] }
   | {
       t: 'ul';
@@ -81,9 +97,15 @@ export function parseInline(src: string, link?: TextLinker): Inline[] {
       flush();
       out.push({ t: 'em', c: parseInline(m[1], link) });
       i += m[0].length;
-    } else if ((m = rest.match(/^!?\[([^\]]*)\]\(([^)\s]+)\)/))) {
+    } else if ((m = rest.match(/^!\[([^\]]*)\]\(([^)\s]+)\)/))) {
       flush();
-      // Images are shown as links (nothing is loaded from a remote address); `![alt](url)` reads as its alt text.
+      if (isWorkspaceUploadUrl(m[2])) out.push({ t: 'image', href: m[2], alt: m[1] || 'image' });
+      else if (SAFE_HREF.test(m[2]))
+        out.push({ t: 'link', href: m[2], c: parseInline(m[1] || m[2], link) });
+      else out.push({ t: 'text', v: m[1] || m[2] });
+      i += m[0].length;
+    } else if ((m = rest.match(/^\[([^\]]*)\]\(([^)\s]+)\)/))) {
+      flush();
       if (!m[1]) m[1] = m[2];
       if (SAFE_HREF.test(m[2])) out.push({ t: 'link', href: m[2], c: parseInline(m[1], link) });
       else out.push({ t: 'text', v: m[1] });
@@ -123,7 +145,11 @@ export function trailing(nodes: Inline[]): Inline[] {
 /** Plain text of inline nodes (for comparisons). */
 export function plainText(nodes: Inline[]): string {
   return nodes
-    .map((n) => (n.t === 'text' || n.t === 'code' || n.t === 'ref' || n.t === 'mention' ? n.v : plainText(n.c)))
+    .map((n) => {
+      if (n.t === 'text' || n.t === 'code' || n.t === 'ref' || n.t === 'mention') return n.v;
+      if (n.t === 'image') return n.alt;
+      return plainText(n.c);
+    })
     .join('');
 }
 
@@ -321,8 +347,15 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
               ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
             /></del>
           }
+          @case ('image') {
+            <img [src]="n.href" [alt]="n.alt" class="my-2 max-h-96 max-w-full rounded-md border" />
+          }
           @case ('link') {
-            @if (n.href[0] === '/') {
+            @if (isUpload(n.href)) {
+              <a class="text-primary underline underline-offset-2 hover:opacity-80" [href]="n.href"
+                ><ng-container *ngTemplateOutlet="inl; context: { $implicit: n.c }"
+              /></a>
+            } @else if (n.href[0] === '/') {
               <a
                 class="text-primary underline underline-offset-2 hover:opacity-80"
                 [routerLink]="n.href"
@@ -355,12 +388,18 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           @case ('heading') {
             @switch (b.level) {
               @case (1) {
-                <h2 class="mt-5 mb-2 scroll-mt-16 text-lg font-semibold tracking-tight" [attr.id]="b.id">
+                <h2
+                  class="mt-5 mb-2 scroll-mt-16 text-lg font-semibold tracking-tight"
+                  [attr.id]="b.id"
+                >
                   <ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" />
                 </h2>
               }
               @case (2) {
-                <h3 class="mt-4 mb-1.5 scroll-mt-16 text-base font-semibold tracking-tight" [attr.id]="b.id">
+                <h3
+                  class="mt-4 mb-1.5 scroll-mt-16 text-base font-semibold tracking-tight"
+                  [attr.id]="b.id"
+                >
                   <ng-container *ngTemplateOutlet="inl; context: { $implicit: b.inline }" />
                 </h3>
               }
@@ -516,11 +555,18 @@ export class Markdown {
     return blocks;
   });
 
+  /** Workspace uploads are real files, not in-app routes. */
+  protected isUpload(href: string): boolean {
+    return isWorkspaceUploadUrl(href);
+  }
+
   /** `#anchor` link: scroll to the heading inside this document instead of navigating the app. */
   protected jump(ev: Event, href: string): void {
     ev.preventDefault();
     const id = decodeURIComponent(href.slice(1));
-    const target = Array.from(this.host.nativeElement.querySelectorAll('[id]')).find((e) => e.id === id);
+    const target = Array.from(this.host.nativeElement.querySelectorAll('[id]')).find(
+      (e) => e.id === id,
+    );
     target?.scrollIntoView({ block: 'start', behavior: 'smooth' });
   }
   /** A table cell that is exactly a status or priority word shows the app's own glyph and label. */

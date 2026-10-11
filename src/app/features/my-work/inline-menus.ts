@@ -1,14 +1,13 @@
 // Small inline property menus for dense rows: click the glyph, pick a value (Linear-style).
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
-  ISSUE_STATUSES,
-  ISSUE_STATUS_META,
   PRIORITIES,
   PRIORITY_META,
-  type IssueStatus,
+  TramaStore,
+  resolveStatusEntry,
   type Priority,
 } from '../../core';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -37,11 +36,11 @@ import { StatusIcon } from '../../shared/status';
     <ng-template #menu>
       <hlm-dropdown-menu class="w-48">
         <hlm-dropdown-menu-label>Status</hlm-dropdown-menu-label>
-        @for (s of statuses; track s) {
-          <button hlmDropdownMenuItem (triggered)="pick(s)">
-            <app-status-icon entity="issue" [status]="s" />
-            <span class="flex-1">{{ meta[s].label }}</span>
-            @if (s === status()) {
+        @for (s of statuses(); track s.id) {
+          <button hlmDropdownMenuItem (triggered)="pick(s.id)">
+            <app-status-icon entity="issue" [status]="s.id" />
+            <span class="flex-1">{{ s.name }}</span>
+            @if (s.id === status()) {
               <svg [lucideIcon]="check" [size]="14" class="text-muted-foreground"></svg>
             }
           </button>
@@ -51,16 +50,18 @@ import { StatusIcon } from '../../shared/status';
   `,
 })
 export class IssueStatusMenu {
-  readonly status = input.required<IssueStatus>();
+  readonly status = input.required<string>();
   readonly disabled = input(false);
-  readonly changed = output<IssueStatus>();
+  readonly changed = output<string>();
 
-  protected readonly statuses = ISSUE_STATUSES;
-  protected readonly meta = ISSUE_STATUS_META;
+  private readonly store = inject(TramaStore);
+  protected readonly statuses = computed(() => this.store.settings().statuses.issue);
   protected readonly check = LucideCheck;
-  protected readonly label = computed(() => ISSUE_STATUS_META[this.status()].label);
+  protected readonly label = computed(
+    () => resolveStatusEntry(this.statuses(), this.status())?.name ?? this.status(),
+  );
 
-  protected pick(s: IssueStatus): void {
+  protected pick(s: string): void {
     if (s !== this.status()) this.changed.emit(s);
   }
 }

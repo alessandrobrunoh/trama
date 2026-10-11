@@ -136,7 +136,9 @@ abstract class WsItemBase {
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly selected = computed(() => this.ui.selectedSet().has(this.summary().ws.id));
-  protected readonly statuses = statusOptions();
+  protected get statuses() {
+    return statusOptions(this.store.settings().statuses.workstream);
+  }
   protected readonly priorities = priorityOptions();
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly statusMeta = WORKSTREAM_STATUS_META;
@@ -297,7 +299,7 @@ abstract class WsItemBase {
           clearLabel="Automatic (derived)"
           [disabled]="!canEdit()"
           [options]="statuses"
-          [value]="[w.status]"
+          [value]="[w.statusOverride || w.status]"
           (valueChange)="setStatus($event[0])"
         >
           <app-status-icon entity="workstream" [status]="w.status" [hlmTooltip]="statusTip()" position="bottom" />
@@ -455,7 +457,7 @@ export class WorkstreamRow extends WsItemBase {
         </span>
       </div>
       <div class="flex items-start gap-1.5">
-        <app-picker #statusPicker variant="bare" label="Status" triggerClass="size-5 justify-center -ml-0.5 mt-px" [searchable]="false" [clearable]="!!w.statusOverride" clearLabel="Automatic (derived)" [disabled]="!canEdit()" [options]="statuses" [value]="[w.status]" (valueChange)="setStatus($event[0])">
+        <app-picker #statusPicker variant="bare" label="Status" triggerClass="size-5 justify-center -ml-0.5 mt-px" [searchable]="false" [clearable]="!!w.statusOverride" clearLabel="Automatic (derived)" [disabled]="!canEdit()" [options]="statuses" [value]="[w.statusOverride || w.status]" (valueChange)="setStatus($event[0])">
           <app-status-icon entity="workstream" [status]="w.status" />
         </app-picker>
         <span class="line-clamp-2 min-w-0 flex-1 text-[13px] leading-snug font-medium">{{ w.title }}</span>

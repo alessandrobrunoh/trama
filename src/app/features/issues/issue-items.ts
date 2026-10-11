@@ -47,7 +47,7 @@ abstract class IssueItemBase {
   protected readonly check = LucideCheck;
   protected readonly buildingIcon = LucideBuilding2;
   protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly quiet = computed(() => isClosedIssue(this.issue()));
+  protected readonly quiet = computed(() => isClosedIssue(this.issue(), this.store.settings().statuses.issue));
   protected readonly demand = computed(() => this.store.demand().get(this.issue().id));
   protected readonly customerCount = computed(() => this.demand()?.customerCount ?? 0);
   protected readonly demandText = computed(() => {

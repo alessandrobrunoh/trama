@@ -1,7 +1,16 @@
 // Issue list and board: filters, display options (persisted), drag-and-drop between groups,
 // multi-select with a bulk action bar, right-click menu and keyboard actions on the focused row.
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+} from '@angular/core';
 import {
   LucideArrowDownWideNarrow,
   LucideArrowUpNarrowWide,
@@ -58,7 +67,12 @@ import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { Picker, type PickOption } from '../workstreams/picker';
-import { priorityOptions, projectFilterOptions, teamOptions, userOptions } from '../workstreams/ws-model';
+import {
+  priorityOptions,
+  projectFilterOptions,
+  teamOptions,
+  userOptions,
+} from '../workstreams/ws-model';
 import { DemandFilters } from '../customers/demand-filters';
 import { IssueActions } from './issue-actions';
 import { IssueCard, IssueRow } from './issue-items';
@@ -125,133 +139,285 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
     <!-- Filter + display toolbar -->
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6 max-md:contents">
+    <div
+      class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6 max-md:contents"
+    >
       <div class="contents max-md:block max-md:w-full max-md:border-b max-md:px-4 max-md:py-2">
         <app-search-input noun="issues" [(value)]="search" />
       </div>
       <!-- Phones: this row sticks under the header while the list scrolls (see styles.css, [data-mobile-sticky]). -->
-      <div class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:border-b max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2" data-mobile-sticky>
-      <div class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain">
-        <app-picker variant="chip" label="Status" [multiple]="true" [searchable]="false" [options]="statuses" [value]="fv('status')" (valueChange)="setF('status', $event)" />
-        <app-picker variant="chip" label="Type" [multiple]="true" [searchable]="false" [options]="kinds" [value]="fv('kind')" (valueChange)="setF('kind', $event)" />
-        <app-picker variant="chip" label="Priority" [multiple]="true" [searchable]="false" [options]="priorities" [value]="fv('priority')" (valueChange)="setF('priority', $event)" />
-        <app-picker variant="chip" label="Assignee" [multiple]="true" [options]="assigneeFilter()" [value]="fv('assigneeId')" (valueChange)="setF('assigneeId', $event)" />
-        <app-picker variant="chip" label="Team" [multiple]="true" [options]="teams()" [value]="fv('teamId')" (valueChange)="setF('teamId', $event)" />
-        <app-label-picker variant="chip" label="Label" [creatable]="false" [manageLink]="false" [value]="fv('labels')" (valueChange)="setF('labels', $event)" />
-        <app-picker variant="chip" label="Workstream" [multiple]="true" [options]="wsFilter()" [value]="fv('workstreamIds')" (valueChange)="setF('workstreamIds', $event)" />
-        @if (projectFilter().length > 1) {
-          <app-picker variant="chip" label="Project" [multiple]="true" [icon]="projectIcon" [options]="projectFilter()" [value]="fv('projectId')" (valueChange)="setF('projectId', $event)" />
-        }
-        @if (milestoneFilter().length) {
-          <app-picker variant="chip" label="Milestone" [multiple]="true" [options]="milestoneFilter()" [value]="fv('milestoneIds')" (valueChange)="setF('milestoneIds', $event)" />
-        }
-        <app-demand-filters [filters]="filters()" (filtersChange)="filters.set($event)" />
-        @if (hasFilters()) {
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs" (click)="clearFilters()">
-            <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
-          </button>
-        }
-      </div>
-      <div class="ml-auto flex shrink-0 items-center gap-1">
-        <div class="bg-muted/60 flex items-center rounded-md p-0.5" role="group" aria-label="Layout">
-          <button
-            type="button"
-            class="flex h-6 items-center gap-1 rounded-[5px] px-1.5 text-xs"
-            [class]="d().layout === 'list' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="d().layout === 'list'"
-            hlmTooltip="List"
-            (click)="patch({ layout: 'list' })"
-          >
-            <svg [lucideIcon]="listIcon" [size]="14"></svg>
-          </button>
-          <button
-            type="button"
-            class="flex h-6 items-center gap-1 rounded-[5px] px-1.5 text-xs"
-            [class]="d().layout === 'board' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="d().layout === 'board'"
-            hlmTooltip="Board"
-            (click)="patch({ layout: 'board' })"
-          >
-            <svg [lucideIcon]="boardIcon" [size]="14"></svg>
-          </button>
+      <div
+        class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:border-b max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2"
+        data-mobile-sticky
+      >
+        <div
+          class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        >
+          <app-picker
+            variant="chip"
+            label="Status"
+            [multiple]="true"
+            [searchable]="false"
+            [options]="statuses"
+            [value]="fv('status')"
+            (valueChange)="setF('status', $event)"
+          />
+          <app-picker
+            variant="chip"
+            label="Type"
+            [multiple]="true"
+            [searchable]="false"
+            [options]="kinds"
+            [value]="fv('kind')"
+            (valueChange)="setF('kind', $event)"
+          />
+          <app-picker
+            variant="chip"
+            label="Priority"
+            [multiple]="true"
+            [searchable]="false"
+            [options]="priorities"
+            [value]="fv('priority')"
+            (valueChange)="setF('priority', $event)"
+          />
+          <app-picker
+            variant="chip"
+            label="Assignee"
+            [multiple]="true"
+            [options]="assigneeFilter()"
+            [value]="fv('assigneeId')"
+            (valueChange)="setF('assigneeId', $event)"
+          />
+          <app-picker
+            variant="chip"
+            label="Team"
+            [multiple]="true"
+            [options]="teams()"
+            [value]="fv('teamId')"
+            (valueChange)="setF('teamId', $event)"
+          />
+          <app-label-picker
+            variant="chip"
+            label="Label"
+            scope="issue"
+            [creatable]="false"
+            [manageLink]="false"
+            [value]="fv('labels')"
+            (valueChange)="setF('labels', $event)"
+          />
+          <app-picker
+            variant="chip"
+            label="Workstream"
+            [multiple]="true"
+            [options]="wsFilter()"
+            [value]="fv('workstreamIds')"
+            (valueChange)="setF('workstreamIds', $event)"
+          />
+          @if (projectFilter().length > 1) {
+            <app-picker
+              variant="chip"
+              label="Project"
+              [multiple]="true"
+              [icon]="projectIcon"
+              [options]="projectFilter()"
+              [value]="fv('projectId')"
+              (valueChange)="setF('projectId', $event)"
+            />
+          }
+          @if (milestoneFilter().length) {
+            <app-picker
+              variant="chip"
+              label="Milestone"
+              [multiple]="true"
+              [options]="milestoneFilter()"
+              [value]="fv('milestoneIds')"
+              (valueChange)="setF('milestoneIds', $event)"
+            />
+          }
+          <app-demand-filters [filters]="filters()" (filtersChange)="filters.set($event)" />
+          @if (hasFilters()) {
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs"
+              (click)="clearFilters()"
+            >
+              <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
+            </button>
+          }
         </div>
+        <div class="ml-auto flex shrink-0 items-center gap-1">
+          <div
+            class="bg-muted/60 flex items-center rounded-md p-0.5"
+            role="group"
+            aria-label="Layout"
+          >
+            <button
+              type="button"
+              class="flex h-6 items-center gap-1 rounded-[5px] px-1.5 text-xs"
+              [class]="
+                d().layout === 'list'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              [attr.aria-pressed]="d().layout === 'list'"
+              hlmTooltip="List"
+              (click)="patch({ layout: 'list' })"
+            >
+              <svg [lucideIcon]="listIcon" [size]="14"></svg>
+            </button>
+            <button
+              type="button"
+              class="flex h-6 items-center gap-1 rounded-[5px] px-1.5 text-xs"
+              [class]="
+                d().layout === 'board'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              [attr.aria-pressed]="d().layout === 'board'"
+              hlmTooltip="Board"
+              (click)="patch({ layout: 'board' })"
+            >
+              <svg [lucideIcon]="boardIcon" [size]="14"></svg>
+            </button>
+          </div>
 
-        <hlm-popover align="end" sideOffset="4">
-          <button hlmBtn hlmPopoverTrigger variant="outline" size="sm" class="h-7 gap-1.5 px-2 text-xs font-normal" aria-label="Display options">
-            <svg [lucideIcon]="displayIcon" [size]="13"></svg>
-            <span class="max-sm:hidden">Display</span>
-          </button>
-          <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72 p-0 text-[13px]">
-            <div class="flex flex-col gap-2.5 p-3">
-              <label class="flex items-center justify-between gap-3">
-                <span class="text-muted-foreground">Grouping</span>
-                <select class="border-input bg-background h-7 w-36 rounded-md border px-1.5 text-xs" [value]="d().groupBy" (change)="patch({ groupBy: $any($event.target).value })">
-                  @for (g of groups; track g) {
-                    <option [value]="g">{{ groupLabels[g] }}</option>
-                  }
-                </select>
-              </label>
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-muted-foreground">Ordering</span>
-                <span class="flex items-center gap-1">
-                  <select class="border-input bg-background h-7 w-[7.25rem] rounded-md border px-1.5 text-xs" [value]="d().sortField" (change)="patch({ sortField: $any($event.target).value })">
-                    @for (s of sorts; track s) {
-                      <option [value]="s">{{ sortLabels[s] }}</option>
+          <hlm-popover align="end" sideOffset="4">
+            <button
+              hlmBtn
+              hlmPopoverTrigger
+              variant="outline"
+              size="sm"
+              class="h-7 gap-1.5 px-2 text-xs font-normal"
+              aria-label="Display options"
+            >
+              <svg [lucideIcon]="displayIcon" [size]="13"></svg>
+              <span class="max-sm:hidden">Display</span>
+            </button>
+            <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72 p-0 text-[13px]">
+              <div class="flex flex-col gap-2.5 p-3">
+                <label class="flex items-center justify-between gap-3">
+                  <span class="text-muted-foreground">Grouping</span>
+                  <select
+                    class="border-input bg-background h-7 w-36 rounded-md border px-1.5 text-xs"
+                    [value]="d().groupBy"
+                    (change)="patch({ groupBy: $any($event.target).value })"
+                  >
+                    @for (g of groups; track g) {
+                      <option [value]="g">{{ groupLabels[g] }}</option>
                     }
                   </select>
-                  <button hlmBtn variant="outline" size="icon-sm" class="size-7" [attr.aria-label]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'" [hlmTooltip]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'" (click)="patch({ sortDir: d().sortDir === 'asc' ? 'desc' : 'asc' })">
-                    <svg [lucideIcon]="d().sortDir === 'asc' ? ascIcon : descIcon" [size]="13"></svg>
-                  </button>
-                </span>
-              </div>
-              <label class="flex cursor-pointer items-center justify-between gap-3">
-                <span class="text-muted-foreground">Show empty groups</span>
-                <input type="checkbox" class="accent-primary size-3.5" [checked]="d().showEmptyGroups" (change)="patch({ showEmptyGroups: $any($event.target).checked })" />
-              </label>
-              @if (d().layout === 'list') {
+                </label>
                 <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">Density</span>
-                  <span class="bg-muted/60 flex rounded-md p-0.5">
-                    @for (o of densities; track o) {
-                      <button type="button" class="h-6 rounded-[5px] px-2 text-xs capitalize" [class]="d().density === o ? 'bg-background shadow-xs' : 'text-muted-foreground'" (click)="patch({ density: o })">{{ o }}</button>
-                    }
+                  <span class="text-muted-foreground">Ordering</span>
+                  <span class="flex items-center gap-1">
+                    <select
+                      class="border-input bg-background h-7 w-[7.25rem] rounded-md border px-1.5 text-xs"
+                      [value]="d().sortField"
+                      (change)="patch({ sortField: $any($event.target).value })"
+                    >
+                      @for (s of sorts; track s) {
+                        <option [value]="s">{{ sortLabels[s] }}</option>
+                      }
+                    </select>
+                    <button
+                      hlmBtn
+                      variant="outline"
+                      size="icon-sm"
+                      class="size-7"
+                      [attr.aria-label]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'"
+                      [hlmTooltip]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'"
+                      (click)="patch({ sortDir: d().sortDir === 'asc' ? 'desc' : 'asc' })"
+                    >
+                      <svg
+                        [lucideIcon]="d().sortDir === 'asc' ? ascIcon : descIcon"
+                        [size]="13"
+                      ></svg>
+                    </button>
                   </span>
                 </div>
-              }
-            </div>
-            <div class="border-t p-3">
-              <p class="text-muted-foreground mb-2 text-xs">Display properties</p>
-              <div class="flex flex-wrap gap-1.5">
-                @for (p of props; track p) {
-                  <button
-                    type="button"
-                    class="h-6 rounded-md border px-2 text-xs transition-colors"
-                    [class]="isShown(p) ? 'border-border-strong bg-accent text-foreground' : 'border-border text-muted-foreground hover:text-foreground'"
-                    [attr.aria-pressed]="isShown(p)"
-                    (click)="toggleProp(p)"
-                  >
-                    {{ propLabels[p] }}
-                  </button>
+                <label class="flex cursor-pointer items-center justify-between gap-3">
+                  <span class="text-muted-foreground">Show empty groups</span>
+                  <input
+                    type="checkbox"
+                    class="accent-primary size-3.5"
+                    [checked]="d().showEmptyGroups"
+                    (change)="patch({ showEmptyGroups: $any($event.target).checked })"
+                  />
+                </label>
+                @if (d().layout === 'list') {
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="text-muted-foreground">Density</span>
+                    <span class="bg-muted/60 flex rounded-md p-0.5">
+                      @for (o of densities; track o) {
+                        <button
+                          type="button"
+                          class="h-6 rounded-[5px] px-2 text-xs capitalize"
+                          [class]="
+                            d().density === o ? 'bg-background shadow-xs' : 'text-muted-foreground'
+                          "
+                          (click)="patch({ density: o })"
+                        >
+                          {{ o }}
+                        </button>
+                      }
+                    </span>
+                  </div>
                 }
               </div>
-            </div>
-            <div class="flex justify-end border-t px-3 py-2">
-              <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 text-xs" (click)="resetDisplay()">Reset to default</button>
-            </div>
-          </hlm-popover-content>
-        </hlm-popover>
-      </div>
+              <div class="border-t p-3">
+                <p class="text-muted-foreground mb-2 text-xs">Display properties</p>
+                <div class="flex flex-wrap gap-1.5">
+                  @for (p of props; track p) {
+                    <button
+                      type="button"
+                      class="h-6 rounded-md border px-2 text-xs transition-colors"
+                      [class]="
+                        isShown(p)
+                          ? 'border-border-strong bg-accent text-foreground'
+                          : 'border-border text-muted-foreground hover:text-foreground'
+                      "
+                      [attr.aria-pressed]="isShown(p)"
+                      (click)="toggleProp(p)"
+                    >
+                      {{ propLabels[p] }}
+                    </button>
+                  }
+                </div>
+              </div>
+              <div class="flex justify-end border-t px-3 py-2">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="sm"
+                  class="text-muted-foreground h-7 text-xs"
+                  (click)="resetDisplay()"
+                >
+                  Reset to default
+                </button>
+              </div>
+            </hlm-popover-content>
+          </hlm-popover>
+        </div>
       </div>
     </div>
 
     @if (scoped().length === 0) {
       <app-empty-state [icon]="inbox" [title]="emptyTitle()" [description]="emptyDescription()">
         @if (canEdit() && showCreate()) {
-          <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New issue <app-kbd keys="c" class="opacity-70" /></button>
+          <button hlmBtn size="sm" (click)="create()">
+            <svg [lucideIcon]="plus" [size]="14"></svg>New issue
+            <app-kbd keys="c" class="opacity-70" />
+          </button>
         }
       </app-empty-state>
     } @else if (shown() === 0) {
-      <app-empty-state [icon]="filterIcon" title="No issues match" description="Nothing in this view matches the filters. Remove a filter or change the search.">
+      <app-empty-state
+        [icon]="filterIcon"
+        title="No issues match"
+        description="Nothing in this view matches the filters. Remove a filter or change the search."
+      >
         <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
       </app-empty-state>
     } @else {
@@ -321,7 +487,12 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               @if (key) {
                 <app-actor-avatar [actor]="{ type: 'user', id: key }" [size]="16" />
               } @else {
-                <svg [lucideIcon]="noUser" [size]="16" [strokeWidth]="1.5" class="text-muted-foreground"></svg>
+                <svg
+                  [lucideIcon]="noUser"
+                  [size]="16"
+                  [strokeWidth]="1.5"
+                  class="text-muted-foreground"
+                ></svg>
               }
             }
             @case ('projectId') {
@@ -333,8 +504,13 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             }
             @case ('workstreamIds') {
               @if (key) {
-                <app-status-icon entity="workstream" [status]="$any(store.getWorkstream(key)?.status ?? 'draft')" />
-                <span class="text-muted-foreground font-mono text-xs">{{ store.getWorkstream(key)?.key }}</span>
+                <app-status-icon
+                  entity="workstream"
+                  [status]="$any(store.getWorkstream(key)?.status ?? 'draft')"
+                />
+                <span class="text-muted-foreground font-mono text-xs">{{
+                  store.getWorkstream(key)?.key
+                }}</span>
               } @else {
                 <svg [lucideIcon]="hexIcon" [size]="14" class="text-muted-foreground"></svg>
               }
@@ -349,7 +525,9 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     <ng-template #issueMenu let-i>
       @let ids = targetsFor(i);
       <hlm-dropdown-menu class="w-60">
-        <hlm-dropdown-menu-label class="truncate">{{ ids.length > 1 ? ids.length + ' issues' : i.key + ' · ' + i.title }}</hlm-dropdown-menu-label>
+        <hlm-dropdown-menu-label class="truncate">{{
+          ids.length > 1 ? ids.length + ' issues' : i.key + ' · ' + i.title
+        }}</hlm-dropdown-menu-label>
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="statusSub">
             <app-status-icon entity="issue" [status]="i.status" /> Status
@@ -368,7 +546,8 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             <hlm-dropdown-menu-item-sub-indicator />
           </button>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="wsSub">
-            <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Add to workstream
+            <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Add to
+            workstream
             <hlm-dropdown-menu-item-sub-indicator />
           </button>
         </hlm-dropdown-menu-group>
@@ -381,23 +560,35 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             </button>
           }
           <button hlmDropdownMenuItem (triggered)="actions.copyKeys(ids)">
-            <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy {{ ids.length > 1 ? 'keys' : 'key' }}
+            <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy
+            {{ ids.length > 1 ? 'keys' : 'key' }}
             <hlm-dropdown-menu-shortcut><app-kbd keys="mod+." /></hlm-dropdown-menu-shortcut>
           </button>
           <button hlmDropdownMenuItem (triggered)="actions.copyLinks(ids)">
-            <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy {{ ids.length > 1 ? 'links' : 'link' }}
+            <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy
+            {{ ids.length > 1 ? 'links' : 'link' }}
             <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+l" /></hlm-dropdown-menu-shortcut>
           </button>
           @if (ids.length === 1) {
             <button hlmDropdownMenuItem (triggered)="actions.copyBranch(i.id)">
               <svg [lucideIcon]="branchIcon" [size]="14"></svg> Copy git branch name
-              <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+g" /></hlm-dropdown-menu-shortcut>
+              <hlm-dropdown-menu-shortcut
+                ><app-kbd keys="mod+shift+g"
+              /></hlm-dropdown-menu-shortcut>
             </button>
             <button hlmDropdownMenuItem (triggered)="favorites.toggle('issue', i.id)">
-              <svg [lucideIcon]="starIcon" [size]="14" [attr.fill]="favorites.has('issue', i.id) ? 'currentColor' : 'none'"></svg>
+              <svg
+                [lucideIcon]="starIcon"
+                [size]="14"
+                [attr.fill]="favorites.has('issue', i.id) ? 'currentColor' : 'none'"
+              ></svg>
               {{ favorites.has('issue', i.id) ? 'Remove from favorites' : 'Add to favorites' }}
             </button>
-            <button hlmDropdownMenuItem (triggered)="actions.openPrompt('duplicate', ids)" [disabled]="!!i.duplicateOfId">
+            <button
+              hlmDropdownMenuItem
+              (triggered)="actions.openPrompt('duplicate', ids)"
+              [disabled]="!!i.duplicateOfId"
+            >
               <svg [lucideIcon]="copyIcon" [size]="14"></svg> Mark as duplicate…
             </button>
             <button hlmDropdownMenuItem (triggered)="actions.createWorkstreamFrom(i)">
@@ -408,8 +599,12 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         @if (store.allowed('deleteIssues')) {
           <hlm-dropdown-menu-separator />
           <button hlmDropdownMenuItem variant="destructive" (triggered)="actions.remove(ids)">
-            <svg [lucideIcon]="trash" [size]="14"></svg> Delete{{ ids.length > 1 ? ' ' + ids.length + ' issues' : '' }}…
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+backspace" /></hlm-dropdown-menu-shortcut>
+            <svg [lucideIcon]="trash" [size]="14"></svg> Delete{{
+              ids.length > 1 ? ' ' + ids.length + ' issues' : ''
+            }}…
+            <hlm-dropdown-menu-shortcut
+              ><app-kbd keys="mod+backspace"
+            /></hlm-dropdown-menu-shortcut>
           </button>
         }
       </hlm-dropdown-menu>
@@ -497,44 +692,121 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
 
     <!-- Bulk action bar -->
     @if (selection().length) {
-      <div class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4 max-md:fixed max-md:bottom-[calc(3.0625rem+env(safe-area-inset-bottom)+0.5rem)]">
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-4 z-20 flex justify-center px-4 max-md:fixed max-md:bottom-[calc(3.0625rem+env(safe-area-inset-bottom)+0.5rem)]"
+      >
         <div
           class="bg-popover text-popover-foreground ring-foreground/10 pointer-events-auto flex max-w-full items-center gap-0.5 overflow-x-auto rounded-lg p-1 text-[13px] shadow-lg ring-1"
           role="toolbar"
           aria-label="Bulk actions"
         >
-          <span class="flex items-center gap-1 rounded-md border border-dashed px-2 py-0.5 text-xs whitespace-nowrap">
+          <span
+            class="flex items-center gap-1 rounded-md border border-dashed px-2 py-0.5 text-xs whitespace-nowrap"
+          >
             <span class="tabular-nums">{{ selection().length }}</span> selected
-            <button type="button" class="text-muted-foreground hover:text-foreground -mr-1 rounded p-0.5" aria-label="Clear selection" hlmTooltip="Clear selection · Esc" (click)="ui.clearSelected()">
+            <button
+              type="button"
+              class="text-muted-foreground hover:text-foreground -mr-1 rounded p-0.5"
+              aria-label="Clear selection"
+              hlmTooltip="Clear selection · Esc"
+              (click)="ui.clearSelected()"
+            >
               <svg [lucideIcon]="xIcon" [size]="12"></svg>
             </button>
           </span>
           @if (selection().length < shown()) {
-            <button hlmBtn variant="ghost" size="sm" class="h-7 px-2 text-xs" hlmTooltip="Select all · ⌘A" (click)="selectAll()">Select all</button>
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="h-7 px-2 text-xs"
+              hlmTooltip="Select all · ⌘A"
+              (click)="selectAll()"
+            >
+              Select all
+            </button>
           }
           <span class="bg-border mx-1 h-4 w-px shrink-0"></span>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Change status · S" (click)="actions.openPrompt('status', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Change status · S"
+            (click)="actions.openPrompt('status', selection())"
+          >
             <app-status-icon entity="issue" status="in_progress" /> Status
           </button>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Set priority · P" (click)="actions.openPrompt('priority', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Set priority · P"
+            (click)="actions.openPrompt('priority', selection())"
+          >
             <app-priority-icon priority="high" /> Priority
           </button>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Assign · A" (click)="actions.openPrompt('assignee', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Assign · A"
+            (click)="actions.openPrompt('assignee', selection())"
+          >
             <svg [lucideIcon]="noUser" [size]="14"></svg> Assignee
           </button>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Labels · L" (click)="actions.openPrompt('label', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Labels · L"
+            (click)="actions.openPrompt('label', selection())"
+          >
             <svg [lucideIcon]="tagIcon" [size]="14"></svg> Labels
           </button>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Move to project · ⇧P" (click)="actions.openPrompt('project', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Move to project · ⇧P"
+            (click)="actions.openPrompt('project', selection())"
+          >
             <svg [lucideIcon]="projectIcon" [size]="14"></svg> Project
           </button>
-          <button hlmBtn variant="ghost" size="sm" class="h-7 gap-1.5 px-2 text-xs" hlmTooltip="Add to workstream · W" (click)="actions.openPrompt('workstream', selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="h-7 gap-1.5 px-2 text-xs"
+            hlmTooltip="Add to workstream · W"
+            (click)="actions.openPrompt('workstream', selection())"
+          >
             <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Workstream
           </button>
-          <button hlmBtn variant="ghost" size="icon-sm" class="size-7" aria-label="Copy keys" hlmTooltip="Copy keys · ⌘." (click)="actions.copyKeys(selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            class="size-7"
+            aria-label="Copy keys"
+            hlmTooltip="Copy keys · ⌘."
+            (click)="actions.copyKeys(selection())"
+          >
             <svg [lucideIcon]="copyIcon" [size]="14"></svg>
           </button>
-          <button hlmBtn variant="ghost" size="icon-sm" class="text-destructive hover:text-destructive size-7" aria-label="Delete selected" hlmTooltip="Delete · ⌘⌫" (click)="actions.remove(selection())">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            class="text-destructive hover:text-destructive size-7"
+            aria-label="Delete selected"
+            hlmTooltip="Delete · ⌘⌫"
+            (click)="actions.remove(selection())"
+          >
             <svg [lucideIcon]="trash" [size]="14"></svg>
           </button>
         </div>
@@ -577,16 +849,27 @@ export class IssueBoard {
   protected readonly search = this.listState.remember('issues.search', '');
   private anchor: string | null = null;
 
-  protected readonly statuses = issueStatusOptions();
+  protected get statuses() {
+    return issueStatusOptions(this.store.settings().statuses.issue);
+  }
   protected readonly kinds = issueKindOptions();
   protected readonly priorities = priorityOptions();
   protected readonly teams = computed(() => teamOptions(this.store));
-  protected readonly assigneeFilter = computed<PickOption[]>(() => [{ value: '', label: 'Unassigned' }, ...userOptions(this.store)]);
-  protected readonly wsFilter = computed<PickOption[]>(() => [{ value: '', label: 'No workstream' }, ...workstreamPickOptions(this.store)]);
+  protected readonly assigneeFilter = computed<PickOption[]>(() => [
+    { value: '', label: 'Unassigned' },
+    ...userOptions(this.store),
+  ]);
+  protected readonly wsFilter = computed<PickOption[]>(() => [
+    { value: '', label: 'No workstream' },
+    ...workstreamPickOptions(this.store),
+  ]);
   protected readonly projectFilter = computed(() => projectFilterOptions(this.store));
   protected readonly milestoneFilter = computed(() => milestoneFilterOptions(this.store));
   /** An issue counts under its own project and the projects of its workstreams. */
-  private readonly queryCtx = computed(() => ({ workstreamById: this.store.workstreamById(), demand: this.store.demand() }));
+  private readonly queryCtx = computed(() => ({
+    workstreamById: this.store.workstreamById(),
+    demand: this.store.demand(),
+  }));
   protected readonly groups = GROUPS;
   protected readonly sorts = SORTS;
   protected readonly props = PROPS;
@@ -600,7 +883,9 @@ export class IssueBoard {
   protected readonly priorityOpts = promptOptions(this.store, 'priority', []);
   protected readonly assigneeOpts = computed(() => promptOptions(this.store, 'assignee', []));
   protected readonly teamOpts = computed(() => promptOptions(this.store, 'team', []));
-  protected readonly wsMenuOpts = computed(() => promptOptions(this.store, 'workstream', []).slice(0, 10));
+  protected readonly wsMenuOpts = computed(() =>
+    promptOptions(this.store, 'workstream', []).slice(0, 10),
+  );
 
   protected readonly plus = LucidePlus;
   protected readonly searchIcon = LucideSearch;
@@ -628,14 +913,20 @@ export class IssueBoard {
   protected readonly canEdit = computed(() => this.store.can('member'));
   /** Filters beyond the ones the URL pins (`?team=`). */
   protected readonly hasFilters = computed(
-    () => this.filters().some((f) => !(f.field === 'teamId' && this.team())) || this.search().trim().length > 0,
+    () =>
+      this.filters().some((f) => !(f.field === 'teamId' && this.team())) ||
+      this.search().trim().length > 0,
   );
   protected readonly effectiveGroup = computed<IssueGroup>(() => {
     const g = this.d().groupBy;
     return this.d().layout === 'board' && g === 'none' ? 'status' : g;
   });
-  protected readonly draggable = computed(() => this.canEdit() && DRAGGABLE.has(this.effectiveGroup()));
-  protected readonly dateField = computed(() => (this.d().sortField === 'createdAt' ? 'createdAt' : 'updatedAt'));
+  protected readonly draggable = computed(
+    () => this.canEdit() && DRAGGABLE.has(this.effectiveGroup()),
+  );
+  protected readonly dateField = computed(() =>
+    this.d().sortField === 'createdAt' ? 'createdAt' : 'updatedAt',
+  );
 
   /** Issues inside the current view tab. */
   protected readonly scoped = computed(() => {
@@ -655,7 +946,10 @@ export class IssueBoard {
       if (include && group === 'status') {
         const scope = this.scope();
         const picked = filterValues(this.filters(), 'status');
-        include = include.filter((s) => (!scope || scope.includes(s as IssueStatus)) && (!picked.length || picked.includes(s)));
+        include = include.filter(
+          (s) =>
+            (!scope || scope.includes(s as IssueStatus)) && (!picked.length || picked.includes(s)),
+        );
       }
     }
     return queryGroups(
@@ -673,11 +967,15 @@ export class IssueBoard {
   });
 
   /** Visible issue ids in display order (unique; an issue can sit in several workstream groups). */
-  private readonly ordered = computed(() => [...new Set(this.columns().flatMap((c) => c.items.map((i) => i.id)))]);
+  private readonly ordered = computed(() => [
+    ...new Set(this.columns().flatMap((c) => c.items.map((i) => i.id))),
+  ]);
   protected readonly shown = computed(() => this.ordered().length);
   private readonly visibleSet = computed(() => new Set(this.ordered()));
   /** Selected issues that are visible on this board. */
-  protected readonly selection = computed(() => this.ui.selectedRowIds().filter((id) => this.visibleSet().has(id)));
+  protected readonly selection = computed(() =>
+    this.ui.selectedRowIds().filter((id) => this.visibleSet().has(id)),
+  );
   protected readonly selectedSet = computed(() => new Set(this.selection()));
   /** What keyboard actions apply to: the selection, else the focused row. */
   private readonly targets = computed<string[]>(() => {
@@ -688,20 +986,106 @@ export class IssueBoard {
   });
 
   private readonly _keys = usePageShortcuts([
-    { keys: 's', label: 'Change status', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('status', this.targets()) },
-    { keys: 'p', label: 'Set priority', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('priority', this.targets()) },
-    { keys: 'a', label: 'Assign to…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('assignee', this.targets()) },
-    { keys: 'i', label: 'Assign to me', group: 'Issues', when: () => this.canAct(), run: () => this.actions.toggleAssignMe(this.targets()) },
-    { keys: 'l', label: 'Toggle labels…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('label', this.targets()) },
-    { keys: 'shift+p', label: 'Move to project…', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('project', this.targets()) },
-    { keys: 'w', label: 'Add to workstream', group: 'Issues', when: () => this.canAct(), run: () => this.actions.openPrompt('workstream', this.targets()) },
-    { keys: 'mod+.', label: 'Copy issue key', group: 'Issues', when: () => this.targets().length > 0 && !this.typing(), run: () => this.actions.copyKeys(this.targets()) },
-    { keys: 'mod+shift+l', label: 'Copy issue link', group: 'Issues', when: () => this.targets().length > 0 && !this.typing(), run: () => this.actions.copyLinks(this.targets()) },
-    { keys: 'mod+shift+g', label: 'Copy git branch name', group: 'Issues', when: () => this.targets().length === 1 && !this.typing(), run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'mod+shift+.', label: 'Copy git branch name', group: 'Issues', hidden: true, when: () => this.targets().length === 1 && !this.typing(), run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'mod+shift+>', label: 'Copy git branch name', group: 'Issues', hidden: true, when: () => this.targets().length === 1 && !this.typing(), run: () => this.actions.copyBranch(this.targets()[0]) },
-    { keys: 'mod+backspace', label: 'Delete issue', group: 'Issues', when: () => this.canAct() && !this.typing(), run: () => this.actions.remove(this.targets()) },
-    { keys: 'mod+a', label: 'Select all issues', group: 'Issues', when: () => this.canEdit() && this.shown() > 0 && !this.typing(), run: () => this.selectAll() },
+    {
+      keys: 's',
+      label: 'Change status',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('status', this.targets()),
+    },
+    {
+      keys: 'p',
+      label: 'Set priority',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('priority', this.targets()),
+    },
+    {
+      keys: 'a',
+      label: 'Assign to…',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('assignee', this.targets()),
+    },
+    {
+      keys: 'i',
+      label: 'Assign to me',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.toggleAssignMe(this.targets()),
+    },
+    {
+      keys: 'l',
+      label: 'Toggle labels…',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('label', this.targets()),
+    },
+    {
+      keys: 'shift+p',
+      label: 'Move to project…',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('project', this.targets()),
+    },
+    {
+      keys: 'w',
+      label: 'Add to workstream',
+      group: 'Issues',
+      when: () => this.canAct(),
+      run: () => this.actions.openPrompt('workstream', this.targets()),
+    },
+    {
+      keys: 'mod+.',
+      label: 'Copy issue key',
+      group: 'Issues',
+      when: () => this.targets().length > 0 && !this.typing(),
+      run: () => this.actions.copyKeys(this.targets()),
+    },
+    {
+      keys: 'mod+shift+l',
+      label: 'Copy issue link',
+      group: 'Issues',
+      when: () => this.targets().length > 0 && !this.typing(),
+      run: () => this.actions.copyLinks(this.targets()),
+    },
+    {
+      keys: 'mod+shift+g',
+      label: 'Copy git branch name',
+      group: 'Issues',
+      when: () => this.targets().length === 1 && !this.typing(),
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'mod+shift+.',
+      label: 'Copy git branch name',
+      group: 'Issues',
+      hidden: true,
+      when: () => this.targets().length === 1 && !this.typing(),
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'mod+shift+>',
+      label: 'Copy git branch name',
+      group: 'Issues',
+      hidden: true,
+      when: () => this.targets().length === 1 && !this.typing(),
+      run: () => this.actions.copyBranch(this.targets()[0]),
+    },
+    {
+      keys: 'mod+backspace',
+      label: 'Delete issue',
+      group: 'Issues',
+      when: () => this.canAct() && !this.typing(),
+      run: () => this.actions.remove(this.targets()),
+    },
+    {
+      keys: 'mod+a',
+      label: 'Select all issues',
+      group: 'Issues',
+      when: () => this.canEdit() && this.shown() > 0 && !this.typing(),
+      run: () => this.selectAll(),
+    },
     { keys: 'f', label: 'Filter issues', group: 'Issues', run: () => this.focusSearch() },
   ]);
 
@@ -730,7 +1114,8 @@ export class IssueBoard {
       this.filters.update((f) => {
         let next = team || !initial ? setFilter(f, 'teamId', 'in', team ? [team] : []) : f;
         if (project) next = setFilter(next, 'projectId', 'in', [project]);
-        if (status && (ISSUE_STATUSES as readonly string[]).includes(status)) next = setFilter(next, 'status', 'in', [status]);
+        const known = this.store.settings().statuses.issue.some((entry) => entry.id === status || entry.type === status);
+        if (status && known) next = setFilter(next, 'status', 'in', [status]);
         return next;
       });
     });
@@ -757,7 +1142,9 @@ export class IssueBoard {
   }
 
   protected toggleProp(p: IssueProp): void {
-    this.patch({ hidden: this.isShown(p) ? [...this.d().hidden, p] : this.d().hidden.filter((x) => x !== p) });
+    this.patch({
+      hidden: this.isShown(p) ? [...this.d().hidden, p] : this.d().hidden.filter((x) => x !== p),
+    });
   }
 
   protected label(key: string): string {
@@ -820,16 +1207,20 @@ export class IssueBoard {
   protected move(issue: Issue, value: string): void {
     switch (this.effectiveGroup()) {
       case 'status':
-        if (issue.status !== value) void this.store.updateIssue(issue.id, { status: value as IssueStatus });
+        if (issue.status !== value)
+          void this.store.updateIssue(issue.id, { status: value as IssueStatus });
         break;
       case 'priority':
-        if (issue.priority !== value) void this.store.updateIssue(issue.id, { priority: value as Priority });
+        if (issue.priority !== value)
+          void this.store.updateIssue(issue.id, { priority: value as Priority });
         break;
       case 'teamId':
-        if ((issue.teamId ?? '') !== value) void this.store.updateIssue(issue.id, { teamId: value || null });
+        if ((issue.teamId ?? '') !== value)
+          void this.store.updateIssue(issue.id, { teamId: value || null });
         break;
       case 'assigneeId':
-        if ((issue.assigneeId ?? '') !== value) void this.store.updateIssue(issue.id, { assigneeId: value || null });
+        if ((issue.assigneeId ?? '') !== value)
+          void this.store.updateIssue(issue.id, { assigneeId: value || null });
         break;
     }
   }
@@ -860,7 +1251,11 @@ export class IssueBoard {
     return sel.length > 1 && sel.includes(issue.id) ? sel : [issue.id];
   }
 
-  protected allHave(ids: readonly string[], field: 'status' | 'priority' | 'assigneeId' | 'teamId', value: string): boolean {
+  protected allHave(
+    ids: readonly string[],
+    field: 'status' | 'priority' | 'assigneeId' | 'teamId',
+    value: string,
+  ): boolean {
     const list = this.actions.issues(ids);
     return list.length > 0 && list.every((i) => (i[field] ?? '') === value);
   }

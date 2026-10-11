@@ -1,7 +1,14 @@
 // Properties sidebar of a workstream: every row is an inline popover editor.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { DELIVERY_STATE_META, TramaStore, isOverdue, type Priority, type Workstream, type WorkstreamStatus } from '../../core';
+import {
+  DELIVERY_STATE_META,
+  TramaStore,
+  isOverdue,
+  type Priority,
+  type Workstream,
+  type WorkstreamStatus,
+} from '../../core';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
@@ -10,14 +17,33 @@ import { MilestoneInfo } from '../milestones/milestone-stats';
 import { Picker } from './picker';
 import { WsActions } from './ws-actions';
 import { statusSourceInfo } from './status-source';
-import { contributors, isDeliveredState, issueCounts, priorityOptions, projectOptions, repoOptionsIn, statusOptions, teamOptions, userOptions } from './ws-model';
+import {
+  contributors,
+  isDeliveredState,
+  issueCounts,
+  priorityOptions,
+  projectOptions,
+  repoOptionsIn,
+  statusOptions,
+  teamOptions,
+  userOptions,
+} from './ws-model';
 import { IssueProgress, WsDatePicker } from './ws-parts';
 import { LabelPicker } from '../../shared/label-picker';
 
 @Component({
   selector: 'app-ws-properties',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LabelPicker, PropertyRow, Picker, HlmTooltip, ActorLabel, FullDatePipe, IssueProgress, WsDatePicker],
+  imports: [
+    LabelPicker,
+    PropertyRow,
+    Picker,
+    HlmTooltip,
+    ActorLabel,
+    FullDatePipe,
+    IssueProgress,
+    WsDatePicker,
+  ],
   host: { class: 'block' },
   template: `
     @let w = ws();
@@ -31,10 +57,12 @@ import { LabelPicker } from '../../shared/label-picker';
           clearLabel="Automatic (derived)"
           [disabled]="!canEdit()"
           [options]="statuses"
-          [value]="[w.status]"
+          [value]="[w.statusOverride || w.status]"
           (valueChange)="setStatus($event[0])"
         />
-        <span class="text-muted-foreground shrink-0 text-[11px]" [hlmTooltip]="source().hint">{{ w.statusSource === 'derived' ? 'auto' : source().label }}</span>
+        <span class="text-muted-foreground shrink-0 text-[11px]" [hlmTooltip]="source().hint">{{
+          w.statusSource === 'derived' ? 'auto' : source().label
+        }}</span>
       </app-property-row>
       @if (w.delivery !== 'none') {
         <app-property-row label="Delivery">
@@ -45,19 +73,60 @@ import { LabelPicker } from '../../shared/label-picker';
         </app-property-row>
       }
       <app-property-row label="Owner team">
-        <app-picker variant="field" label="Owner team" [disabled]="!canEdit()" [options]="teams()" [value]="[w.ownerTeamId]" (valueChange)="setOwner($event[0])" />
+        <app-picker
+          variant="field"
+          label="Owner team"
+          [disabled]="!canEdit()"
+          [options]="teams()"
+          [value]="[w.ownerTeamId]"
+          (valueChange)="setOwner($event[0])"
+        />
       </app-property-row>
       <app-property-row label="Participating">
-        <app-picker variant="field" label="Participating teams" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="participantOptions()" [value]="w.participatingTeamIds" (valueChange)="update({ participatingTeamIds: $event })" />
+        <app-picker
+          variant="field"
+          label="Participating teams"
+          placeholder="None"
+          [multiple]="true"
+          [disabled]="!canEdit()"
+          [options]="participantOptions()"
+          [value]="w.participatingTeamIds"
+          (valueChange)="update({ participatingTeamIds: $event })"
+        />
       </app-property-row>
       <app-property-row label="Accountable">
-        <app-picker variant="field" label="Accountable" placeholder="Unassigned" [clearable]="true" clearLabel="Unassign" [disabled]="!canEdit()" [options]="users()" [value]="w.accountableUserId ? [w.accountableUserId] : []" (valueChange)="update({ accountableUserId: $event[0] ?? null })" />
+        <app-picker
+          variant="field"
+          label="Accountable"
+          placeholder="Unassigned"
+          [clearable]="true"
+          clearLabel="Unassign"
+          [disabled]="!canEdit()"
+          [options]="users()"
+          [value]="w.accountableUserId ? [w.accountableUserId] : []"
+          (valueChange)="update({ accountableUserId: $event[0] ?? null })"
+        />
       </app-property-row>
       <app-property-row label="Priority">
-        <app-picker variant="field" label="Priority" [searchable]="false" [disabled]="!canEdit()" [options]="priorities" [value]="[w.priority]" (valueChange)="setPriority($event[0])" />
+        <app-picker
+          variant="field"
+          label="Priority"
+          [searchable]="false"
+          [disabled]="!canEdit()"
+          [options]="priorities"
+          [value]="[w.priority]"
+          (valueChange)="setPriority($event[0])"
+        />
       </app-property-row>
       <app-property-row label="Start date">
-        <app-ws-date-picker class="min-w-0 flex-1" label="Start date" triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm" [disabled]="!canEdit()" [value]="w.startDate" (dateChange)="setStart($event)">
+        <app-ws-date-picker
+          class="min-w-0 flex-1"
+          label="Start date"
+          triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm"
+          [disabled]="!canEdit()"
+          [value]="w.startDate"
+          (dateChange)="setStart($event)"
+        >
           @if (w.startDate) {
             <span>{{ w.startDate | fullDate }}</span>
           } @else {
@@ -66,7 +135,13 @@ import { LabelPicker } from '../../shared/label-picker';
         </app-ws-date-picker>
       </app-property-row>
       <app-property-row label="Target date">
-        <app-ws-date-picker class="min-w-0 flex-1" triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm" [disabled]="!canEdit()" [value]="w.targetDate" (dateChange)="setDate($event)">
+        <app-ws-date-picker
+          class="min-w-0 flex-1"
+          triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm"
+          [disabled]="!canEdit()"
+          [value]="w.targetDate"
+          (dateChange)="setDate($event)"
+        >
           @if (w.targetDate) {
             <span [class.text-status-blocked]="overdue()">{{ w.targetDate | fullDate }}</span>
             @if (overdue()) {
@@ -82,7 +157,10 @@ import { LabelPicker } from '../../shared/label-picker';
           @if (milestones().length) {
             <span class="tabular-nums">{{ milestones().length }}</span>
             @if (next(); as n) {
-              <span class="text-muted-foreground truncate text-xs" [hlmTooltip]="n.ms.name">next · M{{ n.n }}{{ n.ms.targetDate ? ' · ' + (n.ms.targetDate | fullDate) : '' }}</span>
+              <span class="text-muted-foreground truncate text-xs" [hlmTooltip]="n.ms.name"
+                >next · M{{ n.n
+                }}{{ n.ms.targetDate ? ' · ' + (n.ms.targetDate | fullDate) : '' }}</span
+              >
             } @else {
               <span class="text-muted-foreground text-xs">all complete</span>
             }
@@ -92,25 +170,55 @@ import { LabelPicker } from '../../shared/label-picker';
         </span>
       </app-property-row>
       <app-property-row label="Project">
-        <app-picker variant="field" label="Project" placeholder="No project" [clearable]="true" clearLabel="Remove from project" [disabled]="!canEdit()" [options]="projects()" [value]="w.projectId ? [w.projectId] : []" (valueChange)="setProject($event[0])" />
+        <app-picker
+          variant="field"
+          label="Project"
+          placeholder="No project"
+          [clearable]="true"
+          clearLabel="Remove from project"
+          [disabled]="!canEdit()"
+          [options]="projects()"
+          [value]="w.projectId ? [w.projectId] : []"
+          (valueChange)="setProject($event[0])"
+        />
       </app-property-row>
       <app-property-row label="Repositories">
-        <app-picker variant="field" label="Repositories" placeholder="None" [multiple]="true" [disabled]="!canEdit()" [options]="repos()" [value]="w.repositoryIds" (valueChange)="update({ repositoryIds: $event })" />
+        <app-picker
+          variant="field"
+          label="Repositories"
+          placeholder="None"
+          [multiple]="true"
+          [disabled]="!canEdit()"
+          [options]="repos()"
+          [value]="w.repositoryIds"
+          (valueChange)="update({ repositoryIds: $event })"
+        />
       </app-property-row>
       <app-property-row label="Issues">
-        <span class="px-1.5"><app-issue-progress [done]="counts().issuesDone" [active]="counts().issuesActive" [total]="counts().issuesTotal" /></span>
+        <span class="px-1.5"
+          ><app-issue-progress
+            [done]="counts().issuesDone"
+            [active]="counts().issuesActive"
+            [total]="counts().issuesTotal"
+        /></span>
       </app-property-row>
       <app-property-row label="Dependencies">
         <span class="text-muted-foreground px-1.5 text-xs">
           @if (deps().waits || deps().blocks) {
-            waits on <span class="text-foreground tabular-nums">{{ deps().waits }}</span> · blocks <span class="text-foreground tabular-nums">{{ deps().blocks }}</span>
+            waits on <span class="text-foreground tabular-nums">{{ deps().waits }}</span> · blocks
+            <span class="text-foreground tabular-nums">{{ deps().blocks }}</span>
           } @else {
             None
           }
         </span>
       </app-property-row>
       <app-property-row label="Labels">
-        <app-label-picker [disabled]="!canEdit()" [value]="w.labels" (valueChange)="update({ labels: $event })" />
+        <app-label-picker
+          scope="workstream"
+          [disabled]="!canEdit()"
+          [value]="w.labels"
+          (valueChange)="update({ labels: $event })"
+        />
       </app-property-row>
     </div>
 
@@ -135,12 +243,19 @@ import { LabelPicker } from '../../shared/label-picker';
           }
         </ul>
         @if (people().length > 6) {
-          <button type="button" class="text-muted-foreground hover:text-foreground mt-1 text-xs" (click)="showAll.update((v) => !v)">
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground mt-1 text-xs"
+            (click)="showAll.update((v) => !v)"
+          >
             {{ showAll() ? 'Show fewer' : 'Show all ' + people().length }}
           </button>
         }
       } @else {
-        <p class="text-muted-foreground text-xs">Nobody yet. People appear here when they author PRs, comment, answer questions or own linked issues.</p>
+        <p class="text-muted-foreground text-xs">
+          Nobody yet. People appear here when they author PRs, comment, answer questions or own
+          linked issues.
+        </p>
       }
     </div>
   `,
@@ -151,7 +266,9 @@ export class WsProperties {
   private readonly msInfo = inject(MilestoneInfo);
   readonly ws = input.required<Workstream>();
 
-  protected readonly statuses = statusOptions();
+  protected get statuses() {
+    return statusOptions(this.store.settings().statuses.workstream);
+  }
   protected readonly showAll = signal(false);
   protected readonly source = computed(() => statusSourceInfo(this.ws()));
   protected readonly deliveryLabel = computed(() => DELIVERY_STATE_META[this.ws().delivery].label);
@@ -161,13 +278,21 @@ export class WsProperties {
       ? 'Delivered, and the outcome is achieved.'
       : 'Delivery evidence only. The outcome is not achieved until criteria are met and nothing blocks or waits on a person.',
   );
-  protected readonly counts = computed(() => issueCounts(this.store.issuesByWorkstream().get(this.ws().id) ?? []));
+  protected readonly counts = computed(() =>
+    issueCounts(this.store.issuesByWorkstream().get(this.ws().id) ?? []),
+  );
   protected readonly deps = computed(() => ({
-    waits: (this.store.incomingDependencies().get(this.ws().id) ?? []).filter((d) => d.fromType === 'workstream').length,
-    blocks: (this.store.outgoingDependencies().get(this.ws().id) ?? []).filter((d) => d.toType === 'workstream').length,
+    waits: (this.store.incomingDependencies().get(this.ws().id) ?? []).filter(
+      (d) => d.fromType === 'workstream',
+    ).length,
+    blocks: (this.store.outgoingDependencies().get(this.ws().id) ?? []).filter(
+      (d) => d.toType === 'workstream',
+    ).length,
   }));
   protected readonly people = computed(() => contributors(this.store, this.ws()));
-  protected readonly milestones = computed(() => this.store.milestonesByWorkstream().get(this.ws().id) ?? []);
+  protected readonly milestones = computed(
+    () => this.store.milestonesByWorkstream().get(this.ws().id) ?? [],
+  );
   protected readonly next = computed(() => this.msInfo.nextByWorkstream().get(this.ws().id));
 
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -176,10 +301,15 @@ export class WsProperties {
   protected readonly repos = computed(() => repoOptionsIn(this.store, this.ws().projectId));
   protected readonly projects = computed(() => projectOptions(this.store, this.ws().projectId));
   protected readonly priorities = priorityOptions();
-  protected readonly participantOptions = computed(() => this.teams().filter((t) => t.value !== this.ws().ownerTeamId));
+  protected readonly participantOptions = computed(() =>
+    this.teams().filter((t) => t.value !== this.ws().ownerTeamId),
+  );
 
   protected readonly overdue = computed(
-    () => isOverdue(this.ws().targetDate) && this.ws().status !== 'shipped' && this.ws().status !== 'canceled',
+    () =>
+      isOverdue(this.ws().targetDate) &&
+      this.ws().status !== 'shipped' &&
+      this.ws().status !== 'canceled',
   );
   protected update(patch: Parameters<TramaStore['updateWorkstream']>[1]): void {
     void this.store.updateWorkstream(this.ws().id, patch);
@@ -187,7 +317,10 @@ export class WsProperties {
 
   protected setOwner(id: string | undefined): void {
     if (!id || id === this.ws().ownerTeamId) return;
-    this.update({ ownerTeamId: id, participatingTeamIds: this.ws().participatingTeamIds.filter((t) => t !== id) });
+    this.update({
+      ownerTeamId: id,
+      participatingTeamIds: this.ws().participatingTeamIds.filter((t) => t !== id),
+    });
   }
 
   protected setPriority(p: string | undefined): void {
@@ -199,7 +332,10 @@ export class WsProperties {
     const project = this.store.getProject(id);
     if (!project) return this.update({ projectId: null });
     const own = this.ws().repositoryIds.filter((r) => project.repositoryIds.includes(r));
-    this.update({ projectId: project.id, repositoryIds: own.length ? own : [...project.repositoryIds] });
+    this.update({
+      projectId: project.id,
+      repositoryIds: own.length ? own : [...project.repositoryIds],
+    });
   }
 
   protected setDate(d: Date | null): void {

@@ -160,7 +160,12 @@ export class ViewShare {
   protected readonly visibility = computed(() => this.view().sharing.visibility);
   protected readonly triggerIcon = computed(() => VISIBILITY_ICON[this.visibility()]);
   protected readonly triggerLabel = computed(() => VISIBILITY_LABEL[this.visibility()]);
-  protected readonly canManage = computed(() => canManageViewSharing(this.view(), this.store.me()?.id, this.store.myRole()));
+  protected readonly canManage = computed(() =>
+    canManageViewSharing(this.view(), this.store.me()?.id, this.store.myRole(), {
+      canWrite: this.store.can('member'),
+      canAdmin: this.store.can('admin'),
+    }),
+  );
   protected readonly canShare = computed(() => this.store.allowed('manageSharedViews'));
   protected readonly owner = computed(() => this.store.getUser(this.view().ownerId));
   protected readonly people = computed(() =>

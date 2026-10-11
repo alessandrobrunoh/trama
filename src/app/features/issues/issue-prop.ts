@@ -5,7 +5,7 @@ import { LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, type Issue } from '../../core';
+import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, resolveStatusEntry, type Issue } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -81,7 +81,10 @@ export class IssueProp {
   protected readonly state = signal<'open' | 'closed'>('closed');
   protected readonly noUser = LucideCircleUserRound;
   protected readonly canEdit = computed(() => this.store.can('member'));
-  protected readonly statusLabel = computed(() => ISSUE_STATUS_META[this.issue().status].label);
+  protected readonly statusLabel = computed(() => {
+    const status = this.issue().status;
+    return resolveStatusEntry(this.store.settings().statuses.issue, status)?.name ?? status;
+  });
   protected readonly priorityLabel = computed(() => PRIORITY_META[this.issue().priority].label);
   protected readonly tip = computed(() => {
     const i = this.issue();

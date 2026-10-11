@@ -433,7 +433,7 @@ export class ImportSection {
   protected readonly canManage = computed(() => this.store.allowed('manageIntegrations'));
   protected readonly teams = computed(() => this.store.teams());
   protected readonly projects = computed(() => this.store.projects().slice().sort((a, b) => a.name.localeCompare(b.name)));
-  protected readonly labels = computed(() => this.store.settings().labels);
+  protected readonly labels = computed(() => this.store.settings().labels.filter((l) => l.scope === 'issue' && !l.archived));
   protected readonly members = computed(() => this.store.members().map((m) => ({ id: m.user.id, name: m.user.name })));
   protected readonly githubConnections = computed(() => this.store.integrations().filter((c) => c.provider === 'github'));
 

@@ -1,9 +1,13 @@
 import {
   PROJECT_HEALTHS,
   PROJECT_STATUSES,
+  defaultStatusCatalog,
+  resolveStatusEntry,
+  statusTypeOf,
   type Project,
   type ProjectHealth,
   type ProjectStatus,
+  type StatusEntry,
 } from '../../core/contracts/domain';
 import { PROJECT_HEALTH_META } from '../../core/meta';
 import type { TramaStore } from '../../core/stores/trama.store';
@@ -26,11 +30,21 @@ export const PROJECT_STATUS_META: Record<ProjectStatus, ProjectStatusMeta> = {
   canceled: { label: 'Canceled', text: 'text-status-draft', dot: 'bg-status-draft' },
 };
 
-export const projectStatusOptions = (): PickOption[] =>
-  PROJECT_STATUSES.map((s) => ({ value: s, label: PROJECT_STATUS_META[s].label }));
+export const projectStatusOptions = (entries = defaultStatusCatalog().project): PickOption[] =>
+  entries.map((s) => ({ value: s.id, label: s.name }));
 
-export const isClosed = (p: Pick<Project, 'status'>): boolean =>
-  p.status === 'completed' || p.status === 'canceled';
+export const isClosed = (p: Pick<Project, 'status'>, entries?: readonly StatusEntry<ProjectStatus>[]): boolean => {
+  const type = statusTypeOf(entries ?? defaultStatusCatalog().project, p.status);
+  return type === 'completed' || type === 'canceled';
+};
+
+export const projectStatusView = (
+  status: string,
+  entries = defaultStatusCatalog().project,
+): { label: string; color: string } => {
+  const entry = resolveStatusEntry(entries, status);
+  return { label: entry?.name ?? status, color: entry?.color ?? '#747780' };
+};
 
 /** Past its target date and not closed. */
 export const isOverdue = (p: Pick<Project, 'status' | 'targetDate'>, now = Date.now()): boolean =>

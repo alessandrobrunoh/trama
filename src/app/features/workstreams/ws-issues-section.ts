@@ -269,7 +269,9 @@ export class WsIssuesSection {
   protected readonly plusIcon = LucidePlus;
   protected readonly xIcon = LucideX;
   protected readonly color = ISSUE_STATUS_COLOR;
-  protected readonly issueStatuses = issueStatusOptions();
+  protected get issueStatuses() {
+    return issueStatusOptions(this.store.settings().statuses.issue);
+  }
   protected readonly kindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label }));
 
   protected readonly slug = computed(() => this.store.slug() ?? '');

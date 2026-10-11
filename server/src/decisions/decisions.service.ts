@@ -6,7 +6,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
-import type { ActorRef, DecisionStatus } from '../contracts/domain.js';
+import { statusTypeOf, type ActorRef, type DecisionStatus } from '../contracts/domain.js';
+import { loadStatusCatalog, requireStatus, statusFilterIds } from '../status/status-catalog.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
@@ -19,7 +20,8 @@ export interface DecisionInput {
   title?: string;
   statement?: string;
   rationale?: string | null;
-  status?: DecisionStatus;
+  /** Catalog id, or a legacy enum (the seeded status of that type). */
+  status?: string;
   originWorkstreamId?: string | null;
   relatedWorkstreamIds?: string[];
   tags?: string[];
@@ -39,10 +41,14 @@ export class DecisionsService {
     private readonly repo: Repository<DecisionEntity>,
   ) {}
 
-  list(
+  private async entries(workspaceId: string) {
+    return (await loadStatusCatalog(this.ds, workspaceId)).decision;
+  }
+
+  async list(
     workspaceId: string,
     f: {
-      status?: DecisionStatus;
+      status?: string;
       workstreamId?: string;
       tag?: string;
       q?: string;
@@ -52,7 +58,10 @@ export class DecisionsService {
       .createQueryBuilder('d')
       .where('d.workspaceId = :workspaceId', { workspaceId })
       .orderBy('d.number', 'DESC');
-    if (f.status) qb.andWhere('d.status = :s', { s: f.status });
+    if (f.status) {
+      const entries = await this.entries(workspaceId);
+      qb.andWhere('d.status IN (:...st)', { st: statusFilterIds(entries, f.status) });
+    }
     if (f.workstreamId)
       qb.andWhere(
         '(d.originWorkstreamId = :w OR d.relatedWorkstreamIds @> :wj::jsonb)',
@@ -109,11 +118,15 @@ export class DecisionsService {
     input: DecisionInput & { title: string; statement?: string },
   ) {
     await this.validate(workspaceId, input);
-    const status = input.status ?? 'proposed';
-    if (status === 'superseded')
+    const chosen = requireStatus(await this.entries(workspaceId), input.status ?? 'proposed', 'status');
+    if (chosen.type === 'superseded')
       throw new BadRequestException('Use /supersede to supersede a decision');
+    if (chosen.type !== 'draft' && chosen.type !== 'proposed' && chosen.type !== 'accepted' && chosen.type !== 'rejected')
+      throw new BadRequestException(`A decision cannot be created as ${chosen.type}`);
+    const status = chosen.id as DecisionStatus;
+    const type = chosen.type;
     const decidedById =
-      status === 'accepted' || status === 'rejected'
+      type === 'accepted' || type === 'rejected'
         ? this.requireHuman(actor)
         : null;
     const row = await this.ds.transaction(async (m) => {
@@ -140,11 +153,11 @@ export class DecisionsService {
     await this.record(
       row,
       actor,
-      status === 'draft'
+      type === 'draft'
         ? 'decision.draft'
-        : status === 'proposed'
+        : type === 'proposed'
           ? 'decision.proposed'
-          : `decision.${status}`,
+          : `decision.${type}`,
       { title: row.title },
     );
     await this.bus.touchMany(
@@ -179,15 +192,17 @@ export class DecisionsService {
   ) {
     const row = await this.get(workspaceId, idOrKey);
     if (patch.status !== undefined) {
+      const entries = await this.entries(workspaceId);
+      const to = requireStatus(entries, patch.status, 'status');
       if (
-        row.status !== 'draft' ||
-        patch.status !== 'proposed' ||
+        statusTypeOf(entries, row.status) !== 'draft' ||
+        to.type !== 'proposed' ||
         !(patch.statement ?? row.statement).trim()
       )
         throw new BadRequestException(
           'Only a complete draft decision can be proposed',
         );
-      row.status = 'proposed';
+      row.status = to.id as DecisionStatus;
     }
     await this.validate(workspaceId, patch);
     const before = this.touched(row);
@@ -222,9 +237,11 @@ export class DecisionsService {
   async accept(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const userId = this.requireHuman(actor);
     const row = await this.get(workspaceId, idOrKey);
-    if (row.status !== 'proposed')
+    const entries = await this.entries(workspaceId);
+    const current = statusTypeOf(entries, row.status) ?? row.status;
+    if (current !== 'proposed')
       throw new ConflictException(
-        `Decision is ${row.status}, only proposed decisions can be accepted`,
+        `Decision is ${current}, only proposed decisions can be accepted`,
       );
     row.status = 'accepted';
     row.decidedById = userId;
@@ -243,9 +260,11 @@ export class DecisionsService {
   async reject(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const userId = this.requireHuman(actor);
     const row = await this.get(workspaceId, idOrKey);
-    if (row.status !== 'proposed')
+    const entries = await this.entries(workspaceId);
+    const current = statusTypeOf(entries, row.status) ?? row.status;
+    if (current !== 'proposed')
       throw new ConflictException(
-        `Decision is ${row.status}, only proposed decisions can be rejected`,
+        `Decision is ${current}, only proposed decisions can be rejected`,
       );
     row.status = 'rejected';
     row.decidedById = userId;
@@ -272,13 +291,16 @@ export class DecisionsService {
     const by = await this.get(workspaceId, byId);
     if (by.id === row.id)
       throw new BadRequestException('A decision cannot supersede itself');
-    if (row.status !== 'accepted' && row.status !== 'proposed')
+    const entries = await this.entries(workspaceId);
+    const rowType = statusTypeOf(entries, row.status) ?? row.status;
+    const byType = statusTypeOf(entries, by.status) ?? by.status;
+    if (rowType !== 'accepted' && rowType !== 'proposed')
       throw new ConflictException(
-        `Decision is ${row.status} and cannot be superseded`,
+        `Decision is ${rowType} and cannot be superseded`,
       );
-    if (by.status === 'superseded' || by.status === 'rejected')
+    if (byType === 'superseded' || byType === 'rejected')
       throw new ConflictException(
-        `Decision ${by.key} is ${by.status} and cannot supersede another`,
+        `Decision ${by.key} is ${byType} and cannot supersede another`,
       );
     for (
       let cursor: DecisionEntity | null = by, i = 0;

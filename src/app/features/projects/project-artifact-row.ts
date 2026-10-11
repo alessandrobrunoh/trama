@@ -24,6 +24,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { TramaStore, UiStore, type Artifact, type SubjectRef } from '../../core';
 import { ArtifactIcon, CiChip, ConflictChip, ReviewChip } from '../../shared/artifact';
+import { isWorkspaceUploadUrl } from '../../core/upload-url';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { ProviderIcon } from '../../shared/provider-icon';
@@ -146,12 +147,15 @@ const LONG_DESCRIPTION = 140;
         } @else if (a.url) {
           <a
             [href]="a.url"
-            target="_blank"
-            rel="noopener noreferrer"
+            [attr.target]="hosted(a.url) ? null : '_blank'"
+            [attr.rel]="hosted(a.url) ? null : 'noopener noreferrer'"
+            [attr.download]="hosted(a.url) && a.kind === 'file' ? a.title : null"
             class="inline-flex min-w-0 items-center gap-1 text-sm hover:underline"
           >
             <span class="truncate">{{ a.title }}</span>
-            <svg [lucideIcon]="ext" [size]="11" class="text-muted-foreground shrink-0"></svg>
+            @if (!hosted(a.url)) {
+              <svg [lucideIcon]="ext" [size]="11" class="text-muted-foreground shrink-0"></svg>
+            }
           </a>
         } @else {
           <span class="min-w-0 truncate text-sm">{{ a.title }}</span>
@@ -280,6 +284,9 @@ export class ProjectArtifactRow {
   protected readonly expanded = signal(false);
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected hosted(url: string): boolean {
+    return isWorkspaceUploadUrl(url);
+  }
   protected readonly showProvider = computed(() => SHOW_PROVIDER.has(this.artifact().provider));
   protected readonly chain = computed(() => {
     const mode = this.origin();
@@ -298,7 +305,9 @@ export class ProjectArtifactRow {
       title: `${a.documentId ? 'Detach' : 'Remove'} “${a.title}”?`,
       description: a.documentId
         ? 'The document is detached from here. The document itself is kept.'
-        : 'The item is detached from the context. The linked page itself is not touched.',
+        : isWorkspaceUploadUrl(a.url)
+          ? 'The attachment is removed. If nothing else still uses the file, it can no longer be downloaded.'
+          : 'The item is detached from the context. The linked page itself is not touched.',
       confirmLabel: a.documentId ? 'Detach' : 'Remove',
       onConfirm: async () => {
         await this.store.removeArtifact(a.id);

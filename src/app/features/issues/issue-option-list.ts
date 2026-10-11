@@ -61,7 +61,7 @@ export class IssueOptionList {
   protected readonly options = computed(() => {
     if (this.field() !== 'label') return promptOptions(this.store, this.field(), this.issues());
     // Same labels, same order as the label picker; a typed name that matches nothing can be created on the spot.
-    const { suggested, rest } = this.catalog.arrange(this.current(), !this.query().trim());
+    const { suggested, rest } = this.catalog.arrange(this.current(), !this.query().trim(), 'issue');
     const list = promptOptions(this.store, 'label', this.issues(), [...suggested, ...rest]);
     const name = this.query().trim();
     if (!name || name.length > LABEL_NAME_MAX || !this.catalog.canCreate() || this.catalog.find(name)) return list;
@@ -80,7 +80,7 @@ export class IssueOptionList {
   }
 
   private async createAndToggle(name: string): Promise<void> {
-    const made = await this.catalog.create(name);
+    const made = await this.catalog.create(name, undefined, 'issue');
     if (!made) return;
     this.query.set('');
     this.catalog.touch(made.id);

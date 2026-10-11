@@ -80,7 +80,7 @@ export class ImportsService {
       members: users.map((u) => ({ id: u.id, name: u.name, email: u.email })),
       teams: teams.map((t) => ({ id: t.id, name: t.name, key: t.key })),
       projects: projects.map((p) => ({ id: p.id, name: p.name })),
-      labels: resolveLabelCatalog(ws.settings?.labels).map((l) => ({ id: l.id, name: l.name })),
+      labels: resolveLabelCatalog(ws.settings?.labels).filter((l) => l.scope === 'issue').map((l) => ({ id: l.id, name: l.name })),
     };
   }
 
@@ -108,9 +108,12 @@ export class ImportsService {
     const labelIds = ids(mapping.labels);
     if (labelIds.length) {
       const ws = await this.ds.getRepository(WorkspaceEntity).findOneByOrFail({ id: workspaceId });
-      const known = new Set(resolveLabelCatalog(ws.settings?.labels).map((l) => l.id));
-      const unknown = labelIds.filter((id) => !known.has(id));
+      const catalog = resolveLabelCatalog(ws.settings?.labels);
+      const byId = new Map(catalog.map((l) => [l.id, l]));
+      const unknown = labelIds.filter((id) => !byId.has(id));
       if (unknown.length) throw new BadRequestException(`Unknown label in: ${[...new Set(unknown)].join(', ')}`);
+      const wrong = labelIds.filter((id) => byId.has(id) && byId.get(id)!.scope !== 'issue');
+      if (wrong.length) throw new BadRequestException(`Label does not apply to issues: ${[...new Set(wrong)].join(', ')}`);
     }
   }
 

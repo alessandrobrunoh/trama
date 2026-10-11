@@ -7,7 +7,14 @@ import type { EventsService } from '../events/events.service.js';
 import type { WorkspaceLabel } from '../contracts/domain.js';
 import { LabelsService } from './labels.service.js';
 
-const custom = (id: string, name: string, extra: Partial<WorkspaceLabel> = {}): WorkspaceLabel => ({ id, name, color: '#2563eb', template: false, ...extra });
+const custom = (id: string, name: string, extra: Partial<WorkspaceLabel> = {}): WorkspaceLabel => ({
+  id,
+  name,
+  color: '#2563eb',
+  template: false,
+  scope: 'issue',
+  ...extra,
+});
 
 function setup(labels: WorkspaceLabel[] = []) {
   const ws = Object.assign(new WorkspaceEntity(), { id: 'ws_1', settings: { labels } });
@@ -90,7 +97,34 @@ describe('workspace label management', () => {
 
   it('still refuses duplicate names, ignoring case', async () => {
     const { service, ctx } = setup([custom('lb_a', 'Auth')]);
-    await expect(service.create(ctx, { name: 'auth' })).rejects.toBeInstanceOf(ConflictException);
-    await expect(service.create(ctx, { name: 'bug' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.create(ctx, { name: 'auth', scope: 'workstream' })).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.create(ctx, { name: 'bug', scope: 'issue' })).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it('creates a label in the chosen scope and will not move a template', async () => {
+    const { service, ctx, ws } = setup();
+    await service.create(ctx, { name: 'Roadmap', scope: 'workstream' });
+    expect(catalogOf(ws).find((l) => l.name === 'Roadmap')).toMatchObject({ scope: 'workstream', template: false });
+    await service.update(ctx, 'lb_bug', { color: '#111111' });
+    expect(catalogOf(ws).find((l) => l.id === 'lb_bug')).toMatchObject({ name: 'Bug', scope: 'issue', color: '#111111' });
+    await expect(service.update(ctx, 'lb_bug', { scope: 'project' })).rejects.toBeInstanceOf(BadRequestException);
+    const roadmap = catalogOf(ws).find((l) => l.name === 'Roadmap')!;
+    await service.update(ctx, roadmap.id, { scope: 'project' });
+    expect(catalogOf(ws).find((l) => l.id === roadmap.id)?.scope).toBe('project');
+  });
+
+  it('rejects a label from another scope unless the record already has it', async () => {
+    const { service } = setup([custom('lb_a', 'Auth', { scope: 'workstream' })]);
+    await expect(service.assign('ws_1', ['lb_a'], 'issue')).rejects.toThrow(/does not apply to issues/);
+    await expect(service.assign('ws_1', ['lb_bug'], 'workstream')).rejects.toThrow(/does not apply to workstreams/);
+    await expect(service.assign('ws_1', ['lb_missing'], 'issue')).rejects.toThrow(/Unknown label/);
+    await expect(service.assign('ws_1', ['lb_bug', 'lb_a'], 'issue', ['lb_a'])).resolves.toEqual(['lb_bug', 'lb_a']);
+    await expect(service.assign('ws_1', ['lb_bug'], null)).rejects.toThrow(/does not apply to this record/);
+    await expect(service.assign('ws_1', ['lb_bug'], null, ['lb_bug'])).resolves.toEqual(['lb_bug']);
+  });
+
+  it('refuses to merge a label into one of another scope', async () => {
+    const { service, ctx } = setup([custom('lb_a', 'Auth'), custom('lb_b', 'Roadmap', { scope: 'workstream' })]);
+    await expect(service.merge(ctx, 'lb_a', 'lb_b')).rejects.toBeInstanceOf(BadRequestException);
   });
 });

@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } fr
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, Max, Min, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import { CUSTOMER_REVENUE_MAX, PROJECT_STATUSES, type ActorRef, type Priority, type ProjectStatus } from '../contracts/domain.js';
+import { CUSTOMER_REVENUE_MAX, type ActorRef, type Priority } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { PROJECT_ICON_MAX, PROJECT_ICON_PATTERN } from './project-icon.js';
 import { CustomersService } from '../customers/customers.service.js';
@@ -17,7 +17,7 @@ class CreateProjectDto {
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @Matches(COLOR) color?: string;
   @IsOptional() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string;
-  @IsOptional() @IsIn(PROJECT_STATUSES) status?: ProjectStatus;
+  @IsOptional() @IsString() @MaxLength(80) status?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
@@ -34,7 +34,7 @@ class UpdateProjectDto {
   @Clearable() @IsString() @MaxLength(20000) description?: string | null;
   @OptionalNotNull() @Matches(COLOR) color?: string;
   @Clearable() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string | null;
-  @OptionalNotNull() @IsIn(PROJECT_STATUSES) status?: ProjectStatus;
+  @OptionalNotNull() @IsString() @MaxLength(80) status?: string;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() leadId?: string | null;
   @OptionalNotNull() @IsArray() @IsString({ each: true }) teamIds?: string[];
@@ -46,7 +46,7 @@ class UpdateProjectDto {
 }
 
 class ListProjectsQuery {
-  @IsOptional() @IsIn(PROJECT_STATUSES) status?: ProjectStatus;
+  @IsOptional() @IsString() @MaxLength(80) status?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsString() repositoryId?: string;

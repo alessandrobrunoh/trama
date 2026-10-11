@@ -11,6 +11,7 @@ import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
   WORKSTREAM_STATUSES,
+  defaultStatusCatalog,
   WORKSTREAM_STATUS_META,
   type ActorRef,
   type Artifact,
@@ -178,20 +179,20 @@ export const WS_VIEW_TABS: {
 
 // ───────────────────────── picker options ─────────────────────────
 
-export const statusOptions = (): PickOption[] =>
-  WORKSTREAM_STATUSES.map((s) => ({
-    value: s,
-    label: WORKSTREAM_STATUS_META[s].label,
-    kind: 'status',
-    statusEntity: 'workstream',
+export const statusOptions = (entries = defaultStatusCatalog().workstream): PickOption[] =>
+  entries.map((s) => ({
+    value: s.id,
+    label: s.name,
+    kind: 'status' as const,
+    statusEntity: 'workstream' as const,
   }));
 
-export const issueStatusOptions = (): PickOption[] =>
-  ISSUE_STATUSES.map((s) => ({
-    value: s,
-    label: ISSUE_STATUS_META[s].label,
-    kind: 'status',
-    statusEntity: 'issue',
+export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>
+  entries.map((s) => ({
+    value: s.id,
+    label: s.name,
+    kind: 'status' as const,
+    statusEntity: 'issue' as const,
   }));
 
 /** Issues as picker options (circle status glyph, key as hint). */

@@ -1,236 +1,345 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  untracked,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideCheck, LucideDynamicIcon, LucideMinus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   CAPABILITIES,
   CAPABILITY_META,
-  CAPABILITY_ROLES,
-  DEFAULT_PERMISSIONS,
-  TEAM_EDIT_POLICIES,
+  emptyMemberAccess,
+  MEMBER_GRANTS,
+  OWNER_REQUIRED_CAPABILITIES,
   type Capability,
   type CapabilityMeta,
-  emptyMemberAccess,
   type MemberAccess,
-  type Role,
+  type WorkspaceRole,
 } from '../../../core/contracts/domain';
-import { ROLES, ROLE_DETAILS, ROLE_META } from '../../../core/meta';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { UiStore } from '../../../core/stores/ui.store';
 import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT } from './section-kit';
-
-interface Group {
-  title: string;
-  rows: { cap: Capability; meta: CapabilityMeta; min: Role; custom: boolean }[];
-}
 
 const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access & automation'];
 
 /**
- * Who may do what in this workspace: one row per capability, one column per role.
- * The highlighted cell is the minimum role; every role to its left (higher rank) may do it too.
- * Owners edit the matrix; everyone else sees it.
+ * Workspace roles. Each role has its own capabilities and work grants. Owner cannot be deleted
+ * and always keeps the permissions needed to manage members.
  */
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, MemberAccessEditor, ...SECTION_KIT],
+  imports: [RouterLink, HlmButtonImports, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
       <app-section-header
         title="Roles & permissions"
-        description="Everyone in the workspace has one role. Choose the lowest role that may do each action; higher roles always can too."
+        description="Create a role and choose exactly what it can do. Nothing is inherited from another role. The Owner role stays, because someone must be able to manage roles and members."
       >
-        @if (isOwner() && customCount() > 0) {
-          <button actions hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="reset()">Reset to defaults</button>
+        @if (isOwner()) {
+          <button actions hlmBtn size="sm" [disabled]="busy()" (click)="creating.set(true)">
+            New role
+          </button>
         }
       </app-section-header>
       @if (!isOwner()) {
-        <app-readonly-note>Only owners can change roles and permissions. You can see what each role may do.</app-readonly-note>
+        <app-readonly-note
+          >Only owners can change roles and permissions. You can see what each role may
+          do.</app-readonly-note
+        >
       }
 
-      <app-settings-group title="Roles">
-        @for (r of roles; track r) {
-          <app-settings-row [label]="label(r)" [description]="details[r]">
-            <span class="text-muted-foreground text-xs tabular-nums">{{ countFor(r) }}</span>
-          </app-settings-row>
-        }
-      </app-settings-group>
-    </div>
+      @if (creating()) {
+        <form class="mb-4 flex flex-wrap items-center gap-2" (submit)="create($event)">
+          <input
+            hlmInput
+            class="h-8 w-56 text-[13px]"
+            placeholder="Role name"
+            aria-label="New role name"
+            [value]="draftName()"
+            (input)="draftName.set($any($event.target).value)"
+          />
+          <button hlmBtn size="sm" type="submit" [disabled]="busy() || !draftName().trim()">
+            Create
+          </button>
+          <button hlmBtn size="sm" variant="ghost" type="button" (click)="creating.set(false)">
+            Cancel
+          </button>
+        </form>
+      }
 
-    <div>
-      <div class="mb-2 px-0.5">
-        <h3 class="text-[13px] font-medium">Permission matrix</h3>
-        <p class="text-muted-foreground mt-0.5 text-xs leading-snug">
-          {{ isOwner() ? 'Click a role to make it the minimum for that action.' : 'The outlined role is the minimum for that action.' }}
-          Viewers are read-only, so they never appear as a minimum.
-        </p>
+      <div class="mb-4 flex flex-wrap gap-1.5">
+        @for (role of roles(); track role.id) {
+          <button
+            type="button"
+            hlmBtn
+            size="sm"
+            class="h-7"
+            [variant]="selectedId() === role.id ? 'default' : 'outline'"
+            (click)="select(role.id)"
+          >
+            {{ role.name }}
+            <span class="ml-1.5 tabular-nums opacity-70">{{ countFor(role.id) }}</span>
+          </button>
+        }
       </div>
-      <div class="bg-card overflow-hidden rounded-lg border">
-        <div class="bg-muted/40 grid grid-cols-[minmax(0,1fr)_repeat(4,2.75rem)] items-end gap-x-1 border-b px-4 py-2 sm:grid-cols-[minmax(0,1fr)_repeat(4,3.5rem)]">
-          <span class="text-muted-foreground text-[11px] font-medium">Action</span>
-          @for (r of roles; track r) {
-            <span class="text-muted-foreground text-center text-[11px] font-medium">{{ label(r) }}</span>
+
+      @if (selected(); as role) {
+        <app-settings-group
+          [title]="role.name"
+          [description]="
+            role.owner
+              ? 'This role cannot be deleted or renamed away from ownership, and it keeps the ability to manage members.'
+              : 'People with this role can do only what is checked here.'
+          "
+        >
+          @if (!role.owner && isOwner()) {
+            <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+              <input
+                hlmInput
+                class="h-8 w-56 text-[13px]"
+                aria-label="Role name"
+                [value]="draftName()"
+                (input)="draftName.set($any($event.target).value)"
+              />
+              <button
+                hlmBtn
+                size="sm"
+                variant="outline"
+                [disabled]="busy() || !draftName().trim() || draftName().trim() === role.name"
+                (click)="rename(role)"
+              >
+                Rename
+              </button>
+              <button hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="remove(role)">
+                Delete
+              </button>
+            </div>
+          } @else {
+            <app-settings-row
+              [label]="countFor(role.id)"
+              description="People who have this role."
+            />
           }
-        </div>
-        @for (g of groups(); track g.title) {
-          <div class="bg-muted/20 text-muted-foreground border-b px-4 py-1.5 text-[11px] font-medium tracking-wide uppercase">{{ g.title }}</div>
-          @for (row of g.rows; track row.cap) {
-            <div class="grid grid-cols-[minmax(0,1fr)_repeat(4,2.75rem)] items-center gap-x-1 border-b px-4 py-2.5 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_repeat(4,3.5rem)]">
-              <div class="min-w-0 pr-2">
-                <div class="flex items-center gap-1.5 text-[13px] font-medium">
-                  {{ row.meta.label }}
-                  @if (row.custom) {
-                    <span class="bg-muted text-muted-foreground rounded px-1 py-px text-[10px] font-normal" title="Differs from the default">Custom</span>
-                  }
-                </div>
-                <div class="text-muted-foreground text-xs leading-snug">{{ row.meta.description }}</div>
+        </app-settings-group>
+
+        <div class="mt-8">
+          <h3 class="mb-1 text-[13px] font-medium">Capabilities</h3>
+          <p class="text-muted-foreground mb-3 text-xs leading-snug">
+            Checked means this role can do it. Unchecked means the request is refused.
+          </p>
+          @for (group of groups; track group) {
+            <div class="mt-3">
+              <div class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+                {{ group }}
               </div>
-              @for (r of roles; track r) {
-                <div class="flex justify-center">
-                  @if (r === 'viewer') {
-                    <span class="text-muted-foreground/40 flex size-8 items-center justify-center" aria-label="Viewers cannot do this">
-                      <svg [lucideIcon]="dash" [size]="14"></svg>
-                    </span>
-                  } @else {
-                    <button
-                      type="button"
-                      class="flex size-8 items-center justify-center rounded-md border transition-colors disabled:cursor-default"
-                      [class]="cellClass(r, row.min)"
-                      [disabled]="!isOwner() || busy()"
-                      [attr.aria-label]="label(r) + (allows(r, row.min) ? ' can ' : ' cannot ') + row.meta.label.toLowerCase()"
-                      [attr.aria-pressed]="r === row.min"
-                      (click)="set(row.cap, r)"
-                    >
-                      @if (allows(r, row.min)) {
-                        <svg [lucideIcon]="check" [size]="14"></svg>
-                      } @else {
-                        <span class="bg-muted-foreground/30 size-1 rounded-full"></span>
-                      }
-                    </button>
-                  }
-                </div>
+              @for (cap of capsIn(group); track cap) {
+                <label class="flex items-start gap-2 py-1.5">
+                  <input
+                    type="checkbox"
+                    class="accent-primary mt-0.5 size-4 cursor-pointer disabled:cursor-default"
+                    [checked]="hasCap(role, cap)"
+                    [disabled]="!isOwner() || busy() || locked(role, cap)"
+                    [attr.aria-label]="meta(cap).label"
+                    (change)="toggleCap(role, cap, $any($event.target).checked)"
+                  />
+                  <span class="min-w-0">
+                    <span class="block text-[13px] font-medium">{{ meta(cap).label }}</span>
+                    <span class="text-muted-foreground block text-xs leading-snug">{{
+                      meta(cap).description
+                    }}</span>
+                  </span>
+                </label>
               }
             </div>
           }
-        }
-      </div>
-    </div>
+        </div>
 
-    <div>
-      <div class="mb-2 px-0.5">
-        <h3 class="text-[13px] font-medium">What each role can do</h3>
-        <p class="text-muted-foreground mt-0.5 text-xs leading-snug">
-          View, create, edit and delete, per kind of work. A person starts from their role. When you invite them you can add actions, not remove the ones checked here. Owners always have all of them.
-        </p>
-      </div>
-      <div class="mb-3 flex flex-wrap gap-1.5">
-        @for (r of grantRoles; track r) {
-          <button type="button" hlmBtn size="sm" class="h-7" [variant]="grantRole() === r ? 'default' : 'outline'" (click)="pickGrantRole(r)">{{ label(r) }}</button>
+        @if (!role.owner) {
+          <div class="mt-8">
+            <h3 class="mb-1 text-[13px] font-medium">Work this role starts with</h3>
+            <p class="text-muted-foreground mb-3 text-xs leading-snug">
+              View, create, edit and delete. An invitation can add actions, not remove these.
+            </p>
+            <app-member-access-editor
+              [showProjects]="false"
+              [role]="role.id"
+              [disabled]="!isOwner() || busy()"
+              [(value)]="grantDraft"
+            />
+            @if (isOwner()) {
+              <button
+                type="button"
+                hlmBtn
+                size="sm"
+                class="mt-3"
+                [disabled]="busy()"
+                (click)="saveGrants(role)"
+              >
+                Save work permissions
+              </button>
+            }
+          </div>
         }
-      </div>
-      <app-member-access-editor [showProjects]="false" [role]="grantRole()" [disabled]="!isOwner() || busy()" [(value)]="roleDraft" />
-      @if (isOwner()) {
-        <button type="button" hlmBtn size="sm" class="mt-3" [disabled]="busy()" (click)="saveRoleGrants()">Save {{ label(grantRole()) }}</button>
       }
     </div>
 
-    <app-settings-group title="Always true" description="These rules are fixed, whatever the matrix says.">
-      <app-settings-row label="Owners hold the keys" description="Only owners change these permissions, grant the owner role or delete the workspace. Owners themselves always keep every action." />
-      <app-settings-row label="Roles are not escalated" description="Nobody can grant a role above their own, and a workspace always keeps at least one owner." />
-      <app-settings-row label="Agents act as members" description="An agent can never go above member, and can never accept or reject a decision: that stays a human call." />
-      <app-settings-row label="API tokens can only be narrower" description="A token has a scope (read, write, admin) that caps what it can do, never raises it." />
-      <app-settings-row label="A person starts from their role" description="An invitation can add actions the role does not have, and can hide projects. It cannot take away an action the role already gives." />
+    <app-settings-group
+      title="Always true"
+      description="These rules stay, whatever a role's checkboxes say."
+    >
+      <app-settings-row
+        label="Owner holds the keys"
+        description="Only an owner creates, renames or deletes roles, or grants the owner role. The owner role cannot be deleted."
+      />
+      <app-settings-row
+        label="No inheritance"
+        description="A role can do only what is checked on it. Admin, Member and Viewer are not built in."
+      />
+      <app-settings-row
+        label="One role per person"
+        description="A member has exactly one role. Extra actions on an invitation are added on top of that role."
+      />
+      <app-settings-row
+        label="Agents act as members"
+        description="An agent uses the historical member permissions and can never accept or reject a decision."
+      />
     </app-settings-group>
 
-    <app-settings-group title="Team roles" description="On top of the workspace role, each team has its own roles and a policy.">
-      <app-settings-row label="Team member" description="Listed on the team. Sees the team's attention items and can be assigned its work." />
-      <app-settings-row label="Team lead" description="A member who can also edit the team itself (name, colour, members, edit policy) without being a workspace admin." />
-      <app-settings-row label="Edit policy" description="Per team. Everyone in the workspace, or team members and leads only, may edit the team's workstreams and issues. Admins always can.">
-        <span class="text-muted-foreground max-w-48 text-right text-xs">
-          {{ policyA }} or {{ policyB }}
-        </span>
-      </app-settings-row>
+    <app-settings-group
+      title="Team roles"
+      description="On top of the workspace role, each team has its own roles and a policy."
+    >
+      <app-settings-row
+        label="Team member"
+        description="Listed on the team. Sees the team's attention items and can be assigned its work."
+      />
+      <app-settings-row
+        label="Team lead"
+        description="A member who can also edit the team itself without holding a workspace role that manages teams."
+      />
       <div class="bg-muted/30 flex items-center justify-between gap-3 px-4 py-2 text-xs">
-        <span class="text-muted-foreground">Set leads and the edit policy in each team's Members tab.</span>
-        <a hlmBtn variant="outline" size="sm" class="h-7 shrink-0" [routerLink]="['/', slug(), 'settings', 'teams']">Teams</a>
+        <span class="text-muted-foreground"
+          >Set leads and the edit policy in each team's Members tab.</span
+        >
+        <a
+          hlmBtn
+          variant="outline"
+          size="sm"
+          class="h-7 shrink-0"
+          [routerLink]="['/', slug(), 'settings', 'teams']"
+          >Teams</a
+        >
       </div>
     </app-settings-group>
   `,
 })
 export class RolesSection {
   private readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
 
-  protected readonly roles = ROLES;
-  protected readonly grantRoles: Role[] = ['admin', 'member', 'viewer'];
-  protected readonly grantRole = signal<Role>('member');
-  protected readonly roleDraft = signal<MemberAccess>({ ...emptyMemberAccess(), grants: [] });
-  protected readonly details = ROLE_DETAILS;
-
-  private readonly syncRoleDraft = effect(() => {
-    const role = this.grantRole();
-    const grants = this.store.settings().roleGrants?.[role] ?? [];
-    untracked(() => this.roleDraft.set({ ...emptyMemberAccess(), grants: [...grants] }));
-  });
-  protected readonly policyA = TEAM_EDIT_POLICIES.workspace.label;
-  protected readonly policyB = TEAM_EDIT_POLICIES.members.label.toLowerCase();
-  protected readonly check = LucideCheck;
-  protected readonly dash = LucideMinus;
+  protected readonly groups = GROUP_ORDER;
   protected readonly busy = signal(false);
+  protected readonly creating = signal(false);
+  protected readonly draftName = signal('');
+  protected readonly selectedId = signal<string | null>(null);
+  protected readonly grantDraft = signal<MemberAccess>({ ...emptyMemberAccess(), grants: [] });
   protected readonly isOwner = computed(() => this.store.can('owner'));
   protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly roles = computed(() => this.store.settings().roles);
+  protected readonly selected = computed(
+    () => this.roles().find((role) => role.id === this.selectedId()) ?? this.roles()[0],
+  );
 
-  protected readonly groups = computed<Group[]>(() => {
-    const perms = this.store.settings().permissions;
-    return GROUP_ORDER.map((title) => ({
-      title,
-      rows: CAPABILITIES.filter((cap) => CAPABILITY_META[cap].group === title).map((cap) => ({
-        cap,
-        meta: CAPABILITY_META[cap],
-        min: perms[cap],
-        custom: perms[cap] !== DEFAULT_PERMISSIONS[cap],
-      })),
-    }));
+  private readonly syncDraft = effect(() => {
+    const role = this.selected();
+    untracked(() => {
+      if (!role) return;
+      if (!this.creating()) this.draftName.set(role.name);
+      this.grantDraft.set({
+        ...emptyMemberAccess(),
+        grants: role.owner ? [...MEMBER_GRANTS] : [...role.grants],
+      });
+      if (!this.selectedId()) this.selectedId.set(role.id);
+    });
   });
-  protected readonly customCount = computed(() => this.groups().reduce((n, g) => n + g.rows.filter((r) => r.custom).length, 0));
 
-  protected label(r: Role): string {
-    return ROLE_META[r].label;
+  protected meta(cap: Capability): CapabilityMeta {
+    return CAPABILITY_META[cap];
   }
-  protected countFor(role: Role): string {
-    const n = this.store.memberships().filter((m) => m.role === role).length;
+  protected capsIn(group: CapabilityMeta['group']): Capability[] {
+    return CAPABILITIES.filter((cap) => CAPABILITY_META[cap].group === group);
+  }
+  protected countFor(roleId: string): string {
+    const n = this.store.memberships().filter((member) => member.role === roleId).length;
     return n === 1 ? '1 person' : `${n} people`;
   }
-  protected allows(role: Role, min: Role): boolean {
-    return ROLE_META[role].rank >= ROLE_META[min].rank;
+  protected hasCap(role: WorkspaceRole, cap: Capability): boolean {
+    return role.capabilities.includes(cap);
   }
-  protected cellClass(role: Role, min: Role): string {
-    if (role === min) return 'border-primary bg-selected text-foreground';
-    return this.allows(role, min) ? 'border-transparent text-muted-foreground hover:bg-accent' : 'border-transparent hover:bg-accent';
+  protected locked(role: WorkspaceRole, cap: Capability): boolean {
+    return role.owner && (OWNER_REQUIRED_CAPABILITIES as readonly string[]).includes(cap);
   }
 
-  protected async set(cap: Capability, role: Role): Promise<void> {
-    if (!this.isOwner() || this.busy() || !CAPABILITY_ROLES.includes(role) || this.store.settings().permissions[cap] === role) return;
+  protected select(id: string): void {
+    this.creating.set(false);
+    this.selectedId.set(id);
+  }
+
+  protected async create(event: Event): Promise<void> {
+    event.preventDefault();
+    const name = this.draftName().trim();
+    if (!name || this.busy()) return;
     this.busy.set(true);
-    await this.store.updateSettings({ permissions: { [cap]: role } });
+    const id = await this.store.createRole({ name, capabilities: [], grants: [] });
+    this.busy.set(false);
+    if (!id) return;
+    this.creating.set(false);
+    this.draftName.set('');
+    this.selectedId.set(id);
+  }
+
+  protected async rename(role: WorkspaceRole): Promise<void> {
+    const name = this.draftName().trim();
+    if (!name || name === role.name || this.busy()) return;
+    this.busy.set(true);
+    await this.store.updateRole(role.id, { name });
     this.busy.set(false);
   }
 
-  protected async reset(): Promise<void> {
+  protected remove(role: WorkspaceRole): void {
+    this.ui.setConfirmDelete({
+      title: `Delete ${role.name}?`,
+      description: 'People and invitations using it have to move first. This cannot be undone.',
+      confirmLabel: 'Delete role',
+      onConfirm: async () => {
+        const ok = await this.store.deleteRole(role.id);
+        if (ok) this.selectedId.set(null);
+      },
+    });
+  }
+
+  protected async toggleCap(role: WorkspaceRole, cap: Capability, on: boolean): Promise<void> {
+    if (!this.isOwner() || this.busy() || this.locked(role, cap)) return;
+    const next = new Set(role.capabilities);
+    if (on) next.add(cap);
+    else next.delete(cap);
     this.busy.set(true);
-    await this.store.updateSettings({ permissions: { ...DEFAULT_PERMISSIONS } });
+    await this.store.updateRole(role.id, { capabilities: [...next] });
     this.busy.set(false);
   }
 
-  protected pickGrantRole(role: Role): void {
-    this.grantRole.set(role);
-  }
-
-  protected async saveRoleGrants(): Promise<void> {
-    if (!this.isOwner() || this.busy()) return;
+  protected async saveGrants(role: WorkspaceRole): Promise<void> {
+    if (!this.isOwner() || this.busy() || role.owner) return;
     this.busy.set(true);
-    await this.store.updateSettings({ roleGrants: { [this.grantRole()]: [...this.roleDraft().grants] } });
+    await this.store.updateRole(role.id, { grants: [...this.grantDraft().grants] });
     this.busy.set(false);
   }
 }

@@ -54,7 +54,7 @@ import { IssueProgress, WsDatePicker } from '../workstreams/ws-parts';
     <div class="min-h-0 flex-1 overflow-y-auto">
       <div class="flex flex-col gap-0.5 px-4 py-3">
         <app-property-row label="Status">
-          <app-picker variant="field" label="Status" [searchable]="false" [clearable]="!!w.statusOverride" clearLabel="Automatic (derived)" [disabled]="!canEdit()" [options]="statuses" [value]="[w.status]" (valueChange)="actions.setStatus([w], $any($event[0]) ?? null)" />
+          <app-picker variant="field" label="Status" [searchable]="false" [clearable]="!!w.statusOverride" clearLabel="Automatic (derived)" [disabled]="!canEdit()" [options]="statuses" [value]="[w.statusOverride || w.status]" (valueChange)="actions.setStatus([w], $any($event[0]) ?? null)" />
         </app-property-row>
         <app-property-row label="Accountable">
           <app-picker variant="field" label="Accountable" placeholder="Unassigned" [clearable]="true" clearLabel="Unassign" [disabled]="!canEdit()" [options]="users()" [value]="w.accountableUserId ? [w.accountableUserId] : []" (valueChange)="actions.setAccountable([w], $event[0] ?? null)" />
@@ -102,7 +102,9 @@ export class TimelinePanel {
 
   protected readonly x = LucideX;
   protected readonly ext = LucideArrowUpRight;
-  protected readonly statuses = statusOptions();
+  protected get statuses() {
+    return statusOptions(this.store.settings().statuses.workstream);
+  }
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.canEditTeamWork(this.ws().ownerTeamId));

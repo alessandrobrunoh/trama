@@ -69,7 +69,9 @@ export class WsBulkBar {
 
   protected readonly selected = computed(() => this.actions.selected());
   protected readonly canEdit = computed(() => this.store.can('member'));
-  protected readonly statuses: PickOption[] = [{ value: AUTO, label: 'Automatic (derived)' }, ...statusOptions()];
+  protected get statuses(): PickOption[] {
+    return [{ value: AUTO, label: 'Automatic (derived)' }, ...statusOptions(this.store.settings().statuses.workstream)];
+  }
   protected readonly priorities = priorityOptions();
   protected readonly users = computed<PickOption[]>(() => [{ value: AUTO, label: 'Unassign' }, ...userOptions(this.store)]);
   protected readonly xIcon = LucideX;

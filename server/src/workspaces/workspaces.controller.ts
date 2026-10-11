@@ -17,7 +17,6 @@ import {
   IsIn,
   IsISO8601,
   IsInt,
-  IsObject,
   IsOptional,
   IsString,
   Matches,
@@ -38,17 +37,17 @@ import {
   SessionOnly,
   Roles,
   canDo,
+  hasAdminPower,
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import { TokensService } from '../auth/tokens.service.js';
-import { ESTIMATE_SCALES, MAX_TOKEN_LIMITS, WEEK_STARTS } from '../contracts/domain.js';
+import { ESTIMATE_SCALES, MAX_TOKEN_LIMITS, ROLE_NAME_MAX, WEEK_STARTS } from '../contracts/domain.js';
 import type { EstimateScale, ExecutionProvider, Role, TokenScope, WeekStart } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { toDate } from '../common/util.js';
 import { WorkspacesService } from './workspaces.service.js';
 
-const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
 const PROVIDERS: Exclude<ExecutionProvider, 'human'>[] = ['delta', 'claude_code', 'codex', 'cursor', 'other'];
 
 class CreateWorkspaceDto {
@@ -61,9 +60,8 @@ class UpdateWorkspaceDto {
   @OptionalNotNull() @IsString() @MaxLength(40) slug?: string;
 }
 
-/** Everything optional; `null` clears `defaultTeamId` / `iconColor` / `iconInitial`. `permissions` is owner-only. */
+/** Everything optional; `null` clears `defaultTeamId` / `iconColor` / `iconInitial`. Roles have their own endpoints. */
 class UpdateSettingsDto {
-  @OptionalNotNull() @IsObject() permissions?: Record<string, string>;
   @Clearable() @IsString() defaultTeamId?: string | null;
   @OptionalNotNull() @IsIn(ESTIMATE_SCALES) estimateScale?: EstimateScale;
   @OptionalNotNull() @IsIn(WEEK_STARTS) weekStart?: WeekStart;
@@ -71,8 +69,18 @@ class UpdateSettingsDto {
   @Clearable() @Matches(/^#[0-9a-fA-F]{6}$/, { message: 'iconColor must be #rrggbb' }) iconColor?: string | null;
   @Clearable() @IsString() @MaxLength(2) iconInitial?: string | null;
   @OptionalNotNull() @IsBoolean() deltaThreads?: boolean;
-  /** Replaces the work permissions of the roles included. Owner is ignored. */
-  @IsOptional() @IsObject() roleGrants?: Record<string, string[]>;
+}
+
+class RoleBodyDto {
+  @IsString() @MinLength(1) @MaxLength(ROLE_NAME_MAX) name: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) capabilities?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) grants?: string[];
+}
+
+class UpdateRoleDto {
+  @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(ROLE_NAME_MAX) name?: string;
+  @IsOptional() @IsArray() @IsString({ each: true }) capabilities?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) grants?: string[];
 }
 
 /** Deleting a workspace is irreversible: repeat its slug or name. */
@@ -87,11 +95,11 @@ class TransferOwnershipDto {
 
 class AddMemberDto {
   @IsEmail() email: string;
-  @IsIn(ROLES) role: Role;
+  @IsString() @MinLength(1) @MaxLength(80) role: Role;
 }
 
 class ChangeRoleDto {
-  @IsOptional() @IsIn(ROLES) role?: Role;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(80) role?: Role;
   /** `null` clears a custom access and restores the role. Omitted leaves it unchanged. */
   @IsOptional() access?: unknown;
 }
@@ -174,6 +182,25 @@ export class WorkspaceController {
     return Object.assign(await this.service.updateSettings(ctx, dto), { role: ctx.role });
   }
 
+  @Post('roles')
+  @Roles('owner')
+  createRole(@Ctx() ctx: WorkspaceContext, @Body() dto: RoleBodyDto) {
+    return this.service.createRole(ctx, dto);
+  }
+
+  @Patch('roles/:roleId')
+  @Roles('owner')
+  updateRole(@Ctx() ctx: WorkspaceContext, @Param('roleId') roleId: string, @Body() dto: UpdateRoleDto) {
+    return this.service.updateRole(ctx, roleId, dto);
+  }
+
+  @Delete('roles/:roleId')
+  @Roles('owner')
+  @HttpCode(200)
+  deleteRole(@Ctx() ctx: WorkspaceContext, @Param('roleId') roleId: string) {
+    return this.service.deleteRole(ctx, roleId);
+  }
+
   /** Hand the workspace to another member (they become owner and primary owner). Browser session, primary owner only. */
   @Post('transfer-ownership')
   @Roles('owner')
@@ -203,13 +230,13 @@ export class MembersController {
   @Post()
   @Can('inviteMembers')
   add(@Ctx() ctx: WorkspaceContext, @Body() dto: AddMemberDto) {
-    return this.service.addMember(ctx.workspace.id, ctx.role, dto);
+    return this.service.addMember(ctx.workspace, ctx.role, dto, ctx.tokenScope);
   }
 
   @Patch(':id')
   @Roles('admin')
   change(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: ChangeRoleDto) {
-    return this.service.updateMember(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id, dto);
+    return this.service.updateMember(ctx.workspace, this.actor(ctx), id, dto);
   }
 
   /**
@@ -220,7 +247,11 @@ export class MembersController {
   @Roles('viewer')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    return this.service.removeMember(ctx.workspace, { role: ctx.role, userId: ctx.userId }, id);
+    return this.service.removeMember(ctx.workspace, this.actor(ctx), id);
+  }
+
+  private actor(ctx: WorkspaceContext) {
+    return { role: ctx.role, userId: ctx.userId, tokenScope: ctx.tokenScope, canManageMembers: hasAdminPower(ctx) };
   }
 }
 
@@ -268,7 +299,7 @@ export class TokensController {
   /** Admins see every token of the workspace; others only their own. */
   @Get()
   async list(@Ctx() ctx: WorkspaceContext) {
-    const all = await this.service.listTokens(ctx.workspace.id, ctx.role === 'admin' || ctx.role === 'owner' ? undefined : ctx.userId ?? '-');
+    const all = await this.service.listTokens(ctx.workspace.id, hasAdminPower(ctx) ? undefined : ctx.userId ?? '-');
     // the assistant's per-turn tokens live for seconds; they are not something to manage
     return all.filter((t) => t.name !== ASSISTANT_TOKEN_NAME);
   }
@@ -292,8 +323,8 @@ export class TokensController {
     // from a write token would hand out the user's full role (and any permission) to the new secret.
     if (auth.token?.scope === 'write' && scope !== 'write' && scope !== 'read')
       throw new ForbiddenException('A write-scoped token can only create read or write tokens');
-    if (scope === 'admin' && ctx.role !== 'admin' && ctx.role !== 'owner')
-      throw new ForbiddenException('Only admins can create admin-scoped tokens');
+    if (scope === 'admin' && !hasAdminPower(ctx))
+      throw new ForbiddenException('Only someone who can administer the workspace can create admin-scoped tokens');
     let actor = ctx.actor;
     if (dto.agentId) {
       if (!canDo(ctx, 'manageAgents')) throw new ForbiddenException('You are not allowed to create agent tokens');
@@ -316,7 +347,7 @@ export class TokensController {
   @Delete(':id')
   @HttpCode(204)
   remove(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    const admin = ctx.role === 'admin' || ctx.role === 'owner';
+    const admin = hasAdminPower(ctx);
     return this.service.removeToken(ctx.workspace.id, id, admin ? undefined : ctx.userId ?? '-');
   }
 }

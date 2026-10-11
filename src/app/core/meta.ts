@@ -14,7 +14,7 @@ import type {
   Priority,
   ProjectHealth,
   ProjectStatus,
-  Role,
+  LegacyRole,
   ViewLayout,
   WorkstreamStatus,
 } from './contracts/domain';
@@ -229,16 +229,16 @@ export const ATTENTION_KIND_META: Record<
 export const ATTENTION_KINDS = sortedKeys(ATTENTION_KIND_META);
 export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, low: 2 };
 
-export const ROLE_META: Record<Role, { label: string; rank: number; description: string }> = {
+export const ROLE_META: Record<LegacyRole, { label: string; rank: number; description: string }> = {
   viewer: { label: 'Viewer', rank: 0, description: 'Read only' },
   member: { label: 'Member', rank: 1, description: 'Create and update work' },
   admin: { label: 'Admin', rank: 2, description: 'Manage teams, repositories, agents and members' },
   owner: { label: 'Owner', rank: 3, description: 'Everything, including deleting the workspace' },
 };
-export const ROLES: Role[] = ['owner', 'admin', 'member', 'viewer'];
+export const ROLES: LegacyRole[] = ['owner', 'admin', 'member', 'viewer'];
 
 /** Longer role explanations for Settings → Members and Roles & permissions. */
-export const ROLE_DETAILS: Record<Role, string> = {
+export const ROLE_DETAILS: Record<LegacyRole, string> = {
   owner:
     'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
   admin:

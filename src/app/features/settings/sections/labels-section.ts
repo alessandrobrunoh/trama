@@ -17,7 +17,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { LABEL_NAME_MAX, LABEL_SWATCHES, type WorkspaceLabel } from '../../../core/contracts/domain';
+import { LABEL_NAME_MAX, LABEL_SWATCHES, type LabelScope, type WorkspaceLabel } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { EmptyState } from '../../../shared/empty-state';
@@ -32,6 +32,13 @@ type Dialog =
   | { kind: 'delete'; label: WorkspaceLabel };
 
 type Sort = 'name' | 'usage';
+type ScopeFilter = 'all' | LabelScope;
+
+const SCOPE_NOUN: Record<LabelScope, string> = {
+  issue: 'Issue',
+  workstream: 'Workstream',
+  project: 'Project',
+};
 
 const HEX = /^#[0-9a-f]{6}$/i;
 
@@ -50,7 +57,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
   imports: [NgTemplateOutlet, HlmButtonImports, HlmDialogImports, HlmDropdownMenuImports, HlmInputImports, LucideDynamicIcon, LabelChip, EmptyState, Picker, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-6' },
   template: `
-    <app-section-header title="Labels" description="One catalog for the whole workspace. Tag issues, workstreams, projects and repositories with the same labels, and find them again by filtering.">
+    <app-section-header title="Labels" description="Each label applies to issues, workstreams, or projects. Templates are issue labels; their name and scope stay fixed.">
       <div actions>
         @if (catalog.canCreate()) {
           <button hlmBtn size="sm" (click)="openForm(null)">
@@ -77,6 +84,19 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
           [value]="query()"
           (input)="query.set($any($event.target).value)"
         />
+      </div>
+      <div class="bg-muted/50 inline-flex rounded-md border p-0.5" role="group" aria-label="Which records">
+        @for (s of scopeFilters; track s.id) {
+          <button
+            type="button"
+            class="h-6 rounded-[5px] px-2.5 text-xs transition-colors"
+            [class]="scopeFilter() === s.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+            [attr.aria-pressed]="scopeFilter() === s.id"
+            (click)="scopeFilter.set(s.id)"
+          >
+            {{ s.label }}
+          </button>
+        }
       </div>
       <div class="bg-muted/50 inline-flex rounded-md border p-0.5" role="group" aria-label="Sort labels">
         @for (s of sorts; track s.id) {
@@ -127,6 +147,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
             } @else {
               <app-label-chip [labelId]="l.id" size="md" />
             }
+            <span class="text-muted-foreground text-[11px]">{{ scopeNoun(l.scope) }}</span>
             @if (l.template) {
               <span class="text-muted-foreground text-[11px]">Template</span>
             }
@@ -142,7 +163,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
             <hlm-dropdown-menu class="w-48">
               <button hlmDropdownMenuItem (triggered)="openForm(l)">
                 <svg [lucideIcon]="pencil" [size]="14"></svg>
-                {{ l.template ? 'Change color' : 'Rename or recolor' }}
+                {{ l.template ? 'Change color' : 'Edit' }}
               </button>
               @if (!l.template) {
                 <button hlmDropdownMenuItem (triggered)="openMerge(l)">
@@ -171,7 +192,9 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
             <form class="contents" (submit)="submitForm($event)">
               <hlm-dialog-header>
                 <h2 hlmDialogTitle>{{ editing() ? 'Edit label' : 'New label' }}</h2>
-                <p hlmDialogDescription>{{ editing()?.template ? 'Templates keep their name; you can change the color.' : 'A short name people will search for.' }}</p>
+                <p hlmDialogDescription>
+                  {{ editing()?.template ? 'Templates stay issue labels; you can change the color.' : 'A short name, and which records it can be added to.' }}
+                </p>
               </hlm-dialog-header>
               <div class="flex flex-col gap-4 text-[13px]">
                 <div class="grid gap-1.5">
@@ -191,6 +214,24 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                   @if (nameError(); as e) {
                     <span id="label-name-error" class="text-destructive text-xs">{{ e }}</span>
                   }
+                </div>
+                <div class="grid gap-2">
+                  <span class="text-muted-foreground text-xs font-medium" id="label-scope-label">Applies to</span>
+                  <div class="bg-muted/50 inline-flex w-fit rounded-md border p-0.5" role="radiogroup" aria-labelledby="label-scope-label">
+                    @for (s of scopes; track s.id) {
+                      <button
+                        type="button"
+                        role="radio"
+                        class="h-7 rounded-[5px] px-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                        [class]="formScope() === s.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+                        [attr.aria-checked]="formScope() === s.id"
+                        [disabled]="!!editing()?.template || busy()"
+                        (click)="formScope.set(s.id)"
+                      >
+                        {{ s.label }}
+                      </button>
+                    }
+                  </div>
                 </div>
                 <div class="grid gap-2">
                   <span class="text-muted-foreground text-xs font-medium" id="label-color-label">Color</span>
@@ -327,11 +368,24 @@ export class LabelsSection {
     { id: 'name', label: 'Name' },
     { id: 'usage', label: 'Most used' },
   ];
+  protected readonly scopeFilter = signal<ScopeFilter>('all');
+  protected readonly scopeFilters: { id: ScopeFilter; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'issue', label: 'Issues' },
+    { id: 'workstream', label: 'Workstreams' },
+    { id: 'project', label: 'Projects' },
+  ];
+  protected readonly scopes: { id: LabelScope; label: string }[] = [
+    { id: 'issue', label: 'Issues' },
+    { id: 'workstream', label: 'Workstreams' },
+    { id: 'project', label: 'Projects' },
+  ];
 
   protected readonly dlg = signal<Dialog | null>(null);
   protected readonly busy = signal(false);
   protected readonly formName = signal('');
   protected readonly formColor = signal<string>(LABEL_SWATCHES[0]);
+  protected readonly formScope = signal<LabelScope>('issue');
   protected readonly mergeInto = signal('');
 
   protected readonly swatches = LABEL_SWATCHES;
@@ -349,7 +403,8 @@ export class LabelsSection {
 
   private readonly matching = computed(() => {
     const q = this.query().trim().toLowerCase();
-    const list = this.catalog.all().filter((label) => !q || label.name.toLowerCase().includes(q));
+    const scope = this.scopeFilter();
+    const list = this.catalog.all().filter((label) => (scope === 'all' || label.scope === scope) && (!q || label.name.toLowerCase().includes(q)));
     const byName = (a: WorkspaceLabel, b: WorkspaceLabel) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
     if (this.sort() === 'usage') return [...list].sort((a, b) => this.catalog.usageOf(b.id).total - this.catalog.usageOf(a.id).total || byName(a, b));
     return [...list].sort(byName);
@@ -367,12 +422,13 @@ export class LabelsSection {
     const d = this.dlg();
     return d && d.kind !== 'form' ? d.label : null;
   });
-  protected readonly mergeOptions = computed<PickOption[]>(() =>
-    this.catalog
+  protected readonly mergeOptions = computed<PickOption[]>(() => {
+    const scope = this.target()?.scope;
+    return this.catalog
       .active()
-      .filter((label) => label.id !== this.target()?.id)
-      .map((label) => ({ value: label.id, label: label.name, kind: 'label' as const, color: label.color, hint: String(this.catalog.usageOf(label.id).total) })),
-  );
+      .filter((label) => label.id !== this.target()?.id && label.scope === scope)
+      .map((label) => ({ value: label.id, label: label.name, kind: 'label' as const, color: label.color, hint: String(this.catalog.usageOf(label.id).total) }));
+  });
   protected readonly mergeTarget = computed(() => this.catalog.get(this.mergeInto()) ?? null);
 
   protected readonly colorValid = computed(() => HEX.test(this.formColor()));
@@ -387,8 +443,13 @@ export class LabelsSection {
     const name = this.formName().trim();
     if (!name || this.nameError() || !this.colorValid()) return false;
     const cur = this.editing();
-    return !cur || name !== cur.name || this.formColor().toLowerCase() !== cur.color;
+    const scopeChanged = !!cur && !cur.template && this.formScope() !== cur.scope;
+    return !cur || name !== cur.name || this.formColor().toLowerCase() !== cur.color || scopeChanged;
   });
+
+  protected scopeNoun(scope: LabelScope): string {
+    return SCOPE_NOUN[scope];
+  }
 
   protected usageText(id: string): string {
     return describeUsage(this.catalog.usageOf(id));
@@ -409,6 +470,7 @@ export class LabelsSection {
   protected openForm(label: WorkspaceLabel | null): void {
     this.formName.set(label?.name ?? '');
     this.formColor.set(label?.color ?? this.catalog.nextColor());
+    this.formScope.set(label?.scope ?? 'issue');
     this.dlg.set({ kind: 'form', label });
   }
 
@@ -431,12 +493,17 @@ export class LabelsSection {
     const cur = this.editing();
     const name = this.formName().trim();
     const color = this.formColor().toLowerCase();
+    const scope = this.formScope();
     this.busy.set(true);
     let ok: boolean;
     if (cur) {
-      ok = await this.store.updateLabel(cur.id, { ...(name !== cur.name ? { name } : {}), ...(color !== cur.color ? { color } : {}) });
+      ok = await this.store.updateLabel(cur.id, {
+        ...(name !== cur.name ? { name } : {}),
+        ...(color !== cur.color ? { color } : {}),
+        ...(!cur.template && scope !== cur.scope ? { scope } : {}),
+      });
     } else {
-      ok = !!(await this.catalog.create(name, color));
+      ok = !!(await this.catalog.create(name, color, scope));
     }
     this.busy.set(false);
     if (!ok) return;

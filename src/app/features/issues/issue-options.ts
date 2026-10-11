@@ -1,6 +1,11 @@
 // Options + glyphs for the issue property popovers and the "Change status…" command dialog.
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
-import { LucideBox, LucideCircleDashed, LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
+import {
+  LucideBox,
+  LucideCircleDashed,
+  LucideCircleUserRound,
+  LucideDynamicIcon,
+} from '@lucide/angular';
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
@@ -22,7 +27,8 @@ export interface IssueOption {
   /** '' = none (unassign, no team). */
   value: string;
   label: string;
-  glyph: 'status' | 'priority' | 'user' | 'team' | 'workstream' | 'issue' | 'project' | 'label' | 'none';
+  glyph:
+    'status' | 'priority' | 'user' | 'team' | 'workstream' | 'issue' | 'project' | 'label' | 'none';
   /** Swatch of a label. */
   color?: string;
   status?: string;
@@ -42,15 +48,27 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
 };
 
 /** `labels` is the already ordered label list (see `LabelCatalog.arrange`); without it the catalog order is used. */
-export function promptOptions(store: TramaStore, field: IssuePromptField, issues: readonly Issue[], labels?: readonly WorkspaceLabel[]): IssueOption[] {
+export function promptOptions(
+  store: TramaStore,
+  field: IssuePromptField,
+  issues: readonly Issue[],
+  labels?: readonly WorkspaceLabel[],
+): IssueOption[] {
   switch (field) {
     case 'status':
-      return ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label, glyph: 'status', status: s, search: ISSUE_STATUS_META[s].label }));
+      return store.settings().statuses.issue.map((s) => ({ value: s.id, label: s.name, glyph: 'status' as const, status: s.id, search: s.name }));
     case 'priority':
-      return PRIORITIES.map((p) => ({ value: p, label: PRIORITY_META[p].label, glyph: 'priority', search: PRIORITY_META[p].label }));
+      return PRIORITIES.map((p) => ({
+        value: p,
+        label: PRIORITY_META[p].label,
+        glyph: 'priority',
+        search: PRIORITY_META[p].label,
+      }));
     case 'assignee': {
       const me = store.me()?.id;
-      const users = [...store.users()].sort((a, b) => Number(b.id === me) - Number(a.id === me) || a.name.localeCompare(b.name));
+      const users = [...store.users()].sort(
+        (a, b) => Number(b.id === me) - Number(a.id === me) || a.name.localeCompare(b.name),
+      );
       return [
         { value: '', label: 'No assignee', glyph: 'none', search: 'no assignee unassign' },
         ...users.map((u) => ({
@@ -64,23 +82,52 @@ export function promptOptions(store: TramaStore, field: IssuePromptField, issues
     case 'team':
       return [
         { value: '', label: 'No team', glyph: 'none', search: 'no team' },
-        ...store.teams().map((t) => ({ value: t.id, label: t.name, glyph: 'team' as const, hint: t.key, search: `${t.name} ${t.key}` })),
+        ...store
+          .teams()
+          .map((t) => ({
+            value: t.id,
+            label: t.name,
+            glyph: 'team' as const,
+            hint: t.key,
+            search: `${t.name} ${t.key}`,
+          })),
       ];
     case 'project':
       return [
         { value: '', label: 'No project', glyph: 'none', search: 'no project' },
-        ...store.projects().map((p) => ({ value: p.id, label: p.name, glyph: 'project' as const, search: p.name })),
+        ...store
+          .projects()
+          .map((p) => ({ value: p.id, label: p.name, glyph: 'project' as const, search: p.name })),
       ];
     case 'label':
-      return (labels ?? store.settings().labels.filter((l) => !l.archived)).map((l) => ({ value: l.id, label: l.name, glyph: 'label' as const, color: l.color, search: l.name }));
+      return (
+        labels ?? store.settings().labels.filter((l) => !l.archived && l.scope === 'issue')
+      ).map((l) => ({
+        value: l.id,
+        label: l.name,
+        glyph: 'label' as const,
+        color: l.color,
+        search: l.name,
+      }));
     case 'workstream': {
       const linked = new Set(issues.flatMap((i) => i.workstreamIds));
       return store
         .workstreams()
-        .filter((w) => isOpenWorkstream(w) || linked.has(w.id))
+        .filter((w) => isOpenWorkstream(w, store.settings().statuses.workstream) || linked.has(w.id))
         .slice()
-        .sort((a, b) => Number(linked.has(b.id)) - Number(linked.has(a.id)) || (a.updatedAt < b.updatedAt ? 1 : -1))
-        .map((w) => ({ value: w.id, label: w.title, glyph: 'workstream', status: w.status, hint: w.key, search: `${w.key} ${w.title}` }));
+        .sort(
+          (a, b) =>
+            Number(linked.has(b.id)) - Number(linked.has(a.id)) ||
+            (a.updatedAt < b.updatedAt ? 1 : -1),
+        )
+        .map((w) => ({
+          value: w.id,
+          label: w.title,
+          glyph: 'workstream',
+          status: w.status,
+          hint: w.key,
+          search: `${w.key} ${w.title}`,
+        }));
     }
     case 'duplicate': {
       const self = new Set(issues.map((i) => i.id));
@@ -89,7 +136,14 @@ export function promptOptions(store: TramaStore, field: IssuePromptField, issues
         .filter((i) => !self.has(i.id) && !i.duplicateOfId)
         .slice()
         .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
-        .map((i) => ({ value: i.id, label: i.title, glyph: 'issue', status: i.status, hint: i.key, search: `${i.key} ${i.title}` }));
+        .map((i) => ({
+          value: i.id,
+          label: i.title,
+          glyph: 'issue',
+          status: i.status,
+          hint: i.key,
+          search: `${i.key} ${i.title}`,
+        }));
     }
   }
 }
@@ -122,7 +176,12 @@ export function currentValues(field: IssuePromptField, issues: readonly Issue[])
 }
 
 /** Apply the chosen option. Returns true when the dialog / popover should close. */
-export function applyOption(actions: IssueActions, field: IssuePromptField, ids: readonly string[], value: string): boolean {
+export function applyOption(
+  actions: IssueActions,
+  field: IssuePromptField,
+  ids: readonly string[],
+  value: string,
+): boolean {
   switch (field) {
     case 'status':
       actions.setStatus(ids, value as IssueStatus);
@@ -186,7 +245,11 @@ export function applyOption(actions: IssueActions, field: IssuePromptField, ids:
         <app-actor-avatar [actor]="{ type: 'team', id: o.value }" [size]="16" />
       }
       @default {
-        <svg [lucideIcon]="o.search.startsWith('no assignee') ? userIcon : noneIcon" [size]="15" class="text-muted-foreground"></svg>
+        <svg
+          [lucideIcon]="o.search.startsWith('no assignee') ? userIcon : noneIcon"
+          [size]="15"
+          class="text-muted-foreground"
+        ></svg>
       }
     }
   `,

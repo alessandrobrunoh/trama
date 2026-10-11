@@ -44,7 +44,7 @@ import { StatusBadge } from '../../shared/status';
         <div class="flex flex-wrap items-center gap-x-2.5 gap-y-1">
           <app-key-chip [value]="d.key" />
           <a [routerLink]="['/', slug(), 'decisions', d.key]" class="min-w-0 flex-1 text-sm font-medium hover:underline">{{ d.title }}</a>
-          <app-status-badge [status]="d.status" />
+          <app-status-badge [status]="d.status" subject="decision" />
         </div>
         <p class="text-muted-foreground line-clamp-2 text-sm">{{ d.statement }}</p>
         <div class="text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">

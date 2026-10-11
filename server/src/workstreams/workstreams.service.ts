@@ -1,23 +1,47 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Inject,
+  Injectable,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import {
   isDeltaThreadUrl,
+  resolveStatusEntry,
   type AcceptanceCriterion,
   type ActorRef,
   type CriterionState,
   type Priority,
   type WorkstreamStatus,
 } from '../contracts/domain.js';
+import { loadStatusCatalog, requireStatus } from '../status/status-catalog.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
-import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
+import {
+  isUniqueViolation,
+  notFound,
+  toDate,
+  uid,
+  unique,
+} from '../common/util.js';
 import { pruneIssueMilestones } from '../milestones/milestone-scope.js';
-import { ArtifactEntity, TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
+import {
+  ArtifactEntity,
+  TeamEntity,
+  WorkstreamEntity,
+} from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { LabelsService } from '../workspaces/labels.service.js';
-import { applyProjectScope, assertCanUseProject, currentAccess, projectHidden } from '../auth/member-access.js';
+import {
+  applyProjectScope,
+  assertCanUseProject,
+  currentAccess,
+  projectHidden,
+} from '../auth/member-access.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 
 import {
   applyCriterionChange,
@@ -43,13 +67,15 @@ export interface WorkstreamInput {
   acceptanceCriteria?: CriterionInput[];
   priority?: Priority;
   labels?: string[];
-  statusOverride?: WorkstreamStatus | null;
+  /** Catalog id, or a legacy enum (the seeded status of that type). `null` clears the pin. */
+  statusOverride?: string | null;
   startDate?: string | null;
   targetDate?: string | null;
 }
 
 export interface WorkstreamFilter {
-  status?: WorkstreamStatus;
+  /** Catalog id, or a legacy enum. A custom id matches that pin; a type matches every status of that type. */
+  status?: string;
   ownerTeamId?: string;
   teamId?: string;
   accountableUserId?: string;
@@ -73,14 +99,22 @@ export class WorkstreamsService {
     private readonly labels: LabelsService,
     @InjectRepository(WorkstreamEntity)
     private readonly repo: Repository<WorkstreamEntity>,
+    @Optional()
+    @Inject(UploadsService)
+    private readonly uploads?: UploadsService,
   ) {}
 
-  list(workspaceId: string, f: WorkstreamFilter = {}) {
+  async list(workspaceId: string, f: WorkstreamFilter = {}) {
     const qb = this.repo
       .createQueryBuilder('w')
       .where('w.workspaceId = :workspaceId', { workspaceId })
       .orderBy('w.updatedAt', 'DESC');
-    if (f.status) qb.andWhere('w.status = :status', { status: f.status });
+    if (f.status) {
+      const entries = (await loadStatusCatalog(this.ds, workspaceId)).workstream;
+      const entry = resolveStatusEntry(entries, f.status);
+      if (entry && entry.id !== entry.type) qb.andWhere('w.statusOverride = :sid', { sid: entry.id });
+      else qb.andWhere('w.status = :stype', { stype: entry?.type ?? f.status });
+    }
     if (f.ownerTeamId)
       qb.andWhere('w.ownerTeamId = :ot', { ot: f.ownerTeamId });
     if (f.teamId)
@@ -119,7 +153,8 @@ export class WorkstreamsService {
         ? { workspaceId, key: idOrKey.toUpperCase() }
         : { workspaceId, id: idOrKey },
     });
-    if (!row || projectHidden(currentAccess(), row.projectId)) throw notFound('Workstream', idOrKey);
+    if (!row || projectHidden(currentAccess(), row.projectId))
+      throw notFound('Workstream', idOrKey);
     return row;
   }
 
@@ -150,8 +185,13 @@ export class WorkstreamsService {
     // A workstream of a project works in the project's repositories: inherit them unless it names some.
     let repositoryIds = unique(input.repositoryIds);
     if (input.projectId) {
-      const project = await this.refs.projectRepositories(workspaceId, input.projectId, repositoryIds);
-      if (input.repositoryIds === undefined) repositoryIds = [...project.repositoryIds];
+      const project = await this.refs.projectRepositories(
+        workspaceId,
+        input.projectId,
+        repositoryIds,
+      );
+      if (input.repositoryIds === undefined)
+        repositoryIds = [...project.repositoryIds];
     }
     // The Delta thread is optional: a workstream can exist before any execution thread does ("Delta-first,
     // not Delta-dependent"). A supplied URL is always validated.
@@ -166,7 +206,14 @@ export class WorkstreamsService {
         [workspaceId, `${team.key}-%`],
       );
       const number = await this.counters.nextAbove(m, workspaceId, `wskey:${team.key}`, top);
-      const acceptanceCriteria = replaceCriteria(input.acceptanceCriteria, [], actor);
+      const catalog = await loadStatusCatalog(this.ds, workspaceId);
+      for (const criterion of input.acceptanceCriteria ?? []) {
+        if (criterion.state) requireStatus(catalog.criterion, criterion.state, 'criterion state');
+      }
+      const acceptanceCriteria = replaceCriteria(input.acceptanceCriteria, [], actor, new Date(), catalog.criterion);
+      const override = input.statusOverride
+        ? requireStatus(catalog.workstream, input.statusOverride, 'status')
+        : null;
       const derived: WorkstreamStatus = acceptanceCriteria.length
         ? 'planned'
         : 'draft';
@@ -190,10 +237,15 @@ export class WorkstreamsService {
           repositoryIds,
           acceptanceCriteria,
           priority: input.priority ?? 'none',
-          labels: (await this.labels.assign(workspaceId, input.labels)) ?? [],
+          labels:
+            (await this.labels.assign(
+              workspaceId,
+              input.labels,
+              'workstream',
+            )) ?? [],
           derivedStatus: derived,
-          statusOverride: input.statusOverride ?? null,
-          status: input.statusOverride ?? derived,
+          statusOverride: (override?.id as WorkstreamStatus | undefined) ?? null,
+          status: override?.type ?? derived,
           startDate:
             (toDate(input.startDate) as Date | null | undefined) ?? null,
           targetDate:
@@ -218,7 +270,8 @@ export class WorkstreamsService {
       try {
         return await run(m);
       } catch (e) {
-        if (isUniqueViolation(e)) throw new ConflictException('Workstream key already exists; retry');
+        if (isUniqueViolation(e))
+          throw new ConflictException('Workstream key already exists; retry');
         throw e;
       }
     };
@@ -244,9 +297,18 @@ export class WorkstreamsService {
     await this.refs.teams(workspaceId, patch.participatingTeamIds);
     await this.refs.users(workspaceId, [patch.accountableUserId]);
     await this.refs.repositories(workspaceId, patch.repositoryIds);
-    const projectId = patch.projectId !== undefined ? patch.projectId : ws.projectId;
-    if (projectId && (patch.projectId !== undefined || patch.repositoryIds !== undefined))
-      await this.refs.projectRepositories(workspaceId, projectId, patch.repositoryIds ?? ws.repositoryIds);
+    const projectId =
+      patch.projectId !== undefined ? patch.projectId : ws.projectId;
+    if (
+      projectId &&
+      (patch.projectId !== undefined || patch.repositoryIds !== undefined)
+    )
+      await this.refs.projectRepositories(
+        workspaceId,
+        projectId,
+        patch.repositoryIds ?? ws.repositoryIds,
+      );
+    const beforeText = [ws.description, ws.objective, ws.context].join('\n');
     const changed: string[] = [];
     const set = <K extends keyof WorkstreamEntity>(
       k: K,
@@ -276,22 +338,48 @@ export class WorkstreamsService {
     if (patch.projectId !== undefined) set('projectId', patch.projectId);
     if (patch.repositoryIds !== undefined)
       set('repositoryIds', unique(patch.repositoryIds));
-    if (patch.acceptanceCriteria !== undefined)
-      set('acceptanceCriteria', replaceCriteria(patch.acceptanceCriteria, ws.acceptanceCriteria, actor));
+    if (patch.acceptanceCriteria !== undefined) {
+      const catalog = await loadStatusCatalog(this.ds, workspaceId);
+      for (const criterion of patch.acceptanceCriteria) {
+        if (criterion.state) requireStatus(catalog.criterion, criterion.state, 'criterion state');
+      }
+      set('acceptanceCriteria', replaceCriteria(patch.acceptanceCriteria, ws.acceptanceCriteria, actor, new Date(), catalog.criterion));
+    }
     if (patch.priority !== undefined) set('priority', patch.priority);
-    if (patch.labels !== undefined) set('labels', (await this.labels.assign(workspaceId, patch.labels)) ?? []);
+    if (patch.labels !== undefined) {
+      const labels =
+        (await this.labels.assign(
+          workspaceId,
+          patch.labels,
+          'workstream',
+          ws.labels,
+        )) ?? [];
+      set('labels', labels);
+    }
     if (patch.startDate !== undefined)
       set('startDate', (toDate(patch.startDate) as Date | null) ?? null);
     if (patch.targetDate !== undefined)
       set('targetDate', (toDate(patch.targetDate) as Date | null) ?? null);
     if (patch.statusOverride !== undefined) {
-      set('statusOverride', patch.statusOverride);
-      ws.status = ws.statusOverride ?? ws.derivedStatus;
+      if (patch.statusOverride === null) {
+        set('statusOverride', null);
+        ws.status = ws.derivedStatus;
+      } else {
+        const entry = requireStatus((await loadStatusCatalog(this.ds, workspaceId)).workstream, patch.statusOverride, 'status');
+        set('statusOverride', entry.id as WorkstreamStatus);
+        ws.status = entry.type;
+      }
     }
     if (!changed.length) return ws;
+    const afterText = [ws.description, ws.objective, ws.context].join('\n');
+    if (beforeText !== afterText)
+      await this.uploads?.assertAttachable(workspaceId, afterText);
     ws.updatedAt = new Date();
     await this.repo.save(ws);
-    if (changed.includes('projectId')) await this.dropStaleMilestones(workspaceId, ws.id);
+    if (beforeText !== afterText)
+      await this.uploads?.retained(workspaceId, beforeText, afterText);
+    if (changed.includes('projectId'))
+      await this.dropStaleMilestones(workspaceId, ws.id);
     await this.events.record({
       workspaceId,
       actor,
@@ -306,6 +394,12 @@ export class WorkstreamsService {
 
   async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const ws = await this.get(workspaceId, idOrKey);
+    const lost =
+      (await this.uploads?.idsLostWith(workspaceId, { workstreamId: ws.id }, [
+        ws.description,
+        ws.objective,
+        ws.context,
+      ])) ?? [];
     let linked: string[] = [];
     let waiting: string[] = [];
     await this.ds.transaction(async (m) => {
@@ -352,6 +446,7 @@ export class WorkstreamsService {
       );
       await m.delete(WorkstreamEntity, { id: ws.id });
     });
+    await this.uploads?.releaseIds(workspaceId, lost);
     await this.events.record({
       workspaceId,
       actor,
@@ -359,8 +454,14 @@ export class WorkstreamsService {
       subject: { type: 'workstream', id: ws.id },
       data: { key: ws.key, title: ws.title },
     });
-    for (const id of linked.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id });
-    if (waiting.length) await this.bus.touchMany(workspaceId, waiting, 'workstream.deleted');
+    for (const id of linked.slice(0, 200))
+      this.events.publish(workspaceId, {
+        type: 'updated',
+        entity: 'issue',
+        id,
+      });
+    if (waiting.length)
+      await this.bus.touchMany(workspaceId, waiting, 'workstream.deleted');
   }
 
   /** Leaving (or switching) a project drops its milestones from this workstream's issues that no longer qualify. */
@@ -370,9 +471,18 @@ export class WorkstreamsService {
       [workspaceId, workstreamId],
     );
     const changed = await this.ds.transaction((m) =>
-      pruneIssueMilestones(m, workspaceId, issues.map((r) => r.id)),
+      pruneIssueMilestones(
+        m,
+        workspaceId,
+        issues.map((r) => r.id),
+      ),
     );
-    for (const id of changed.slice(0, 200)) this.events.publish(workspaceId, { type: 'updated', entity: 'issue', id });
+    for (const id of changed.slice(0, 200))
+      this.events.publish(workspaceId, {
+        type: 'updated',
+        entity: 'issue',
+        id,
+      });
   }
 
   // ───────── acceptance criteria
@@ -384,7 +494,9 @@ export class WorkstreamsService {
     input: CriterionInput,
   ) {
     const ws = await this.get(workspaceId, idOrKey);
-    const criterion = newCriterion(input, actor);
+    const catalog = (await loadStatusCatalog(this.ds, workspaceId)).criterion;
+    if (input.state) requireStatus(catalog, input.state, 'criterion state');
+    const criterion = newCriterion(input, actor, new Date(), catalog);
     ws.acceptanceCriteria = [...ws.acceptanceCriteria, criterion];
     return this.saveCriteria(ws, actor, 'added', criterion);
   }
@@ -401,7 +513,9 @@ export class WorkstreamsService {
     if (!current) throw notFound('Criterion', criterionId);
     if (patch.evidence?.artifactIds?.length)
       await this.assertEvidenceArtifacts(ws, patch.evidence.artifactIds);
-    const next = applyCriterionChange(current, patch, actor);
+    const catalog = (await loadStatusCatalog(this.ds, workspaceId)).criterion;
+    if (patch.state) requireStatus(catalog, patch.state, 'criterion state');
+    const next = applyCriterionChange(current, patch, actor, new Date(), catalog);
     ws.acceptanceCriteria = ws.acceptanceCriteria.map((c) =>
       c.id === criterionId ? next : c,
     );
@@ -413,7 +527,14 @@ export class WorkstreamsService {
     const unique = [...new Set(ids)];
     const rows = await this.ds
       .getRepository(ArtifactEntity)
-      .find({ where: { workspaceId: ws.workspaceId, id: In(unique), workstreamId: ws.id }, select: { id: true } });
+      .find({
+        where: {
+          workspaceId: ws.workspaceId,
+          id: In(unique),
+          workstreamId: ws.id,
+        },
+        select: { id: true },
+      });
     const found = new Set(rows.map((r) => r.id));
     const missing = unique.filter((id) => !found.has(id));
     if (missing.length)
@@ -461,7 +582,9 @@ export class WorkstreamsService {
           text: criterion.text,
           state: criterion.state,
           previousState,
-          ...(criterion.evidence ? { evidence: criterion.evidence.artifactIds.length } : {}),
+          ...(criterion.evidence
+            ? { evidence: criterion.evidence.artifactIds.length }
+            : {}),
         },
       },
       { type: 'updated', entity: 'workstream', id: ws.id },
@@ -472,7 +595,9 @@ export class WorkstreamsService {
 }
 
 /** Empty means "no thread (yet)"; anything else must be a Delta thread link. */
-export function optionalDeltaThreadUrl(value: string | null | undefined): string {
+export function optionalDeltaThreadUrl(
+  value: string | null | undefined,
+): string {
   const url = typeof value === 'string' ? value.trim() : '';
   if (!url) return '';
   if (!isDeltaThreadUrl(url)) {

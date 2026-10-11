@@ -6,7 +6,7 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
-import type { WorkstreamStatus } from '../contracts/domain.js';
+import { statusTypeOf, type WorkstreamStatus } from '../contracts/domain.js';
 import {
   ArtifactEntity,
   DecisionEntity,
@@ -21,6 +21,7 @@ import {
   type WorkstreamTouched,
 } from '../events/workstream-bus.js';
 import { deriveStatus, nextShippedAt, type StatusDependency } from './derive-status.js';
+import { loadStatusCatalog } from './status-catalog.js';
 
 export interface StatusChange {
   workstreamId: string;
@@ -149,14 +150,31 @@ export class StatusService
         .getMany(),
     ]);
     const incomingDependencies = await this.incoming(workspaceId, ws.id);
+    // Derivation reads semantic types. A custom display status must not become a new state.
+    const catalog = await loadStatusCatalog(this.ds, workspaceId);
+    const overrideType = ws.statusOverride
+      ? (statusTypeOf(catalog.workstream, ws.statusOverride) ?? null)
+      : null;
 
     const result = deriveStatus({
-      workstream: ws,
+      workstream: {
+        ...ws,
+        statusOverride: overrideType,
+        acceptanceCriteria: ws.acceptanceCriteria.map((criterion) => ({
+          ...criterion,
+          state: statusTypeOf(catalog.criterion, criterion.state) ?? criterion.state,
+        })),
+      },
       inputRequests,
       artifacts,
-      decisions,
+      decisions: decisions.map((decision) => ({
+        ...decision,
+        status: statusTypeOf(catalog.decision, decision.status) ?? decision.status,
+      })),
       incomingDependencies,
-      issues,
+      issues: issues.map((issue) => ({
+        status: statusTypeOf(catalog.issue, issue.status) ?? issue.status,
+      })),
     });
 
     let change: StatusChange | null = null;

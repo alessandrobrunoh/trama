@@ -566,6 +566,7 @@ export class CustomerSubscriptionEntity extends Wire {
 @Index('IDX_artifacts_workstream', ['workstreamId'])
 @Index('IDX_artifacts_project', ['projectId'])
 @Index('IDX_artifacts_issue', ['issueId'])
+@Index('IDX_artifacts_upload', ['uploadId'])
 @Index('IDX_artifacts_external', ['workspaceId', 'repositoryId', 'externalId'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
@@ -595,6 +596,8 @@ export class ArtifactEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) url: string | null;
   /** A `document` artifact that points to a Trama document; deleting the document deletes the artifact. */
   @Column({ type: 'varchar', nullable: true }) documentId: string | null;
+  /** Set when the artifact is an uploaded file (`uploads.id`). Not part of the API contract; `url` is the workspace path. */
+  @Column({ type: 'varchar', nullable: true }) uploadId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalId: string | null;
   @Column({ type: 'varchar', default: 'open' }) state: ArtifactState;
   @Column({ type: 'varchar', nullable: true }) ci: CiState | null;
@@ -606,7 +609,32 @@ export class ArtifactEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
 
   protected override hidden() {
-    return ['workspaceId'];
+    return ['workspaceId', 'uploadId'];
+  }
+}
+
+/**
+ * A file uploaded into the workspace. Documents cannot hold one: they are versioned markdown with a
+ * full-text index. The bytes stay here, in the same database, and are served only while some record
+ * the caller can read still points at them.
+ */
+@Entity('uploads')
+@Index('IDX_uploads_workspace', ['workspaceId', 'createdAt'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+export class UploadEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) filename: string;
+  @Column({ type: 'varchar' }) contentType: string;
+  @Column({ type: 'integer' }) byteSize: number;
+  @Column({ type: 'bytea' }) bytes: Buffer;
+  /** False until a description, comment or artifact references it. An unreferenced row is the uploader's draft. */
+  @Column({ type: 'boolean', default: false }) referenced: boolean;
+  @Column({ type: 'jsonb' }) createdBy: ActorRef;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+
+  protected override hidden() {
+    return ['workspaceId', 'bytes', 'referenced'];
   }
 }
 
@@ -953,6 +981,7 @@ export const ENTITIES = [
   CustomerRequestEntity,
   CustomerSubscriptionEntity,
   ArtifactEntity,
+  UploadEntity,
   DecisionEntity,
   DependencyEntity,
   CommentEntity,

@@ -1,6 +1,6 @@
 // The label catalog as the UI uses it: lookup by id, usage counts, "recent" for pickers, and inline creation.
 import { Injectable, computed, inject, signal } from '@angular/core';
-import { LABEL_ASSIGN_MAX, LABEL_SWATCHES, TramaStore, type WorkspaceLabel } from '../core';
+import { LABEL_ASSIGN_MAX, LABEL_SWATCHES, TramaStore, type LabelScope, type WorkspaceLabel } from '../core';
 import { readJson, writeJson } from '../core/stores/storage';
 
 /** How many records carry one label, per kind of record. */
@@ -99,9 +99,18 @@ export class LabelCatalog {
    * `suggested` (recent picks, then the most used, only in a long list) and `rest` (alphabetical).
    * Archived labels appear only when `keep` holds them, so they can be unticked.
    */
-  arrange(keep: ReadonlySet<string> = new Set(), withSuggested = true): { suggested: WorkspaceLabel[]; rest: WorkspaceLabel[] } {
+  /**
+   * `scope` limits the list to that record type. Already-selected ids stay so a mismatched label can be removed.
+   * `null` (repositories, which have no label scope) offers only what is already selected.
+   */
+  arrange(keep: ReadonlySet<string> = new Set(), withSuggested = true, scope?: LabelScope | null): { suggested: WorkspaceLabel[]; rest: WorkspaceLabel[] } {
     const offered = this.all()
-      .filter((label) => !label.archived || keep.has(label.id))
+      .filter((label) => {
+        if (label.archived && !keep.has(label.id)) return false;
+        if (scope === undefined) return true;
+        if (scope === null) return keep.has(label.id);
+        return label.scope === scope || keep.has(label.id);
+      })
       .sort((a, b) => Number(!!a.archived) - Number(!!b.archived) || a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
     const suggested: WorkspaceLabel[] = [];
     if (withSuggested && offered.length >= SUGGEST_FROM) {
@@ -137,8 +146,8 @@ export class LabelCatalog {
     return wanted ? this.all().find((label) => label.name.toLowerCase() === wanted) : undefined;
   }
 
-  /** Create a custom label. Resolves the new label, or `undefined` when the API refused (a toast says why). */
-  create(name: string, color?: string): Promise<WorkspaceLabel | undefined> {
-    return this.store.createLabel(color ? { name: name.trim(), color } : { name: name.trim() });
+  /** Create a custom label in `scope`. Resolves the new label, or `undefined` when the API refused (a toast says why). */
+  create(name: string, color: string | undefined, scope: LabelScope): Promise<WorkspaceLabel | undefined> {
+    return this.store.createLabel(color ? { name: name.trim(), color, scope } : { name: name.trim(), scope });
   }
 }

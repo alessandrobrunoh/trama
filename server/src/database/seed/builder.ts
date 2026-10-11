@@ -192,7 +192,7 @@ export class SeedBuilder {
   adoptLabels() {
     const { catalog, groups } = adoptFreeTextLabels(
       undefined,
-      this.data.workstreams.map((row) => (row.labels ?? []) as string[]),
+      this.data.workstreams.map((row) => ({ scope: 'workstream' as const, labels: (row.labels ?? []) as string[] })),
     );
     groups.forEach((ids, i) => {
       this.data.workstreams[i].labels = ids;
