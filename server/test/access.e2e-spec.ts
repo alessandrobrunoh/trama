@@ -25,15 +25,15 @@ describe('permission policies, team roles and token scopes', () => {
     return { owner: owner.client, ownerId: owner.user.id, slug, w: `/api/w/${slug}`, ws, ...people };
   }
 
-  describe('workspace permission policy', () => {
-    async function roleCaps(client: Client, w: string, roleId: string): Promise<string[]> {
-      const ws = (await client.get(w).expect(200)).body;
-      return ws.settings.roles.find((role: { id: string }) => role.id === roleId).capabilities;
-    }
-    async function setCaps(client: Client, w: string, roleId: string, capabilities: string[]) {
-      await client.patch(`${w}/roles/${roleId}`, { capabilities }).expect(200);
-    }
+  async function roleCaps(client: Client, w: string, roleId: string): Promise<string[]> {
+    const ws = (await client.get(w).expect(200)).body;
+    return ws.settings.roles.find((role: { id: string }) => role.id === roleId).capabilities;
+  }
+  async function setCaps(client: Client, w: string, roleId: string, capabilities: string[]) {
+    await client.patch(`${w}/roles/${roleId}`, { capabilities }).expect(200);
+  }
 
+  describe('workspace permission policy', () => {
     it('exposes the seeded roles and only owners may change them', async () => {
       const { owner, admin, member, w } = await setup();
       const ws = (await owner.get(w).expect(200)).body;
