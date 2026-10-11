@@ -93,6 +93,12 @@ describe('permission policies, team roles and token scopes', () => {
       const other = await Client.signup(server, 'Newbie');
       await member.post(`${w}/members`, { email: other.email, role: 'admin' }).expect(403);
       await member.post(`${w}/members`, { email: other.email, role: 'viewer' }).expect(201);
+      await setCaps(
+        owner,
+        w,
+        'member',
+        (await roleCaps(owner, w, 'member')).filter((cap) => cap !== 'manageSharedViews'),
+      );
       await member.post(`${w}/views`, { name: 'Mine', entity: 'issue', shared: true }).expect(403);
       await member.post(`${w}/views`, { name: 'Private', entity: 'issue' }).expect(201);
       await admin.post(`${w}/views`, { name: 'Shared', entity: 'issue', shared: true }).expect(201);
@@ -251,9 +257,14 @@ describe('permission policies, team roles and token scopes', () => {
       const { owner, member, w } = await setup();
       const agent = (await owner.post(`${w}/agents`, { name: 'Bot', provider: 'codex' }).expect(201)).body;
       await member.post(`${w}/tokens`, { name: 'for agent', agentId: agent.id }).expect(403);
-      await owner.patch(`${w}/settings`, { permissions: { manageAgents: 'member' } }).expect(200);
+      await setCaps(owner, w, 'member', [...(await roleCaps(owner, w, 'member')), 'manageAgents']);
       await member.post(`${w}/tokens`, { name: 'for agent', agentId: agent.id }).expect(201);
-      await owner.patch(`${w}/settings`, { permissions: { manageTokens: 'admin' } }).expect(200);
+      await setCaps(
+        owner,
+        w,
+        'member',
+        (await roleCaps(owner, w, 'member')).filter((cap) => cap !== 'manageTokens'),
+      );
       await member.post(`${w}/tokens`, { name: 'mine' }).expect(403);
     });
   });

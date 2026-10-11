@@ -181,7 +181,7 @@ describe('project updates', () => {
       });
 
       it('demoting the lead (changing leadId) removes their right to post', async () => {
-        const { owner, lead, member, project, post, withoutManageProjects } = await setup();
+        const { owner, lead, member, w, project, post, withoutManageProjects } = await setup();
         await withoutManageProjects();
         await post(lead.client).expect(201);
         await owner.client.patch(`${w}/projects/${project.id}`, { leadId: member.user.id }).expect(200);
