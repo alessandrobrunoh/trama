@@ -2814,9 +2814,9 @@ export function ownerWorkspaceRole(capabilities: readonly Capability[] = [...CAP
   return { id: OWNER_ROLE_ID, name: 'Owner', owner: true, capabilities: normalizeCapabilities(capabilities, true), grants: [...MEMBER_GRANTS] };
 }
 
-/** A brand-new workspace: the owner role only. */
+/** A brand-new workspace starts with the four old ranks, as editable roles. Admin, Member and Viewer can be deleted. */
 export function freshWorkspaceRoles(): WorkspaceRole[] {
-  return [ownerWorkspaceRole()];
+  return migrateLegacyRoles();
 }
 
 /**
@@ -3226,7 +3226,7 @@ export function statusStoredValues<T extends string>(entry: StatusEntry<T>, entr
 }
 
 export interface WorkspaceSettings {
-  /** Roles people and invitations can hold. A new workspace stores only Owner; older settings are migrated on read. */
+  /** Roles people and invitations can hold. A new workspace stores the four old ranks; older settings without `roles` are migrated on read. */
   roles: WorkspaceRole[];
   /** Team preselected when creating issues and workstreams. */
   defaultTeamId?: ID;

@@ -190,7 +190,7 @@ describe('workspace roles', () => {
       ),
     ).toBe(false);
     const fresh = resolveWorkspaceSettings({ roles: freshWorkspaceRoles() });
-    expect(fresh.roles.map((role) => role.id)).toEqual(['owner']);
+    expect(fresh.roles.map((role) => role.id)).toEqual(['owner', 'admin', 'member', 'viewer']);
   });
 
   it('keeps invite members on the owner role even when a save tries to remove it', async () => {
