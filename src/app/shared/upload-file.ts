@@ -4,7 +4,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { Notifier } from '../core';
 import { UPLOAD_ACCEPT, clientUploadError } from '../core/upload-url';
 
-/** File picker. Emits a file the server will accept; the parent decides whether it becomes an artifact or markdown. */
+/** File picker. Emits files the server will accept; the parent decides whether they become artifacts or markdown. */
 @Component({
   selector: 'app-upload-file',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -16,6 +16,7 @@ import { UPLOAD_ACCEPT, clientUploadError } from '../core/upload-url';
       class="sr-only"
       type="file"
       [accept]="accept"
+      [multiple]="multiple()"
       [disabled]="busy()"
       (change)="picked($event)"
     />
@@ -39,6 +40,8 @@ export class UploadFile {
   readonly variant = input<'ghost' | 'outline'>('outline');
   readonly size = input<'sm' | 'xs'>('sm');
   readonly busy = input(false);
+  /** Allow picking several files at once; each accepted one is emitted. */
+  readonly multiple = input(false);
   readonly file = output<File>();
   protected readonly icon = LucidePaperclip;
   protected readonly accept = UPLOAD_ACCEPT;
@@ -46,14 +49,24 @@ export class UploadFile {
 
   protected picked(ev: Event): void {
     const input = ev.target as HTMLInputElement;
-    const file = input.files?.[0];
+    const files = input.files;
     input.value = '';
-    if (!file) return;
-    const reason = clientUploadError(file);
-    if (reason) {
-      this.notifier.error('Cannot upload that file', { description: reason });
-      return;
+    if (!files?.length) return;
+    let firstReason: string | null = null;
+    let rejected = 0;
+    for (const file of Array.from(files)) {
+      const reason = clientUploadError(file);
+      if (reason) {
+        rejected++;
+        firstReason ??= reason;
+        continue;
+      }
+      this.file.emit(file);
     }
-    this.file.emit(file);
+    if (rejected)
+      this.notifier.error('Cannot upload that file', {
+        description:
+          rejected > 1 ? `${rejected} files were skipped. First: ${firstReason}` : firstReason!,
+      });
   }
 }

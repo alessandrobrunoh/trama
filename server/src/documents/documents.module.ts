@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtifactsModule } from '../artifacts/artifacts.module.js';
+import { UploadsModule } from '../uploads/uploads.module.js';
 import {
   DocumentEntity,
   DocumentRevisionEntity,
@@ -12,6 +13,7 @@ import { DocumentsService } from './documents.service.js';
   imports: [
     TypeOrmModule.forFeature([DocumentEntity, DocumentRevisionEntity]),
     ArtifactsModule,
+    UploadsModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService],

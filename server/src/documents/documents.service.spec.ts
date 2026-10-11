@@ -175,6 +175,12 @@ function setup(opts: { raceOnce?: boolean } = {}) {
   const events = { record: vi.fn(async () => ({})), publish: vi.fn() };
   const touch = vi.fn(async () => undefined);
   const bus = { touch } as unknown as WorkstreamBus;
+  const uploads = {
+    assertAttachable: vi.fn(async () => undefined),
+    retained: vi.fn(async () => undefined),
+    idsLostWith: vi.fn(async () => []),
+    releaseIds: vi.fn(async () => undefined),
+  };
   const refs = {
     workstreams: async () => undefined,
     repositories: async () => undefined,
@@ -191,9 +197,10 @@ function setup(opts: { raceOnce?: boolean } = {}) {
     events as unknown as EventsService,
     bus,
     artifactsService,
+    uploads as never,
     docs as unknown as Repository<DocumentEntity>,
   );
-  return { service, docs, revs, arts, events, queries, touch };
+  return { service, docs, revs, arts, events, queries, touch, uploads };
 }
 
 describe('DocumentsService.create', () => {
@@ -606,5 +613,41 @@ describe('permissions', () => {
     await expect(
       service.archive(ctx(OTHER, 'member'), doc.id),
     ).resolves.toMatchObject({ archivedAt: expect.any(Date) });
+  });
+});
+
+describe('uploads', () => {
+  const MARKDOWN = 'See ![shot](/api/w/acme/uploads/upl_abc123defg).';
+
+  it('checks the files a create mentions and marks them referenced', async () => {
+    const { service, uploads } = setup();
+    await service.create(ctx(), { title: 'Spec', body: MARKDOWN });
+    expect(uploads.assertAttachable).toHaveBeenCalledWith(WS, MARKDOWN);
+    expect(uploads.retained).toHaveBeenCalledWith(WS, null, MARKDOWN);
+  });
+
+  it('re-checks on a body change and keeps what the next body still mentions', async () => {
+    const { service, uploads } = setup();
+    const doc = await service.create(ctx(), { title: 'Spec', body: 'plain' });
+    uploads.retained.mockClear();
+    await service.update(ctx(), doc.id, {
+      baseVersion: 1,
+      body: MARKDOWN,
+    });
+    expect(uploads.assertAttachable).toHaveBeenCalledWith(WS, MARKDOWN);
+    expect(uploads.retained).toHaveBeenCalledWith(WS, 'plain', MARKDOWN);
+  });
+
+  it('releases the files of the body and the history when deleted', async () => {
+    const { service, uploads } = setup();
+    const doc = await service.create(ctx(), { title: 'Spec', body: MARKDOWN });
+    uploads.idsLostWith.mockResolvedValue(['upl_abc123defg']);
+    await service.remove(ctx(), doc.id);
+    expect(uploads.idsLostWith).toHaveBeenCalledWith(
+      WS,
+      { documentId: doc.id },
+      [MARKDOWN],
+    );
+    expect(uploads.releaseIds).toHaveBeenCalledWith(WS, ['upl_abc123defg']);
   });
 });
