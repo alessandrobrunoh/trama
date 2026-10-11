@@ -56,10 +56,12 @@ import {
   WORKSTREAM_STATUS_META,
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
+import { formatBytes } from '../../core/format';
 import { DraftStore } from '../../core/stores/draft.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { StatusIcon } from '../../shared/status';
+import { UploadFile } from '../../shared/upload-file';
 import { issueEstimateOptions } from '../issues/issue-model';
 import { Picker, type PickOption } from '../workstreams/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
@@ -67,6 +69,9 @@ import { DraftSuggestions } from '../ai/draft-suggestions';
 import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 
 type ComposerKind = 'issue' | 'workstream' | 'decision';
+
+/** Kinds whose records can own file/image artifacts, so the dialog accepts attachments for them. */
+const ATTACHABLE = new Set<CreateKind>(['issue', 'workstream', 'project']);
 
 interface KindDef {
   kind: ComposerKind;
@@ -151,6 +156,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     AppSelect,
     FormRow,
     DraftSuggestions,
+    UploadFile,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -322,6 +328,37 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 @if (err('delta'); as e) {
                   <p class="text-destructive text-xs" role="alert">{{ e }}</p>
                 }
+              }
+              @if (canAttach()) {
+                <div
+                  class="mt-2 flex flex-wrap items-center gap-1.5"
+                  data-testid="create-attachments"
+                >
+                  <app-upload-file
+                    label="Attach files"
+                    variant="ghost"
+                    size="xs"
+                    [multiple]="true"
+                    [busy]="busy()"
+                    (file)="addAttachment($event)"
+                  />
+                  @for (f of attachments(); track $index) {
+                    <span
+                      class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
+                    >
+                      <span class="truncate">{{ f.name }}</span>
+                      <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
+                      <button
+                        type="button"
+                        class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
+                        [attr.aria-label]="'Remove ' + f.name"
+                        (click)="removeAttachment($index)"
+                      >
+                        <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+                      </button>
+                    </span>
+                  }
+                </div>
               }
             </div>
 
@@ -640,6 +677,32 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       />
                     </app-form-row>
                   }
+                  <div class="flex flex-wrap items-center gap-1.5" data-testid="create-attachments">
+                    <app-upload-file
+                      label="Attach files"
+                      variant="ghost"
+                      size="xs"
+                      [multiple]="true"
+                      [busy]="busy()"
+                      (file)="addAttachment($event)"
+                    />
+                    @for (f of attachments(); track $index) {
+                      <span
+                        class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
+                      >
+                        <span class="truncate">{{ f.name }}</span>
+                        <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
+                        <button
+                          type="button"
+                          class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
+                          [attr.aria-label]="'Remove ' + f.name"
+                          (click)="removeAttachment($index)"
+                        >
+                          <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+                        </button>
+                      </span>
+                    }
+                  </div>
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -774,6 +837,9 @@ export class CreateDialog {
   protected readonly repositoryIds = signal<string[]>([]);
   protected readonly projectId = signal('');
   protected readonly issueIds = signal<string[]>([]);
+  /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
+  protected readonly attachments = signal<File[]>([]);
+  protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
   // decision
   protected readonly workstreamId = signal('');
   protected readonly decisionStatus = signal<string>('proposed');
@@ -1043,6 +1109,7 @@ export class CreateDialog {
     this.teamKey.set('');
     this.teamKeyTouched = false;
     this.gitProvider.set('github');
+    this.attachments.set([]);
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'workstream');
     this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
@@ -1113,12 +1180,33 @@ export class CreateDialog {
     if (values[0]) sig.set(values[0]);
   }
 
+  protected addAttachment(file: File): void {
+    this.attachments.update((list) => [...list, file]);
+  }
+
+  protected removeAttachment(at: number): void {
+    this.attachments.update((list) => list.filter((_, i) => i !== at));
+  }
+
+  protected bytes(size: number): string {
+    return formatBytes(size);
+  }
+
+  /** Upload the picked files onto the new record. The store toasts each failure itself. */
+  private async uploadAttachments(
+    target: { type: 'issue' | 'workstream' | 'project'; id: string },
+  ): Promise<void> {
+    for (const file of this.attachments())
+      await this.store.uploadArtifactFile(target, file);
+  }
+
   protected onSwitch(next: ComposerKind): void {
     if (next === this.kind()) return;
     // Title / description / priority carry over; kind-specific properties keep their own state.
     // The text moves to the new kind's draft, so the old one is not left behind.
     this.drafts.set(this.draftKey(this.kind()), null);
     this.restored.set(false);
+    this.attachments.set([]);
     this.kind.set(next);
     this.submitted.set(false);
     this.ui.createKind.set(next);
@@ -1266,6 +1354,7 @@ export class CreateDialog {
           if (i) {
             const links = this.workstreamIds();
             if (links.length) await this.store.linkIssue(i.id, { workstreamIds: links });
+            await this.uploadAttachments({ type: 'issue', id: i.id });
             done = { label: `${i.key} created`, path: ['issues', i.key] };
           }
           break;
@@ -1287,6 +1376,7 @@ export class CreateDialog {
             await Promise.all(
               this.issueIds().map((id) => this.store.linkIssue(id, { workstreamIds: [w.id] })),
             );
+            await this.uploadAttachments({ type: 'workstream', id: w.id });
             done = { label: `${w.key} created`, path: ['workstreams', w.key] };
           }
           break;
@@ -1331,7 +1421,10 @@ export class CreateDialog {
             summary: this.text().trim() || undefined,
             repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
           });
-          if (p) done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
+          if (p) {
+            await this.uploadAttachments({ type: 'project', id: p.id });
+            done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
+          }
           break;
         }
         case 'view': {
@@ -1368,6 +1461,7 @@ export class CreateDialog {
         this.text.set('');
         this.text2.set('');
         this.issueIds.set([]);
+        this.attachments.set([]);
         this.submitted.set(false);
         this.draftAttempt.set(false);
         this.focusTitle();

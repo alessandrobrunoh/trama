@@ -21,12 +21,14 @@ import {
   LucideLink,
   LucideList,
   LucideListChecks,
+  LucidePaperclip,
   LucideRows3,
   LucideTerminal,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, Notifier, type ActorRef } from '../../core';
+import { UPLOAD_ACCEPT, clientUploadError } from '../../core/upload-url';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import {
   SLASH_COMMANDS,
@@ -130,7 +132,8 @@ function caretCoords(
 /**
  * Markdown source editor: a plain textarea (fast, accessible, native undo) with a formatting toolbar, keyboard
  * shortcuts, list continuation, a `/` command menu, `@` / `#` mentions and smart paste (HTML becomes Markdown,
- * a link pasted over selected text links it). Bind the text two-way: `<app-document-editor [(value)]="body" />`.
+ * a link pasted over selected text links it). Pasted, dropped or picked files are uploaded and inserted as
+ * workspace markdown. Bind the text two-way: `<app-document-editor [(value)]="body" />`.
  */
 @Component({
   selector: 'app-document-editor',
@@ -162,8 +165,28 @@ function caretCoords(
             }
           </button>
         }
+        <input
+          #picker
+          class="sr-only"
+          type="file"
+          [accept]="accept"
+          multiple
+          [disabled]="uploading()"
+          (change)="pickedFiles($event)"
+        />
+        <button
+          type="button"
+          class="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring ml-auto inline-flex size-7 shrink-0 items-center justify-center rounded-md outline-none focus-visible:ring-2 disabled:opacity-50"
+          aria-label="Upload a file or image"
+          hlmTooltip="Upload a file or image"
+          [disabled]="uploading()"
+          (mousedown)="$event.preventDefault()"
+          (click)="picker.click()"
+        >
+          <svg [lucideIcon]="paperclip" [size]="15"></svg>
+        </button>
         @if (hint()) {
-          <span class="text-muted-foreground ml-auto hidden shrink-0 pl-3 text-[11px] sm:inline">
+          <span class="text-muted-foreground ml-1 hidden shrink-0 pl-1 text-[11px] sm:inline">
             Type <kbd class="bg-muted rounded px-1 font-mono">/</kbd> for commands,
             <kbd class="bg-muted rounded px-1 font-mono">@</kbd> to mention
           </span>
@@ -191,6 +214,8 @@ function caretCoords(
         (keyup)="onCaretMove($event)"
         (click)="refreshMenu()"
         (paste)="onPaste($event)"
+        (dragover)="onDragOver($event)"
+        (drop)="onDrop($event)"
         (scroll)="scrolled.emit(ratio())"
         (blur)="onBlur()"
       ></textarea>
@@ -578,11 +603,10 @@ export class DocumentEditor {
     if (!cd) return;
     const plain = cd.getData('text/plain');
     const html = cd.getData('text/html');
-    if (!plain && !html && Array.from(cd.files).some((f) => f.type.startsWith('image/'))) {
+    const files = Array.from(cd.files);
+    if (files.length && !plain && !html) {
       ev.preventDefault();
-      this.notifier.info('Pasting images is not supported yet', {
-        description: 'Link to the image with ![description](https://…) instead.',
-      });
+      void this.attachFiles(files);
       return;
     }
     const state = this.state();
@@ -607,6 +631,62 @@ export class DocumentEditor {
         this.apply({ from: state.start, to: state.end, insert: md, selStart: at, selEnd: at });
         this.notifier.info('Pasted as Markdown', { duration: 2500 });
       }
+    }
+  }
+
+  // ───────────── file uploads ─────────────
+
+  protected readonly paperclip = LucidePaperclip;
+  protected readonly accept = UPLOAD_ACCEPT;
+  protected readonly uploading = signal(false);
+
+  protected pickedFiles(ev: Event): void {
+    const input = ev.target as HTMLInputElement;
+    const files = Array.from(input.files ?? []);
+    input.value = '';
+    if (files.length) void this.attachFiles(files);
+  }
+
+  protected onDragOver(ev: DragEvent): void {
+    // Only claim the drop when files are coming; text drags keep the browser default.
+    if (!this.readonly() && ev.dataTransfer?.types.includes('Files'))
+      ev.preventDefault();
+  }
+
+  protected onDrop(ev: DragEvent): void {
+    const files = Array.from(ev.dataTransfer?.files ?? []);
+    if (!files.length) return;
+    ev.preventDefault();
+    void this.attachFiles(files);
+  }
+
+  /** Stage each file and drop its markdown at the caret, one undo-friendly block per file. */
+  protected async attachFiles(files: readonly File[]): Promise<void> {
+    if (this.readonly() || this.uploading()) return;
+    const valid: File[] = [];
+    let rejected = 0;
+    let firstReason: string | null = null;
+    for (const file of files) {
+      const reason = clientUploadError(file);
+      if (reason) {
+        rejected++;
+        firstReason ??= reason;
+      } else valid.push(file);
+    }
+    if (rejected)
+      this.notifier.error('Cannot upload that file', {
+        description:
+          rejected > 1 ? `${rejected} files were skipped. First: ${firstReason}` : firstReason!,
+      });
+    if (!valid.length) return;
+    this.uploading.set(true);
+    try {
+      for (const file of valid) {
+        const markdown = await this.store.stageUpload(file);
+        if (markdown) this.insertBlock(markdown, markdown.length);
+      }
+    } finally {
+      this.uploading.set(false);
     }
   }
 

@@ -249,10 +249,16 @@ export class UploadsService {
   /**
    * Ids that will have no row left after `owner` is deleted: files named in `texts` or in comments on that
    * record, and uploads whose only artifact owner is that record. Call before the delete, then `releaseIds`.
+   * A document owner also loses the files named in its revisions and in its linked artifacts.
    */
   async idsLostWith(
     workspaceId: string,
-    owner: { issueId?: string; workstreamId?: string; projectId?: string },
+    owner: {
+      issueId?: string;
+      workstreamId?: string;
+      projectId?: string;
+      documentId?: string;
+    },
     texts: readonly (string | null | undefined)[],
   ): Promise<string[]> {
     const ids = new Set<string>();
@@ -260,23 +266,38 @@ export class UploadsService {
     const issueId = owner.issueId ?? null;
     const workstreamId = owner.workstreamId ?? null;
     const projectId = owner.projectId ?? null;
+    const documentId = owner.documentId ?? null;
     const artifacts = await this.ds.query<
       { id: string; uploadId: string | null }[]
     >(
-      `SELECT "id", "uploadId" FROM "artifacts"
-       WHERE "workspaceId" = $1
-         AND "issueId" IS NOT DISTINCT FROM $2
-         AND "workstreamId" IS NOT DISTINCT FROM $3
-         AND "projectId" IS NOT DISTINCT FROM $4`,
-      [workspaceId, issueId, workstreamId, projectId],
+      documentId
+        ? `SELECT "id", "uploadId" FROM "artifacts"
+           WHERE "workspaceId" = $1 AND "documentId" = $2`
+        : `SELECT "id", "uploadId" FROM "artifacts"
+           WHERE "workspaceId" = $1
+             AND "issueId" IS NOT DISTINCT FROM $2
+             AND "workstreamId" IS NOT DISTINCT FROM $3
+             AND "projectId" IS NOT DISTINCT FROM $4`,
+      documentId
+        ? [workspaceId, documentId]
+        : [workspaceId, issueId, workstreamId, projectId],
     );
     const subjects = [
       issueId,
       workstreamId,
       projectId,
+      documentId,
       ...artifacts.map((row) => row.id),
     ].filter((id): id is string => !!id);
     for (const row of artifacts) if (row.uploadId) ids.add(row.uploadId);
+    if (documentId) {
+      const revisions = await this.ds.query<{ body: string }[]>(
+        `SELECT "body" FROM "document_revisions" WHERE "workspaceId" = $1 AND "documentId" = $2`,
+        [workspaceId, documentId],
+      );
+      for (const rev of revisions)
+        for (const id of uploadIdsIn(rev.body)) ids.add(id);
+    }
     if (subjects.length) {
       const comments = await this.ds.query<{ body: string }[]>(
         `SELECT "body" FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
@@ -489,6 +510,18 @@ export class UploadsService {
         projectScoped: true,
         projectId: row.id,
       });
+
+    // A file in a document stays readable while the current body or any kept revision mentions it.
+    const docs = await this.ds.query<{ hit: boolean }[]>(
+      `SELECT EXISTS (
+         SELECT 1 FROM "documents" WHERE "workspaceId" = $1 AND strpos("body", $2) > 0
+       ) OR EXISTS (
+         SELECT 1 FROM "document_revisions" WHERE "workspaceId" = $1 AND strpos("body", $2) > 0
+       ) AS "hit"`,
+      [workspaceId, token],
+    );
+    if (docs[0]?.hit)
+      out.push({ resource: 'documents', projectScoped: false, projectId: null });
 
     const comments = await this.ds.query<{ type: string; id: string }[]>(
       `SELECT "subject"->>'type' AS "type", "subject"->>'id' AS "id"

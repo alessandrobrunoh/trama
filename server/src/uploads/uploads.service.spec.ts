@@ -29,7 +29,10 @@ function file(name: string, bytes: Buffer): IncomingUpload {
   };
 }
 
-function setup(issueBodies: { body: string; projectId: string | null }[] = []) {
+function setup(
+  issueBodies: { body: string; projectId: string | null }[] = [],
+  docBodies: string[] = [],
+) {
   const rows: UploadEntity[] = [];
   const uploads = {
     create: (row: UploadEntity) => row,
@@ -68,6 +71,11 @@ function setup(issueBodies: { body: string; projectId: string | null }[] = []) {
   };
   const ds = {
     query: async (sql: string, params: unknown[] = []) => {
+      if (sql.includes('FROM "documents"')) {
+        const raw = params[1];
+        const token = typeof raw === 'string' ? raw : '';
+        return [{ hit: docBodies.some((body) => body.includes(token)) }];
+      }
       if (!sql.includes('FROM "issues"') || !sql.includes('strpos')) return [];
       const raw = params[1];
       const token = typeof raw === 'string' ? raw : '';
@@ -150,6 +158,36 @@ describe('UploadsService', () => {
 
     bodies.length = 0;
     await service.retained('ws_1', staged.markdown, null);
+    await expect(
+      service.open('ws_1', staged.id, member),
+    ).rejects.toBeInstanceOf(NotFoundException);
+    expect(rows).toHaveLength(0);
+  });
+
+  it('serves a file mentioned by a document body, and drops it once no version mentions it', async () => {
+    const docBodies: string[] = [];
+    const { service, rows } = setup([], docBodies);
+    const staged = await service.stage(
+      'ws_1',
+      'acme',
+      member,
+      file('shot.png', PNG),
+    );
+
+    await expect(service.open('ws_1', staged.id, other)).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+
+    docBodies.push(staged.markdown);
+    expect((await service.open('ws_1', staged.id, other)).id).toBe(staged.id);
+
+    // The current body drops it, but a kept revision still mentions it.
+    docBodies.length = 0;
+    docBodies.push(`Old version:\n\n${staged.markdown}`);
+    expect((await service.open('ws_1', staged.id, other)).id).toBe(staged.id);
+
+    docBodies.length = 0;
+    await service.releaseIds('ws_1', [staged.id]);
     await expect(
       service.open('ws_1', staged.id, member),
     ).rejects.toBeInstanceOf(NotFoundException);

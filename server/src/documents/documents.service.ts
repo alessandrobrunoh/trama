@@ -22,6 +22,7 @@ import {
 import { EventsService } from '../events/events.service.js';
 import { WorkstreamBus } from '../events/workstream-bus.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
+import { UploadsService } from '../uploads/uploads.service.js';
 import {
   MARK_END,
   MARK_START,
@@ -82,6 +83,7 @@ export class DocumentsService {
     private readonly events: EventsService,
     private readonly bus: WorkstreamBus,
     private readonly artifacts: ArtifactsService,
+    private readonly uploads: UploadsService,
     @InjectRepository(DocumentEntity)
     private readonly repo: Repository<DocumentEntity>,
   ) {}
@@ -261,6 +263,7 @@ export class DocumentsService {
     const title = cleanTitle(input.title);
     if (!title) throw new BadRequestException('A document needs a title');
     this.assertBody(input.body);
+    await this.uploads.assertAttachable(workspaceId, input.body);
     const owners = await this.resolveOwners(workspaceId, input);
     const now = new Date();
     const row = await this.ds.transaction(async (m) => {
@@ -295,6 +298,7 @@ export class DocumentsService {
     });
     for (const [key, value] of Object.entries(owners))
       await this.attachTo(workspaceId, ctx.actor, row.id, { [key]: value });
+    await this.uploads.retained(workspaceId, null, row.body);
     await this.events.record({
       workspaceId,
       actor: ctx.actor,
@@ -319,6 +323,8 @@ export class DocumentsService {
       );
     if (row.version !== input.baseVersion) throw this.conflict(row);
     this.assertBody(input.body);
+    if (input.body !== undefined)
+      await this.uploads.assertAttachable(workspaceId, input.body);
     const patch: Partial<Pick<DocumentEntity, 'title' | 'body' | 'icon'>> = {};
     const fields: string[] = [];
     if (input.title !== undefined) {
@@ -356,6 +362,8 @@ export class DocumentsService {
     const workspaceId = ctx.workspace.id;
     const baseVersion = row.version;
     const now = new Date();
+    // Captured before the write: the loaded row may share identity with the stored one.
+    const previousBody = row.body;
     const next = {
       title: patch.title ?? row.title,
       body: patch.body ?? row.body,
@@ -404,6 +412,9 @@ export class DocumentsService {
     });
     if (checkpoint === null)
       throw this.conflict(await this.load(workspaceId, row.id));
+    // Files dropped from the body stay while a kept revision still mentions them; `releaseIds` re-checks.
+    if (patch.body !== undefined)
+      await this.uploads.retained(workspaceId, previousBody, next.body);
     if (patch.title !== undefined)
       await this.ds
         .getRepository(ArtifactEntity)
@@ -488,6 +499,9 @@ export class DocumentsService {
     const attached = await this.ds
       .getRepository(ArtifactEntity)
       .find({ where: { workspaceId, documentId: id } });
+    const lost = await this.uploads.idsLostWith(workspaceId, { documentId: id }, [
+      row.body,
+    ]);
     await this.ds.transaction(async (m) => {
       const ids = [id, ...attached.map((a) => a.id)];
       await m.query(
@@ -516,6 +530,7 @@ export class DocumentsService {
       attached.map((a) => a.workstreamId).filter((w): w is string => !!w),
     ))
       await this.bus.touch(workspaceId, w, 'artifact.deleted');
+    await this.uploads.releaseIds(workspaceId, lost);
   }
 
   // ───────────────────────────── revisions ─────────────────────────────
