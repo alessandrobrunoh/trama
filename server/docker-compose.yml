@@ -114,6 +114,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delta}
       POSTGRES_DB: trama
     # PG 18+ stores the cluster in a versioned dir under /var/lib/postgresql.
+    ports:
+      - '127.0.0.1:5435:5432'
     volumes:
       - delta-pgdata:/var/lib/postgresql
     healthcheck:
