@@ -258,10 +258,12 @@ describe('IssuesController bulk', () => {
       }),
     };
     const customers = { attachCounts: vi.fn(async () => undefined) };
+    const artifacts = { countForIssue: vi.fn(async () => 0) };
     const controller = new IssuesController(
       service as never,
       customers as never,
       permissions as never,
+      artifacts as never,
     );
     return { controller, service, permissions };
   }

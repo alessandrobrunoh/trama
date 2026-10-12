@@ -48,7 +48,7 @@ Items are addressed by id (`iss_…`, `wk_…`) or by key (`BUG-142`, `AUTH-42`,
 ```bash
 trama search --q "login timeout"
 trama issue list --open --priority urgent,high --fields key,title,status,assigneeId
-trama issue get BUG-142
+trama issue get BUG-142 --fields key,title,status,artifactCount
 trama workstream get AUTH-42
 trama workstream context AUTH-42          # markdown briefing: read this before starting work
 trama project context prj_…               # markdown "mega context" of a whole project: read before reporting on it
@@ -58,6 +58,9 @@ trama issue artifacts BUG-142
 trama workstream list --status working --team-id tm_…
 trama event list --workstream-id wk_… --limit 20
 ```
+
+`issue get` includes a small `artifactCount` when the caller can read artifacts; `0` means skip
+`issue artifacts`. The field is absent when artifact access is not granted.
 
 ### Issues of this checkout
 

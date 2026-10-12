@@ -482,6 +482,8 @@ export class IssueEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   /** Filled on read. Not a column. */
   customerCount?: number;
+  /** Filled on issue get for callers who can read artifacts. Not a column. */
+  artifactCount?: number;
 }
 
 // ───────────────────────────── customers ─────────────────────────────

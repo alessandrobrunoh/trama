@@ -453,6 +453,30 @@ fn maps_http_errors_to_stable_exit_codes() {
 }
 
 #[test]
+fn issue_get_reports_artifact_count_without_an_artifact_request() {
+    let mock = Mock::start(vec![route(
+        "GET",
+        "/api/w/acme/issues/BUG-1",
+        200,
+        json!({ "key": "BUG-1", "title": "A bug", "status": "todo", "artifactCount": 0 }),
+    )]);
+    let o = Run::new().with_key(&mock.api()).run(&[
+        "issue",
+        "get",
+        "BUG-1",
+        "--fields",
+        "key,title,status,artifactCount",
+    ]);
+
+    assert_eq!(code(&o), 0, "{}", stderr(&o));
+    assert_eq!(
+        out_json(&o),
+        json!({ "key": "BUG-1", "title": "A bug", "status": "todo", "artifactCount": 0 })
+    );
+    assert_eq!(mock.requests().len(), 1);
+}
+
+#[test]
 fn server_errors_on_reads_are_retried_but_writes_are_not() {
     let mock = Mock::start(vec![
         route(

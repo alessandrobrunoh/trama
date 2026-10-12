@@ -134,6 +134,16 @@ export class ArtifactsService {
     return qb.getMany();
   }
 
+  /** Counts issue artifacts visible to the caller without loading artifact rows. */
+  countForIssue(workspaceId: string, issueId: string): Promise<number> {
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .where('a.workspaceId = :workspaceId', { workspaceId })
+      .andWhere('a.issueId = :issueId', { issueId });
+    applyProjectScope(qb, 'a', 'projectId');
+    return qb.getCount();
+  }
+
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
     if (!row || projectHidden(currentAccess(), row.projectId))

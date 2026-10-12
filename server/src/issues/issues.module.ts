@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ArtifactsModule } from '../artifacts/artifacts.module.js';
 import { CustomersModule } from '../customers/customers.module.js';
 import { IssueEntity } from '../database/entities/index.js';
 import { UploadsModule } from '../uploads/uploads.module.js';
@@ -10,6 +11,7 @@ import { IssuesService } from './issues.service.js';
 @Module({
   imports: [
     TypeOrmModule.forFeature([IssueEntity]),
+    ArtifactsModule,
     WorkstreamsModule,
     CustomersModule,
     UploadsModule,

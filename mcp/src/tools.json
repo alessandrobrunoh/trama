@@ -1018,7 +1018,7 @@
   "method": "GET",
   "path": "/issues/{idOrKey}",
   "permission": "issues:read",
-  "description": "One issue (old keys still resolve).",
+  "description": "One issue (old keys still resolve). Includes visible artifactCount for callers with artifacts:read; 0 means skip list_issue_artifacts.",
   "params": {
    "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
   }

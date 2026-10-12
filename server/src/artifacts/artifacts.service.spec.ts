@@ -280,3 +280,42 @@ describe('ArtifactsService document artifacts', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
+
+describe('ArtifactsService issue artifact counts', () => {
+  function withCount(count: number) {
+    const query = {
+      where: vi.fn().mockReturnThis(),
+      andWhere: vi.fn().mockReturnThis(),
+      getCount: vi.fn(async () => count),
+    };
+    const repo = {
+      createQueryBuilder: vi.fn(() => query),
+    } as unknown as Repository<ArtifactEntity>;
+    const service = new ArtifactsService(
+      {} as DataSource,
+      {} as RefsService,
+      {} as EventsService,
+      {} as WorkstreamBus,
+      repo,
+    );
+    return { service, query, repo };
+  }
+
+  it.each([0, 3])(
+    'returns %i for an issue without loading its artifacts',
+    async (count) => {
+      const { service, query, repo } = withCount(count);
+
+      await expect(service.countForIssue('ws_1', 'in_1')).resolves.toBe(count);
+
+      expect(repo.createQueryBuilder.mock.calls).toEqual([['a']]);
+      expect(query.where).toHaveBeenCalledWith('a.workspaceId = :workspaceId', {
+        workspaceId: 'ws_1',
+      });
+      expect(query.andWhere).toHaveBeenCalledWith('a.issueId = :issueId', {
+        issueId: 'in_1',
+      });
+      expect(query.getCount).toHaveBeenCalledOnce();
+    },
+  );
+});

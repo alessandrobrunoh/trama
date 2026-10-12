@@ -134,6 +134,8 @@ Everything is predictable so an agent can use it without reading docs twice.
 - **Output.** Compact JSON on stdout when piped, a table (lists) or indented JSON (objects) in a terminal.
   `-o json|pretty|jsonl|table|raw`; `--fields id,assignee.name` keeps only what you need (dot paths, arrays and
   `{"results":[…]}` envelopes handled). The markdown briefings (`workstream context`, `project context`) are passed through as is.
+- **Issue artifacts.** `trama issue get BUG-142 --fields key,title,status,artifactCount` includes a count for callers with
+  `artifacts:read`; zero means skip `trama issue artifacts`. The field is absent without artifact access.
 - **Errors.** JSON on stderr: `{"error":{"code","message","status","hint"}}` (plain text in a terminal), and a stable exit code:
 
   | exit | code | |

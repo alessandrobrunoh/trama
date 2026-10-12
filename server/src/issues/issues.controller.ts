@@ -32,10 +32,12 @@ import {
 } from 'class-validator';
 import {
   Actor,
+  Auth,
   Can,
   Ctx,
   EditsTeamWork,
   canDo,
+  type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import { CUSTOMER_REVENUE_MAX } from '../contracts/domain.js';
@@ -50,6 +52,7 @@ import {
   CreateWorkstreamDto,
   PRIORITIES,
 } from '../workstreams/workstreams.controller.js';
+import { ArtifactsService } from '../artifacts/artifacts.service.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { PermissionsService } from '../workspaces/permissions.service.js';
 import { IssuesService } from './issues.service.js';
@@ -72,6 +75,14 @@ const SOURCES: IssueSource[] = [
   'api',
   'agent',
 ];
+
+/** Custom tokens must not learn artifact metadata without the artifacts resource permission. */
+function canReadArtifacts(auth: AuthInfo): boolean {
+  return (
+    auth.token?.scope !== 'custom' ||
+    auth.token.permissions?.includes('artifacts:read') === true
+  );
+}
 
 /** A seeded issue status, or an id created in workspace settings (`st_…`). */
 const ISSUE_STATUS_INPUT =
@@ -215,6 +226,7 @@ export class IssuesController {
     private readonly service: IssuesService,
     private readonly customers: CustomersService,
     private readonly permissions: PermissionsService,
+    private readonly artifacts: ArtifactsService,
   ) {}
 
   @Get()
@@ -255,8 +267,20 @@ export class IssuesController {
   }
 
   @Get(':idOrKey')
-  async get(@Ctx() ctx: WorkspaceContext, @Param('idOrKey') idOrKey: string) {
-    return this.withCounts(ctx, await this.service.get(ctx.workspace.id, idOrKey));
+  async get(
+    @Ctx() ctx: WorkspaceContext,
+    @Auth() auth: AuthInfo,
+    @Param('idOrKey') idOrKey: string,
+  ) {
+    const issue = await this.service.get(ctx.workspace.id, idOrKey);
+    const counts = this.withCounts(ctx, issue);
+    const artifactCount = canReadArtifacts(auth)
+      ? this.artifacts.countForIssue(ctx.workspace.id, issue.id)
+      : undefined;
+    await counts;
+    if (artifactCount !== undefined)
+      issue.artifactCount = await artifactCount;
+    return issue;
   }
 
   @Post()

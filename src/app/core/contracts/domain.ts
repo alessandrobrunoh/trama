@@ -1020,6 +1020,11 @@ export interface Issue {
    * `0` when nobody is linked. Not stored on the issue row.
    */
   customerCount?: number;
+  /**
+   * Visible artifacts attached to this issue. Set on issue get only when the caller can read artifacts;
+   * `0` means there is no need to list artifacts. Not stored on the issue row.
+   */
+  artifactCount?: number;
   createdAt: ISODate;
   updatedAt: ISODate;
 }
