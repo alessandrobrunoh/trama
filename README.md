@@ -129,7 +129,7 @@ cd trama
 cd server
 cp .env.example .env
 npm install
-npm run db:up          # PostgreSQL on localhost:5434
+npm run db:up          # PostgreSQL on localhost:5435
 npm run start:dev      # http://localhost:3000/api
 
 # 2. Web app (in another terminal, from the repo root)

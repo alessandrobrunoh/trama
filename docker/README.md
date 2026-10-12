@@ -37,7 +37,7 @@ once in the database, then redeploy:
 docker exec delta-postgres psql -U delta -d trama -c "ALTER USER delta PASSWORD 'the-new-password'"
 ```
 
-`npm run db:up` (development) starts only Postgres, published on `localhost:5434` by `server/docker-compose.dev.yml`.
+`npm run db:up` (development) starts only Postgres, published on `localhost:5435` by `server/docker-compose.dev.yml`.
 In production Postgres has **no** host port: only the API (same compose network) can reach it.
 
 ## Publishing and pulling the images (ghcr.io)

@@ -311,7 +311,7 @@ Not part of this server. The MCP server is the separate Rust crate in [`mcp/`](.
 
 ## Configuration
 
-`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5434/trama`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `DEMO_LOGIN` (`1`/`true`/`yes`/`on` or `0`/`false`/`no`/`off`; unset shows the sign-in demo panel outside production and hides it in production), `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
+`PORT` (3000), `DATABASE_URL` (default `postgres://delta:delta@localhost:5435/trama`; the database is created on boot if missing), `CORS_ORIGIN` (comma-separated), `NODE_ENV`, `SEED_DEMO`, `DEMO_LOGIN` (`1`/`true`/`yes`/`on` or `0`/`false`/`no`/`off`; unset shows the sign-in demo panel outside production and hides it in production), `SECRETS_KEY` (AES key material for integration secrets). See `.env.example`.
 
 `GET /api/config` (unauthenticated) returns `{ demoLogin: boolean }` for the sign-in page.
 
