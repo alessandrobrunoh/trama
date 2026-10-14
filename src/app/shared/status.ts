@@ -9,10 +9,8 @@ import {
 import {
   LucideCircle,
   LucideCircleAlert,
-  LucideCircleArrowUp,
   LucideCircleCheck,
   LucideCircleDashed,
-  LucideCircleHelp,
   LucideCircleMinus,
   LucideCircleX,
   LucideGitMerge,
@@ -29,13 +27,12 @@ import {
   type IssueStatus,
   type StatusEntry,
   type StatusSubject,
-  type WorkstreamStatus,
 } from '../core/contracts/domain';
 import { TramaStore } from '../core/stores/trama.store';
 import { LucideNames, isLucideName } from './lucide-names';
 
 /** Every enum value that has a status visual. */
-export type AnyStatus = WorkstreamStatus | IssueStatus | DecisionStatus | ArtifactState | CiState;
+export type AnyStatus = IssueStatus | DecisionStatus | ArtifactState | CiState;
 
 type Glyph =
   | { kind: 'icon'; icon: LucideIcon }
@@ -55,22 +52,22 @@ interface StatusVisual {
 /* Tone → static class strings (Tailwind must see the full class names). */
 const TONE = {
   neutral: { text: 'text-status-draft', pill: 'bg-status-draft/10 border-status-draft/25' },
-  planned: { text: 'text-status-planned', pill: 'bg-status-planned/10 border-status-planned/25' },
-  active: { text: 'text-status-working', pill: 'bg-status-working/10 border-status-working/25' },
+  planned: { text: 'text-status-todo', pill: 'bg-status-todo/10 border-status-todo/25' },
+  active: { text: 'text-status-in-progress', pill: 'bg-status-in-progress/10 border-status-in-progress/25' },
   input: {
-    text: 'text-status-needs-input',
-    pill: 'bg-status-needs-input/10 border-status-needs-input/25',
+    text: 'text-status-proposed',
+    pill: 'bg-status-proposed/10 border-status-proposed/25',
   },
   review: {
-    text: 'text-status-in-review',
-    pill: 'bg-status-in-review/10 border-status-in-review/25',
+    text: 'text-status-proposed',
+    pill: 'bg-status-proposed/10 border-status-proposed/25',
   },
-  danger: { text: 'text-status-blocked', pill: 'bg-status-blocked/10 border-status-blocked/25' },
+  danger: { text: 'text-status-rejected', pill: 'bg-status-rejected/10 border-status-rejected/25' },
   ready: {
-    text: 'text-status-ready-to-land',
-    pill: 'bg-status-ready-to-land/10 border-status-ready-to-land/25',
+    text: 'text-status-accepted',
+    pill: 'bg-status-accepted/10 border-status-accepted/25',
   },
-  done: { text: 'text-status-shipped', pill: 'bg-status-shipped/10 border-status-shipped/25' },
+  done: { text: 'text-status-done', pill: 'bg-status-done/10 border-status-done/25' },
 } as const;
 
 const v = (label: string, tone: keyof typeof TONE, glyph: Glyph): StatusVisual => ({
@@ -81,21 +78,14 @@ const v = (label: string, tone: keyof typeof TONE, glyph: Glyph): StatusVisual =
 const icon = (i: LucideIcon): Glyph => ({ kind: 'icon', icon: i });
 
 export const STATUS_VISUALS: Record<AnyStatus, StatusVisual> = {
-  // WorkstreamStatus
+  // IssueStatus
   draft: v('Draft', 'neutral', { kind: 'dashed' }),
-  planned: v('Planned', 'planned', icon(LucideCircle)),
-  working: v('Working', 'active', { kind: 'pie', fraction: 0.5 }),
-  needs_input: v('Needs input', 'input', icon(LucideCircleHelp)),
-  in_review: v('In review', 'review', { kind: 'pie', fraction: 0.75 }),
-  blocked: v('Blocked', 'danger', icon(LucideCircleMinus)),
-  ready_to_land: v('Ready to land', 'ready', icon(LucideCircleArrowUp)),
-  shipped: v('Shipped', 'done', icon(LucideCircleCheck)),
-  canceled: v('Canceled', 'neutral', icon(LucideCircleX)),
-  // IssueStatus (in_review and canceled are shared with workstreams)
   backlog: v('Backlog', 'neutral', { kind: 'dashed' }),
   todo: v('Todo', 'planned', icon(LucideCircle)),
   in_progress: v('In progress', 'active', { kind: 'pie', fraction: 0.5 }),
+  in_review: v('In review', 'review', { kind: 'pie', fraction: 0.75 }),
   done: v('Done', 'done', icon(LucideCircleCheck)),
+  canceled: v('Canceled', 'neutral', icon(LucideCircleX)),
   // DecisionStatus
   accepted: v('Accepted', 'done', icon(LucideCircleCheck)),
   proposed: v('Proposed', 'input', { kind: 'dashed' }),
@@ -120,37 +110,12 @@ export function statusLabel(status: AnyStatus): string {
   return STATUS_VISUALS[status].label;
 }
 
-/** Which glyph family to draw. Issues are circles (demand), workstreams hexagons (outcomes). */
-export type StatusEntity = 'auto' | 'workstream' | 'issue' | 'other';
+/** Which glyph family to draw. Issues use circles; other resources use their catalog icon. */
+export type StatusEntity = 'auto' | 'issue' | 'other';
 
-const WORKSTREAM_ONLY = new Set<string>([
-  'draft',
-  'planned',
-  'working',
-  'needs_input',
-  'blocked',
-  'ready_to_land',
-  'shipped',
-]);
 const ISSUE_ONLY = new Set<string>(['backlog', 'todo', 'in_progress', 'done']);
 
-type Shape = 'hex' | 'circle' | 'icon';
-
-/** Workstream glyph (hexagon) details: fill fraction + inner mark. */
-const HEX: Record<
-  string,
-  { fill: number; dashed?: boolean; mark?: 'check' | 'x' | 'q' | 'minus' | 'up'; solid?: boolean }
-> = {
-  draft: { fill: 0, dashed: true },
-  planned: { fill: 0 },
-  working: { fill: 0.5 },
-  needs_input: { fill: 0, mark: 'q' },
-  in_review: { fill: 0.75 },
-  blocked: { fill: 1, mark: 'minus', solid: true },
-  ready_to_land: { fill: 1, mark: 'up', solid: true },
-  shipped: { fill: 1, mark: 'check', solid: true },
-  canceled: { fill: 1, mark: 'x', solid: true },
-};
+type Shape = 'circle' | 'icon';
 /** Issue glyph (circle) details. */
 const CIRCLE: Record<
   string,
@@ -165,15 +130,8 @@ const CIRCLE: Record<
   canceled: { fill: 1, mark: 'x', solid: true },
 };
 
-const HEX_OUTER = '8,1.4 13.7,4.7 13.7,11.3 8,14.6 2.3,11.3 2.3,4.7';
-const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
-
 /**
- * Status glyph (14px by default). Two families keep the two core concepts apart at a glance:
- *   issues (demand)       → circles: dashed backlog, empty todo, half in progress, ¾ in review, ✓ done
- *   workstreams (outcome) → hexagons: dashed draft, empty planned, half working, ¾ in review, ✓ shipped
- * `in_review` / `canceled` exist in both — pass `entity` when the subject is ambiguous.
- *   <app-status-icon [status]="ws.status" entity="workstream" />
+ * Status glyph (14px by default). Issues use their circular lifecycle glyph; other resources use catalog icons.
  */
 @Component({
   selector: 'app-status-icon',
@@ -195,94 +153,6 @@ const HEX_INNER = '8,4.3 11.2,6.15 11.2,9.85 8,11.7 4.8,9.85 4.8,6.15';
       }
     } @else {
     @switch (shape()) {
-      @case ('hex') {
-        @let h = hex();
-        <svg
-          [attr.width]="size()"
-          [attr.height]="size()"
-          viewBox="0 0 16 16"
-          fill="none"
-          aria-hidden="true"
-        >
-          @if (h.solid) {
-            <polygon
-              [attr.points]="outer"
-              fill="currentColor"
-              stroke="currentColor"
-              stroke-width="1.4"
-              stroke-linejoin="round"
-            />
-          } @else {
-            <polygon
-              [attr.points]="outer"
-              stroke="currentColor"
-              stroke-width="1.5"
-              stroke-linejoin="round"
-              [attr.stroke-dasharray]="h.dashed ? '2 1.6' : null"
-            />
-            @if (h.fill > 0) {
-              <clipPath [attr.id]="clipId">
-                <rect
-                  x="0"
-                  [attr.y]="11.7 - 7.4 * h.fill"
-                  width="16"
-                  [attr.height]="7.4 * h.fill + 0.1"
-                />
-              </clipPath>
-              <polygon
-                [attr.points]="inner"
-                fill="currentColor"
-                [attr.clip-path]="'url(#' + clipId + ')'"
-              />
-            }
-          }
-          @switch (h.mark) {
-            @case ('check') {
-              <path
-                d="M5.4 8.1 7.2 9.9 10.7 6.2"
-                stroke="var(--background)"
-                stroke-width="1.6"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            }
-            @case ('x') {
-              <path
-                d="M5.9 5.9l4.2 4.2M10.1 5.9l-4.2 4.2"
-                stroke="var(--background)"
-                stroke-width="1.5"
-                stroke-linecap="round"
-              />
-            }
-            @case ('minus') {
-              <path
-                d="M5.3 8h5.4"
-                stroke="var(--background)"
-                stroke-width="1.7"
-                stroke-linecap="round"
-              />
-            }
-            @case ('up') {
-              <path
-                d="M8 10.6V5.6M5.8 7.7 8 5.5l2.2 2.2"
-                stroke="var(--background)"
-                stroke-width="1.5"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            }
-            @case ('q') {
-              <path
-                d="M6.6 6.6a1.45 1.45 0 0 1 2.8.5c0 .95-1.4 1.2-1.4 2"
-                stroke="currentColor"
-                stroke-width="1.3"
-                stroke-linecap="round"
-              />
-              <circle cx="8" cy="10.9" r=".75" fill="currentColor" />
-            }
-          }
-        </svg>
-      }
       @case ('circle') {
         @let c = circle();
         <svg
@@ -355,9 +225,6 @@ export class StatusIcon {
   readonly subject = input<StatusSubject | null>(null);
 
   private static seq = 0;
-  protected readonly clipId = `hexclip-${++StatusIcon.seq}`;
-  protected readonly outer = HEX_OUTER;
-  protected readonly inner = HEX_INNER;
   private readonly names = inject(LucideNames);
   private readonly store = inject(TramaStore);
   protected readonly dashed = LucideCircleDashed;
@@ -371,14 +238,11 @@ export class StatusIcon {
   protected readonly shape = computed<Shape>(() => {
     const s = this.status();
     const e = this.entity();
-    if (e === 'workstream' && HEX[s]) return 'hex';
     if (e === 'issue' && CIRCLE[s]) return 'circle';
     if (e === 'other') return 'icon';
-    if (WORKSTREAM_ONLY.has(s)) return 'hex';
     if (ISSUE_ONLY.has(s) || (e === 'auto' && CIRCLE[s] && s !== 'canceled')) return 'circle';
     return 'icon';
   });
-  protected readonly hex = computed(() => HEX[this.status()] ?? HEX['planned']);
   protected readonly circle = computed(() => CIRCLE[this.status()] ?? CIRCLE['todo']);
 
   /** Catalog entry for an explicit subject/entity, or for an unambiguous auto status. */
@@ -389,9 +253,8 @@ export class StatusIcon {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status);
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status);
-    if (entity === 'workstream') return resolveStatusEntry(catalog.workstream, status);
     if (entity === 'other') return resolveStatusEntry(catalog.decision, status);
-    const lists = [catalog.issue, catalog.workstream, catalog.decision];
+    const lists = [catalog.issue, catalog.decision];
     const hits = lists.filter((entries) => entries.some((entry) => entry.id === status || entry.type === status));
     if (hits.length !== 1) return undefined;
     return resolveStatusEntry(hits[0], status);
@@ -447,7 +310,6 @@ export class StatusBadge {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status)?.name;
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status)?.name;
-    if (entity === 'workstream') return resolveStatusEntry(catalog.workstream, status)?.name;
     if (entity === 'other') return resolveStatusEntry(catalog.decision, status)?.name;
     return undefined;
   }
@@ -477,11 +339,9 @@ export class StatusLabel {
     const subject = this.subject();
     const entries = subject
       ? catalog[STATUS_CATALOG_KEY[subject]]
-      : this.entity() === 'workstream'
-        ? catalog.workstream
-        : this.entity() === 'issue'
-          ? catalog.issue
-          : null;
+      : this.entity() === 'issue'
+        ? catalog.issue
+        : null;
     return (entries ? resolveStatusEntry(entries, this.status())?.name : undefined) ?? this.visual().label;
   });
 }

@@ -1,13 +1,13 @@
-// Progress (burn-up) chart for a workstream or a single milestone, like Linear's project graph:
+// Project or single-milestone progress (burn-up) chart:
 // Scope (grey), Started (amber) and Completed (accent, filled) from the start date to today, a
 // projection cone to the target date (current pace vs. required pace), a red hatched band when the
 // target date has passed, milestone diamonds on the x-axis and completions per period at the bottom.
-// Reusable: `<app-progress-chart [ws]="ws" />` or `<app-progress-chart [ws]="ws" [milestone]="ms" />`.
+// Reusable: `<app-progress-chart [project]="project" />` or with `[milestone]="ms"`.
 // Series are reconstructed from issue timestamps (link time, startedAt, completedAt); issues without
 // an estimate count as 1 point.
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { format } from 'date-fns';
-import { TramaStore, type Milestone, type Project, type Workstream } from '../../core';
+import { TramaStore, type Milestone, type Project } from '../../core';
 import { ChartTip } from '../stats/charts/chart-tip';
 import { compact, niceScale, trackWidth } from '../stats/charts/chart-utils';
 import { MilestoneInfo } from './milestone-stats';
@@ -147,9 +147,7 @@ export class ProgressChart {
   private readonly store = inject(TramaStore);
   private readonly info = inject(MilestoneInfo);
 
-  /** The workstream to chart (give this or `project`). */
-  readonly ws = input<Workstream | null>(null);
-  /** The project to chart: all issues of its workstreams. */
+  /** The project to chart: all of its issues. */
   readonly project = input<Project | null>(null);
   /** Chart only the issues of this milestone (and its target date). */
   readonly milestone = input<Milestone | null>(null);
@@ -172,37 +170,24 @@ export class ProgressChart {
   private readonly measure = trackWidth(320);
   protected readonly width = this.measure.width;
 
-  private readonly wsIssues = computed(() => {
-    const p = this.project();
-    if (p) return this.store.issuesByProject().get(p.id) ?? [];
-    const w = this.ws();
-    return w ? (this.store.issuesByWorkstream().get(w.id) ?? []) : [];
+  private readonly projectIssues = computed(() => {
+    const project = this.project();
+    return project ? (this.store.issuesByProject().get(project.id) ?? []) : [];
   });
   private readonly issues = computed(() => {
     const m = this.milestone();
-    return m ? this.wsIssues().filter((i) => i.milestoneIds?.includes(m.id)) : this.wsIssues();
+    return m ? this.projectIssues().filter((i) => i.milestoneIds?.includes(m.id)) : this.projectIssues();
   });
 
-  private readonly linkedDay = computed(() => {
-    const p = this.project();
-    const ids = new Set(p ? (this.store.workstreamsByProject().get(p.id) ?? []).map((x) => x.id) : [this.ws()?.id ?? '']);
-    const map = new Map<string, number>();
-    for (const e of this.store.events()) {
-      if (e.type !== 'issue.linked' || !e.workstreamId || !ids.has(e.workstreamId) || e.subject.type !== 'issue') continue;
-      const d = dayOf(e.at);
-      const cur = map.get(e.subject.id);
-      if (cur === undefined || d < cur) map.set(e.subject.id, d);
-    }
-    return map;
-  });
+  private readonly linkedDay = computed(() => new Map<string, number>());
 
   protected readonly model = computed(() => {
-    const scope = this.project() ?? this.ws();
+    const scope = this.project();
     const m = this.milestone();
     const target = m ? m.targetDate : scope?.targetDate;
     return buildBurnup({
       issues: this.issues(),
-      points: usesPoints(this.wsIssues(), this.store.estimateScale()),
+      points: usesPoints(this.projectIssues(), this.store.estimateScale()),
       startDay: dayOf(scope?.startDate ?? scope?.createdAt ?? new Date()),
       targetDay: target ? dayOf(target) : null,
       today: todayDay(),
@@ -355,8 +340,7 @@ export class ProgressChart {
     const m = this.model();
     const one = this.milestone();
     const p = this.project();
-    const w = this.ws();
-    const list = one ? [one] : p ? (this.store.milestonesByProject().get(p.id) ?? []) : w ? (this.store.milestonesByWorkstream().get(w.id) ?? []) : [];
+    const list = one ? [one] : p ? (this.store.milestonesByProject().get(p.id) ?? []) : [];
     const states = this.info.states();
     const y = this.mt + this.innerH();
     return list
@@ -370,7 +354,7 @@ export class ProgressChart {
           x: this.px(Math.min(Math.max(day, m.startDay), m.xMax)),
           y,
           fill: st === 'done' ? 'var(--status-shipped)' : 'var(--background)',
-          stroke: st === 'done' ? 'var(--status-shipped)' : st === 'overdue' ? RED : 'var(--entity-workstream)',
+          stroke: st === 'done' ? 'var(--status-shipped)' : st === 'overdue' ? RED : 'var(--entity-project)',
         };
       });
   });

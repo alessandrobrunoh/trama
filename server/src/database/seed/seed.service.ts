@@ -21,9 +21,7 @@ import {
   UserEntity,
   WorkspaceCounterEntity,
   WorkspaceEntity,
-  WorkstreamEntity,
 } from '../entities/index.js';
-import { WorkstreamBus } from '../../events/workstream-bus.js';
 import { DEMO_PASSWORD, createSeed } from './seed-data.js';
 
 @Injectable()
@@ -32,7 +30,6 @@ export class SeedService implements OnApplicationBootstrap {
 
   constructor(
     private readonly ds: DataSource,
-    private readonly bus: WorkstreamBus,
   ) {}
 
   /** Seeds the demo workspace into an empty database (never in production, off with SEED_DEMO=false). */
@@ -49,7 +46,7 @@ export class SeedService implements OnApplicationBootstrap {
     const data = createSeed(Date.now(), passwordHash, { mockHistory: process.env.SEED_MOCK_HISTORY !== 'false' });
     await this.ds.transaction(async (m) => {
       const tables = ENTITIES.map((e) => `"${this.ds.getMetadata(e).tableName}"`);
-      await m.query(`TRUNCATE ${tables.join(', ')} CASCADE`);
+      await m.query(`TRUNCATE "legacy_workstream_history", ${tables.join(', ')} CASCADE`);
       await insert(m, UserEntity, data.users);
       await insert(m, WorkspaceEntity, [data.workspace]);
       await insert(m, MembershipEntity, data.memberships);
@@ -57,7 +54,12 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, TeamEntity, data.teams);
       await insert(m, RepositoryEntity, data.repositories);
       await insert(m, ProjectEntity, data.projects);
-      await insert(m, WorkstreamEntity, data.workstreams);
+      for (const row of data.legacyWorkstreams)
+        await m.query(
+          `INSERT INTO "legacy_workstream_history" ("id", "key", "title", "objective")
+           VALUES ($1, $2, $3, $4)`,
+          [row.id, row.key, row.title, row.objective],
+        );
       await insert(m, MilestoneEntity, data.milestones);
       await insert(m, InputRequestEntity, data.inputRequests);
       await insert(m, IssueEntity, data.issues);
@@ -74,12 +76,6 @@ export class SeedService implements OnApplicationBootstrap {
         Object.entries(data.counters).map(([name, value]) => ({ workspaceId: data.workspace.id, name, value })),
       );
     });
-    // Let the status engine re-derive every seeded workstream.
-    await this.bus.touchMany(
-      data.workspace.id as string,
-      data.workstreams.map((w) => w.id as string),
-      'seed.reset',
-    );
   }
 }
 

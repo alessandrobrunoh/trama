@@ -25,7 +25,6 @@ describe('assistant token scope', () => {
       'workspace:read',
       'agents:read',
       'issues:write',
-      'workstreams:write',
       'projects:write',
       'artifacts:write',
       'comments:write',

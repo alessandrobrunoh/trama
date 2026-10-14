@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import { hasAdminPower, type WorkspaceContext } from '../auth/request-context.js';
+import {
+  hasAdminPower,
+  type WorkspaceContext,
+} from '../auth/request-context.js';
 import {
   DOCUMENT_LIMITS,
   type ActorRef,
@@ -20,7 +23,6 @@ import {
   DocumentRevisionEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus } from '../events/workstream-bus.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 import {
@@ -37,8 +39,6 @@ import {
 
 export interface DocumentOwners {
   projectId?: string;
-  /** Workstream id or key. */
-  workstreamId?: string;
   /** Issue id or key. */
   issueId?: string;
 }
@@ -81,7 +81,6 @@ export class DocumentsService {
   constructor(
     private readonly ds: DataSource,
     private readonly events: EventsService,
-    private readonly bus: WorkstreamBus,
     private readonly artifacts: ArtifactsService,
     private readonly uploads: UploadsService,
     @InjectRepository(DocumentEntity)
@@ -112,7 +111,6 @@ export class DocumentsService {
       list.push({
         artifactId: a.id,
         ...(a.projectId ? { projectId: a.projectId } : {}),
-        ...(a.workstreamId ? { workstreamId: a.workstreamId } : {}),
         ...(a.issueId ? { issueId: a.issueId } : {}),
       });
       out.set(a.documentId!, list);
@@ -133,17 +131,11 @@ export class DocumentsService {
 
   /** Resolves the owner filters/inputs (id or key) to ids; 404 when one does not exist. */
   private async resolveOwners(workspaceId: string, o: DocumentOwners) {
-    const out: { projectId?: string; workstreamId?: string; issueId?: string } =
-      {};
+    const out: { projectId?: string; issueId?: string } = {};
     if (o.projectId) {
       await this.artifacts.assertProject(workspaceId, o.projectId);
       out.projectId = o.projectId;
     }
-    if (o.workstreamId)
-      out.workstreamId = await this.artifacts.resolveWorkstreamId(
-        workspaceId,
-        o.workstreamId,
-      );
     if (o.issueId)
       out.issueId = await this.artifacts.resolveIssueId(workspaceId, o.issueId);
     return out;
@@ -183,8 +175,6 @@ export class DocumentsService {
         { [param]: value },
       );
     if (owners.projectId) linked('projectId', 'ownerProject', owners.projectId);
-    if (owners.workstreamId)
-      linked('workstreamId', 'ownerWorkstream', owners.workstreamId);
     if (owners.issueId) linked('issueId', 'ownerIssue', owners.issueId);
     if (f.attached !== undefined)
       qb.andWhere(
@@ -257,7 +247,7 @@ export class DocumentsService {
     return new ConflictException(body);
   }
 
-  /** Anyone who can write can create; attaches to the given project / workstream / issue in the same call. */
+  /** Anyone who can write can create; attaches to the given project or issue in the same call. */
   async create(ctx: WorkspaceContext, input: CreateDocumentInput) {
     const workspaceId = ctx.workspace.id;
     const title = cleanTitle(input.title);
@@ -442,20 +432,7 @@ export class DocumentsService {
         entity: 'document',
         id: row.id,
       });
-    if (patch.title !== undefined)
-      await this.touchWorkstreams(workspaceId, row.id);
     return this.withLinks(workspaceId, row);
-  }
-
-  private async touchWorkstreams(workspaceId: string, documentId: string) {
-    const rows = await this.ds.getRepository(ArtifactEntity).find({
-      where: { workspaceId, documentId },
-      select: { workstreamId: true },
-    });
-    for (const w of new Set(
-      rows.map((r) => r.workstreamId).filter((w): w is string => !!w),
-    ))
-      await this.bus.touch(workspaceId, w, 'artifact.updated');
   }
 
   /** Hides the document from lists; it stays readable, linked and restorable. */
@@ -499,9 +476,11 @@ export class DocumentsService {
     const attached = await this.ds
       .getRepository(ArtifactEntity)
       .find({ where: { workspaceId, documentId: id } });
-    const lost = await this.uploads.idsLostWith(workspaceId, { documentId: id }, [
-      row.body,
-    ]);
+    const lost = await this.uploads.idsLostWith(
+      workspaceId,
+      { documentId: id },
+      [row.body],
+    );
     await this.ds.transaction(async (m) => {
       const ids = [id, ...attached.map((a) => a.id)];
       await m.query(
@@ -526,10 +505,6 @@ export class DocumentsService {
         entity: 'artifact',
         id: a.id,
       });
-    for (const w of new Set(
-      attached.map((a) => a.workstreamId).filter((w): w is string => !!w),
-    ))
-      await this.bus.touch(workspaceId, w, 'artifact.deleted');
     await this.uploads.releaseIds(workspaceId, lost);
   }
 
@@ -595,15 +570,13 @@ export class DocumentsService {
 
   // ───────────────────────────── attachments ─────────────────────────────
 
-  /** Attaches the document to one project / workstream / issue (id or key) as a `document` artifact. Idempotent. */
+  /** Attaches the document to one project or issue (id or key) as a `document` artifact. Idempotent. */
   async attach(ctx: WorkspaceContext, id: string, owner: DocumentOwners) {
     const workspaceId = ctx.workspace.id;
     await this.load(workspaceId, id);
     const keys = Object.entries(owner).filter(([, v]) => !!v);
     if (keys.length !== 1)
-      throw new BadRequestException(
-        'Give exactly one of projectId, workstreamId or issueId',
-      );
+      throw new BadRequestException('Give exactly one of projectId or issueId');
     const resolved = await this.resolveOwners(workspaceId, owner);
     await this.attachTo(workspaceId, ctx.actor, id, resolved);
     this.events.publish(workspaceId, {
@@ -618,7 +591,7 @@ export class DocumentsService {
     workspaceId: string,
     actor: ActorRef,
     documentId: string,
-    owner: { projectId?: string; workstreamId?: string; issueId?: string },
+    owner: { projectId?: string; issueId?: string },
   ) {
     const exists = await this.ds
       .getRepository(ArtifactEntity)

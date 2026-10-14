@@ -341,7 +341,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
     id: 'mention',
     label: 'Mention a person or record',
     hint: '@',
-    keywords: 'at user issue workstream people',
+    keywords: 'at user issue people',
     block: false,
     insert: () => ({ text: '@' }),
   },

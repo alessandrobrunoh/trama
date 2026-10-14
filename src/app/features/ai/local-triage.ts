@@ -45,7 +45,7 @@ function nearest(values: readonly number[], wanted: number): number | undefined 
 export function localTriage(
   title: string,
   description: string,
-  options: Pick<AiIssueDraftOptions, 'kinds' | 'priorities' | 'estimates' | 'workstreams'>,
+  options: Pick<AiIssueDraftOptions, 'kinds' | 'priorities' | 'estimates'>,
 ): AiIssueDraftSuggestion[] {
   const text = norm(`${title}\n${description}`);
   if (text.trim().length < 3) return [];

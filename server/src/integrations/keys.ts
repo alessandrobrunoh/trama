@@ -1,9 +1,9 @@
-/** Workstream keys such as AUTH-42 (team key + number). */
+/** Issue keys such as AUTH-42 (team key + number). */
 const KEY_RE = /\b[A-Z][A-Z0-9]{1,9}-\d+\b/g;
 const KEY_RE_CI = /\b[A-Za-z][A-Za-z0-9]{1,9}-\d+\b/g;
 
 /**
- * Candidate workstream keys found in free text (title, body, commit message).
+ * Candidate Issue keys found in free text (title, body, commit message).
  * `ignoreCase` is for branch names (`auth-42/replay-detection`). Results are
  * upper-cased, de-duplicated, and — when `known` is given — validated against it.
  */

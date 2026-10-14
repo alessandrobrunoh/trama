@@ -103,7 +103,7 @@ impl Ctx {
 fn build_cli(reg: &Registry) -> Command {
     let mut root = Command::new("trama")
         .version(VERSION)
-        .about("Agent-first command line for Trama: issues, workstreams, decisions and more")
+        .about("Agent-first command line for Trama: issues, decisions and more")
         .long_about(
             "Agent-first command line for Trama.\n\n\
              Every Trama API route is a command: `trama <resource> <verb>`. Output is JSON when piped, a table in a terminal.\n\
@@ -169,9 +169,9 @@ async fn run_tool(
             label.push_str(v);
         }
     }
-    // The workstream briefing is markdown unless JSON was asked for; the project briefing only exists as markdown.
+    // Context briefings are markdown unless JSON was requested.
     let accept = match entry.tool.name.as_str() {
-        "get_workstream_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
+        "get_issue_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
         "get_project_context" => http::ACCEPT_MARKDOWN,
         _ => http::ACCEPT_JSON,
     };

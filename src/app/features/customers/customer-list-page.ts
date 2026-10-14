@@ -20,7 +20,7 @@ import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { CustomerAvatar } from './customer-avatar';
 import {
   compactNumber,

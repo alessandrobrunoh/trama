@@ -4,22 +4,19 @@ import { PageHeader } from '../../shared/page-header';
 import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
 import { OverviewFlow } from './overview-flow';
 import { OverviewGreeting } from './overview-greeting';
-import { OverviewHealth } from './overview-health';
 import { OverviewKpis } from './overview-kpis';
 import { OverviewModel } from './overview-model';
 import { OverviewNeedsYou } from './overview-needs-you';
 import { OverviewRail } from './overview-rail';
-import { OverviewUpcoming } from './overview-upcoming';
 
 /**
  * Workspace at a glance. Top to bottom: greeting, 30-day KPIs, then a main column (what needs me,
- * what is at risk or due, workstream health, flow charts) beside a quiet rail (triage, shipped,
- * decisions, activity). Issues are demand; workstreams are outcomes; the page keeps them apart.
+ * what needs attention and issue flow beside a quiet rail (triage, decisions, activity).
  */
 @Component({
   selector: 'app-overview-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, OnboardingChecklist, OverviewGreeting, OverviewKpis, OverviewNeedsYou, OverviewUpcoming, OverviewHealth, OverviewFlow, OverviewRail],
+  imports: [PageHeader, OnboardingChecklist, OverviewGreeting, OverviewKpis, OverviewNeedsYou, OverviewFlow, OverviewRail],
   providers: [OverviewModel],
   host: { class: 'block min-h-full' },
   template: `
@@ -44,8 +41,6 @@ import { OverviewUpcoming } from './overview-upcoming';
         <div class="grid items-start gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
           <div class="flex min-w-0 flex-col gap-10">
             <app-overview-needs-you />
-            <app-overview-upcoming />
-            <app-overview-health />
             <app-overview-flow />
           </div>
           <app-overview-rail />

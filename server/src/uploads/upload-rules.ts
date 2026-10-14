@@ -267,7 +267,6 @@ export interface UploadRef {
   resource:
     | 'artifacts'
     | 'issues'
-    | 'workstreams'
     | 'projects'
     | 'comments'
     | 'documents';
@@ -278,7 +277,6 @@ export interface UploadRef {
 const API_READ: Record<UploadRef['resource'], string> = {
   artifacts: 'artifacts:read',
   issues: 'issues:read',
-  workstreams: 'workstreams:read',
   projects: 'projects:read',
   comments: 'comments:read',
   documents: 'documents:read',
@@ -287,7 +285,6 @@ const API_READ: Record<UploadRef['resource'], string> = {
 /** Grants that may stage a file into a description or a comment. Attaching an artifact is separate. */
 const STAGE_GRANTS: readonly MemberGrant[] = [
   'issues:update',
-  'workstreams:update',
   'projects:update',
   'comments:create',
   'comments:update',
@@ -297,7 +294,6 @@ const STAGE_GRANTS: readonly MemberGrant[] = [
 ];
 const STAGE_PERMISSIONS = [
   'issues:write',
-  'workstreams:write',
   'projects:write',
   'comments:write',
   'artifacts:write',

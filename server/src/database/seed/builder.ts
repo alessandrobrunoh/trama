@@ -1,7 +1,6 @@
-import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX, adoptFreeTextLabels, isDeltaThreadUrl } from '../../contracts/domain.js';
+import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX } from '../../contracts/domain.js';
 import type { WorkspaceSettings } from '../../contracts/domain.js';
 import type {
-  AcceptanceCriterion,
   ActorRef,
   ArtifactKind,
   ArtifactProvider,
@@ -18,10 +17,8 @@ import type {
   ReviewState,
   Role,
   SubjectRef,
-  ViewEntity,
   ViewFilter,
   ViewLayout,
-  WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { uid } from '../../common/util.js';
 import type {
@@ -42,7 +39,6 @@ import type {
   TeamEntity,
   UserEntity,
   WorkspaceEntity,
-  WorkstreamEntity,
 } from '../entities/index.js';
 
 const STARTED: ReadonlySet<string> = new Set(['in_progress', 'in_review']);
@@ -61,7 +57,7 @@ export interface SeedData {
   teams: Rows<TeamEntity>;
   repositories: Rows<RepositoryEntity>;
   projects: Rows<ProjectEntity>;
-  workstreams: Rows<WorkstreamEntity>;
+  legacyWorkstreams: { id: string; key: string; title: string; objective: string }[];
   milestones: Rows<MilestoneEntity>;
   inputRequests: Rows<InputRequestEntity>;
   issues: Rows<IssueEntity>;
@@ -109,6 +105,14 @@ export class SeedBuilder {
   readonly data: SeedData;
   readonly workspaceId: string;
   private readonly keyCounters: Record<string, number> = {};
+  private readonly streamKeys = new Map<string, string>();
+  private readonly issueLinks = new Map<string, string[]>();
+  private readonly pendingComments: {
+    streamId: string;
+    author: ActorRef;
+    body: string;
+    daysAgo: number;
+  }[] = [];
 
   constructor(
     readonly now: number,
@@ -116,7 +120,7 @@ export class SeedBuilder {
   ) {
     this.workspaceId = workspaceId;
     this.data = {
-      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], projects: [], workstreams: [], milestones: [],
+      users: [], workspace: {}, memberships: [], agents: [], teams: [], repositories: [], projects: [], legacyWorkstreams: [], milestones: [],
       inputRequests: [], issues: [], artifacts: [], decisions: [], dependencies: [], comments: [],
       events: [], views: [], integrations: [], counters: {},
     };
@@ -129,8 +133,11 @@ export class SeedBuilder {
     this.data.counters[name] = Math.max(this.data.counters[name] ?? 0, value);
   }
 
-  event(at: Date, actor: ActorRef, type: string, subject: SubjectRef, workstreamId: string | null, data: Record<string, unknown> = {}) {
-    this.data.events.push({ id: uid('ev'), workspaceId: this.workspaceId, at, actor, type, subject, workstreamId, data });
+  event(at: Date, actor: ActorRef, type: string, subject: SubjectRef, legacyWorkstreamKey: string | null, data: Record<string, unknown> = {}) {
+    const key = legacyWorkstreamKey
+      ? this.streamKeys.get(legacyWorkstreamKey) ?? legacyWorkstreamKey
+      : undefined;
+    this.data.events.push({ id: uid('ev'), workspaceId: this.workspaceId, at, actor, type, subject, legacyWorkstreamKey: key, data });
   }
 
   user(name: string, email: string, avatarHue: number, passwordHash: string, role: Role, created = 60) {
@@ -161,7 +168,7 @@ export class SeedBuilder {
     return id;
   }
 
-  /** Linear-style project. Its repositories are the union of its workstreams' (see `syncProjectRepos`). */
+  /** Linear-style project. */
   project(o: {
     name: string;
     summary?: string;
@@ -188,26 +195,15 @@ export class SeedBuilder {
     return id;
   }
 
-  /** Replace free-text workstream labels with catalog ids and store that catalog on the workspace. */
+  /** Initialize the workspace's label catalog. */
   adoptLabels() {
-    const { catalog, groups } = adoptFreeTextLabels(
-      undefined,
-      this.data.workstreams.map((row) => ({ scope: 'workstream' as const, labels: (row.labels ?? []) as string[] })),
-    );
-    groups.forEach((ids, i) => {
-      this.data.workstreams[i].labels = ids;
-    });
     const settings = (this.data.workspace.settings ?? {}) as Partial<WorkspaceSettings>;
-    this.data.workspace.settings = { ...settings, labels: catalog };
+    this.data.workspace.settings = { ...settings, labels: settings.labels ?? [] };
   }
 
-  /** A workstream of a project may only use the project's repositories: give each project the union of its workstreams'. */
+  /** Project repositories are managed independently. */
   syncProjectRepos() {
-    for (const p of this.data.projects) {
-      const repos = new Set<string>();
-      for (const w of this.data.workstreams) if (w.projectId === p.id) for (const r of (w.repositoryIds ?? []) as string[]) repos.add(r);
-      p.repositoryIds = [...repos];
-    }
+    // Retained as a no-op for seed construction call sites.
   }
 
   workstream(o: {
@@ -220,95 +216,36 @@ export class SeedBuilder {
     accountable?: string;
     project?: string;
     repos?: string[];
-    criteria?: [string, AcceptanceCriterion['state']][];
+    criteria?: [string, string][];
     priority?: Priority;
     labels?: string[];
-    /** status progression, oldest first; last = current derived status */
-    path: WorkstreamStatus[];
-    override?: 'draft' | 'canceled';
-    /** days ago the work started (timeline start) */
+    path: string[];
+    override?: string;
     start?: number;
     target?: number;
     created: number;
     shipped?: number;
     createdBy: string;
   }) {
-    const [prefix, numStr] = o.key.split('-');
-    const number = Number(numStr);
-    this.bump(`wskey:${prefix}`, number);
     const id = uid('wk');
-    const current = o.path[o.path.length - 1];
-    const createdAt = this.at(o.created);
-    const lastChange = o.path.length > 1 ? this.at(Math.max(0.05, o.created / (o.path.length + 1))) : createdAt;
-    this.data.workstreams.push({
-      id,
-      workspaceId: this.workspaceId,
-      key: o.key,
-      number,
-      title: o.title,
-      description: o.context ?? null,
-      objective: o.objective,
-      context: o.context ?? null,
-      deltaThreadUrl: `https://delta.dev/t/${o.key.toLowerCase()}`,
-      ownerTeamId: o.owner,
-      participatingTeamIds: o.participating ?? [],
-      accountableUserId: o.accountable ?? null,
-      projectId: o.project ?? null,
-      repositoryIds: o.repos ?? [],
-      acceptanceCriteria: (o.criteria ?? []).map(([text, state]) => ({ id: uid('ac'), text, state })),
-      priority: o.priority ?? 'medium',
-      labels: o.labels ?? [],
-      status: o.override ?? current,
-      derivedStatus: current,
-      delivery: 'none',
-      statusOverride: o.override ?? null,
-      startDate: o.start !== undefined ? this.at(o.start) : null,
-      targetDate: o.target !== undefined ? this.at(-o.target) : null,
-      createdById: o.createdBy,
-      createdAt,
-      updatedAt: lastChange,
-      shippedAt: o.shipped !== undefined ? this.at(o.shipped) : null,
-    });
-    void prefix;
-    const actor = user(o.createdBy);
-    this.event(createdAt, actor, 'workstream.created', { type: 'workstream', id }, id, { key: o.key, title: o.title });
-    // status history, spread between creation and the last change
-    o.path.slice(1).forEach((to, i, arr) => {
-      const frac = (i + 1) / (arr.length + 1);
-      const when = new Date(createdAt.getTime() + (lastChange.getTime() - createdAt.getTime()) * frac);
-      this.event(i === arr.length - 1 ? lastChange : when, SYSTEM, 'workstream.status_changed', { type: 'workstream', id }, id, {
-        key: o.key, from: o.path[i], to,
-      });
-    });
-    if (o.override === 'canceled')
-      this.event(lastChange, actor, 'workstream.updated', { type: 'workstream', id }, id, { key: o.key, fields: ['statusOverride'] });
+    this.data.legacyWorkstreams.push({ id, key: o.key, title: o.title, objective: o.objective });
+    this.streamKeys.set(id, o.key);
+    const project = o.project && this.data.projects.find((row) => row.id === o.project);
+    if (project)
+      project.repositoryIds = [...new Set([...(project.repositoryIds ?? []), ...(o.repos ?? [])])];
     return id;
   }
 
-  /** Criterion progress events for a workstream (criteria must already exist). */
-  criterionEvents(workstreamId: string, key: string, items: { daysAgo: number; text: string; state: AcceptanceCriterion['state']; by: string }[]) {
-    for (const c of items)
-      this.event(this.at(c.daysAgo), user(c.by), 'criterion.updated', { type: 'workstream', id: workstreamId }, workstreamId, {
-        change: 'updated', text: c.text, state: c.state,
-      });
-    void key;
-  }
+  /** Criteria and status history are retired with the Workstream model. */
+  criterionEvents(_workstreamId: string, _key: string, _items: { daysAgo: number; text: string; state: string; by: string }[]) {}
 
-  /** Kept so older seed stories compile. A Delta session URL is stored on the workstream. */
-  execution(workstreamId: string, o: ExecOpts): string {
-    if (o.session && isDeltaThreadUrl(o.session)) {
-      const ws = this.data.workstreams.find((w) => w.id === workstreamId);
-      if (ws) ws.deltaThreadUrl = o.session;
-    }
+  /** Execution stories are retired; return a local id for old seed call sites. */
+  execution(_workstreamId: string, _o: ExecOpts): string {
     return uid('ex');
   }
 
-  dependency(fromType: 'workstream' | 'execution', fromId: string, toType: 'workstream' | 'execution', toId: string, toWorkstreamId: string, daysAgo: number) {
-    if (fromType !== 'workstream' || toType !== 'workstream') return '';
-    const id = uid('dp');
-    this.data.dependencies.push({ id, workspaceId: this.workspaceId, fromType, fromId, toType, toId, createdAt: this.at(daysAgo) });
-    this.event(this.at(daysAgo), SYSTEM, 'dependency.added', { type: toType, id: toId }, toWorkstreamId, { dependencyId: id, from: { type: fromType, id: fromId }, to: { type: toType, id: toId } });
-    return id;
+  dependency(_fromType: 'workstream' | 'execution', _fromId: string, _toType: 'workstream' | 'execution', _toId: string, _toWorkstreamId: string, _daysAgo: number) {
+    return '';
   }
 
   input(workstreamId: string, o: {
@@ -321,8 +258,9 @@ export class SeedBuilder {
     answer?: { text: string; by: string; daysAgo: number };
   }) {
     const id = uid('ir');
+    const legacyWorkstreamKey = this.streamKeys.get(workstreamId) ?? workstreamId;
     this.data.inputRequests.push({
-      id, workspaceId: this.workspaceId, workstreamId, question: o.question, options: o.options ?? null,
+      id, workspaceId: this.workspaceId, issueId: null, legacyWorkstreamKey, question: o.question, options: o.options ?? null,
       requestedBy: o.by, assigneeUserId: o.assignee ?? null, state: o.answer ? 'answered' : 'open', answer: o.answer?.text ?? null,
       answeredById: o.answer?.by ?? null, createdAt: this.at(o.created), answeredAt: o.answer ? this.at(o.answer.daysAgo) : null,
     });
@@ -350,9 +288,10 @@ export class SeedBuilder {
     updated?: number;
   }) {
     const id = uid('ar');
+    const legacyWorkstreamKey = this.streamKeys.get(workstreamId) ?? workstreamId;
     const isPr = o.kind === 'pull_request' || o.kind === 'merge_request';
     this.data.artifacts.push({
-      id, workspaceId: this.workspaceId, workstreamId, repositoryId: o.repo ?? null, kind: o.kind,
+      id, workspaceId: this.workspaceId, projectId: null, issueId: null, legacyWorkstreamKey, repositoryId: o.repo ?? null, kind: o.kind,
       provider: o.provider, title: o.title, url: o.url ?? null, externalId: o.externalId ?? null, state: o.state,
       ci: o.ci ?? null, review: o.review ?? (isPr ? 'none' : null), hasConflicts: o.conflicts ?? (isPr ? false : null), environment: o.env ?? null,
       authorRef: o.by, createdAt: this.at(o.created), updatedAt: this.at(o.updated ?? o.created),
@@ -383,11 +322,17 @@ export class SeedBuilder {
     tags?: string[];
   }) {
     const id = uid('dc');
+    const legacyWorkstreamKey = o.origin ? this.streamKeys.get(o.origin) ?? o.origin : null;
+    const legacyWorkstreamKeys = [...new Set([
+      ...(legacyWorkstreamKey ? [legacyWorkstreamKey] : []),
+      ...(o.related ?? []).map((streamId) => this.streamKeys.get(streamId) ?? streamId),
+    ])];
     this.bump('adr', o.number);
     this.data.decisions.push({
       id, workspaceId: this.workspaceId, key: `ADR-${o.number}`, number: o.number, title: o.title, statement: o.statement,
-      rationale: o.rationale ?? null, status: o.status, originWorkstreamId: o.origin ?? null,
-      relatedWorkstreamIds: o.related ?? [], supersededById: o.superseded ?? null, proposedBy: o.by,
+      rationale: o.rationale ?? null, status: o.status, originIssueId: null, relatedIssueIds: [],
+      legacyWorkstreamKey, legacyWorkstreamKeys,
+      supersededById: o.superseded ?? null, proposedBy: o.by,
       decidedById: o.decidedBy ?? null, decidedAt: o.decided !== undefined ? this.at(o.decided) : null, tags: o.tags ?? [],
       createdAt: this.at(o.created), updatedAt: this.at(o.decided ?? o.created),
     });
@@ -402,7 +347,7 @@ export class SeedBuilder {
   /** Records the supersede event after both decisions exist. */
   superseded(decisionId: string, byKey: string, daysAgo: number, by: string) {
     const d = this.data.decisions.find((x) => x.id === decisionId)!;
-    this.event(this.at(daysAgo), user(by), 'decision.superseded', { type: 'decision', id: decisionId }, d.originWorkstreamId ?? null, { key: d.key, title: d.title, supersededBy: byKey });
+    this.event(this.at(daysAgo), user(by), 'decision.superseded', { type: 'decision', id: decisionId }, d.legacyWorkstreamKey ?? null, { key: d.key, title: d.title, supersededBy: byKey });
   }
 
   /** Milestone of a project; `target` = days from now (negative = past). */
@@ -444,35 +389,100 @@ export class SeedBuilder {
     this.data.issues.push({
       id, workspaceId: this.workspaceId, key, number: o.number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', status: o.status,
-      workstreamIds: o.workstreams ?? [], milestoneIds: o.milestones ?? [], aliases: [], estimate: o.estimate ?? null,
+      goal: null, milestoneIds: o.milestones ?? [], aliases: [], estimate: o.estimate ?? null,
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
       createdAt: this.at(o.created), updatedAt: this.at(o.moved ?? o.created),
     });
+    for (const streamId of o.workstreams ?? []) {
+      const linked = this.issueLinks.get(streamId) ?? [];
+      linked.push(id);
+      this.issueLinks.set(streamId, linked);
+    }
     const subj: SubjectRef = { type: 'issue', id };
     this.event(this.at(o.created), o.reporter ? user(o.reporter) : SYSTEM, 'issue.created', subj, null, { key, kind: o.kind, title: o.title, status: 'backlog' });
     if (o.status !== 'backlog' && o.moved !== undefined) {
-      const targets = o.workstreams?.length ? o.workstreams : [null];
-      for (const w of targets)
-        this.event(this.at(o.moved), user(o.movedBy!), 'issue.status_changed', subj, w, { key, from: 'backlog', to: o.status, workstreamIds: o.workstreams ?? [] });
+      this.event(this.at(o.moved), user(o.movedBy!), 'issue.status_changed', subj, null, { key, from: 'backlog', to: o.status });
     }
     return id;
   }
 
-  comment(subject: SubjectRef | { type: 'execution'; id: string }, workstreamId: string | null, author: ActorRef, body: string, daysAgo: number) {
+  comment(subject: { type: string; id: string }, workstreamId: string | null, author: ActorRef, body: string, daysAgo: number) {
+    if (subject.type === 'execution') return '';
+    if (subject.type === 'workstream' && workstreamId) {
+      this.pendingComments.push({ streamId: workstreamId, author, body, daysAgo });
+      return '';
+    }
     const id = uid('cm');
-    const resolved: SubjectRef = subject.type === 'execution' && workstreamId ? { type: 'workstream', id: workstreamId } : (subject as SubjectRef);
+    const resolved = subject as SubjectRef;
     this.data.comments.push({ id, workspaceId: this.workspaceId, subject: resolved, author, body, createdAt: this.at(daysAgo), updatedAt: this.at(daysAgo) });
-    this.event(this.at(daysAgo), author, 'comment.created', resolved, workstreamId, { commentId: id, excerpt: body.slice(0, 200) });
+    this.event(this.at(daysAgo), author, 'comment.created', resolved, null, { commentId: id, excerpt: body.slice(0, 200) });
     return id;
   }
 
-  view(owner: string, name: string, entity: ViewEntity | 'execution', o: { filters?: ViewFilter[]; sort?: { field: string; direction: 'asc' | 'desc' }; groupBy?: string; layout?: ViewLayout; shared: boolean; created: number }) {
-    if (entity === 'execution') return;
+  view(owner: string, name: string, entity: string, o: { filters?: ViewFilter[]; sort?: { field: string; direction: 'asc' | 'desc' }; groupBy?: string; layout?: ViewLayout; shared: boolean; created: number }) {
+    if (entity === 'execution' || entity === 'workstream') return;
     this.data.views.push({
-      id: uid('vw'), workspaceId: this.workspaceId, ownerId: owner, name, entity, filters: o.filters ?? [], sort: o.sort ?? null,
+      id: uid('vw'), workspaceId: this.workspaceId, ownerId: owner, name, entity: entity as 'issue' | 'decision' | 'project', filters: o.filters ?? [], sort: o.sort ?? null,
       groupBy: o.groupBy ?? null, layout: o.layout ?? 'list', shared: o.shared, sharing: { visibility: o.shared ? 'workspace' : 'private', grants: [] }, publicTokenHash: null, publicTokenEnc: null, createdAt: this.at(o.created), updatedAt: this.at(o.created),
     });
+  }
+
+  finalize(): void {
+    const issuesByKey = new Map<string, string[]>();
+    for (const [streamId, issueIds] of this.issueLinks) {
+      const key = this.streamKeys.get(streamId);
+      if (key) issuesByKey.set(key, issueIds);
+      if (key && issueIds.length === 1) {
+        const issue = this.data.issues.find((row) => row.id === issueIds[0]);
+        const stream = this.data.legacyWorkstreams.find((row) => row.id === streamId);
+        if (issue && stream && !issue.goal) issue.goal = stream.objective || null;
+      }
+    }
+    const ownerIssue = (key?: string | null) => {
+      const ids = key ? issuesByKey.get(key) ?? [] : [];
+      return ids.length === 1 ? ids[0] : null;
+    };
+    for (const row of this.data.inputRequests) {
+      const issueId = ownerIssue(row.legacyWorkstreamKey);
+      if (issueId) {
+        row.issueId = issueId;
+        row.legacyWorkstreamKey = null;
+      }
+    }
+    for (const row of this.data.artifacts) {
+      const issueId = ownerIssue(row.legacyWorkstreamKey);
+      if (issueId) {
+        row.issueId = issueId;
+        row.legacyWorkstreamKey = null;
+      }
+    }
+    for (const row of this.data.decisions) {
+      const issueId = ownerIssue(row.legacyWorkstreamKey);
+      if (issueId) {
+        row.originIssueId = issueId;
+        row.legacyWorkstreamKey = null;
+      }
+      const remainingLegacyKeys: string[] = [];
+      for (const key of row.legacyWorkstreamKeys ?? []) {
+        const relatedIssueId = ownerIssue(key);
+        if (relatedIssueId) row.relatedIssueIds = [...new Set([...(row.relatedIssueIds ?? []), relatedIssueId])];
+        else remainingLegacyKeys.push(key);
+      }
+      row.legacyWorkstreamKeys = remainingLegacyKeys;
+    }
+    for (const event of this.data.events) {
+      if (ownerIssue(event.legacyWorkstreamKey)) event.legacyWorkstreamKey = undefined;
+    }
+    for (const pending of this.pendingComments) {
+      const key = this.streamKeys.get(pending.streamId);
+      const issueId = ownerIssue(key);
+      if (!issueId) continue;
+      const id = uid('cm');
+      const subject = { type: 'issue' as const, id: issueId };
+      this.data.comments.push({ id, workspaceId: this.workspaceId, subject, author: pending.author, body: pending.body, createdAt: this.at(pending.daysAgo), updatedAt: this.at(pending.daysAgo) });
+      this.event(this.at(pending.daysAgo), pending.author, 'comment.created', subject, null, { commentId: id, excerpt: pending.body.slice(0, 200) });
+    }
   }
 }

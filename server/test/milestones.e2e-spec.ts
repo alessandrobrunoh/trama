@@ -6,11 +6,8 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   let c: Client;
   let me: string;
   let slug: string;
-  let team: { id: string };
   const base = () => `/api/w/${slug}`;
   const mkProject = async (name: string) => (await c.post(`${base()}/projects`, { name }).expect(201)).body;
-  const mkWs = async (title: string, projectId?: string) =>
-    (await c.post(`${base()}/workstreams`, { title, ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e', projectId }).expect(201)).body;
   const mkIssue = async (kind: string, title: string, extra: object = {}) =>
     (await c.post(`${base()}/issues`, { kind, title, ...extra }).expect(201)).body;
 
@@ -20,7 +17,6 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     c = u.client;
     me = u.user.id;
     slug = (await c.post('/api/workspaces', { name: 'Milestone Co' }).expect(201)).body.slug;
-    team = (await c.post(`${base()}/teams`, { name: 'Identity', key: 'AUTH', memberIds: [u.user.id] }).expect(201)).body;
   });
   afterAll(() => app.close());
 
@@ -52,63 +48,6 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     expect(types).toEqual(expect.arrayContaining(['milestone.created', 'milestone.updated', 'milestone.deleted']));
   });
 
-  it('issues: one milestone per project of a linked workstream; unlinking and project changes drop it', async () => {
-    const pA = await mkProject('A');
-    const pB = await mkProject('B');
-    const wsA = await mkWs('A', pA.id);
-    const wsA2 = await mkWs('A two', pA.id);
-    const wsB = await mkWs('B', pB.id);
-    const loose = await mkWs('No project');
-    const a1 = (await c.post(`${base()}/milestones`, { projectId: pA.id, name: 'A1' }).expect(201)).body;
-    const a2 = (await c.post(`${base()}/milestones`, { projectId: pA.id, name: 'A2' }).expect(201)).body;
-    const b1 = (await c.post(`${base()}/milestones`, { projectId: pB.id, name: 'B1' }).expect(201)).body;
-    const issue = await mkIssue('bug', 'Milestoned');
-    expect(issue.milestoneIds).toEqual([]);
-
-    // not linked to a workstream of the project yet
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(400);
-    // a workstream without a project gives no access to any milestone
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [loose.id] }).expect(200);
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(400);
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id, wsB.id] }).expect(200);
-    // two milestones of the same project
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id, a2.id] }).expect(400);
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: ['ms_missing'] }).expect(400);
-    const set = (await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id, b1.id] }).expect(200)).body;
-    expect(set.milestoneIds).toEqual([a1.id, b1.id]);
-    expect((await c.get(`${base()}/issues?milestoneId=${a1.id}`).expect(200)).body).toHaveLength(1);
-
-    // unlinking the only workstream of project B removes B's milestone only
-    const unlinked = (await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id] }).expect(200)).body;
-    expect(unlinked.milestoneIds).toEqual([a1.id]);
-
-    // a second workstream of the same project keeps the milestone when the first one goes
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id, wsA2.id] }).expect(200);
-    expect((await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA2.id] }).expect(200)).body.milestoneIds).toEqual([a1.id]);
-
-    // a workstream leaving its project drops the milestone from its issues
-    await c.patch(`${base()}/workstreams/${wsA2.id}`, { projectId: null }).expect(200);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
-    await c.patch(`${base()}/workstreams/${wsA2.id}`, { projectId: pA.id }).expect(200);
-
-    // deleting the milestone removes it from the issue
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(200);
-    await c.delete(`${base()}/milestones/${a1.id}`).expect(204);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
-
-    // deleting the workstream drops the milestone from the issue when no other workstream carries the project
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a2.id] }).expect(200);
-    await c.delete(`${base()}/workstreams/${wsA2.key}`).expect(204);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
-
-    // deleting the project cascades its milestones and cleans issues
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [wsA.id] }).expect(200);
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a2.id] }).expect(200);
-    await c.delete(`${base()}/projects/${pA.id}`).expect(204);
-    await c.get(`${base()}/milestones/${a2.id}`).expect(404);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
-  });
-
   it('issues: a project of their own gives access to its milestones, filters, and is cleared with the project', async () => {
     const pA = await mkProject('Direct A');
     const pB = await mkProject('Direct B');
@@ -119,21 +58,16 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     await c.post(`${base()}/issues`, { kind: 'bug', title: 'Ghost', projectId: 'pj_missing' }).expect(400);
     await c.patch(`${base()}/issues/${issue.key}`, { projectId: 'pj_missing' }).expect(400);
 
-    // milestones of its own project, without any workstream; other projects stay out of reach
+    // milestones of its own project; other projects stay out of reach
     await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [b1.id] }).expect(400);
     expect((await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(200)).body.milestoneIds).toEqual([a1.id]);
     expect((await c.get(`${base()}/issues?projectId=${pA.id}`).expect(200)).body.map((i: { key: string }) => i.key)).toEqual([issue.key]);
     expect((await c.get(`${base()}/issues?projectId=${pB.id}`).expect(200)).body).toEqual([]);
 
-    // a workstream of the same project keeps the milestone when the project is cleared
-    const ws = await mkWs('Direct ws', pA.id);
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [ws.id] }).expect(200);
+    // clearing its project removes access to the project's milestone
     const cleared = (await c.patch(`${base()}/issues/${issue.key}`, { projectId: null }).expect(200)).body;
     expect(cleared.projectId).toBeUndefined();
-    expect(cleared.milestoneIds).toEqual([a1.id]);
-
-    // with neither a project nor a workstream of it, the milestone goes
-    await c.patch(`${base()}/issues/${issue.key}`, { workstreamIds: [] }).expect(200);
+    expect(cleared.milestoneIds).toEqual([]);
     expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
 
     // moving to another project drops the old project's milestone
@@ -146,12 +80,6 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     // deleting the project detaches its issues
     await c.delete(`${base()}/projects/${pB.id}`).expect(204);
     expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.projectId).toBeUndefined();
-  });
-
-  it('workstream startDate', async () => {
-    const ws = (await c.post(`${base()}/workstreams`, { title: 'Dated', ownerTeamId: team.id, deltaThreadUrl: 'https://delta.dev/t/e2e', startDate: '2026-10-01T00:00:00.000Z' }).expect(201)).body;
-    expect(ws.startDate).toBe('2026-10-01T00:00:00.000Z');
-    expect((await c.patch(`${base()}/workstreams/${ws.key}`, { startDate: null }).expect(200)).body.startDate).toBeUndefined();
   });
 
   it('estimate: validated, nullable, recorded in issue.updated', async () => {
@@ -185,14 +113,12 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const canceled = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'canceled' }).expect(200)).body;
     expect(canceled.completedAt).toBeTruthy();
 
-    // linking alone keeps the status; an explicit status starts the clock
+    // A new Issue starts in backlog; moving it explicitly starts the work clock.
     const linked = await mkIssue('bug', 'Linked');
-    const ws = await mkWs('Link target');
-    const afterLink = (await c.post(`${base()}/issues/${linked.key}/link`, { workstreamIds: [ws.id] }).expect(200)).body;
-    expect(afterLink.status).toBe('backlog');
-    expect(afterLink.startedAt).toBeFalsy();
-    expect(afterLink.assigneeId).toBeFalsy();
-    const started2 = (await c.post(`${base()}/issues/${linked.key}/link`, { workstreamIds: [ws.id], status: 'in_progress' }).expect(200)).body;
+    expect(linked.status).toBe('backlog');
+    expect(linked.startedAt).toBeFalsy();
+    expect(linked.assigneeId).toBeFalsy();
+    const started2 = (await c.patch(`${base()}/issues/${linked.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(started2.status).toBe('in_progress');
     expect(started2.startedAt).toBeTruthy();
     expect(started2.assigneeId).toBe(me);
@@ -232,9 +158,6 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   it('changing the kind re-keys the issue and keeps the old key working', async () => {
     const bug = await mkIssue('bug', 'Actually a feature');
     const feat0 = await mkIssue('feature', 'Existing feature');
-    const ws = await mkWs('Rekey');
-    await c.patch(`${base()}/issues/${bug.key}`, { workstreamIds: [ws.id] }).expect(200);
-
     const rekeyed = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', title: 'Now a feature' }).expect(200)).body;
     expect(rekeyed.id).toBe(bug.id);
     expect(rekeyed.kind).toBe('feature');
@@ -242,7 +165,6 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     expect(rekeyed.number).toBe(feat0.number + 1);
     expect(rekeyed.aliases).toEqual([bug.key]);
     expect(rekeyed.title).toBe('Now a feature');
-    expect(rekeyed.workstreamIds).toEqual([ws.id]);
 
     // old key (any case) and new key both resolve; the new key is what comes back
     expect((await c.get(`${base()}/issues/${bug.key}`).expect(200)).body.key).toBe(rekeyed.key);
@@ -270,9 +192,9 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   });
 
   it('commit and branch artifacts are no longer accepted', async () => {
-    const ws = await mkWs('Artifacts');
+    const issue = await mkIssue('bug', 'Artifacts');
     for (const kind of ['commit', 'branch'])
-      await c.post(`${base()}/artifacts`, { workstreamId: ws.id, kind, title: 'x' }).expect(400);
-    await c.post(`${base()}/artifacts`, { workstreamId: ws.id, kind: 'pull_request', title: 'PR' }).expect(201);
+      await c.post(`${base()}/artifacts`, { issueId: issue.id, kind, title: 'x' }).expect(400);
+    await c.post(`${base()}/artifacts`, { issueId: issue.id, kind: 'pull_request', title: 'PR' }).expect(201);
   });
 });

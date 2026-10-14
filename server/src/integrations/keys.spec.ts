@@ -6,7 +6,7 @@ describe('extractKeys', () => {
   it('finds keys in free text and de-duplicates', () => {
     expect(extractKeys(['Fix AUTH-42 and WEB-7 (see AUTH-42)'])).toEqual(['AUTH-42', 'WEB-7']);
   });
-  it('validates against known workstream keys', () => {
+  it('validates against known Issue keys', () => {
     expect(extractKeys(['AUTH-42 UTF-8 HTTP-2 NOPE-1'], { known })).toEqual(['AUTH-42']);
   });
   it('is case-sensitive for text but not for branch names', () => {

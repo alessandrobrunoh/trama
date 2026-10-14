@@ -21,13 +21,13 @@ describe('favorites', () => {
 
   it('pins and unpins every kind of entity, in the order they were pinned', async () => {
     const issue = (await owner.post(`${base()}/issues`, { title: 'Pinned issue', kind: 'bug' }).expect(201)).body;
-    const ws = (await owner.post(`${base()}/workstreams`, { title: 'Pinned ws', ownerTeamId: teamId, deltaThreadUrl: 'https://delta.dev/t/fav' }).expect(201)).body;
+    const project = (await owner.post(`${base()}/projects`, { name: 'Pinned project' }).expect(201)).body;
     const decision = (await owner.post(`${base()}/decisions`, { title: 'Pinned decision', statement: 'We pin things.' }).expect(201)).body;
     const view = (await owner.post(`${base()}/views`, { name: 'Pinned view', entity: 'issue' }).expect(201)).body;
 
     const pins = [
       ['issue', issue.id],
-      ['workstream', ws.id],
+      ['project', project.id],
       ['decision', decision.id],
       ['team', teamId],
       ['view', view.id],

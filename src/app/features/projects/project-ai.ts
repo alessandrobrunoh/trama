@@ -365,9 +365,7 @@ export class ProjectAiCard {
             }
           </ul>
         } @else {
-          <p class="text-meta">
-            No more suggestions. Issues in this project's workstreams are already counted.
-          </p>
+          <p class="text-meta">No more suggestions. Issues in this project are already counted.</p>
         }
       } @else {
         <p class="text-meta">
@@ -527,14 +525,9 @@ const SEVERITY_STYLE: Record<AttentionSeverity, { label: string; classes: string
                   <span class="min-w-0 text-sm font-medium">{{ r.title }}</span>
                 </div>
                 <p class="text-meta text-xs">{{ r.detail }}</p>
-                @if (r.issueId || r.workstreamId) {
+                @if (r.issueId) {
                   <div class="flex flex-wrap items-center gap-1.5">
-                    @if (r.workstreamId) {
-                      <app-entity-chip type="workstream" [ref]="r.workstreamId" />
-                    }
-                    @if (r.issueId) {
-                      <app-entity-chip type="issue" [ref]="r.issueId" />
-                    }
+                    <app-entity-chip type="issue" [ref]="r.issueId" />
                   </div>
                 }
               </li>

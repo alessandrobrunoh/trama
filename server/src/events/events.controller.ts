@@ -17,7 +17,8 @@ import { EventsService } from './events.service.js';
 import { StreamAuthService, closeWhenInvalid, streamRecheckMs } from './stream-auth.js';
 
 class ListEventsQuery {
-  @IsOptional() @IsString() workstreamId?: string;
+  /** Filter legacy history by its former Workstream key; this is not a live resource lookup. */
+  @IsOptional() @IsString() legacyWorkstreamKey?: string;
   /** `<type>:<id>`, e.g. `execution:ex_abc`. */
   @IsOptional() @IsString() subject?: string;
   /** Event type or prefix, e.g. `execution.` */
@@ -44,7 +45,8 @@ export class EventsController {
       .orderBy('e.at', 'DESC')
       .addOrderBy('e.id', 'DESC')
       .limit(q.limit ?? 100);
-    if (q.workstreamId) qb.andWhere('e.workstreamId = :wk', { wk: q.workstreamId });
+    if (q.legacyWorkstreamKey)
+      qb.andWhere('e.legacyWorkstreamKey = :legacyKey', { legacyKey: q.legacyWorkstreamKey });
     if (q.subject) {
       const [type, id] = q.subject.split(':');
       if (!type || !id) throw new BadRequestException('subject must be "<type>:<id>"');

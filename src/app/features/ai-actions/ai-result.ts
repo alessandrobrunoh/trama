@@ -34,7 +34,7 @@ import { AiActions, SETUP_MESSAGE, type AiFailure, type JobState } from './ai-ac
     >
       @if (!bare()) {
         <header class="flex items-center gap-1.5 py-1.5 pr-1.5 pl-3">
-          <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-entity-workstream"></svg>
+          <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-primary"></svg>
           <h3 class="text-muted-foreground min-w-0 flex-1 truncate text-xs font-medium">{{ title() }}</h3>
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground" type="button" aria-label="Close" hlmTooltip="Close · Esc" (click)="closed.emit()">
             <svg [lucideIcon]="xIcon" [size]="13"></svg>

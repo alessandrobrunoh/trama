@@ -49,7 +49,6 @@ import {
   type SavedView,
   type ViewFilter,
   type ViewLayout,
-  type Workstream,
 } from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorAvatar } from '../../shared/actor-avatar';
@@ -61,9 +60,7 @@ import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { IssueCard, IssueRow } from '../issues/issue-items';
 import { TimelineView } from '../timeline/timeline-view';
-import { InlineText } from '../workstreams/inline-edit';
-import { buildSummary, type WsSummary } from '../workstreams/ws-model';
-import { WorkstreamCard, WorkstreamRow } from '../workstreams/workstream-items';
+import { InlineText } from '../../shared/inline-edit';
 import { OptionMenu } from './option-controls';
 import { canEditSavedView, canManageViewSharing } from './view-access';
 import { ViewShare } from './view-share';
@@ -89,8 +86,8 @@ import {
 type PageLayout = 'list' | 'board' | 'timeline';
 
 /**
- * A saved view: renders its entity with the right rows (issues = circles, workstreams = hexagons,
- * projects = glyphs), honours `layout` (list / board / timeline) and `groupBy`, and lets the owner edit name, filters, sort,
+ * A saved view: renders its entity with the right rows, honours `layout` (list / board / timeline)
+ * and `groupBy`, and lets the owner edit name, filters, sort,
  * grouping, layout and visibility in place. Every change is saved immediately.
  */
 @Component({
@@ -114,8 +111,6 @@ type PageLayout = 'list' | 'board' | 'timeline';
     InlineText,
     OptionMenu,
     ViewShare,
-    WorkstreamRow,
-    WorkstreamCard,
     IssueRow,
     IssueCard,
     ViewProjectRow,
@@ -460,12 +455,6 @@ type PageLayout = 'list' | 'board' | 'timeline';
               <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4">
                 @for (item of g.items; track item.id) {
                   @switch (v.entity) {
-                    @case ('workstream') {
-                      <app-workstream-card
-                        [summary]="summary(item)"
-                        [focused]="ui.focusedRowId() === item.id"
-                      />
-                    }
                     @case ('issue') {
                       <app-issue-card
                         [issue]="asIssue(item)"
@@ -505,9 +494,8 @@ type PageLayout = 'list' | 'board' | 'timeline';
         </div>
       } @else if (layout() === 'timeline') {
         <app-timeline-view
-          [entity]="v.entity === 'project' ? 'project' : 'workstream'"
+          entity="project"
           [groups]="groups()"
-          [grouped]="grouped()"
         />
       } @else {
         <div class="min-h-0 flex-1 overflow-y-auto">
@@ -523,12 +511,6 @@ type PageLayout = 'list' | 'board' | 'timeline';
             }
             @for (item of g.items; track item.id) {
               @switch (v.entity) {
-                @case ('workstream') {
-                  <app-workstream-row
-                    [summary]="summary(item)"
-                    [focused]="ui.focusedRowId() === item.id"
-                  />
-                }
                 @case ('issue') {
                   <app-issue-row
                     [issue]="asIssue(item)"
@@ -637,18 +619,15 @@ export class ViewDetailPage {
     );
   });
 
-  protected readonly entityIcon = computed(() => ENTITY_ICON[this.view()?.entity ?? 'workstream']);
+  protected readonly entityIcon = computed(() => ENTITY_ICON[this.view()?.entity ?? 'issue']);
   protected readonly entityLabel = computed(
-    () => ENTITY_LABEL[this.view()?.entity ?? 'workstream'],
+    () => ENTITY_LABEL[this.view()?.entity ?? 'issue'],
   );
   protected readonly statusEntity = computed(
-    () => STATUS_ENTITY[this.view()?.entity ?? 'workstream'],
+    () => STATUS_ENTITY[this.view()?.entity ?? 'issue'],
   );
-  /** Workstreams and projects have dates, so they can be drawn as a timeline. */
-  protected readonly supportsTimeline = computed(() => {
-    const e = this.view()?.entity;
-    return e === 'workstream' || e === 'project';
-  });
+  /** Projects have start and target dates, so they can be drawn as a timeline. */
+  protected readonly supportsTimeline = computed(() => this.view()?.entity === 'project');
   protected readonly layout = computed<PageLayout>(() => {
     const l = this.view()?.layout;
     if (l === 'board') return 'board';
@@ -659,9 +638,7 @@ export class ViewDetailPage {
   private readonly pending = signal<string[]>([]);
 
   // ── query ──
-  /** An issue's project filter / grouping also counts the projects of its workstreams. */
   private readonly queryCtx = computed(() => ({
-    workstreamById: this.store.workstreamById(),
     demand: this.store.demand(),
   }));
   protected readonly rows = computed<Queryable[]>(() => {
@@ -675,8 +652,6 @@ export class ViewDetailPage {
         : undefined);
     const spec = { filters: v.filters, sort };
     const ctx = this.queryCtx();
-    if (v.entity === 'workstream')
-      return queryItems('workstream', this.store.workstreams(), spec, ctx);
     if (v.entity === 'issue') return queryItems('issue', this.store.issues(), spec, ctx);
     if (v.entity === 'project') return queryItems('project', this.store.projects(), spec, ctx);
     return queryItems('decision', this.store.decisions(), spec, ctx);
@@ -719,13 +694,6 @@ export class ViewDetailPage {
     });
   });
 
-  private readonly summaries = computed(() => {
-    const map = new Map<string, WsSummary>();
-    if (this.view()?.entity !== 'workstream') return map;
-    for (const w of this.rows() as Workstream[]) map.set(w.id, buildSummary(this.store, w));
-    return map;
-  });
-
   // ── toolbar state ──
   protected readonly activeFilters = computed(() => {
     const v = this.view();
@@ -743,10 +711,10 @@ export class ViewDetailPage {
     return filterableFields(v.entity).filter((f) => !used.has(f.field));
   });
   protected readonly groupableFields = computed(() =>
-    FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.groupable),
+    FIELD_DEFS[this.view()?.entity ?? 'issue'].filter((f) => f.groupable),
   );
   protected readonly sortableFields = computed(() =>
-    FIELD_DEFS[this.view()?.entity ?? 'workstream'].filter((f) => f.sortable),
+    FIELD_DEFS[this.view()?.entity ?? 'issue'].filter((f) => f.sortable),
   );
   protected readonly groupLabel = computed(() => {
     const v = this.view();
@@ -797,9 +765,6 @@ export class ViewDetailPage {
   }
 
   // ── template casts ──
-  protected summary(item: Queryable): WsSummary {
-    return this.summaries().get(item.id) ?? buildSummary(this.store, item as Workstream);
-  }
   protected asIssue(item: Queryable): Issue {
     return item as Issue;
   }

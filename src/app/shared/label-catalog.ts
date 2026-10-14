@@ -6,13 +6,12 @@ import { readJson, writeJson } from '../core/stores/storage';
 /** How many records carry one label, per kind of record. */
 export interface LabelUsage {
   issues: number;
-  workstreams: number;
   projects: number;
   repositories: number;
   total: number;
 }
 
-export const NO_USAGE: LabelUsage = { issues: 0, workstreams: 0, projects: 0, repositories: 0, total: 0 };
+export const NO_USAGE: LabelUsage = { issues: 0, projects: 0, repositories: 0, total: 0 };
 
 const RECENT_MAX = 4;
 /** Labels offered as suggestions when nothing is typed. */
@@ -21,14 +20,13 @@ const SUGGESTED_MAX = 4;
 const SUGGEST_FROM = 8;
 const recentKey = (slug: string | null) => `trama.labels.recent.${slug ?? ''}`;
 
-/** "12 issues · 3 workstreams"; "Not used" when nothing carries the label. */
+/** "12 issues · 3 projects"; "Not used" when nothing carries the label. */
 export function describeUsage(u: LabelUsage, empty = 'Not used'): string {
   const parts: string[] = [];
   const add = (n: number, one: string, many: string) => {
     if (n) parts.push(`${n} ${n === 1 ? one : many}`);
   };
   add(u.issues, 'issue', 'issues');
-  add(u.workstreams, 'workstream', 'workstreams');
   add(u.projects, 'project', 'projects');
   add(u.repositories, 'repository', 'repositories');
   return parts.length ? parts.join(' · ') : empty;
@@ -47,10 +45,10 @@ export class LabelCatalog {
   readonly canCreate = computed(() => this.store.can('member'));
   readonly canManage = computed(() => this.store.can('admin'));
 
-  /** Per label id, how many issues, workstreams, projects and repositories carry it. */
+  /** Per label id, how many issues, projects and repositories carry it. */
   readonly usage = computed(() => {
     const map = new Map<string, LabelUsage>();
-    const bump = (ids: readonly string[] | undefined, key: 'issues' | 'workstreams' | 'projects' | 'repositories') => {
+    const bump = (ids: readonly string[] | undefined, key: 'issues' | 'projects' | 'repositories') => {
       for (const id of ids ?? []) {
         const u = map.get(id) ?? { ...NO_USAGE };
         u[key] += 1;
@@ -59,7 +57,6 @@ export class LabelCatalog {
       }
     };
     for (const i of this.store.issues()) bump(i.labels, 'issues');
-    for (const w of this.store.workstreams()) bump(w.labels, 'workstreams');
     for (const p of this.store.projects()) bump(p.labels, 'projects');
     for (const r of this.store.repositories()) bump(r.labels, 'repositories');
     return map;

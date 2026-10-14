@@ -100,7 +100,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
       </app-settings-row>
     </app-settings-group>
 
-    <app-settings-group title="Git branch name format" description="Used by “Copy git branch name” on issues and workstreams (⌘⇧G). Stored in this browser only.">
+    <app-settings-group title="Git branch name format" description="Used by “Copy git branch name” on issues (⌘⇧G). Stored in this browser only.">
       <div class="flex flex-col gap-2 p-4" role="radiogroup" aria-label="Git branch name format">
         @for (f of branchFormats; track f.id) {
           <button

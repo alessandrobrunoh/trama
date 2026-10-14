@@ -29,14 +29,20 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { toast } from '@spartan-ng/brain/sonner';
-import { ATTENTION_KIND_META, TramaStore, Notifier, shortDate, type AttentionItem } from '../../core';
+import {
+  ATTENTION_KIND_META,
+  TramaStore,
+  Notifier,
+  shortDate,
+  type AttentionItem,
+} from '../../core';
 import { ActorAvatar, EntityChip, Kbd, RelativeTimePipe, type EntityChipType } from '../../shared';
 import { AgoPipe } from '../overview/ago';
 import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
 import { snoozePresets, type SnoozePreset } from './snooze';
 
 /**
- * One My Attention row: icon, title, detail, workstream key, since, and the inline actions that
+ * One My Attention row: icon, title, detail, entity context, since, and the inline actions that
  * resolve it (answer an input request, accept/reject a decision, open the PR, snooze, dismiss).
  */
 @Component({
@@ -72,8 +78,18 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     <div
       class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 px-4 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-6"
     >
-      <span class="mt-0.5 inline-flex cursor-help" [hlmTooltip]="kindLabel() + ': ' + help()" position="right" tabindex="-1">
-        <svg [lucideIcon]="kind().icon" [size]="16" [strokeWidth]="1.75" [class]="kind().color"></svg>
+      <span
+        class="mt-0.5 inline-flex cursor-help"
+        [hlmTooltip]="kindLabel() + ': ' + help()"
+        position="right"
+        tabindex="-1"
+      >
+        <svg
+          [lucideIcon]="kind().icon"
+          [size]="16"
+          [strokeWidth]="1.75"
+          [class]="kind().color"
+        ></svg>
       </span>
 
       <div class="min-w-0">
@@ -105,7 +121,13 @@ import { snoozePresets, type SnoozePreset } from './snooze';
                     {{ o }}
                   </button>
                 }
-                <button hlmBtn variant="ghost" size="sm" class="max-sm:h-9" (click)="answering.set(true)">
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="sm"
+                  class="max-sm:h-9"
+                  (click)="answering.set(true)"
+                >
                   <svg [lucideIcon]="reply" [size]="14"></svg>
                   {{ (ir.options?.length ?? 0) > 0 ? 'Other answer' : 'Answer' }}
                   <app-kbd keys="a" class="max-sm:hidden" />
@@ -138,11 +160,25 @@ import { snoozePresets, type SnoozePreset } from './snooze';
                   (keydown.escape)="cancelAnswer($event)"
                 ></textarea>
                 <div class="flex flex-wrap items-center gap-1.5">
-                  <button hlmBtn size="sm" class="max-sm:h-9" [disabled]="!draft().trim()" (click)="send()">
+                  <button
+                    hlmBtn
+                    size="sm"
+                    class="max-sm:h-9"
+                    [disabled]="!draft().trim()"
+                    (click)="send()"
+                  >
                     Send answer
                     <app-kbd keys="mod+enter" class="max-sm:hidden" />
                   </button>
-                  <button hlmBtn variant="ghost" size="sm" class="max-sm:h-9" (click)="cancelAnswer()">Cancel</button>
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="sm"
+                    class="max-sm:h-9"
+                    (click)="cancelAnswer()"
+                  >
+                    Cancel
+                  </button>
                 </div>
               </div>
             }
@@ -163,13 +199,15 @@ import { snoozePresets, type SnoozePreset } from './snooze';
         }
       </div>
 
-      <div
-        class="col-span-full flex items-center gap-2 max-sm:ps-7 sm:col-span-1 sm:justify-end"
-      >
+      <div class="col-span-full flex items-center gap-2 max-sm:ps-7 sm:col-span-1 sm:justify-end">
         @if (subjectChip(); as c) {
           <app-entity-chip [type]="c.type" [ref]="c.ref" compact class="max-sm:me-auto" />
         }
-        <span class="text-meta w-9 text-end tabular-nums max-sm:w-auto" [class.max-sm:me-auto]="!subjectChip()">{{ item().since | ago }}</span>
+        <span
+          class="text-meta w-9 text-end tabular-nums max-sm:w-auto"
+          [class.max-sm:me-auto]="!subjectChip()"
+          >{{ item().since | ago }}</span
+        >
 
         @if (mode() === 'open') {
           <div
@@ -276,14 +314,13 @@ import { snoozePresets, type SnoozePreset } from './snooze';
 
     <ng-template #moreMenu>
       <hlm-dropdown-menu class="w-52">
-        @if (item().workstreamId && wsKey(); as k) {
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'workstreams', k])">Open workstream</button>
-        }
         @if (artifactUrl(); as url) {
           <button hlmDropdownMenuItem (triggered)="openExternal(url)">Open pull request</button>
         }
         @if (request()?.state === 'open') {
-          <button hlmDropdownMenuItem (triggered)="dismissQuestion()">Dismiss question for everyone</button>
+          <button hlmDropdownMenuItem (triggered)="dismissQuestion()">
+            Dismiss question for everyone
+          </button>
         }
         <hlm-dropdown-menu-separator />
         <button hlmDropdownMenuItem (triggered)="dismiss.emit()">
@@ -326,20 +363,18 @@ export class AttentionRow {
   protected readonly kind = computed(() => ATTENTION_KIND_VIEW[this.item().kind]);
   protected readonly kindLabel = computed(() => ATTENTION_KIND_META[this.item().kind].label);
   protected readonly help = computed(() => ATTENTION_KIND_HELP[this.item().kind]);
-  /** The entity the item is about, as a compact chip (decision > issue > workstream). */
+  /** The entity the item is about, as a compact chip. */
   protected readonly subjectChip = computed<{ type: EntityChipType; ref: string } | null>(() => {
     const it = this.item();
-    if (it.decisionId && this.store.decisionById().has(it.decisionId)) return { type: 'decision', ref: it.decisionId };
-    if (it.issueId && this.store.issueById().has(it.issueId)) return { type: 'issue', ref: it.issueId };
-    if (it.workstreamId && this.store.workstreamById().has(it.workstreamId)) return { type: 'workstream', ref: it.workstreamId };
+    if (it.decisionId && this.store.decisionById().has(it.decisionId))
+      return { type: 'decision', ref: it.decisionId };
+    if (it.issueId && this.store.issueById().has(it.issueId))
+      return { type: 'issue', ref: it.issueId };
     return null;
   });
-  protected readonly severityBar = computed(() => (this.mode() === 'open' ? SEVERITY_VIEW[this.item().severity].bar : 'bg-transparent'));
-  protected readonly ws = computed(() => {
-    const id = this.item().workstreamId;
-    return id ? this.store.workstreamById().get(id) : undefined;
-  });
-  protected readonly wsKey = computed(() => this.ws()?.key);
+  protected readonly severityBar = computed(() =>
+    this.mode() === 'open' ? SEVERITY_VIEW[this.item().severity].bar : 'bg-transparent',
+  );
   protected readonly request = computed(() => {
     const id = this.item().inputRequestId;
     return id ? this.store.inputRequestById().get(id) : undefined;
@@ -355,7 +390,10 @@ export class AttentionRow {
   });
   protected readonly presets = computed<SnoozePreset[]>(() => snoozePresets());
 
-  protected readonly primaryLink = computed<{ commands: unknown[]; query?: Record<string, string> }>(() => {
+  protected readonly primaryLink = computed<{
+    commands: unknown[];
+    query?: Record<string, string>;
+  }>(() => {
     const it = this.item();
     const slug = this.slug();
     switch (it.kind) {
@@ -371,16 +409,16 @@ export class AttentionRow {
         return { commands: ['/', slug, 'issues'], query: q };
       }
       case 'input_requested':
-      case 'blocked':
         break;
     }
-    const k = this.wsKey();
-    return { commands: k ? ['/', slug, 'workstreams', k] : ['/', slug, 'workstreams'] };
+    const issue = it.issueId ? this.store.issueById().get(it.issueId) : undefined;
+    return { commands: issue ? ['/', slug, 'issues', issue.key] : ['/', slug, 'attention'] };
   });
 
   protected readonly archivedLabel = computed(() => {
     const it = this.item();
-    if (it.state === 'snoozed') return it.snoozedUntil ? `Snoozed until ${shortDate(it.snoozedUntil)}` : 'Snoozed';
+    if (it.state === 'snoozed')
+      return it.snoozedUntil ? `Snoozed until ${shortDate(it.snoozedUntil)}` : 'Snoozed';
     return 'Dismissed';
   });
 

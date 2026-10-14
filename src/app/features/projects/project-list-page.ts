@@ -20,8 +20,8 @@ import { PriorityIcon } from '../../shared/priority-icon';
 import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { compactNumber, describeDemand } from '../customers/customer-model';
 import { DemandFilters } from '../customers/demand-filters';
-import { Picker } from '../workstreams/picker';
-import { teamOptions } from '../workstreams/ws-model';
+import { Picker } from '../../shared/picker';
+import { teamOptions } from '../../shared/picker-options';
 import { ProjectGlyph } from './project-glyph';
 import { ProjectHealthBadge } from './project-health';
 import {
@@ -154,7 +154,7 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
       <app-empty-state
         [icon]="boxIcon"
         title="No projects yet"
-        description="A project is a planned outcome with a lead, a target date and the repositories it touches. Workstreams carry out the work."
+        description="A project groups planned issues, milestones, repositories and project context."
       >
         @if (canManage()) {
           <button hlmBtn size="sm" (click)="create()">
@@ -214,8 +214,14 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
               <span class="flex w-24 items-center max-md:w-auto"
                 ><app-priority-icon [priority]="p.priority" [showLabel]="true"
               /></span>
-              <span class="flex w-28 items-center gap-1.5 max-md:w-auto" [style.color]="row.status.color">
-                <span class="size-2 shrink-0 rounded-full" [style.background]="row.status.color"></span>
+              <span
+                class="flex w-28 items-center gap-1.5 max-md:w-auto"
+                [style.color]="row.status.color"
+              >
+                <span
+                  class="size-2 shrink-0 rounded-full"
+                  [style.background]="row.status.color"
+                ></span>
                 {{ row.status.label }}
               </span>
               <span class="flex w-24 items-center max-md:w-auto">
@@ -345,7 +351,10 @@ export class ProjectListPage {
         // Open projects first, then by name (or by demand when asked).
         .sort((a, b) => {
           const entries = this.store.settings().statuses.project;
-          return sort === 'name' ? Number(isClosed(a, entries)) - Number(isClosed(b, entries)) || a.name.localeCompare(b.name) : 0;
+          return sort === 'name'
+            ? Number(isClosed(a, entries)) - Number(isClosed(b, entries)) ||
+                a.name.localeCompare(b.name)
+            : 0;
         })
         .map((project) => ({
           project,

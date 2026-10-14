@@ -1,4 +1,4 @@
-// Generic filter / sort / group for workstreams, issues, decisions and projects,
+// Generic filter / sort / group for issues, decisions and projects,
 // driven by the contract's ViewFilter / SavedView. Pure functions: use inside `computed()`.
 import type { SavedView, ViewEntity, ViewFilter } from '../contracts/domain';
 import {
@@ -9,7 +9,6 @@ import {
   PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
   PROVIDER_META,
-  WORKSTREAM_STATUS_META,
 } from '../meta';
 import { EntityOf, FieldDef, QueryContext, Queryable, fieldDef, fieldValues } from './fields';
 
@@ -35,7 +34,6 @@ export interface Group<T> {
 /** Display order of an enum value for (entity, field); `Infinity` when unordered. */
 export function enumOrder(entity: ViewEntity, field: string, value: string): number {
   const table = (): Record<string, { order: number }> | null => {
-    if (field === 'status' && entity === 'workstream') return WORKSTREAM_STATUS_META;
     if (field === 'status' && entity === 'decision') return DECISION_STATUS_META;
     if (field === 'status' && entity === 'issue') return ISSUE_STATUS_META;
     if (field === 'status' && entity === 'project') return PROJECT_STATUS_META;
@@ -161,7 +159,7 @@ export function sortItems<E extends ViewEntity>(
 /**
  * Group by a field. Group order: enum fields follow their display order; other fields sort
  * keys alphabetically; the "no value" group (`key: ''`) is last. Multi-valued fields place an
- * item in each of its groups. Pass `include` to force empty groups and fix their order (board columns, e.g. WORKSTREAM_STATUS_FLOW).
+ * item in each of its groups. Pass `include` to force empty groups and fix their order (board columns).
  */
 export function groupItems<E extends ViewEntity>(
   entity: E,

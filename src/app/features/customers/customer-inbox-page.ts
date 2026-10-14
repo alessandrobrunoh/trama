@@ -8,7 +8,7 @@ import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { CustomerAvatar } from './customer-avatar';
 import { IntakeSourceBadge } from './intake-source-badge';
 

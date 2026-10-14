@@ -15,7 +15,6 @@ import {
   LucideDynamicIcon,
   LucideEllipsis,
   LucideExternalLink,
-  LucideHexagon,
   LucidePencil,
   LucideTrash2,
   type LucideIcon,
@@ -30,9 +29,9 @@ import { RelativeTimePipe } from '../../shared/pipes';
 import { ProviderIcon } from '../../shared/provider-icon';
 import { StatusBadge } from '../../shared/status';
 
-/** A project / workstream / issue reference resolved for display and navigation. */
+/** A project / issue reference resolved for display and navigation. */
 export interface SubjectView {
-  type: 'project' | 'workstream' | 'issue';
+  type: 'project' | 'issue';
   label: string;
   /** Show `label` in mono (keys). */
   mono: boolean;
@@ -57,18 +56,6 @@ export function resolveSubject(store: TramaStore, ref: SubjectRef): SubjectView 
           }
         : null;
     }
-    case 'workstream': {
-      const w = store.workstreamById().get(ref.id);
-      return w
-        ? {
-            type: 'workstream',
-            label: w.key,
-            mono: true,
-            title: w.title,
-            link: ['/', slug, 'workstreams', w.key],
-          }
-        : null;
-    }
     case 'issue': {
       const i = store.issueById().get(ref.id);
       return i
@@ -88,13 +75,11 @@ export function resolveSubject(store: TramaStore, ref: SubjectRef): SubjectView 
 
 export const SUBJECT_ICON: Record<SubjectView['type'], LucideIcon> = {
   project: LucideBox,
-  workstream: LucideHexagon,
   issue: LucideCircleDot,
 };
 
 export const SUBJECT_TONE: Record<SubjectView['type'], string> = {
   project: 'text-muted-foreground',
-  workstream: 'text-entity-workstream',
   issue: 'text-entity-issue',
 };
 
@@ -103,7 +88,7 @@ const LONG_DESCRIPTION = 140;
 
 /**
  * One artifact in the project context: kind / provider glyph, title (external link when it has a URL), state, CI /
- * review chips, a short description and an "origin" chip that links back to the project, workstream or issue it is
+ * review chips, a short description and an "origin" chip that links back to the project or issue it is
  * attached to. `origin` picks what the chip shows: just the owner, the whole path, or nothing.
  */
 @Component({

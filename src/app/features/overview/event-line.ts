@@ -1,4 +1,11 @@
-import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  booleanAttribute,
+  computed,
+  inject,
+  input,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideActivity,
@@ -32,19 +39,17 @@ import {
   TramaStore,
   type DomainEvent,
   type IssueStatus,
-  type WorkstreamStatus,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EntityChip, type EntityChipType } from '../../shared/entity-chip';
 import { FullDatePipe } from '../../shared/pipes';
-import { StatusIcon, statusLabel, type AnyStatus, type StatusEntity } from '../../shared/status';
+import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import { AgoPipe } from './ago';
 
 /** Coarse event family, used by the Activity page filters. */
-export type EventCategory = 'workstream' | 'issue' | 'decision' | 'artifact' | 'comment' | 'input' | 'other';
+export type EventCategory = 'issue' | 'decision' | 'artifact' | 'comment' | 'input' | 'other';
 
 export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
-  workstream: 'Workstreams',
   issue: 'Issues',
   decision: 'Decisions',
   artifact: 'Artifacts',
@@ -56,10 +61,6 @@ export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
 export function eventCategory(e: DomainEvent): EventCategory {
   const prefix = e.type.split('.')[0];
   switch (prefix) {
-    case 'workstream':
-    case 'criterion':
-    case 'dependency':
-      return 'workstream';
     case 'issue':
       return 'issue';
     case 'decision':
@@ -103,7 +104,8 @@ export interface EventView {
 }
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
-const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const strs = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
 function humanize(type: string): string {
   return type.replace(/[._]/g, ' ');
@@ -112,20 +114,24 @@ function humanize(type: string): string {
 function fieldsText(d: Record<string, unknown>): string | undefined {
   const f = strs(d['fields']);
   if (!f.length) return undefined;
-  return f.map((x) => x.replace(/Id(s)?$/, '$1').replace(/([A-Z])/g, ' $1').toLowerCase()).join(', ');
+  return f
+    .map((x) =>
+      x
+        .replace(/Id(s)?$/, '$1')
+        .replace(/([A-Z])/g, ' $1')
+        .toLowerCase(),
+    )
+    .join(', ');
 }
 
 /** Turn a DomainEvent into a short, human-readable description (actor is rendered separately). */
 export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): EventView {
   const d = e.data ?? {};
-  const ws = e.workstreamId ? store.workstreamById().get(e.workstreamId) : undefined;
-  const wsRef: EntityRef | undefined = ws
-    ? { type: 'workstream', ref: ws.id }
-    : str(d['key']) && e.subject.type === 'workstream'
-      ? { type: 'workstream', ref: str(d['key'])! }
-      : undefined;
-  const subjectWs: EntityRef | undefined =
-    e.subject.type === 'workstream' ? { type: 'workstream', ref: store.workstreamById().has(e.subject.id) ? e.subject.id : (str(d['key']) ?? e.subject.id) } : wsRef;
+  // Historical workstream events remain readable, but deliberately have no entity link.
+  const legacyText = (): string | undefined =>
+    str(d['title']) ??
+    str(d['key']) ??
+    (e.subject.type === 'workstream' ? e.subject.id : undefined);
   const issueRef = (): EntityRef => ({
     type: 'issue',
     ref: store.issueById().has(e.subject.id) ? e.subject.id : (str(d['key']) ?? e.subject.id),
@@ -137,49 +143,56 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
 
   switch (e.type) {
     case 'workstream.created':
-      return { icon: LucideRocket, verb: 'created workstream', subject: subjectWs, text: subjectWs ? undefined : str(d['title']) };
+      return { icon: LucideRocket, verb: 'created legacy workstream', text: legacyText() };
     case 'workstream.updated':
-      return { icon: LucideSquarePen, verb: 'updated', subject: subjectWs, detail: fieldsText(d) };
+      return {
+        icon: LucideSquarePen,
+        verb: 'updated legacy workstream',
+        text: legacyText(),
+        detail: fieldsText(d),
+      };
     case 'workstream.deleted':
-      return { icon: LucideTrash2, verb: 'deleted workstream', text: str(d['key']) ?? str(d['title']) };
+      return { icon: LucideTrash2, verb: 'deleted legacy workstream', text: legacyText() };
     case 'workstream.status_changed': {
-      const to = str(d['to']) as WorkstreamStatus | undefined;
-      const from = str(d['from']) as WorkstreamStatus | undefined;
       return {
         icon: LucideActivity,
-        verb: to ? `moved to ${statusLabel(to).toLowerCase()}` : 'changed status of',
-        subject: subjectWs,
-        transition: to ? { from, to, entity: 'workstream' } : undefined,
+        verb: `changed legacy workstream status to ${str(d['to']) ?? 'unknown'}`,
+        text: legacyText(),
       };
     }
     case 'criterion.updated':
       return {
         icon: LucideListChecks,
-        verb: d['state'] === 'met' ? 'met a criterion in' : 'updated a criterion in',
-        subject: wsRef,
-        detail: str(d['text']),
+        verb: d['state'] === 'met' ? 'met a legacy criterion' : 'updated a legacy criterion',
+        text: str(d['key']) ?? str(d['text']),
       };
     case 'input.requested':
-      return { icon: LucideCircleHelp, verb: 'asked in', subject: wsRef, detail: str(d['question']) };
+      return {
+        icon: LucideCircleHelp,
+        verb: 'asked a legacy workstream question',
+        text: legacyText(),
+        detail: str(d['question']),
+      };
     case 'input.answered':
       return {
         icon: LucideCircleCheck,
-        verb: 'answered a question in',
-        subject: wsRef,
+        verb: 'answered a legacy workstream question',
+        text: legacyText(),
         detail: [str(d['question']), str(d['answer'])].filter(Boolean).join(' → ') || undefined,
       };
     case 'input.dismissed':
-      return { icon: LucideCircleX, verb: 'dismissed a question in', subject: wsRef, detail: str(d['question']) };
+      return {
+        icon: LucideCircleX,
+        verb: 'dismissed a legacy workstream question',
+        text: legacyText(),
+        detail: str(d['question']),
+      };
     case 'artifact.attached': {
       const kind = str(d['kind']) as keyof typeof ARTIFACT_KIND_META | undefined;
       return {
         icon: LucideGitPullRequest,
         verb: `linked ${kind ? (ARTIFACT_KIND_META[kind]?.label.toLowerCase() ?? 'an artifact') : 'an artifact'}`,
         text: [str(d['externalId']), str(d['title'])].filter(Boolean).join(' ') || undefined,
-        link: ws ? ['/', slug, 'workstreams', ws.key] : undefined,
-        query: ws ? { tab: 'artifacts' } : undefined,
-        joiner: wsRef ? 'to' : undefined,
-        target: wsRef,
       };
     }
     case 'artifact.updated': {
@@ -194,24 +207,16 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideGitPullRequest,
         verb: 'updated',
         text: [str(d['externalId']), str(d['title'])].filter(Boolean).join(' ') || 'an artifact',
-        link: ws ? ['/', slug, 'workstreams', ws.key] : undefined,
-        query: ws ? { tab: 'artifacts' } : undefined,
-        joiner: wsRef ? 'in' : undefined,
-        target: wsRef,
         detail: bits.join(', ') || undefined,
       };
     }
     case 'artifact.deleted':
-      return { icon: LucideTrash2, verb: 'removed', text: str(d['title']) ?? 'an artifact', joiner: wsRef ? 'from' : undefined, target: wsRef };
+      return { icon: LucideTrash2, verb: 'removed', text: str(d['title']) ?? 'an artifact' };
     case 'review.requested':
       return {
         icon: LucideGitPullRequest,
         verb: 'requested review on',
         text: [str(d['externalId']), str(d['title'])].filter(Boolean).join(' ') || 'a pull request',
-        link: ws ? ['/', slug, 'workstreams', ws.key] : undefined,
-        query: ws ? { tab: 'artifacts' } : undefined,
-        joiner: wsRef ? 'in' : undefined,
-        target: wsRef,
       };
     case 'decision.proposed':
     case 'decision.accepted':
@@ -223,8 +228,6 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideScale,
         verb: verb === 'updated' ? 'updated decision' : `${verb} decision`,
         subject: decisionRef(),
-        joiner: wsRef && verb === 'proposed' ? 'in' : undefined,
-        target: verb === 'proposed' ? wsRef : undefined,
         detail: verb === 'updated' ? fieldsText(d) : undefined,
       };
     }
@@ -252,7 +255,12 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
     case 'customer.archived':
     case 'customer.restored':
     case 'customer.deleted': {
-      const verb = e.type === 'customer.archived' ? 'archived' : e.type === 'customer.restored' ? 'restored' : e.type.split('.')[1];
+      const verb =
+        e.type === 'customer.archived'
+          ? 'archived'
+          : e.type === 'customer.restored'
+            ? 'restored'
+            : e.type.split('.')[1];
       return {
         icon: LucideBuilding2,
         verb: `${verb} customer`,
@@ -264,7 +272,10 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
     case 'customer_request.unlinked':
       return {
         icon: LucideLink2,
-        verb: e.type === 'customer_request.linked' ? 'linked customer feedback to' : 'unlinked customer feedback from',
+        verb:
+          e.type === 'customer_request.linked'
+            ? 'linked customer feedback to'
+            : 'unlinked customer feedback from',
         subject: str(d['issueId']) ? { type: 'issue', ref: str(d['issueId'])! } : undefined,
         detail: str(d['customer']),
       };
@@ -279,35 +290,47 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
       const from = str(d['from']) as IssueStatus | undefined;
       return {
         icon: LucideFlag,
-        verb: to ? `moved to ${(ISSUE_STATUS_META[to]?.label ?? to).toLowerCase()}` : 'changed status of',
+        verb: to
+          ? `moved to ${(ISSUE_STATUS_META[to]?.label ?? to).toLowerCase()}`
+          : 'changed status of',
         subject: issueRef(),
         transition: to ? { from, to, entity: 'issue' } : undefined,
       };
     }
     case 'issue.linked': {
       const ids = strs(d['workstreamIds']);
-      const created = str(d['createdWorkstreamId']);
-      const targetId = created ?? ids[ids.length - 1];
       return {
         icon: LucideLink2,
-        verb: 'added',
+        verb: 'updated legacy issue associations',
         subject: issueRef(),
-        joiner: targetId ? 'to' : undefined,
-        target: targetId ? { type: 'workstream', ref: targetId } : undefined,
-        detail: ids.length > 1 ? `Contributes to ${ids.length} workstreams` : undefined,
+        detail: ids.length
+          ? `${ids.length} legacy workstream link${ids.length === 1 ? '' : 's'}`
+          : 'This event predates Issue-only associations.',
       };
     }
     case 'dependency.added':
     case 'dependency.removed':
-      return { icon: LucideLink2, verb: e.type.endsWith('added') ? 'added a dependency to' : 'removed a dependency from', subject: wsRef };
+      return {
+        icon: LucideLink2,
+        verb: e.type.endsWith('added')
+          ? 'added a legacy dependency'
+          : 'removed a legacy dependency',
+        text: legacyText(),
+      };
     case 'comment.created': {
       const target: EntityRef | undefined =
         e.subject.type === 'issue'
           ? { type: 'issue', ref: e.subject.id }
           : e.subject.type === 'decision'
             ? { type: 'decision', ref: e.subject.id }
-            : wsRef;
-      return { icon: LucideMessageSquare, verb: 'commented on', subject: target, detail: str(d['excerpt']) };
+            : undefined;
+      return {
+        icon: LucideMessageSquare,
+        verb: 'commented on',
+        subject: target,
+        text: e.subject.type === 'workstream' ? legacyText() : undefined,
+        detail: str(d['excerpt']),
+      };
     }
     case 'team.created':
     case 'team.updated':
@@ -316,7 +339,10 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideUsers,
         verb: `${e.type.split('.')[1]} team`,
         text: store.getTeam(e.subject.id)?.name ?? str(d['key']),
-        link: e.type !== 'team.deleted' && str(d['key']) ? ['/', slug, 'teams', str(d['key'])] : undefined,
+        link:
+          e.type !== 'team.deleted' && str(d['key'])
+            ? ['/', slug, 'teams', str(d['key'])]
+            : undefined,
       };
     case 'repository.created':
     case 'repository.updated':
@@ -325,7 +351,8 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideFolderGit2,
         verb: `${e.type.split('.')[1]} repository`,
         text: str(d['fullName']) ?? store.getRepository(e.subject.id)?.fullName,
-        link: e.type !== 'repository.deleted' ? ['/', slug, 'repositories', e.subject.id] : undefined,
+        link:
+          e.type !== 'repository.deleted' ? ['/', slug, 'repositories', e.subject.id] : undefined,
       };
     case 'milestone.created':
     case 'milestone.updated':
@@ -335,7 +362,8 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideDiamond,
         verb: `${e.type.split('.')[1]} milestone`,
         text: str(d['name']) ?? store.getMilestone(e.subject.id)?.name,
-        link: projectId && store.getProject(projectId) ? ['/', slug, 'projects', projectId] : undefined,
+        link:
+          projectId && store.getProject(projectId) ? ['/', slug, 'projects', projectId] : undefined,
       };
     }
     case 'project.created':
@@ -347,12 +375,15 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideBox,
         verb: `${verb} project`,
         text: str(d['name']) ?? store.getProject(e.subject.id)?.name,
-        detail: e.type === 'project.status_changed' ? `${str(d['from']) ?? ''} → ${str(d['to']) ?? ''}`.replaceAll('_', ' ') : undefined,
+        detail:
+          e.type === 'project.status_changed'
+            ? `${str(d['from']) ?? ''} → ${str(d['to']) ?? ''}`.replaceAll('_', ' ')
+            : undefined,
         link: e.type !== 'project.deleted' ? ['/', slug, 'projects', e.subject.id] : undefined,
       };
     }
     default:
-      return { icon: LucideActivity, verb: humanize(e.type), subject: wsRef };
+      return { icon: LucideActivity, verb: humanize(e.type), text: str(d['key']) ?? str(d['title']) };
   }
 }
 
@@ -363,7 +394,16 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
 @Component({
   selector: 'app-event-line',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, ActorAvatar, EntityChip, StatusIcon, AgoPipe, FullDatePipe],
+  imports: [
+    RouterLink,
+    LucideDynamicIcon,
+    HlmTooltip,
+    ActorAvatar,
+    EntityChip,
+    StatusIcon,
+    AgoPipe,
+    FullDatePipe,
+  ],
   host: { class: 'flex items-start gap-2.5 py-1.5' },
   template: `
     @let ev = v();
@@ -372,7 +412,9 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
       <div class="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 text-sm leading-6">
         <span class="font-medium">{{ actorName() }}</span>
         @if (isAgent()) {
-          <span class="text-muted-foreground border-border-strong inline-flex h-4 items-center gap-0.5 rounded border px-1 text-[10px] leading-none">
+          <span
+            class="text-muted-foreground border-border-strong inline-flex h-4 items-center gap-0.5 rounded border px-1 text-[10px] leading-none"
+          >
             <svg [lucideIcon]="bot" [size]="9" [strokeWidth]="2"></svg>agent
           </span>
         }
@@ -382,7 +424,12 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         }
         @if (ev.text) {
           @if (ev.link) {
-            <a [routerLink]="ev.link" [queryParams]="ev.query" class="min-w-0 truncate hover:underline">{{ ev.text }}</a>
+            <a
+              [routerLink]="ev.link"
+              [queryParams]="ev.query"
+              class="min-w-0 truncate hover:underline"
+              >{{ ev.text }}</a
+            >
           } @else {
             <span class="min-w-0 truncate">{{ ev.text }}</span>
           }
@@ -392,7 +439,10 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
           <app-entity-chip [type]="t.type" [ref]="t.ref" [compact]="compact()" />
         }
         @if (ev.transition; as tr) {
-          <span class="text-muted-foreground inline-flex items-center gap-1 text-xs" [attr.aria-label]="'from ' + (tr.from ?? '?') + ' to ' + tr.to">
+          <span
+            class="text-muted-foreground inline-flex items-center gap-1 text-xs"
+            [attr.aria-label]="'from ' + (tr.from ?? '?') + ' to ' + tr.to"
+          >
             @if (tr.from) {
               <app-status-icon [status]="tr.from" [entity]="tr.entity" [size]="12" />
               <span aria-hidden="true">→</span>

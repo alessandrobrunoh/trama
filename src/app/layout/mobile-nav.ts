@@ -170,7 +170,7 @@ export class MobileNav {
   /** Inbox = what waits on you (attention) plus unread updates. */
   protected readonly inbox = computed(() => this.store.attentionCount() + this.notifications.updatesUnread());
 
-  /** The first three primary places live in the bar; Workstreams and Projects open from More. */
+  /** The first three primary places live in the bar; Projects opens from More. */
   protected readonly tabs = PRIMARY_NAV.slice(0, 3);
   /** Tabs live in the bar; the sheet lists everything else. */
   private static readonly IN_BAR = new Set(['inbox', 'my-work', 'issues', 'assistant', 'settings']);

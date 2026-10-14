@@ -115,12 +115,6 @@ export class AssistantStore {
         id,
         label: this.store.issues().find((i) => i.key === id || i.id === id)?.key ?? id,
       };
-    if (id && page === 'workstreams')
-      return {
-        kind: 'workstream',
-        id,
-        label: this.store.workstreams().find((w) => w.key === id || w.id === id)?.title ?? id,
-      };
     if (id && page === 'repositories')
       return {
         kind: 'project',

@@ -21,7 +21,7 @@ import {
 } from '../../core';
 
 /** What the keyboard / bulk command dialog edits. */
-export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'team' | 'project' | 'label' | 'workstream' | 'duplicate';
+export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'team' | 'project' | 'label' | 'duplicate';
 
 export interface IssuePrompt {
   field: IssuePromptField;
@@ -111,63 +111,6 @@ export class IssueActions {
     } else {
       this.patchMany(ids, (i) => (i.labels.includes(labelId) ? null : { addLabels: [labelId] }), `Label ${name} added`);
     }
-  }
-
-  // ───────────────────────── workstreams ─────────────────────────
-
-  /** Add when not every issue is linked yet, otherwise remove the link from all. */
-  toggleWorkstream(ids: readonly string[], workstreamId: string): void {
-    const list = this.issues(ids);
-    if (list.length && list.every((i) => i.workstreamIds.includes(workstreamId))) this.unlink(ids, workstreamId);
-    else this.link(ids, workstreamId);
-  }
-
-  /**
-   * Link issues into a workstream. Uses the link endpoint (records `issue.linked` on the workstream;
-   * the issue status is left unchanged). Canceled issues are attached with a plain update,
-   * duplicates are skipped.
-   */
-  link(ids: readonly string[], workstreamId: string): void {
-    const ws = this.store.getWorkstream(workstreamId);
-    if (!ws) return;
-    const all = this.issues(ids).filter((i) => !i.workstreamIds.includes(ws.id));
-    const dupes = all.filter((i) => i.duplicateOfId);
-    const list = all.filter((i) => !i.duplicateOfId);
-    if (!list.length) {
-      if (dupes.length) this.notifier.error('Duplicates can’t be linked', { description: 'Clear “duplicate of” first.' });
-      return;
-    }
-    const done = list.map((i) => i.id);
-    void this.run(done, { addWorkstreamIds: [ws.id] });
-    this.notifier.success(`${this.subject(done)} added to ${ws.key}`, {
-      description: ws.title,
-      action: { label: 'Undo', run: () => void this.run(done, { removeWorkstreamIds: [ws.id] }) },
-    });
-  }
-
-  unlink(ids: readonly string[], workstreamId: string): void {
-    const ws = this.store.getWorkstream(workstreamId);
-    const list = this.issues(ids).filter((i) => i.workstreamIds.includes(workstreamId));
-    if (!list.length) return;
-    const done = list.map((i) => i.id);
-    void this.run(done, { removeWorkstreamIds: [workstreamId] });
-    this.notifier.success(`${this.subject(done)} removed from ${ws?.key ?? 'workstream'}`, {
-      action: { label: 'Undo', run: () => void this.run(done, { addWorkstreamIds: [workstreamId] }) },
-    });
-  }
-
-  /**
-   * Opens the create dialog prefilled from the issue.
-   * Note: the dialog currently reads `ownerTeamId` only (title / issueIds are passed for when it supports them).
-   */
-  createWorkstreamFrom(issue: Issue): void {
-    this.ui.openCreate('workstream', {
-      issueIds: [issue.id],
-      title: issue.title,
-      description: issue.body ?? undefined,
-      ...(issue.teamId ? { ownerTeamId: issue.teamId } : {}),
-      priority: issue.priority,
-    });
   }
 
   // ───────────────────────── duplicates ─────────────────────────

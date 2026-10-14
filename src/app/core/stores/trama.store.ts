@@ -16,12 +16,10 @@ import type {
   AddMemberInput,
   UpdateMemberInput,
   CreateAgentInput,
-  CreateArtifactInput,
   CreateOwnedArtifactInput,
   CreateProjectUpdateInput,
   UpdateProjectUpdateInput,
   CreateDecisionInput,
-  CreateDependencyInput,
   CreateInputRequestInput,
   CreateCustomerInput,
   BulkIssuePatch,
@@ -55,11 +53,7 @@ import type {
   WebhookWithSecret,
   CreateViewInput,
   SharingInput,
-  CreateWorkstreamInput,
-  CriterionInput,
-  CriterionPatch,
   EventsQuery,
-  LinkIssueInput,
   UpdateAgentInput,
   UpdateArtifactInput,
   UpdateDecisionInput,
@@ -70,10 +64,8 @@ import type {
   UpdateRepositoryInput,
   UpdateTeamInput,
   UpdateViewInput,
-  UpdateWorkstreamInput,
 } from '../api/api.types';
 import type {
-  AcceptanceCriterion,
   ActorRef,
   ActorType,
   Agent,
@@ -87,7 +79,6 @@ import type {
   Customer,
   CustomerRequest,
   Decision,
-  Dependency,
   DomainEvent,
   ExecutionProvider,
   ID,
@@ -116,7 +107,6 @@ import type {
   WorkspaceSettings,
   WorkspaceLabel,
   WorkspaceSnapshot,
-  Workstream,
 } from '../contracts/domain';
 import type { Capability, ShareLevel } from '../contracts/domain';
 import { buildDemandIndex, mergeDemand, resolveWorkspaceSettings, roleHasCapability } from '../contracts/domain';
@@ -160,11 +150,7 @@ export interface CommentThreadInfo {
 }
 const IDLE_THREAD: CommentThreadInfo = { state: 'idle', nextCursor: null, loadingMore: false };
 
-/**
- * A node of the local project tree (project → workstream → issue). `artifacts` are the ones attached
- * directly to `subject`; `children` are the workstreams of a project / the issues of a workstream (or of a project
- * when they are planned under it without a workstream).
- */
+/** A project or issue node in the local artifact tree. */
 export interface ArtifactTreeNode {
   subject: SubjectRef;
   artifacts: Artifact[];
@@ -223,40 +209,16 @@ const NO_UPDATES: readonly ProjectUpdate[] = [];
 const PROJECT_CONTEXT_ENTITIES: ReadonlySet<string> = new Set([
   'project',
   'project_update',
-  'workstream',
   'issue',
   'artifact',
   'milestone',
   'decision',
   'input_request',
-  'dependency',
 ]);
 
 /** A shallow copy without `undefined` values (so spreading a PATCH body does not wipe fields). */
 function definedOnly<T extends object>(patch: T): Partial<T> {
   return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
-}
-
-/** Optimistic view of a criterion edit; mirrors the server rules (verification and proof follow the state and text). */
-function previewCriterion(c: AcceptanceCriterion, patch: CriterionPatch): AcceptanceCriterion {
-  const { evidence, ...rest } = patch;
-  const next: AcceptanceCriterion = { ...c, ...rest };
-  if (rest.text !== undefined) next.text = rest.text.trim();
-  if (next.text !== c.text && c.state === 'met' && rest.state === undefined) {
-    next.state = 'pending';
-    delete next.evidence;
-  }
-  if (next.state !== 'met') {
-    delete next.verifiedBy;
-    delete next.verifiedAt;
-  }
-  if (evidence !== undefined) {
-    const ids = [...new Set(evidence?.artifactIds ?? [])];
-    const note = evidence?.note?.trim();
-    if (ids.length || note) next.evidence = { artifactIds: ids, ...(note ? { note } : {}) };
-    else delete next.evidence;
-  }
-  return next;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -288,7 +250,6 @@ export class TramaStore {
   private readonly _teams = signal<readonly Team[]>([]);
   private readonly _repositories = signal<readonly Repository[]>([]);
   private readonly _projects = signal<readonly Project[]>([]);
-  private readonly _workstreams = signal<readonly Workstream[]>([]);
   private readonly _milestones = signal<readonly Milestone[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
   private readonly _issues = signal<readonly Issue[]>([]);
@@ -296,7 +257,6 @@ export class TramaStore {
   private readonly _customerRequests = signal<readonly CustomerRequest[]>([]);
   private readonly _artifacts = signal<readonly Artifact[]>([]);
   private readonly _decisions = signal<readonly Decision[]>([]);
-  private readonly _dependencies = signal<readonly Dependency[]>([]);
   private readonly _comments = signal<readonly Comment[]>([]);
   private readonly _commentIndex = signal<readonly CommentIndexEntry[]>([]);
   private readonly _commentThreads = signal<ReadonlyMap<string, CommentThreadInfo>>(new Map());
@@ -312,8 +272,7 @@ export class TramaStore {
   readonly teams = this._teams.asReadonly();
   readonly repositories = this._repositories.asReadonly();
   readonly projects = this._projects.asReadonly();
-  readonly workstreams = this._workstreams.asReadonly();
-  /** All milestones, ordered by workstream then `sortOrder`. */
+  /** All milestones, ordered by project then `sortOrder`. */
   readonly milestones = this._milestones.asReadonly();
   readonly inputRequests = this._inputRequests.asReadonly();
   readonly issues = this._issues.asReadonly();
@@ -321,7 +280,6 @@ export class TramaStore {
   readonly customerRequests = this._customerRequests.asReadonly();
   readonly artifacts = this._artifacts.asReadonly();
   readonly decisions = this._decisions.asReadonly();
-  readonly dependencies = this._dependencies.asReadonly();
   /** Comments loaded so far (the threads opened on demand), not every comment of the workspace. */
   readonly comments = this._comments.asReadonly();
   /** Who commented how often on what, for the whole workspace (comes with the snapshot). */
@@ -343,11 +301,6 @@ export class TramaStore {
   readonly teamByKey = computed(() => new Map(this._teams().map((t) => [t.key.toUpperCase(), t])));
   readonly repositoryById = computed(() => indexById(this._repositories()));
   readonly projectById = computed(() => indexById(this._projects()));
-  readonly workstreamById = computed(() => indexById(this._workstreams()));
-  /** Keyed by upper-case key (`AUTH-42`). */
-  readonly workstreamByKey = computed(
-    () => new Map(this._workstreams().map((w) => [w.key.toUpperCase(), w])),
-  );
   readonly inputRequestById = computed(() => indexById(this._inputRequests()));
   readonly issueById = computed(() => indexById(this._issues()));
   readonly customerById = computed(() => indexById(this._customers()));
@@ -381,17 +334,11 @@ export class TramaStore {
     return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
   });
 
-  readonly inputRequestsByWorkstream = computed(() =>
-    groupBy(this._inputRequests(), (r) => r.workstreamId),
-  );
   /** Open input requests, newest first. */
   readonly openInputRequests = computed(() =>
     this._inputRequests()
       .filter((r) => r.state === 'open')
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
-  );
-  readonly artifactsByWorkstream = computed(() =>
-    groupBy(this._artifacts(), (a) => a.workstreamId),
   );
   /** Artifacts attached directly to a project (by project id). */
   readonly artifactsByProject = computed(() => groupBy(this._artifacts(), (a) => a.projectId));
@@ -400,49 +347,18 @@ export class TramaStore {
   readonly artifactsByRepository = computed(() =>
     groupBy(this._artifacts(), (a) => a.repositoryId),
   );
-  /** Decisions that originate from, or are related to, a workstream. */
-  readonly decisionsByWorkstream = computed(() =>
-    groupBy(this._decisions(), (d) => {
-      const ids = new Set(d.relatedWorkstreamIds);
-      if (d.originWorkstreamId) ids.add(d.originWorkstreamId);
-      return [...ids];
-    }),
-  );
-  readonly issuesByWorkstream = computed(() =>
-    groupBy(this._issues(), (i) => (i.workstreamIds.length ? i.workstreamIds : undefined)),
-  );
   /** Milestones of a project (by project id), ordered by `sortOrder`. */
   readonly milestonesByProject = computed(() => {
     const map = groupBy(this._milestones(), (m) => m.projectId);
     for (const list of map.values()) list.sort(bySortOrder);
     return map;
   });
-  /** The milestones a workstream shares through its project (by workstream id). Workstreams without a project have none. */
-  readonly milestonesByWorkstream = computed(() => {
-    const byProject = this.milestonesByProject();
-    const map = new Map<string, Milestone[]>();
-    for (const w of this._workstreams()) {
-      const list = w.projectId ? byProject.get(w.projectId) : undefined;
-      if (list?.length) map.set(w.id, list);
-    }
-    return map;
-  });
-  /** Issues planned under a project (`issue.projectId`) or linked to any of its workstreams (by project id). */
+  /** Issues planned under a project (`issue.projectId`). */
   readonly issuesByProject = computed(() => {
-    const projectOf = new Map(this._workstreams().map((w) => [w.id, w.projectId]));
-    return groupBy(this._issues(), (i) => {
-      const ids = new Set<string>();
-      if (i.projectId) ids.add(i.projectId);
-      for (const w of i.workstreamIds) {
-        const p = projectOf.get(w);
-        if (p) ids.add(p);
-      }
-      return ids.size ? [...ids] : undefined;
-    });
+    return groupBy(this._issues(), (i) => i.projectId);
   });
   /**
-   * Customer demand by issue, project and workstream id (they never collide). An issue counts its own requests;
-   * a project its own plus those on its issues; a workstream those on its issues. A customer counts once per row.
+   * Customer demand by issue and project id. A project includes its own requests and those on its issues.
    * Rows nobody asked for are absent.
    */
   readonly demand = computed<ReadonlyMap<string, Demand>>(() => {
@@ -456,11 +372,6 @@ export class TramaStore {
       );
       if (parts.length) out.set(project.id, mergeDemand(parts, customers));
     }
-    const issuesByWorkstream = this.issuesByWorkstream();
-    for (const ws of this._workstreams()) {
-      const parts = (issuesByWorkstream.get(ws.id) ?? []).map((i) => own.get(i.id)).filter((d): d is Demand => !!d);
-      if (parts.length) out.set(ws.id, mergeDemand(parts, customers));
-    }
     return out;
   });
   /** Issues in a milestone (by milestone id). */
@@ -468,29 +379,8 @@ export class TramaStore {
     groupBy(this._issues(), (i) => (i.milestoneIds?.length ? i.milestoneIds : undefined)),
   );
   readonly issuesByTeam = computed(() => groupBy(this._issues(), (i) => i.teamId));
-  /** Workstreams owned by a team (by team id). */
-  readonly workstreamsByOwnerTeam = computed(() =>
-    groupBy(this._workstreams(), (w) => w.ownerTeamId),
-  );
-  /** Workstreams a team participates in, excluding ones it owns (by team id). */
-  readonly workstreamsByParticipatingTeam = computed(() =>
-    groupBy(this._workstreams(), (w) => w.participatingTeamIds),
-  );
-  readonly workstreamsByProject = computed(() =>
-    groupBy(this._workstreams(), (w) => w.projectId),
-  );
-  readonly workstreamsByRepository = computed(() =>
-    groupBy(this._workstreams(), (w) => w.repositoryIds),
-  );
-  /**
-   * The artifact tree of every project, derived from the snapshot (no /context call needed):
-   * project → workstreams of the project → their issues, plus the issues planned under the project that are in
-   * none of its workstreams. Each node carries the artifacts attached directly to it. Keyed by project id.
-   */
+  /** Each project with its directly planned issues and attached artifacts. */
   readonly projectArtifactTree = computed(() => {
-    const issuesByWs = this.issuesByWorkstream();
-    const wsByProject = this.workstreamsByProject();
-    const byWs = this.artifactsByWorkstream();
     const byIssue = this.artifactsByIssue();
     const byProject = this.artifactsByProject();
     const ownIssues = groupBy(this._issues(), (i) => i.projectId);
@@ -501,20 +391,12 @@ export class TramaStore {
     });
     const tree = new Map<ID, ArtifactTreeNode>();
     for (const p of this._projects()) {
-      const claimed = new Set<ID>();
-      const children: ArtifactTreeNode[] = [];
-      for (const w of wsByProject.get(p.id) ?? []) {
-        const issues = issuesByWs.get(w.id) ?? [];
-        const inWs = new Set(issues.map((i) => i.id));
-        for (const i of issues) claimed.add(i.id);
-        children.push({
-          subject: { type: 'workstream', id: w.id },
-          artifacts: (byWs.get(w.id) ?? []).filter((a) => !a.issueId || !inWs.has(a.issueId)),
-          children: issues.map(issueNode),
-        });
-      }
-      for (const i of ownIssues.get(p.id) ?? []) if (!claimed.has(i.id)) children.push(issueNode(i));
-      tree.set(p.id, { subject: { type: 'project', id: p.id }, artifacts: byProject.get(p.id) ?? [], children });
+      const children = (ownIssues.get(p.id) ?? []).map(issueNode);
+      tree.set(p.id, {
+        subject: { type: 'project', id: p.id },
+        artifacts: byProject.get(p.id) ?? [],
+        children,
+      });
     }
     return tree;
   });
@@ -541,20 +423,10 @@ export class TramaStore {
     }
     return out;
   });
-  /** Dependencies pointing AT a node (what blocks it), keyed by node id (workstream or execution). */
-  readonly incomingDependencies = computed(() => groupBy(this._dependencies(), (d) => d.toId));
-  /** Dependencies leaving a node (what it blocks), keyed by node id. */
-  readonly outgoingDependencies = computed(() => groupBy(this._dependencies(), (d) => d.fromId));
-  /** Comments by `type:id` (e.g. `workstream:ws_1`), oldest first. */
+  /** Comments by `type:id`, oldest first. */
   readonly commentsBySubject = computed(() => {
     const map = groupBy(this._comments(), (c) => subjectKey(c.subject.type, c.subject.id));
     for (const list of map.values()) list.sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
-    return map;
-  });
-  /** Events by workstream id, newest first. */
-  readonly eventsByWorkstream = computed(() => {
-    const map = groupBy(this._events(), (e) => e.workstreamId);
-    for (const list of map.values()) list.sort(newest);
     return map;
   });
   /** Events by `type:id` of their subject, newest first. */
@@ -572,11 +444,6 @@ export class TramaStore {
     return id ? this._teams().filter((t) => t.memberIds.includes(id)) : [];
   });
   readonly myTeamIds = computed(() => new Set(this.myTeams().map((t) => t.id)));
-  /** Workstreams I'm accountable for. */
-  readonly myWorkstreams = computed(() => {
-    const id = this._me()?.id;
-    return id ? this._workstreams().filter((w) => w.accountableUserId === id) : [];
-  });
 
   /** Open attention items, severity then newest first. */
   readonly openAttention = computed(() =>
@@ -649,11 +516,6 @@ export class TramaStore {
 
   // ─────────────────────────── point lookups (id or key) ───────────────────────────
 
-  /** By id or key (`AUTH-42`, case-insensitive). */
-  getWorkstream(ref: string | null | undefined): Workstream | undefined {
-    if (!ref) return undefined;
-    return this.workstreamById().get(ref) ?? this.workstreamByKey().get(ref.toUpperCase());
-  }
   /** By id, key (`BUG-142`) or alias (an old key from before a kind change). */
   getIssue(ref: string | null | undefined): Issue | undefined {
     if (!ref) return undefined;
@@ -735,8 +597,6 @@ export class TramaStore {
   readonly settings = computed<WorkspaceSettings>(() => resolveWorkspaceSettings(this._workspace()?.settings));
   /** Scale used by the estimate pickers (`estimateOptions(scale)` in core/estimates.ts). */
   readonly estimateScale = computed(() => this.settings().estimateScale);
-  /** Whether workstreams are linked to a Delta thread (workspace setting, on by default). */
-  readonly deltaThreads = computed(() => this.settings().deltaThreads !== false);
   /** IANA zone to display dates in, or `undefined` to follow the browser. */
   readonly timeZone = computed(() => {
     const tz = this.settings().timeZone;
@@ -760,7 +620,7 @@ export class TramaStore {
   }
 
   /**
-   * May I edit workstreams / issues owned by this team? Workspace role first (member+), then the team's
+   * May I edit issues owned by this team? Workspace role first (member+), then the team's
    * edit policy: with `members`, only team members, leads and admins. No team = no restriction.
    */
   canEditTeamWork(teamId: ID | null | undefined): boolean {
@@ -832,9 +692,9 @@ export class TramaStore {
     this._myRole.set(null);
     for (const c of [
       this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
-      this._workstreams, this._milestones, this._inputRequests, this._issues, this._customers,
+      this._milestones, this._inputRequests, this._issues, this._customers,
       this._customerRequests, this._artifacts,
-      this._decisions, this._dependencies, this._comments, this._events, this._attention,
+      this._decisions, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
     ] as WritableSignal<readonly Row[]>[]) {
       c.set([]);
@@ -889,7 +749,6 @@ export class TramaStore {
     list(this._teams, s.teams);
     list(this._repositories, s.repositories);
     list(this._projects, s.projects ?? []);
-    list(this._workstreams, s.workstreams);
     list(this._milestones, s.milestones ?? []);
     list(this._inputRequests, s.inputRequests);
     // Issues waiting for their delayed delete stay hidden even if a refetch still lists them.
@@ -898,7 +757,6 @@ export class TramaStore {
     list(this._customerRequests, s.customerRequests ?? []);
     list(this._artifacts, s.artifacts);
     list(this._decisions, s.decisions);
-    list(this._dependencies, s.dependencies);
     if (s.commentIndex) {
       // Slim snapshot: the comments themselves load per subject (`loadComments`); only the summary arrives here.
       const index = s.commentIndex;
@@ -1057,93 +915,6 @@ export class TramaStore {
     return new Date().toISOString();
   }
 
-  // ─────────────────────────── workstreams ───────────────────────────
-
-  async createWorkstream(input: CreateWorkstreamInput): Promise<Workstream | undefined> {
-    return this.write('create workstream', (s) => this.api.workstreams.create(s, input), {
-      onResult: (w) => this.upsert(this._workstreams, w),
-    });
-  }
-
-  /** `ref` = id or key. Optimistic; the server then re-derives status. */
-  async updateWorkstream(ref: string, patch: UpdateWorkstreamInput): Promise<boolean> {
-    const ws = this.getWorkstream(ref);
-    if (!ws) return false;
-    const tx = this.tx();
-    tx.patch(this._workstreams, ws.id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update workstream', (s) => this.api.workstreams.update(s, ws.id, patch), {
-      tx,
-      onResult: (w) => this.upsert(this._workstreams, w),
-    }).then((r) => !!r);
-  }
-
-  async deleteWorkstream(ref: string): Promise<boolean> {
-    const ws = this.getWorkstream(ref);
-    if (!ws) return false;
-    const tx = this.tx();
-    tx.remove(this._workstreams, ws.id);
-    for (const a of this._artifacts().filter((x) => x.workstreamId === ws.id && !x.projectId && !x.issueId)) tx.remove(this._artifacts, a.id);
-    for (const r of this._inputRequests().filter((x) => x.workstreamId === ws.id)) tx.remove(this._inputRequests, r.id);
-    return this.ok('delete workstream', (s) => this.api.workstreams.remove(s, ws.id), { tx });
-  }
-
-  // criteria ----------------------------------------------------------------
-
-  /** Waits for the server (the criterion id is server-assigned). Resolves the new criterion. */
-  async addCriterion(ref: string, input: CriterionInput): Promise<AcceptanceCriterion | undefined> {
-    const ws = this.getWorkstream(ref);
-    if (!ws) return undefined;
-    const before = new Set(ws.acceptanceCriteria.map((c) => c.id));
-    let created: AcceptanceCriterion | undefined;
-    await this.write('add criterion', (s) => this.api.workstreams.addCriterion(s, ws.id, input), {
-      onResult: (res) => {
-        const r = res as Rec | null;
-        if (r && Array.isArray(r['acceptanceCriteria'])) {
-          this.upsert(this._workstreams, r as unknown as Workstream);
-          created = (r['acceptanceCriteria'] as AcceptanceCriterion[]).find((c) => !before.has(c.id));
-        } else if (r && typeof r['id'] === 'string' && typeof r['text'] === 'string') {
-          created = r as unknown as AcceptanceCriterion;
-          const c = created;
-          this._workstreams.update((list) =>
-            list.map((w) =>
-              w.id === ws.id && !w.acceptanceCriteria.some((x) => x.id === c.id)
-                ? { ...w, acceptanceCriteria: [...w.acceptanceCriteria, c] }
-                : w,
-            ),
-          );
-        }
-      },
-    });
-    return created;
-  }
-
-  async updateCriterion(ref: string, criterionId: ID, patch: CriterionPatch): Promise<boolean> {
-    const ws = this.getWorkstream(ref);
-    if (!ws) return false;
-    const tx = this.tx();
-    tx.patch(this._workstreams, ws.id, {
-      acceptanceCriteria: ws.acceptanceCriteria.map((c) => (c.id === criterionId ? previewCriterion(c, patch) : c)),
-    });
-    // The server stamps who verified a `met` criterion, so take its answer back.
-    return this.write('update criterion', (s) => this.api.workstreams.updateCriterion(s, ws.id, criterionId, patch), {
-      tx,
-      onResult: (res) => {
-        const r = res as Rec | null;
-        if (r && Array.isArray(r['acceptanceCriteria'])) this.upsert(this._workstreams, r as unknown as Workstream);
-      },
-    }).then((r) => r !== undefined);
-  }
-
-  async removeCriterion(ref: string, criterionId: ID): Promise<boolean> {
-    const ws = this.getWorkstream(ref);
-    if (!ws) return false;
-    const tx = this.tx();
-    tx.patch(this._workstreams, ws.id, {
-      acceptanceCriteria: ws.acceptanceCriteria.filter((c) => c.id !== criterionId),
-    });
-    return this.ok('remove criterion', (s) => this.api.workstreams.removeCriterion(s, ws.id, criterionId), { tx });
-  }
-
   // ─────────────────────────── input requests ───────────────────────────
 
   async createInputRequest(input: CreateInputRequestInput): Promise<InputRequest | undefined> {
@@ -1214,8 +985,8 @@ export class TramaStore {
 
   /**
    * Optimistic, except `kind`: changing it re-keys the issue, so the server's answer (new `key`,
-   * old key in `aliases`) is applied when it arrives. Unlinking a workstream or changing the
-   * project also drops the milestones that no longer qualify locally.
+   * old key in `aliases`) is applied when it arrives. Changing the project also drops milestones
+   * that no longer qualify locally.
    */
   async updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean> {
     return !!(await this.patchIssue(id, patch));
@@ -1243,12 +1014,8 @@ export class TramaStore {
   private issueOptimistic(current: Issue, patch: UpdateIssueInput): Record<string, unknown> {
     const { kind: _kind, ...local } = patch;
     const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
-    if ((patch.workstreamIds || patch.projectId !== undefined) && patch.milestoneIds === undefined) {
-      const projects = new Set(
-        (patch.workstreamIds ?? current.workstreamIds)
-          .map((w) => this.workstreamById().get(w)?.projectId)
-          .filter((p): p is string => !!p),
-      );
+    if (patch.projectId !== undefined && patch.milestoneIds === undefined) {
+      const projects = new Set<string>();
       const ownProject = patch.projectId !== undefined ? patch.projectId : current.projectId;
       if (ownProject) projects.add(ownProject);
       optimistic['milestoneIds'] = (current.milestoneIds ?? []).filter((m) => {
@@ -1276,13 +1043,8 @@ export class TramaStore {
       if (patch.projectId !== undefined) local.projectId = patch.projectId;
       if (patch.addLabels?.length || patch.removeLabels?.length)
         local.labels = [...new Set([...current.labels, ...(patch.addLabels ?? [])])].filter((l) => !(patch.removeLabels ?? []).includes(l));
-      if (patch.addWorkstreamIds?.length || patch.removeWorkstreamIds?.length)
-        local.workstreamIds = [...new Set([...current.workstreamIds, ...(patch.addWorkstreamIds ?? [])])].filter(
-          (w) => !(patch.removeWorkstreamIds ?? []).includes(w),
-        );
       tx.patch(this._issues, current.id, this.issueOptimistic(current, local));
     }
-    if (patch.addWorkstreamIds?.length) this.hideAttentionWhere(tx, (a) => !!a.issueId && targets.some((t) => t.id === a.issueId));
     return this.writeOk(
       'update issues',
       (s) => this.api.issues.bulkUpdate(s, targets.map((t) => t.id), patch),
@@ -1294,7 +1056,7 @@ export class TramaStore {
     if (!this.issueById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._issues, id);
-    for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId && !x.workstreamId)) tx.remove(this._artifacts, a.id);
+    for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId)) tx.remove(this._artifacts, a.id);
     for (const link of this._customerRequests().filter((r) => r.issueId === id)) tx.remove(this._customerRequests, link.id);
     return this.ok('delete issue', (s) => this.api.issues.remove(s, id), { tx });
   }
@@ -1314,7 +1076,7 @@ export class TramaStore {
     const gone = new Set(targets);
     const tx = this.tx();
     for (const id of targets) tx.remove(this._issues, id);
-    for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId) && !x.projectId && !x.workstreamId)) tx.remove(this._artifacts, a.id);
+    for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId) && !x.projectId)) tx.remove(this._artifacts, a.id);
     for (const link of this._customerRequests().filter((r) => !!r.issueId && gone.has(r.issueId))) tx.remove(this._customerRequests, link.id);
     for (const id of targets) this.stagedDeletes.add(id);
     const release = () => targets.forEach((id) => this.stagedDeletes.delete(id));
@@ -1346,32 +1108,6 @@ export class TramaStore {
       tx.rollback();
     };
     return { cancel, commit };
-  }
-
-  /**
-   * Attach the issue to existing workstreams and/or a new one (`createWorkstream`).
-   * Linking never changes the status; only an explicit `status` does. The created
-   * workstream arrives with the next refetch (`issue.workstreamIds`).
-   */
-  async linkIssue(id: ID, input: LinkIssueInput): Promise<Issue | undefined> {
-    const current = this.issueById().get(id);
-    if (!current) return undefined;
-    const tx = this.tx();
-    const status = input.status ?? current.status;
-    tx.patch(this._issues, id, {
-      status,
-      ...(input.workstreamIds ? { workstreamIds: [...new Set([...current.workstreamIds, ...input.workstreamIds])] } : {}),
-    });
-    this.hideAttentionWhere(tx, (a) => a.issueId === id);
-    return this.write('link issue', (s) => this.api.issues.link(s, id, input), {
-      tx,
-      onResult: (item) => {
-        if (item) this.upsert(this._issues, item);
-      },
-    }).then((res) => {
-      if (res === undefined) return undefined;
-      return this.issueById().get(id);
-    });
   }
 
   // ─────────────────────────── customers ───────────────────────────
@@ -1433,7 +1169,7 @@ export class TramaStore {
 
   // ─────────────────────────── milestones ───────────────────────────
 
-  /** Waits for the server (`ms_…` id). `sortOrder` defaults to last in the workstream. */
+  /** Waits for the server (`ms_…` id). `sortOrder` defaults to last in the project. */
   async createMilestone(input: CreateMilestoneInput): Promise<Milestone | undefined> {
     return this.write('create milestone', (s) => this.api.milestones.create(s, input), {
       onResult: (m) => this.upsert(this._milestones, m),
@@ -1488,12 +1224,6 @@ export class TramaStore {
   }
 
   // ─────────────────────────── artifacts ───────────────────────────
-
-  async attachArtifact(input: CreateArtifactInput): Promise<Artifact | undefined> {
-    return this.write('attach artifact', (s) => this.api.artifacts.create(s, input), {
-      onResult: (a) => this.upsert(this._artifacts, a),
-    });
-  }
 
   /** Attach an artifact to a project itself (a link, a spec, a design...). Waits for the server. */
   async attachProjectArtifact(projectId: ID, input: CreateOwnedArtifactInput): Promise<Artifact | undefined> {
@@ -1587,21 +1317,6 @@ export class TramaStore {
     const tx = this.tx();
     tx.remove(this._decisions, id);
     return this.ok('delete decision', (s) => this.api.decisions.remove(s, id), { tx });
-  }
-
-  // ─────────────────────────── dependencies ───────────────────────────
-
-  async addDependency(input: CreateDependencyInput): Promise<Dependency | undefined> {
-    return this.write('add dependency', (s) => this.api.dependencies.create(s, input), {
-      onResult: (d) => this.upsert(this._dependencies, d),
-    });
-  }
-
-  async removeDependency(id: ID): Promise<boolean> {
-    if (!this._dependencies().some((d) => d.id === id)) return false;
-    const tx = this.tx();
-    tx.remove(this._dependencies, id);
-    return this.ok('remove dependency', (s) => this.api.dependencies.remove(s, id), { tx });
   }
 
   // ─────────────────────────── comments ───────────────────────────
@@ -1862,12 +1577,11 @@ export class TramaStore {
     if (!this.projectById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._projects, id);
-    for (const a of this._artifacts().filter((x) => x.projectId === id && !x.workstreamId && !x.issueId)) tx.remove(this._artifacts, a.id);
+    for (const a of this._artifacts().filter((x) => x.projectId === id && !x.issueId)) tx.remove(this._artifacts, a.id);
     for (const r of this._customerRequests().filter((x) => x.projectId === id)) tx.remove(this._customerRequests, r.id);
     this.dropProjectData(id);
-    // its milestones go with it, and its workstreams are detached
+    // its milestones go with it
     this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
-    for (const w of this._workstreams().filter((x) => x.projectId === id)) tx.patch(this._workstreams, w.id, { projectId: undefined });
     return this.ok('delete project', (s) => this.api.projects.remove(s, id), { tx });
   }
 
@@ -2320,7 +2034,7 @@ export class TramaStore {
 
   /** Attach an uploaded file as an image or file artifact. */
   async uploadArtifactFile(
-    target: { type: 'issue' | 'workstream' | 'project'; id: string },
+    target: { type: 'issue' | 'project'; id: string },
     file: File,
   ): Promise<Artifact | undefined> {
     return this.write('upload file', (s) => this.api.uploads.attach(s, target, file), {

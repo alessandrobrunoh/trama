@@ -1,4 +1,4 @@
-// Keyword-overlap ranking used to find similar finished issues and likely workstreams.
+// Keyword-overlap ranking for finding similar finished issues.
 // Pure and bounded: no Angular, at most `SCAN_LIMIT` items are looked at, each reduced to at most
 // `TOKEN_LIMIT` distinct words. Score = IDF-weighted shared words, normalised (cosine on sets).
 

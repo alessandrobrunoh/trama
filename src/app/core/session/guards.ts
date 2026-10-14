@@ -61,7 +61,7 @@ export function roleGuard(minRole: import('../contracts/domain').Role): CanActiv
 }
 
 /** Where an installed app opens (`start_url`) and where its home-screen shortcuts point. */
-const LAUNCH_SECTIONS = new Set(['inbox', 'my-work', 'issues', 'workstreams', 'projects', 'overview']);
+const LAUNCH_SECTIONS = new Set(['inbox', 'my-work', 'issues', 'projects', 'overview']);
 
 /**
  * `/a/launch?go=inbox|my-work|issues|new-issue|search`: the PWA entry point. Signed in, it opens the last

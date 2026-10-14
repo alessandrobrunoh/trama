@@ -278,9 +278,10 @@ export class AccessGuard implements CanActivate {
         owner: effective.owner,
         capabilities: effective.capabilities,
       };
-      const teamScope = this.reflector.getAllAndOverride<
-        'workstream' | 'issue' | undefined
-      >(TEAM_SCOPE_KEY, targets);
+      const teamScope = this.reflector.getAllAndOverride<'issue' | undefined>(
+        TEAM_SCOPE_KEY,
+        targets,
+      );
       if (teamScope)
         await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }

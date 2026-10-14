@@ -3,13 +3,11 @@ import { RouterLink } from '@angular/router';
 import { TramaStore } from '../core/stores/trama.store';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 
-export type EntityChipType = 'workstream' | 'issue' | 'decision';
+export type EntityChipType = 'issue' | 'decision';
 
 /**
  * Compact, linkable reference to another entity: status glyph · key · title.
- * Workstreams draw a hexagon glyph, issues a circle — the same visual language used in every list,
- * so "this issue contributes to that outcome" reads at a glance.
- *   <app-entity-chip type="workstream" [ref]="ws.id" />
+ * Issue references use the same visual language as issue lists.
  *   <app-entity-chip type="issue" [ref]="'BUG-142'" compact />
  */
 @Component({
@@ -47,12 +45,6 @@ export class EntityChip {
     const slug = this.store.slug() ?? '';
     const ref = this.ref();
     switch (this.type()) {
-      case 'workstream': {
-        const w = this.store.getWorkstream(ref);
-        return w
-          ? { key: w.key, title: w.title, status: w.status as AnyStatus, entity: 'workstream' as StatusEntity, link: ['/', slug, 'workstreams', w.key] }
-          : null;
-      }
       case 'issue': {
         const i = this.store.getIssue(ref);
         return i

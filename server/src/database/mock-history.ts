@@ -1,7 +1,7 @@
 // Deterministic mock issue history for the "Estimates & time" statistics (and the milestone burn-up).
 //
 // Pure: no database access. `generateMockHistory()` takes a snapshot of the workspace (members, teams,
-// workstreams, existing issues, issue counters) and returns rows to insert plus a few patches for existing
+// existing issues, issue counters) and returns rows to insert plus a few patches for existing
 // issues. Used by the demo seed (`createSeed`) and by the `db:mock-estimates` CLI (scripts/mock-estimates.ts).
 //
 // Everything it creates is tagged by a deterministic id prefix (`in_mock_`, `ev_mock_`, `ms_mock_`), so reruns
@@ -34,14 +34,6 @@ export const ESTIMATE_VALUES: Record<string, readonly number[]> = {
   none: [1, 2, 3, 5, 8, 13],
 };
 
-export interface MockWorkstream {
-  id: string;
-  key?: string;
-  projectId?: string | null;
-  ownerTeamId: string;
-  status: string;
-}
-
 export interface MockExistingIssue {
   id: string;
   kind: IssueKind;
@@ -62,7 +54,6 @@ export interface MockContext {
   /** People who can own issues (no viewers). */
   userIds: readonly string[];
   teamIds: readonly string[];
-  workstreams: readonly MockWorkstream[];
   /** Milestones that already exist (they may receive some mock issues). */
   milestones: readonly { id: string; projectId: string }[];
   /** Last used issue number per kind. */
@@ -405,35 +396,6 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     plans.push({ outcome: 'backlog', kind: rng.weighted(OPEN_KIND_WEIGHTS), tier: rng.chance(0.4) ? drawTier() : null, createdAt: ago(days + rng.f()) });
   }
 
-  // ── workstream / milestone layout
-  const eligible = ctx.workstreams.filter((w) => w.status !== 'canceled' && w.status !== 'draft');
-  const active = eligible.filter((w) => ['working', 'in_review', 'ready_to_land', 'needs_input', 'blocked', 'planned'].includes(w.status));
-  const pool = active.length >= 2 ? active : eligible;
-  const sorted = [...pool].sort((a, b) => (a.key ?? a.id).localeCompare(b.key ?? b.id));
-  const focusA = sorted.find((w) => w.status === 'working') ?? sorted[0];
-  const focusB = sorted.find((w) => w.id !== focusA?.id && w.ownerTeamId !== focusA?.ownerTeamId) ?? sorted.find((w) => w.id !== focusA?.id);
-  const mockMilestones: { id: string; workstreamId: string; target: number }[] = [];
-  // Milestones belong to a project, so only workstreams that carry out one can get them.
-  const addMilestone = (n: number, ws: MockWorkstream, name: string, description: string, targetDays: number, createdDays: number) => {
-    if (!ws.projectId) return;
-    const id = `${MOCK_MILESTONE_PREFIX}${n}`;
-    const target = ago(-targetDays);
-    mockMilestones.push({ id, workstreamId: ws.id, target });
-    out.milestones.push({
-      id, workspaceId: ctx.workspaceId, projectId: ws.projectId, name, description, targetDate: roundTo10Utc(target), sortOrder: 100 + n,
-      createdAt: ISO(ago(createdDays)), updatedAt: ISO(ago(createdDays)),
-    });
-    out.events.push({
-      id: `${MOCK_EVENT_PREFIX}ms_${n}`, workspaceId: ctx.workspaceId, at: ISO(ago(createdDays)), actor: { type: 'user', id: ctx.userIds[0] },
-      type: 'milestone.created', subject: { type: 'milestone', id }, workstreamId: null, data: { name, projectId: ws.projectId },
-    });
-  };
-  if (focusA) {
-    addMilestone(1, focusA, 'Private beta', 'First customers on the new flow.', -9, 80);
-    addMilestone(2, focusA, 'General availability', 'Everything needed to open it to all workspaces.', 17, 80);
-  }
-  if (focusB) addMilestone(3, focusB, 'Hardening pass', 'Performance, edge cases and rollout checks.', 26, 70);
-
   // ── turn plans into rows
   const titlePool: Record<string, number> = {};
   const nextTitle = (kind: IssueKind): string => {
@@ -462,39 +424,8 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     const actorOf = (): ActorRef => ({ type: 'user', id: assignee ?? reporter ?? person() });
     const creator: ActorRef = reporter ? { type: 'user', id: reporter } : { type: 'system' };
 
-    // workstreams
-    const linkP = { done: 0.85, in_progress: 1, in_review: 1, canceled: 0, todo: 0.7, backlog: 0.2 }[p.outcome];
-    const wsIds: string[] = [];
-    if (eligible.length && rng.chance(linkP)) {
-      const first =
-        focusA && focusB
-          ? rng.weighted([[focusA, 35], [focusB, 25], [rng.pick(eligible), 40]] as const)
-          : focusA ?? rng.pick(eligible);
-      wsIds.push(first.id);
-      if (eligible.length > 1 && rng.chance(0.08)) {
-        const other = rng.pick(eligible);
-        if (other.id !== first.id) wsIds.push(other.id);
-      }
-    }
-    const firstWs = ctx.workstreams.find((w) => w.id === wsIds[0]);
-    const teamId = firstWs && rng.chance(0.8) ? firstWs.ownerTeamId : ctx.teamIds.length ? rng.pick(ctx.teamIds) : null;
-
-    // milestones (one per workstream)
+    const teamId = ctx.teamIds.length ? rng.pick(ctx.teamIds) : null;
     const milestoneIds: string[] = [];
-    if (p.outcome !== 'canceled' && p.outcome !== 'backlog')
-      for (const w of wsIds) {
-        const mine = mockMilestones.filter((m) => m.workstreamId === w);
-        if (mine.length === 2) {
-          const [m1, m2] = mine;
-          milestoneIds.push(p.outcome === 'done' && p.endedAt! < m1.target ? m1.id : m2.id);
-        } else if (mine.length === 1) {
-          if (rng.chance(0.85)) milestoneIds.push(mine[0].id);
-        } else {
-          const projectId = ctx.workstreams.find((x) => x.id === w)?.projectId;
-          const existing = projectId ? ctx.milestones.filter((m) => m.projectId === projectId) : [];
-          if (existing.length && rng.chance(0.6)) milestoneIds.push(rng.pick(existing).id);
-        }
-      }
 
     // status path: [at, from, to]
     const path: [number, IssueStatus, IssueStatus][] = [];
@@ -527,7 +458,6 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
       teamId,
       priority: rng.weighted(PRIORITY_WEIGHTS),
       status: p.outcome,
-      workstreamIds: wsIds,
       milestoneIds,
       aliases: [],
       estimate: p.tier === null ? null : values[p.tier],
@@ -542,15 +472,12 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     // events
     let seq = 0;
     const subject = { type: 'issue' as const, id };
-    const push = (at: number, actor: ActorRef, type: string, workstreamId: string | null, data: Record<string, unknown>) => {
-      out.events.push({ id: `${MOCK_EVENT_PREFIX}${id.slice(MOCK_ISSUE_PREFIX.length)}_${seq++}`, workspaceId: ctx.workspaceId, at: ISO(Math.min(at, now - 30_000)), actor, type, subject, workstreamId, data });
+    const push = (at: number, actor: ActorRef, type: string, data: Record<string, unknown>) => {
+      out.events.push({ id: `${MOCK_EVENT_PREFIX}${id.slice(MOCK_ISSUE_PREFIX.length)}_${seq++}`, workspaceId: ctx.workspaceId, at: ISO(Math.min(at, now - 30_000)), actor, type, subject, data });
     };
-    push(p.createdAt, creator, 'issue.created', null, { key, kind: p.kind, title, status: 'backlog' });
-    if (p.tier !== null && rng.chance(0.6)) push(p.createdAt + 5 * 60_000 + rng.range(0, 0.4) * HOUR, actorOf(), 'issue.updated', null, { key, fields: ['estimate'] });
-    const firstMove = path.length ? path[0][0] : now;
-    for (const w of wsIds)
-      push(Math.min(firstMove - 60_000, p.createdAt + Math.max(0.1, (firstMove - p.createdAt) / DAY * rng.range(0.1, 0.5)) * DAY), actorOf(), 'issue.linked', w, { key, workstreamIds: wsIds });
-    for (const [at, from, to] of path) push(at, actorOf(), 'issue.status_changed', wsIds[0] ?? null, { key, from, to });
+    push(p.createdAt, creator, 'issue.created', { key, kind: p.kind, title, status: 'backlog' });
+    if (p.tier !== null && rng.chance(0.6)) push(p.createdAt + 5 * 60_000 + rng.range(0, 0.4) * HOUR, actorOf(), 'issue.updated', { key, fields: ['estimate'] });
+    for (const [at, from, to] of path) push(at, actorOf(), 'issue.status_changed', { key, from, to });
   });
 
   for (const [kind, n] of Object.entries(numbers) as [IssueKind, number][])
@@ -590,10 +517,6 @@ function startOfUtcDay(ms: number): number {
   return Math.floor(ms / DAY) * DAY;
 }
 
-function roundTo10Utc(ms: number): Date {
-  return new Date(startOfUtcDay(ms) + 10 * HOUR);
-}
-
 // ───────────────────────────── demo seed ─────────────────────────────
 
 /** Appends the mock history to a freshly built demo seed (same data the `db:mock-estimates` CLI adds to a dev DB). */
@@ -608,7 +531,6 @@ export function addMockHistoryToSeed(data: SeedData, now: number): void {
     estimateScale: resolveScale(data.workspace.settings?.estimateScale),
     userIds: data.users.map((u) => u.id as string).filter((id) => roleOf.get(id) !== 'viewer'),
     teamIds: data.teams.map((t) => t.id as string),
-    workstreams: data.workstreams.map((w) => ({ id: w.id as string, key: w.key, ownerTeamId: w.ownerTeamId as string, status: w.status as string, projectId: (w.projectId as string | null | undefined) ?? null })),
     milestones: data.milestones.map((m) => ({ id: m.id as string, projectId: m.projectId as string })),
     issueCounters: counters,
     existingIssues: data.issues.map((i) => ({

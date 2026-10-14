@@ -243,18 +243,14 @@ export class StatusesSection {
     switch (this.current()) {
       case 'issue':
         return store.issues().filter((issue) => has(issue.status)).length;
-      case 'workstream':
-        return store.workstreams().filter((ws) => has(ws.status) || has(ws.statusOverride) || has(ws.derivedStatus)).length;
       case 'project':
         return store.projects().filter((project) => has(project.status)).length;
       case 'decision':
         return store.decisions().filter((decision) => has(decision.status)).length;
       case 'project_health':
         return store.projects().filter((project) => has(project.health)).length;
-      case 'delivery':
-        return store.workstreams().filter((ws) => has(ws.delivery)).length;
-      case 'criterion':
-        return store.workstreams().filter((ws) => ws.acceptanceCriteria.some((criterion) => has(criterion.state))).length;
+      default:
+        return 0;
     }
   }
 

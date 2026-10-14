@@ -22,7 +22,6 @@ import {
   LucideCircleHelp,
   LucideCopy,
   LucideDynamicIcon,
-  LucideEraser,
   LucideFolderGit2,
   LucideGitBranch,
   LucideGitPullRequest,
@@ -53,7 +52,6 @@ import {
   LucideUserRound,
   LucideUserRoundCheck,
   LucideUsers,
-  LucideWorkflow,
   type LucideIcon,
   LucideBox,
 } from '@lucide/angular';
@@ -63,13 +61,10 @@ import type {
   ArtifactKind,
   IssueStatus,
   Project,
-  WorkstreamStatus,
 } from '../../core/contracts/domain';
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
-  WORKSTREAM_STATUSES,
-  WORKSTREAM_STATUS_META,
 } from '../../core/meta';
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
@@ -125,7 +120,6 @@ interface PanelItem {
   key?: string;
   title: string;
   subtitle?: string;
-  workstreamKey?: string;
 }
 interface ItemGroup {
   id: string;
@@ -144,13 +138,11 @@ interface Visual {
 }
 
 /** Palette scopes (chips). `all` mixes everything plus Go to / Actions. */
-type Scope =
-  'all' | 'issue' | 'workstream' | 'project' | 'decision' | 'repository' | 'person' | 'team';
+type Scope = 'all' | 'issue' | 'project' | 'decision' | 'repository' | 'person' | 'team';
 
 const SCOPES: { id: Scope; label: string; placeholder: string }[] = [
   { id: 'all', label: 'All', placeholder: '' },
   { id: 'issue', label: 'Issues', placeholder: 'Search issues…' },
-  { id: 'workstream', label: 'Workstreams', placeholder: 'Search workstreams…' },
   { id: 'project', label: 'Projects', placeholder: 'Search projects…' },
   { id: 'decision', label: 'Decisions', placeholder: 'Search decisions…' },
   { id: 'repository', label: 'Repositories', placeholder: 'Search repositories…' },
@@ -164,9 +156,6 @@ const PREFIXES: Record<string, Scope> = {
   issues: 'issue',
   is: 'issue',
   bug: 'issue',
-  ws: 'workstream',
-  workstream: 'workstream',
-  workstreams: 'workstream',
   project: 'project',
   projects: 'project',
   decision: 'decision',
@@ -181,7 +170,6 @@ const PREFIXES: Record<string, Scope> = {
 };
 
 const HIT_ICON: Record<ItemType, LucideIcon> = {
-  workstream: LucideWorkflow,
   project: LucideBox,
   decision: LucideScale,
   issue: LucideInbox,
@@ -234,9 +222,9 @@ export const COMMAND_DIALOG_CLASS =
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.
- *  - scope chips (All · Issues · Workstreams · Decisions · Repositories · People · Teams); Tab cycles,
+ *  - scope chips (All · Issues · Projects · Decisions · Repositories · People · Teams); Tab cycles,
  *    prefixes like `issue:` / `@` switch scope, Backspace on an empty query goes back to All
- *  - `palette`: context actions for the open issue/workstream, recent items, Go to, Actions, live results
+ *  - `palette`: context actions for the open issue, recent items, Go to, Actions, live results
  *  - `search`:  recent items and results grouped by type
  * Results come from `GET /search` (debounced) and fall back to a client-side fuzzy search over the store.
  */
@@ -511,10 +499,10 @@ export const COMMAND_DIALOG_CLASS =
                       class="text-muted-foreground shrink-0 text-[11px] opacity-0 [[data-selected]_&]:opacity-100"
                       >Copy email</span
                     >
-                  } @else if (h.workstreamKey || h.subtitle) {
+                  } @else if (h.subtitle) {
                     <span
                       class="text-muted-foreground max-w-[40%] shrink-0 truncate font-mono text-xs max-sm:hidden"
-                      >{{ h.workstreamKey ?? h.subtitle }}</span
+                      >{{ h.subtitle }}</span
                     >
                   }
                 </button>
@@ -560,7 +548,7 @@ export const COMMAND_DIALOG_CLASS =
               class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm"
             >
               <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-              <p>Search workstreams, issues, decisions, repositories, people and teams.</p>
+              <p>Search issues, projects, decisions, repositories, people and teams.</p>
               <p class="text-xs">
                 Tip: type <span class="font-mono">issue:</span>,
                 <span class="font-mono">ws:</span> or <span class="font-mono">&#64;</span> to
@@ -632,7 +620,7 @@ export class CommandPanel {
     if (s?.placeholder) return s.placeholder;
     return this.mode() === 'palette'
       ? 'Type a command or search…'
-      : 'Search workstreams, issues, decisions…';
+      : 'Search issues, projects, decisions…';
   });
   protected readonly isSearching = computed(() => this.query().trim().length > 0);
   /** The scope chips stay out of the way until you search or narrow the scope (the `/` dialog always shows them). */
@@ -679,18 +667,12 @@ export class CommandPanel {
   /** Scope set, empty query: browse that type straight from the store. */
   private readonly browse = computed<PanelItem[]>(() => {
     const s = this.store;
-    const wsKey = (id: string) => s.workstreamById().get(id)?.key;
     switch (this.scope()) {
       case 'issue':
         return [...s.issues()]
           .sort(byUpdated)
           .slice(0, 50)
           .map((i) => ({ type: 'issue', id: i.id, key: i.key, title: i.title }));
-      case 'workstream':
-        return [...s.workstreams()]
-          .sort(byUpdated)
-          .slice(0, 50)
-          .map((w) => ({ type: 'workstream', id: w.id, key: w.key, title: w.title }));
       case 'project':
         return [...s.projects()]
           .sort((a, b) => a.name.localeCompare(b.name))
@@ -704,7 +686,6 @@ export class CommandPanel {
             id: d.id,
             key: d.key,
             title: d.title,
-            workstreamKey: d.originWorkstreamId ? wsKey(d.originWorkstreamId) : undefined,
           }));
       case 'repository':
         return [...s.repositories()]
@@ -752,9 +733,9 @@ export class CommandPanel {
     return out;
   });
 
-  // ─────────────────────────── context (open issue / workstream) ───────────────────────────
+  // ─────────────────────────── context (open issue) ───────────────────────────
 
-  /** The issue or workstream whose page is open, from the router URL. */
+  /** The issue whose page is open, from the router URL. */
   protected readonly context = computed(() => {
     const path = this.router.url.split(/[?#]/)[0].split('/').filter(Boolean);
     if (path.length < 3) return null;
@@ -762,24 +743,18 @@ export class CommandPanel {
     if (path[1] === 'issues') {
       const issue = this.store.getIssue(key);
       return issue
-        ? { type: 'issue' as const, id: issue.id, key: issue.key, issue, ws: null }
+        ? { type: 'issue' as const, id: issue.id, key: issue.key, issue }
         : null;
-    }
-    if (path[1] === 'workstreams') {
-      const ws = this.store.getWorkstream(key);
-      return ws ? { type: 'workstream' as const, id: ws.id, key: ws.key, issue: null, ws } : null;
     }
     return null;
   });
 
   protected readonly contextLabel = computed(() => {
     const c = this.context();
-    return c ? `${c.type === 'issue' ? 'Issue' : 'Workstream'} actions` : '';
+    return c ? 'Issue actions' : '';
   });
 
-  protected readonly contextIcon = computed(() =>
-    this.context()?.type === 'workstream' ? HIT_ICON.workstream : HIT_ICON.issue,
-  );
+  protected readonly contextIcon = computed(() => HIT_ICON.issue);
 
   protected readonly contextMain = computed(() => this.contextCommands().filter((c) => !c.ai));
   protected readonly contextAi = computed(() => this.contextCommands().filter((c) => c.ai));
@@ -811,7 +786,7 @@ export class CommandPanel {
       }
     }
     if (this.ai.available()) {
-      const ask = (kind: 'summarize' | 'triage' | 'improve' | 'update' | 'breakdown') => () =>
+      const ask = (kind: 'summarize' | 'triage' | 'improve') => () =>
         this.ai.request(kind, c.id);
       if (c.issue) {
         out.push({
@@ -827,7 +802,7 @@ export class CommandPanel {
             {
               id: 'ctx:ai-triage',
               label: 'Suggest properties',
-              keywords: 'ai triage priority estimate type workstream',
+              keywords: 'ai triage priority estimate type',
               icon: LucideSparkles,
               ai: true,
               run: ask('triage'),
@@ -841,25 +816,6 @@ export class CommandPanel {
               run: ask('improve'),
             },
           );
-        }
-      } else if (c.ws) {
-        out.push({
-          id: 'ctx:ai-update',
-          label: 'Draft status update',
-          keywords: 'ai report stakeholder summary',
-          icon: LucideSparkles,
-          ai: true,
-          run: ask('update'),
-        });
-        if (this.ai.canEditWorkstream(c.ws)) {
-          out.push({
-            id: 'ctx:ai-breakdown',
-            label: 'Break down into issues',
-            keywords: 'ai plan split tasks',
-            icon: LucideSparkles,
-            ai: true,
-            run: ask('breakdown'),
-          });
         }
       }
     }
@@ -879,7 +835,7 @@ export class CommandPanel {
         keywords: 'git branch checkout',
         icon: LucideGitBranch,
         keys: 'mod+shift+g',
-        run: () => void this.branches.copy(c.key, (c.issue ?? c.ws)!.title),
+        run: () => void this.branches.copy(c.key, c.issue.title),
       },
       {
         id: 'ctx:copy-link',
@@ -912,32 +868,7 @@ export class CommandPanel {
         },
       }));
     }
-    const ws = c.ws!;
-    const out: Cmd[] = WORKSTREAM_STATUSES.map((s: WorkstreamStatus) => ({
-      id: 'st:' + s,
-      label: WORKSTREAM_STATUS_META[s].label,
-      icon: LucideCircleDot,
-      status: s as AnyStatus,
-      entity: 'workstream' as StatusEntity,
-      hint: s === ws.status ? (ws.statusOverride ? 'Pinned' : 'Current') : undefined,
-      run: () => {
-        if (s !== ws.statusOverride) void this.store.updateWorkstream(ws.id, { statusOverride: s });
-        done();
-      },
-    }));
-    if (ws.statusOverride) {
-      out.unshift({
-        id: 'st:clear',
-        label: 'Clear override (use derived status)',
-        icon: LucideEraser,
-        hint: WORKSTREAM_STATUS_META[ws.derivedStatus]?.label,
-        run: () => {
-          void this.store.updateWorkstream(ws.id, { statusOverride: null });
-          done();
-        },
-      });
-    }
-    return out;
+    return [];
   });
 
   // ─────────────────────────── static commands ───────────────────────────
@@ -1023,15 +954,6 @@ export class CommandPanel {
         keywords: 'new bug feature incident report',
         icon: LucidePlus,
         run: create('issue'),
-      });
-    if (this.store.allowed('createWorkstreams'))
-      out.push({
-        id: 'new:workstream',
-        label: 'Create workstream',
-        keywords: 'new',
-        icon: LucidePlus,
-        keys: 'c',
-        run: create('workstream'),
       });
     if (this.store.can('member'))
       out.push({
@@ -1336,11 +1258,6 @@ export class CommandPanel {
   protected visual(h: PanelItem): Visual {
     const s = this.store;
     switch (h.type) {
-      case 'workstream': {
-        const w = s.workstreamById().get(h.id);
-        if (w) return { kind: 'status', status: w.status, entity: 'workstream' };
-        break;
-      }
       case 'decision': {
         const d = s.decisionById().get(h.id);
         if (d) return { kind: 'status', status: d.status };
@@ -1401,7 +1318,6 @@ export class CommandPanel {
       id: h.id,
       key: h.key,
       title: h.title,
-      workstreamKey: h.workstreamKey,
     };
     this.recents.push(hit);
     this.ui.closeModal();

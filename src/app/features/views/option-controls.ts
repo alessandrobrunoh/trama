@@ -17,7 +17,7 @@ export interface PickOption {
   /** Leading colour dot (a CSS colour, e.g. a team colour). */
   color?: string;
   status?: AnyStatus;
-  /** Glyph family for `status` (issues = circles, workstreams = hexagons). */
+  /** Glyph family for the status option. */
   statusEntity?: StatusEntity;
   actor?: ActorRef;
   /** Render the label in the mono face (keys). */
@@ -169,7 +169,7 @@ export class OptionMenu {
  * "Add …" picker: a trigger button (projected content) opening a searchable list. Emits the value
  * of the chosen option; the parent decides what that means (add a team, supersede by…).
  *
- *   <app-entity-picker [options]="free()" placeholder="Find workstream…" (picked)="add($event)">
+ *   <app-entity-picker [options]="free()" placeholder="Find an item…" (picked)="add($event)">
  *     <svg lucidePlus [size]="13"></svg> Add
  *   </app-entity-picker>
  */

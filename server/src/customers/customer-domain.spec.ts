@@ -13,13 +13,22 @@ import {
   requestsOn,
   splitDomains,
 } from '../../../src/app/features/customers/customer-model.ts';
-import type { Customer, CustomerRequest, Issue, Project } from '../contracts/domain.js';
+import type {
+  Customer,
+  CustomerRequest,
+  Issue,
+  Project,
+} from '../contracts/domain.js';
 
 describe('normalizeCustomerDomain', () => {
   it('strips scheme, www, path and port, and lower-cases', () => {
-    expect(normalizeCustomerDomain('  HTTPS://WWW.Acme.com/pricing?x=1  ')).toBe('acme.com');
+    expect(
+      normalizeCustomerDomain('  HTTPS://WWW.Acme.com/pricing?x=1  '),
+    ).toBe('acme.com');
     expect(normalizeCustomerDomain('acme.com.')).toBe('acme.com');
-    expect(normalizeCustomerDomain('https://support.acme.com:443/a')).toBe('support.acme.com');
+    expect(normalizeCustomerDomain('https://support.acme.com:443/a')).toBe(
+      'support.acme.com',
+    );
   });
 
   it('rejects empty, single-label and non-host text', () => {
@@ -32,27 +41,42 @@ describe('normalizeCustomerDomain', () => {
 
 describe('normalizeCustomerDomains', () => {
   it('keeps order, drops duplicates and blanks, and reports the invalid ones', () => {
-    expect(normalizeCustomerDomains(['https://Acme.com', '', 'www.acme.com', 'acme.io'])).toEqual({
+    expect(
+      normalizeCustomerDomains([
+        'https://Acme.com',
+        '',
+        'www.acme.com',
+        'acme.io',
+      ]),
+    ).toEqual({
       domains: ['acme.com', 'acme.io'],
       invalid: [],
     });
-    expect(normalizeCustomerDomains(['acme.com', 'nope', 'localhost'])).toEqual({
-      domains: ['acme.com'],
-      invalid: ['nope', 'localhost'],
-    });
+    expect(normalizeCustomerDomains(['acme.com', 'nope', 'localhost'])).toEqual(
+      {
+        domains: ['acme.com'],
+        invalid: ['nope', 'localhost'],
+      },
+    );
   });
 });
 
 describe('normalizeHttpUrl', () => {
   it('accepts http(s) URLs only', () => {
-    expect(normalizeHttpUrl(' https://acme.zendesk.com/tickets/42 ')).toBe('https://acme.zendesk.com/tickets/42');
-    expect(normalizeHttpUrl('http://example.com/logo.png')).toBe('http://example.com/logo.png');
+    expect(normalizeHttpUrl(' https://acme.zendesk.com/tickets/42 ')).toBe(
+      'https://acme.zendesk.com/tickets/42',
+    );
+    expect(normalizeHttpUrl('http://example.com/logo.png')).toBe(
+      'http://example.com/logo.png',
+    );
     expect(normalizeHttpUrl('javascript:alert(1)')).toBeNull();
     expect(normalizeHttpUrl('data:image/png;base64,AAAA')).toBeNull();
     expect(normalizeHttpUrl('ftp://example.com/x')).toBeNull();
     expect(normalizeHttpUrl('not a url')).toBeNull();
     expect(normalizeHttpUrl('')).toBeNull();
-    expect(normalizeHttpUrl(`https://example.com/${'a'.repeat(2000)}`)).toBeNull();
+    expect(
+      normalizeHttpUrl(`https://example.com/${'a'.repeat(2000)}`),
+    ).toBeNull();
   });
 });
 
@@ -75,9 +99,25 @@ const at = '2026-01-01T00:00:00.000Z';
 const actor = { type: 'user', id: 'u' } as const;
 
 const issue = (id: string): Issue =>
-  ({ id, key: id.toUpperCase(), title: id, status: 'todo', updatedAt: at, workspaceId: 'ws', number: 1, kind: 'bug', source: 'manual', workstreamIds: [], milestoneIds: [], labels: [], aliases: [], priority: 'none', createdAt: at }) as Issue;
+  ({
+    id,
+    key: id.toUpperCase(),
+    title: id,
+    status: 'todo',
+    updatedAt: at,
+    workspaceId: 'ws',
+    number: 1,
+    kind: 'bug',
+    source: 'manual',
+    milestoneIds: [],
+    labels: [],
+    aliases: [],
+    priority: 'none',
+    createdAt: at,
+  }) as Issue;
 
-const project = (id: string): Project => ({ id, workspaceId: 'ws', name: id }) as Project;
+const project = (id: string): Project =>
+  ({ id, workspaceId: 'ws', name: id }) as Project;
 
 const customer = (id: string, name: string): Customer => ({
   id,
@@ -91,7 +131,12 @@ const customer = (id: string, name: string): Customer => ({
   updatedAt: at,
 });
 
-const request = (id: string, customerId: string, target: { issueId: string } | { projectId: string }, extra: Partial<CustomerRequest> = {}): CustomerRequest => ({
+const request = (
+  id: string,
+  customerId: string,
+  target: { issueId: string } | { projectId: string },
+  extra: Partial<CustomerRequest> = {},
+): CustomerRequest => ({
   id,
   workspaceId: 'ws',
   customerId,
@@ -105,8 +150,18 @@ const request = (id: string, customerId: string, target: { issueId: string } | {
 
 describe('customer request views', () => {
   const requests = [
-    request('a', 'cus_1', { issueId: 'iss_1' }, { createdAt: '2026-02-01T00:00:00.000Z' }),
-    request('a2', 'cus_1', { issueId: 'iss_1' }, { createdAt: '2026-03-01T00:00:00.000Z' }),
+    request(
+      'a',
+      'cus_1',
+      { issueId: 'iss_1' },
+      { createdAt: '2026-02-01T00:00:00.000Z' },
+    ),
+    request(
+      'a2',
+      'cus_1',
+      { issueId: 'iss_1' },
+      { createdAt: '2026-03-01T00:00:00.000Z' },
+    ),
     request('b', 'cus_1', { projectId: 'pj_1' }, { important: true }),
     request('c', 'cus_2', { issueId: 'iss_1' }, { important: true }),
     request('gone', 'cus_1', { issueId: 'iss_missing' }),
@@ -119,14 +174,22 @@ describe('customer request views', () => {
   const projects = new Map([['pj_1', project('pj_1')]]);
 
   it('lists the requests on an issue in full: important first, then newest', () => {
-    expect(requestsOn({ issueId: 'iss_1' }, requests, customers).map((r) => r.request.id)).toEqual(['c', 'a2', 'a']);
+    expect(
+      requestsOn({ issueId: 'iss_1' }, requests, customers).map(
+        (r) => r.request.id,
+      ),
+    ).toEqual(['c', 'a2', 'a']);
   });
 
   it('lists the requests on a project', () => {
-    expect(requestsOn({ projectId: 'pj_1' }, requests, customers).map((r) => r.customer.name)).toEqual(['Acme']);
+    expect(
+      requestsOn({ projectId: 'pj_1' }, requests, customers).map(
+        (r) => r.customer.name,
+      ),
+    ).toEqual(['Acme']);
   });
 
-  it('shows one customer\'s requests on issues and projects, and drops missing targets', () => {
+  it("shows one customer's requests on issues and projects, and drops missing targets", () => {
     const rows = requestRows('cus_1', requests, issues, projects);
     expect(rows.map((r) => r.request.id)).toEqual(['b', 'a2', 'a']);
     expect(rows[0]!.project?.id).toBe('pj_1');
@@ -140,7 +203,11 @@ describe('customer request views', () => {
   });
 
   it('splits and formats edit-form input', () => {
-    expect(splitDomains('acme.com, acme.io\nfoo.dev ;')).toEqual(['acme.com', 'acme.io', 'foo.dev']);
+    expect(splitDomains('acme.com, acme.io\nfoo.dev ;')).toEqual([
+      'acme.com',
+      'acme.io',
+      'foo.dev',
+    ]);
     expect(compactNumber(1_250_000)).toBe('1.3M');
   });
 });

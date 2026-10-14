@@ -8,8 +8,8 @@ import { Notifier } from '../../core/notify/notifier';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore } from '../../core/stores/ui.store';
 import { ProviderIcon } from '../../shared/provider-icon';
-import { Picker } from '../workstreams/picker';
-import { teamOptions } from '../workstreams/ws-model';
+import { Picker } from '../../shared/picker';
+import { teamOptions } from '../../shared/picker-options';
 import { RemoteRepoBrowser } from './remote-repo-browser';
 
 /**

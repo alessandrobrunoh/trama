@@ -11,7 +11,7 @@ import { COMMAND_DIALOG_CLASS, CommandPanel } from './command-panel';
   template: `
     <hlm-command-dialog
       title="Command palette"
-      description="Search for a screen, an action or any workstream, issue or decision."
+      description="Search for a screen, an action or any issue, project or decision."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
       [dialogContentClass]="dialogClass"

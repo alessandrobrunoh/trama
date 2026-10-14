@@ -14,14 +14,33 @@ import {
 
 describe('requiredMemberGrant', () => {
   it('splits creating an issue from editing one', () => {
-    expect(requiredMemberGrant('POST', '/api/w/:slug/issues')).toBe('issues:create');
-    expect(requiredMemberGrant('PATCH', '/api/w/:slug/issues/:idOrKey')).toBe('issues:update');
-    expect(requiredMemberGrant('DELETE', '/api/w/:slug/issues/:idOrKey')).toBe('issues:delete');
-    expect(requiredMemberGrant('GET', '/api/w/:slug/issues')).toBe('issues:view');
-    expect(requiredMemberGrant('POST', '/api/w/:slug/issues/bulk')).toBe('issues:update');
-    expect(requiredMemberGrant('POST', '/api/w/:slug/issues/:idOrKey/comments')).toBe('comments:create');
-    expect(requiredMemberGrant('POST', '/api/w/:slug/issues/:idOrKey/artifacts/upload')).toBe('artifacts:create');
-    expect(requiredMemberGrant('POST', '/api/w/:slug/projects/:id/artifacts/upload')).toBe('artifacts:create');
+    expect(requiredMemberGrant('POST', '/api/w/:slug/issues')).toBe(
+      'issues:create',
+    );
+    expect(requiredMemberGrant('PATCH', '/api/w/:slug/issues/:idOrKey')).toBe(
+      'issues:update',
+    );
+    expect(requiredMemberGrant('DELETE', '/api/w/:slug/issues/:idOrKey')).toBe(
+      'issues:delete',
+    );
+    expect(requiredMemberGrant('GET', '/api/w/:slug/issues')).toBe(
+      'issues:view',
+    );
+    expect(requiredMemberGrant('POST', '/api/w/:slug/issues/bulk')).toBe(
+      'issues:update',
+    );
+    expect(
+      requiredMemberGrant('POST', '/api/w/:slug/issues/:idOrKey/comments'),
+    ).toBe('comments:create');
+    expect(
+      requiredMemberGrant(
+        'POST',
+        '/api/w/:slug/issues/:idOrKey/artifacts/upload',
+      ),
+    ).toBe('artifacts:create');
+    expect(
+      requiredMemberGrant('POST', '/api/w/:slug/projects/:id/artifacts/upload'),
+    ).toBe('artifacts:create');
     expect(requiredMemberGrant('GET', '/api/w/:slug/uploads/:id')).toBeNull();
   });
 
@@ -131,13 +150,9 @@ describe('project scope', () => {
     expect(projectHidden(null, 'pj_2')).toBe(false);
   });
 
-  it('removes hidden projects and the issues inside them from a snapshot', () => {
+  it('removes hidden projects and directly assigned issues from a snapshot', () => {
     const snapshot: AccessSnapshot = {
       projects: [{ id: 'pj_1' }, { id: 'pj_2' }],
-      workstreams: [
-        { id: 'wk_1', projectId: 'pj_1' },
-        { id: 'wk_2', projectId: 'pj_2' },
-      ],
       milestones: [
         { id: 'ms_1', projectId: 'pj_1' },
         { id: 'ms_2', projectId: 'pj_2' },
@@ -148,9 +163,8 @@ describe('project scope', () => {
         { id: 'in_3', projectId: null },
       ],
       artifacts: [],
-      decisions: [{ id: 'dc_1', originWorkstreamId: 'wk_2' }],
-      inputRequests: [],
-      dependencies: [],
+      decisions: [{ id: 'dc_1', originIssueId: 'in_2' }],
+      inputRequests: [{ id: 'ir_1', issueId: 'in_2' }],
       comments: [
         { subject: { type: 'issue', id: 'in_2' } },
         { subject: { type: 'issue', id: 'in_1' } },
@@ -161,7 +175,6 @@ describe('project scope', () => {
         { subject: { type: 'issue', id: 'in_2' } },
         { subject: { type: 'issue', id: 'in_1' } },
       ],
-      attention: [{ issueId: 'in_2' }, { issueId: 'in_1' }],
       views: [],
     };
     const scoped = scopeSnapshot(snapshot, {
@@ -170,11 +183,10 @@ describe('project scope', () => {
     });
     expect(scoped.projects.map((p) => p.id)).toEqual(['pj_1']);
     expect(scoped.issues.map((i) => i.id)).toEqual(['in_1']);
-    expect(scoped.workstreams.map((w) => w.id)).toEqual(['wk_1']);
     expect(scoped.comments.map((c) => c.subject.id)).toEqual(['in_1']);
     expect(scoped.customerRequests).toEqual([]);
     expect(scoped.decisions).toEqual([]);
+    expect(scoped.inputRequests).toEqual([]);
     expect(scoped.events.map((e) => e.subject.id)).toEqual(['in_1']);
-    expect(scoped.attention.map((a) => a.issueId)).toEqual(['in_1']);
   });
 });

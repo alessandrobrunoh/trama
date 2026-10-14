@@ -1,388 +1,310 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import type { WorkspaceContext } from '../auth/request-context.js';
-import type { InsightSignal, InsightSignalId, InsightsReport } from '../contracts/domain.js';
-import { computeActors, type ActorArtifact, type ActorInputRequest, type EventCountRow } from './insights-actors.js';
-import { buildFacts, type ActivityRow, type StatusEventRow } from './insights-facts.js';
 import {
-  BASELINE_DAYS,
-  AGENT_TOUCH_DAYS,
-  computeAging,
-  computeCumulativeFlow,
-  computeDurations,
-  computeThroughput,
-  computeWip,
-  type AgentTouch,
-  type IssueChange,
-} from './insights-flow.js';
-import {
-  buildSignals,
-  computeBottlenecks,
-  computeSignalItems,
-  type IArtifact,
-  type ICustomerRequest,
-  type IDecision,
-  type IDependency,
-  type IInputRequest,
-  type IIssue,
-  type IIssueLink,
-  type IMilestone,
-  type IShippedWorkstream,
-  type IWorkstream,
-  type SignalData,
-} from './insights-signals.js';
-import { DAY, type NameIndex } from './insights-util.js';
+  INSIGHT_SIGNALS,
+  type InsightBottleneck,
+  type InsightContributor,
+  type InsightItem,
+  type InsightSignal,
+  type InsightSignalId,
+  type InsightWipRow,
+  type InsightsReport,
+} from '../contracts/domain.js';
+import { projectHidden } from '../auth/member-access.js';
 
-export interface InsightsQuery {
-  days: number;
-  teamId?: string;
-  projectId?: string;
-  staleDays: number;
-  /** Items kept per signal (counts are never cut). */
-  limit: number;
+type Query = { days?: number; teamId?: string; projectId?: string; staleDays?: number; limit?: number };
+type Row = Record<string, any>;
+const DAY = 86_400_000;
+const OPEN = ['backlog', 'todo', 'in_progress', 'in_review'];
+const ACTIVE = ['in_progress', 'in_review'];
+
+function age(date: Date, now: Date): number {
+  return Math.max(0, Math.round(((now.getTime() - date.getTime()) / DAY) * 10) / 10);
 }
 
-export const DEFAULT_QUERY: InsightsQuery = { days: 30, staleDays: 7, limit: 25 };
+function duration(from: Date, to: Date): number {
+  return Math.max(0, Math.round(((to.getTime() - from.getTime()) / DAY) * 10) / 10);
+}
 
-type Row = Record<string, any>;
-const OPEN_ISSUE = `('backlog','todo','in_progress','in_review')`;
-const PR_KINDS = `('pull_request','merge_request')`;
-
-/** SQL that appends numbered parameters and remembers them. */
-class Params {
-  readonly values: unknown[] = [];
-  add(v: unknown): string {
-    this.values.push(v);
-    return `$${this.values.length}`;
-  }
+function stats(values: number[]) {
+  if (!values.length) return { count: 0 };
+  const sorted = [...values].sort((a, b) => a - b);
+  const percentile = (p: number) => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)];
+  return {
+    count: values.length,
+    p50: percentile(0.5),
+    p85: percentile(0.85),
+    p95: percentile(0.95),
+    mean: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10,
+    max: sorted[sorted.length - 1],
+  };
 }
 
 @Injectable()
 export class InsightsService {
-  constructor(private readonly ds: DataSource) {}
+  constructor(private readonly db: DataSource) {}
 
-  async report(ctx: WorkspaceContext, q: InsightsQuery): Promise<InsightsReport> {
-    const data = await this.load(ctx.workspace.id, q);
-    const items = computeSignalItems(data.signals);
-    const workstreamRows = data.signals.workstreams;
-    const window = { from: data.from, to: data.to };
-    const durations = computeDurations(data.signals.issues, workstreamRows, window);
-    const throughput = computeThroughput(data.signals.issues, workstreamRows, window);
-    return {
-      generatedAt: data.to.toISOString(),
-      range: { days: q.days, from: data.from.toISOString(), to: data.to.toISOString() },
-      scope: { ...(q.teamId ? { teamId: q.teamId } : {}), ...(q.projectId ? { projectId: q.projectId } : {}) },
-      staleDays: q.staleDays,
-      signals: buildSignals(items, q.staleDays, q.limit),
-      bottlenecks: computeBottlenecks(items),
-      flow: {
-        ...durations,
-        throughput: throughput.buckets,
-        previousThroughput: throughput.previous,
-        wip: computeWip(data.signals.issues, workstreamRows, data.touches, data.signals.names, data.to),
-        aging: computeAging(data.signals.issues, data.to, data.signals.names),
-        cumulativeFlow: computeCumulativeFlow(data.signals.issues, data.changes, data.doneBefore, window),
-      },
-      actors: computeActors({
-        names: data.signals.names,
-        agentIds: data.agentIds,
-        rangeFrom: data.from,
-        events: data.events,
-        artifacts: data.actorArtifacts,
-        inputRequests: data.actorRequests,
-        reopenedByAgent: data.reopened,
-      }),
-    };
+  async report(ctx: WorkspaceContext, query: Query): Promise<InsightsReport> {
+    const data = await this.load(ctx, query);
+    return data.report;
   }
 
-  /** The complete list behind one signal tile (up to `limit` items). */
-  async signal(ctx: WorkspaceContext, id: InsightSignalId, q: InsightsQuery): Promise<InsightSignal> {
-    const data = await this.load(ctx.workspace.id, q);
-    const signal = buildSignals(computeSignalItems(data.signals), q.staleDays, q.limit).find((s) => s.id === id);
-    if (!signal) throw new NotFoundException(`Unknown signal "${id}"`);
-    return signal;
+  async signal(ctx: WorkspaceContext, id: InsightSignalId, query: Query): Promise<InsightSignal> {
+    return (await this.load(ctx, query)).report.signals.find((signal) => signal.id === id)!;
   }
 
-  private async load(workspaceId: string, q: InsightsQuery) {
-    const db = this.ds;
+  private async load(ctx: WorkspaceContext, query: Query) {
+    const workspaceId = ctx.workspace.id;
+    const days = query.days ?? 30;
+    const staleDays = query.staleDays ?? 7;
+    const limit = query.limit ?? 25;
     const now = new Date();
-    const from = new Date(now.getTime() - q.days * DAY);
-    const lookback = new Date(now.getTime() - Math.max(q.days * 2, BASELINE_DAYS) * DAY);
-    const scoped = !!(q.teamId || q.projectId);
+    const from = new Date(now.getTime() - days * DAY);
+    const lookback = new Date(now.getTime() - Math.max(days * 2, 90) * DAY);
+    if (query.teamId) {
+      const [team] = await this.db.query<Row[]>(
+        'SELECT id FROM teams WHERE id = $1 AND "workspaceId" = $2',
+        [query.teamId, workspaceId],
+      );
+      if (!team) throw new NotFoundException('Team not found');
+    }
+    if (query.projectId) {
+      const [project] = await this.db.query<Row[]>(
+        'SELECT id FROM projects WHERE id = $1 AND "workspaceId" = $2',
+        [query.projectId, workspaceId],
+      );
+      if (!project || projectHidden(ctx.access, query.projectId)) throw new NotFoundException('Project not found');
+    }
 
-    if (q.teamId) {
-      const [t] = await db.query<Row[]>(`SELECT 1 FROM teams WHERE id = $1 AND "workspaceId" = $2`, [q.teamId, workspaceId]);
-      if (!t) throw new NotFoundException('Team not found');
-    }
-    if (q.projectId) {
-      const [p] = await db.query<Row[]>(`SELECT 1 FROM projects WHERE id = $1 AND "workspaceId" = $2`, [q.projectId, workspaceId]);
-      if (!p) throw new NotFoundException('Project not found');
-    }
-
-    // workstreams in scope: open ones, plus those shipped inside the look-back window
-    const wp = new Params();
-    const wsWhere = [
-      `"workspaceId" = ${wp.add(workspaceId)}`,
-      `status <> 'draft'`,
-      `(status NOT IN ('shipped','canceled') OR "shippedAt" >= ${wp.add(lookback)})`,
-    ];
-    if (q.teamId) {
-      const t = wp.add(q.teamId);
-      wsWhere.push(`("ownerTeamId" = ${t} OR "participatingTeamIds" ? ${t}::text)`);
-    }
-    if (q.projectId) wsWhere.push(`"projectId" = ${wp.add(q.projectId)}`);
-    const workstreams = (
-      await db.query<Row[]>(
-        `SELECT id, key, title, status, delivery, "ownerTeamId", "accountableUserId", "projectId", "startDate", "targetDate",
-                "createdAt", "updatedAt", "shippedAt", "acceptanceCriteria"
-           FROM workstreams WHERE ${wsWhere.join(' AND ')}`,
-        wp.values,
-      )
-    ).map((r): IWorkstream => ({ ...(r as IWorkstream) }));
-    // every shipped workstream in scope, whenever it shipped: the historic proof check is not windowed
-    const sp = new Params();
-    const shippedWhere = [`"workspaceId" = ${sp.add(workspaceId)}`, `status = 'shipped'`];
-    if (q.teamId) {
-      const t = sp.add(q.teamId);
-      shippedWhere.push(`("ownerTeamId" = ${t} OR "participatingTeamIds" ? ${t}::text)`);
-    }
-    if (q.projectId) shippedWhere.push(`"projectId" = ${sp.add(q.projectId)}`);
-    const shippedHistory = (
-      await db.query<Row[]>(
-        `SELECT id, key, title, status, "derivedStatus", "statusOverride", "legacyShipped", "accountableUserId", "shippedAt", "updatedAt",
-                "acceptanceCriteria"
-           FROM workstreams WHERE ${shippedWhere.join(' AND ')}`,
-        sp.values,
-      )
-    ).map((r): IShippedWorkstream => ({ ...(r as IShippedWorkstream) }));
-    const wsIds = workstreams.map((w) => w.id);
-    const openWsIds = workstreams.filter((w) => w.status !== 'shipped' && w.status !== 'canceled').map((w) => w.id);
-
-    // issues: open ones, plus those finished inside the look-back window
-    const ip = new Params();
-    const issueWhere = [`"workspaceId" = ${ip.add(workspaceId)}`];
-    const issueScope: string[] = [];
-    if (q.teamId) issueScope.push(`("teamId" = ${ip.add(q.teamId)} OR "workstreamIds" ?| ${ip.add(wsIds)}::text[])`);
-    if (q.projectId) issueScope.push(`("projectId" = ${ip.add(q.projectId)} OR "workstreamIds" ?| ${ip.add(wsIds)}::text[])`);
-    const issueCols = `id, key, title, kind, status, "assigneeId", "teamId", "projectId", "workstreamIds", "milestoneIds",
-                "createdAt", "startedAt", "completedAt", "updatedAt"`;
-    const windowParam = ip.add(lookback);
-    const issues = (
-      await db.query<Row[]>(
-        `SELECT ${issueCols} FROM issues
-          WHERE ${[...issueWhere, ...issueScope].join(' AND ')}
-            AND (status IN ${OPEN_ISSUE} OR "completedAt" >= ${windowParam})`,
-        ip.values,
-      )
-    ).map((r) => r as IIssue);
-    const [{ n: doneBefore }] = await db.query<{ n: string }[]>(
-      `SELECT count(*)::text AS n FROM issues
-        WHERE ${[...issueWhere, ...issueScope].join(' AND ')}
-          AND status = 'done' AND ("completedAt" IS NULL OR "completedAt" < ${windowParam})`,
-      ip.values,
+    const conditions = ['i."workspaceId" = $1'];
+    const params: unknown[] = [workspaceId];
+    const bind = (value: unknown) => {
+      params.push(value);
+      return `$${params.length}`;
+    };
+    if (query.teamId) conditions.push(`i."teamId" = ${bind(query.teamId)}`);
+    if (query.projectId) conditions.push(`i."projectId" = ${bind(query.projectId)}`);
+    // Keep this as a correlated scope: all report data derives from visible Issues.
+    const issues: Row[] = await this.db.query(
+      `SELECT i.id, i.key, i.title, i.status, i."teamId", i."projectId", i."assigneeId",
+              i."createdAt", i."updatedAt", i."startedAt", i."completedAt", i."milestoneIds"
+         FROM issues i WHERE ${conditions.join(' AND ')}
+           AND (i.status IN ('backlog','todo','in_progress','in_review') OR i."completedAt" >= $${params.push(lookback)})`,
+      params,
     );
+    const visibleIssues = issues.filter((issue) => !projectHidden(ctx.access, issue.projectId));
+    const issueIds = visibleIssues.map((issue) => issue.id);
+    const scoped = issueIds.length > 0;
+    const requests: Row[] = scoped
+      ? await this.db.query(
+          `SELECT r.question, r."assigneeUserId", r."createdAt", r."issueId",
+                  i.id, i.key, i.title
+             FROM input_requests r JOIN issues i ON i.id = r."issueId" AND i."workspaceId" = r."workspaceId"
+            WHERE r."workspaceId" = $1 AND r.state = 'open'
+               AND r."issueId" = ANY($2::text[])`,
+          [workspaceId, issueIds],
+        )
+      : [];
+    const decisions: Row[] = scoped
+      ? await this.db.query(
+          `SELECT DISTINCT d.id, d.key, d.title, d."createdAt", d."proposedBy"
+             FROM decisions d JOIN issues i ON i."workspaceId" = d."workspaceId"
+               AND (i.id = d."originIssueId" OR d."relatedIssueIds" ? i.id)
+            WHERE d."workspaceId" = $1 AND d.status = 'proposed' AND i.id = ANY($2::text[])`,
+          [workspaceId, issueIds],
+        )
+      : [];
+    const artifacts: Row[] = scoped
+      ? await this.db.query(
+          `SELECT a.id, a.title, a.kind, a.state, a.ci, a.review, a."updatedAt", a."issueId",
+                  i.key AS "issueKey"
+             FROM artifacts a JOIN issues i ON i.id = a."issueId" AND i."workspaceId" = a."workspaceId"
+            WHERE a."workspaceId" = $1 AND a."issueId" = ANY($2::text[])
+              AND a.kind IN ('pull_request', 'merge_request') AND a.state = 'open'`,
+          [workspaceId, issueIds],
+        )
+      : [];
+    const milestones: Row[] = await this.db.query(
+      `SELECT m.id, m.name, m."projectId", m."targetDate", p.name AS "projectName", p.status AS "projectStatus",
+              count(i.id) FILTER (WHERE i.status = ANY($2::text[]))::int AS "openIssues"
+         FROM milestones m JOIN projects p ON p.id = m."projectId"
+         LEFT JOIN issues i ON i."workspaceId" = m."workspaceId" AND i."milestoneIds" ? m.id
+        WHERE m."workspaceId" = $1 AND m."targetDate" < now()
+          AND ($3::text IS NULL OR m."projectId" = $3)
+        GROUP BY m.id, p.id`,
+      [workspaceId, OPEN, query.projectId ?? null],
+    );
+    const visibleMilestones = milestones.filter((m) =>
+      visibleIssues.some((i) => i.projectId === m.projectId),
+    );
+    const events: Row[] = scoped
+      ? await this.db.query(
+          `SELECT e.actor->>'id' AS "actorId", e.actor->>'type' AS "actorType", e.type,
+                  max(e.at) AS "lastAt", count(*)::int AS events
+             FROM domain_events e
+            WHERE e."workspaceId" = $1 AND e.at >= $2 AND e.at < $3
+              AND e.subject->>'id' = ANY($4::text[])
+              AND e.actor->>'type' IN ('user', 'agent')
+            GROUP BY 1, 2, 3`,
+          [workspaceId, from, now, issueIds],
+        )
+      : [];
+    const actorNames: Row[] = events.length
+      ? await this.db.query(
+          `SELECT id, name, 'user' AS type FROM users WHERE id = ANY($1::text[])
+           UNION ALL SELECT id, name, 'agent' AS type FROM agents WHERE id = ANY($2::text[])`,
+          [
+            [...new Set(events.filter((e) => e.actorType === 'user').map((e) => e.actorId))],
+            [...new Set(events.filter((e) => e.actorType === 'agent').map((e) => e.actorId))],
+          ],
+        )
+      : [];
 
-    const wsFilter = (col: string, p: Params): string => (scoped ? ` AND ${col} = ANY(${p.add(wsIds)}::text[])` : '');
-
-    const issueIds = issues.map((i) => i.id);
-    const run = (build: (p: Params) => string) => {
-      const p = new Params();
-      const sql = build(p);
-      return db.query<Row[]>(sql, p.values);
+    const item = (
+      type: InsightItem['type'],
+      row: Row,
+      since: Date,
+      detail: string,
+      waitingOn?: InsightItem['waitingOn'],
+    ): InsightItem => ({
+      type,
+      id: row.id,
+      ...(row.key ? { key: row.key } : {}),
+      title: row.title ?? row.name,
+      ...(row.projectId ? { projectId: row.projectId } : {}),
+      since: since.toISOString(),
+      ageDays: age(since, now),
+      ...(waitingOn ? { waitingOn } : {}),
+      detail,
+    });
+    const signalItems: Record<InsightSignalId, InsightItem[]> = {
+      needs_input: [
+        ...requests.map((r) => item(
+          'issue',
+          r,
+          r.createdAt,
+          'Issue question is waiting for an answer.',
+          r.assigneeUserId ? { type: 'user', id: r.assigneeUserId, name: r.assigneeUserId } : { type: 'unassigned', name: 'Unassigned' },
+        )),
+        ...decisions.map((d) => item('decision', d, d.createdAt, 'Proposed Decision is waiting for a response.')),
+      ],
+      stale_issues: visibleIssues
+        .filter((i) => ACTIVE.includes(i.status) && age(new Date(i.updatedAt), now) >= staleDays)
+        .map((i) => item('issue', i, new Date(i.updatedAt), 'In-flight Issue has not been updated recently.')),
+      overdue_milestones: visibleMilestones
+        .filter((m) => Number(m.openIssues) > 0 && !['completed', 'canceled'].includes(m.projectStatus))
+        .map((m) => ({ ...item('milestone', m, new Date(m.targetDate), `${m.openIssues} open Issues remain.`), projectId: m.projectId })),
+      prs_stuck_in_review: artifacts
+        .filter((a) => a.review?.approved !== true && a.review?.state !== 'approved' && age(new Date(a.updatedAt), now) >= 3)
+        .map((a) => item('artifact', a, new Date(a.updatedAt), 'Open pull request has no approval and has been inactive for at least 3 days.')),
+      ci_failing: artifacts
+        .filter((a) => a.ci === 'failing' || a.ci?.state === 'failing' || a.ci?.status === 'failing')
+        .map((a) => item('artifact', a, new Date(a.updatedAt), 'Latest pull request CI result is failing.')),
+      undecided_decisions: decisions.map((d) => item('decision', d, d.createdAt, 'Proposed Decision is waiting for a response.')),
+      customer_demand_waiting: [],
     };
-    const [
-      statusRows, activityRows, changeRows, linkRows, inputRows, artifactRows, ciRows, decisionRows, depRows,
-      milestoneRows, customerRows, userRows, agentRows, eventRows, touchRows, reopenedRows, actorArtifactRows, actorRequestRows,
-    ] = await Promise.all([
-      run((p) => `SELECT "workstreamId" AS id, data->>'to' AS "to", min(at) AS "firstAt", max(at) AS "lastAt" FROM domain_events
-          WHERE "workspaceId" = ${p.add(workspaceId)} AND type = 'workstream.status_changed' AND "workstreamId" = ANY(${p.add(wsIds)}::text[]) GROUP BY 1, 2`),
-      run((p) => `SELECT "workstreamId" AS id, max(at) AS "lastAt" FROM domain_events
-          WHERE "workspaceId" = ${p.add(workspaceId)} AND "workstreamId" = ANY(${p.add(wsIds)}::text[]) AND actor->>'type' <> 'system' GROUP BY 1`),
-      run((p) => `SELECT subject->>'id' AS "issueId", at, data->>'from' AS "from", data->>'to' AS "to" FROM domain_events
-          WHERE "workspaceId" = ${p.add(workspaceId)} AND type = 'issue.status_changed' AND subject->>'id' = ANY(${p.add(issueIds)}::text[]) ORDER BY at`),
-      run((p) => `SELECT subject->>'id' AS "issueId", "workstreamId", min(at) AS at FROM domain_events
-          WHERE "workspaceId" = ${p.add(workspaceId)} AND type = 'issue.linked' AND "workstreamId" = ANY(${p.add(openWsIds)}::text[]) GROUP BY 1, 2`),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT id, "workstreamId", question, "requestedBy", "assigneeUserId", "createdAt" FROM input_requests
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND state = 'open'${wsFilter('"workstreamId"', p)}`,
-          p.values,
-        );
-      })(),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT id, "workstreamId", kind, title, "externalId", state, ci, review, "hasConflicts", "authorRef", "createdAt", "updatedAt"
-             FROM artifacts
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND kind IN ('pull_request','merge_request','release','deployment')
-              AND (state IN ('open','draft') OR "updatedAt" >= ${p.add(lookback)} OR "workstreamId" = ANY(${p.add(openWsIds)}::text[]))
-              ${wsFilter('"workstreamId"', p)}`,
-          p.values,
-        );
-      })(),
-      db.query<Row[]>(
-        `SELECT subject->>'id' AS id, max(at) AS at FROM domain_events
-          WHERE "workspaceId" = $1 AND type = 'artifact.updated' AND data->'changes'->'ci'->>1 = 'failing' GROUP BY 1`,
-        [workspaceId],
-      ),
-      (() => {
-        const p = new Params();
-        const scope = scoped
-          ? ` AND ("originWorkstreamId" = ANY(${p.add(wsIds)}::text[]) OR "relatedWorkstreamIds" ?| ${p.add(wsIds)}::text[])`
-          : '';
-        return db.query<Row[]>(
-          `SELECT id, key, title, status, "originWorkstreamId", "relatedWorkstreamIds", "proposedBy", "createdAt" FROM decisions
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND status = 'proposed'${scope}`,
-          p.values,
-        );
-      })(),
-      db.query<Row[]>(`SELECT "fromId", "toId" FROM dependencies WHERE "workspaceId" = $1 AND "fromType" = 'workstream' AND "toType" = 'workstream'`, [workspaceId]),
-      (() => {
-        const p = new Params();
-        const scope = [q.projectId ? `m."projectId" = ${p.add(q.projectId)}` : '', q.teamId ? `p."teamIds" ? ${p.add(q.teamId)}::text` : '']
-          .filter(Boolean)
-          .map((c) => ` AND ${c}`)
-          .join('');
-        return db.query<Row[]>(
-          `SELECT m.id, m.name, m."projectId", p.name AS "projectName", p.status AS "projectStatus", m."targetDate",
-                  count(i.id) FILTER (WHERE i.status IN ${OPEN_ISSUE})::int AS "openIssues",
-                  count(i.id) FILTER (WHERE i.status = 'done')::int AS "doneIssues"
-             FROM milestones m
-             JOIN projects p ON p.id = m."projectId"
-             LEFT JOIN issues i ON i."workspaceId" = m."workspaceId" AND i."milestoneIds" ? m.id
-            WHERE m."workspaceId" = ${p.add(workspaceId)} AND m."targetDate" IS NOT NULL AND m."targetDate" < now()${scope}
-            GROUP BY m.id, p.id`,
-          p.values,
-        );
-      })(),
-      (() => {
-        const p = new Params();
-        const scope = [
-          q.teamId ? `(i."teamId" = ${p.add(q.teamId)} OR p."teamIds" ? ${p.add(q.teamId)}::text)` : '',
-          q.projectId ? `(i."projectId" = ${p.add(q.projectId)} OR cr."projectId" = ${p.add(q.projectId)})` : '',
-        ]
-          .filter(Boolean)
-          .map((c) => ` AND ${c}`)
-          .join('');
-        return db.query<Row[]>(
-          `SELECT cr."issueId", cr."projectId", cr."createdAt", cr.important, c.name AS "customerName",
-                  i.key AS "issueKey", i.title AS "issueTitle", p.name AS "projectName"
-             FROM customer_requests cr
-             JOIN customers c ON c.id = cr."customerId" AND c.status <> 'churned' AND c."archivedAt" IS NULL
-             LEFT JOIN issues i ON i.id = cr."issueId"
-             LEFT JOIN projects p ON p.id = cr."projectId"
-            WHERE cr."workspaceId" = ${p.add(workspaceId)}
-              AND ((i.id IS NOT NULL AND i.status NOT IN ('done','canceled')) OR (p.id IS NOT NULL AND p.status NOT IN ('completed','canceled')))${scope}`,
-          p.values,
-        );
-      })(),
-      db.query<Row[]>(`SELECT u.id, u.name FROM users u JOIN memberships m ON m."userId" = u.id WHERE m."workspaceId" = $1`, [workspaceId]),
-      db.query<Row[]>(`SELECT id, name FROM agents WHERE "workspaceId" = $1`, [workspaceId]),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT actor->>'type' AS "actorType", actor->>'id' AS "actorId", type,
-                  CASE WHEN type = 'issue.status_changed' THEN data->>'to' END AS "to", count(*)::int AS n, max(at) AS "lastAt"
-             FROM domain_events
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND at >= ${p.add(from)} AND at < ${p.add(now)}
-              AND actor->>'type' IN ('user','agent')${wsFilter('"workstreamId"', p)}
-            GROUP BY 1, 2, 3, 4`,
-          p.values,
-        );
-      })(),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT DISTINCT actor->>'id' AS "agentId", "workstreamId" FROM domain_events
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND at >= ${p.add(new Date(now.getTime() - AGENT_TOUCH_DAYS * DAY))}
-              AND actor->>'type' = 'agent' AND "workstreamId" IS NOT NULL${wsFilter('"workstreamId"', p)}`,
-          p.values,
-        );
-      })(),
-      db.query<Row[]>(
-        `SELECT d.actor->>'id' AS "agentId", count(DISTINCT d.subject->>'id')::int AS n
-           FROM domain_events d
-           JOIN domain_events r ON r."workspaceId" = d."workspaceId" AND r.type = 'issue.status_changed'
-            AND r.subject->>'id' = d.subject->>'id' AND r.data->>'from' = 'done' AND r.data->>'to' NOT IN ('done','canceled')
-            AND r.at > d.at AND r.at >= $2 AND r.at < $3
-          WHERE d."workspaceId" = $1 AND d.type = 'issue.status_changed' AND d.data->>'to' = 'done' AND d.actor->>'type' = 'agent'
-            AND d.at >= $2::timestamptz - interval '90 days'
-            AND NOT EXISTS (
-              SELECT 1 FROM domain_events d2 WHERE d2."workspaceId" = d."workspaceId" AND d2.type = 'issue.status_changed'
-                AND d2.subject->>'id' = d.subject->>'id' AND d2.data->>'to' = 'done' AND d2.at > d.at AND d2.at < r.at)
-          GROUP BY 1`,
-        [workspaceId, from, now],
-      ),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT kind, state, ci, "authorRef", "createdAt" FROM artifacts
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND kind IN ${PR_KINDS} AND "authorRef"->>'type' IN ('user','agent')
-              AND ("createdAt" >= ${p.add(from)} OR state = 'open')${wsFilter('"workstreamId"', p)}`,
-          p.values,
-        );
-      })(),
-      (() => {
-        const p = new Params();
-        return db.query<Row[]>(
-          `SELECT "requestedBy", state, "createdAt", "answeredAt" FROM input_requests
-            WHERE "workspaceId" = ${p.add(workspaceId)} AND "requestedBy"->>'type' = 'agent'
-              AND ("createdAt" >= ${p.add(from)} OR state = 'open')${wsFilter('"workstreamId"', p)}`,
-          p.values,
-        );
-      })(),
-    ]);
-
-    const names: NameIndex = new Map<string, { name: string; type: 'user' | 'agent' }>([
-      ...userRows.map((u) => [u.id as string, { name: u.name as string, type: 'user' as const }] as const),
-      ...agentRows.map((a) => [a.id as string, { name: a.name as string, type: 'agent' as const }] as const),
-    ]);
-    const ciFailedAt = new Map(ciRows.map((r) => [r.id as string, r.at as Date]));
-    const artifacts = artifactRows.map((r): IArtifact => ({ ...(r as IArtifact), ciFailedAt: ciFailedAt.get(r.id) }));
-
-    const signals: SignalData = {
-      now,
-      rangeFrom: from,
-      staleDays: q.staleDays,
-      names,
-      workstreams,
-      shippedHistory,
-      facts: buildFacts(
-        workstreams,
-        statusRows as StatusEventRow[],
-        activityRows as ActivityRow[],
-      ),
-      issues,
-      inputRequests: inputRows.map((r) => r as IInputRequest),
-      artifacts,
-      decisions: decisionRows.map((r) => r as IDecision),
-      dependencies: depRows.map((r) => r as IDependency),
-      milestones: milestoneRows.map((r) => r as IMilestone),
-      issueLinks: linkRows.map((r) => r as IIssueLink),
-      customerRequests: customerRows.map((r): ICustomerRequest => ({
-        customerName: r.customerName,
-        important: !!r.important,
-        createdAt: r.createdAt,
-        targetType: r.issueId ? 'issue' : 'project',
-        targetId: r.issueId ?? r.projectId,
-        targetKey: r.issueKey ?? undefined,
-        targetTitle: r.issueTitle ?? r.projectName ?? 'Project',
-      })),
+    const signals = (Object.keys(INSIGHT_SIGNALS) as InsightSignalId[]).map((id) => {
+      const all = signalItems[id].sort((a, b) => (b.ageDays ?? 0) - (a.ageDays ?? 0));
+      const oldestDays = all[0]?.ageDays;
+      return {
+        id, ...INSIGHT_SIGNALS[id], severity: all.length ? (id === 'overdue_milestones' || id === 'stale_issues' ? 'warning' : 'info') : 'ok',
+        count: all.length, ...(oldestDays === undefined ? {} : { oldestDays }), items: all.slice(0, limit), truncated: all.length > limit,
+      } as InsightSignal;
+    });
+    const done = visibleIssues.filter((i) => i.status === 'done' && i.completedAt && new Date(i.completedAt) >= from);
+    const cycle = done.filter((i) => i.startedAt).map((i) => duration(new Date(i.startedAt), new Date(i.completedAt)));
+    const lead = done.map((i) => duration(new Date(i.createdAt), new Date(i.completedAt)));
+    const throughput = Array.from({ length: Math.ceil(days / 7) }, (_, n) => {
+      const start = new Date(from.getTime() + n * 7 * DAY);
+      const end = new Date(Math.min(start.getTime() + 7 * DAY, now.getTime()));
+      return { start: start.toISOString(), end: end.toISOString(), issuesDone: done.filter((i) => new Date(i.completedAt) >= start && new Date(i.completedAt) < end).length };
+    });
+    const contributors = new Map<string, InsightContributor>();
+    for (const event of events) {
+      const key = `${event.actorType}:${event.actorId}`;
+      const actor = contributors.get(key) ?? {
+        actor: {
+          type: event.actorType,
+          id: event.actorId,
+          name: actorNames.find((candidate) => candidate.id === event.actorId)?.name ?? 'Unknown',
+        },
+        events: 0,
+        issuesDone: 0,
+        comments: 0,
+        pullRequests: 0,
+        decisionsProposed: 0,
+        inputRequestsRaised: 0,
+        lastActiveAt: new Date(event.lastAt).toISOString(),
+      };
+      actor.events += Number(event.events);
+      if (event.type === 'issue.status_changed') actor.issuesDone += Number(event.events);
+      actor.lastActiveAt = new Date(
+        Math.max(
+          new Date(actor.lastActiveAt ?? event.lastAt).getTime(),
+          new Date(event.lastAt).getTime(),
+        ),
+      ).toISOString();
+      contributors.set(key, actor);
+    }
+    const contributorRows = [...contributors.values()].sort((a, b) => b.events - a.events);
+    const eventTotal = contributorRows.reduce((sum, row) => sum + row.events, 0);
+    const peopleEvents = contributorRows.filter((row) => row.actor.type === 'user').reduce((sum, row) => sum + row.events, 0);
+    const wipByAssignee = new Map<string, Row[]>();
+    for (const issue of visibleIssues.filter((row) => ACTIVE.includes(row.status) && row.assigneeId)) {
+      const assigned = wipByAssignee.get(issue.assigneeId) ?? [];
+      assigned.push(issue);
+      wipByAssignee.set(issue.assigneeId, assigned);
+    }
+    const wipUsers = wipByAssignee.size
+      ? await this.db.query<Row[]>(
+          'SELECT id, name FROM users WHERE id = ANY($1::text[])',
+          [[...wipByAssignee.keys()]],
+        )
+      : [];
+    const wipRows: InsightWipRow[] = [...wipByAssignee].map(([id, assigned]) => ({
+      actor: { type: 'user' as const, id, name: wipUsers.find((user) => user.id === id)?.name ?? 'Unknown' },
+      issues: assigned.length,
+      overloaded: assigned.length > 5,
+      items: assigned.map((issue) => item('issue', issue, new Date(issue.updatedAt), 'Assigned in-flight Issue.')),
+    })).sort((a, b) => b.issues - a.issues);
+    const bottleneckMap = new Map<string, InsightBottleneck>();
+    for (const waiting of signalItems.needs_input) {
+      const actor = waiting.waitingOn ?? { type: 'unassigned' as const, name: 'Unassigned' };
+      const key = actor.id ?? 'unassigned';
+      const row = bottleneckMap.get(key) ?? {
+        actor,
+        inputRequests: 0,
+        decisions: 0,
+        reviews: 0,
+        oldestDays: 0,
+        totalWaitDays: 0,
+      };
+      if (waiting.type === 'decision') row.decisions++;
+      else row.inputRequests++;
+      row.oldestDays = Math.max(row.oldestDays, waiting.ageDays ?? 0);
+      row.totalWaitDays += waiting.ageDays ?? 0;
+      bottleneckMap.set(key, row);
+    }
+    const report: InsightsReport = {
+      generatedAt: now.toISOString(), range: { days, from: from.toISOString(), to: now.toISOString() },
+      scope: { ...(query.teamId ? { teamId: query.teamId } : {}), ...(query.projectId ? { projectId: query.projectId } : {}) },
+      staleDays, signals,
+      bottlenecks: [...bottleneckMap.values()].sort((a, b) => b.totalWaitDays - a.totalWaitDays),
+      flow: {
+        issueCycle: { stats: stats(cycle), histogram: [], slowest: [] },
+        issueLead: { stats: stats(lead), histogram: [], slowest: [] },
+        throughput, previousThroughput: { issuesDone: 0 },
+        wip: { people: wipRows, agents: [], limits: { issues: 5 } },
+        aging: { baselineSamples: 0, items: [] },
+      },
+      actors: {
+        people: contributorRows.filter((row) => row.actor.type === 'user'),
+        agents: contributorRows.filter((row) => row.actor.type === 'agent'),
+        share: { people: eventTotal ? peopleEvents / eventTotal : 0, agents: eventTotal ? (eventTotal - peopleEvents) / eventTotal : 0 },
+        failures: [],
+      },
     };
-
-    return {
-      from,
-      to: now,
-      signals,
-      doneBefore: Number(doneBefore),
-      changes: changeRows.map((r): IssueChange => ({ issueId: r.issueId, at: r.at, from: r.from, to: r.to })),
-      touches: touchRows.map((r): AgentTouch => ({ agentId: r.agentId, workstreamId: r.workstreamId })),
-      agentIds: agentRows.map((a) => a.id as string),
-      events: eventRows.map((r) => r as EventCountRow),
-      reopened: new Map(reopenedRows.map((r) => [r.agentId as string, r.n as number])),
-      actorArtifacts: actorArtifactRows.map((r) => r as ActorArtifact),
-      actorRequests: actorRequestRows.map((r) => r as ActorInputRequest),
-    };
+    return { report, signalItems };
   }
 }

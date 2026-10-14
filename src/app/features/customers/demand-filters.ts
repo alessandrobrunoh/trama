@@ -3,7 +3,7 @@ import { LucideDynamicIcon, LucideTrendingUp } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { TramaStore, filterValues, setFilter, type ViewFilter } from '../../core';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 
 /** The customer fields this control owns inside a list's filters. */
 export const DEMAND_FILTER_FIELDS = ['customerId', 'customerTierId', 'customerCount', 'requestCount', 'importantCount', 'customerRevenue', 'customerSize'] as const;

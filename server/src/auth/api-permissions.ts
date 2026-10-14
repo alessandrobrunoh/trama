@@ -30,11 +30,10 @@ const NESTED_RESOURCE: Record<string, ApiResource> = {
 };
 
 /**
- * Nested segments that are also catalog resources but stay under the parent's permission (the
- * workstream graph). Any other nested segment naming a catalog resource is a sub-resource nobody
- * mapped yet and is refused for custom tokens, so it cannot silently fall under the parent's permission.
+ * Nested segments that stay under their parent's permission. Any other nested segment naming a
+ * catalog resource is refused for custom tokens until explicitly mapped.
  */
-const PARENT_OWNED = new Set<string>(['graph']);
+const PARENT_OWNED = new Set<string>();
 
 /** `POST …/<verb>` routes that need a more specific permission than a plain write. */
 const ACTION_OVERRIDES: Record<

@@ -1,4 +1,4 @@
-// "Context" tab of the project page: every artifact under the project (its own + workstreams + issues) as a
+// "Context" tab of the project page: every artifact under the project and its issues as a
 // collapsible tree or a flat list, each traced back to its owner, plus the markdown briefing for agents.
 import {
   ChangeDetectionStrategy,
@@ -210,7 +210,7 @@ type TreeRow =
         <app-empty-state
           [icon]="pkgIcon"
           title="No context yet"
-          description="Documents and links attached to the project, and the pull requests, builds and docs of its workstreams and issues, all show up here."
+          description="Documents and links attached to the project, and the pull requests, builds and docs of its issues, all show up here."
         >
           @if (canEdit()) {
             <button hlmBtn size="sm" (click)="openAdd()">Add document / link</button>
@@ -309,11 +309,11 @@ type TreeRow =
         }
       }
 
-      <!-- other context: open decisions + open questions from the workstreams -->
+      <!-- Decisions and open questions are shown with their direct Issue context. -->
       <section class="px-4 py-5 sm:px-6" aria-labelledby="pc-other">
         <h2 id="pc-other" class="mb-1 text-sm font-medium">Other context</h2>
         <p class="text-muted-foreground mb-3 text-xs">
-          Decisions in play and questions waiting for an answer in this project’s workstreams.
+          Decisions in play and questions waiting for an answer on this project's issues.
         </p>
         @if (ctxState() === 'error' && !ctx()) {
           <div
@@ -368,7 +368,7 @@ type TreeRow =
                         d.key
                       }}</span>
                       <span class="min-w-0 flex-1 truncate">{{ d.title }}</span>
-                      @if (originOf(d.originWorkstreamId); as o) {
+                      @if (issueOf(d.originIssueId ?? d.relatedIssueIds[0]); as o) {
                         <a
                           [routerLink]="o.link"
                           class="text-muted-foreground hover:text-foreground relative shrink-0 font-mono text-[11px] hover:underline"
@@ -403,7 +403,7 @@ type TreeRow =
                     <li
                       class="hover:bg-hover relative flex min-h-9 items-center gap-2 border-b px-3 text-[13px] last:border-b-0"
                     >
-                      @if (originOf(q.workstreamId); as o) {
+                      @if (issueOf(q.issueId); as o) {
                         <a
                           class="absolute inset-0"
                           [routerLink]="o.link"
@@ -439,8 +439,7 @@ type TreeRow =
         <hlm-dialog-header>
           <h2 hlmDialogTitle>Project context</h2>
           <p hlmDialogDescription>
-            The briefing handed to agents: the project, its workstreams, issues, artifacts and
-            decisions.
+            The briefing handed to agents: the project, its issues, artifacts and decisions.
           </p>
         </hlm-dialog-header>
         <div class="flex items-center gap-1.5">
@@ -672,10 +671,13 @@ export class ProjectContextTab {
     return INDENT_BASE + depth * INDENT_STEP;
   }
 
-  protected originOf(workstreamId: string | undefined): SubjectView | null {
-    return workstreamId
-      ? resolveSubject(this.store, { type: 'workstream', id: workstreamId })
-      : null;
+  protected issueOf(issueId: string | undefined): { label: string; link: string[] } | null {
+    const issue = issueId ? this.store.issueById().get(issueId) : undefined;
+    if (!issue) return null;
+    return {
+      label: issue.key,
+      link: ['/', this.slug(), 'issues', issue.key],
+    };
   }
 
   protected toggleKind(kind: ArtifactKind): void {

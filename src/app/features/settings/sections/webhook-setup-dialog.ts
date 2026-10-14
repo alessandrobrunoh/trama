@@ -52,7 +52,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
           <hlm-dialog-header>
             <h2 hlmDialogTitle>{{ rotated() ? 'New webhook secret' : 'Set up the webhook' }}</h2>
             <p hlmDialogDescription>
-              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on your workstreams.' }}
+              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on issues and projects.' }}
             </p>
           </hlm-dialog-header>
 

@@ -9,7 +9,7 @@ import { AiButton } from './ai-button';
 import { AiResult } from './ai-result';
 
 /**
- * "Standup digest": what changed in the last day and week, workstreams at risk, overdue milestones
+ * "Standup digest": what changed in the last day and week, issues at risk, overdue milestones
  * and the issues waiting longest, written by the AI from store data. Self-contained: drop it
  * anywhere (`<app-ai-digest-card />`). Nothing is requested until the person presses Generate.
  */
@@ -21,7 +21,7 @@ import { AiResult } from './ai-result';
   template: `
     <section class="bg-card border-border-strong rounded-lg border px-3 py-2.5" aria-labelledby="ai-digest-title">
       <header class="flex items-center gap-1.5">
-        <svg [lucideIcon]="sparkles" [size]="14" [strokeWidth]="1.75" class="text-entity-workstream"></svg>
+        <svg [lucideIcon]="sparkles" [size]="14" [strokeWidth]="1.75" class="text-primary"></svg>
         <h3 id="ai-digest-title" class="text-[13px] font-medium">Standup digest</h3>
         <span class="flex-1"></span>
         @if (job.state() === 'idle') {
@@ -63,9 +63,8 @@ export class AiDigestCard implements OnDestroy {
   protected readonly copyIcon = LucideCopy;
   protected readonly job = this.ai.job<string>((signal) => this.ai.standupDigest(signal));
   protected readonly scope = computed(() => {
-    const w = this.store.workstreams().filter((x) => x.status !== 'shipped' && x.status !== 'canceled').length;
     const i = this.store.issues().filter((x) => x.status !== 'done' && x.status !== 'canceled').length;
-    return `${w} active workstream${w === 1 ? '' : 's'} and ${i} open issue${i === 1 ? '' : 's'}`;
+    return `${i} open issue${i === 1 ? '' : 's'}`;
   });
 
   constructor() {

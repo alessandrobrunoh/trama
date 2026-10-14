@@ -36,7 +36,7 @@ describe('custom API tokens: permissions and limits', () => {
     expect(noDelete.body.message).toMatch(/issues:delete/);
     const noTeamWrite = await client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(403);
     expect(noTeamWrite.body.message).toMatch(/teams:write/);
-    await client.get(`${w}/workstreams`).expect(403);
+    await client.get(`${w}/decisions`).expect(403);
     await client.get(`${w}/snapshot`).expect(403);
     await client.get(`${w}/tokens`).expect(403);
     await client.post(`${w}/ai/chat`, { messages: [{ role: 'user', content: 'hi' }] }).expect(403);

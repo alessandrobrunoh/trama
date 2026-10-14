@@ -3,7 +3,6 @@ import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type CustomerTier } from '../../../core/contracts/domain';
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
@@ -11,7 +10,6 @@ import { SessionStore } from '../../../core/session/session.store';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe } from '../../../shared/pipes';
-import { ProviderIcon } from '../../../shared/provider-icon';
 import { AppSelect, type Option } from '../../create/form-kit';
 import { SECTION_KIT } from './section-kit';
 
@@ -21,7 +19,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 @Component({
   selector: 'app-workspace-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, FullDatePipe, ProviderIcon, AppSelect, ...SECTION_KIT],
+  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, FullDatePipe, AppSelect, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -100,7 +98,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
             </div>
           </div>
         </app-settings-row>
-        <app-settings-row label="Default team" description="Preselected when someone files an issue or starts a workstream." wide>
+        <app-settings-row label="Default team" description="Preselected when someone files an issue." wide>
           <app-select size="sm" [options]="teamOptions()" [value]="prefs().defaultTeamId" (valueChange)="patchPrefs({ defaultTeamId: $event })" [disabled]="!canAdmin()" label="Default team" />
         </app-settings-row>
         <app-settings-row label="Week starts on" description="Used by calendars, date pickers and cycles." wide>
@@ -137,20 +135,6 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
         }
       </app-settings-group>
     </form>
-
-    <app-settings-group title="Features" description="Optional parts of Trama. Turn off what your team does not use.">
-      <app-settings-row label="Delta threads" description="Link each workstream to the Delta thread where the work happens, and show it on workstreams, the timeline and the graph. When off, the link is hidden. The link is always optional when creating a workstream. Existing links are kept.">
-        <span class="flex items-center gap-3">
-          <span class="bg-primary/10 text-primary inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium">
-            <app-provider-icon provider="delta" [size]="11" /> Recommended
-          </span>
-          <hlm-switch [checked]="store.deltaThreads()" [disabled]="!canAdmin() || savingFeature()" (checkedChange)="setDeltaThreads($event)" aria-label="Delta threads" />
-        </span>
-      </app-settings-row>
-      @if (!canAdmin()) {
-        <div class="text-muted-foreground px-4 pb-3 text-xs">Only admins and owners can change features.</div>
-      }
-    </app-settings-group>
 
     <app-settings-group title="Estimates" description="How issues are sized. Estimates are stored as numbers, so switching scale never rewrites an issue: a value that is not on the new scale stays visible and selectable.">
       <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2" role="radiogroup" aria-label="Estimate scale">
@@ -202,7 +186,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       <app-settings-row label="Contents" description="What this workspace holds right now.">
         <span class="text-muted-foreground text-[13px] tabular-nums">{{ counts() }}</span>
       </app-settings-row>
-      <app-settings-row label="Labels" description="One catalog shared by issues, workstreams, projects and repositories.">
+      <app-settings-row label="Labels" description="One catalog shared by issues, projects and repositories.">
         <a hlmBtn variant="outline" size="sm" [routerLink]="['/', store.slug(), 'settings', 'labels']">Manage labels</a>
       </app-settings-row>
     </app-settings-group>
@@ -252,7 +236,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
     <app-settings-group title="Danger zone">
       <app-settings-row
         label="Delete workspace"
-        [description]="canOwner() ? 'Removes every workstream, issue, decision, repository and its history. This cannot be undone.' : 'Only an owner can delete the workspace.'"
+        [description]="canOwner() ? 'Removes this workspace and all of its data. This cannot be undone.' : 'Only an owner can delete the workspace.'"
       >
         <button hlmBtn variant="destructive" size="sm" [disabled]="!canOwner()" (click)="deleteWorkspace()">Delete workspace</button>
       </app-settings-row>
@@ -284,7 +268,6 @@ export class WorkspaceSection {
   protected readonly swatches = ['#5e6ad2', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#64748b'];
   protected readonly checkIcon = LucideCheck;
   protected readonly savingScale = signal(false);
-  protected readonly savingFeature = signal(false);
   protected readonly savingTier = signal(false);
   protected readonly newTier = signal('');
   protected readonly tiers = computed(() => this.store.settings().customerTiers);
@@ -327,7 +310,6 @@ export class WorkspaceSection {
   protected readonly counts = computed(() => {
     const s = this.store;
     return [
-      `${s.workstreams().length} workstreams`,
       `${s.issues().length} issues`,
       `${s.decisions().length} decisions`,
       `${s.memberships().length} members`,
@@ -369,13 +351,6 @@ export class WorkspaceSection {
     const ok = await this.store.updateSettings({ estimateScale: scale });
     this.savingScale.set(false);
     if (ok) this.notify.success(`Estimates: ${ESTIMATE_SCALE_DEFS[scale].label}`, { description: scale === 'none' ? 'Estimates are hidden; existing values are kept.' : 'Existing estimates keep their value.' });
-  }
-  protected async setDeltaThreads(enabled: boolean): Promise<void> {
-    if (!this.canAdmin() || enabled === this.store.deltaThreads() || this.savingFeature()) return;
-    this.savingFeature.set(true);
-    const ok = await this.store.updateSettings({ deltaThreads: enabled });
-    this.savingFeature.set(false);
-    if (ok) this.notify.success(enabled ? 'Delta threads turned on' : 'Delta threads turned off');
   }
   protected patchPrefs(change: Partial<ReturnType<WorkspaceSection['storedPrefs']>>): void {
     this.prefs.update((p) => ({ ...p, ...change }));
@@ -459,7 +434,7 @@ export class WorkspaceSection {
     this.ui.setConfirmDelete({
       title: `Delete ${ws.name}?`,
       description:
-        'Every workstream, issue, repository and decision in it is removed for everyone. This cannot be undone.',
+        'The workspace and all of its data are removed for everyone. This cannot be undone.',
       confirmLabel: 'Delete workspace',
       requireText: { accept: [ws.name, ws.slug], label: `Type ${ws.name} to confirm` },
       onConfirm: async (typed) => {

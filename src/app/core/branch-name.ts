@@ -1,4 +1,4 @@
-// Git branch names for issues and workstreams ("Copy git branch name"), pure and framework-free.
+// Git branch names for issues ("Copy git branch name"), pure and framework-free.
 
 export type BranchFormat = 'user/key-title' | 'key-title' | 'feature/key-title';
 
@@ -40,7 +40,7 @@ export function branchUser(fullName: string | undefined): string {
 export interface BranchNameOptions {
   /** Handle for the `user/` prefix (already a slug, or a first name; it is slugified anyway). */
   user?: string;
-  /** Issue or workstream key: "BUG-142". */
+  /** Issue key: "BUG-142". */
   key: string;
   title: string;
   format?: BranchFormat;

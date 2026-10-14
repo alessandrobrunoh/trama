@@ -106,16 +106,19 @@ type Tab = 'open' | 'archived';
           description="No questions, reviews, blockers or deadlines are waiting on you. Agents keep working, and anything that needs a human will show up here."
         >
           <div class="flex flex-wrap justify-center gap-2">
-            <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'workstreams']">Workstreams</a>
             <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'issues']">Issues</a>
             @if (!store.agents().length) {
-              <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'connect']">Connect your agent</a>
+              <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'connect']"
+                >Connect your agent</a
+              >
             }
           </div>
         </app-empty-state>
       }
       @if (sections().length) {
-        <p class="text-meta hidden flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex sm:px-6">
+        <p
+          class="text-meta hidden flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 sm:flex sm:px-6"
+        >
           <span class="flex items-center gap-1"><app-kbd keys="j" /><app-kbd keys="k" /> move</span>
           <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
           <span class="flex items-center gap-1"><app-kbd keys="a" /> answer</span>
@@ -198,7 +201,9 @@ export class AttentionPage {
 
   // "Everyone" scope: fetched separately (the snapshot only carries my items).
   private readonly allItems = signal<AttentionItem[] | null>(null);
-  protected readonly loadingAll = computed(() => this.scope() === 'all' && this.allItems() === null);
+  protected readonly loadingAll = computed(
+    () => this.scope() === 'all' && this.allItems() === null,
+  );
   private readonly acted = signal<ReadonlyMap<string, Partial<AttentionItem>>>(new Map());
 
   protected readonly items = computed<readonly AttentionItem[]>(() => {
@@ -213,7 +218,9 @@ export class AttentionPage {
   protected readonly archived = computed(() =>
     this.items()
       .filter((a) => a.state !== 'open')
-      .sort((a, b) => (a.state === b.state ? b.since.localeCompare(a.since) : a.state === 'snoozed' ? -1 : 1)),
+      .sort((a, b) =>
+        a.state === b.state ? b.since.localeCompare(a.since) : a.state === 'snoozed' ? -1 : 1,
+      ),
   );
 
   protected readonly sections = computed(() => {
@@ -248,7 +255,8 @@ export class AttentionPage {
 
   protected readonly description = computed(() => {
     const open = this.open();
-    if (!open.length) return this.scope() === 'all' ? 'Nothing open across the workspace' : 'All clear';
+    if (!open.length)
+      return this.scope() === 'all' ? 'Nothing open across the workspace' : 'All clear';
     const high = open.filter((a) => a.severity === 'high').length;
     return `${open.length} open${high ? ` · ${high} high priority` : ''}${this.scope() === 'all' ? ' · everyone' : ''}`;
   });

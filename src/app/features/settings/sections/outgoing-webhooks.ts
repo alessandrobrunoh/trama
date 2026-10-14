@@ -79,7 +79,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
   template: `
     <app-settings-group
       title="Custom webhooks"
-      description="Send a signed JSON POST to your own URL when something happens in Trama (an issue is filed, a workstream ships…). Feed a chat bridge, a dashboard or any automation."
+      description="Send a signed JSON POST to your own URL when something happens in Trama (an issue is filed or a decision is accepted…). Feed a chat bridge, a dashboard or any automation."
     >
       @if (canManage() && !form()) {
         <button aside hlmBtn size="sm" variant="outline" class="h-7" (click)="startCreate()">

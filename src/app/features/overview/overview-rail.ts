@@ -10,7 +10,7 @@ import { AgoPipe } from './ago';
 import { EventLine } from './event-line';
 import { OverviewModel } from './overview-model';
 
-/** Quiet lists: backlog to triage, recently shipped, decisions to review and the latest activity. */
+/** Quiet lists: backlog to triage, decisions to review and the latest activity. */
 @Component({
   selector: 'app-overview-rail',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -36,29 +36,6 @@ import { OverviewModel } from './overview-model';
           </li>
         } @empty {
           <li class="text-meta py-2">The backlog is empty. New demand lands here until someone picks it up.</li>
-        }
-      </ul>
-    </section>
-
-    <section aria-labelledby="ov-shipped">
-      <header class="mb-1 flex items-baseline gap-3 border-b pb-2">
-        <h2 id="ov-shipped" class="text-sm font-medium">Recently shipped</h2>
-        <span class="text-meta">last 30 days</span>
-        <span class="flex-1"></span>
-        <a [routerLink]="['/', m.slug(), 'workstreams']" [queryParams]="{ view: 'shipped' }" class="text-meta hover:text-foreground">All</a>
-      </header>
-      <ul>
-        @for (w of m.shipped(); track w.id) {
-          <li>
-            <a [routerLink]="['/', m.slug(), 'workstreams', w.key]" class="hover:bg-hover -mx-2 flex h-8 items-center gap-2 rounded-md px-2">
-              <app-status-icon entity="workstream" status="shipped" />
-              <span class="text-muted-foreground w-[4.25rem] shrink-0 truncate font-mono text-[11px]">{{ w.key }}</span>
-              <span class="min-w-0 flex-1 truncate text-[13px]">{{ w.title }}</span>
-              <span class="text-meta shrink-0 tabular-nums">{{ w.shippedAt | ago }}</span>
-            </a>
-          </li>
-        } @empty {
-          <li class="text-meta py-2">Nothing shipped in the last 30 days.</li>
         }
       </ul>
     </section>

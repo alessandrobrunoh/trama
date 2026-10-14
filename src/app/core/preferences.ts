@@ -10,7 +10,7 @@ import { oneOf, readJson, writeJson } from './stores/storage';
 export const PREFERENCES_STORAGE_KEY = 'trama.preferences.v1';
 
 /** Page opened after signing in and from "/". */
-export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'issues', 'workstreams'] as const;
+export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'issues'] as const;
 export type HomeView = (typeof HOME_VIEWS)[number];
 
 export const HOME_VIEW_LABELS: Record<HomeView, string> = {
@@ -18,7 +18,6 @@ export const HOME_VIEW_LABELS: Record<HomeView, string> = {
   inbox: 'Inbox',
   'my-work': 'My work',
   issues: 'Issues',
-  workstreams: 'Workstreams',
 };
 
 /** Key that posts a comment. With `mod-enter`, plain Enter adds a new line. */

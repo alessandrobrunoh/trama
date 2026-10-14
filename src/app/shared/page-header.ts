@@ -11,7 +11,7 @@ import { PageChrome, type PageTitle } from '../layout/page-chrome';
  *   [actions]  right-aligned controls (layout toggles, scope switches)
  *   default    tabs / filter row rendered under the toolbar (optional)
  *
- *   <app-page-header title="Workstreams" description="Everything in flight">
+ *   <app-page-header title="Issues" description="Everything in flight">
  *     <button actions hlmBtn size="sm">New</button>
  *   </app-page-header>
  */

@@ -2,9 +2,10 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtifactsModule } from '../artifacts/artifacts.module.js';
 import { CustomersModule } from '../customers/customers.module.js';
+import { DecisionsModule } from '../decisions/decisions.module.js';
 import { IssueEntity } from '../database/entities/index.js';
+import { InputRequestsModule } from '../input-requests/input-requests.module.js';
 import { UploadsModule } from '../uploads/uploads.module.js';
-import { WorkstreamsModule } from '../workstreams/workstreams.module.js';
 import { IssuesController } from './issues.controller.js';
 import { IssuesService } from './issues.service.js';
 
@@ -12,7 +13,8 @@ import { IssuesService } from './issues.service.js';
   imports: [
     TypeOrmModule.forFeature([IssueEntity]),
     ArtifactsModule,
-    WorkstreamsModule,
+    DecisionsModule,
+    InputRequestsModule,
     CustomersModule,
     UploadsModule,
   ],

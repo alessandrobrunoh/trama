@@ -24,7 +24,6 @@ import {
   LucideStar,
   LucideDynamicIcon,
   LucideExternalLink,
-  LucideHexagon,
   LucideInbox,
   LucideLink,
   LucideList,
@@ -66,13 +65,13 @@ import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import {
   priorityOptions,
   projectFilterOptions,
   teamOptions,
   userOptions,
-} from '../workstreams/ws-model';
+} from '../../shared/picker-options';
 import { DemandFilters } from '../customers/demand-filters';
 import { IssueActions } from './issue-actions';
 import { IssueCard, IssueRow } from './issue-items';
@@ -90,7 +89,6 @@ import {
   issueStatusOptions,
   milestoneFilterOptions,
   readDisplay,
-  workstreamPickOptions,
   writeDisplay,
   type IssueDisplay,
   type IssueGroup,
@@ -204,14 +202,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             [manageLink]="false"
             [value]="fv('labels')"
             (valueChange)="setF('labels', $event)"
-          />
-          <app-picker
-            variant="chip"
-            label="Workstream"
-            [multiple]="true"
-            [options]="wsFilter()"
-            [value]="fv('workstreamIds')"
-            (valueChange)="setF('workstreamIds', $event)"
           />
           @if (projectFilter().length > 1) {
             <app-picker
@@ -426,7 +416,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
         [layout]="d().layout"
         [disabled]="!draggable()"
         [prefix]="dropPrefix()"
-        [addable]="canEdit() && showCreate() && effectiveGroup() !== 'workstreamIds'"
+        [addable]="canEdit() && showCreate()"
         addLabel="New issue in this group"
         emptyText="No issues"
         (add)="createIn($event)"
@@ -502,19 +492,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                 <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground"></svg>
               }
             }
-            @case ('workstreamIds') {
-              @if (key) {
-                <app-status-icon
-                  entity="workstream"
-                  [status]="$any(store.getWorkstream(key)?.status ?? 'draft')"
-                />
-                <span class="text-muted-foreground font-mono text-xs">{{
-                  store.getWorkstream(key)?.key
-                }}</span>
-              } @else {
-                <svg [lucideIcon]="hexIcon" [size]="14" class="text-muted-foreground"></svg>
-              }
-            }
           }
           <span class="truncate font-medium">{{ label(key) }}</span>
         </ng-template>
@@ -543,11 +520,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           </button>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="teamSub">
             <svg [lucideIcon]="teamIcon" [size]="14"></svg> Team
-            <hlm-dropdown-menu-item-sub-indicator />
-          </button>
-          <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="wsSub">
-            <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Add to
-            workstream
             <hlm-dropdown-menu-item-sub-indicator />
           </button>
         </hlm-dropdown-menu-group>
@@ -590,9 +562,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               [disabled]="!!i.duplicateOfId"
             >
               <svg [lucideIcon]="copyIcon" [size]="14"></svg> Mark as duplicate…
-            </button>
-            <button hlmDropdownMenuItem (triggered)="actions.createWorkstreamFrom(i)">
-              <svg [lucideIcon]="plus" [size]="14"></svg> Create workstream from issue
             </button>
           }
         </hlm-dropdown-menu-group>
@@ -664,26 +633,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               }
             </button>
           }
-        </hlm-dropdown-menu-sub>
-      </ng-template>
-      <ng-template #wsSub>
-        <hlm-dropdown-menu-sub class="max-h-96 w-72 overflow-y-auto">
-          <hlm-dropdown-menu-label>Contributes to the outcome of…</hlm-dropdown-menu-label>
-          @for (o of wsMenuOpts(); track o.value) {
-            <button hlmDropdownMenuItem (triggered)="actions.toggleWorkstream(ids, o.value)">
-              <app-issue-option-glyph [option]="o" />
-              <span class="text-muted-foreground shrink-0 font-mono text-[11px]">{{ o.hint }}</span>
-              <span class="truncate">{{ o.label }}</span>
-              @if (allLinked(ids, o.value)) {
-                <svg [lucideIcon]="checkIcon" [size]="13" class="ml-auto shrink-0"></svg>
-              }
-            </button>
-          }
-          <hlm-dropdown-menu-separator />
-          <button hlmDropdownMenuItem (triggered)="actions.openPrompt('workstream', ids)">
-            <svg [lucideIcon]="searchIcon" [size]="14"></svg> Search workstreams…
-            <hlm-dropdown-menu-shortcut><app-kbd keys="w" /></hlm-dropdown-menu-shortcut>
-          </button>
         </hlm-dropdown-menu-sub>
       </ng-template>
     </ng-template>
@@ -780,16 +729,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           <button
             hlmBtn
             variant="ghost"
-            size="sm"
-            class="h-7 gap-1.5 px-2 text-xs"
-            hlmTooltip="Add to workstream · W"
-            (click)="actions.openPrompt('workstream', selection())"
-          >
-            <svg [lucideIcon]="hexIcon" [size]="14" class="text-entity-workstream"></svg> Workstream
-          </button>
-          <button
-            hlmBtn
-            variant="ghost"
             size="icon-sm"
             class="size-7"
             aria-label="Copy keys"
@@ -822,7 +761,7 @@ export class IssueBoard {
   protected readonly favorites = inject(FavoritesStore);
   private readonly document = inject(DOCUMENT);
 
-  /** Issues this board shows. The issues page passes every issue; a workstream passes its own. */
+  /** Issues this board shows. */
   readonly issues = input.required<readonly Issue[]>();
   /** Restrict to these statuses (view tabs); null = all. */
   readonly scope = input<readonly IssueStatus[] | null>(null);
@@ -836,7 +775,7 @@ export class IssueBoard {
   readonly project = input<string>();
   readonly emptyTitle = input('No issues yet');
   readonly emptyDescription = input(
-    'Issues are demand: the bugs, requests and incidents people report. When you decide to act, add them to a workstream: the outcome that resolves them.',
+    'Issues track bugs, requests and incidents from triage through completion.',
   );
   readonly showCreate = input(true);
   /** localStorage key for display options. */
@@ -859,15 +798,9 @@ export class IssueBoard {
     { value: '', label: 'Unassigned' },
     ...userOptions(this.store),
   ]);
-  protected readonly wsFilter = computed<PickOption[]>(() => [
-    { value: '', label: 'No workstream' },
-    ...workstreamPickOptions(this.store),
-  ]);
   protected readonly projectFilter = computed(() => projectFilterOptions(this.store));
   protected readonly milestoneFilter = computed(() => milestoneFilterOptions(this.store));
-  /** An issue counts under its own project and the projects of its workstreams. */
   private readonly queryCtx = computed(() => ({
-    workstreamById: this.store.workstreamById(),
     demand: this.store.demand(),
   }));
   protected readonly groups = GROUPS;
@@ -883,9 +816,6 @@ export class IssueBoard {
   protected readonly priorityOpts = promptOptions(this.store, 'priority', []);
   protected readonly assigneeOpts = computed(() => promptOptions(this.store, 'assignee', []));
   protected readonly teamOpts = computed(() => promptOptions(this.store, 'team', []));
-  protected readonly wsMenuOpts = computed(() =>
-    promptOptions(this.store, 'workstream', []).slice(0, 10),
-  );
 
   protected readonly plus = LucidePlus;
   protected readonly searchIcon = LucideSearch;
@@ -898,7 +828,6 @@ export class IssueBoard {
   protected readonly boardIcon = LucideColumns3;
   protected readonly displayIcon = LucideSlidersHorizontal;
   protected readonly noUser = LucideCircleUserRound;
-  protected readonly hexIcon = LucideHexagon;
   protected readonly projectIcon = LucideBox;
   protected readonly teamIcon = LucideUsers;
   protected readonly copyIcon = LucideCopy;
@@ -966,7 +895,7 @@ export class IssueBoard {
     );
   });
 
-  /** Visible issue ids in display order (unique; an issue can sit in several workstream groups). */
+  /** Visible issue ids in display order. */
   private readonly ordered = computed(() => [
     ...new Set(this.columns().flatMap((c) => c.items.map((i) => i.id))),
   ]);
@@ -1027,13 +956,6 @@ export class IssueBoard {
       group: 'Issues',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('project', this.targets()),
-    },
-    {
-      keys: 'w',
-      label: 'Add to workstream',
-      group: 'Issues',
-      when: () => this.canAct(),
-      run: () => this.actions.openPrompt('workstream', this.targets()),
     },
     {
       keys: 'mod+.',
@@ -1258,11 +1180,6 @@ export class IssueBoard {
   ): boolean {
     const list = this.actions.issues(ids);
     return list.length > 0 && list.every((i) => (i[field] ?? '') === value);
-  }
-
-  protected allLinked(ids: readonly string[], wsId: string): boolean {
-    const list = this.actions.issues(ids);
-    return list.length > 0 && list.every((i) => i.workstreamIds.includes(wsId));
   }
 
   private canAct(): boolean {

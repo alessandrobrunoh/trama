@@ -9,19 +9,17 @@ import {
 import { RouterLink } from '@angular/router';
 import { LucideDynamicIcon, LucideGitBranch } from '@lucide/angular';
 import { HlmHoverCardImports } from '@spartan-ng/helm/hover-card';
-import type { Decision, Issue, Repository, Workstream } from '../core/contracts/domain';
+import type { Decision, Issue, Repository } from '../core/contracts/domain';
 import { TramaStore } from '../core/stores/trama.store';
 import { ActorAvatar, ActorLabel } from './actor-avatar';
 import { IssueKindLabel } from './issue';
 import type { TextLinker } from './markdown';
-import { FullDatePipe } from './pipes';
 import { PriorityIcon } from './priority-icon';
 import { StatusIcon, StatusLabel, type AnyStatus } from './status';
 
 /** A record the assistant (or any text) mentioned, resolved against the loaded workspace. */
 export type ResolvedRef =
   | { type: 'issue'; key: string; title: string; link: string[]; issue: Issue }
-  | { type: 'workstream'; key: string; title: string; link: string[]; workstream: Workstream }
   | { type: 'decision'; key: string; title: string; link: string[]; decision: Decision }
   | { type: 'repository'; key: string; title: string; link: string[]; repository: Repository };
 
@@ -32,8 +30,8 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Finds mentions of workspace records in plain text: issue / workstream / decision keys
- * (`BUG-142`, `AUTH-42`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
+ * Finds mentions of workspace records in plain text: issue / decision keys
+ * (`BUG-142`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
  * loaded record become interactive; everything else stays text.
  */
 @Injectable({ providedIn: 'root' })
@@ -50,15 +48,6 @@ export class EntityRefs {
         title: issue.title,
         link: ['/', slug, 'issues', issue.key],
         issue,
-      };
-    const workstream = this.store.getWorkstream(token);
-    if (workstream)
-      return {
-        type: 'workstream',
-        key: workstream.key,
-        title: workstream.title,
-        link: ['/', slug, 'workstreams', workstream.key],
-        workstream,
       };
     const decision = this.store.getDecision(token);
     if (decision)
@@ -119,7 +108,6 @@ export class EntityRefs {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     ActorLabel,
-    FullDatePipe,
     IssueKindLabel,
     LucideDynamicIcon,
     PriorityIcon,
@@ -133,9 +121,6 @@ export class EntityRefs {
         @switch (r.type) {
           @case ('issue') {
             <app-issue-kind [kind]="r.issue.kind" [size]="13" />
-          }
-          @case ('workstream') {
-            <app-status-icon [status]="r.workstream.status" entity="workstream" [size]="13" />
           }
           @case ('repository') {
             <svg [lucideIcon]="gitIcon" [size]="13"></svg>
@@ -167,31 +152,6 @@ export class EntityRefs {
               }
             </div>
           }
-          @case ('workstream') {
-            <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <app-status-label [status]="r.workstream.status" entity="workstream" />
-              <app-priority-icon [priority]="r.workstream.priority" showLabel />
-            </div>
-            <div class="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-              @if (team(); as t) {
-                <span>{{ t }}</span>
-              }
-              @if (r.workstream.accountableUserId) {
-                <app-actor
-                  [actor]="{ type: 'user', id: r.workstream.accountableUserId }"
-                  [size]="16"
-                />
-              }
-              @if (r.workstream.targetDate) {
-                <span>Due {{ r.workstream.targetDate | fullDate }}</span>
-              }
-            </div>
-            @if (r.workstream.objective) {
-              <p class="text-muted-foreground mt-1.5 line-clamp-3 leading-snug">
-                {{ r.workstream.objective }}
-              </p>
-            }
-          }
           @case ('decision') {
             <app-status-label [status]="r.decision.status" entity="other" />
             @if (r.decision.statement) {
@@ -219,24 +179,17 @@ export class EntityPreview {
   protected readonly gitIcon = LucideGitBranch;
   protected readonly team = computed(() => {
     const r = this.ref();
-    const id =
-      r.type === 'issue'
-        ? r.issue.teamId
-        : r.type === 'workstream'
-          ? r.workstream.ownerTeamId
-          : undefined;
+    const id = r.type === 'issue' ? r.issue.teamId : undefined;
     return id ? this.store.getTeam(id)?.name : undefined;
   });
 }
 
 function statusOf(
   r: ResolvedRef,
-): { status: AnyStatus; entity: 'issue' | 'workstream' | 'other' } | null {
+): { status: AnyStatus; entity: 'issue' | 'other' } | null {
   switch (r.type) {
     case 'issue':
       return { status: r.issue.status, entity: 'issue' };
-    case 'workstream':
-      return { status: r.workstream.status as AnyStatus, entity: 'workstream' };
     case 'decision':
       return { status: r.decision.status, entity: 'other' };
     default:
@@ -315,8 +268,6 @@ const norm = (s: string) =>
         >
           @if (r.type === 'issue') {
             <app-priority-icon [priority]="r.issue.priority" />
-          } @else if (r.type === 'workstream') {
-            <app-priority-icon [priority]="r.workstream.priority" />
           }
           <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ r.key }}</span>
           @if (visual(); as v) {
@@ -358,11 +309,7 @@ export class EntityRow {
   });
   protected readonly assignee = computed(() => {
     const r = this.resolved();
-    return r?.type === 'issue'
-      ? r.issue.assigneeId
-      : r?.type === 'workstream'
-        ? r.workstream.accountableUserId
-        : undefined;
+    return r?.type === 'issue' ? r.issue.assigneeId : undefined;
   });
   protected readonly duplicatesTitle = computed(() => {
     const t = norm(this.trailText());

@@ -19,7 +19,18 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
   selector: 'app-team-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    SearchInput, RouterLink, HlmButtonImports, LucideDynamicIcon, PageHeader, Kbd, EmptyState, KeyChip, TopBarActions, AvatarStack, StatusIcon],
+    SearchInput,
+    RouterLink,
+    HlmButtonImports,
+    LucideDynamicIcon,
+    PageHeader,
+    Kbd,
+    EmptyState,
+    KeyChip,
+    TopBarActions,
+    AvatarStack,
+    StatusIcon,
+  ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
@@ -39,20 +50,33 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
     </div>
 
     @if (total() === 0) {
-      <app-empty-state [icon]="users" title="No teams yet" description="Teams own workstreams (outcomes, keyed like AUTH-12) and triage issues (incoming demand). Each team has a short key that prefixes its workstreams.">
+      <app-empty-state
+        [icon]="users"
+        title="No teams yet"
+        description="Teams organize people, issues and repositories. Each team has a short key."
+      >
         @if (canAdmin()) {
-          <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New team</button>
+          <button hlmBtn size="sm" (click)="create()">
+            <svg [lucideIcon]="plus" [size]="14"></svg>New team
+          </button>
         }
-        <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', slug(), 'settings', 'members']">Invite a teammate</a>
+        <a hlmBtn size="sm" variant="ghost" [routerLink]="['/', slug(), 'settings', 'members']"
+          >Invite a teammate</a
+        >
       </app-empty-state>
     } @else if (shown().length === 0) {
-      <app-empty-state [icon]="searchIcon" title="No teams match" description="Try another name or key." />
+      <app-empty-state
+        [icon]="searchIcon"
+        title="No teams match"
+        description="Try another name or key."
+      />
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
-        <div class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex">
+        <div
+          class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex"
+        >
           <span class="flex-1">Name</span>
           <span class="w-24">Members</span>
-          <span class="w-28 text-right">Workstreams</span>
           <span class="w-20 text-right">Issues</span>
         </div>
         @for (r of shown(); track r.team.id) {
@@ -63,7 +87,10 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex min-h-16 items-center gap-3 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-11 md:py-2"
             [class.bg-muted]="ui.focusedRowId() === r.team.id"
           >
-            <span class="flex size-6 shrink-0 items-center justify-center rounded-md" [style.background]="r.tint">
+            <span
+              class="flex size-6 shrink-0 items-center justify-center rounded-md"
+              [style.background]="r.tint"
+            >
               <span class="size-2.5 rounded-full" [style.background]="r.team.color"></span>
             </span>
             <span class="min-w-0 flex-1">
@@ -72,7 +99,9 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
                 <app-key-chip [value]="r.team.key" />
               </span>
               @if (r.team.description) {
-                <span class="text-muted-foreground block truncate text-xs">{{ r.team.description }}</span>
+                <span class="text-muted-foreground block truncate text-xs">{{
+                  r.team.description
+                }}</span>
               }
             </span>
             <span class="hidden w-24 items-center md:flex">
@@ -82,10 +111,9 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
                 <span class="text-muted-foreground text-xs">—</span>
               }
             </span>
-            <span class="text-muted-foreground flex w-28 shrink-0 items-center justify-end gap-1.5 text-xs tabular-nums max-md:hidden">
-              <app-status-icon status="working" entity="workstream" [size]="12" />{{ r.active }}<span class="opacity-60">/ {{ r.owned }}</span>
-            </span>
-            <span class="text-muted-foreground flex w-20 shrink-0 items-center justify-end gap-1.5 text-[13px] tabular-nums">
+            <span
+              class="text-muted-foreground flex w-20 shrink-0 items-center justify-end gap-1.5 text-[13px] tabular-nums"
+            >
               <app-status-icon status="todo" entity="issue" [size]="12" />{{ r.openIssues }}
             </span>
           </a>
@@ -110,7 +138,6 @@ export class TeamListPage {
   protected readonly total = computed(() => this.store.teams().length);
   protected readonly shown = computed(() => {
     const q = this.search().trim().toLowerCase();
-    const owned = this.store.workstreamsByOwnerTeam();
     const issues = this.store.issuesByTeam();
     return this.store
       .teams()
@@ -118,13 +145,10 @@ export class TeamListPage {
       .slice()
       .sort((a, b) => a.name.localeCompare(b.name))
       .map((team) => {
-        const ws = owned.get(team.id) ?? [];
         return {
           team,
           tint: `color-mix(in oklab, ${team.color} 16%, transparent)`,
           members: team.memberIds.map((id) => ({ type: 'user' as const, id })),
-          owned: ws.length,
-          active: ws.filter((w) => w.status !== 'shipped' && w.status !== 'canceled' && w.status !== 'draft').length,
           openIssues: (issues.get(team.id) ?? []).filter((i) => OPEN_ISSUE.has(i.status)).length,
         };
       });

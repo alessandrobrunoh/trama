@@ -27,7 +27,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
     slug: 'trama-vs-trello-jira-linear',
     title: 'Trama vs Trello, Jira and Linear: why another issue tracker?',
     description:
-      'Trello, Jira and Linear are excellent at tracking tickets. Trama starts from a different question: what is the unit of work when humans and agents ship together?',
+      'Trello, Jira and Linear are excellent at tracking tickets. Trama keeps work Issue-first, with optional Goals, Plans and Documents and human input requests in Question or Decision mode.',
     date: '2026-10-08',
     readingMinutes: 8,
     tag: 'Comparison',
@@ -102,14 +102,14 @@ export const BLOG_POSTS: readonly BlogPost[] = [
         type: 'list',
         items: [
           '<strong>Issues</strong> describe demand: the bug, the request, the incident.',
-          '<strong>Workstreams</strong> describe the outcome: the coordinated effort that solves one or many issues, with an objective, acceptance criteria and a link to the shared workspace where the work happens.',
+          '<strong>Optional Goals</strong> state a desired outcome without replacing the Issue as the unit of work. Plans and Documents can add context when useful.',
           '<strong>Decisions</strong> preserve the why: proposed, accepted or superseded, linked to the work they shaped.',
           '<strong>Artifacts</strong> show what was delivered: pull requests, documents and releases, with CI and review state, traced back to the issues they addressed.',
         ],
       },
       {
         type: 'p',
-        html: 'Two principles follow from that. First, <strong>no fake progress</strong>: a workstream’s status is derived from observable facts such as resolved issues, merged pull requests and met criteria, never from a percentage someone typed. Second, <strong>agents are contributors, not just assignees</strong>: they join a workstream next to people, ask humans for input when they are blocked, and use API tokens scoped per resource and action, with usage caps.',
+        html: 'Two principles follow from that. First, <strong>Issues stay granular</strong>: each tracks a unit of work, while a Goal is optional context for the desired outcome. Second, <strong>agents work alongside people</strong>: they can ask humans for input in Question or Decision mode, and use API tokens scoped per resource and action, with usage caps.',
       },
       { type: 'h2', id: 'side-by-side', text: 'Side by side' },
       { type: 'comparison' },
@@ -120,7 +120,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       { type: 'h2', id: 'switching', text: 'Do I have to switch everything?' },
       {
         type: 'p',
-        html: 'No. Trama is designed for gradual adoption. One issue, one workstream is a perfectly valid way to start, and the model only shows its depth when your work needs it. Issues can already arrive from the API, email, GitHub, GitLab or an agent. Linking issues that live in Jira, Linear or GitHub Issues directly to a Trama workstream is on our roadmap, so a team can add the coordination layer without moving its backlog on day one.',
+        html: 'No. Trama is designed for gradual adoption. Start with an issue and add an optional Goal, Plan or Document only when useful. Issues can arrive from the API, email, GitHub, GitLab or an agent. The current model keeps Issues as granular units of work.',
       },
       { type: 'h2', id: 'summary', text: 'The short version' },
       {
@@ -138,14 +138,14 @@ export const BLOG_POSTS: readonly BlogPost[] = [
     slug: 'introducing-trama',
     title: 'Introducing Trama',
     description:
-      'Issues describe problems. Workstreams organise outcomes. Decisions and artifacts explain what was delivered. Meet the source-available coordination layer for humans and coding agents.',
+      'A historical launch announcement introducing Trama’s original model. Today, Issues are granular units of work with optional Goals, Plans and Documents.',
     date: '2026-10-06',
     readingMinutes: 6,
     tag: 'Announcement',
     blocks: [
       {
         type: 'p',
-        html: 'Today we are opening up <strong>Trama</strong>, a source-available coordination layer for software teams that work with coding agents. The name is Italian for <em>weft</em>: the thread that runs across a loom and turns separate strands into one fabric. That is what we want Trama to do for your work.',
+        html: 'On October 6, 2026, we opened up <strong>Trama</strong>, a source-available coordination layer for software teams that work with coding agents. This launch announcement records the product model at that time. The name is Italian for <em>weft</em>: the thread that runs across a loom and turns separate strands into one fabric.',
       },
       { type: 'h2', id: 'shape-of-work', text: 'The shape of work changed' },
       {
@@ -163,7 +163,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       { type: 'h2', id: 'issues', text: 'Issues stay first-class' },
       {
         type: 'p',
-        html: 'We are not trying to replace the issue. Bugs, requests, incidents, tech debt and feedback are still best described one at a time, with the statuses, priorities and estimates your team already understands. In Trama, issues are the <strong>unit of demand</strong>: what problems exist?',
+        html: 'The launch model kept issues for bugs, requests, incidents, tech debt and feedback, with the statuses, priorities and estimates teams already understood. Issues were the <strong>unit of demand</strong>.',
       },
       { type: 'h2', id: 'workstreams', text: 'Meet the workstream' },
       {
@@ -221,7 +221,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       },
       {
         type: 'p',
-        html: 'Curious how Trama compares to the tools you use today? Read <a href="/blog/trama-vs-trello-jira-linear">Trama vs Trello, Jira and Linear</a>. Or simply create a workspace and group your first issues into a workstream.',
+        html: 'The product model has since changed: Issues are granular units of work, Goals are optional desired outcomes, and Plans or Documents add context only when useful. Human input requests use Question or Decision mode. For a current comparison, read <a href="/blog/trama-vs-trello-jira-linear">Trama vs Trello, Jira and Linear</a>.',
       },
     ],
   },

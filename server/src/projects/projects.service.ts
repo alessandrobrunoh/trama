@@ -8,10 +8,14 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, Priority, ProjectStatus } from '../contracts/domain.js';
-import { loadStatusCatalog, requireStatus, statusFilterIds } from '../status/status-catalog.js';
+import {
+  loadStatusCatalog,
+  requireStatus,
+  statusFilterIds,
+} from '../status/status-catalog.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, toDate, uid, unique } from '../common/util.js';
-import { ProjectEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { ProjectEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import {
   demandConditions,
@@ -70,7 +74,11 @@ export class ProjectsService {
   ) {}
 
   private async projectStatus(workspaceId: string, stored: string) {
-    return requireStatus((await loadStatusCatalog(this.ds, workspaceId)).project, stored, 'status');
+    return requireStatus(
+      (await loadStatusCatalog(this.ds, workspaceId)).project,
+      stored,
+      'status',
+    );
   }
 
   async list(workspaceId: string, f: ProjectFilter = {}) {
@@ -80,7 +88,9 @@ export class ProjectsService {
       .orderBy('p.updatedAt', 'DESC');
     if (f.status) {
       const catalog = (await loadStatusCatalog(this.ds, workspaceId)).project;
-      qb.andWhere('p.status IN (:...st)', { st: statusFilterIds(catalog, f.status) });
+      qb.andWhere('p.status IN (:...st)', {
+        st: statusFilterIds(catalog, f.status),
+      });
     }
     if (f.leadId) qb.andWhere('p.leadId = :leadId', { leadId: f.leadId });
     if (f.teamId)
@@ -116,7 +126,10 @@ export class ProjectsService {
         'Your access cannot add projects outside its list',
       );
     await this.validate(workspaceId, input);
-    const entry = await this.projectStatus(workspaceId, input.status ?? 'backlog');
+    const entry = await this.projectStatus(
+      workspaceId,
+      input.status ?? 'backlog',
+    );
     const status = entry.id as ProjectStatus;
     const row = await this.repo.save(
       this.repo.create({
@@ -189,28 +202,12 @@ export class ProjectsService {
     if (patch.status !== undefined) {
       const entry = await this.projectStatus(workspaceId, patch.status);
       row.status = entry.id as ProjectStatus;
-      row.completedAt = CLOSED.includes(entry.type) ? (row.completedAt ?? new Date()) : null;
+      row.completedAt = CLOSED.includes(entry.type)
+        ? (row.completedAt ?? new Date())
+        : null;
     }
     row.updatedAt = new Date();
-    await this.ds.transaction(async (m) => {
-      await m.save(row);
-      if (patch.repositoryIds === undefined) return;
-      // Its workstreams may only use the project's repositories: drop the ones that left.
-      const streams = await m
-        .getRepository(WorkstreamEntity)
-        .findBy({ workspaceId, projectId: id });
-      for (const w of streams) {
-        const kept = w.repositoryIds.filter((r) =>
-          row.repositoryIds.includes(r),
-        );
-        if (kept.length !== w.repositoryIds.length)
-          await m.update(
-            WorkstreamEntity,
-            { id: w.id },
-            { repositoryIds: kept },
-          );
-      }
-    });
+    await this.repo.save(row);
     await this.events.record({
       workspaceId,
       actor,

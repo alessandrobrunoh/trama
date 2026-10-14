@@ -10,7 +10,7 @@ import {
 
 export interface Crumb {
   label: string;
-  /** Router link commands, e.g. ['/', slug, 'workstreams']. Omit for the current (last) crumb. */
+  /** Router link commands. Omit for the current (last) crumb. */
   link?: readonly unknown[];
   /** Render the label in mono (entity keys such as AUTH-42). */
   mono?: boolean;
@@ -18,7 +18,7 @@ export interface Crumb {
 
 /**
  * Lets a page customise the shell's top bar.
- *  - breadcrumbs: derived from the URL by default; a page can override (e.g. show the workstream title)
+ *  - breadcrumbs: derived from the URL by default; a page can override (e.g. show an issue title)
  *    with `usePageCrumbs(() => [...])`.
  *  - actions: project buttons into the right side of the top bar with
  *      <ng-template appTopBarActions><button hlmBtn size="sm">New</button></ng-template>
@@ -41,7 +41,6 @@ export class PageChrome {
  * Override the breadcrumb trail for the current page (call in an injection context, e.g. a field
  * initializer). Reactive: the callback may read signals. Restores the URL-derived trail on destroy.
  *   private readonly _crumbs = usePageCrumbs(() => [
- *     { label: 'Workstreams', link: ['/', this.slug(), 'workstreams'] },
  *     { label: this.ws()?.key ?? '', mono: true },
  *   ]);
  */

@@ -1,16 +1,11 @@
 import {
-  LucideCalendarClock,
-  LucideCircleArrowUp,
   LucideCircleHelp,
   LucideCircleX,
-  LucideFileSearch,
   LucideGavel,
-  LucideGitMerge,
   LucideGitPullRequest,
-  LucideHourglass,
   LucideInbox,
   LucideOctagonAlert,
-  LucideRocket,
+  LucideGitMerge,
   type LucideIcon,
 } from '@lucide/angular';
 import type { AttentionKind, AttentionSeverity } from '../../core';
@@ -27,29 +22,17 @@ export const ATTENTION_KIND_VIEW: Record<AttentionKind, KindView> = {
   needs_decision: { icon: LucideGavel, color: 'text-status-needs-input' },
   review_requested: { icon: LucideGitPullRequest, color: 'text-status-in-review' },
   ci_failed: { icon: LucideCircleX, color: 'text-status-blocked' },
-  blocked: { icon: LucideOctagonAlert, color: 'text-status-blocked' },
   conflict: { icon: LucideGitMerge, color: 'text-status-blocked' },
-  ready_to_land: { icon: LucideCircleArrowUp, color: 'text-status-ready-to-land' },
-  ready_to_ship: { icon: LucideRocket, color: 'text-status-ready-to-land' },
-  proof_missing: { icon: LucideFileSearch, color: 'text-muted-foreground' },
-  deadline: { icon: LucideCalendarClock, color: 'text-status-needs-input' },
-  dependency: { icon: LucideHourglass, color: 'text-muted-foreground' },
   triage: { icon: LucideInbox, color: 'text-status-working' },
 };
 
 /** One-sentence explanation of why an item of each kind is in My Attention (tooltips). */
 export const ATTENTION_KIND_HELP: Record<AttentionKind, string> = {
-  input_requested: 'Someone (often an agent) asked a question on a workstream and is waiting for a human answer.',
+  input_requested: 'Someone (often an agent) asked a question and is waiting for a human answer.',
   needs_decision: 'A decision was proposed and needs to be accepted or rejected.',
   review_requested: 'A pull or merge request is waiting for your review.',
-  ci_failed: 'Checks are failing on an open pull request of a workstream you are involved in.',
-  blocked: 'A workstream you are accountable for is blocked and cannot move on its own.',
+  ci_failed: 'Checks are failing on an open pull request you are involved in.',
   conflict: 'A pull request has merge conflicts that need resolving.',
-  ready_to_land: 'Approved and green: a pull request can be merged.',
-  ready_to_ship: 'Every acceptance criterion is met; the workstream can be marked shipped.',
-  proof_missing: 'The code is delivered, but criteria marked met have no evidence. Link a PR, a build or a note that shows what was verified.',
-  deadline: 'A target date is close or has passed.',
-  dependency: 'Your workstream waits on another workstream that has not shipped yet.',
   triage: 'A new issue for one of your teams sits in the backlog and needs triage.',
 };
 
@@ -79,38 +62,10 @@ export const ATTENTION_SECTIONS: readonly AttentionSection[] = [
   },
   {
     id: 'broken',
-    title: 'Blocked',
-    hint: 'CI failures, merge conflicts and blocked work',
-    kinds: ['ci_failed', 'blocked', 'conflict'],
+    title: 'Needs a fix',
+    hint: 'Failing checks and merge conflicts on Issue artifacts',
+    kinds: ['ci_failed', 'conflict'],
     icon: LucideOctagonAlert,
-  },
-  {
-    id: 'ready',
-    title: 'Ready to land or ship',
-    hint: 'Approved and green, or everything done',
-    kinds: ['ready_to_land', 'ready_to_ship'],
-    icon: LucideCircleArrowUp,
-  },
-  {
-    id: 'proof',
-    title: 'Proof missing',
-    hint: 'Delivered work whose met criteria have no evidence',
-    kinds: ['proof_missing'],
-    icon: LucideFileSearch,
-  },
-  {
-    id: 'deadline',
-    title: 'Deadlines',
-    hint: 'Due soon or overdue',
-    kinds: ['deadline'],
-    icon: LucideCalendarClock,
-  },
-  {
-    id: 'dependency',
-    title: 'Waiting on others',
-    hint: 'Your work depends on workstreams that have not shipped',
-    kinds: ['dependency'],
-    icon: LucideHourglass,
   },
   {
     id: 'triage',

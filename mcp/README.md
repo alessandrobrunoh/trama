@@ -1,7 +1,7 @@
 # trama-mcp
 
 MCP server for Trama, written in Rust. It exposes the REST API to any MCP client (Claude, Cursor, VS Code, or the
-in-app Assistant) with <!-- mcp-tools-count:start -->21 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
+in-app Assistant) with <!-- mcp-tools-count:start -->20 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
 
 **It holds no data and no secrets.** Each client connects with its own API key
 (Settings → API tokens → *Custom*). The server forwards that key to the API, which remains the only authority:
@@ -58,21 +58,20 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | Tool | What it does |
 |---|---|
 | `whoami` | Which workspace and permissions this API key has, its caps and expiry |
-| `get_context` | Read everything about one workstream, issue, project, decision or input request by key or id |
-| `find_work` | Find issues, workstreams, input requests or decisions with filters (assignee `me`, status, project…) |
+| `get_context` | Read issue, project, decision or input request context by key or id |
+| `find_work` | Find issues, input requests or decisions with filters (assignee `me`, status, project…) |
 | `search` | Full-text search across every object type; run it before creating anything |
-| `get_insights` | Where the problems are: blocked or stale work, bottlenecks, stuck PRs, flow metrics, agent failures |
+| `get_insights` | Where the problems are: stale or overdue issues, bottlenecks, stuck PRs, flow metrics, agent failures |
 | `get_workspace` | Workspace settings: label ids, estimate scale |
 | `list_repositories` | Registered git repositories (maps a checkout to its project) |
 | `list_projects` | Projects; filter by repository to find the project of a checkout |
-| `create_issue` | File an issue (duplicate-checked, optionally grouped into a workstream) |
+| `create_issue` | File an issue (duplicate-checked) |
 | `update_issue` | Change an issue's status, priority, assignee, labels, duplicate marker… |
-| `link_issue` | Group an issue under existing or new workstreams |
-| `start_work` | Pick up a workstream or issue: briefing, safety checks, marks the start |
-| `report_progress` | Record criteria, PR/build artifacts, issue status, project update and a comment in one call |
+| `start_work` | Pick up an issue: context, safety checks, marks the start |
+| `report_progress` | Record artifacts, issue status, project update and a comment |
 | `ask_human` | Ask a person one question (an input request), once |
 | `record_decision` | Propose a lasting decision (a person accepts it) |
-| `attach_artifact` | Attach or update a PR, build, document or link on a workstream, issue or project |
+| `attach_artifact` | Attach or update a PR, build, document or link on an issue or project |
 | `add_comment` | Comment on any object by key or id |
 | `triage_issues` | Triage up to 25 issues in one call (priority, duplicates, grouping) |
 | `list_capabilities` | Discover the full catalog: search it, get a tool's schema and how to call it |
@@ -99,7 +98,7 @@ profile does not list can also still be called by name, so existing prompts keep
 | Per connection, header | `--header "X-Trama-Profile: full"` |
 | Per connection, URL | `https://<host>/mcp?profile=full` |
 
-The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (about a hundred,
+The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (137 catalog operations,
 with a much larger context cost); `core` is the default. Neither changes what a key may do: the API enforces permissions.
 
 ## Catalog
@@ -121,10 +120,10 @@ The curated layer is separate on purpose, so catalog changes and curation change
 `cargo test` fails when the tool count or table above is stale; refresh them with
 `UPDATE_MCP_DOCS=1 cargo test generated_tool_docs_are_current`.
 
-Project-level tools: `get_project_context` (markdown "mega context" of a project: updates, milestones,
-workstreams, issues, artifacts, decisions), `list_project_updates` / `get_project_update` /
+Project-level tools: `get_project_context` (markdown context for a project: updates, milestones,
+issues, artifacts and decisions), `list_project_updates` / `get_project_update` /
 `create_project_update` / `update_project_update` / `delete_project_update` (health + markdown status posts),
-`list_project_artifacts` and `list_issue_artifacts`, and `create_artifact` with any of `projectId` / `issueId` / `workstreamId`.
+`list_project_artifacts` and `list_issue_artifacts`, and `create_artifact` with either `projectId` or `issueId`.
 Project routes are permissioned as `projects:*` and issue routes as `issues:*`.
 
 ## Security notes

@@ -53,7 +53,7 @@ import { extractOutline, readingMinutes, wordCount } from '../../shared/heading-
 import { EntityRefs } from '../../shared/entity-ref';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
-import { CommentThread } from '../workstreams/comments';
+import { CommentThread } from '../../shared/comments';
 import { isEmojiIcon } from '../projects/project-glyph';
 import { DocumentOwnerDialog, OWNER_ICONS, describeLink } from './document-attach';
 import { DocumentEditor } from './document-editor';
@@ -386,7 +386,7 @@ interface Conflict {
                     (click)="ownerOpen.set(true)"
                   >
                     <svg [lucideIcon]="attachIcon" [size]="11"></svg
-                    >{{ links().length ? 'Attach' : 'Attach to a project, workstream or issue' }}
+                    >{{ links().length ? 'Attach' : 'Attach to a project or issue' }}
                   </button>
                 }
               </span>

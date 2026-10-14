@@ -15,14 +15,14 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trello: 'A card on a board',
     jira: 'An issue in an epic → story → sub-task tree',
     linear: 'An issue, grouped into projects and cycles',
-    trama: 'Issues for demand, workstreams for the outcome',
+    trama: 'Issues are the unit of work; add a Goal for the desired outcome',
   },
   {
     topic: 'Many issues, one fix',
     trello: 'Labels or a dedicated list',
     jira: 'Epics and issue links',
     linear: 'Projects and issue relations',
-    trama: 'One workstream groups the issues that share a root cause',
+    trama: 'Keep related issues linked; an optional Goal describes the outcome',
   },
   {
     topic: 'Why it was done this way',
@@ -36,7 +36,7 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trello: 'Power-Ups',
     jira: 'Development panel per issue',
     linear: 'Linked pull requests per issue',
-    trama: 'Artifacts per workstream with CI and review state, traced back to issues',
+    trama: 'Documents and artifacts are optional, linked to the issues they support',
   },
   {
     topic: 'Progress',
@@ -50,7 +50,7 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trello: 'Third-party automations',
     jira: 'An assignee on a ticket',
     linear: 'An assignee on a ticket',
-    trama: 'Contributors on a workstream, with scoped tokens and usage caps',
+    trama: 'Agents work on issues and can request human input in Question or Decision mode',
   },
   {
     topic: 'Source access & self-hosting',

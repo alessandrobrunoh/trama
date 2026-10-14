@@ -14,10 +14,8 @@ import {
   IssueEntity,
   ProjectEntity,
   UploadEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus } from '../events/workstream-bus.js';
 import {
   canAttachArtifact,
   canStageUpload,
@@ -33,7 +31,6 @@ import {
 } from './upload-rules.js';
 
 const ISSUE_KEY = /^[A-Za-z]+-\d+$/;
-const WORKSTREAM_KEY = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
 
 export interface IncomingUpload {
   buffer: Buffer;
@@ -62,7 +59,6 @@ export class UploadsService {
   constructor(
     private readonly ds: DataSource,
     private readonly events: EventsService,
-    private readonly bus: WorkstreamBus,
     @InjectRepository(UploadEntity)
     private readonly uploads: Repository<UploadEntity>,
     @InjectRepository(ArtifactEntity)
@@ -100,7 +96,7 @@ export class UploadsService {
     slug: string,
     caller: UploadCaller,
     file: IncomingUpload,
-    owner: { issueId?: string; workstreamId?: string; projectId?: string },
+    owner: { issueId?: string; projectId?: string },
   ): Promise<ArtifactEntity> {
     if (!canAttachArtifact(caller, currentAccess()))
       throw new ForbiddenException('You cannot attach files here');
@@ -125,7 +121,6 @@ export class UploadsService {
         m.create(ArtifactEntity, {
           id: uid('ar'),
           workspaceId,
-          workstreamId: resolved.workstreamId,
           projectId: resolved.projectId,
           issueId: resolved.issueId,
           repositoryId: null,
@@ -151,20 +146,14 @@ export class UploadsService {
       actor: caller.actor,
       type: 'artifact.attached',
       subject: { type: 'artifact', id: artifact.id },
-      workstreamId: artifact.workstreamId ?? undefined,
       data: {
         kind: artifact.kind,
         title: artifact.title,
         state: artifact.state,
-        ...(artifact.workstreamId
-          ? { workstreamId: artifact.workstreamId }
-          : {}),
         ...(artifact.projectId ? { projectId: artifact.projectId } : {}),
         ...(artifact.issueId ? { issueId: artifact.issueId } : {}),
       },
     });
-    if (resolved.touch)
-      await this.bus.touch(workspaceId, resolved.touch, 'artifact.attached');
     return artifact;
   }
 
@@ -255,7 +244,6 @@ export class UploadsService {
     workspaceId: string,
     owner: {
       issueId?: string;
-      workstreamId?: string;
       projectId?: string;
       documentId?: string;
     },
@@ -264,7 +252,6 @@ export class UploadsService {
     const ids = new Set<string>();
     for (const text of texts) for (const id of uploadIdsIn(text)) ids.add(id);
     const issueId = owner.issueId ?? null;
-    const workstreamId = owner.workstreamId ?? null;
     const projectId = owner.projectId ?? null;
     const documentId = owner.documentId ?? null;
     const artifacts = await this.ds.query<
@@ -276,15 +263,13 @@ export class UploadsService {
         : `SELECT "id", "uploadId" FROM "artifacts"
            WHERE "workspaceId" = $1
              AND "issueId" IS NOT DISTINCT FROM $2
-             AND "workstreamId" IS NOT DISTINCT FROM $3
-             AND "projectId" IS NOT DISTINCT FROM $4`,
+             AND "projectId" IS NOT DISTINCT FROM $3`,
       documentId
         ? [workspaceId, documentId]
-        : [workspaceId, issueId, workstreamId, projectId],
+        : [workspaceId, issueId, projectId],
     );
     const subjects = [
       issueId,
-      workstreamId,
       projectId,
       documentId,
       ...artifacts.map((row) => row.id),
@@ -374,15 +359,11 @@ export class UploadsService {
 
   private async resolveOwner(
     workspaceId: string,
-    owner: { issueId?: string; workstreamId?: string; projectId?: string },
+    owner: { issueId?: string; projectId?: string },
   ) {
-    const chosen = [owner.issueId, owner.workstreamId, owner.projectId].filter(
-      Boolean,
-    );
+    const chosen = [owner.issueId, owner.projectId].filter(Boolean);
     if (chosen.length !== 1)
-      throw new BadRequestException(
-        'Attach the file to one issue, workstream or project',
-      );
+      throw new BadRequestException('Attach the file to one issue or project');
     if (owner.projectId) {
       const row = await this.ds.getRepository(ProjectEntity).findOne({
         where: { workspaceId, id: owner.projectId },
@@ -392,29 +373,7 @@ export class UploadsService {
         throw notFound('Project', owner.projectId);
       return {
         issueId: null,
-        workstreamId: null,
         projectId: row.id,
-        touch: null as string | null,
-      };
-    }
-    if (owner.workstreamId) {
-      const repo = this.ds.getRepository(WorkstreamEntity);
-      const row = WORKSTREAM_KEY.test(owner.workstreamId)
-        ? await repo.findOne({
-            where: { workspaceId, key: owner.workstreamId.toUpperCase() },
-            select: { id: true, projectId: true },
-          })
-        : await repo.findOne({
-            where: { workspaceId, id: owner.workstreamId },
-            select: { id: true, projectId: true },
-          });
-      if (!row || projectHidden(currentAccess(), row.projectId))
-        throw notFound('Workstream', owner.workstreamId);
-      return {
-        issueId: null,
-        workstreamId: row.id,
-        projectId: null,
-        touch: row.id,
       };
     }
     const issueId = owner.issueId!;
@@ -445,9 +404,7 @@ export class UploadsService {
       throw notFound('Issue', issueId);
     return {
       issueId: row.id,
-      workstreamId: null,
       projectId: null,
-      touch: null as string | null,
     };
   }
 
@@ -459,10 +416,9 @@ export class UploadsService {
     const token = `/uploads/${id}`;
     const out: UploadRef[] = [];
     const artifacts = await this.ds.query<{ projectId: string | null }[]>(
-      `SELECT COALESCE(a."projectId", i."projectId", w."projectId") AS "projectId"
+      `SELECT COALESCE(a."projectId", i."projectId") AS "projectId"
        FROM "artifacts" a
        LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
-       LEFT JOIN "workstreams" w ON w."id" = a."workstreamId" AND w."workspaceId" = a."workspaceId"
        WHERE a."workspaceId" = $1 AND a."uploadId" = $2`,
       [workspaceId, id],
     );
@@ -480,22 +436,6 @@ export class UploadsService {
     for (const row of issues)
       out.push({
         resource: 'issues',
-        projectScoped: true,
-        projectId: row.projectId,
-      });
-
-    const streams = await this.ds.query<{ projectId: string | null }[]>(
-      `SELECT "projectId" FROM "workstreams"
-       WHERE "workspaceId" = $1 AND (
-         strpos(coalesce("description", ''), $2) > 0 OR
-         strpos(coalesce("objective", ''), $2) > 0 OR
-         strpos(coalesce("context", ''), $2) > 0
-       )`,
-      [workspaceId, token],
-    );
-    for (const row of streams)
-      out.push({
-        resource: 'workstreams',
         projectScoped: true,
         projectId: row.projectId,
       });
@@ -521,7 +461,11 @@ export class UploadsService {
       [workspaceId, token],
     );
     if (docs[0]?.hit)
-      out.push({ resource: 'documents', projectScoped: false, projectId: null });
+      out.push({
+        resource: 'documents',
+        projectScoped: false,
+        projectId: null,
+      });
 
     const comments = await this.ds.query<{ type: string; id: string }[]>(
       `SELECT "subject"->>'type' AS "type", "subject"->>'id' AS "id"
@@ -539,11 +483,7 @@ export class UploadsService {
   ) {
     const ids = (type: string) =>
       comments.filter((c) => c.type === type).map((c) => c.id);
-    const tables = {
-      issues: 'issues',
-      workstreams: 'workstreams',
-      milestones: 'milestones',
-    } as const;
+    const tables = { issues: 'issues', milestones: 'milestones' } as const;
     const projectOf = async (table: keyof typeof tables, wanted: string[]) => {
       if (!wanted.length) return new Map<string, string | null>();
       const rows = await this.ds.query<
@@ -555,7 +495,6 @@ export class UploadsService {
       return new Map(rows.map((row) => [row.id, row.projectId]));
     };
     const issues = await projectOf('issues', ids('issue'));
-    const streams = await projectOf('workstreams', ids('workstream'));
     const milestones = await projectOf('milestones', ids('milestone'));
     for (const comment of comments) {
       if (comment.type === 'issue')
@@ -563,12 +502,6 @@ export class UploadsService {
           resource: 'comments',
           projectScoped: true,
           projectId: issues.get(comment.id) ?? null,
-        });
-      else if (comment.type === 'workstream')
-        out.push({
-          resource: 'comments',
-          projectScoped: true,
-          projectId: streams.get(comment.id) ?? null,
         });
       else if (comment.type === 'milestone')
         out.push({

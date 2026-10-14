@@ -16,23 +16,19 @@ import { IssueCommandDialog } from './issue-prop';
 const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   all: {
     title: 'No issues yet',
-    description:
-      'Issues are demand: the bugs, requests and incidents people report. When you decide to act, add them to a workstream: the outcome that resolves them.',
+    description: 'Track bugs, requests and incidents from triage through completion.',
   },
   active: {
     title: 'No active issues',
-    description:
-      'Nothing is scheduled. Move issues out of the backlog, or add them to a workstream to start resolving them.',
+    description: 'Nothing is scheduled. Move issues out of the backlog to start resolving them.',
   },
   backlog: {
     title: 'Backlog is clear',
-    description:
-      'New demand lands here until someone triages it: set a priority, assign it, or add it to a workstream.',
+    description: 'New issues land here until someone triages them: set a priority or assign them.',
   },
   done: {
     title: 'Nothing done yet',
-    description:
-      'Done and canceled issues land here. Workstreams track whether the outcome actually shipped.',
+    description: 'Done and canceled issues land here.',
   },
   draft: {
     title: 'No saved issue drafts',
@@ -122,7 +118,7 @@ export class IssuePage {
   readonly status = input<string>();
   /** Query `?team=<teamId>` (sidebar team links). */
   readonly team = input<string>();
-  /** Query `?project=<projectId>`: only issues of that project (own or through its workstreams). */
+  /** Query `?project=<projectId>`: only issues planned under that project. */
   readonly project = input<string>();
   /** Query `?view=active|backlog|done` (view tabs). */
   readonly view = input<string>();
@@ -150,8 +146,8 @@ export class IssuePage {
   );
   protected readonly description = computed(() =>
     this.teamRef()
-      ? `Demand reported to ${this.teamRef()!.name}. Group related issues into a workstream to drive an outcome.`
-      : 'Demand: bugs, requests and incidents. Group related issues into a workstream to drive an outcome.',
+      ? `Issues reported to ${this.teamRef()!.name}.`
+      : 'Track bugs, requests and incidents from triage through completion.',
   );
   /** Issue count per tab (within the team, when scoped to one). */
   protected readonly counts = computed(() => {

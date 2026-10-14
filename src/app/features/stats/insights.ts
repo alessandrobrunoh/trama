@@ -1,19 +1,16 @@
 // Period-aware charts and KPIs computed from a {@link Timeline}.
-// Issues are demand (opened / closed / backlog); workstreams are outcomes (shipped / cycle / blocked).
+// Issue throughput and cycle time, computed from the event history.
 // Anything that depends on status history is only produced where the loaded events cover it.
 import { addDays, format, startOfDay } from 'date-fns';
 import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
-  WORKSTREAM_STATUS_FLOW,
-  WORKSTREAM_STATUS_META,
   type IssueStatus,
-  type WorkstreamStatus,
 } from '../../core';
 import type { BarRow } from './charts/bar-list';
 import type { ChartSeries } from './charts/chart-utils';
 import type { KpiDelta } from './charts/kpi-tile';
-import { ISSUE_COLOR, WS_COLOR } from './stats-colors';
+import { ISSUE_COLOR } from './stats-colors';
 import type { Change, Timeline } from './timeline';
 
 const DAY = 86_400_000;
@@ -55,20 +52,6 @@ export interface IssueInsights {
   openByAssignee: BarRow[];
 }
 
-export interface WsInsights {
-  kpis: Kpi[];
-  flow: SeriesBlock;
-  stock?: SeriesBlock;
-  stockUnavailable?: string;
-  cycle?: SeriesBlock;
-  cycleNote: string;
-  blocked: BarRow[];
-  blockedNote?: string;
-  criteria: BarRow[];
-  activeByTeam: BarRow[];
-  shippedByTeam: BarRow[];
-}
-
 // ───────────────────────────── axis ─────────────────────────────
 
 interface Axis {
@@ -93,7 +76,7 @@ function buildAxis(period: Period, tl: Timeline): Axis {
     step = 7;
     n = 13;
   } else if (period === 'all') {
-    const created = [...tl.issues.map((i) => i.created), ...tl.workstreams.map((w) => w.created)];
+    const created = tl.issues.map((i) => i.created);
     const earliest = created.length ? Math.min(...created) : tl.now - 28 * DAY;
     const span = Math.max(2, Math.ceil((endDay.getTime() - earliest) / DAY));
     step = span <= 31 ? 1 : span <= 400 ? 7 : 30;
@@ -336,179 +319,5 @@ export function issueInsights(tl: Timeline, period: Period): IssueInsights {
     openedByKind: tally(openedIssues.map((i) => ISSUE_KIND_META[i.kind].label)),
     openedByTeam: tally(openedIssues.map((i) => i.team)),
     openByAssignee: tally(openNow.map((i) => i.assignee)),
-  };
-}
-
-// ───────────────────────────── workstreams: outcomes ─────────────────────────────
-
-const OPEN_WS = (s: string): boolean => s !== 'shipped' && s !== 'canceled';
-
-export function workstreamInsights(tl: Timeline, period: Period): WsInsights {
-  const ax = buildAxis(period, tl);
-  const meta = PERIODS.find((p) => p.id === period)!;
-  const hasPrev = period !== 'all';
-  const len = ax.to - ax.from;
-  const prevFrom = ax.from - len;
-  const cov = tl.coverageStart;
-  const covCur = ax.from >= cov;
-  const covPrev = prevFrom >= cov;
-  const against = `vs ${meta.prev}`;
-  const wss = tl.workstreams;
-
-  const created = wss.map((w) => w.created);
-  const shippedTimes = wss.flatMap((w) => (w.shipped !== undefined ? [w.shipped] : []));
-  const shipped = countIn(shippedTimes, ax.from, ax.to);
-  const shippedPrev = hasPrev ? countIn(shippedTimes, prevFrom, ax.from) : undefined;
-  const shippedSeries = perBucket(shippedTimes, ax);
-
-  const activeNow = wss.filter((w) => OPEN_WS(w.status));
-  const activeAt = (t: number): number => wss.filter((w) => { const s = statusAt(w, t); return s !== undefined && OPEN_WS(s); }).length;
-  const activeSpark = ax.sample.filter((t) => t >= cov).map(activeAt);
-
-  // cycle time: first time it entered Planned -> shippedAt
-  const cycleOf = (w: (typeof wss)[number]): number | undefined => {
-    const planned = w.changes.find((c) => c.to === 'planned');
-    return planned && w.shipped !== undefined && w.shipped >= planned.at ? (w.shipped - planned.at) / DAY : undefined;
-  };
-  const cycles = (from: number, to: number): number[] =>
-    wss.flatMap((w) => (w.shipped !== undefined && inRange(w.shipped, from, to) ? (cycleOf(w) ?? []) : []));
-  const cycleCur = cycles(ax.from, ax.to);
-  const cycleMed = median(cycleCur);
-  const cyclePrevMed = hasPrev ? median(cycles(prevFrom, ax.from)) : undefined;
-
-  // blocked time from status intervals
-  const blockedIntervals = (w: (typeof wss)[number]): [number, number][] => {
-    const lower = Math.max(w.created, Number.isFinite(cov) ? cov : w.created);
-    const out: [number, number][] = [];
-    let start: number | null = w.changes[0]?.from === 'blocked' || (!w.changes.length && w.status === 'blocked') ? lower : null;
-    for (const c of w.changes) {
-      if (c.to === 'blocked' && start === null) start = c.at;
-      else if (c.to !== 'blocked' && start !== null) {
-        out.push([start, c.at]);
-        start = null;
-      }
-    }
-    if (start !== null) out.push([start, tl.now]);
-    return out;
-  };
-  const intervals = new Map(wss.map((w) => [w.id, blockedIntervals(w)] as const));
-  const blockedDays = (w: (typeof wss)[number], from: number, to: number): number =>
-    (intervals.get(w.id) ?? []).reduce((sum, [a, b]) => sum + Math.max(0, Math.min(b, to) - Math.max(a, from)), 0) / DAY;
-  const blockedTotal = (from: number, to: number): number => wss.reduce((n, w) => n + blockedDays(w, from, to), 0);
-  const blockedCovered = cov !== Infinity;
-  const blockedCur = blockedCovered ? blockedTotal(Math.max(ax.from, cov), ax.to) : 0;
-  const blockedNow = wss.filter((w) => w.status === 'blocked').length;
-
-  const criteria = wss.reduce((acc, w) => ({ met: acc.met + w.criteria.met, total: acc.total + w.criteria.total }), { met: 0, total: 0 });
-
-  const kpis: Kpi[] = [
-    {
-      label: 'Active workstreams',
-      value: String(activeNow.length),
-      delta: hasPrev && covCur ? absDelta(activeNow.length - activeAt(ax.from), null, `vs ${activeAt(ax.from)} at the start of the period`) : undefined,
-      hint: blockedNow ? `${blockedNow} blocked now` : undefined,
-      spark: activeSpark,
-      sparkColor: 'var(--chart-1)',
-    },
-    {
-      label: 'Shipped',
-      value: String(shipped),
-      delta: hasPrev ? pctDelta(shipped, shippedPrev, 'up', against) : undefined,
-      hint: meta.long.toLowerCase(),
-      spark: shippedSeries,
-      sparkColor: 'var(--chart-2)',
-    },
-    {
-      label: 'Median cycle time',
-      value: cycleMed === undefined ? '—' : formatDuration(cycleMed),
-      delta: cycleMed !== undefined && cyclePrevMed !== undefined ? pctDelta(cycleMed, cyclePrevMed, 'down', against) : undefined,
-      hint: cycleMed === undefined ? 'nothing shipped with a Planned step in range' : `planned to shipped · ${cycleCur.length} shipped`,
-      spark: [],
-      sparkColor: 'var(--chart-2)',
-    },
-    {
-      label: 'Time blocked',
-      value: blockedCovered ? (blockedCur ? formatDuration(blockedCur) : '0d') : '—',
-      delta:
-        blockedCovered && hasPrev && covCur && covPrev
-          ? pctDelta(blockedCur, blockedTotal(prevFrom, ax.from), 'down', against)
-          : undefined,
-      hint: !covCur && Number.isFinite(cov) ? `since ${format(cov, 'MMM d')} (history loaded)` : 'summed across workstreams',
-      spark: blockedCovered ? ax.starts.flatMap((s, i) => (s >= cov ? [Math.round(blockedTotal(s, ax.ends[i]) * 10) / 10] : [])) : [],
-      sparkColor: 'var(--chart-5)',
-    },
-    {
-      label: 'Criteria met',
-      value: criteria.total ? `${criteria.met}/${criteria.total}` : '—',
-      hint: criteria.total ? `${Math.round((criteria.met / criteria.total) * 100)}% of acceptance criteria` : 'no acceptance criteria',
-      spark: [],
-      sparkColor: 'var(--chart-2)',
-    },
-  ];
-
-  const flow: SeriesBlock = {
-    labels: ax.labels,
-    titles: ax.titles,
-    series: [
-      { key: 'created', label: 'Created', color: 'var(--chart-1)', values: perBucket(created, ax) },
-      { key: 'shipped', label: 'Shipped', color: 'var(--chart-2)', values: shippedSeries },
-    ],
-  };
-
-  const groups = (WORKSTREAM_STATUS_FLOW as readonly WorkstreamStatus[])
-    .filter((s) => s !== 'shipped' && s !== 'canceled')
-    .reverse()
-    .map((s) => ({ key: s, label: WORKSTREAM_STATUS_META[s].label, color: WS_COLOR[s] }));
-  const stack = stackFrom(wss, ax, cov, groups);
-
-  const edges = [1, 3, 7, 14, 28];
-  const cycleLabels = ['< 1d', '1–3d', '3–7d', '1–2w', '2–4w', '4w+'];
-  const cycleCounts = cycleLabels.map(() => 0);
-  for (const c of cycleCur) {
-    const i = edges.findIndex((e) => c < e);
-    cycleCounts[i === -1 ? edges.length : i] += 1;
-  }
-
-  const blockedRows: BarRow[] = blockedCovered
-    ? wss
-        .map((w) => ({ w, d: blockedDays(w, Math.max(ax.from, cov), ax.to) }))
-        .filter((x) => x.d > 0.02)
-        .sort((a, b) => b.d - a.d)
-        .slice(0, 8)
-        .map(({ w, d }) => ({ key: w.id, label: w.title, hint: w.key, value: d, valueLabel: formatDuration(d), detail: `${w.key} ${w.title}: blocked ${formatDuration(d)}`, color: 'var(--chart-5)' }))
-    : [];
-
-  const criteriaRows: BarRow[] = activeNow
-    .filter((w) => w.criteria.total > 0)
-    .sort((a, b) => b.criteria.met / b.criteria.total - a.criteria.met / a.criteria.total || b.criteria.total - a.criteria.total)
-    .slice(0, 8)
-    .map((w) => ({
-      key: w.id,
-      label: w.title,
-      hint: w.key,
-      value: (w.criteria.met / w.criteria.total) * 100,
-      valueLabel: `${w.criteria.met}/${w.criteria.total}`,
-      detail: `${w.key}: ${w.criteria.met} of ${w.criteria.total} criteria met`,
-      color: 'var(--status-shipped)',
-    }));
-
-  return {
-    kpis,
-    flow,
-    stock: stack.block,
-    stockUnavailable: stack.unavailable,
-    cycle: cycleCur.length
-      ? {
-          labels: cycleLabels,
-          titles: cycleLabels.map((l) => `Planned to shipped in ${l}`),
-          series: [{ key: 'cycle', label: 'Workstreams', color: 'var(--chart-2)', values: cycleCounts }],
-        }
-      : undefined,
-    cycleNote: 'Time from entering Planned to shipping. Workstreams that never had a Planned step are left out.',
-    blocked: blockedRows,
-    blockedNote: !covCur && Number.isFinite(cov) ? `Counted from ${format(cov, 'MMM d')}, where loaded activity begins.` : undefined,
-    criteria: criteriaRows,
-    activeByTeam: tally(activeNow.map((w) => w.team)),
-    shippedByTeam: tally(wss.filter((w) => w.shipped !== undefined && inRange(w.shipped, ax.from, ax.to)).map((w) => w.team)),
   };
 }

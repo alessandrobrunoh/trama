@@ -136,26 +136,6 @@ export class UploadsController {
     );
   }
 
-  @Post('workstreams/:idOrKey/artifacts/upload')
-  @Multipart()
-  @UseInterceptors(uploadFile)
-  uploadOnWorkstream(
-    @Ctx() ctx: WorkspaceContext,
-    @Auth() auth: AuthInfo,
-    @Param('idOrKey') workstreamId: string,
-    @UploadedFile() file: IncomingUpload,
-  ) {
-    return this.uploads.attachArtifact(
-      ctx.workspace.id,
-      ctx.workspace.slug,
-      callerOf(ctx, auth),
-      asFile(file),
-      {
-        workstreamId,
-      },
-    );
-  }
-
   @Post('projects/:id/artifacts/upload')
   @Multipart()
   @UseInterceptors(uploadFile)

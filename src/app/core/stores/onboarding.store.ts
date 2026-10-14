@@ -1,6 +1,6 @@
 // Activation checklist of a workspace: six first steps from "nothing here yet" to "an agent is working".
 //
-// Progress is derived from real data wherever there is some (a team exists, a workstream has acceptance
+// Progress is derived from real data wherever there is some (a team exists, an issue exists,
 // criteria, a token was used…). Only what has no trace in the workspace is remembered: dismissal and "tried
 // the command bar". There is no per-user settings endpoint, so those live in this browser, per user and workspace.
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
@@ -12,11 +12,11 @@ import { UiStore } from './ui.store';
 
 export const ONBOARDING_STORAGE_KEY = 'trama.onboarding.v1';
 
-export type OnboardingStepId = 'team' | 'invite' | 'repository' | 'workstream' | 'agent' | 'command-bar';
+export type OnboardingStepId = 'team' | 'invite' | 'repository' | 'issue' | 'agent' | 'command-bar';
 
 /** What clicking the step's button does: open a dialog, or go to a page under the workspace. */
 export type OnboardingAction =
-  | { kind: 'create'; what: 'team' | 'repository' | 'workstream' }
+  | { kind: 'create'; what: 'team' | 'repository' | 'issue' }
   | { kind: 'link'; path: string[] }
   | { kind: 'command-bar' };
 
@@ -40,7 +40,6 @@ const NEEDS: Partial<Record<OnboardingStepId, Capability>> = {
   team: 'createTeams',
   invite: 'inviteMembers',
   repository: 'manageRepositories',
-  workstream: 'createWorkstreams',
   agent: 'manageTokens',
 };
 
@@ -68,14 +67,13 @@ export class OnboardingStore {
   readonly steps = computed<OnboardingStep[]>(() => {
     const s = this.trama;
     const mine = this.mine();
-    const hasCriteria = s.workstreams().some((w) => w.acceptanceCriteria.length > 0);
     const agentConnected =
       s.agents().length > 0 || s.tokens().some((t) => !!t.lastUsedAt && t.actor.id === s.me()?.id);
     const defs: OnboardingStep[] = [
       {
         id: 'team',
         title: 'Create a team',
-        description: 'A team owns work and gives it a key like WEB-12.',
+        description: 'A team organizes issue triage and gives issues a key like WEB-12.',
         cta: 'Create team',
         action: { kind: 'create', what: 'team' },
         done: s.teams().length > 0,
@@ -91,18 +89,18 @@ export class OnboardingStore {
       {
         id: 'repository',
         title: 'Connect a repository',
-        description: 'Pull requests and checks on it move workstreams forward by themselves.',
+        description: 'Pull requests and checks on connected repositories appear alongside issues.',
         cta: 'Add repository',
         action: { kind: 'create', what: 'repository' },
         done: s.repositories().length > 0,
       },
       {
-        id: 'workstream',
-        title: 'Create your first workstream',
-        description: 'An outcome with acceptance criteria. Its status follows the facts, not drag and drop.',
-        cta: 'New workstream',
-        action: { kind: 'create', what: 'workstream' },
-        done: hasCriteria,
+        id: 'issue',
+        title: 'Create your first issue',
+        description: 'Record a problem or request, with an optional goal describing the desired result.',
+        cta: 'New issue',
+        action: { kind: 'create', what: 'issue' },
+        done: s.issues().length > 0,
       },
       {
         id: 'agent',

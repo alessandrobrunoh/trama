@@ -1,5 +1,5 @@
-// AI actions: the assistant woven into the product (summarise, triage, improve, status update,
-// break down, standup digest). It composes prompts for the existing /ai/chat and /ai/suggestions
+// AI actions: the assistant woven into the product (summarise, triage, improve, standup digest).
+// It composes prompts for the existing /ai/chat and /ai/suggestions
 // endpoints and never changes anything by itself: every result is a proposal a person applies.
 //
 // Server rules we respect: browser session only, ONE active request per user, at most 10 requests
@@ -12,17 +12,15 @@ import { AiApi, type AiSuggestion, type ChatContext } from '../../core/ai/ai-api
 import {
   Notifier,
   TramaStore,
-  type CreateIssueInput,
   type ID,
   type Issue,
   type IssueKind,
   type Priority,
-  type Workstream,
 } from '../../core';
 import { MilestoneInfo } from '../milestones/milestone-stats';
-import { KIND_LIST, PRIORITY_LIST, breakdownInputs, digestData, issuePromptData, triageInputs, workstreamPromptData } from './ai-data';
-import { AiFormatError, parseBreakdown, titleKey, parseMarkdown, parseSummary, parseTriage, type ProposedIssue, type Summary, type Triage } from './parse';
-import { breakdownPrompt, digestPrompt, summarizePrompt, triagePrompt, updatePrompt, type PromptCandidate, type PromptSimilar } from './prompts';
+import { KIND_LIST, PRIORITY_LIST, digestData, issuePromptData, triageInputs } from './ai-data';
+import { AiFormatError, parseMarkdown, parseSummary, parseTriage, type Summary, type Triage } from './parse';
+import { digestPrompt, summarizePrompt, triagePrompt, type PromptSimilar } from './prompts';
 
 /** Requests the server allows per user and minute. */
 export const RATE_LIMIT = 10;
@@ -58,7 +56,7 @@ export const SETUP_MESSAGE = "AI isn't set up — enable it in Settings → AI &
 const BUSY_MESSAGE = 'AI is busy — try again in a moment';
 const RATE_MESSAGE = `AI is limited to ${RATE_LIMIT} requests a minute — try again in a moment`;
 
-export type AiRequestKind = 'summarize' | 'triage' | 'improve' | 'update' | 'breakdown';
+export type AiRequestKind = 'summarize' | 'triage' | 'improve';
 interface AiRequest {
   kind: AiRequestKind;
   target: ID;
@@ -69,13 +67,11 @@ interface AiRequest {
 export type TriageChange =
   | { type: 'priority'; value: Priority }
   | { type: 'estimate'; value: number }
-  | { type: 'kind'; value: IssueKind }
-  | { type: 'workstream'; value: string };
+  | { type: 'kind'; value: IssueKind };
 
 export interface TriageResult {
   triage: Triage;
   similar: PromptSimilar[];
-  candidates: PromptCandidate[];
 }
 
 export type JobState = 'idle' | 'loading' | 'done' | 'error';
@@ -335,7 +331,7 @@ export class AiActions {
     return parseSummary(await this.chat(prompt, { kind: 'issue', id: issue.id, label: issue.key }, signal));
   }
 
-  /** Suggested priority, estimate, type and workstreams (proposals only). */
+  /** Suggested priority, estimate and type (proposals only). */
   async triageIssue(issue: Issue, signal: AbortSignal): Promise<TriageResult> {
     await this.store.loadComments({ type: 'issue', id: issue.id });
     const inputs = triageInputs(this.store, issue);
@@ -343,7 +339,6 @@ export class AiActions {
       {
         issue: issuePromptData(this.store, issue),
         estimates: inputs.estimates,
-        candidates: inputs.candidates,
         similar: inputs.similar,
         kinds: KIND_LIST,
         priorities: PRIORITY_LIST,
@@ -353,9 +348,8 @@ export class AiActions {
     const reply = await this.chat(prompt, { kind: 'issue', id: issue.id, label: issue.key }, signal);
     const triage = parseTriage(reply, {
       estimates: inputs.estimates?.map((e) => e.value) ?? [],
-      candidateKeys: inputs.candidates.map((c) => c.key),
     });
-    return { triage, similar: inputs.similar, candidates: inputs.candidates };
+    return { triage, similar: inputs.similar };
   }
 
   /** Clearer title and description via the suggestions endpoint. */
@@ -363,19 +357,6 @@ export class AiActions {
     const slug = this.store.slug();
     if (!slug) throw new AiFailure('Open a workspace first', 'other');
     return this.api.suggest(slug, { kind: 'issue', title: issue.title.slice(0, 300), description: (issue.body ?? '').slice(0, 12000) }, signal);
-  }
-
-  /** Markdown stakeholder update drafted from the workstream's real data. */
-  async workstreamUpdate(ws: Workstream, signal: AbortSignal): Promise<string> {
-    const prompt = updatePrompt(workstreamPromptData(this.store, this.info, ws), this.locale);
-    return parseMarkdown(await this.chat(prompt, { kind: 'workstream', id: ws.id, label: ws.key }, signal));
-  }
-
-  /** 3-7 proposed issues for the workstream (not duplicates of existing titles). */
-  async breakDownWorkstream(ws: Workstream, signal: AbortSignal): Promise<ProposedIssue[]> {
-    const inputs = breakdownInputs(this.store, ws);
-    const reply = await this.chat(breakdownPrompt(inputs, this.locale), { kind: 'workstream', id: ws.id, label: ws.key }, signal);
-    return parseBreakdown(reply, { estimates: inputs.estimates?.map((e) => e.value) ?? [], existingTitles: inputs.existingTitles });
   }
 
   /** Workspace standup digest (markdown). */
@@ -390,42 +371,30 @@ export class AiActions {
     return this.store.canEditTeamWork(issue.teamId);
   }
 
-  canEditWorkstream(ws: Workstream): boolean {
-    return this.store.canEditTeamWork(ws.ownerTeamId);
-  }
-
   /** Apply the chosen triage suggestions. Returns how many changed. */
   async applyTriage(issue: Issue, changes: readonly TriageChange[]): Promise<number> {
     if (!this.canEditIssue(issue) || !changes.length) return 0;
     const patch: { priority?: Priority; estimate?: number; kind?: IssueKind } = {};
-    const workstreamKeys: string[] = [];
     for (const c of changes) {
-      if (c.type === 'workstream') workstreamKeys.push(c.value);
-      else if (c.type === 'priority') patch.priority = c.value;
+      if (c.type === 'priority') patch.priority = c.value;
       else if (c.type === 'estimate') patch.estimate = c.value;
       else patch.kind = c.value;
     }
-    const before = { priority: issue.priority, estimate: issue.estimate ?? null, kind: issue.kind, workstreamIds: [...issue.workstreamIds], status: issue.status };
+    const before = { priority: issue.priority, estimate: issue.estimate ?? null, kind: issue.kind };
 
     let ok = true;
     if (Object.keys(patch).length) ok = (await this.store.updateIssue(issue.id, patch)) && ok;
-    const ids = workstreamKeys.flatMap((k) => {
-      const w = this.store.getWorkstream(k);
-      return w && !before.workstreamIds.includes(w.id) ? [w.id] : [];
-    });
-    if (ids.length) ok = !!(await this.store.linkIssue(issue.id, { workstreamIds: ids })) && ok;
     if (!ok) return 0;
 
-    const n = (Object.keys(patch).length ? Object.keys(patch).length : 0) + ids.length;
+    const n = Object.keys(patch).length;
     this.notify.success(`Applied ${n} suggestion${n === 1 ? '' : 's'} to ${issue.key}`, {
       action: {
         label: 'Undo',
         run: () => {
-          const revert: { priority?: Priority; estimate?: number | null; workstreamIds?: ID[]; kind?: IssueKind } = {};
+          const revert: { priority?: Priority; estimate?: number | null; kind?: IssueKind } = {};
           if (patch.priority !== undefined) revert.priority = before.priority;
           if (patch.estimate !== undefined) revert.estimate = before.estimate;
           if (patch.kind !== undefined) revert.kind = before.kind;
-          if (ids.length) revert.workstreamIds = before.workstreamIds;
           void this.store.updateIssue(issue.id, revert);
         },
       },
@@ -446,51 +415,4 @@ export class AiActions {
     return true;
   }
 
-  /** Post the (reviewed) update as a comment on the workstream. */
-  async postUpdate(ws: Workstream, markdown: string): Promise<boolean> {
-    if (!this.canEditWorkstream(ws) || !markdown.trim()) return false;
-    const c = await this.store.addComment({ type: 'workstream', id: ws.id }, markdown.trim());
-    if (c) this.notify.success(`Update posted on ${ws.key}`);
-    return !!c;
-  }
-
-  /** Create the chosen issues, link them to the workstream, skip duplicates of existing titles. */
-  async createIssues(ws: Workstream, proposals: readonly ProposedIssue[]): Promise<number> {
-    if (!this.canEditWorkstream(ws)) return 0;
-    const scaleOn = this.store.estimateScale() !== 'none';
-    const seen = new Set((this.store.issuesByWorkstream().get(ws.id) ?? []).map((i) => titleKey(i.title)));
-    const created: Issue[] = [];
-    for (const p of proposals) {
-      const title = p.title.trim();
-      const key = titleKey(title);
-      if (!title || !key || seen.has(key)) continue;
-      seen.add(key);
-      const input: CreateIssueInput = {
-        kind: p.kind,
-        title,
-        body: p.description || undefined,
-        priority: p.priority,
-        teamId: ws.ownerTeamId,
-        status: 'todo',
-        ...(scaleOn && p.estimate !== null ? { estimate: p.estimate } : {}),
-      };
-      const issue = await this.store.createIssue(input);
-      if (!issue) continue;
-      await this.store.linkIssue(issue.id, { workstreamIds: [ws.id], status: issue.status });
-      created.push(issue);
-    }
-    if (!created.length) return 0;
-    const canUndo = this.store.allowed('deleteIssues');
-    this.notify.success(`Created ${created.length} issue${created.length === 1 ? '' : 's'} in ${ws.key}`, {
-      action: canUndo
-        ? {
-            label: 'Undo',
-            run: () => {
-              for (const i of created) void this.store.deleteIssue(i.id);
-            },
-          }
-        : undefined,
-    });
-    return created.length;
-  }
 }

@@ -20,7 +20,6 @@ import type {
   CommentPage,
   SnapshotCommentsMode,
   Decision,
-  Dependency,
   Document,
   DocumentRevision,
   DocumentSummary,
@@ -48,6 +47,7 @@ import type {
   IntakeItemStatus,
   IntakeSource,
   Issue,
+  IssueContext,
   Membership,
   Milestone,
   OutgoingWebhook,
@@ -66,7 +66,6 @@ import type {
   Workspace,
   WorkspaceInvite,
   WorkspaceSnapshot,
-  Workstream,
 } from '../contracts/domain';
 import { Notifier } from '../notify/notifier';
 import { ApiError } from './api-error';
@@ -77,14 +76,12 @@ import type {
   StartImportInput,
   AttentionQuery,
   CreateAgentInput,
-  CreateArtifactInput,
   CreateCommentInput,
   CreateDecisionInput,
   CreateDocumentInput,
   DocumentOwnerInput,
   DocumentsQuery,
   UpdateDocumentInput,
-  CreateDependencyInput,
   CreateInputRequestInput,
   CreateInviteInput,
   CreateMilestoneInput,
@@ -118,17 +115,12 @@ import type {
   CreateViewInput,
   InviteViewInput,
   CreateWorkspaceInput,
-  CreateWorkstreamInput,
-  CriterionInput,
-  CriterionPatch,
   EventsQuery,
-  GraphResponse,
   InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
   SignupInput,
-  LinkIssueInput,
   UpdateAgentInput,
   UpdateArtifactInput,
   UpdateDecisionInput,
@@ -152,7 +144,6 @@ import type {
   RoleInput,
   UpdateRoleInput,
   WebhookWithSecret,
-  UpdateWorkstreamInput,
 } from './api.types';
 
 export interface RequestOptions {
@@ -300,7 +291,8 @@ export class ApiClient {
       this.post<Workspace>(`${this.w(slug)}/statuses/${subject}`, input),
     updateStatus: (slug: string, subject: string, id: ID, input: UpdateStatusInput) =>
       this.patch<Workspace>(`${this.w(slug)}/statuses/${subject}/${id}`, input),
-    deleteStatus: (slug: string, subject: string, id: ID) => this.del<Workspace>(`${this.w(slug)}/statuses/${subject}/${id}`),
+    deleteStatus: (slug: string, subject: string, id: ID) =>
+      this.del<Workspace>(`${this.w(slug)}/statuses/${subject}/${id}`),
     createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
       this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),
     updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
@@ -517,7 +509,7 @@ export class ApiClient {
       remove: (slug: string, projectId: ID, id: ID) =>
         this.del(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
     },
-    /** The whole tree under a project in one response (workstreams, issues, artifacts with paths, updates...). */
+    /** The project, its issues, artifacts and updates. */
     context: (slug: string, projectId: ID) =>
       this.get<ProjectContext>(`${this.w(slug)}/projects/${projectId}/context`),
     /** The same context rendered as markdown (for agents / copy). */
@@ -548,52 +540,9 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/repositories/${id}`),
   };
 
-  readonly workstreams = {
-    list: (slug: string) => this.get<Workstream[]>(`${this.w(slug)}/workstreams`),
-    /** `idOrKey`: id or key like AUTH-42. */
-    get: (slug: string, idOrKey: string) =>
-      this.get<Workstream>(`${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}`),
-    create: (slug: string, input: CreateWorkstreamInput) =>
-      this.post<Workstream>(`${this.w(slug)}/workstreams`, input),
-    update: (slug: string, idOrKey: string, input: UpdateWorkstreamInput) =>
-      this.patch<Workstream>(`${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}`, input),
-    remove: (slug: string, idOrKey: string) =>
-      this.del(`${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}`),
-    /** Criterion calls return the updated Workstream. */
-    addCriterion: (slug: string, idOrKey: string, input: CriterionInput) =>
-      this.post<unknown>(
-        `${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/criteria`,
-        input,
-      ),
-    updateCriterion: (slug: string, idOrKey: string, criterionId: ID, input: CriterionPatch) =>
-      this.patch<unknown>(
-        `${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/criteria/${criterionId}`,
-        input,
-      ),
-    removeCriterion: (slug: string, idOrKey: string, criterionId: ID) =>
-      this.del<unknown>(
-        `${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/criteria/${criterionId}`,
-      ),
-    /** Agent context as markdown text. */
-    contextMarkdown: (slug: string, idOrKey: string) =>
-      this.request<string>(
-        'GET',
-        `${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/context`,
-        { text: true, accept: 'text/markdown' },
-      ),
-    /** Agent context as JSON (Accept: application/json). */
-    contextJson: (slug: string, idOrKey: string) =>
-      this.request<Record<string, unknown>>(
-        'GET',
-        `${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/context`,
-        { accept: 'application/json' },
-      ),
-    graph: (slug: string, idOrKey: string) =>
-      this.get<GraphResponse>(`${this.w(slug)}/workstreams/${encodeURIComponent(idOrKey)}/graph`),
-  };
-
   readonly inputRequests = {
-    list: (slug: string) => this.get<InputRequest[]>(`${this.w(slug)}/input-requests`),
+    list: (slug: string, issueId?: ID) =>
+      this.get<InputRequest[]>(`${this.w(slug)}/input-requests`, { issueId }),
     create: (slug: string, input: CreateInputRequestInput) =>
       this.post<InputRequest>(`${this.w(slug)}/input-requests`, input),
     answer: (slug: string, id: ID, answer: string) =>
@@ -610,6 +559,10 @@ export class ApiClient {
     list: (slug: string) => this.get<Issue[]>(`${this.w(slug)}/issues`),
     get: (slug: string, idOrKey: string) =>
       this.get<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}`),
+    context: (slug: string, idOrKey: string) =>
+      this.get<IssueContext>(
+        `${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/context`,
+      ),
     create: (slug: string, input: CreateIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues`, input),
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
@@ -620,9 +573,6 @@ export class ApiClient {
       this.post<Issue[]>(`${this.w(slug)}/issues/bulk`, { ids, patch }),
     bulkRemove: (slug: string, ids: ID[]) =>
       this.post<{ deleted: ID[] }>(`${this.w(slug)}/issues/bulk-delete`, { ids }),
-    /** Attach workstreams (and optionally create one). `id` may be an id or key. */
-    link: (slug: string, id: ID, input: LinkIssueInput) =>
-      this.post<Issue>(`${this.w(slug)}/issues/${id}/link`, input),
     /** Link to a GitHub / Linear issue by URL; the external status is a read-only mirror. */
     externalRef: {
       link: (slug: string, idOrKey: string, url: string) =>
@@ -662,8 +612,6 @@ export class ApiClient {
 
   readonly artifacts = {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
-    create: (slug: string, input: CreateArtifactInput) =>
-      this.post<Artifact>(`${this.w(slug)}/artifacts`, input),
     update: (slug: string, id: ID, input: UpdateArtifactInput) =>
       this.patch<Artifact>(`${this.w(slug)}/artifacts/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/artifacts/${id}`),
@@ -684,16 +632,13 @@ export class ApiClient {
     /** Attach the file as an image or file artifact. The URL form is unchanged. */
     attach: (
       slug: string,
-      target: { type: 'issue' | 'workstream' | 'project'; id: string },
+      target: { type: 'issue' | 'project'; id: string },
       file: File,
     ) => {
       const id = encodeURIComponent(target.id);
-      const path =
-        target.type === 'issue'
-          ? `${this.w(slug)}/issues/${id}/artifacts/upload`
-          : target.type === 'workstream'
-            ? `${this.w(slug)}/workstreams/${id}/artifacts/upload`
-            : `${this.w(slug)}/projects/${id}/artifacts/upload`;
+      const path = target.type === 'issue'
+        ? `${this.w(slug)}/issues/${id}/artifacts/upload`
+        : `${this.w(slug)}/projects/${id}/artifacts/upload`;
       return this.postForm<Artifact>(path, file);
     },
     discard: (slug: string, id: string, o?: RequestOptions) =>
@@ -713,13 +658,6 @@ export class ApiClient {
     reject: (slug: string, id: ID) => this.post<Decision>(`${this.w(slug)}/decisions/${id}/reject`),
     supersede: (slug: string, id: ID, byId: ID) =>
       this.post<Decision>(`${this.w(slug)}/decisions/${id}/supersede`, { byId }),
-  };
-
-  readonly dependencies = {
-    list: (slug: string) => this.get<Dependency[]>(`${this.w(slug)}/dependencies`),
-    create: (slug: string, input: CreateDependencyInput) =>
-      this.post<Dependency>(`${this.w(slug)}/dependencies`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/dependencies/${id}`),
   };
 
   readonly comments = {
@@ -796,8 +734,6 @@ export class ApiClient {
         quiet: true,
       }),
   };
-
-  graph = (slug: string) => this.get<GraphResponse>(`${this.w(slug)}/graph`);
 
   search = (slug: string, q: string) => this.get<SearchResults>(`${this.w(slug)}/search`, { q });
 

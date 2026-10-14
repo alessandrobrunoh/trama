@@ -15,7 +15,14 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { Clipboard, DECISION_STATUS_META, TramaStore, Notifier, UiStore } from '../../core';
+import {
+  Clipboard,
+  DECISION_STATUS_META,
+  TramaStore,
+  Notifier,
+  UiStore,
+  type Decision,
+} from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorLabel } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
@@ -25,8 +32,8 @@ import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
 import { StatusIcon } from '../../shared/status';
 import { EntityPicker, type PickOption as EntityOption } from '../views/option-controls';
-import { CommentThread } from '../workstreams/comments';
-import { EditableMarkdown, InlineText } from '../workstreams/inline-edit';
+import { CommentThread } from '../../shared/comments';
+import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
 import { DecisionTags } from './decision-tags';
 
 /** Status-specific one-liner under the title. */
@@ -203,16 +210,16 @@ const STATUS_HINT: Record<string, string> = {
           </div>
 
           <section class="flex flex-col gap-2">
-            <h3 class="text-muted-foreground text-xs font-medium">Origin workstream</h3>
+            <h3 class="text-muted-foreground text-xs font-medium">Origin issue</h3>
             <div class="flex flex-wrap items-center gap-1.5">
-              @if (d.originWorkstreamId) {
+              @if (originIssueId(d); as originId) {
                 <span class="inline-flex max-w-full items-center gap-0.5">
-                  <app-entity-chip type="workstream" [ref]="d.originWorkstreamId" class="min-w-0" />
+                  <app-entity-chip type="issue" [ref]="originId" class="min-w-0" />
                   @if (canEdit()) {
                     <button
                       type="button"
                       class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded-full"
-                      aria-label="Clear origin workstream"
+                      aria-label="Clear origin issue"
                       (click)="setOrigin(null)"
                     >
                       <svg [lucideIcon]="xIcon" [size]="11"></svg>
@@ -226,13 +233,13 @@ const STATUS_HINT: Record<string, string> = {
                 <app-entity-picker
                   variant="ghost"
                   size="xs"
-                  placeholder="Where was this decided?"
-                  emptyText="No workstreams."
+                  placeholder="Which issue led to this decision?"
+                  emptyText="No other issues."
                   [options]="originCandidates()"
                   (picked)="setOrigin($event)"
                 >
                   <span class="text-muted-foreground text-xs">{{
-                    d.originWorkstreamId ? 'Change' : '+ Set origin'
+                    originIssueId(d) ? 'Change' : '+ Set origin'
                   }}</span>
                 </app-entity-picker>
               }
@@ -240,16 +247,16 @@ const STATUS_HINT: Record<string, string> = {
           </section>
 
           <section class="flex flex-col gap-2">
-            <h3 class="text-muted-foreground text-xs font-medium">Related workstreams</h3>
+            <h3 class="text-muted-foreground text-xs font-medium">Related issues</h3>
             <div class="flex flex-wrap items-center gap-1.5">
-              @for (id of d.relatedWorkstreamIds; track id) {
+              @for (id of relatedIssueIds(d); track id) {
                 <span class="inline-flex max-w-full items-center gap-0.5">
-                  <app-entity-chip type="workstream" [ref]="id" class="min-w-0" />
+                  <app-entity-chip type="issue" [ref]="id" class="min-w-0" />
                   @if (canEdit()) {
                     <button
                       type="button"
                       class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded-full"
-                      [attr.aria-label]="'Remove related workstream'"
+                      [attr.aria-label]="'Remove related issue'"
                       (click)="removeRelated(id)"
                     >
                       <svg [lucideIcon]="xIcon" [size]="11"></svg>
@@ -265,14 +272,14 @@ const STATUS_HINT: Record<string, string> = {
                 <app-entity-picker
                   variant="ghost"
                   size="xs"
-                  placeholder="Link a workstream…"
-                  emptyText="No workstreams."
+                  placeholder="Link an issue…"
+                  emptyText="No other issues."
                   [options]="relatedCandidates()"
                   (picked)="addRelated($event)"
                 >
                   <svg [lucideIcon]="plusIcon" [size]="12"></svg>
                   <span class="text-muted-foreground text-xs">{{
-                    d.relatedWorkstreamIds.length ? 'Add' : 'Link workstream'
+                    relatedIssueIds(d).length ? 'Add' : 'Link issue'
                   }}</span>
                 </app-entity-picker>
               }
@@ -390,33 +397,33 @@ export class DecisionDetailPage {
       }));
   });
   protected readonly originCandidates = computed<EntityOption[]>(() => {
-    const current = this.decision()?.originWorkstreamId;
+    const current = this.decision() ? this.originIssueId(this.decision()!) : undefined;
     return this.store
-      .workstreams()
-      .filter((w) => w.id !== current)
-      .map((w) => ({
-        value: w.id,
-        label: w.key,
-        hint: w.title,
+      .issues()
+      .filter((issue) => issue.id !== current)
+      .map((issue) => ({
+        value: issue.id,
+        label: issue.key,
+        hint: issue.title,
         mono: true,
-        status: w.status,
-        statusEntity: 'workstream',
+        status: issue.status,
+        statusEntity: 'issue',
       }));
   });
   protected readonly relatedCandidates = computed<EntityOption[]>(() => {
     const d = this.decision();
     if (!d) return [];
-    const taken = new Set(d.relatedWorkstreamIds);
+    const taken = new Set(this.relatedIssueIds(d));
     return this.store
-      .workstreams()
-      .filter((w) => !taken.has(w.id))
-      .map((w) => ({
-        value: w.id,
-        label: w.key,
-        hint: w.title,
+      .issues()
+      .filter((issue) => !taken.has(issue.id))
+      .map((issue) => ({
+        value: issue.id,
+        label: issue.key,
+        hint: issue.title,
         mono: true,
-        status: w.status,
-        statusEntity: 'workstream',
+        status: issue.status,
+        statusEntity: 'issue',
       }));
   });
   protected readonly allTags = computed(() => {
@@ -446,18 +453,25 @@ export class DecisionDetailPage {
     const d = this.decision();
     if (d) void this.store.updateDecision(d.id, { tags });
   }
+  protected originIssueId(decision: Decision): string | undefined {
+    return (decision as Decision & { originIssueId?: string }).originIssueId;
+  }
+  protected relatedIssueIds(decision: Decision): string[] {
+    return (decision as Decision & { relatedIssueIds?: string[] }).relatedIssueIds ?? [];
+  }
   protected setOrigin(id: string | null): void {
     const d = this.decision();
     if (!d) return;
     const next = id;
-    if (next === (d.originWorkstreamId ?? null)) return;
-    void this.store.updateDecision(d.id, { originWorkstreamId: next });
+    if (next === (this.originIssueId(d) ?? null)) return;
+    void this.store.updateDecision(d.id, { originIssueId: next });
   }
   protected addRelated(id: string): void {
     const d = this.decision();
-    if (d && !d.relatedWorkstreamIds.includes(id)) {
+    const relatedIssueIds = d ? this.relatedIssueIds(d) : [];
+    if (d && !relatedIssueIds.includes(id)) {
       void this.store.updateDecision(d.id, {
-        relatedWorkstreamIds: [...d.relatedWorkstreamIds, id],
+        relatedIssueIds: [...relatedIssueIds, id],
       });
     }
   }
@@ -465,7 +479,7 @@ export class DecisionDetailPage {
     const d = this.decision();
     if (d)
       void this.store.updateDecision(d.id, {
-        relatedWorkstreamIds: d.relatedWorkstreamIds.filter((x) => x !== id),
+        relatedIssueIds: this.relatedIssueIds(d).filter((x) => x !== id),
       });
   }
   protected async accept(): Promise<void> {

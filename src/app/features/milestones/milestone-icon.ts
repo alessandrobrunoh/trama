@@ -4,9 +4,8 @@ import type { MilestoneState } from './milestone-model';
 const DIAMOND = '8,1.4 14.6,8 8,14.6 1.4,8';
 
 /**
- * Milestone glyph: a diamond that fills from the bottom with progress (the diamond is to a
- * milestone what the hexagon is to a workstream). Solid with a check when done, red outline when
- * overdue and incomplete.
+ * Milestone glyph: a diamond that fills from the bottom with progress. Solid with a check when
+ * done, red outline when overdue and incomplete.
  */
 @Component({
   selector: 'app-milestone-icon',
@@ -17,10 +16,28 @@ const DIAMOND = '8,1.4 14.6,8 8,14.6 1.4,8';
     '[style.color]': 'colorStyle()',
   },
   template: `
-    <svg [attr.width]="size()" [attr.height]="size()" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+    <svg
+      [attr.width]="size()"
+      [attr.height]="size()"
+      viewBox="0 0 16 16"
+      fill="none"
+      aria-hidden="true"
+    >
       @if (state() === 'done') {
-        <polygon [attr.points]="diamond" fill="currentColor" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round" />
-        <path d="M5.4 8.2 7.2 10l3.5-3.7" stroke="var(--background)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        <polygon
+          [attr.points]="diamond"
+          fill="currentColor"
+          stroke="currentColor"
+          stroke-width="1.2"
+          stroke-linejoin="round"
+        />
+        <path
+          d="M5.4 8.2 7.2 10l3.5-3.7"
+          stroke="var(--background)"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       } @else {
         <defs>
           <clipPath [attr.id]="clipId"><polygon [attr.points]="diamond" /></clipPath>
@@ -29,9 +46,23 @@ const DIAMOND = '8,1.4 14.6,8 8,14.6 1.4,8';
           <polygon [attr.points]="diamond" fill="var(--background)" />
         }
         @if (fraction() > 0) {
-          <rect x="0" width="16" [attr.y]="14.6 - fraction() * 13.2" height="16" [attr.clip-path]="'url(#' + clipId + ')'" fill="currentColor" fill-opacity="0.85" />
+          <rect
+            x="0"
+            width="16"
+            [attr.y]="14.6 - fraction() * 13.2"
+            height="16"
+            [attr.clip-path]="'url(#' + clipId + ')'"
+            fill="currentColor"
+            fill-opacity="0.85"
+          />
         }
-        <polygon [attr.points]="diamond" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" [attr.stroke-dasharray]="state() === 'empty' ? '2.2 1.8' : null" />
+        <polygon
+          [attr.points]="diamond"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linejoin="round"
+          [attr.stroke-dasharray]="state() === 'empty' ? '2.2 1.8' : null"
+        />
       }
     </svg>
   `,
@@ -46,7 +77,9 @@ export class MilestoneIcon {
   private static seq = 0;
   protected readonly clipId = `msclip-${++MilestoneIcon.seq}`;
   protected readonly diamond = DIAMOND;
-  protected readonly color = computed(() => (this.state() === 'idle' || this.state() === 'empty' ? 'text-muted-foreground' : ''));
+  protected readonly color = computed(() =>
+    this.state() === 'idle' || this.state() === 'empty' ? 'text-muted-foreground' : '',
+  );
   protected readonly colorStyle = computed(() => {
     switch (this.state()) {
       case 'done':
@@ -54,7 +87,7 @@ export class MilestoneIcon {
       case 'overdue':
         return 'var(--status-blocked)';
       case 'active':
-        return 'var(--entity-workstream)';
+        return 'var(--status-working)';
       default:
         return null;
     }

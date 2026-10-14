@@ -35,12 +35,6 @@ class ListDocumentsQuery {
   /** Full-text search over title and body (every word is a prefix). */
   @IsOptional() @IsString() @MaxLength(200) q?: string;
   @IsOptional() @blankToUndefined @IsString() @MaxLength(64) projectId?: string;
-  /** Workstream id or key. */
-  @IsOptional()
-  @blankToUndefined
-  @IsString()
-  @MaxLength(64)
-  workstreamId?: string;
   /** Issue id or key. */
   @IsOptional() @blankToUndefined @IsString() @MaxLength(64) issueId?: string;
   /** `true`: attached to something. `false`: loose documents. */
@@ -72,8 +66,6 @@ class CreateDocumentDto {
   @IsOptional() @IsString() @MaxLength(DOCUMENT_LIMITS.bodyMax) body?: string;
   @Clearable() @IsString() @MaxLength(32) icon?: string | null;
   @IsOptional() @IsString() @MaxLength(64) projectId?: string;
-  /** Workstream id or key. */
-  @IsOptional() @IsString() @MaxLength(64) workstreamId?: string;
   /** Issue id or key. */
   @IsOptional() @IsString() @MaxLength(64) issueId?: string;
 }
@@ -99,7 +91,6 @@ class RestoreRevisionDto {
 
 class AttachDto {
   @IsOptional() @IsString() @MaxLength(64) projectId?: string;
-  @IsOptional() @IsString() @MaxLength(64) workstreamId?: string;
   @IsOptional() @IsString() @MaxLength(64) issueId?: string;
 }
 

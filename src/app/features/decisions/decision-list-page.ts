@@ -15,13 +15,12 @@ import { readJson, writeJson } from '../../core/stores/storage';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
-import { EntityChip } from '../../shared/entity-chip';
 import { Kbd } from '../../shared/kbd';
 import { KeyChip } from '../../shared/key-chip';
 import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { StatusIcon } from '../../shared/status';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { SearchInput } from '../../shared/search-input';
 
 const PREFS_KEY = 'trama.decisions.list.v1';
@@ -49,7 +48,6 @@ interface DecisionGroup {
     EmptyState,
     KeyChip,
     StatusIcon,
-    EntityChip,
     RelativeTimePipe,
     TopBarActions,
   ],
@@ -141,9 +139,6 @@ interface DecisionGroup {
                   <span class="text-muted-foreground text-[11px]">+{{ d.tags.length - 2 }}</span>
                 }
               </span>
-              @if (d.originWorkstreamId) {
-                <app-entity-chip type="workstream" [ref]="d.originWorkstreamId" compact class="relative max-sm:hidden" />
-              }
               <span class="text-meta pointer-events-none relative w-24 shrink-0 text-end whitespace-nowrap tabular-nums max-sm:hidden">{{ (d.decidedAt ?? d.updatedAt) | relativeTime }}</span>
             </div>
           }

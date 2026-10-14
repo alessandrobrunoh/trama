@@ -158,7 +158,7 @@ export interface BurnInput {
   startDay: number;
   targetDay: number | null;
   today: number;
-  /** Day an issue joined the workstream (from `issue.linked` events); falls back to `createdAt`. */
+  /** Day an issue joined the project; falls back to `createdAt` when no event day is available. */
   linkedDay: ReadonlyMap<string, number>;
 }
 

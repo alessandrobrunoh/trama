@@ -1,14 +1,7 @@
-// Insights of one project, computed from the issues / milestones / workstreams already in the store.
+// Insights of one project, computed from its issues and milestones.
 // Pure functions: the tab passes the records and `now`, nothing here reads the store.
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns';
-import type {
-  Issue,
-  IssueStatus,
-  Milestone,
-  Priority,
-  Project,
-  Workstream,
-} from '../../core/contracts/domain';
+import type { Issue, IssueStatus, Milestone, Priority, Project } from '../../core/contracts/domain';
 
 const DAY = 86_400_000;
 
@@ -39,8 +32,6 @@ export interface ProjectKpis {
   active: number;
   /** Open issues nobody is assigned to. */
   unassigned: number;
-  /** Workstreams of the project that are blocked. */
-  blockedWorkstreams: number;
   /** Whole days until the target date (negative = overdue); undefined without a target. */
   daysLeft?: number;
 }
@@ -106,7 +97,6 @@ export interface ProjectStats {
 export interface ProjectStatsInput {
   project: Project;
   issues: readonly Issue[];
-  workstreams: readonly Workstream[];
   milestones: readonly Milestone[];
   /** Resolves an assignee id to a display name. */
   userName: (id: string) => string | undefined;
@@ -129,7 +119,6 @@ export function projectStats(input: ProjectStatsInput): ProjectStats {
     open: scoped.filter(isOpen).length,
     active: scoped.filter((i) => i.status === 'in_progress' || i.status === 'in_review').length,
     unassigned: scoped.filter((i) => isOpen(i) && !i.assigneeId).length,
-    blockedWorkstreams: input.workstreams.filter((w) => w.status === 'blocked').length,
     daysLeft:
       target === undefined ? undefined : differenceInCalendarDays(new Date(target), new Date(now)),
   };

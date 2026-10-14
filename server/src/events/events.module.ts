@@ -10,13 +10,12 @@ import {
 import { EventsController } from './events.controller.js';
 import { EventsService } from './events.service.js';
 import { StreamAuthService } from './stream-auth.js';
-import { WorkstreamBus } from './workstream-bus.js';
 
 @Global()
 @Module({
   imports: [TypeOrmModule.forFeature([DomainEventEntity, SessionEntity, ApiTokenEntity, MembershipEntity, AgentEntity])],
   controllers: [EventsController],
-  providers: [EventsService, WorkstreamBus, StreamAuthService],
-  exports: [EventsService, WorkstreamBus],
+  providers: [EventsService, StreamAuthService],
+  exports: [EventsService],
 })
 export class EventsModule {}

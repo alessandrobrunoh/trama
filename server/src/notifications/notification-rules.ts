@@ -1,10 +1,14 @@
-import type { ActorRef, NotificationKind, SubjectRef, WorkstreamStatus } from '../contracts/domain.js';
+import type {
+  ActorRef,
+  LegacySubjectRef,
+  NotificationKind,
+} from '../contracts/domain.js';
 
 /** The slice of a recorded DomainEvent the rules need. */
 export interface RuleEvent {
   type: string;
   actor: ActorRef;
-  subject: SubjectRef;
+  subject: LegacySubjectRef;
   data: Record<string, unknown>;
 }
 
@@ -13,9 +17,13 @@ export interface RuleContext {
   event: RuleEvent;
   /** Display name of whoever caused the event. */
   actorName: string;
-  issue?: { id: string; key: string; title: string; assigneeId?: string | null; reporterId?: string | null };
-  /** The event's workstream, or the subject itself when the event is about a workstream. */
-  workstream?: { id: string; key: string; title: string; accountableUserId?: string | null };
+  issue?: {
+    id: string;
+    key: string;
+    title: string;
+    assigneeId?: string | null;
+    reporterId?: string | null;
+  };
   decision?: { id: string; key: string; title: string };
   /** The customer a `customer_request.*` event is about, with the people following it. */
   customer?: { id: string; name: string; subscriberIds: readonly string[] };
@@ -24,8 +32,17 @@ export interface RuleContext {
    * the customers behind its requests, who follows them, and who recorded the requests.
    */
   delivery?: {
-    target: { type: 'issue' | 'project'; id: string; label: string; link: string };
-    customers: readonly { id: string; name: string; subscriberIds: readonly string[] }[];
+    target: {
+      type: 'issue' | 'project';
+      id: string;
+      label: string;
+      link: string;
+    };
+    customers: readonly {
+      id: string;
+      name: string;
+      subscriberIds: readonly string[];
+    }[];
     requesterIds: readonly string[];
   };
 }
@@ -38,16 +55,11 @@ export interface NotificationDraft {
   body?: string;
   /** Relative to the workspace, e.g. `issues/BUG-142`. */
   link: string;
-  subject: SubjectRef;
+  subject: LegacySubjectRef;
 }
 
-const asString = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
-
-const STATUS_PHRASE: Partial<Record<WorkstreamStatus, string>> = {
-  shipped: 'shipped',
-  blocked: 'is blocked',
-  ready_to_land: 'is ready to land',
-};
+const asString = (v: unknown): string | undefined =>
+  typeof v === 'string' && v ? v : undefined;
 
 /**
  * Who should hear about an event, and what to tell them. Pure: no database, no delivery.
@@ -55,14 +67,15 @@ const STATUS_PHRASE: Partial<Record<WorkstreamStatus, string>> = {
  * person's settings.
  */
 export function planNotifications(ctx: RuleContext): NotificationDraft[] {
-  const { event, actorName, issue, workstream, decision } = ctx;
+  const { event, actorName, issue, decision } = ctx;
   const drafts: NotificationDraft[] = [];
-  const add = (userId: string | null | undefined, draft: Omit<NotificationDraft, 'userId'>) => {
+  const add = (
+    userId: string | null | undefined,
+    draft: Omit<NotificationDraft, 'userId'>,
+  ) => {
     if (userId) drafts.push({ userId, ...draft });
   };
   const { customer, delivery } = ctx;
-  const wsLink = workstream ? `workstreams/${workstream.key}` : undefined;
-  const accountable = workstream?.accountableUserId;
 
   switch (event.type) {
     case 'issue.created': {
@@ -70,51 +83,54 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
       break;
     }
     case 'issue.updated': {
-      const change = event.data['assignee'] as { to?: string | null } | undefined;
+      const change = event.data['assignee'] as
+        { to?: string | null } | undefined;
       add(asString(change?.to), assigned(issue, actorName));
       break;
     }
     case 'input.requested': {
-      if (!workstream || !wsLink) break;
-      add(asString(event.data['assigneeUserId']) ?? accountable, {
+      if (!issue) break;
+      add(asString(event.data['assigneeUserId']) ?? issue.assigneeId, {
         kind: 'input_requested',
-        title: `${actorName} asked a question on ${workstream.key}`,
+        title: `${actorName} asked a question on ${issue.key}`,
         body: asString(event.data['question']),
-        link: wsLink,
+        link: `issues/${issue.key}`,
         subject: event.subject,
       });
       break;
     }
     case 'decision.proposed': {
       if (!decision) break;
-      add(accountable, {
+      add(issue?.assigneeId, {
         kind: 'decision_proposed',
         title: `${actorName} proposed ${decision.key}: ${decision.title}`,
-        body: workstream ? `${workstream.key} · ${workstream.title}` : undefined,
+        body: issue ? `${issue.key} · ${issue.title}` : undefined,
         link: `decisions/${decision.key}`,
         subject: event.subject,
       });
       break;
     }
     case 'review.requested': {
-      if (!workstream || !wsLink) break;
-      add(accountable, {
+      if (!issue) break;
+      add(issue.assigneeId, {
         kind: 'review_requested',
         title: `Review requested: ${asString(event.data['title']) ?? 'a pull request'}`,
-        body: `${workstream.key} · ${workstream.title}`,
-        link: wsLink,
+        body: `${issue.key} · ${issue.title}`,
+        link: `issues/${issue.key}`,
         subject: event.subject,
       });
       break;
     }
     case 'artifact.updated': {
-      const ci = (event.data['changes'] as Record<string, [unknown, unknown]> | undefined)?.['ci'];
-      if (!workstream || !wsLink || ci?.[1] !== 'failing') break;
-      add(accountable, {
+      const ci = (
+        event.data['changes'] as Record<string, [unknown, unknown]> | undefined
+      )?.['ci'];
+      if (!issue || ci?.[1] !== 'failing') break;
+      add(issue.assigneeId, {
         kind: 'ci_failed',
         title: `Checks are failing: ${asString(event.data['title']) ?? 'a pull request'}`,
-        body: `${workstream.key} · ${workstream.title}`,
-        link: wsLink,
+        body: `${issue.key} · ${issue.title}`,
+        link: `issues/${issue.key}`,
         subject: event.subject,
       });
       break;
@@ -132,46 +148,38 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
         add(issue.assigneeId, draft);
         add(issue.reporterId, draft);
       } else if (event.subject.type === 'decision' && decision) {
-        add(accountable, {
+        add(issue?.assigneeId, {
           kind: 'comment',
           title: `${actorName} commented on ${decision.key}: ${decision.title}`,
           body: excerpt,
           link: `decisions/${decision.key}`,
           subject: event.subject,
         });
-      } else if (workstream && wsLink) {
-        add(accountable, {
-          kind: 'comment',
-          title: `${actorName} commented on ${workstream.key}: ${workstream.title}`,
-          body: excerpt,
-          link: wsLink,
-          subject: event.subject,
-        });
       }
-      break;
-    }
-    case 'workstream.status_changed': {
-      const phrase = STATUS_PHRASE[event.data['to'] as WorkstreamStatus];
-      if (!workstream || !wsLink || !phrase) break;
-      add(accountable, {
-        kind: 'workstream_update',
-        title: `${workstream.key} ${phrase}`,
-        body: workstream.title,
-        link: wsLink,
-        subject: event.subject,
-      });
       break;
     }
     case 'customer_request.linked':
     case 'customer_request.updated': {
       if (!customer) break;
       const created = event.type === 'customer_request.linked';
-      if (!created && !(asStrings(event.data['fields']).includes('important') && event.data['important'] === true)) break;
-      const target = asString(event.data['issueKey']) ?? asString(event.data['project']) ?? 'a request';
+      if (
+        !created &&
+        !(
+          asStrings(event.data['fields']).includes('important') &&
+          event.data['important'] === true
+        )
+      )
+        break;
+      const target =
+        asString(event.data['issueKey']) ??
+        asString(event.data['project']) ??
+        'a request';
       const important = event.data['important'] === true;
       const draft = {
         // Added already flagged: one message, the stronger one.
-        kind: important ? ('customer_important' as const) : ('customer_request' as const),
+        kind: important
+          ? ('customer_important' as const)
+          : ('customer_request' as const),
         title: created
           ? `${actorName} added ${important ? 'an important ' : 'a '}request from ${customer.name}: ${target}`
           : `${actorName} flagged a request from ${customer.name} as important: ${target}`,
@@ -187,14 +195,17 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
       if (!delivery || !delivery.customers.length) break;
       const names = delivery.customers.map((c) => c.name);
       const who =
-        names.length <= 2 ? names.join(' and ') : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+        names.length <= 2
+          ? names.join(' and ')
+          : `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
       const draft = {
         kind: 'customer_delivered' as const,
         title: `${delivery.target.label} was delivered: ${who} asked for it`,
         link: delivery.target.link,
         subject: { type: delivery.target.type, id: delivery.target.id },
       };
-      for (const c of delivery.customers) for (const userId of c.subscriberIds) add(userId, draft);
+      for (const c of delivery.customers)
+        for (const userId of c.subscriberIds) add(userId, draft);
       for (const userId of delivery.requesterIds) add(userId, draft);
       break;
     }
@@ -211,12 +222,18 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
   });
 }
 
-const asStrings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+const asStrings = (v: unknown): string[] =>
+  Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
 
-function assigned(issue: RuleContext['issue'], actorName: string): Omit<NotificationDraft, 'userId'> {
+function assigned(
+  issue: RuleContext['issue'],
+  actorName: string,
+): Omit<NotificationDraft, 'userId'> {
   return {
     kind: 'assigned',
-    title: issue ? `${actorName} assigned you ${issue.key}: ${issue.title}` : `${actorName} assigned you an issue`,
+    title: issue
+      ? `${actorName} assigned you ${issue.key}: ${issue.title}`
+      : `${actorName} assigned you an issue`,
     link: issue ? `issues/${issue.key}` : 'issues',
     subject: { type: 'issue', id: issue?.id ?? '' },
   };

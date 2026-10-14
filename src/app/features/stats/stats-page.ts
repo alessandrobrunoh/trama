@@ -4,7 +4,7 @@ import { PageHeader } from '../../shared/page-header';
 import { StatsBoard } from './stats-board';
 import { workspaceStats } from './stats-model';
 
-/** Workspace statistics: health signals, flow, people and agents, then counts of workstreams, issues, artifacts, decisions. */
+/** Workspace statistics focused on issue demand, workspace health, contributors, and delivery context. */
 @Component({
   selector: 'app-stats-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -13,7 +13,7 @@ import { workspaceStats } from './stats-model';
   template: `
     <app-page-header
       title="Statistics"
-      description="Where the problems are, how work flows, and what was delivered. Health and flow are computed on the server from the full activity log."
+      description="Issue demand, workspace health, and contributor activity. Health signals are computed from the complete activity log."
     />
     <div class="mx-auto w-full max-w-[1320px] px-4 py-4 sm:px-6">
       <app-stats-board [model]="model()" [syncUrl]="true" [insights]="true" />

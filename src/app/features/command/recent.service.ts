@@ -10,7 +10,6 @@ export interface RecentItem {
   id: string;
   key?: string;
   title: string;
-  workstreamKey?: string;
   at: number;
 }
 
@@ -56,10 +55,6 @@ export class RecentItems {
         const i = this.store.getIssue(ref);
         return i ? { type, id: i.id, key: i.key, title: i.title } : null;
       }
-      case 'workstream': {
-        const w = this.store.getWorkstream(ref);
-        return w ? { type, id: w.id, key: w.key, title: w.title } : null;
-      }
       case 'decision': {
         const d = this.store.getDecision(ref);
         return d ? { type, id: d.id, key: d.key, title: d.title } : null;
@@ -86,8 +81,8 @@ export class RecentItems {
     const slug = this.store.slug();
     if (!slug) return [];
     const exists = (r: RecentItem): boolean => {
+      if ((r.type as string) === 'workstream') return false;
       switch (r.type) {
-        case 'workstream': return this.store.workstreamById().has(r.id);
         case 'decision': return this.store.decisionById().has(r.id);
         case 'issue': return this.store.issueById().has(r.id);
         case 'repository': return this.store.repositoryById().has(r.id);
@@ -103,7 +98,7 @@ export class RecentItems {
   push(h: SearchHit): void {
     const slug = this.store.slug();
     if (!slug) return;
-    const item: RecentItem = { type: h.type, id: h.id, key: h.key, title: h.title, workstreamKey: h.workstreamKey, at: Date.now() };
+    const item: RecentItem = { type: h.type, id: h.id, key: h.key, title: h.title, at: Date.now() };
     this.all.update((m) => ({
       ...m,
       [slug]: [item, ...(m[slug] ?? []).filter((r) => !(r.type === item.type && r.id === item.id))].slice(0, MAX),

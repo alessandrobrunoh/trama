@@ -25,53 +25,35 @@ import {
   type Decision,
   type Issue,
   type IssueStatus,
-  type Workstream,
-  type WorkstreamStatus,
 } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { RelativeTimePipe } from '../../shared/pipes';
-import { StatusIcon, statusLabel, type AnyStatus, type StatusEntity } from '../../shared/status';
+import { StatusIcon, statusLabel, type AnyStatus } from '../../shared/status';
 import { ATTENTION_KIND_VIEW } from '../attention/attention-kinds';
 import { formatDuration } from '../stats/insights';
 import { weekSummary, type Lookup } from '../stats/perf';
 import { buildWork } from '../stats/work';
-import { MyIssueRow, MyWorkstreamRow } from './my-work-rows';
+import { MyIssueRow } from './my-work-rows';
 
-type Tab = 'assigned' | 'accountable' | 'contributing' | 'created';
-const TABS: Tab[] = ['assigned', 'accountable', 'contributing', 'created'];
+type Tab = 'assigned' | 'created';
+const TABS: Tab[] = ['assigned', 'created'];
 
 const ISSUE_ORDER: IssueStatus[] = ['in_progress', 'in_review', 'todo', 'backlog', 'done', 'canceled'];
-const WS_ORDER: WorkstreamStatus[] = [
-  'needs_input',
-  'blocked',
-  'ready_to_land',
-  'in_review',
-  'working',
-  'planned',
-  'draft',
-  'shipped',
-  'canceled',
-];
-const CLOSED = new Set<string>(['done', 'canceled', 'shipped']);
+const CLOSED = new Set<string>(['done', 'canceled']);
 
 interface Group<T> {
-  status: AnyStatus;
+  status: IssueStatus;
   label: string;
   closed: boolean;
   items: T[];
 }
 
-interface WsItem {
-  ws: Workstream;
-  reasons: string[];
-}
-
 /**
- * My Work (VISION §36): explicit, predictable lists — issues assigned to me (circles), workstreams I
- * am accountable for and ones I contribute to (hexagons), and what I created. Plus a "waiting on me"
+ * My Work: explicit, predictable lists — issues assigned to me and what I created.
+ * Plus a "waiting on me"
  * summary that hands off to My Attention. `?tab=` selects the tab; keys 1–4 switch tabs.
  */
 @Component({
@@ -90,7 +72,6 @@ interface WsItem {
     StatusIcon,
     RelativeTimePipe,
     MyIssueRow,
-    MyWorkstreamRow,
   ],
   host: { class: 'flex min-h-full flex-col' },
   template: `
@@ -216,7 +197,7 @@ interface WsItem {
       @case ('assigned') {
         @if (issueGroups().length) {
           @for (g of issueGroups(); track g.status) {
-            <ng-container *ngTemplateOutlet="groupHeader; context: { $implicit: g, entity: 'issue' }" />
+            <ng-container *ngTemplateOutlet="groupHeader; context: { $implicit: g }" />
             @if (!isFolded('i:' + g.status)) {
               @for (i of g.items; track i.id) {
                 <app-my-issue-row [issue]="i" [focused]="ui.focusedRowId() === i.id" />
@@ -240,68 +221,13 @@ interface WsItem {
         }
       }
 
-      @case ('accountable') {
-        @if (accountableGroups().length) {
-          @for (g of accountableGroups(); track g.status) {
-            <ng-container *ngTemplateOutlet="groupHeader; context: { $implicit: g, entity: 'workstream' }" />
-            @if (!isFolded('a:' + g.status)) {
-              @for (r of g.items; track r.ws.id) {
-                <app-my-workstream-row [ws]="r.ws" [reasons]="r.reasons" [focused]="ui.focusedRowId() === r.ws.id" />
-              }
-            }
-          }
-        } @else {
-          <app-empty-state
-            class="m-auto"
-            [icon]="inbox"
-            title="You are not accountable for any workstream"
-            description="A workstream is an outcome that resolves one or more issues. The accountable person makes sure it lands."
-          >
-            <div class="flex flex-wrap justify-center gap-2">
-              <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'workstreams']">Browse workstreams</a>
-              @if (canEdit()) {
-                <button hlmBtn size="sm" variant="ghost" (click)="newWorkstream()">New workstream</button>
-              }
-            </div>
-          </app-empty-state>
-        }
-      }
-
-      @case ('contributing') {
-        @if (contributingGroups().length) {
-          @for (g of contributingGroups(); track g.status) {
-            <ng-container *ngTemplateOutlet="groupHeader; context: { $implicit: g, entity: 'workstream' }" />
-            @if (!isFolded('c:' + g.status)) {
-              @for (r of g.items; track r.ws.id) {
-                <app-my-workstream-row [ws]="r.ws" [reasons]="r.reasons" [focused]="ui.focusedRowId() === r.ws.id" />
-              }
-            }
-          }
-        } @else {
-          <app-empty-state
-            class="m-auto"
-            [icon]="inbox"
-            title="Nothing you contribute to yet"
-            description="Workstreams show up here when one of your teams takes part, an issue assigned to you is linked to them, or you authored one of their artifacts."
-          />
-        }
-      }
-
       @case ('created') {
-        @if (created().issues.length || created().workstreams.length || created().decisions.length) {
+        @if (created().issues.length || created().decisions.length) {
           @if (created().issues.length) {
             <ng-container *ngTemplateOutlet="sectionHeader; context: { $implicit: 'Issues', count: created().issues.length, key: 'ci' }" />
             @if (!isFolded('ci')) {
               @for (i of created().issues; track i.id) {
                 <app-my-issue-row [issue]="i" [focused]="ui.focusedRowId() === i.id" />
-              }
-            }
-          }
-          @if (created().workstreams.length) {
-            <ng-container *ngTemplateOutlet="sectionHeader; context: { $implicit: 'Workstreams', count: created().workstreams.length, key: 'cw' }" />
-            @if (!isFolded('cw')) {
-              @for (w of created().workstreams; track w.id) {
-                <app-my-workstream-row [ws]="w" [focused]="ui.focusedRowId() === w.id" />
               }
             }
           }
@@ -329,13 +255,13 @@ interface WsItem {
             class="m-auto"
             [icon]="scale"
             title="You have not created anything yet"
-            description="Issues you report, workstreams you start and decisions you propose are collected here."
+            description="Issues you report and decisions you propose are collected here."
           />
         }
       }
     }
 
-    <ng-template #groupHeader let-g let-entity="entity">
+    <ng-template #groupHeader let-g>
       @let key = foldKey(g.status);
       <button
         type="button"
@@ -344,7 +270,7 @@ interface WsItem {
         (click)="toggleFold(key)"
       >
         <span class="inline-flex shrink-0 transition-transform" [class.rotate-90]="!isFolded(key)"><svg [lucideIcon]="chevron" [size]="12" class="text-muted-foreground"></svg></span>
-        <app-status-icon [entity]="asEntity(entity)" [status]="g.status" />
+        <app-status-icon entity="issue" [status]="g.status" />
         <span class="font-medium">{{ g.label }}</span>
         <span class="text-muted-foreground tabular-nums">{{ g.items.length }}</span>
       </button>
@@ -414,55 +340,16 @@ export class MyWorkPage {
   });
   protected readonly issueGroups = computed(() => this.groupIssues(this.assigned()));
 
-  // ── accountable workstreams ──
-  private readonly accountable = computed<WsItem[]>(() => this.store.myWorkstreams().map((ws) => ({ ws, reasons: [] })));
-  protected readonly accountableGroups = computed(() => this.groupWorkstreams(this.accountable()));
-
-  // ── contributing workstreams ──
-  private readonly contributing = computed<WsItem[]>(() => {
-    const me = this.meId();
-    if (!me) return [];
-    const myTeams = this.store.myTeamIds();
-    const myIssuesByWs = new Map<string, number>();
-    for (const i of this.assigned()) for (const w of i.workstreamIds) myIssuesByWs.set(w, (myIssuesByWs.get(w) ?? 0) + 1);
-    const authored = new Set(
-      this.store
-        .artifacts()
-        .filter((a) => a.authorRef?.type === 'user' && a.authorRef.id === me)
-        .map((a) => a.workstreamId),
-    );
-    const out: WsItem[] = [];
-    for (const ws of this.store.workstreams()) {
-      if (ws.accountableUserId === me) continue;
-      const reasons: string[] = [];
-      const teams = [ws.ownerTeamId, ...ws.participatingTeamIds].filter((t) => myTeams.has(t));
-      if (teams.length) {
-        const keys = teams.map((t) => this.store.getTeam(t)?.key).filter(Boolean);
-        reasons.push(`${keys.slice(0, 2).join(', ')} team${keys.length > 1 ? 's' : ''}`);
-      }
-      const n = myIssuesByWs.get(ws.id);
-      if (n) reasons.push(`${n} of your issue${n === 1 ? '' : 's'}`);
-      if (authored.has(ws.id)) reasons.push('your artifacts');
-      if (reasons.length) out.push({ ws, reasons });
-    }
-    return out;
-  });
-  protected readonly contributingGroups = computed(() => this.groupWorkstreams(this.contributing()));
-
   // ── created by me ──
   protected readonly created = computed(() => {
     const me = this.meId();
     const closed = !this.showClosed();
     const newest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
-    if (!me) return { issues: [] as Issue[], workstreams: [] as Workstream[], decisions: [] as Decision[] };
+    if (!me) return { issues: [] as Issue[], decisions: [] as Decision[] };
     return {
       issues: this.store
         .issues()
         .filter((i) => i.reporterId === me && !(closed && CLOSED.has(i.status)))
-        .sort(newest),
-      workstreams: this.store
-        .workstreams()
-        .filter((w) => w.createdById === me && !(closed && CLOSED.has(w.status)))
         .sort(newest),
       decisions: this.store
         .decisions()
@@ -476,11 +363,8 @@ export class MyWorkPage {
     const c = this.created();
     return {
       assigned: this.assigned().filter((i) => open(i.status)).length,
-      accountable: this.accountable().filter((r) => open(r.ws.status)).length,
-      contributing: this.contributing().filter((r) => open(r.ws.status)).length,
       created:
         c.issues.filter((i) => open(i.status)).length +
-        c.workstreams.filter((w) => open(w.status)).length +
         c.decisions.filter((d) => d.status === 'proposed').length,
     };
   });
@@ -506,7 +390,7 @@ export class MyWorkPage {
     const me = this.meId();
     if (!me) return null;
     const look: Lookup = { user: (id) => this.store.getUser(id)?.name ?? 'Unknown', team: (id) => this.store.getTeam(id)?.name ?? 'No team' };
-    const w = weekSummary(buildWork(this.store, this.store.issues(), []).issues, me, Date.now(), this.store.estimateScale(), look);
+    const w = weekSummary(buildWork(this.store, this.store.issues()).issues, me, Date.now(), this.store.estimateScale(), look);
     const running = this.assigned().some((i) => i.status === 'in_progress' || i.status === 'in_review');
     if (!w.doneThis && !w.doneLast && !running) return null;
     return {
@@ -520,7 +404,7 @@ export class MyWorkPage {
 
   protected readonly description = computed(() => {
     const c = this.counts();
-    return `${c.assigned} open issue${c.assigned === 1 ? '' : 's'} assigned to you · ${c.accountable} workstream${c.accountable === 1 ? '' : 's'} you own`;
+    return `${c.assigned} open issue${c.assigned === 1 ? '' : 's'} assigned to you`;
   });
 
   // ── helpers ──
@@ -529,7 +413,7 @@ export class MyWorkPage {
     const show = this.showClosed();
     return ISSUE_ORDER.filter((s) => show || !CLOSED.has(s))
       .map((status) => ({
-        status: status as AnyStatus,
+        status,
         label: ISSUE_STATUS_META[status].label,
         closed: CLOSED.has(status),
         items: list
@@ -539,23 +423,8 @@ export class MyWorkPage {
       .filter((g) => g.items.length > 0);
   }
 
-  private groupWorkstreams(list: readonly WsItem[]): Group<WsItem>[] {
-    const show = this.showClosed();
-    return WS_ORDER.filter((s) => show || !CLOSED.has(s))
-      .map((status) => ({
-        status: status as AnyStatus,
-        label: statusLabel(status),
-        closed: CLOSED.has(status),
-        items: list
-          .filter((r) => r.ws.status === status)
-          .sort((a, b) => priorityRank(a.ws.priority) - priorityRank(b.ws.priority) || a.ws.key.localeCompare(b.ws.key)),
-      }))
-      .filter((g) => g.items.length > 0);
-  }
-
   protected foldKey(status: string): string {
-    const prefix = this.tab() === 'assigned' ? 'i' : this.tab() === 'accountable' ? 'a' : 'c';
-    return `${prefix}:${status}`;
+    return `i:${status}`;
   }
   protected isFolded(key: string): boolean {
     return this.folded().has(key);
@@ -568,18 +437,10 @@ export class MyWorkPage {
       return next;
     });
   }
-  protected asEntity(e: string): StatusEntity {
-    return e === 'issue' ? 'issue' : 'workstream';
-  }
-
   protected tabLabel(t: Tab): string {
     switch (t) {
       case 'assigned':
         return 'Assigned issues';
-      case 'accountable':
-        return 'Workstreams you own';
-      case 'contributing':
-        return 'Workstreams you contribute to';
       case 'created':
         return 'Created by you';
     }
@@ -588,10 +449,6 @@ export class MyWorkPage {
     switch (t) {
       case 'assigned':
         return 'Assigned';
-      case 'accountable':
-        return 'Own';
-      case 'contributing':
-        return 'Contribute';
       case 'created':
         return 'Created';
     }
@@ -600,12 +457,8 @@ export class MyWorkPage {
     switch (t) {
       case 'assigned':
         return 'Open issues assigned to you';
-      case 'accountable':
-        return 'Open workstreams you are responsible for delivering';
-      case 'contributing':
-        return 'Open workstreams linked to your teams, issues or contributions';
       case 'created':
-        return 'Open issues, workstreams and decisions you created';
+        return 'Issues and decisions you created';
     }
   }
 
@@ -619,10 +472,6 @@ export class MyWorkPage {
   protected newIssue(): void {
     const me = this.meId();
     this.ui.openCreate('issue', me ? { assigneeId: me, status: 'todo' } : {});
-  }
-  protected newWorkstream(): void {
-    const me = this.meId();
-    this.ui.openCreate('workstream', me ? { accountableUserId: me } : {});
   }
 }
 

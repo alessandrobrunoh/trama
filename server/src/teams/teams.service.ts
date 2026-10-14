@@ -4,7 +4,7 @@ import { DataSource, type Repository } from 'typeorm';
 import type { ActorRef, TeamEditPolicy } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid, unique } from '../common/util.js';
-import { TeamEntity, WorkstreamEntity } from '../database/entities/index.js';
+import { TeamEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
 export interface TeamInput {
@@ -86,16 +86,10 @@ export class TeamsService {
     return team;
   }
 
-  /** 409 while the team still owns workstreams; otherwise detaches it from everything else. */
+  /** Removes team ownership from issues before deleting the team. */
   async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
     const team = await this.get(workspaceId, idOrKey);
-    const owned = await this.ds.getRepository(WorkstreamEntity).countBy({ workspaceId, ownerTeamId: team.id });
-    if (owned > 0) throw new ConflictException(`Team owns ${owned} workstream(s); reassign them first`);
     await this.ds.transaction(async (m) => {
-      const streams = await m.getRepository(WorkstreamEntity).findBy({ workspaceId });
-      for (const w of streams)
-        if (w.participatingTeamIds.includes(team.id))
-          await m.update(WorkstreamEntity, { id: w.id }, { participatingTeamIds: w.participatingTeamIds.filter((t) => t !== team.id) });
       await m.query(`UPDATE "issues" SET "teamId" = NULL WHERE "teamId" = $1`, [team.id]);
       await m.delete(TeamEntity, { id: team.id });
     });

@@ -17,8 +17,7 @@ import { DocumentActions } from './document-attach';
 import { Documents } from './documents.service';
 
 /**
- * "Documents" tab of a project: the documents attached to the project itself (the ones attached to its
- * workstreams and issues stay in Context, where their origin is shown).
+ * "Documents" tab of a project: documents attached directly to the project (issue documents stay in Context).
  */
 @Component({
   selector: 'app-project-documents-tab',

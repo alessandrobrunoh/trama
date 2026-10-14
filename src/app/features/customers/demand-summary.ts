@@ -7,7 +7,7 @@ import { CustomerAvatar } from './customer-avatar';
 import { compactNumber, type RequestState } from './customer-model';
 
 /**
- * "Who is waiting on this": the customers behind an issue, project or workstream, how many requests,
+ * "Who is waiting on this": the customers behind an issue or project, how many requests,
  * how many are flagged important and how much revenue they stand for. Says "Delivered to" once the work is
  * done. Shows nothing when nobody asked.
  *   <app-demand-summary [demand]="store.demand().get(issue.id)" state="open" />

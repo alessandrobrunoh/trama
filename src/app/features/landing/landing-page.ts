@@ -13,7 +13,6 @@ import {
   LucideLightbulb,
   LucideMessageCircleQuestion,
   LucideUsers,
-  LucideWaypoints,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { BLOG_POSTS } from '../blog/blog-posts';
@@ -58,16 +57,15 @@ import { SiteHeader } from './site-header';
           class="mx-auto mt-6 max-w-3xl text-[clamp(2.25rem,6vw,4rem)] leading-[1.05] font-semibold tracking-[-0.035em] text-balance"
         >
           Issues describe problems.
-          <span class="text-muted-foreground">Workstreams deliver outcomes.</span>
+          <span class="text-muted-foreground">Issues are the unit of work.</span>
         </h1>
         <p
           class="text-muted-foreground mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-pretty sm:text-base"
         >
           Trello, Jira and Linear treat every ticket as a unit of work. Trama keeps your issues, and
-          adds what they are missing: <span class="text-foreground">workstreams</span> that solve
-          many issues at once, <span class="text-foreground">decisions</span> that explain why, and
-          <span class="text-foreground">artifacts</span> that prove what shipped, with humans and
-          coding agents working side by side.
+          adds what teams need around them: an optional <span class="text-foreground">Goal</span>
+          for the desired outcome, optional <span class="text-foreground">Plans and Documents</span>,
+          and human input requests in Question or Decision mode.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a hlmBtn size="lg" routerLink="/register">
@@ -88,14 +86,14 @@ import { SiteHeader } from './site-header';
           <div
             class="border-border/80 bg-card overflow-hidden rounded-xl border shadow-[0_30px_80px_-30px_rgb(0_0_0/0.35)]"
             role="img"
-            aria-label="Preview of a Trama workstream grouping three issues, with acceptance criteria, an agent pull request and a decision"
+            aria-label="Preview of a Trama issue with an optional Goal, related issues and human input request"
           >
             <div class="border-border/70 flex h-9 items-center gap-1.5 border-b px-3.5">
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="text-muted-foreground ml-3 truncate font-mono text-[11px]"
-                >trama / acme / workstreams / AUTH-12</span
+                >trama / acme / issues / BUG-142</span
               >
             </div>
             <div class="flex">
@@ -118,8 +116,8 @@ import { SiteHeader } from './site-header';
               </aside>
               <div class="min-w-0 flex-1 p-4 sm:p-6">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
-                  <span class="text-entity-workstream inline-flex items-center gap-1 font-medium">
-                    <svg [lucideIcon]="workstreamIcon" [size]="13"></svg> AUTH-12
+                  <span class="text-entity-issue inline-flex items-center gap-1 font-medium">
+                    <svg [lucideIcon]="openIcon" [size]="13"></svg> BUG-142
                   </span>
                   <span
                     class="bg-tone-blue/12 text-tone-blue rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -130,10 +128,10 @@ import { SiteHeader } from './site-header';
                   >
                 </div>
                 <h2 class="mt-2 text-lg font-semibold tracking-tight sm:text-xl">
-                  Stabilize authentication before v2
+                  Session expires unexpectedly
                 </h2>
                 <p class="text-muted-foreground mt-1 text-[13px]">
-                  Three reports, one root cause: refresh tokens are not rotated consistently.
+                  Session handling fails after an access token expires.
                 </p>
 
                 <div class="mt-5 grid gap-5 lg:grid-cols-[1.25fr_1fr]">
@@ -142,7 +140,7 @@ import { SiteHeader } from './site-header';
                       <p
                         class="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase"
                       >
-                        Linked issues
+                        Related issues
                       </p>
                       <ul
                         class="border-border/70 divide-border/70 divide-y rounded-lg border text-[13px]"
@@ -171,7 +169,7 @@ import { SiteHeader } from './site-header';
                       <p
                         class="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase"
                       >
-                        Acceptance criteria
+                        Optional Goal
                       </p>
                       <ul class="flex flex-col gap-1.5 text-[13px]">
                         <li class="flex items-center gap-2">
@@ -180,7 +178,7 @@ import { SiteHeader } from './site-header';
                             [size]="14"
                             class="text-tone-green shrink-0"
                           ></svg>
-                          No session loss during token rotation
+                          Keep sessions valid during token rotation
                         </li>
                         <li class="flex items-center gap-2">
                           <svg
@@ -188,7 +186,7 @@ import { SiteHeader } from './site-header';
                             [size]="14"
                             class="text-muted-foreground shrink-0"
                           ></svg>
-                          OAuth login passes on Safari 18
+                          Document the expected refresh-token behavior
                         </li>
                       </ul>
                     </div>
@@ -299,8 +297,8 @@ import { SiteHeader } from './site-header';
               }
             </ol>
             <p class="text-muted-foreground mt-5 text-[13px] leading-relaxed">
-              Demand and execution are separate. The workstream links the shared workspace where
-              people and agents work, and keeps the decisions and artifacts attached to the outcome.
+              Issues are granular units of work. Add a Goal for the desired outcome, and optional
+              Plans or Documents for context; agents can ask a human a question or request a decision.
             </p>
           </div>
         </div>
@@ -371,8 +369,8 @@ import { SiteHeader } from './site-header';
             </h2>
             <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
               Claude Code, Codex, Cursor or your own agents connect through the MCP server and the
-              API. They join workstreams as contributors, attach artifacts, and ask a human when
-              they're blocked.
+              API. They work on issues, attach optional Plans or Documents, and ask a human a
+              question or request a decision when they're blocked.
             </p>
             <ul class="mt-5 flex flex-col gap-2 text-[14px]">
               @for (point of agentPoints; track point) {
@@ -510,7 +508,8 @@ import { SiteHeader } from './site-header';
           Weave your team's work together.
         </h2>
         <p class="text-muted-foreground mx-auto mt-3 max-w-md text-[15px]">
-          Create a workspace in under a minute. Start with one issue and one workstream.
+          Create a workspace in under a minute. Start with an issue; add a Goal or supporting
+          documents only when useful.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a hlmBtn size="lg" routerLink="/register">Get started</a>
@@ -524,7 +523,6 @@ import { SiteHeader } from './site-header';
 })
 export class LandingPage {
   protected readonly arrowIcon = LucideArrowRight;
-  protected readonly workstreamIcon = LucideWaypoints;
   protected readonly decisionIcon = LucideLightbulb;
   protected readonly botIcon = LucideBot;
   protected readonly prIcon = LucideGitPullRequest;
@@ -538,8 +536,7 @@ export class LandingPage {
   protected readonly sidebar = [
     { label: 'Overview', count: 0, active: false },
     { label: 'My Attention', count: 3, active: false },
-    { label: 'Issues', count: 42, active: false },
-    { label: 'Workstreams', count: 6, active: true },
+    { label: 'Issues', count: 42, active: true },
     { label: 'Decisions', count: 9, active: false },
     { label: 'Graph', count: 0, active: false },
     { label: 'Timeline', count: 0, active: false },
@@ -553,20 +550,19 @@ export class LandingPage {
 
   protected readonly ticketFlow = ['Issue', 'Assignee', 'Branch', 'PR', 'Done'];
   protected readonly tramaFlow = [
-    'Issues',
-    'Workstream',
-    'Shared workspace',
-    'Artifacts',
-    'Outcome',
+    'Issue',
+    'Optional Goal',
+    'Optional Plan / Document',
+    'Question / Decision',
   ];
 
   protected readonly differentiators = [
     {
-      icon: LucideWaypoints,
-      tint: 'bg-entity-workstream/12 text-entity-workstream',
-      title: 'Many issues, one workstream',
-      body: 'Group the reports that share a root cause into one outcome, with an objective, acceptance criteria and its own lifecycle. Issue status and outcome status move independently.',
-      elsewhere: 'epics and projects group scope or timelines, not causes.',
+      icon: LucideCircleDot,
+      tint: 'bg-entity-issue/12 text-entity-issue',
+      title: 'Issues are the unit of work',
+      body: 'Keep work granular and actionable. Add an optional Goal to state the desired outcome; Plans and Documents are there when more context helps.',
+      elsewhere: 'tickets overloaded with requests, plans and discussion.',
     },
     {
       icon: LucideLightbulb,
@@ -579,21 +575,21 @@ export class LandingPage {
       icon: LucideGitPullRequest,
       tint: 'bg-tone-green/12 text-tone-green',
       title: 'Artifacts with traceability',
-      body: 'Pull requests, docs and releases attach to the workstream with CI and review state, traced back to the issues they fixed. Why does this PR exist? Now you know.',
+      body: 'Optional Plans and Documents keep useful context close to issues. Artifacts trace shipped work back to the issues they address.',
       elsewhere: 'PR links scattered across individual tickets.',
     },
     {
       icon: LucideCircleCheck,
       tint: 'bg-tone-blue/12 text-tone-blue',
       title: 'Facts, not fake progress',
-      body: 'Status is derived from what actually happened: issues resolved, PRs merged, criteria met. No percentages someone typed to look busy.',
+      body: 'Issue status reflects the work at hand. A Goal can state the desired outcome without adding a second required lifecycle.',
       elsewhere: 'story points, burndowns and manual status updates.',
     },
     {
       icon: LucideUsers,
       tint: 'bg-primary/12 text-primary',
       title: 'Contributors, not just assignees',
-      body: 'One accountable owner, several contributors and participating teams. Agents sit next to people on the same workstream and share the same context.',
+      body: 'People and agents can contribute to issues. Agents can ask for human input using Question or Decision mode.',
       elsewhere: 'one assignee per ticket, human or bot.',
     },
     {
@@ -614,7 +610,7 @@ export class LandingPage {
 
   protected readonly permissions = [
     { resource: 'issues', actions: [true, true, false] },
-    { resource: 'workstreams', actions: [true, true, false] },
+    { resource: 'input requests', actions: [true, true, false] },
     { resource: 'decisions', actions: [true, false, false] },
     { resource: 'members', actions: [false, false, false] },
   ];

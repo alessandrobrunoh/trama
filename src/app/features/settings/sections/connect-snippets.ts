@@ -95,7 +95,7 @@ export class ConnectSnippets {
   protected readonly apiUrl = computed(() => (this.base.startsWith('/') && typeof location !== 'undefined' ? location.origin + this.base : this.base));
   protected readonly slug = computed(() => this.store.slug() ?? 'my-workspace');
   private readonly secret = computed(() => this.token() ?? 'trm_YOUR_TOKEN');
-  private readonly exampleKey = computed(() => this.store.workstreams()[0]?.key ?? 'AUTH-42');
+  private readonly exampleKey = computed(() => this.store.issues()[0]?.key ?? 'BUG-142');
 
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [
     { id: 'mcp-cli', label: 'MCP · Claude Code' },
@@ -124,13 +124,13 @@ export class ConnectSnippets {
       case 'env':
         return { label: 'Environment', hint: 'Read by the trama CLI and by `trama mcp`. Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
       case 'read':
-        return { label: 'curl command', hint: 'Lists the workspace’s workstreams. Any GET route works with every scope.' };
+        return { label: 'curl command', hint: 'Lists workspace issues. Any GET route works with every scope.' };
       case 'write':
         return { label: 'curl command', hint: 'Files an issue. Needs a write (or admin) token; a read token gets 403.' };
       case 'context':
         return {
           label: 'curl command',
-          hint: 'Returns one workstream as markdown (objective, acceptance criteria, linked work) so an agent can pick up the context.',
+          hint: 'Returns the issue and its plan, if present, so an agent can pick up the context.',
         };
     }
   });
@@ -158,7 +158,7 @@ export class ConnectSnippets {
       case 'env':
         return [`TRAMA_API_URL=${url}`, `TRAMA_WORKSPACE=${slug}`, `TRAMA_API_KEY=${this.secret()}`].join('\n');
       case 'read':
-        return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/workstreams"`;
+        return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/issues"`;
       case 'write':
         return [
           `curl -X POST "${url}/w/${slug}/issues" \\`,
@@ -167,7 +167,7 @@ export class ConnectSnippets {
           `  -d '{"kind":"bug","title":"Created from the API"}'`,
         ].join('\n');
       case 'context':
-        return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/workstreams/${this.exampleKey()}/context"`;
+        return `curl -H "Authorization: Bearer ${this.secret()}" \\\n  "${url}/w/${slug}/issues/${this.exampleKey()}/context"`;
     }
   });
 }

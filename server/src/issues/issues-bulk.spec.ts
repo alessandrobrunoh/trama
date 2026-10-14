@@ -27,7 +27,6 @@ function issue(id: string, over: Partial<IssueEntity> = {}): IssueEntity {
     teamId: null,
     projectId: null,
     duplicateOfId: null,
-    workstreamIds: [] as string[],
     milestoneIds: [] as string[],
     labels: [] as string[],
     aliases: [] as string[],
@@ -43,17 +42,15 @@ function makeService(opts: { failSave?: boolean } = {}) {
     if (opts.failSave) throw new Error('db down');
     return r;
   });
-  const query = vi.fn(async () => undefined);
+  const query = vi.fn(async (_sql: string, _params?: unknown[]) => undefined);
   const del = vi.fn(async () => undefined);
   const manager = { save, query, delete: del };
   const transaction = vi.fn(async (fn: (m: unknown) => Promise<void>) => fn(manager));
   const record = vi.fn(async () => undefined);
-  const touchMany = vi.fn(async () => undefined);
   const refs = {
     teams: vi.fn(async () => undefined),
     users: vi.fn(async () => undefined),
     projects: vi.fn(async () => undefined),
-    workstreams: vi.fn(async () => undefined),
   };
   const labels = { assign: vi.fn(async (_w: string, ids?: string[]) => ids) };
   const byId = new Map<string, IssueEntity>();
@@ -63,12 +60,10 @@ function makeService(opts: { failSave?: boolean } = {}) {
     refs as never,
     {} as never,
     { record } as never,
-    { touchMany } as never,
-    {} as never,
     labels as never,
     repo as never,
   );
-  return { service, byId, save, query, del, transaction, record, refs, labels, touchMany };
+  return { service, byId, save, query, del, transaction, record, refs, labels };
 }
 
 const eventTypes = (record: ReturnType<typeof vi.fn>) =>
@@ -142,12 +137,11 @@ describe('IssuesService.updateMany', () => {
   });
 
   it('records no event when the transaction fails', async () => {
-    const { service, record, touchMany } = makeService({ failSave: true });
+    const { service, record } = makeService({ failSave: true });
     await expect(
       service.updateMany('ws_1', actor, [issue('in_a')], { priority: 'low' }),
     ).rejects.toThrow('db down');
     expect(record).not.toHaveBeenCalled();
-    expect(touchMany).not.toHaveBeenCalled();
   });
 
   it('adds and removes labels per issue instead of replacing them', async () => {
@@ -170,41 +164,6 @@ describe('IssuesService.updateMany', () => {
     ).rejects.toThrow(/both added and removed/);
   });
 
-  it('links and unlinks workstreams, keeping the others, and refreshes every touched workstream', async () => {
-    const { service, touchMany } = makeService();
-    const rows = [
-      issue('in_a', { workstreamIds: ['wk_1'] }),
-      issue('in_b', { workstreamIds: ['wk_2'] }),
-    ];
-    await service.updateMany('ws_1', actor, rows, {
-      addWorkstreamIds: ['wk_3'],
-      removeWorkstreamIds: ['wk_1'],
-    });
-    expect(rows.map((r) => r.workstreamIds)).toEqual([['wk_3'], ['wk_2', 'wk_3']]);
-    const touched = touchMany.mock.calls.flatMap((c) => [...(c[1] as Iterable<string>)]);
-    expect(new Set(touched)).toEqual(new Set(['wk_1', 'wk_2', 'wk_3']));
-  });
-
-  it('announces issue.linked on each workstream an issue was added to, not on the ones it already had', async () => {
-    const { service, record } = makeService();
-    await service.updateMany('ws_1', actor, [issue('in_a', { workstreamIds: ['wk_1'] })], {
-      addWorkstreamIds: ['wk_1', 'wk_2'],
-    });
-    const linked = record.mock.calls
-      .map((c) => c[0] as { type: string; workstreamId?: string })
-      .filter((e) => e.type === 'issue.linked');
-    expect(linked.map((e) => e.workstreamId)).toEqual(['wk_2']);
-  });
-
-  it('refuses to link duplicates', async () => {
-    const { service, transaction } = makeService();
-    const rows = [issue('in_a'), issue('in_b', { duplicateOfId: 'in_a' })];
-    await expect(
-      service.updateMany('ws_1', actor, rows, { addWorkstreamIds: ['wk_1'] }),
-    ).rejects.toThrow(/Duplicates cannot be linked.*BUG-b/);
-    expect(transaction).not.toHaveBeenCalled();
-  });
-
   it('the acting user claims unassigned issues moved to in_progress, others keep their assignee', async () => {
     const { service } = makeService();
     const rows = [issue('in_a'), issue('in_b', { assigneeId: 'usr_other' })];
@@ -222,9 +181,9 @@ describe('IssuesService.updateMany', () => {
 
 describe('IssuesService.removeMany', () => {
   it('deletes comments, duplicate links and issues in one transaction, then records events', async () => {
-    const { service, transaction, query, del, record, touchMany } = makeService();
+    const { service, transaction, query, del, record } = makeService();
     await service.removeMany('ws_1', actor, [
-      issue('in_a', { workstreamIds: ['wk_1'] }),
+      issue('in_a'),
       issue('in_b'),
     ]);
     expect(transaction).toHaveBeenCalledTimes(1);
@@ -233,7 +192,6 @@ describe('IssuesService.removeMany', () => {
     expect(query.mock.calls[0][1]).toEqual(['ws_1', ['in_a', 'in_b']]);
     expect(del).toHaveBeenCalledTimes(1);
     expect(eventTypes(record)).toEqual(['issue.deleted', 'issue.deleted']);
-    expect([...(touchMany.mock.calls[0][1] as string[])]).toEqual(['wk_1']);
   });
 
   it('records nothing when the transaction fails', async () => {
@@ -264,6 +222,8 @@ describe('IssuesController bulk', () => {
       customers as never,
       permissions as never,
       artifacts as never,
+      {} as never,
+      {} as never,
     );
     return { controller, service, permissions };
   }

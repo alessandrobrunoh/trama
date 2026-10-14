@@ -44,8 +44,7 @@ pub struct Registry {
 /// Tool names whose `<verb>_<noun>` split would not give the command we want.
 const OVERRIDES: &[(&str, &str, &str)] = &[
     ("change_member_role", "member", "set-role"),
-    ("get_workstream_context", "workstream", "context"),
-    ("get_workstream_graph", "workstream", "graph"),
+    ("get_issue_context", "issue", "context"),
     ("get_project_context", "project", "context"),
     ("list_project_artifacts", "project", "artifacts"),
     ("list_issue_artifacts", "issue", "artifacts"),
@@ -54,9 +53,7 @@ const OVERRIDES: &[(&str, &str, &str)] = &[
 
 /// One-line descriptions for groups whose first tool description reads badly as a heading.
 const GROUP_ABOUT: &[(&str, &str)] = &[
-    ("criterion", "Acceptance criteria of a workstream"),
     ("issue", "Bugs, features, incidents, debt, feedback, ideas and security items"),
-    ("workstream", "Units of work an AI/human team ships"),
     ("member", "Workspace members and their roles"),
     ("team", "Teams and their keys"),
     ("project-update", "Status updates (health + write-up) posted on a project"),
@@ -65,7 +62,7 @@ const GROUP_ABOUT: &[(&str, &str)] = &[
 ];
 
 /// Short names people actually type.
-const GROUP_ALIASES: &[(&str, &str)] = &[("workstream", "ws"), ("repository", "repo"), ("outgoing-webhook", "webhook")];
+const GROUP_ALIASES: &[(&str, &str)] = &[("repository", "repo"), ("outgoing-webhook", "webhook")];
 
 /// Extra verbs for commands people already have a word for: `(group, verb, alias)`.
 const VERB_ALIASES: &[(&str, &str, &str)] = &[("project-update", "create", "post"), ("project-update", "update", "edit"), ("artifact", "create", "add")];
@@ -420,13 +417,11 @@ mod tests {
         let r = |n| route(n);
         assert_eq!(r("list_issues"), ("issue".into(), Some("list".into())));
         assert_eq!(r("list_repositories"), ("repository".into(), Some("list".into())));
-        assert_eq!(r("list_dependencies"), ("dependency".into(), Some("list".into())));
         assert_eq!(r("create_input_request"), ("input-request".into(), Some("create".into())));
         assert_eq!(r("get_outgoing_webhook"), ("outgoing-webhook".into(), Some("get".into())));
         assert_eq!(r("list_attention"), ("attention".into(), Some("list".into())));
-        assert_eq!(r("get_workstream_context"), ("workstream".into(), Some("context".into())));
+        assert_eq!(r("get_issue_context"), ("issue".into(), Some("context".into())));
         assert_eq!(r("change_member_role"), ("member".into(), Some("set-role".into())));
-        assert_eq!(r("add_criterion"), ("criterion".into(), Some("add".into())));
         assert_eq!(r("reorder_milestones"), ("milestone".into(), Some("reorder".into())));
         assert_eq!(r("search"), ("search".into(), None));
     }
@@ -458,21 +453,9 @@ mod tests {
     }
 
     #[test]
-    fn positionals_follow_route_order_and_are_encoded() {
-        let (e, m) = parse(&["criterion", "update", "AUTH-42", "crit_1", "--state", "met"]);
-        assert_eq!(e.positionals, vec!["idOrKey", "criterionId"]);
-        let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();
-        assert_eq!(call.path, "/workstreams/AUTH-42/criteria/crit_1");
-        assert_eq!(call.body, Some(json!({ "state": "met" })));
-    }
-
-    #[test]
-    fn criterion_update_carries_evidence_without_touching_state() {
-        let evidence = r#"{"artifactIds":["art_1"],"note":"tested on staging"}"#;
-        let (e, m) = parse(&["criterion", "update", "AUTH-42", "crit_1", "--evidence", evidence]);
-        let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();
-        assert_eq!(call.path, "/workstreams/AUTH-42/criteria/crit_1");
-        assert_eq!(call.body, Some(json!({ "evidence": { "artifactIds": ["art_1"], "note": "tested on staging" } })));
+    fn removed_resources_are_not_commands() {
+        let reg = registry();
+        assert!(!reg.entries.iter().any(|entry| entry.group == "workstream" || entry.group == "criterion" || entry.group == "dependency"));
     }
 
     #[test]
@@ -525,7 +508,7 @@ mod tests {
 
     #[test]
     fn aliases_work() {
-        for args in [["issues", "ls"], ["ws", "ls"], ["repo", "ls"], ["repositories", "list"], ["webhook", "list"]] {
+        for args in [["issues", "ls"], ["repo", "ls"], ["repositories", "list"], ["webhook", "list"]] {
             assert!(root().try_get_matches_from(["trama", args[0], args[1]]).is_ok(), "{args:?}");
         }
     }

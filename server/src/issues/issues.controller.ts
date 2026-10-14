@@ -1,7 +1,6 @@
 import {
   Body,
   Controller,
-  ForbiddenException,
   Delete,
   Get,
   HttpCode,
@@ -9,7 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -36,11 +38,15 @@ import {
   Can,
   Ctx,
   EditsTeamWork,
-  canDo,
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
-import { CUSTOMER_REVENUE_MAX } from '../contracts/domain.js';
+import {
+  CUSTOMER_REVENUE_MAX,
+  isPlanArtifact,
+  isPlanDecision,
+  resolveIssuePlans,
+} from '../contracts/domain.js';
 import type {
   ActorRef,
   IssueKind,
@@ -48,13 +54,12 @@ import type {
   Priority,
 } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
-import {
-  CreateWorkstreamDto,
-  PRIORITIES,
-} from '../workstreams/workstreams.controller.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
+import { DecisionsService } from '../decisions/decisions.service.js';
 import { CustomersService } from '../customers/customers.service.js';
+import { InputRequestsService } from '../input-requests/input-requests.service.js';
 import { PermissionsService } from '../workspaces/permissions.service.js';
+import { renderIssueBriefing } from './issue-briefing.js';
 import { IssuesService } from './issues.service.js';
 
 const KINDS: IssueKind[] = [
@@ -66,6 +71,7 @@ const KINDS: IssueKind[] = [
   'idea',
   'security',
 ];
+const PRIORITIES: Priority[] = ['none', 'low', 'medium', 'high', 'urgent'];
 const SOURCES: IssueSource[] = [
   'manual',
   'github',
@@ -94,6 +100,7 @@ class CreateIssueDto {
   @IsOptional() @IsString() @MaxLength(20000) body?: string;
   @IsOptional() @IsIn(SOURCES) source?: IssueSource;
   @IsOptional() @IsString() @MaxLength(200) reporterName?: string;
+  @IsOptional() @IsString() @MaxLength(2000) goal?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
@@ -102,7 +109,11 @@ class CreateIssueDto {
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
   /** Workspace label ids. */
-  @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  labels?: string[];
 }
 
 class UpdateIssueDto {
@@ -113,6 +124,7 @@ class UpdateIssueDto {
   @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
+  @Clearable() @IsString() @MaxLength(2000) goal?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;
   @Clearable() @IsString() teamId?: string | null;
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
@@ -120,11 +132,7 @@ class UpdateIssueDto {
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
-  @OptionalNotNull()
-  @IsArray()
-  @IsString({ each: true })
-  workstreamIds?: string[];
-  /** At most one milestone per project, from `projectId` or the linked workstreams' projects. */
+  /** At most one milestone per project, from the issue's project. */
   @OptionalNotNull()
   @IsArray()
   @IsString({ each: true })
@@ -132,7 +140,11 @@ class UpdateIssueDto {
   /** Id or key of the issue this duplicates. `null` clears it. */
   @Clearable() @IsString() duplicateOfId?: string | null;
   /** Workspace label ids. Replaces the whole list. */
-  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
+  @OptionalNotNull()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  labels?: string[];
 }
 
 /** At most this many issues per bulk request. */
@@ -149,7 +161,7 @@ class IssueRefsDto {
   ids: string[];
 }
 
-/** One change applied to every issue. Labels and workstreams are added / removed, not replaced. */
+/** One change applied to every issue. Labels are added / removed, not replaced. */
 export class BulkIssuePatchDto {
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
@@ -157,10 +169,16 @@ export class BulkIssuePatchDto {
   @Clearable() @IsString() teamId?: string | null;
   /** `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
-  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) addLabels?: string[];
-  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) removeLabels?: string[];
-  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) addWorkstreamIds?: string[];
-  @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) removeWorkstreamIds?: string[];
+  @OptionalNotNull()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  addLabels?: string[];
+  @OptionalNotNull()
+  @IsArray()
+  @ArrayMaxSize(20)
+  @IsString({ each: true })
+  removeLabels?: string[];
 }
 
 export class BulkUpdateIssuesDto extends IssueRefsDto {
@@ -172,13 +190,8 @@ export class BulkUpdateIssuesDto extends IssueRefsDto {
 
 export class BulkDeleteIssuesDto extends IssueRefsDto {}
 
-class LinkIssueDto {
-  @IsOptional() @IsArray() @IsString({ each: true }) workstreamIds?: string[];
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateWorkstreamDto)
-  createWorkstream?: CreateWorkstreamDto;
-  @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
+class ContextQuery {
+  @IsOptional() @IsIn(['markdown', 'json']) format?: 'markdown' | 'json';
 }
 
 class ListIssueQuery {
@@ -187,32 +200,57 @@ class ListIssueQuery {
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() projectId?: string;
-  @IsOptional() @IsString() workstreamId?: string;
   @IsOptional() @IsString() milestoneId?: string;
   @IsOptional() @IsString() customerId?: string;
   /** At least this many distinct linked customers. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) minCustomers?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(1000)
+  minCustomers?: number;
   /** At least this many customer requests. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) minRequests?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100000)
+  minRequests?: number;
   /** Only issues a customer of this tier asked for. */
   @IsOptional() @IsString() @MaxLength(100) tierId?: string;
   /** The requesting customers' revenue adds up to at least this. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(CUSTOMER_REVENUE_MAX) minRevenue?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(CUSTOMER_REVENUE_MAX)
+  minRevenue?: number;
   /** `true`: only issues with at least one request flagged important. */
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
   @IsBoolean()
   important?: boolean;
   @IsOptional() @IsString() q?: string;
   /** Comma-separated priorities, e.g. `high,urgent`. */
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.split(',').map((p) => p.trim()).filter(Boolean) : value))
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string'
+      ? value
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : value,
+  )
   @IsArray()
   @IsIn(PRIORITIES, { each: true })
   priority?: Priority[];
   /** `true`: only issues still being worked on (backlog, todo, in progress, in review). */
   @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
+  @Transform(({ value }: { value: unknown }) =>
+    value === 'true' ? true : value === 'false' ? false : value,
+  )
   @IsBoolean()
   open?: boolean;
   /** Newest first; at most this many (1-500). */
@@ -227,6 +265,8 @@ export class IssuesController {
     private readonly customers: CustomersService,
     private readonly permissions: PermissionsService,
     private readonly artifacts: ArtifactsService,
+    private readonly decisions: DecisionsService,
+    private readonly inputRequests: InputRequestsService,
   ) {}
 
   @Get()
@@ -247,7 +287,12 @@ export class IssuesController {
   ) {
     const rows = await this.service.getMany(ctx.workspace.id, dto.ids);
     await this.assertTeams(ctx, rows, dto.patch.teamId);
-    const updated = await this.service.updateMany(ctx.workspace.id, actor, rows, dto.patch);
+    const updated = await this.service.updateMany(
+      ctx.workspace.id,
+      actor,
+      rows,
+      dto.patch,
+    );
     return this.withCounts(ctx, updated);
   }
 
@@ -278,9 +323,77 @@ export class IssuesController {
       ? this.artifacts.countForIssue(ctx.workspace.id, issue.id)
       : undefined;
     await counts;
-    if (artifactCount !== undefined)
-      issue.artifactCount = await artifactCount;
+    if (artifactCount !== undefined) issue.artifactCount = await artifactCount;
     return issue;
+  }
+
+  /**
+   * JSON by default; a markdown briefing (what to know to pick the work up) with `?format=markdown` or
+   * `Accept: text/markdown`.
+   */
+  @Get(':idOrKey/context')
+  async context(
+    @Ctx() ctx: WorkspaceContext,
+    @Auth() auth: AuthInfo,
+    @Param('idOrKey') idOrKey: string,
+    @Query() q: ContextQuery = {},
+    @Req() req?: Request,
+    @Res({ passthrough: true }) res?: Response,
+  ) {
+    const issue = await this.service.get(ctx.workspace.id, idOrKey);
+    const [artifacts, decisions, requests] = await Promise.all([
+      canReadArtifacts(auth)
+        ? this.artifacts.list(ctx.workspace.id, { issueId: issue.id })
+        : Promise.resolve([]),
+      this.decisions.list(ctx.workspace.id, { issueId: issue.id }),
+      this.inputRequests.list(ctx.workspace.id, { issueId: issue.id }),
+    ]);
+    const inputRequests = requests.filter((r) => r.state === 'open');
+    const wantsMarkdown =
+      q.format === 'markdown' ||
+      (!q.format &&
+        req?.accepts(['application/json', 'text/markdown']) === 'text/markdown');
+    if (wantsMarkdown) {
+      res?.type('text/markdown; charset=utf-8');
+      const documentIds = artifacts.flatMap((a) =>
+        a.documentId ? [a.documentId] : [],
+      );
+      const plans = resolveIssuePlans({
+        issueId: issue.id,
+        artifacts,
+        decisions,
+        documentVersions: await this.service.documentVersions(
+          ctx.workspace.id,
+          documentIds,
+        ),
+      });
+      return renderIssueBriefing({
+        issue,
+        plans,
+        decisions,
+        inputRequests: requests,
+        artifacts,
+      });
+    }
+    const plans = artifacts.filter(isPlanArtifact);
+    const planDecisions = decisions.filter(isPlanDecision);
+    const latestArtifact = [...plans].sort(
+      (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
+    )[0];
+    return {
+      issue,
+      planSummary:
+        plans.length || planDecisions.length
+          ? {
+              artifactCount: plans.length,
+              latestArtifact,
+              decisions: planDecisions,
+            }
+          : undefined,
+      decisions,
+      inputRequests,
+      artifacts,
+    };
   }
 
   @Post()
@@ -290,7 +403,10 @@ export class IssuesController {
     @Actor() actor: ActorRef,
     @Body() dto: CreateIssueDto,
   ) {
-    return this.withCounts(ctx, await this.service.create(ctx.workspace.id, actor, dto));
+    return this.withCounts(
+      ctx,
+      await this.service.create(ctx.workspace.id, actor, dto),
+    );
   }
 
   @Patch(':idOrKey')
@@ -300,21 +416,10 @@ export class IssuesController {
     @Param('idOrKey') idOrKey: string,
     @Body() dto: UpdateIssueDto,
   ) {
-    return this.withCounts(ctx, await this.service.update(ctx.workspace.id, actor, idOrKey, dto));
-  }
-
-  /** Link to existing workstreams and/or create one. Does not change the issue status unless `status` is given. */
-  @Post(':idOrKey/link')
-  @HttpCode(200)
-  async link(
-    @Ctx() ctx: WorkspaceContext,
-    @Actor() actor: ActorRef,
-    @Param('idOrKey') idOrKey: string,
-    @Body() dto: LinkIssueDto,
-  ) {
-    if (dto.createWorkstream && !canDo(ctx, 'createWorkstreams'))
-      throw new ForbiddenException('You are not allowed to create workstreams');
-    return this.withCounts(ctx, await this.service.link(ctx.workspace.id, actor, idOrKey, dto));
+    return this.withCounts(
+      ctx,
+      await this.service.update(ctx.workspace.id, actor, idOrKey, dto),
+    );
   }
 
   @Delete(':idOrKey')
@@ -340,10 +445,22 @@ export class IssuesController {
     for (const id of teams) await this.permissions.assertTeamEdit(ctx, id);
   }
 
-  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T): Promise<T>;
-  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T[]): Promise<T[]>;
-  private async withCounts<T extends { id: string }>(ctx: WorkspaceContext, rows: T | T[]) {
-    await this.customers.attachCounts(ctx.workspace.id, Array.isArray(rows) ? rows : [rows]);
+  private async withCounts<T extends { id: string }>(
+    ctx: WorkspaceContext,
+    rows: T,
+  ): Promise<T>;
+  private async withCounts<T extends { id: string }>(
+    ctx: WorkspaceContext,
+    rows: T[],
+  ): Promise<T[]>;
+  private async withCounts<T extends { id: string }>(
+    ctx: WorkspaceContext,
+    rows: T | T[],
+  ) {
+    await this.customers.attachCounts(
+      ctx.workspace.id,
+      Array.isArray(rows) ? rows : [rows],
+    );
     return rows;
   }
 }

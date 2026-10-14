@@ -1,13 +1,14 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  type OnModuleDestroy,
+  type OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Client } from 'pg';
 import { Subject } from 'rxjs';
 import type { EntityManager, Repository } from 'typeorm';
-import type {
-  ActorRef,
-  LiveEvent,
-  SubjectRef,
-} from '../contracts/domain.js';
+import type { ActorRef, LiveEvent, SubjectRef } from '../contracts/domain.js';
 import { databaseUrl } from '../database/data-source.options.js';
 import { DomainEventEntity } from '../database/entities/index.js';
 import { uid } from '../common/util.js';
@@ -16,10 +17,9 @@ import { requestStore } from './request-store.js';
 export interface RecordEventInput {
   workspaceId: string;
   actor: ActorRef;
-  /** e.g. `workstream.created`, `execution.state_changed` (see contracts/domain.ts). */
+  /** Event type (see contracts/domain.ts). */
   type: string;
   subject: SubjectRef;
-  workstreamId?: string | null;
   data?: Record<string, unknown>;
   /** Backdating (seed only). */
   at?: Date;
@@ -98,8 +98,13 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       client.removeAllListeners();
       void client.end().catch(() => undefined);
       if (this.stopping) return;
-      this.log.warn(`Live event listener lost (${reason}); retrying in ${Math.round(this.reconnectDelay / 1000)}s`);
-      this.reconnectTimer = setTimeout(() => void this.listen(), this.reconnectDelay);
+      this.log.warn(
+        `Live event listener lost (${reason}); retrying in ${Math.round(this.reconnectDelay / 1000)}s`,
+      );
+      this.reconnectTimer = setTimeout(
+        () => void this.listen(),
+        this.reconnectDelay,
+      );
       this.reconnectDelay = Math.min(this.reconnectDelay * 2, RECONNECT_MAX_MS);
     };
     client.on('error', (e) => lost(e.message));
@@ -134,7 +139,9 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       id: input.subject.id,
     },
   ): Promise<DomainEventEntity> {
-    const repo = input.manager ? input.manager.getRepository(DomainEventEntity) : this.repo;
+    const repo = input.manager
+      ? input.manager.getRepository(DomainEventEntity)
+      : this.repo;
     const row = repo.create({
       id: uid('ev'),
       workspaceId: input.workspaceId,
@@ -142,7 +149,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       actor: input.actor,
       type: input.type,
       subject: input.subject,
-      workstreamId: input.workstreamId ?? null,
+      legacyWorkstreamKey: null,
       data: input.data ?? {},
     });
     await repo.save(row);
@@ -152,7 +159,11 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
   }
 
   /** Broadcast a LiveEvent to SSE subscribers of the workspace (clientId added automatically). */
-  publish(workspaceId: string, event: Pick<LiveEvent, 'type' | 'entity' | 'id'>, userId?: string): void {
+  publish(
+    workspaceId: string,
+    event: Pick<LiveEvent, 'type' | 'entity' | 'id'>,
+    userId?: string,
+  ): void {
     const published: PublishedEvent = {
       workspaceId,
       userId,
@@ -167,9 +178,16 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
     // The NOTIFY comes back through our own listener, so this instance's streams get it exactly once.
-    this.repo.query('SELECT pg_notify($1, $2)', [LIVE_CHANNEL, JSON.stringify(published)]).catch((e: unknown) => {
-      this.log.warn(`Could not relay a live event: ${e instanceof Error ? e.message : String(e)}`);
-      this.bus.next(published);
-    });
+    this.repo
+      .query('SELECT pg_notify($1, $2)', [
+        LIVE_CHANNEL,
+        JSON.stringify(published),
+      ])
+      .catch((e: unknown) => {
+        this.log.warn(
+          `Could not relay a live event: ${e instanceof Error ? e.message : String(e)}`,
+        );
+        this.bus.next(published);
+      });
   }
 }

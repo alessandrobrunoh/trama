@@ -3,7 +3,7 @@
 // project, and an issue is in at most one milestone per project, so assigning replaces the previous one.
 import { Injectable, inject } from '@angular/core';
 import { TramaStore, Notifier, type Issue, type Milestone } from '../../core';
-import type { PickOption } from '../workstreams/picker';
+import type { PickOption } from '../../shared/picker';
 import { isoOfDay } from './milestone-model';
 
 /** Local calendar day of `d`, stored at noon so every time zone shows the same day. */

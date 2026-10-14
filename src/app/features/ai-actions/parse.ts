@@ -131,20 +131,17 @@ export interface Triage {
   priority?: Suggestion<Priority>;
   estimate?: Suggestion<number>;
   kind?: Suggestion<IssueKind>;
-  workstreams: { key: string; why: string }[];
 }
 
 export interface TriageContext {
   /** Allowed estimate values; empty or missing when the workspace has no estimates. */
   estimates: readonly number[];
-  /** Keys of the workstreams that were offered as candidates. */
-  candidateKeys: readonly string[];
 }
 
 export function parseTriage(reply: string, ctx: TriageContext): Triage {
   const json = extractJson(reply);
   if (!isRecord(json)) throw new AiFormatError();
-  const out: Triage = { workstreams: [] };
+  const out: Triage = {};
 
   const p = json['priority'];
   if (isRecord(p)) {
@@ -161,24 +158,11 @@ export function parseTriage(reply: string, ctx: TriageContext): Triage {
     const n = typeof e['value'] === 'number' ? e['value'] : Number(e['value']);
     if (Number.isFinite(n) && ctx.estimates.includes(n)) out.estimate = { value: n, why: why(e['why']) };
   }
-  const ws = json['workstreams'];
-  if (Array.isArray(ws)) {
-    const allowed = new Map(ctx.candidateKeys.map((k2) => [k2.toUpperCase(), k2]));
-    const seen = new Set<string>();
-    for (const w of ws) {
-      const key = isRecord(w) ? text(w['key'], 40) : typeof w === 'string' ? text(w, 40) : undefined;
-      const real = key ? allowed.get(key.toUpperCase()) : undefined;
-      if (!real || seen.has(real)) continue;
-      seen.add(real);
-      out.workstreams.push({ key: real, why: isRecord(w) ? why(w['why']) : '' });
-      if (out.workstreams.length >= 3) break;
-    }
-  }
   return out;
 }
 
 export function triageIsEmpty(t: Triage): boolean {
-  return !t.priority && !t.estimate && !t.kind && t.workstreams.length === 0;
+  return !t.priority && !t.estimate && !t.kind;
 }
 
 export interface ProposedIssue {

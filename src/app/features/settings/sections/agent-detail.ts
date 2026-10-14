@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideDynamicIcon, LucideKeyRound, LucidePencil, LucidePlus, LucideTrash2, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -9,7 +8,6 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
-import { StatusIcon } from '../../../shared/status';
 import { AppSelect, type Option } from '../../create/form-kit';
 import { EventLine } from '../../overview/event-line';
 import { ConnectSnippets } from './connect-snippets';
@@ -25,18 +23,16 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
 
 /**
  * One agent: who it is, the tokens it works with, how to connect a runtime to it,
- * and what it has been doing (attributed activity and the workstreams it touched).
+ * and what it has been doing (attributed activity).
  */
 @Component({
   selector: 'app-agent-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     HlmButtonImports,
     HlmInputImports,
     LucideDynamicIcon,
     ProviderIcon,
-    StatusIcon,
     AppSelect,
     EventLine,
     ConnectSnippets,
@@ -160,20 +156,6 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
         </div>
       </app-settings-group>
 
-      <!-- Contributed to -->
-      <app-settings-group [title]="'Workstreams · ' + contributions().length" description="Where this agent has acted recently, most active first.">
-        @for (c of contributions(); track c.ws.id) {
-          <a class="hover:bg-accent flex min-h-11 items-center gap-3 px-4 py-2 transition-colors" [routerLink]="['/', slug(), 'workstreams', c.ws.key]">
-            <app-status-icon [status]="c.ws.status" entity="workstream" [size]="14" />
-            <span class="text-muted-foreground w-16 shrink-0 font-mono text-xs">{{ c.ws.key }}</span>
-            <span class="min-w-0 flex-1 truncate text-[13px]">{{ c.ws.title }}</span>
-            <span class="text-muted-foreground shrink-0 text-xs tabular-nums">{{ c.count }} {{ c.count === 1 ? 'action' : 'actions' }}</span>
-          </a>
-        } @empty {
-          <div class="text-muted-foreground px-4 py-6 text-center text-[13px]">Nothing yet. Once the agent updates a workstream it will be listed here.</div>
-        }
-      </app-settings-group>
-
       <!-- Activity -->
       <app-settings-group title="Recent activity" description="The latest events performed by this agent.">
         <div class="px-4 py-1">
@@ -235,33 +217,12 @@ export class AgentDetail {
   private readonly mine = computed(() => this.store.events().filter((e) => e.actor.type === 'agent' && e.actor.id === this.agentId()));
   protected readonly activity = computed(() => this.mine().slice(0, 12));
 
-  protected readonly contributions = computed(() => {
-    const id = this.agentId();
-    const counts = new Map<string, number>();
-    const bump = (wsId: string | undefined | null, n = 1) => {
-      if (wsId) counts.set(wsId, (counts.get(wsId) ?? 0) + n);
-    };
-    const isMe = (a: { type: string; id?: string } | undefined) => a?.type === 'agent' && a.id === id;
-    for (const e of this.mine()) bump(e.workstreamId);
-    for (const a of this.store.artifacts()) if (isMe(a.authorRef)) bump(a.workstreamId);
-    for (const r of this.store.inputRequests()) if (isMe(r.requestedBy)) bump(r.workstreamId);
-    for (const c of this.store.commentIndex()) if (isMe(c.author) && c.subject.type === 'workstream') bump(c.subject.id, c.count);
-    for (const d of this.store.decisions()) if (isMe(d.proposedBy)) bump(d.originWorkstreamId);
-    const byId = this.store.workstreamById();
-    return [...counts]
-      .map(([wsId, count]) => ({ ws: byId.get(wsId), count }))
-      .filter((c): c is { ws: NonNullable<typeof c.ws>; count: number } => !!c.ws)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  });
-
   protected readonly stats = computed(() => {
     const last = this.mine()[0]?.at;
     const tokens = this.tokens();
     return [
       { label: 'Actions', value: String(this.mine().length) },
       { label: 'Last active', value: last ? this.ago(last) : 'Never' },
-      { label: 'Workstreams', value: String(this.contributions().length) },
       { label: 'Tokens', value: String(tokens.length) },
     ];
   });

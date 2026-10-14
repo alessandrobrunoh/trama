@@ -1,7 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { DataSource, In, type EntityManager, type EntityTarget } from 'typeorm';
 import { uid } from '../common/util.js';
-import { FAVORITE_TYPES, MAX_FAVORITES, type FavoriteType } from '../contracts/domain.js';
+import {
+  FAVORITE_TYPES,
+  MAX_FAVORITES,
+  type FavoriteType,
+} from '../contracts/domain.js';
 import {
   CustomerEntity,
   DecisionEntity,
@@ -11,13 +20,13 @@ import {
   RepositoryEntity,
   SavedViewEntity,
   TeamEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
-const TABLES: Record<FavoriteType, EntityTarget<{ id: string; workspaceId: string }>> = {
+const TABLES: Partial<
+  Record<FavoriteType, EntityTarget<{ id: string; workspaceId: string }>>
+> = {
   issue: IssueEntity,
-  workstream: WorkstreamEntity,
   project: ProjectEntity,
   decision: DecisionEntity,
   team: TeamEntity,
@@ -39,43 +48,109 @@ export class FavoritesService {
    */
   async list(workspaceId: string, userId: string): Promise<FavoriteEntity[]> {
     const repo = this.ds.getRepository(FavoriteEntity);
-    const all = await repo.find({ where: { workspaceId, userId }, order: { createdAt: 'ASC', id: 'ASC' } });
+    const all = await repo.find({
+      where: { workspaceId, userId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    const active = all.filter((favorite) =>
+      FAVORITE_TYPES.includes(favorite.type),
+    );
     const gone: string[] = [];
     for (const type of FAVORITE_TYPES) {
-      const mine = all.filter((f) => f.type === type);
+      const mine = active.filter((f) => f.type === type);
       if (!mine.length) continue;
-      const alive = await this.visibleIds(this.ds.manager, workspaceId, userId, type, mine.map((f) => f.subjectId));
-      gone.push(...mine.filter((f) => !alive.has(f.subjectId)).map((f) => f.id));
+      const alive = await this.visibleIds(
+        this.ds.manager,
+        workspaceId,
+        userId,
+        type,
+        mine.map((f) => f.subjectId),
+      );
+      gone.push(
+        ...mine.filter((f) => !alive.has(f.subjectId)).map((f) => f.id),
+      );
     }
     if (gone.length) await repo.delete({ id: In(gone) });
-    return all.filter((f) => !gone.includes(f.id));
+    return active.filter((f) => !gone.includes(f.id));
   }
 
   /** Pin a subject. Pinning something already pinned returns the existing favorite. */
-  async add(workspaceId: string, userId: string, type: FavoriteType, subjectId: string): Promise<FavoriteEntity> {
-    if (!FAVORITE_TYPES.includes(type)) throw new BadRequestException(`type must be one of ${FAVORITE_TYPES.join(', ')}`);
+  async add(
+    workspaceId: string,
+    userId: string,
+    type: FavoriteType,
+    subjectId: string,
+  ): Promise<FavoriteEntity> {
+    if (!FAVORITE_TYPES.includes(type))
+      throw new BadRequestException(
+        `type must be one of ${FAVORITE_TYPES.join(', ')}`,
+      );
     const repo = this.ds.getRepository(FavoriteEntity);
-    const existing = await repo.findOneBy({ workspaceId, userId, type, subjectId });
+    const existing = await repo.findOneBy({
+      workspaceId,
+      userId,
+      type,
+      subjectId,
+    });
     if (existing) return existing;
-    const alive = await this.visibleIds(this.ds.manager, workspaceId, userId, type, [subjectId]);
-    if (!alive.has(subjectId)) throw new NotFoundException(`${type} "${subjectId}" not found`);
+    const alive = await this.visibleIds(
+      this.ds.manager,
+      workspaceId,
+      userId,
+      type,
+      [subjectId],
+    );
+    if (!alive.has(subjectId))
+      throw new NotFoundException(`${type} "${subjectId}" not found`);
     if ((await repo.countBy({ workspaceId, userId })) >= MAX_FAVORITES)
-      throw new ConflictException(`You can keep up to ${MAX_FAVORITES} favorites per workspace`);
-    const row = repo.create({ id: uid('fav'), workspaceId, userId, type, subjectId });
+      throw new ConflictException(
+        `You can keep up to ${MAX_FAVORITES} favorites per workspace`,
+      );
+    const row = repo.create({
+      id: uid('fav'),
+      workspaceId,
+      userId,
+      type,
+      subjectId,
+    });
     // A concurrent request may have inserted the same favorite; the unique index decides.
     await repo.createQueryBuilder().insert().values(row).orIgnore().execute();
-    const saved = await repo.findOneByOrFail({ workspaceId, userId, type, subjectId });
-    if (saved.id === row.id) this.events.publish(workspaceId, { type: 'created', entity: 'favorite', id: saved.id });
+    const saved = await repo.findOneByOrFail({
+      workspaceId,
+      userId,
+      type,
+      subjectId,
+    });
+    if (saved.id === row.id)
+      this.events.publish(workspaceId, {
+        type: 'created',
+        entity: 'favorite',
+        id: saved.id,
+      });
     return saved;
   }
 
   /** Unpin. Idempotent: unpinning something that is not pinned succeeds. */
-  async remove(workspaceId: string, userId: string, type: FavoriteType, subjectId: string): Promise<void> {
+  async remove(
+    workspaceId: string,
+    userId: string,
+    type: FavoriteType,
+    subjectId: string,
+  ): Promise<void> {
     const repo = this.ds.getRepository(FavoriteEntity);
-    const existing = await repo.findOneBy({ workspaceId, userId, type, subjectId });
+    const existing = await repo.findOneBy({
+      workspaceId,
+      userId,
+      type,
+      subjectId,
+    });
     if (!existing) return;
     await repo.delete({ id: existing.id });
-    this.events.publish(workspaceId, { type: 'deleted', entity: 'favorite', id: existing.id });
+    this.events.publish(workspaceId, {
+      type: 'deleted',
+      entity: 'favorite',
+      id: existing.id,
+    });
   }
 
   /** Of `ids`, the ones that exist in the workspace and that this user may see. */
@@ -87,10 +162,19 @@ export class FavoritesService {
     ids: string[],
   ): Promise<Set<string>> {
     if (type === 'view') {
-      const rows = await m.find(SavedViewEntity, { where: { workspaceId, id: In(ids) } });
-      return new Set(rows.filter((v) => v.shared || v.ownerId === userId).map((v) => v.id));
+      const rows = await m.find(SavedViewEntity, {
+        where: { workspaceId, id: In(ids) },
+      });
+      return new Set(
+        rows.filter((v) => v.shared || v.ownerId === userId).map((v) => v.id),
+      );
     }
-    const rows = await m.find(TABLES[type], { where: { workspaceId, id: In(ids) }, select: { id: true } });
+    const table = TABLES[type];
+    if (!table) return new Set();
+    const rows = await m.find(table, {
+      where: { workspaceId, id: In(ids) },
+      select: { id: true },
+    });
     return new Set(rows.map((r) => r.id));
   }
 }

@@ -21,7 +21,6 @@ import {
   PRIORITY_META,
   PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
-  WORKSTREAM_STATUS_META,
 } from '../../core/meta';
 import { EmptyState } from '../../shared/empty-state';
 import { KeyChip } from '../../shared/key-chip';
@@ -208,7 +207,7 @@ export class PublicView implements OnInit {
   protected readonly state = signal<'loading' | 'ready' | 'missing'>('loading');
   protected readonly view = signal<PublicViewDto | null>(null);
 
-  protected readonly entity = computed<ViewEntity>(() => this.view()?.entity ?? 'workstream');
+  protected readonly entity = computed<ViewEntity>(() => this.view()?.entity ?? 'issue');
   protected readonly entityIcon = computed(() => ENTITY_ICON[this.entity()]);
   protected readonly entityLabel = computed(() => ENTITY_LABEL[this.entity()]);
   protected readonly statusEntity = computed(() => STATUS_ENTITY[this.entity()]);
@@ -265,7 +264,6 @@ export class PublicView implements OnInit {
     if (field === 'kind') return ISSUE_KIND_META;
     if (field === 'health') return PROJECT_HEALTH_META;
     if (field !== 'status') return null;
-    if (entity === 'workstream') return WORKSTREAM_STATUS_META;
     if (entity === 'issue') return ISSUE_STATUS_META;
     if (entity === 'project') return PROJECT_STATUS_META;
     return DECISION_STATUS_META;

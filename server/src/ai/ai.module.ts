@@ -9,7 +9,6 @@ import {
   ProjectEntity,
   RepositoryEntity,
   UserEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { AiConfig } from './ai.config.js';
 import { AiController } from './ai.controller.js';
@@ -28,7 +27,6 @@ import { AuthModule } from '../auth/auth.module.js';
     AuthModule,
     TypeOrmModule.forFeature([
       IssueEntity,
-      WorkstreamEntity,
       RepositoryEntity,
       DecisionEntity,
       ProjectEntity,

@@ -3,7 +3,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { TramaStore } from '../../core/stores/trama.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'workstream' | 'project' | 'issue' | 'customer' | 'decision' | 'artifact' | 'repository' | 'team';
+export type HitType = 'project' | 'issue' | 'customer' | 'decision' | 'artifact' | 'repository' | 'team';
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -12,13 +12,10 @@ export interface SearchHit {
   key?: string;
   title: string;
   subtitle?: string;
-  /** For executions and artifacts: the workstream they belong to. */
-  workstreamKey?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['workstream', 'project', 'decision', 'issue', 'customer', 'artifact', 'repository', 'team'];
+export const HIT_ORDER: HitType[] = ['project', 'decision', 'issue', 'customer', 'artifact', 'repository', 'team'];
 export const HIT_LABEL: Record<HitType, string> = {
-  workstream: 'Workstreams',
   project: 'Projects',
   decision: 'Decisions',
   issue: 'Issues',
@@ -28,7 +25,6 @@ export const HIT_LABEL: Record<HitType, string> = {
   team: 'Teams',
 };
 export const HIT_SINGULAR: Record<HitType, string> = {
-  workstream: 'Workstream',
   project: 'Project',
   decision: 'Decision',
   issue: 'Issue',
@@ -39,7 +35,6 @@ export const HIT_SINGULAR: Record<HitType, string> = {
 };
 
 const TYPE_ALIASES: Record<string, HitType> = {
-  workstreams: 'workstream',
   projects: 'project',
   project: 'project',
   decisions: 'decision',
@@ -67,7 +62,6 @@ function asHit(raw: unknown, forcedType?: HitType): SearchHit | null {
     key,
     title,
     subtitle: typeof r['subtitle'] === 'string' && r['subtitle'] ? r['subtitle'] : undefined,
-    workstreamKey: typeof r['workstreamKey'] === 'string' ? r['workstreamKey'] : undefined,
   };
 }
 
@@ -98,7 +92,7 @@ export class SearchService {
           if (h) out.push(h);
         }
       } else {
-        // Grouped shape `{ workstreams: [...], issues: [...], ... }`.
+        // Grouped shape `{ issues: [...], ... }`.
         for (const [k, v] of Object.entries(o)) {
           const type = TYPE_ALIASES[k] ?? ((HIT_ORDER as string[]).includes(k) ? (k as HitType) : k === 'issues' || k === 'issue' ? 'issue' : undefined);
           if (!type || !Array.isArray(v)) continue;
@@ -115,20 +109,18 @@ export class SearchService {
   /** Instant fuzzy search over everything already in the snapshot. */
   local(q: string, perType = 6, only?: HitType): SearchHit[] {
     const s = this.store;
-    const wsKey = (id: string | undefined) => (id ? s.workstreamById().get(id)?.key : undefined);
     const scored: { hit: SearchHit; score: number }[] = [];
     const push = (hit: SearchHit, text: string, extra = '') => {
       if (only && hit.type !== only) return;
       const score = Math.max(fuzzyScore(text, q), extra ? fuzzyScore(extra, q) * 0.5 : 0);
       if (score > 0) scored.push({ hit, score });
     };
-    for (const w of s.workstreams()) push({ type: 'workstream', id: w.id, key: w.key, title: w.title }, `${w.key} ${w.title}`, w.objective);
     for (const p of s.projects()) push({ type: 'project', id: p.id, title: p.name }, p.name, p.summary ?? '');
     for (const d of s.decisions()) push({ type: 'decision', id: d.id, key: d.key, title: d.title }, `${d.key} ${d.title}`, d.statement);
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
     for (const c of s.customers()) push({ type: 'customer', id: c.id, title: c.name, subtitle: c.domains.join(', ') }, `${c.name} ${c.domains.join(' ')}`);
     for (const a of s.artifacts())
-      push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId, workstreamKey: wsKey(a.workstreamId) }, a.title, a.externalId ?? '');
+      push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId }, a.title, a.externalId ?? '');
     for (const r of s.repositories()) push({ type: 'repository', id: r.id, title: r.fullName }, r.fullName);
     for (const t of s.teams()) push({ type: 'team', id: t.id, key: t.key, title: t.name }, `${t.key} ${t.name}`);
 
@@ -146,8 +138,6 @@ export class SearchService {
   /** Router commands (below `/:slug`) for a hit. */
   path(h: SearchHit): string[] {
     switch (h.type) {
-      case 'workstream':
-        return ['workstreams', h.key ?? h.id];
       case 'decision':
         return ['decisions', h.key ?? h.id];
       case 'issue':
@@ -162,11 +152,9 @@ export class SearchService {
         return ['teams', h.key ?? h.id];
       case 'artifact': {
         const a = this.store.artifactById().get(h.id);
-        const key = h.workstreamKey ?? this.store.getWorkstream(a?.workstreamId)?.key;
-        if (key) return ['workstreams', key];
         const issue = this.store.getIssue(a?.issueId);
         if (issue) return ['issues', issue.key];
-        return a?.projectId ? ['projects', a.projectId] : ['workstreams'];
+        return a?.projectId ? ['projects', a.projectId] : ['issues'];
       }
     }
   }
@@ -174,6 +162,6 @@ export class SearchService {
   queryParams(h: SearchHit): Record<string, string> | undefined {
     if (h.type !== 'artifact') return undefined;
     const a = this.store.artifactById().get(h.id);
-    return a?.workstreamId || h.workstreamKey ? { tab: 'artifacts' } : undefined;
+    return undefined;
   }
 }

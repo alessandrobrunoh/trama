@@ -7,10 +7,10 @@
   </picture>
 </a>
 
-### Issues describe problems. Workstreams deliver outcomes.
+### Issues describe problems and goals. Agents work directly from Issues.
 
 **Trama is the source-available coordination layer for software teams that work with coding agents.**<br>
-Issues are the demand, workstreams are the outcome, decisions and artifacts are the proof, and humans are pulled in only where they are needed.
+Issues stay granular. Plans, durable Decisions, and human input preserve the context needed to continue the work; artifacts show what it produced.
 
 [![License: PolyForm Shield](https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-1348dc?style=flat-square)](LICENSE)
 [![Angular](https://img.shields.io/badge/Angular-22-dd0031?style=flat-square&logo=angular&logoColor=white)](https://angular.dev)
@@ -33,59 +33,53 @@ Issues are the demand, workstreams are the outcome, decisions and artifacts are 
 
 ## Why Trama
 
-Trello, Jira and Linear treat every ticket as a unit of work. That held up while one issue meant one person and one pull request. It breaks down when:
+Trama keeps one problem per Issue without forcing a session that spans several Issues into a second project-management object. Work with coding agents needs:
 
-- several issues share the **same root cause** and should be fixed together;
+- granular Issues that can be worked on together without duplicating their status;
 - a **coding agent** does a large part of the work, and delegates to subagents;
 - the change spans **several repositories** and teams;
 - the *why* behind a choice lives in a chat thread nobody can find in a month.
 
-> **Issues are excellent units of demand. They are not always the best units of execution.**
+> **An Issue is the unit of work. A session can work across Issues without a second status to maintain.**
 
-Trama doesn't replace issues, it keeps them first-class, and it does not copy what your execution tools already hold (transcripts, prompts, file edits): it links to them. It adds the layer between "someone reported a problem" and "we shipped the fix".
+Trama keeps Issues first-class and does not copy what execution tools already hold (transcripts, prompts, file edits): it links to that context. Optional Plans, Decisions, and human input preserve only what helps someone understand and continue the work.
 
 ```text
-  Issues          "What problems or requests exist?"
+  Issue           "What is the problem, context and desired goal?"
      │
-     ▼
-  Workstream      "What outcome are we pursuing?"          ← the new unit
+     ├── optional Plan          "How will we approach it?"
+     ├── Human input            "Question or Decision?"
+     └── Artifacts              "What did the work produce?"
      │
-     ▼
-  Decisions       "Why did we choose this?"
-  Artifacts       "What did the work actually produce?"    ← PRs, builds, docs, deployments
-     │
-     ▼
-  Outcome         "What did we deliver?"
+     └── PRs, builds, documents, deployments
 ```
 
 The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the thesis in [VISION.md](VISION.md) (two pages) and what Trama deliberately does not do in [NON-GOALS.md](NON-GOALS.md). The original long-form write-up is kept as background in [docs/vision-detailed.md](docs/vision-detailed.md).
 
-> **Status:** early-stage and not yet considered production-ready (see [SECURITY.md](SECURITY.md)). The scope is under review: [NON-GOALS.md](NON-GOALS.md) proposes which surfaces are core and which are frozen.
+> **Status:** early-stage and not yet considered production-ready (see [SECURITY.md](SECURITY.md)). The approved product direction is Issue-first; [NON-GOALS.md](NON-GOALS.md) records current scope boundaries.
 
 ## Core ideas
 
 | Concept | What it is |
 |---|---|
-| **Issue** | A problem, request or task: bug, feature, incident, tech debt, feedback, idea, security finding. Keyed like `BUG-142`. |
-| **Workstream** | The outcome a team commits to. Groups issues that share a root cause, carries acceptance criteria, contributors, milestones and dependencies. Keyed like `AUTH-42`. |
-| **Decision** | A first-class record (`ADR-21`): proposed, accepted, superseded or rejected, with the reasoning kept next to the work. |
+| **Issue** | A problem, request or task: bug, feature, incident, tech debt, feedback, idea, security finding. Its optional Goal describes what should be true when resolved. |
+| **Plan** | An optional implementation approach, created close to the work and linked to the Issue. |
+| **Human input** | One Issue-level feature with two modes: a **Question** an agent needs answered, or a **Decision** whose reasoning should survive the session. |
 | **Artifact** | Proof of delivery: pull/merge requests, builds, test reports, designs, deployments, releases, with live CI and review state. |
-| **Input request** | An agent that is blocked asks a human a question and waits, instead of guessing. |
 | **Attention** | A queue of what needs *human* judgment right now: reviews, decisions, failing CI, conflicts, triage. Human attention is the scarce resource. |
-| **Project** | A planning entity above workstreams (goals, milestones, updates), separate from repositories. Supporting, not core. |
+| **Project** | Optional planning context for Issues, milestones and updates, separate from repositories. Supporting, not core. |
 
-**Reality drives status.** A workstream's state (`draft → planned → working → needs_input → in_review → blocked → ready_to_land → shipped`) is derived from facts (issues resolved, PRs merged, criteria met, open questions, dependencies) and not from someone dragging a card. You can still pin it manually when you need to.
+**One status, one source of truth.** The Issue status tracks the work. Questions and proposed Decisions surface in Attention; they do not create a second execution status.
 
 ## Features
 
 **Core**
 
-- **Workstreams** with acceptance criteria, contributors, a dependency graph, and list / board / graph views. Status is derived from facts.
+- **Issue-first work.** Goal, Plans, Decisions, Questions, and artifacts are available from the Issue when needed.
 - **Humans and agents as actors.** Agents are first-class members with scoped tokens, usage caps and an auditable activity trail. Accountability stays with a human.
-- **Decisions and artifacts** traced back to the issues they came from. Agents propose decisions; humans accept them.
-- **Input requests and an attention inbox** that surface where a person is actually needed.
+- **Human input.** Agents can ask a Question or propose a Decision; people respond from the Issue or Attention inbox.
 - **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Import repositories, link PRs, receive webhooks.
-- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->21 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
+- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->20 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
 - **Agent skills** that teach a coding agent how to pick up work, report progress, ask for input and triage.
 - **Live updates** over SSE, a command palette, keyboard shortcuts, search, roles and API tokens with narrow scopes.
 - **Self-hosting first**: one PostgreSQL, three small images, no large infrastructure stack.
@@ -243,7 +237,7 @@ npm run lint && npm run build
 
 ## Contributing
 
-Trama is early-stage and the architecture is still evolving, so design alignment matters as much as code quality. Small fixes, docs, tests and accessibility improvements can go straight to a pull request. For anything touching the workstream model, permissions, integrations, MCP or the database schema, please open an issue or discussion first.
+Trama is early-stage and the architecture is still evolving, so design alignment matters as much as code quality. Small fixes, docs, tests and accessibility improvements can go straight to a pull request. For larger changes touching the Issue model, permissions, integrations, MCP or the database schema, please open an issue or discussion first.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), sign the [CLA](CLA.md) on your first pull request, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). If you find a vulnerability, follow [SECURITY.md](SECURITY.md) rather than opening a public issue.
 

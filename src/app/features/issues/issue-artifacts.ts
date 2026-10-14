@@ -8,7 +8,7 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
 
 /**
  * "Artifacts" section of the issue page: documents, links, PRs and builds attached directly to the issue.
- * They also belong to the issue's project / workstreams, whose Context tab lists them with this issue as origin.
+ * Project context includes issue-owned artifacts through the issue's direct `projectId`.
  */
 @Component({
   selector: 'app-issue-artifacts',

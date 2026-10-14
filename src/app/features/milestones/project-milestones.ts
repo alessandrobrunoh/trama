@@ -1,13 +1,13 @@
 // "Milestones" section of a project (Linear-style): the progress chart of the whole project, then
 // the milestone list — drag to reorder, "+" to add (name + optional date), click a row to expand its
-// issues and its own chart. `readonly` shows the same list without editing (workstream pages).
+// issues and its own chart.
 import { CdkDrag, CdkDropList, moveItemInArray, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
 import { LucideCalendar, LucideDynamicIcon, LucidePlus } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { TramaStore, shortDate, type Project } from '../../core';
-import { WsDatePicker } from '../workstreams/ws-parts';
+import { DatePicker } from '../../shared/date-picker';
 import { MilestoneActions, isoFromDate } from './milestone-actions';
 import { MilestoneIcon } from './milestone-icon';
 import { MilestoneRow } from './milestone-row';
@@ -16,7 +16,7 @@ import { ProgressChart } from './progress-chart';
 @Component({
   selector: 'app-project-milestones',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [CdkDropList, CdkDrag, HlmButtonImports, HlmInputImports, LucideDynamicIcon, MilestoneIcon, MilestoneRow, ProgressChart, WsDatePicker],
+  imports: [CdkDropList, CdkDrag, HlmButtonImports, HlmInputImports, LucideDynamicIcon, MilestoneIcon, MilestoneRow, ProgressChart, DatePicker],
   host: { class: 'block' },
   template: `
     <section aria-labelledby="project-milestones-title">
@@ -55,10 +55,10 @@ import { ProgressChart } from './progress-chart';
               (keydown.enter)="add()"
               (keydown.escape)="cancel($event)"
             />
-            <app-ws-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 border border-border-strong px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
+            <app-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 border border-border-strong px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
               <svg [lucideIcon]="cal" [size]="12" class="text-muted-foreground"></svg>
               <span [class.text-muted-foreground]="!date()">{{ date() ? dateLabel() : 'Target date' }}</span>
-            </app-ws-date-picker>
+            </app-date-picker>
             <button hlmBtn size="xs" [disabled]="!draft().trim()" (click)="add()">Add</button>
             <button hlmBtn variant="ghost" size="xs" (click)="adding.set(false)">Cancel</button>
           </div>

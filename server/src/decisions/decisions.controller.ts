@@ -12,7 +12,6 @@ import {
 } from '@nestjs/common';
 import {
   IsArray,
-  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -46,11 +45,11 @@ class CreateDecisionDto {
   @IsString()
   @MaxLength(80)
   status?: string;
-  @IsOptional() @IsString() originWorkstreamId?: string;
+  @IsString() originIssueId: string;
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  relatedWorkstreamIds?: string[];
+  relatedIssueIds?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
 }
 
@@ -64,11 +63,11 @@ class UpdateDecisionDto {
   /** Catalog id of type proposed, or the legacy enum. */
   @IsOptional() @IsString() @MaxLength(80) status?: string;
   @Clearable() @IsString() @MaxLength(20000) rationale?: string | null;
-  @Clearable() @IsString() originWorkstreamId?: string | null;
+  @OptionalNotNull() @IsString() originIssueId?: string;
   @OptionalNotNull()
   @IsArray()
   @IsString({ each: true })
-  relatedWorkstreamIds?: string[];
+  relatedIssueIds?: string[];
   @OptionalNotNull() @IsArray() @IsString({ each: true }) tags?: string[];
 }
 
@@ -79,7 +78,7 @@ class SupersedeDto {
 
 class ListDecisionsQuery {
   @IsOptional() @IsString() @MaxLength(80) status?: string;
-  @IsOptional() @IsString() workstreamId?: string;
+  @IsOptional() @IsString() issueId?: string;
   @IsOptional() @IsString() tag?: string;
   @IsOptional() @IsString() q?: string;
 }
@@ -108,9 +107,16 @@ export class DecisionsController {
     // Creating an already decided record is an accept/reject: same capability as /accept and /reject.
     if (dto.status === 'accepted' || dto.status === 'rejected') {
       if (!canDo(ctx, 'acceptDecisions'))
-        throw new ForbiddenException('You are not allowed to accept or reject decisions');
-      if (auth.token?.scope === 'custom' && !auth.token.permissions?.includes('decisions:accept'))
-        throw new ForbiddenException('This API token lacks the "decisions:accept" permission');
+        throw new ForbiddenException(
+          'You are not allowed to accept or reject decisions',
+        );
+      if (
+        auth.token?.scope === 'custom' &&
+        !auth.token.permissions?.includes('decisions:accept')
+      )
+        throw new ForbiddenException(
+          'This API token lacks the "decisions:accept" permission',
+        );
     }
     return this.service.create(ctx.workspace.id, actor, dto);
   }

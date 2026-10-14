@@ -1,4 +1,4 @@
-// Core barrel — `import { TramaStore, SessionStore, WORKSTREAM_STATUS_META, type Workstream } from '../../core';`
+// Core barrel for shared domain, API, state and UI helpers.
 export * from './contracts/domain';
 export * from './config';
 export * from './utils';

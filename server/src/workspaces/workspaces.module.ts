@@ -11,7 +11,6 @@ import {
   TeamEntity,
   UserEntity,
   WorkspaceEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { AccessGuard } from './access.guard.js';
 import { CustomerTiersController } from './customer-tiers.controller.js';
@@ -41,7 +40,6 @@ import { WorkspacesService } from './workspaces.service.js';
       AgentEntity,
       ApiTokenEntity,
       TeamEntity,
-      WorkstreamEntity,
       IssueEntity,
     ]),
   ],
@@ -64,6 +62,11 @@ import { WorkspacesService } from './workspaces.service.js';
     { provide: APP_GUARD, useClass: AccessGuard },
     { provide: APP_INTERCEPTOR, useClass: MemberAccessInterceptor },
   ],
-  exports: [WorkspacesService, LabelsService, StatusesService, PermissionsService],
+  exports: [
+    WorkspacesService,
+    LabelsService,
+    StatusesService,
+    PermissionsService,
+  ],
 })
 export class WorkspacesModule {}

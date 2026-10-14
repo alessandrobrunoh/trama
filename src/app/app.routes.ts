@@ -24,9 +24,6 @@ function redirectInbox(path: string, tab: string): Route {
  * inherited (`paramsInheritanceStrategy: 'always'`), so any page can declare
  * `workspaceSlug = input<string>()`.
  *
- * Workstream detail tabs use the `tab` QUERY param (`?tab=artifacts`), not child routes:
- * overview (default) | artifacts | decisions | graph | activity | context | stats.
- *
  * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, shared, blog, roadmap,
  * changelog, brand, new-workspace, 404.
  */
@@ -166,6 +163,12 @@ export const routes: Routes = [
           import('./features/issues/issue-detail-page').then((m) => m.IssueDetailPage),
       },
       {
+        path: 'input-requests',
+        title: 'Input requests · Trama',
+        loadComponent: () =>
+          import('./features/issues/input-requests-page').then((m) => m.InputRequestsPage),
+      },
+      {
         path: 'customers',
         title: 'Customers · Trama',
         loadComponent: () =>
@@ -183,27 +186,8 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./features/customers/customer-detail-page').then((m) => m.CustomerDetailPage),
       },
-      {
-        path: 'workstreams',
-        title: 'Workstreams · Trama',
-        loadComponent: () =>
-          import('./features/workstreams/workstream-list-page').then((m) => m.WorkstreamListPage),
-      },
-      {
-        path: 'workstreams/:key',
-        title: 'Workstream · Trama',
-        loadComponent: () =>
-          import('./features/workstreams/workstream-detail-page').then(
-            (m) => m.WorkstreamDetailPage,
-          ),
-      },
       // The timeline is a layout of saved views now (views/:id with layout "timeline"); keep old links working.
       { path: 'timeline', pathMatch: 'full', redirectTo: 'views' },
-      {
-        path: 'graph',
-        title: 'Graph · Trama',
-        loadComponent: () => import('./features/graph/graph-page').then((m) => m.GraphPage),
-      },
       {
         path: 'decisions',
         title: 'Decisions · Trama',

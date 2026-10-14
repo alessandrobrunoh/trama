@@ -14,7 +14,6 @@ import { record } from './ai-provider.js';
 
 const DAY = 86_400_000;
 const CLOSED_ISSUE = new Set(['done', 'canceled']);
-const CLOSED_WORKSTREAM = new Set(['shipped', 'canceled']);
 const CLOSED_PROJECT = new Set(['completed', 'canceled']);
 const SEVERITY_RANK: Record<AttentionSeverity, number> = {
   high: 0,
@@ -37,7 +36,6 @@ export interface FactsIssue {
   priority: string;
   assigneeId: string | null;
   assignee: string | null;
-  workstreamIds: string[];
   milestoneIds: string[];
   updatedAt: string;
 }
@@ -63,21 +61,11 @@ export interface ProjectFacts {
     name: string;
     targetDate: string | null;
   }[];
-  workstreams: {
-    id: string;
-    key: string;
-    title: string;
-    status: string;
-    objective: string;
-    targetDate: string | null;
-    openInputRequests: number;
-    oldestInputRequestAt: string | null;
-  }[];
-  /** Every issue of the project (own projectId, or linked to one of its workstreams). */
+  /** Issues directly assigned to the project. */
   issues: FactsIssue[];
   updates: { health: string; body: string; createdAt: string }[];
   decisions: { key: string; title: string; status: string; at: string }[];
-  inputRequests: { workstreamKey: string; question: string; createdAt: string }[];
+  inputRequests: { issueKey: string; question: string; createdAt: string }[];
   events: { at: string; type: string; summary: string }[];
   /** Open issues that are not part of the project (only loaded for the `issues` kind). */
   candidates: FactsIssue[];
@@ -90,7 +78,9 @@ export function clip(value: string | null | undefined, max: number): string {
 
 const isClosedIssue = (i: { status: string }) => CLOSED_ISSUE.has(i.status);
 
-export function countByStatus(issues: readonly FactsIssue[]): Record<string, number> {
+export function countByStatus(
+  issues: readonly FactsIssue[],
+): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const i of issues) counts[i.status] = (counts[i.status] ?? 0) + 1;
   return counts;
@@ -100,7 +90,9 @@ export function milestoneProgress(
   milestoneId: string,
   issues: readonly FactsIssue[],
 ): { total: number; done: number; progress: number } {
-  const scoped = issues.filter((i) => i.milestoneIds.includes(milestoneId) && i.status !== 'canceled');
+  const scoped = issues.filter(
+    (i) => i.milestoneIds.includes(milestoneId) && i.status !== 'canceled',
+  );
   const done = scoped.filter((i) => i.status === 'done').length;
   return {
     total: scoped.length,
@@ -118,7 +110,6 @@ export interface ProjectSignal {
   detail: string;
   severity: AttentionSeverity;
   issueId?: string;
-  workstreamId?: string;
 }
 
 type RawSignal = Omit<ProjectSignal, 'ref'>;
@@ -127,14 +118,18 @@ const dayWord = (n: number) => `${n} day${n === 1 ? '' : 's'}`;
 const day = (iso: string) => iso.slice(0, 10);
 
 /**
- * Risk signals computed without any model: project and milestone deadlines, blocked workstreams,
+ * Risk signals computed without any model: project and milestone deadlines,
  * stale or unowned issues and missing updates. Closed projects have none.
  */
-export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] {
+export function computeSignals(
+  facts: ProjectFacts,
+  now: Date,
+): ProjectSignal[] {
   if (CLOSED_PROJECT.has(facts.project.status)) return [];
   const out: RawSignal[] = [];
   const nowMs = now.getTime();
-  const daysUntil = (iso: string) => Math.ceil((new Date(iso).getTime() - nowMs) / DAY);
+  const daysUntil = (iso: string) =>
+    Math.ceil((new Date(iso).getTime() - nowMs) / DAY);
   const issues = facts.issues;
   const countable = issues.filter((i) => i.status !== 'canceled');
   const open = countable.filter((i) => !isClosedIssue(i));
@@ -142,7 +137,9 @@ export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] 
   const target = facts.project.targetDate;
   if (target) {
     const left = daysUntil(target);
-    const doneShare = countable.length ? (countable.length - open.length) / countable.length : 0;
+    const doneShare = countable.length
+      ? (countable.length - open.length) / countable.length
+      : 0;
     if (left < 0) {
       out.push({
         severity: 'high',
@@ -179,43 +176,12 @@ export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] 
     }
   }
 
-  for (const w of facts.workstreams) {
-    if (CLOSED_WORKSTREAM.has(w.status)) continue;
-    const label = `${w.key} ${clip(w.title, 80)}`;
-    if (w.status === 'blocked') {
-      out.push({
-        severity: 'high',
-        title: `Workstream ${w.key} is blocked`,
-        detail: `${label} is blocked.`,
-        workstreamId: w.id,
-      });
-    }
-    if (w.openInputRequests > 0 && w.oldestInputRequestAt) {
-      const waited = -daysUntil(w.oldestInputRequestAt);
-      if (waited >= 7) {
-        out.push({
-          severity: waited >= 14 ? 'high' : 'medium',
-          title: `Workstream ${w.key} waits for input`,
-          detail: `${label} has ${w.openInputRequests} unanswered input request${w.openInputRequests === 1 ? '' : 's'}, the oldest open for ${dayWord(waited)}.`,
-          workstreamId: w.id,
-        });
-      }
-    }
-    if (w.targetDate) {
-      const left = daysUntil(w.targetDate);
-      if (left < 0) {
-        out.push({
-          severity: left < -7 ? 'high' : 'medium',
-          title: `Workstream ${w.key} is past its target date`,
-          detail: `${label} was due ${day(w.targetDate)} (${dayWord(-left)} ago) and is ${w.status.replace('_', ' ')}.`,
-          workstreamId: w.id,
-        });
-      }
-    }
-  }
-
   const stale = issues
-    .filter((i) => i.status === 'in_progress' && nowMs - new Date(i.updatedAt).getTime() > 14 * DAY)
+    .filter(
+      (i) =>
+        i.status === 'in_progress' &&
+        nowMs - new Date(i.updatedAt).getTime() > 14 * DAY,
+    )
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt))
     .slice(0, 3);
   for (const i of stale) {
@@ -228,8 +194,15 @@ export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] 
     });
   }
   const unowned = open
-    .filter((i) => !i.assigneeId && (i.priority === 'urgent' || i.priority === 'high') && i.status !== 'draft')
-    .sort((a, b) => (a.priority === b.priority ? 0 : a.priority === 'urgent' ? -1 : 1))
+    .filter(
+      (i) =>
+        !i.assigneeId &&
+        (i.priority === 'urgent' || i.priority === 'high') &&
+        i.status !== 'draft',
+    )
+    .sort((a, b) =>
+      a.priority === b.priority ? 0 : a.priority === 'urgent' ? -1 : 1,
+    )
     .slice(0, 3);
   for (const i of unowned) {
     out.push({
@@ -241,7 +214,8 @@ export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] 
   }
 
   if (facts.project.status === 'in_progress') {
-    const last = facts.project.lastUpdateAt ?? facts.updates[0]?.createdAt ?? null;
+    const last =
+      facts.project.lastUpdateAt ?? facts.updates[0]?.createdAt ?? null;
     if (last) {
       const age = Math.floor((nowMs - new Date(last).getTime()) / DAY);
       if (age > 14) {
@@ -262,7 +236,11 @@ export function computeSignals(facts: ProjectFacts, now: Date): ProjectSignal[] 
 
   return out
     .map((s, index) => ({ s, index }))
-    .sort((a, b) => SEVERITY_RANK[a.s.severity] - SEVERITY_RANK[b.s.severity] || a.index - b.index)
+    .sort(
+      (a, b) =>
+        SEVERITY_RANK[a.s.severity] - SEVERITY_RANK[b.s.severity] ||
+        a.index - b.index,
+    )
     .slice(0, MAX_SIGNALS)
     .map(({ s }, index) => ({ ref: `S${index + 1}`, ...s }));
 }
@@ -276,7 +254,9 @@ export function deriveHealth(signals: readonly ProjectSignal[]): ProjectHealth {
   return 'on_track';
 }
 
-export function signalsToRisks(signals: readonly ProjectSignal[]): ProjectAiRisk[] {
+export function signalsToRisks(
+  signals: readonly ProjectSignal[],
+): ProjectAiRisk[] {
   return signals.map(({ ref: _ref, ...risk }) => risk);
 }
 
@@ -291,7 +271,7 @@ const SCHEMAS: Record<ProjectAiKind, string> = {
   summary:
     'Propose a summary and a description for the project from its real content. Return {"summary": string, "description": string}. "summary" is one plain line of at most 200 characters. "description" is Markdown of at most 2500 characters: goal, scope and current state. When the facts are too thin, stay close to the current summary and description instead of guessing.',
   issues:
-    'From "candidates" (open issues that are not in the project), choose up to 10 that clearly belong to the project given its name, description, workstreams and issues. Return {"suggestions": [{"issueId": the candidate "id", "reason": one short sentence naming the evidence}]}. Use only ids from "candidates"; return an empty array when none fits.',
+    'From "candidates" (open issues that are not in the project), choose up to 10 that clearly belong to the project given its name, description and issues. Return {"suggestions": [{"issueId": the candidate "id", "reason": one short sentence naming the evidence}]}. Use only ids from "candidates"; return an empty array when none fits.',
   risks:
     'Explain the risks. "signals" were computed from the data and are the only risks: do not add, remove or rate them. For each signal write a clearer title (at most 100 characters) and a detail of one or two sentences that cites the relevant records. Return {"risks": [{"ref": the signal "ref", "title": string, "detail": string}]}.',
 };
@@ -305,7 +285,6 @@ interface PromptCaps {
   candidates: number;
   events: number;
   updates: number;
-  workstreams: number;
   decisions: number;
   inputRequests: number;
   text: number;
@@ -316,13 +295,18 @@ const FULL_CAPS: PromptCaps = {
   candidates: 60,
   events: 15,
   updates: 3,
-  workstreams: 30,
   decisions: 8,
   inputRequests: 10,
   text: 4000,
 };
 
-const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3, none: 4 };
+const PRIORITY_RANK: Record<string, number> = {
+  urgent: 0,
+  high: 1,
+  medium: 2,
+  low: 3,
+  none: 4,
+};
 
 function promptIssue(i: FactsIssue) {
   return {
@@ -339,8 +323,13 @@ function promptIssue(i: FactsIssue) {
 function buildFacts(facts: ProjectFacts, caps: PromptCaps) {
   const open = facts.issues
     .filter((i) => !isClosedIssue(i))
-    .sort((a, b) => (PRIORITY_RANK[a.priority] ?? 4) - (PRIORITY_RANK[b.priority] ?? 4));
-  const closed = facts.issues.filter(isClosedIssue).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    .sort(
+      (a, b) =>
+        (PRIORITY_RANK[a.priority] ?? 4) - (PRIORITY_RANK[b.priority] ?? 4),
+    );
+  const closed = facts.issues
+    .filter(isClosedIssue)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
   const shown = [...open, ...closed].slice(0, caps.issues);
   return {
     now: day(new Date().toISOString()),
@@ -351,21 +340,13 @@ function buildFacts(facts: ProjectFacts, caps: PromptCaps) {
       createdAt: day(facts.project.createdAt),
       startDate: facts.project.startDate && day(facts.project.startDate),
       targetDate: facts.project.targetDate && day(facts.project.targetDate),
-      lastUpdateAt: facts.project.lastUpdateAt && day(facts.project.lastUpdateAt),
+      lastUpdateAt:
+        facts.project.lastUpdateAt && day(facts.project.lastUpdateAt),
     },
     milestones: facts.milestones.map((m) => ({
       name: clip(m.name, 120),
       targetDate: m.targetDate && day(m.targetDate),
       ...milestoneProgress(m.id, facts.issues),
-    })),
-    workstreams: facts.workstreams.slice(0, caps.workstreams).map((w) => ({
-      id: w.id,
-      key: w.key,
-      title: clip(w.title, 160),
-      status: w.status,
-      objective: clip(w.objective, Math.min(300, caps.text)),
-      targetDate: w.targetDate && day(w.targetDate),
-      openInputRequests: w.openInputRequests,
     })),
     issueCounts: countByStatus(facts.issues),
     issues: shown.map(promptIssue),
@@ -380,11 +361,13 @@ function buildFacts(facts: ProjectFacts, caps: PromptCaps) {
       status: d.status,
       at: day(d.at),
     })),
-    openInputRequests: facts.inputRequests.slice(0, caps.inputRequests).map((r) => ({
-      workstream: r.workstreamKey,
-      question: clip(r.question, 240),
-      since: day(r.createdAt),
-    })),
+    openInputRequests: facts.inputRequests
+      .slice(0, caps.inputRequests)
+      .map((r) => ({
+        issue: r.issueKey,
+        question: clip(r.question, 240),
+        since: day(r.createdAt),
+      })),
     recentEvents: facts.events.slice(0, caps.events).map((e) => ({
       at: day(e.at),
       type: e.type,
@@ -407,9 +390,12 @@ export function factsJson(
   for (let attempt = 0; ; attempt++) {
     const extras = { ...extra };
     if (facts.candidates.length)
-      extras['candidates'] = facts.candidates.slice(0, caps.candidates).map(promptIssue);
+      extras['candidates'] = facts.candidates
+        .slice(0, caps.candidates)
+        .map(promptIssue);
     const text = JSON.stringify({ ...buildFacts(facts, caps), ...extras });
-    if (text.length <= limit || attempt >= 10) return text.length <= limit ? text : text.slice(0, limit);
+    if (text.length <= limit || attempt >= 10)
+      return text.length <= limit ? text : text.slice(0, limit);
     for (const key of keys) caps[key] = Math.floor(caps[key] / 2);
   }
 }
@@ -418,8 +404,14 @@ export function factsJson(
 
 /** Parses the model reply as one JSON object, tolerating code fences and prose around it. */
 export function parseModelObject(text: string): Record<string, unknown> | null {
-  const trimmed = text.replace(/^```(?:json)?\s*\n?/i, '').replace(/\n?```\s*$/, '').trim();
-  for (const candidate of [trimmed, trimmed.slice(trimmed.indexOf('{'), trimmed.lastIndexOf('}') + 1)]) {
+  const trimmed = text
+    .replace(/^```(?:json)?\s*\n?/i, '')
+    .replace(/\n?```\s*$/, '')
+    .trim();
+  for (const candidate of [
+    trimmed,
+    trimmed.slice(trimmed.indexOf('{'), trimmed.lastIndexOf('}') + 1),
+  ]) {
     if (!candidate) continue;
     try {
       const parsed = record(JSON.parse(candidate));
@@ -432,13 +424,18 @@ export function parseModelObject(text: string): Record<string, unknown> | null {
 }
 
 function invalid(): never {
-  throw new BadGatewayException('The AI did not return a valid suggestion. Try again.');
+  throw new BadGatewayException(
+    'The AI did not return a valid suggestion. Try again.',
+  );
 }
 
 const isHealth = (value: unknown): value is ProjectHealth =>
   typeof value === 'string' && (PROJECT_HEALTHS as string[]).includes(value);
 
-export function parseUpdateDraft(text: string, fallback: ProjectHealth): ProjectAiUpdateDraft {
+export function parseUpdateDraft(
+  text: string,
+  fallback: ProjectHealth,
+): ProjectAiUpdateDraft {
   const raw = parseModelObject(text);
   const body = raw?.['body'];
   if (!raw || typeof body !== 'string' || !body.trim()) return invalid();
@@ -453,10 +450,15 @@ export function parseSummary(text: string): ProjectAiSummary {
   const raw = parseModelObject(text);
   const summary = raw?.['summary'];
   const description = raw?.['description'];
-  if (!raw || typeof summary !== 'string' || typeof description !== 'string') return invalid();
+  if (!raw || typeof summary !== 'string' || typeof description !== 'string')
+    return invalid();
   const line = summary.replace(/\s+/g, ' ').trim().slice(0, 300);
   if (!line) return invalid();
-  return { kind: 'summary', summary: line, description: description.trim().slice(0, 12_000) };
+  return {
+    kind: 'summary',
+    summary: line,
+    description: description.trim().slice(0, 12_000),
+  };
 }
 
 /** `allowed` maps every acceptable id or key (lower-cased) to the real issue id; anything else is dropped. */
@@ -473,11 +475,15 @@ export function parseIssueSuggestions(
     const item = record(entry);
     const ref = item?.['issueId'] ?? item?.['id'] ?? item?.['key'];
     const reason = item?.['reason'];
-    if (typeof ref !== 'string' || typeof reason !== 'string' || !reason.trim()) continue;
+    if (typeof ref !== 'string' || typeof reason !== 'string' || !reason.trim())
+      continue;
     const issueId = allowed.get(ref.trim().toLowerCase());
     if (!issueId || seen.has(issueId)) continue;
     seen.add(issueId);
-    suggestions.push({ issueId, reason: reason.replace(/\s+/g, ' ').trim().slice(0, 300) });
+    suggestions.push({
+      issueId,
+      reason: reason.replace(/\s+/g, ' ').trim().slice(0, 300),
+    });
     if (suggestions.length >= MAX_ISSUE_SUGGESTIONS) break;
   }
   return { kind: 'issues', suggestions };
@@ -487,7 +493,10 @@ export function parseIssueSuggestions(
  * Merges the model's wording into the deterministic signals. Severity and record links always come
  * from the signal; unknown refs are ignored and signals the model skipped keep their own text.
  */
-export function mergeRiskTexts(text: string, signals: readonly ProjectSignal[]): ProjectAiRisk[] {
+export function mergeRiskTexts(
+  text: string,
+  signals: readonly ProjectSignal[],
+): ProjectAiRisk[] {
   const raw = parseModelObject(text);
   const list = raw?.['risks'];
   if (!raw || !Array.isArray(list)) return invalid();
@@ -497,7 +506,12 @@ export function mergeRiskTexts(text: string, signals: readonly ProjectSignal[]):
     const ref = item?.['ref'];
     const title = item?.['title'];
     const detail = item?.['detail'];
-    if (typeof ref !== 'string' || typeof title !== 'string' || typeof detail !== 'string') continue;
+    if (
+      typeof ref !== 'string' ||
+      typeof title !== 'string' ||
+      typeof detail !== 'string'
+    )
+      continue;
     if (!title.trim() || !detail.trim() || texts.has(ref.trim())) continue;
     texts.set(ref.trim(), {
       title: title.replace(/\s+/g, ' ').trim().slice(0, 140),
@@ -507,6 +521,9 @@ export function mergeRiskTexts(text: string, signals: readonly ProjectSignal[]):
   return signals.map(({ ref, ...risk }) => ({ ...risk, ...texts.get(ref) }));
 }
 
-export function risksResult(health: ProjectHealth, risks: ProjectAiRisk[]): ProjectAiRisks {
+export function risksResult(
+  health: ProjectHealth,
+  risks: ProjectAiRisk[],
+): ProjectAiRisks {
   return { kind: 'risks', health, risks };
 }
