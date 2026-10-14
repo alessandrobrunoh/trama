@@ -20,7 +20,7 @@ pub fn command() -> Command {
     Command::new("watch")
         .about("Stream live workspace events as JSON lines")
         .long_about("Streams LiveEvents (created, updated, deleted, attention) as they happen, one JSON object per line. Each is a pointer (entity + id); read the object with the matching `get` command.")
-        .arg(Arg::new("entity").long("entity").value_name("ENTITY").help("Only events of this entity, e.g. issue, workstream, decision"))
+        .arg(Arg::new("entity").long("entity").value_name("ENTITY").help("Only events of this entity, e.g. issue or decision"))
         .arg(Arg::new("kind").long("type").value_name("TYPE").value_parser(["created", "updated", "deleted", "attention"]).help("Only this event type"))
         .arg(Arg::new("count").long("count").value_name("N").value_parser(value_parser!(u64).range(1..)).help("Exit after N matching events"))
         .arg(Arg::new("for").long("for").value_name("SECONDS").value_parser(value_parser!(u64).range(1..)).help("Exit after this many seconds"))

@@ -434,12 +434,12 @@ mod tests {
     }
 
     #[test]
-    fn artifacts_attach_to_a_project_issue_or_workstream() {
+    fn artifacts_attach_to_a_project_or_issue() {
         let t = tool("create_artifact");
         let s = t.input_schema();
         assert_eq!(s["required"], json!(["kind", "title"]));
         assert!(s["properties"]["kind"]["enum"].as_array().unwrap().contains(&json!("link")));
-        for owner in ["projectId", "issueId", "workstreamId"] {
+        for owner in ["projectId", "issueId"] {
             assert!(s["properties"][owner].is_object(), "{owner}");
         }
         let call = t.build_call(&json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })).unwrap();
@@ -450,6 +450,23 @@ mod tests {
         assert_eq!(call.path, "/issues/BUG-1/artifacts");
         assert_eq!(tool("list_issue_artifacts").permission, "artifacts:read");
         assert_eq!(tool("list_project_artifacts").permission, "artifacts:read");
+    }
+
+    #[test]
+    fn catalog_contains_only_issue_first_routes() {
+        let tools = load().unwrap();
+        let raw = TOOLS_JSON.to_ascii_lowercase();
+        for retired_term in ["workstream", "criterion", "dependency", "graph"] {
+            assert!(!raw.contains(retired_term), "raw catalog still contains {retired_term}");
+        }
+        assert!(!tools.iter().any(|tool| tool.path.starts_with("/workstreams") || tool.path.starts_with("/dependencies")));
+        assert!(!tools.iter().any(|tool| matches!(tool.name.as_str(), "link_issue" | "add_criterion" | "update_criterion" | "remove_criterion")));
+        let context = tools.iter().find(|tool| tool.name == "get_issue_context").unwrap();
+        assert_eq!(context.path, "/issues/{idOrKey}/context");
+        let requests = tools.iter().find(|tool| tool.name == "list_input_requests").unwrap();
+        assert!(requests.params.iter().any(|param| param.name == "issueId"));
+        let decisions = tools.iter().find(|tool| tool.name == "create_decision").unwrap();
+        assert!(decisions.params.iter().any(|param| param.name == "originIssueId"));
     }
 
     #[test]

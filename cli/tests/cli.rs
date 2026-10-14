@@ -568,22 +568,22 @@ fn refuses_plain_http_to_remote_hosts_and_unknown_key_formats() {
 }
 
 #[test]
-fn workstream_context_is_markdown_by_default_and_json_on_request() {
+fn issue_context_is_markdown_by_default_and_json_on_request() {
     let md = Route {
         method: "GET",
-        path: "/api/w/acme/workstreams/AUTH-42/context",
+        path: "/api/w/acme/issues/BUG-42/context",
         status: 200,
         content_type: "text/markdown; charset=utf-8",
-        body: "# AUTH-42\n\nBriefing\n".into(),
+        body: "# BUG-42\n\nBriefing\n".into(),
         headers: vec![],
     };
     let mock = Mock::start(vec![md]);
     let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["workstream", "context", "AUTH-42"]);
+    let o = run.run(&["issue", "context", "BUG-42"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(stdout(&o), "# AUTH-42\n\nBriefing\n");
+    assert_eq!(stdout(&o), "# BUG-42\n\nBriefing\n");
     assert!(mock.last().headers["accept"].starts_with("text/markdown"));
-    run.run(&["workstream", "context", "AUTH-42", "-o", "json"]);
+    run.run(&["issue", "context", "BUG-42", "-o", "json"]);
     assert_eq!(mock.last().headers["accept"], "application/json");
 }
 

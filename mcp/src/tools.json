@@ -47,7 +47,7 @@
   "method": "POST",
   "path": "/labels/{id}/merge",
   "permission": "workspace:write",
-  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories, workstreams, saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
+  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories and saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
   "params": {
    "id": "path string! Label id to merge away",
    "into": "body string! Label id that takes over"
@@ -58,7 +58,7 @@
   "method": "DELETE",
   "path": "/labels/{id}",
   "permission": "workspace:delete",
-  "description": "Delete a custom workspace label and remove it from issues, projects, repositories and workstreams (admin). Templates cannot be deleted.",
+  "description": "Delete a custom workspace label and remove it from issues, projects and repositories (admin). Templates cannot be deleted.",
   "params": {
    "id": "path string! Label id"
   }
@@ -68,7 +68,7 @@
   "method": "GET",
   "path": "/snapshot",
   "permission": "snapshot:read",
-  "description": "Everything in the workspace in one (large) payload: users, teams, workstreams, issues, decisions, artifacts, events, attention, views. Prefer targeted list_* tools; only usable by user-acting tokens.",
+  "description": "Everything in the workspace in one (large) payload: users, teams, issues, decisions, artifacts, events, attention and views. Prefer targeted list_* tools; only usable by user-acting tokens.",
   "params": {}
  },
  {
@@ -76,10 +76,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across workstreams, projects, issues, decisions, artifacts, documents (titles), repositories and teams.",
+  "description": "Full-text search across projects, issues, decisions, artifacts, documents (titles), repositories and teams.",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: workstream,project,issue,customer,decision,artifact,document,repository,team",
+   "types": "query string Comma-separated: project,issue,customer,decision,artifact,document,repository,team",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -90,25 +90,10 @@
   "permission": "events:read",
   "description": "Activity log of every change, newest first.",
   "params": {
-   "workstreamId": "query string Only events of this workstream",
    "subject": "query string '<type>:<id>', e.g. issue:iss_abc",
    "type": "query string Event type or prefix, e.g. 'issue.'",
    "before": "query string ISO timestamp: only older events",
    "limit": "query integer 1-500 (default 100)"
-  }
- },
- {
-  "name": "get_graph",
-  "method": "GET",
-  "path": "/graph",
-  "permission": "graph:read",
-  "description": "Dependency/ownership graph of workstreams, artifacts, actors and repositories.",
-  "params": {
-   "teamId": "query string Restrict to a team",
-   "workstreamId": "query string Restrict to a workstream",
-   "includeArtifacts": "query boolean Default true",
-   "includeActors": "query boolean Default true",
-   "includeRepositories": "query boolean Default true"
   }
  },
  {
@@ -325,7 +310,7 @@
   "method": "DELETE",
   "path": "/teams/{idOrKey}",
   "permission": "teams:delete",
-  "description": "Delete a team (409 while it owns workstreams).",
+  "description": "Delete a team.",
   "params": {
    "idOrKey": "path string! Team id or key (e.g. AUTH)"
   }
@@ -388,156 +373,11 @@
   }
  },
  {
-  "name": "list_workstreams",
-  "method": "GET",
-  "path": "/workstreams",
-  "permission": "workstreams:read",
-  "description": "List workstreams (the units of work an AI/human team ships).",
-  "params": {
-   "status": "query string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Status",
-   "ownerTeamId": "query string Owner team",
-   "teamId": "query string Owner or participating team",
-   "accountableUserId": "query string Accountable user",
-   "priority": "query string(none|urgent|high|medium|low) Priority",
-   "projectId": "query string Project",
-   "repositoryId": "query string Repository",
-   "label": "query string Label",
-   "q": "query string Text filter"
-  }
- },
- {
-  "name": "get_workstream",
-  "method": "GET",
-  "path": "/workstreams/{idOrKey}",
-  "permission": "workstreams:read",
-  "description": "One workstream with criteria, status and completion ({achieved, gaps[]}: why the outcome is not done yet). statusSource says where the status comes from: derived (the facts), override (pinned by hand; derivedStatus is what the facts say) or legacy (a historic shipped with no criteria). Neither a pin nor a legacy shipped is proof of the outcome.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
-  }
- },
- {
-  "name": "get_workstream_context",
-  "method": "GET",
-  "path": "/workstreams/{idOrKey}/context",
-  "permission": "workstreams:read",
-  "description": "Markdown briefing for a workstream: outcome status and what is still missing (completion gaps), objective, criteria, decisions, dependencies, artifacts, open questions, recent progress.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
-  }
- },
- {
-  "name": "get_workstream_graph",
-  "method": "GET",
-  "path": "/workstreams/{idOrKey}/graph",
-  "permission": "workstreams:read",
-  "description": "Graph around one workstream.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
-  }
- },
- {
-  "name": "create_workstream",
-  "method": "POST",
-  "path": "/workstreams",
-  "permission": "workstreams:write",
-  "description": "Create a workstream. Key = <ownerTeamKey>-<n>.",
-  "params": {
-   "title": "body string! Title",
-   "ownerTeamId": "body string! Owner team id",
-   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream). Optional: a workstream can exist before its thread; omit it rather than invent one. A supplied URL is validated",
-   "description": "body string Description",
-   "objective": "body string Objective",
-   "context": "body string Context",
-   "participatingTeamIds": "body string[] Participating team ids",
-   "accountableUserId": "body string Accountable user id",
-   "projectId": "body string Project id. The workstream then works in the project's repositories (inherited when repositoryIds is omitted)",
-   "repositoryIds": "body string[] Repository ids",
-   "priority": "body string(none|urgent|high|medium|low) Priority",
-   "labels": "body string[] Workspace label ids",
-   "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
-   "startDate": "body string ISO date",
-   "targetDate": "body string ISO date",
-   "acceptanceCriteria": "body object[] [{text, state?: pending|in_progress|met}]"
-  }
- },
- {
-  "name": "update_workstream",
-  "method": "PATCH",
-  "path": "/workstreams/{idOrKey}",
-  "permission": "workstreams:write",
-  "description": "Partially update a workstream; null clears optional fields.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
-   "title": "body string Title",
-   "ownerTeamId": "body string Owner team id",
-   "deltaThreadUrl": "body string https URL on delta.dev (the Delta thread carrying this workstream)",
-   "description": "body string Description",
-   "objective": "body string Objective",
-   "context": "body string Context",
-   "participatingTeamIds": "body string[] Participating team ids",
-   "accountableUserId": "body string Accountable user id",
-   "projectId": "body string Project id (null detaches). repositoryIds must be a subset of the project's",
-   "repositoryIds": "body string[] Repository ids",
-   "priority": "body string(none|urgent|high|medium|low) Priority",
-   "labels": "body string[] Workspace label ids",
-   "statusOverride": "body string(draft|planned|working|needs_input|in_review|blocked|ready_to_land|shipped|canceled) Manual status (null clears)",
-   "startDate": "body string ISO date",
-   "targetDate": "body string ISO date"
-  }
- },
- {
-  "name": "delete_workstream",
-  "method": "DELETE",
-  "path": "/workstreams/{idOrKey}",
-  "permission": "workstreams:delete",
-  "description": "Delete a workstream and everything attached to it.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)"
-  }
- },
- {
-  "name": "add_criterion",
-  "method": "POST",
-  "path": "/workstreams/{idOrKey}/criteria",
-  "permission": "workstreams:write",
-  "description": "Add an acceptance criterion.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
-   "text": "body string! Criterion",
-   "state": "body string(pending|in_progress|met) State"
-  }
- },
- {
-  "name": "update_criterion",
-  "method": "PATCH",
-  "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
-  "permission": "workstreams:write",
-  "description": "Update an acceptance criterion: text, state, and the evidence that proves it.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
-   "criterionId": "path string! Criterion id",
-   "text": "body string Text (editing a met criterion resets it to pending)",
-   "state": "body string(pending|in_progress|met) State (met records who verified it; a person or an agent)",
-   "evidence": "body object {artifactIds?: [artifact ids of this workstream], note?: string} Proof for the criterion (null clears). Does not change state"
-  }
- },
- {
-  "name": "remove_criterion",
-  "method": "DELETE",
-  "path": "/workstreams/{idOrKey}/criteria/{criterionId}",
-  "permission": "workstreams:delete",
-  "description": "Remove an acceptance criterion.",
-  "params": {
-   "idOrKey": "path string! Workstream id or key (e.g. AUTH-42)",
-   "criterionId": "path string! Criterion id"
-  }
- },
- {
   "name": "list_projects",
   "method": "GET",
   "path": "/projects",
   "permission": "projects:read",
-  "description": "Projects: planned outcomes (Linear-style) that workstreams carry out. Each project carries customerCount (distinct customers who asked for it).",
+  "description": "Projects: planned outcomes. Each project carries customerCount (distinct customers who asked for it).",
   "params": {
    "status": "query string(backlog|planned|in_progress|paused|completed|canceled) Status",
    "teamId": "query string Team",
@@ -567,7 +407,7 @@
   "method": "POST",
   "path": "/projects",
   "permission": "projects:write",
-  "description": "Create a project (a planned outcome). Workstreams carry it out; milestones belong to it.",
+  "description": "Create a project (a planned outcome). Milestones belong to it.",
   "params": {
    "name": "body string! Name",
    "summary": "body string One-line summary",
@@ -588,7 +428,7 @@
   "method": "PATCH",
   "path": "/projects/{id}",
   "permission": "projects:write",
-  "description": "Partially update a project; null clears optional fields. Removing a repository also removes it from the project's workstreams.",
+  "description": "Partially update a project; null clears optional fields.",
   "params": {
    "id": "path string! Project id",
    "name": "body string Name",
@@ -611,7 +451,7 @@
   "method": "DELETE",
   "path": "/projects/{id}",
   "permission": "projects:delete",
-  "description": "Delete a project and its milestones. Its workstreams are kept, detached.",
+  "description": "Delete a project and its milestones.",
   "params": {
    "id": "path string! Project id"
   }
@@ -621,7 +461,7 @@
   "method": "GET",
   "path": "/projects/{id}/context.md",
   "permission": "projects:read",
-  "description": "Markdown briefing for a whole project (mega context): overview, latest updates, milestones, workstreams, issues, artifacts, decisions, open questions. Read it before working on a project.",
+  "description": "Markdown briefing for a whole project: overview, latest updates, milestones, issues, artifacts, decisions and open questions. Read it before working on a project.",
   "params": {
    "id": "path string! Project id"
   }
@@ -692,7 +532,6 @@
   "params": {
    "q": "query string Search text (title and body)",
    "projectId": "query string Only documents attached to this project",
-   "workstreamId": "query string Only documents attached to this workstream (id or key)",
    "issueId": "query string Only documents attached to this issue (id or key)",
    "attached": "query boolean true = attached somewhere, false = loose documents",
    "archived": "query string(false|only|all) Archived documents: false (default) hides them, only shows just them",
@@ -718,13 +557,12 @@
   "method": "POST",
   "path": "/documents",
   "permission": "documents:write",
-  "description": "Create a Markdown document (specs, plans, notes that are not in a repository). Give projectId, workstreamId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate what already lives in a repository or an issue.",
+  "description": "Create a Markdown document (specs, plans, notes that are not in a repository). Give projectId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate what already lives in a repository or an issue.",
   "params": {
    "title": "body string! Title (max 200 characters)",
    "body": "body string Markdown body (max 150000 characters)",
    "icon": "body string One emoji",
    "projectId": "body string Attach to this project",
-   "workstreamId": "body string Attach to this workstream (id or key)",
    "issueId": "body string Attach to this issue (id or key)"
   }
  },
@@ -810,11 +648,10 @@
   "method": "POST",
   "path": "/documents/{id}/attach",
   "permission": "artifacts:write",
-  "description": "Attach a document to exactly one project, workstream or issue (it then appears in their artifacts as a document artifact). Idempotent.",
+  "description": "Attach a document to exactly one project or issue (it then appears in their artifacts as a document artifact). Idempotent.",
   "params": {
    "id": "path string! Document id (doc_…)",
    "projectId": "body string Project id",
-   "workstreamId": "body string Workstream id or key",
    "issueId": "body string Issue id or key"
   }
  },
@@ -834,7 +671,7 @@
   "method": "GET",
   "path": "/projects/{id}/artifacts",
   "permission": "artifacts:read",
-  "description": "Artifacts attached to the project itself, plus those of its workstreams and issues.",
+  "description": "Artifacts attached to the project itself and its issues.",
   "params": {
    "id": "path string! Project id"
   }
@@ -916,7 +753,7 @@
   "description": "Questions agents/people asked humans.",
   "params": {
    "state": "query string(open|answered|dismissed) State",
-   "workstreamId": "query string Workstream",
+   "issueId": "query string Issue",
    "assigneeUserId": "query string Assignee"
   }
  },
@@ -935,10 +772,10 @@
   "method": "POST",
   "path": "/input-requests",
   "permission": "input-requests:write",
-  "description": "Ask a human a question on a workstream.",
+  "description": "Create a human input request, optionally linked to an issue.",
   "params": {
    "question": "body string! Question",
-   "workstreamId": "body string! Workstream id",
+   "issueId": "body string Issue id",
    "options": "body string[] Suggested answers",
    "assigneeUserId": "body string Who should answer"
   }
@@ -992,7 +829,7 @@
   "method": "GET",
   "path": "/issues",
   "permission": "issues:read",
-  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security). Sort out demand with customerId, minCustomers, minRequests, tierId, minRevenue and important.",
+  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security). Filter by team, assignee, project, milestone, customer demand or text.",
   "params": {
    "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
@@ -1002,7 +839,6 @@
    "teamId": "query string Team",
    "assigneeId": "query string Assignee",
    "projectId": "query string Project",
-   "workstreamId": "query string Workstream",
    "milestoneId": "query string Milestone",
    "customerId": "query string Only issues linked to this customer",
    "minCustomers": "query integer At least this many distinct linked customers",
@@ -1024,6 +860,16 @@
   }
  },
  {
+  "name": "get_issue_context",
+  "method": "GET",
+  "path": "/issues/{idOrKey}/context",
+  "permission": "issues:read",
+  "description": "Full context for an issue, returned as JSON or markdown according to the requested representation.",
+  "params": {
+   "idOrKey": "path string! Issue id or key"
+  }
+ },
+ {
   "name": "create_issue",
   "method": "POST",
   "path": "/issues",
@@ -1041,6 +887,7 @@
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security)! Kind",
+   "goal": "body string Issue outcome or desired result",
    "source": "body string(manual|github|gitlab|email|api|agent) Source",
    "labels": "body string[] Workspace label ids"
   }
@@ -1064,23 +911,8 @@
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Kind (re-keys the issue)",
-   "workstreamIds": "body string[] Linked workstream ids",
-   "milestoneIds": "body string[] Milestone ids (max one per project; from the issue's project or its workstreams' projects)",
    "duplicateOfId": "body string Id or key of the original (null clears)",
    "labels": "body string[] Workspace label ids"
-  }
- },
- {
-  "name": "link_issue",
-  "method": "POST",
-  "path": "/issues/{idOrKey}/link",
-  "permission": "issues:write",
-  "description": "Attach an issue to existing workstreams and/or a new one created atomically. Linking is organizational and does not change the issue status; pass status only to change it deliberately (moving to in_progress is a separate action).",
-  "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
-   "workstreamIds": "body string[] Existing workstream ids",
-   "createWorkstream": "body object New workstream {title, ownerTeamId, deltaThreadUrl?, objective?, ...}",
-   "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Optional explicit status. Omit to keep the current one"
   }
  },
  {
@@ -1098,10 +930,10 @@
   "method": "POST",
   "path": "/issues/bulk",
   "permission": "issues:write",
-  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels and workstreams are added/removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
+  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels are added or removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
   "params": {
    "ids": "body string[]! Issue ids or keys (1-100)",
-   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?, addWorkstreamIds?, removeWorkstreamIds?}"
+   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?}"
   }
  },
  {
@@ -1360,9 +1192,8 @@
   "method": "GET",
   "path": "/artifacts",
   "permission": "artifacts:read",
-  "description": "PRs, docs, builds, deployments, links etc. attached to workstreams, issues and projects.",
+  "description": "PRs, docs, builds, deployments, links etc. attached to issues and projects.",
   "params": {
-   "workstreamId": "query string Workstream",
    "repositoryId": "query string Repository",
    "kind": "query string Kind",
    "state": "query string State"
@@ -1383,11 +1214,10 @@
   "method": "POST",
   "path": "/artifacts",
   "permission": "artifacts:write",
-  "description": "Attach an artifact (PR, build, document, link…) to a project, an issue and/or a workstream. At least one of projectId, issueId, workstreamId is required.",
+  "description": "Attach an artifact (PR, build, document, link…) to a project or issue. At least one of projectId or issueId is required.",
   "params": {
    "projectId": "body string Project id",
    "issueId": "body string Issue id",
-   "workstreamId": "body string Workstream id",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release)! Kind",
    "title": "body string! Title",
    "description": "body string Why it is attached / what it is (markdown)",
@@ -1410,7 +1240,6 @@
   "description": "Update an artifact.",
   "params": {
    "id": "path string! Artifact id",
-   "workstreamId": "body string Workstream id",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release) Kind",
    "title": "body string Title",
    "repositoryId": "body string Repository id",
@@ -1452,7 +1281,7 @@
   "description": "Architecture/product decisions (ADR-n).",
   "params": {
    "status": "query string(draft|proposed|accepted|superseded|rejected) Status",
-   "workstreamId": "query string Workstream",
+   "issueId": "query string Issue",
    "tag": "query string Tag",
    "q": "query string Text"
   }
@@ -1477,8 +1306,8 @@
    "title": "body string! Title",
    "statement": "body string! Decision statement",
    "rationale": "body string Rationale",
-   "originWorkstreamId": "body string Origin workstream",
-   "relatedWorkstreamIds": "body string[] Related workstreams",
+   "originIssueId": "body string! Origin issue",
+   "relatedIssueIds": "body string[] Related issues",
    "tags": "body string[] Tags",
    "status": "body string(draft|proposed) Initial status"
   }
@@ -1494,8 +1323,8 @@
    "title": "body string Title",
    "statement": "body string Decision statement",
    "rationale": "body string Rationale",
-   "originWorkstreamId": "body string Origin workstream",
-   "relatedWorkstreamIds": "body string[] Related workstreams",
+   "originIssueId": "body string! Origin issue",
+   "relatedIssueIds": "body string[] Related issues",
    "tags": "body string[] Tags"
   }
  },
@@ -1541,57 +1370,13 @@
   }
  },
  {
-  "name": "list_dependencies",
-  "method": "GET",
-  "path": "/dependencies",
-  "permission": "dependencies:read",
-  "description": "Blocking relations between workstreams.",
-  "params": {
-   "fromId": "query string Blocker",
-   "toId": "query string Blocked"
-  }
- },
- {
-  "name": "get_dependency",
-  "method": "GET",
-  "path": "/dependencies/{id}",
-  "permission": "dependencies:read",
-  "description": "One dependency.",
-  "params": {
-   "id": "path string! Dependency id"
-  }
- },
- {
-  "name": "create_dependency",
-  "method": "POST",
-  "path": "/dependencies",
-  "permission": "dependencies:write",
-  "description": "'from' blocks 'to'. Cycles are rejected.",
-  "params": {
-   "fromType": "body string!(workstream) From type",
-   "fromId": "body string! From id",
-   "toType": "body string!(workstream) To type",
-   "toId": "body string! To id"
-  }
- },
- {
-  "name": "delete_dependency",
-  "method": "DELETE",
-  "path": "/dependencies/{id}",
-  "permission": "dependencies:delete",
-  "description": "Remove a dependency.",
-  "params": {
-   "id": "path string! Dependency id"
-  }
- },
- {
   "name": "list_comments",
   "method": "GET",
   "path": "/comments",
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(workstream|issue|artifact|decision|input_request|repository|team|project|project_update) Subject type",
+   "subjectType": "query string(issue|artifact|decision|input_request|repository|team|project|project_update) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -1602,7 +1387,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: workstream|issue|artifact|decision|input_request|repository|team|project|project_update, id}",
+   "subject": "body object! {type: issue|artifact|decision|input_request|repository|team|project|project_update, id}",
    "body": "body string! Comment (markdown)"
   }
  },
@@ -1653,11 +1438,11 @@
   "description": "Create a saved view.",
   "params": {
    "name": "body string! Name",
-   "entity": "body string(workstream|issue|decision|project)! Entity",
+   "entity": "body string(issue|decision|project)! Entity",
    "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
-   "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
+   "layout": "body string(list|board|timeline) Layout (timeline only for project views)",
    "shared": "body boolean Visible to everyone (legacy; same as sharing.visibility workspace|private)",
    "sharing": "body object {visibility: private|workspace|link, grants?: [{userId, level: view|edit}]} (link = anyone with the public link can read it)"
   }
@@ -1671,11 +1456,11 @@
   "params": {
    "id": "path string! View id",
    "name": "body string Name",
-   "entity": "body string(workstream|issue|decision|project) Entity",
+   "entity": "body string(issue|decision|project) Entity",
    "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
-   "layout": "body string(list|board|graph|timeline) Layout (timeline only for workstream and project views)",
+   "layout": "body string(list|board|timeline) Layout (timeline only for project views)",
    "shared": "body boolean Visible to everyone (legacy; same as sharing.visibility workspace|private)",
    "sharing": "body object {visibility: private|workspace|link, grants?: [{userId, level: view|edit}]} (link = anyone with the public link can read it)"
   }
@@ -1695,7 +1480,7 @@
   "method": "GET",
   "path": "/insights",
   "permission": "insights:read",
-  "description": "Where are the problems? Health signals (blocked, waiting for input and who the bottleneck is, stale, overdue, scope creep, PRs stuck in review, failing CI, undecided decisions, customer demand waiting, shipped workstreams without proof: read-only history), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
+  "description": "Where are the problems? Health signals (waiting for input, stale or overdue issues, scope creep, PRs stuck in review, failing CI, undecided decisions and customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
   "params": {
     "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
     "teamId": "query string Only this team's work",
@@ -1711,7 +1496,7 @@
   "permission": "insights:read",
   "description": "The full item list behind one health signal (what a tile of get_insights drills into).",
   "params": {
-    "id": "path string(blocked_workstreams|needs_input|stale_workstreams|stale_issues|delivered_outcome_open|shipped_without_proof|overdue_milestones|overdue_workstreams|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
+    "id": "path string(needs_input|stale_issues|overdue_milestones|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
     "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
     "teamId": "query string Only this team's work",
     "projectId": "query string Only this project's work",

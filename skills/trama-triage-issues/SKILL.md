@@ -1,86 +1,33 @@
 ---
 name: trama-triage-issues
-description: How to file, deduplicate, classify and group issues into workstreams in Trama. Use when the user reports a bug, request or idea to log, asks you to triage a backlog, find duplicates, or turn several related issues into one workstream.
+description: File, deduplicate, and classify Trama issues. Use when a user reports a bug, request, or idea to log, asks you to triage an issue, or asks where existing issues are.
 ---
 
 # File and triage issues
 
-An issue describes **one** problem or request. A workstream is the coordinated effort that resolves one or many issues. Keep them apart.
+An Issue is the unit of work. One Issue should describe one problem or request. Agents may work across multiple Issues directly.
 
-## Before creating anything: search
+## Search before creating
 
-```
-search { q: "refresh token logout", types: "issue,workstream,decision", limit: 10 }
-find_work { scope: "issues", q: "…" }
-```
+Use `search` or `find_work` to search existing Issues first. If a matching Issue exists, use `update_issue` or add a concise comment rather than creating a duplicate. Check for true duplicates and use the supported duplicate relationship instead of deleting the issue.
 
-If a matching open issue exists, **comment on it** (`add_comment`) or update it instead of creating another. If you find a true duplicate, mark it: `update_issue { idOrKey, duplicateOfId: "<original>" }`. `create_issue` also refuses to create an issue whose title equals an open one (it returns it as `existing`; `force: true` overrides) and lists similar open issues after creating.
+## Create an Issue
 
-## Create the issue
+Read workspace settings and available catalogs first. Discover the exact create fields from the current MCP capability or CLI schema.
 
-```
-get_workspace                                          // settings.labels, settings.estimateScale
-create_issue {
-  kind: "bug",                          // required
-  title: "Logout leaves a stale auth cookie",
-  body: "## What happens\n…\n## Expected\n…\n## Steps\n1. …",
-  priority: "medium", teamId, projectId, source: "agent",
-  labels: ["lb_bug"],                   // catalog ids that exist in this workspace
-  estimate: 2                           // only when the size is clear and the scale is not none
-}
-```
+Include the useful context available: a clear title and a concise description. For bugs, capture steps to reproduce, expected versus actual behavior, and relevant environment. Use only valid issue kinds, priorities, and catalog IDs. Set optional fields only when supported and justified. Associate an optional Goal only when the right existing Goal is clear; if several apply, ask.
 
-- **kind** decides the key prefix and cannot be guessed lightly (changing it re-keys the issue): `bug` BUG, `feature` FEAT, `incident` INC, `tech_debt` DEBT, `feedback` FB, `idea` IDEA, `security` SEC.
-- **title**: the symptom or request in plain words, under ~80 characters. No "bug:" prefixes.
-- **body**: markdown. For bugs give steps, expected vs actual, and where you saw it. Include a stack trace or log line only if short and relevant.
-- **status** defaults to `backlog`. Use `draft` if it is unfinished and you want people to refine it first. Do not set `in_progress` unless someone is working on it.
-- **priority**: `urgent` only for outages and security exposure; most things are `medium` or `low`. When unsure, leave `none` and say why.
-- **source**: use `agent` so people can tell it was filed by an agent.
-- **projectId**: the project resolved from this checkout (`trama`, "Issues of this checkout") when there is exactly one. Several: ask. None: omit it and say the issue is not on a project.
-- **labels**: ids from `get_workspace` → `settings.labels`, never names and never new labels. Use the catalog entry that exists: bug, incident, security → Bug; feature, idea → Feature; tech_debt → Improvement; a documentation change → Documentation. Skip a mapping whose id is not in the catalog.
-- **estimate**: omit it when `settings.estimateScale` is `none`. Otherwise set a value on that scale only when you can justify it in one sentence (the user gave a size, or the change is obviously one small fix or a wide one). Fibonacci is `0, 1, 2, 3, 5, 8, 13, 21`. Linear is `1`–`10`. Exponential is `1, 2, 4, 8, 16, 32`. T-shirt is stored as XS `1`, S `2`, M `3`, L `5`, XL `8`. If you cannot justify a number, omit it and say why. Do not pick one just to fill the field.
-- **assigneeId**: leave it empty while the issue stays in `backlog`, `draft` or `todo`. When you set `in_progress` and nobody is assigned, set it to `whoami.actor.id` if `actor.type` is `user`. The server does the same on create, update and link with an explicit `in_progress` status (linking alone never changes status), and does not claim an `agent`. Never replace an assignee who is already set. Passing `assigneeId` yourself, including `null`, wins over that rule.
+Do not put secrets, tokens, customer data, or full execution transcripts in an Issue. Keep transcripts in execution tools.
 
-## Group issues into a workstream
+## Create or read context for issues
 
-Group when several issues **share a root cause or need the same change**. Do not group by convenience or by team.
+For related work, search and read context for each Issue that may be affected. Agents can implement across any number of Issues without an intermediate work object or duplicated status. Record changes and artifacts on the Issue(s) they concern. An optional Goal can provide broader context but never replaces Issue context.
 
-A Delta thread does not change this. The thread is the execution context, not a reason to group: issues requested in one thread but serving different outcomes go to different workstreams (or stay plain issues). One thread may touch several workstreams. Only when the user says the issues are one effort do you link them together without asking. Spawn one subagent per issue; a subagent does not get its own workstream. If a slice has no issue yet, create an issue on the workstream it serves.
+## Triage
 
-1. Check there is not already a workstream for it (`search`, `find_work { scope: "workstreams" }`).
-2. To attach to an existing one:
-   ```
-   link_issue { idOrKey: "BUG-148", workstreamIds: ["<workstream id>"] }
-   ```
-   or, when creating the issue, `create_issue { …, workstream: "AUTH-42" }`.
-3. To start a new one in the same call:
-   ```
-   link_issue {
-     idOrKey: "BUG-142",
-     createWorkstream: {
-       title: "Stabilize authentication before v2",
-       ownerTeamId, deltaThreadUrl,       // deltaThreadUrl is optional: https URL of the Delta thread; omit it if there is none yet
-       objective: "Sessions survive token rotation on all supported browsers."
-     }
-   }
-   ```
-   `deltaThreadUrl` is optional. If you do not have one, omit it (the thread can be linked later); do not invent one and do not block on asking. A supplied URL is validated.
-4. Then add acceptance criteria that are *observable* ("OAuth login passes on Safari 18"), not tasks ("fix OAuth").
+1. Find relevant Issues using `search` or `find_work`.
+2. Review duplicates, stale reports, missing information, priority, and classification.
+3. Present a concise proposed set of changes before making broad or ambiguous edits.
+4. Apply agreed changes using `triage_issues`, `create_issue`, or `update_issue` as appropriate, and verify their results.
 
-An issue can belong to several workstreams, but only if it truly contributes to each; keep that rare.
-
-## Triaging a backlog
-
-1. `find_work { scope: "issues", status: "backlog" }`, newest first.
-2. For each: duplicate? already fixed? missing information? Propose changes in a table to the user rather than editing dozens of issues silently.
-3. Apply the agreed changes in one call with `triage_issues`; each item names an `issue` and any of `priority`, `kind`, `status`, `labels`, `duplicateOf`, `workstream` / `createWorkstream`, `comment` (up to 25, applied independently, the reply says what each did). Prefer fewer, deliberate writes; there are daily write caps.
-   ```
-   triage_issues { items: [{ issue: "BUG-150", duplicateOf: "BUG-142" }, { issue: "BUG-151", priority: "high", workstream: "AUTH-42" }] }
-   ```
-4. Group clusters of related issues and propose the workstream (title, objective, criteria) before creating it.
-
-## Don'ts
-
-- Do not delete issues. If something is wrong, set `canceled` or mark it a duplicate.
-- Do not change other people's assignees, estimates or priorities without being asked. Filling them on an issue you are creating, or taking the assignee because you moved it to `in_progress` and it had none, is not that.
-- Do not paste secrets, tokens or customer data into issue bodies.
+Do not delete Issues. Do not change another person's assignment, estimate, or priority without authorization. Leave unsupported or uncertain optional fields unset.

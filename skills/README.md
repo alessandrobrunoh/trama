@@ -7,11 +7,11 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 | Skill | Use it when |
 |---|---|
 | [`trama`](trama/SKILL.md) | Always first: concepts, ground rules, tool map, and the issues of this checkout |
-| [`trama-workflow`](trama-workflow/SKILL.md) | The work cycle: search, reuse or create the workstream, then hand off |
-| [`trama-start-work`](trama-start-work/SKILL.md) | Picking up a workstream or issue |
-| [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording criteria, PRs, CI, issue status |
-| [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Blocked, or a choice should be recorded |
-| [`trama-triage-issues`](trama-triage-issues/SKILL.md) | Filing, deduplicating and grouping issues |
+| [`trama-workflow`](trama-workflow/SKILL.md) | Issue-first work across one or more issues |
+| [`trama-start-work`](trama-start-work/SKILL.md) | Reading context and starting implementation |
+| [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording factual progress and artifacts on issues |
+| [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Using an Issue's Human input feature in Question or Decision mode |
+| [`trama-triage-issues`](trama-triage-issues/SKILL.md) | Filing, finding, and triaging issues |
 | [`trama-cli`](trama-cli/SKILL.md) | The same work through the `trama` shell command, when MCP is unavailable (`trama skill install` installs it) |
 
 ## Install
@@ -25,7 +25,7 @@ mkdir -p ~/.claude/skills && cp -R skills/trama* ~/.claude/skills/
 Or for one repository: copy them to `<repo>/.claude/skills/`. Other agents: put the folders wherever that
 agent loads skills from.
 
-Connect the MCP server too (the skills assume its tools exist). It lists a short set of task-level tools by default (`get_context`, `find_work`, `start_work`, `report_progress`, `ask_human`, `record_decision`, …) and reaches every other operation with `list_capabilities` + `run_tool`; see [Tool profiles](../mcp/README.md#tool-profiles):
+Connect the MCP server too (the skills assume its tools exist). Use the deployed tool catalog and `list_capabilities` + `run_tool` to discover the current operations and exact arguments; see [Tool profiles](../mcp/README.md#tool-profiles):
 
 ```bash
 claude mcp add --transport http trama https://<your-trama-host>/mcp \
@@ -42,6 +42,5 @@ Reads then span every connected workspace; writes still need exactly one (`works
 
 The skills describe behaviour that lives in code. When it changes, update them:
 
-- Status derivation: `server/src/status/derive-status.ts`
-- Tool names and parameters: `mcp/src/tools.json` is the full catalog (the CLI's commands and flags come from it too; `cli/tests/cli.rs` checks that every example in `trama-cli/SKILL.md` still parses). The default MCP tool list is `mcp/src/curated.json`; the skills other than `trama-cli` name those tools, and a test fails when one of them uses a catalog tool that is not in that list without going through `run_tool`.
-- Enums and defaults (kinds, states, token limits): `contracts/domain.ts`
+- Tool names and parameters: verify against the current MCP and CLI catalogs before adding concrete examples. These skills intentionally avoid assuming that proposed Issue-first operations or field names already exist in every deployed API version.
+- Domain behavior and supported states: verify against current contracts and server behavior before documenting lifecycle rules.

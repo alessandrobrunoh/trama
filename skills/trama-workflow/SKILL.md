@@ -1,63 +1,30 @@
 ---
 name: trama-workflow
-description: Run the Trama work cycle when you are about to start, continue, or close work, not when you are only looking something up. Use when the user hands you one or more issues, asks you to take, start, triage, or ship work in Trama, or names a workstream to work on. Search first. If a matching workstream already exists, attach the issues to it. If not, create one and document the outcome there before writing code. Then hand off to the other Trama skills. Do not use for a single read (get_context, search, whoami).
+description: Use the Issue-first Trama workflow when starting, continuing, or closing work on one or more issues. Search first, read each issue's context, optionally associate a Goal, and use an Issue's Human input feature when a person must answer a question or record a decision.
 ---
 
 # The Trama work cycle
 
-You are the dispatcher, not the specialist. Decide where the work belongs, then hand off. Do not re-explain what the other skills already specify: `trama` for the rules, `trama-triage-issues` for filing, `trama-start-work` for picking up a workstream, `trama-report-progress` for recording facts, `trama-ask-and-decide` for a question or a decision. On the CLI the same work is `trama` commands (`trama-cli`). The MCP server lists a short task-level tool set; anything not listed is `list_capabilities` then `run_tool`.
+This skill dispatches work to `trama` for concepts and rules, `trama-triage-issues` for filing, `trama-start-work` for starting, `trama-report-progress` for factual updates, and `trama-ask-and-decide` for Human input. Use `trama-cli` when MCP is unavailable.
 
-## 1. Know which workspace
+## 1. Identify the workspace and find the issue
 
-```
-whoami
-```
+Call `whoami`. If several workspaces are connected, use `list_accounts` to select one for writes. Use `find_work` or `search` for matching Issues before creating anything; use `get_context` to read the matching Issue and Decision context. Read the workspace stamp on every result. Reuse or update a matching issue rather than creating a duplicate.
 
-If it returns more than one workspace, call `list_accounts` and pick one slug. A key like `BUG-142` is unique only inside its workspace, and a write with no `workspace` is refused. Pass that slug on every call below. With one key, omit it.
+## 2. Read the issue context
 
-## 2. Search before you create
+Read context for every issue the work will touch. If the user names several issues, work across them directly without adding another unit of execution or duplicating their status. An optional Goal may provide broader product context, but it does not replace issue context or become a unit of execution.
 
-```
-search { q, types: "workstream,issue,decision", limit: 10 }
-```
+When the user describes work but names no issue, search first. If nothing matches, create an issue using `create_issue` or the `trama-triage-issues` workflow. Associate an optional Goal only when it is clear which existing Goal applies; ask rather than guessing if there are multiple plausible Goals.
 
-Read what comes back, including the `workspace` stamp on each row. Do not create an issue or a workstream that already exists. Comment on or update the existing one instead (`trama-triage-issues`).
+## 3. Start and implement
 
-## 3. Decide where the work lives
+Start work on the relevant issue or issues using `start_work` when available. Respect each issue's actual state and any open Human input. Stop only for work that depends on an unanswered question or an unaccepted decision; continue independent work across other issues.
 
-A workstream is an outcome, not a container, and not a Delta thread. The thread is only the execution context; it does not set work boundaries. One workstream per outcome, never a second for the same outcome, and never one stretched over unrelated outcomes just because they share a thread.
+A Plan is optional. For non-trivial implementation, create or update one near the issue it serves and follow any applicable approval process exposed by the current Trama tools. Do not make a Plan a gate for small, clear changes.
 
-Per issue, ask: does it serve the outcome of an existing workstream? Search first (`search`, `find_work { scope: "workstreams" }`; a workstream whose `deltaThreadUrl` is this thread is a candidate, not a rule). If yes, link it there. If no, it needs its own workstream or stays a plain issue. One thread can therefore touch several workstreams; you may treat one as the thread's primary. A subagent works an issue; it gets no workstream of its own, and a slice with no issue yet becomes an issue on the workstream it serves. Only when the user says these issues are one effort do you group them without further questions.
+## 4. Record progress and conclude
 
-For each issue or group of issues:
+Record verifiable progress on the relevant issue(s) with `report_progress`, `attach_artifact`, or supported Issue updates: concise updates and the actual issue status when it changes. Do not invent progress or duplicate status on another object. Keep full transcripts and execution details in the execution tools, not Trama.
 
-- The issues are already on a workstream: use that one. Load it with `get_context` (or go straight to `start_work`) and continue at step 5.
-- Several issues share one outcome and have no workstream: create one and link them.
-  ```
-  link_issue {
-    idOrKey: "BUG-142",
-    createWorkstream: { title, ownerTeamId, objective, deltaThreadUrl }
-  }
-  link_issue { idOrKey: "BUG-148", workstreamIds: ["<id>"] }
-  ```
-- One issue, no workstream, and the work is a real outcome to pursue: create one the same way. A typo, a one-line fix, or a question is not an outcome. Leave it as an issue and work the issue; do not invent a workstream to have somewhere to write.
-- The user described work but named nothing: search first. Create an issue (`trama-triage-issues`) only when nothing matches, then decide as above.
-
-`deltaThreadUrl` is optional: a workstream can exist before its Delta thread. If you are the parent of a Delta thread, set it to this thread's URL. Otherwise omit it; do not invent one. A supplied URL must be an https link on delta.dev.
-
-Document the outcome on the workstream, not on the issue: an objective in one sentence, and criteria that are observable ("OAuth login passes on Safari 18"), not tasks ("fix OAuth"). Add them with `report_progress { workstream, addCriteria: [...] }`.
-
-## 4. Do not write the status
-
-A workstream's status is derived from the facts you record. Never set it, and never set `statusOverride`.
-
-## 5. Hand off
-
-- Starting: `trama-start-work`. It sets the first criterion to `in_progress` and leaves one comment saying what you will do.
-- As facts appear (a criterion met, a PR opened, CI, a review): `trama-report-progress`. Record what you saw, never a guess.
-- Blocked, or a choice only a person can make: `trama-ask-and-decide`. Ask once, then keep going on whatever the answer does not affect.
-- Nothing to do (blocked, shipped, canceled, an open question that changes the approach, a proposed decision in your way): stop and tell the user. Do not start anyway.
-
-## Done
-
-Done is a fact, not a status you set. Every acceptance criterion is `met` or you have said why one is not, and the PR is merged or the work is recorded. Then stop. Do not re-summarize the workstream; the criteria and the comment trail already do.
+If a person must choose or clarify, use the Issue's Human input feature (Question or Decision mode) as described in `trama-ask-and-decide`. Then continue work unaffected by the answer. Report remaining blockers and what was actually verified.

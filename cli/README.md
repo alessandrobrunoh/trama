@@ -12,7 +12,7 @@ the MCP server's shorter default tool list is a separate layer on top (`mcp/src/
 
 ```bash
 trama issue list --open --priority urgent,high --fields key,title,status
-trama workstream context AUTH-42          # markdown briefing
+trama issue context BUG-142               # markdown issue context
 trama project context prj_…               # markdown "mega context" of a whole project
 trama project-update post prj_… --health on_track --file body=update.md
 trama artifact add --issue-id BUG-142 --kind pull_request --title "Fix login" --url https://…
@@ -104,11 +104,11 @@ over every selection.
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `issue` `workstream` `criterion` `decision` `artifact` `document` `input-request` `comment` `project`
-`project-update` `milestone` `dependency` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
-`outgoing-webhook` `graph` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
-plus actions (`issue link`, `decision accept`, `input-request answer`, `workstream context`, `project context`, `project artifacts`, …).
-Aliases: `issues`, `ws`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`BUG-142`, `AUTH-42`, `ADR-21`).
+Resources: `issue` `decision` `artifact` `document` `input-request` `comment` `project`
+`project-update` `milestone` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
+`outgoing-webhook` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
+plus actions (`decision accept`, `input-request answer`, `issue context`, `project context`, `project artifacts`, …).
+Aliases: `issues`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`BUG-142`, `AUTH`, `ADR-21`).
 
 ```bash
 trama commands                      # every command with its HTTP route and permission
@@ -120,7 +120,7 @@ trama api GET /integrations -Q limit=5      # any route without a dedicated comm
 
 How flags are built from the catalog:
 
-- path parameters are positional (`trama criterion update AUTH-42 crit_1 --state met`); everything else is `--kebab-case`;
+- path parameters are positional (`trama issue update BUG-142 --status in_progress`); everything else is `--kebab-case`;
 - enums are validated before sending; lists are comma-separated (`--label a,b`); booleans can be bare (`--open`) or explicit (`--open false`);
 - objects accept `type:id` for subjects (`--subject issue:iss_1`), `k=v,k=v`, JSON, or `@file`;
 - `--data '{…}'` / `@file.json` / `-` supplies a whole JSON body; explicit flags win over it;
@@ -133,7 +133,7 @@ Everything is predictable so an agent can use it without reading docs twice.
 
 - **Output.** Compact JSON on stdout when piped, a table (lists) or indented JSON (objects) in a terminal.
   `-o json|pretty|jsonl|table|raw`; `--fields id,assignee.name` keeps only what you need (dot paths, arrays and
-  `{"results":[…]}` envelopes handled). The markdown briefings (`workstream context`, `project context`) are passed through as is.
+  `{"results":[…]}` envelopes handled). Markdown context briefings (`issue context`, `project context`) are passed through as is.
 - **Issue artifacts.** `trama issue get BUG-142 --fields key,title,status,artifactCount` includes a count for callers with
   `artifacts:read`; zero means skip `trama issue artifacts`. The field is absent without artifact access.
 - **Errors.** JSON on stderr: `{"error":{"code","message","status","hint"}}` (plain text in a terminal), and a stable exit code:
