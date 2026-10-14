@@ -67,7 +67,7 @@ describe('permission policies, team roles and token scopes', () => {
     it('can lock down issue deletion and decision acceptance', async () => {
       const { owner, admin, member, w } = await setup();
       const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Crash' }).expect(201)).body;
-      const decision = (await member.post(`${w}/decisions`, { title: 'Use X', statement: 'We use X' }).expect(201)).body;
+      const decision = (await member.post(`${w}/decisions`, { title: 'Use X', statement: 'We use X', originIssueId: issue.id }).expect(201)).body;
 
       const drop = new Set(['deleteIssues', 'acceptDecisions', 'createIssues']);
       await setCaps(owner, w, 'member', (await roleCaps(owner, w, 'member')).filter((cap) => !drop.has(cap)));
