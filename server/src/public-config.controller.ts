@@ -1,6 +1,6 @@
 import { Controller, Get } from '@nestjs/common';
 import { Public } from './auth/request-context.js';
-import { demoLoginEnabled } from './public-config.js';
+import { demoLoginEnabled, publicPageViewConfig } from './public-config.js';
 
 @Controller('config')
 export class PublicConfigController {
@@ -8,6 +8,6 @@ export class PublicConfigController {
   @Public()
   @Get()
   config() {
-    return { demoLogin: demoLoginEnabled() };
+    return { demoLogin: demoLoginEnabled(), ...publicPageViewConfig() };
   }
 }

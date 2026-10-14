@@ -51,6 +51,7 @@ All settings live in `.env` (the compose file maps them to the containers).
 | `SMTP_URL`, `MAIL_FROM` | empty | `smtps://user:pass@host:465` or `smtp://user:pass@host:587`. Empty: invitations are not emailed, the link is shown in the UI |
 | `AI_API_URL`, `AI_API_KEY`, `AI_MODEL` | empty | Optional AI suggestions and assistant, any OpenAI-compatible API. Empty: off. See [server/AI.md](../server/AI.md) |
 | `VAPID_*` | empty | Optional browser push (`npx web-push generate-vapid-keys`) |
+| `PUBLIC_ROADMAP_VIEW_TOKEN`, `PUBLIC_CHANGELOG_VIEW_TOKEN` | empty | Optional public pages backed by link-shared views; set each to its Shared View token |
 | `TRAMA_VERSION` | `latest` | Image tag of the three Trama images |
 | `TRAMA_REGISTRY` | `ghcr.io/alessandrobrunoh` | Change it if you mirror or fork the images |
 | `TRAMA_HTTP_PORT`, `TRAMA_HTTPS_PORT` | `80`, `443` | Published ports |

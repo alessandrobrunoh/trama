@@ -1,4 +1,29 @@
-import { demoLoginEnabled } from './public-config.js';
+import { demoLoginEnabled, publicPageViewConfig } from './public-config.js';
+
+describe('publicPageViewConfig', () => {
+  it('returns trimmed public view tokens when configured', () => {
+    expect(
+      publicPageViewConfig({
+        PUBLIC_ROADMAP_VIEW_TOKEN: ' roadmap-token ',
+        PUBLIC_CHANGELOG_VIEW_TOKEN: 'changelog-token',
+      }),
+    ).toEqual({
+      roadmapViewToken: 'roadmap-token',
+      changelogViewToken: 'changelog-token',
+    });
+  });
+
+  it('omits unset or blank view tokens as null', () => {
+    expect(
+      publicPageViewConfig({
+        PUBLIC_ROADMAP_VIEW_TOKEN: ' ',
+      }),
+    ).toEqual({
+      roadmapViewToken: null,
+      changelogViewToken: null,
+    });
+  });
+});
 
 describe('demoLoginEnabled', () => {
   it('follows DEMO_LOGIN in production and development', () => {

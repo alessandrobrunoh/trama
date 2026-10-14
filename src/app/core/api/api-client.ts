@@ -250,8 +250,13 @@ export class ApiClient {
   // ───────────────────────── health & auth ─────────────────────────
 
   health = () => this.get<{ ok: boolean }>('/health');
-  /** Public sign-in settings, including whether `DEMO_LOGIN` is enabled. */
-  publicConfig = () => this.get<{ demoLogin: boolean }>('/config');
+  /** Public settings available before sign-in, including tokens for configured Shared View pages. */
+  publicConfig = () =>
+    this.get<{
+      demoLogin: boolean;
+      roadmapViewToken: string | null;
+      changelogViewToken: string | null;
+    }>('/config');
 
   readonly auth = {
     login: async (input: LoginInput): Promise<User> =>

@@ -2,15 +2,16 @@ import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideArrowRight, LucideDynamicIcon } from '@lucide/angular';
+import { PublicView } from '../views/public-view-page';
 import { CHANGELOG, type ChangeKind } from './changelog-entries';
 import { SiteFooter } from '../landing/site-footer';
 import { SiteHeader } from '../landing/site-header';
 
-/** `/changelog`: public release notes, newest first. Add an entry when something user-visible ships. */
+/** `/changelog`: curated release notes plus a live list of completed issues. */
 @Component({
   selector: 'app-changelog-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, LucideDynamicIcon, SiteHeader, SiteFooter],
+  imports: [DatePipe, RouterLink, LucideDynamicIcon, PublicView, SiteHeader, SiteFooter],
   host: {
     class: 'bg-background text-foreground relative isolate flex min-h-svh flex-col overflow-x-clip',
   },
@@ -63,6 +64,14 @@ import { SiteHeader } from '../landing/site-header';
           </li>
         }
       </ol>
+
+      <section class="border-border mt-12 border-t pt-8">
+        <h2 class="text-2xl font-semibold tracking-[-0.02em]">Completed issues</h2>
+        <p class="text-muted-foreground mt-2 text-[14px] leading-relaxed">
+          Issues currently marked done in the Trama project.
+        </p>
+        <app-public-view class="mt-5 block w-full" [embedded]="true" [viewSource]="'changelog'" />
+      </section>
     </main>
 
     <app-site-footer />

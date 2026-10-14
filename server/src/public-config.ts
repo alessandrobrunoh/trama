@@ -15,3 +15,13 @@ export function demoLoginEnabled(
   if (DEMO_LOGIN_OFF.has(raw)) return false;
   return env.NODE_ENV !== 'production';
 }
+
+export function publicPageViewConfig(env: NodeJS.ProcessEnv = process.env): {
+  roadmapViewToken: string | null;
+  changelogViewToken: string | null;
+} {
+  return {
+    roadmapViewToken: env.PUBLIC_ROADMAP_VIEW_TOKEN?.trim() || null,
+    changelogViewToken: env.PUBLIC_CHANGELOG_VIEW_TOKEN?.trim() || null,
+  };
+}
