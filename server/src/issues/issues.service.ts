@@ -26,6 +26,7 @@ import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
 import {
+  DocumentEntity,
   IssueEntity,
   MilestoneEntity,
 } from '../database/entities/index.js';
@@ -221,6 +222,19 @@ export class IssuesService {
       );
     if (f.limit) qb.take(f.limit);
     return qb.getMany();
+  }
+
+  /** Current revision number of each Trama document, for plan approval checks. */
+  async documentVersions(
+    workspaceId: string,
+    ids: string[],
+  ): Promise<Map<string, number>> {
+    if (!ids.length) return new Map();
+    const rows = await this.ds.getRepository(DocumentEntity).find({
+      where: { workspaceId, id: In(ids) },
+      select: { id: true, version: true },
+    });
+    return new Map(rows.map((d) => [d.id, d.version]));
   }
 
   /** `idOrKey`: id (`in_…`), key (`BUG-142`) or an alias (an old key from before a kind change). */

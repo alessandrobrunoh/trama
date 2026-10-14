@@ -107,4 +107,39 @@ describe('IssuesController.context', () => {
     expect(result.planSummary).toBeUndefined();
     expect(result.decisions).toEqual([{ id: 'dc_1', title: 'Decision', tags: [] }]);
   });
+
+  it('returns a markdown briefing when markdown is requested', async () => {
+    const issue = {
+      id: 'in_1',
+      key: 'BUG-1',
+      title: 'Broken',
+      kind: 'bug',
+      status: 'todo',
+      priority: 'none',
+    };
+    const answered = { id: 'ir_1', state: 'answered', question: 'Which?', answer: 'B' };
+    const documentVersions = vi.fn(async () => new Map<string, number>());
+    const controller = new IssuesController(
+      { get: vi.fn(async () => issue), documentVersions } as never,
+      {} as never,
+      {} as never,
+      { list: vi.fn(async () => []) } as never,
+      { list: vi.fn(async () => []) } as never,
+      { list: vi.fn(async () => [answered]) } as never,
+    );
+    const res = { type: vi.fn() };
+
+    const result = await controller.context(
+      ctx,
+      session,
+      'BUG-1',
+      { format: 'markdown' },
+      undefined,
+      res as never,
+    );
+
+    expect(res.type).toHaveBeenCalledWith('text/markdown; charset=utf-8');
+    expect(result).toContain('# BUG-1 — Broken');
+    expect(result).toContain('- Answered: Which? → B');
+  });
 });

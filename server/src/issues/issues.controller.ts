@@ -8,7 +8,10 @@ import {
   Patch,
   Post,
   Query,
+  Req,
+  Res,
 } from '@nestjs/common';
+import type { Request, Response } from 'express';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
@@ -42,6 +45,7 @@ import {
   CUSTOMER_REVENUE_MAX,
   isPlanArtifact,
   isPlanDecision,
+  resolveIssuePlans,
 } from '../contracts/domain.js';
 import type {
   ActorRef,
@@ -55,6 +59,7 @@ import { DecisionsService } from '../decisions/decisions.service.js';
 import { CustomersService } from '../customers/customers.service.js';
 import { InputRequestsService } from '../input-requests/input-requests.service.js';
 import { PermissionsService } from '../workspaces/permissions.service.js';
+import { renderIssueBriefing } from './issue-briefing.js';
 import { IssuesService } from './issues.service.js';
 
 const KINDS: IssueKind[] = [
@@ -184,6 +189,10 @@ export class BulkUpdateIssuesDto extends IssueRefsDto {
 }
 
 export class BulkDeleteIssuesDto extends IssueRefsDto {}
+
+class ContextQuery {
+  @IsOptional() @IsIn(['markdown', 'json']) format?: 'markdown' | 'json';
+}
 
 class ListIssueQuery {
   @IsOptional() @IsIn(KINDS) kind?: IssueKind;
@@ -318,23 +327,54 @@ export class IssuesController {
     return issue;
   }
 
+  /**
+   * JSON by default; a markdown briefing (what to know to pick the work up) with `?format=markdown` or
+   * `Accept: text/markdown`.
+   */
   @Get(':idOrKey/context')
   async context(
     @Ctx() ctx: WorkspaceContext,
     @Auth() auth: AuthInfo,
     @Param('idOrKey') idOrKey: string,
+    @Query() q: ContextQuery = {},
+    @Req() req?: Request,
+    @Res({ passthrough: true }) res?: Response,
   ) {
     const issue = await this.service.get(ctx.workspace.id, idOrKey);
-    const [artifacts, decisions, inputRequests] = await Promise.all([
+    const [artifacts, decisions, requests] = await Promise.all([
       canReadArtifacts(auth)
         ? this.artifacts.list(ctx.workspace.id, { issueId: issue.id })
         : Promise.resolve([]),
       this.decisions.list(ctx.workspace.id, { issueId: issue.id }),
-      this.inputRequests.list(ctx.workspace.id, {
-        issueId: issue.id,
-        state: 'open',
-      }),
+      this.inputRequests.list(ctx.workspace.id, { issueId: issue.id }),
     ]);
+    const inputRequests = requests.filter((r) => r.state === 'open');
+    const wantsMarkdown =
+      q.format === 'markdown' ||
+      (!q.format &&
+        req?.accepts(['application/json', 'text/markdown']) === 'text/markdown');
+    if (wantsMarkdown) {
+      res?.type('text/markdown; charset=utf-8');
+      const documentIds = artifacts.flatMap((a) =>
+        a.documentId ? [a.documentId] : [],
+      );
+      const plans = resolveIssuePlans({
+        issueId: issue.id,
+        artifacts,
+        decisions,
+        documentVersions: await this.service.documentVersions(
+          ctx.workspace.id,
+          documentIds,
+        ),
+      });
+      return renderIssueBriefing({
+        issue,
+        plans,
+        decisions,
+        inputRequests: requests,
+        artifacts,
+      });
+    }
     const plans = artifacts.filter(isPlanArtifact);
     const planDecisions = decisions.filter(isPlanDecision);
     const latestArtifact = [...plans].sort(
