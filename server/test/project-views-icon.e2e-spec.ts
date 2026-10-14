@@ -87,7 +87,7 @@ describe('project icon, project views and the project issue filter', () => {
       const plain = await mkIssue('plain');
 
       const keys = async (q: string) => ((await c.get(`${w}/issues?${q}`).expect(200)).body as { key: string }[]).map((i) => i.key).sort();
-      expect(await keys(`projectId=${P.id}`)).toEqual([direct.key.key]);
+      expect(await keys(`projectId=${P.id}`)).toEqual([direct.key]);
       expect(await keys(`projectId=${Q.id}`)).toEqual([]);
       expect(await keys(`projectId=${P.id}&open=true`)).toEqual([direct.key]);
       expect(await keys('projectId=pj_missing')).toEqual([]);

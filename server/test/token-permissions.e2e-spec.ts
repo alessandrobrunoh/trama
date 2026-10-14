@@ -86,7 +86,8 @@ describe('custom API tokens: permissions and limits', () => {
 
   it('decision verdicts need decisions:accept', async () => {
     const { owner, w, mint } = await setup();
-    const decision = (await owner.post(`${w}/decisions`, { title: 'Use Rust', statement: 'Build the MCP server in Rust', status: 'proposed' }).expect(201)).body;
+    const issue = (await owner.post(`${w}/issues`, { kind: 'bug', title: 'MCP server' }).expect(201)).body;
+    const decision = (await owner.post(`${w}/decisions`, { title: 'Use Rust', statement: 'Build the MCP server in Rust', status: 'proposed', originIssueId: issue.id }).expect(201)).body;
     const writer = await mint({ permissions: ['decisions:write'] });
     await writer.client.post(`${w}/decisions/${decision.id}/accept`).expect(403);
     const judge = await mint({ permissions: ['decisions:accept'] });

@@ -65,15 +65,16 @@ export class IssueFirst1793740000000 implements MigrationInterface {
     await q.query(
       `ALTER TABLE "input_requests" ADD "legacyWorkstreamKey" character varying`,
     );
+    // Detaching below sets the column to NULL, so it must stop being NOT NULL first.
+    await q.query(
+      `ALTER TABLE "input_requests" ALTER COLUMN "workstreamId" DROP NOT NULL`,
+    );
     await q.query(`
       UPDATE "input_requests" r
       SET "legacyWorkstreamKey" = w."key", "workstreamId" = NULL
       FROM "workstreams" w
       WHERE w."id" = r."workstreamId"
     `);
-    await q.query(
-      `ALTER TABLE "input_requests" ALTER COLUMN "workstreamId" DROP NOT NULL`,
-    );
     await q.query(
       `ALTER TABLE "input_requests" DROP CONSTRAINT IF EXISTS "FK_6668744227c4c46afdab5d048fd"`,
     );
