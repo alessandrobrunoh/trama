@@ -14,7 +14,7 @@ For larger changes, please open a GitHub Issue or Discussion first.
 
 This is especially important for changes involving:
 
-- the Workstream domain model;
+- the Issue domain model;
 - Input requests;
 - Artifacts;
 - Decisions;
@@ -35,8 +35,7 @@ The goal is to avoid contributors spending significant time implementing competi
 
 Contributions should generally reinforce these principles:
 
-1. **Work over tickets**  
-   A Workstream represents an outcome, not just a task card.
+1. **Reduce project-management tax.** Issues stay granular; avoid adding another required unit of work or a duplicate status.
 
 2. **Humans and agents are both actors**  
    Agent activity should be explicit and auditable.
@@ -44,11 +43,9 @@ Contributions should generally reinforce these principles:
 3. **Human attention is scarce**  
    Trama should surface where human judgment is needed.
 
-4. **Reality should drive status**  
-   Git, CI, reviews, input requests, and deployments should determine state whenever possible.
+4. **Keep one source of work status.** Questions and Decisions surface in Attention; they do not create a parallel execution status.
 
-5. **Context should be reusable**  
-   Decisions, dependencies, acceptance criteria, and outcomes should remain useful to future humans and agents.
+5. **Context should transfer.** Goals, Plans, meaningful Decisions, answers, and artifacts should remain useful to future humans and agents.
 
 6. **Multi-team is the default**  
    Avoid assumptions that every unit of work belongs to exactly one team.
@@ -128,7 +125,7 @@ There is no strict conventional-commit requirement yet, but commit messages shou
 Good examples:
 
 ```text
-Add workstream repository relation
+Add issue-scoped human input
 Fix workspace scoping in execution query
 Refactor GitHub webhook verification
 Document agent identity model
@@ -150,7 +147,7 @@ Use short descriptive branch names when possible.
 Examples:
 
 ```text
-feat/workstreams
+feat/issue-human-input
 feat/github-webhooks
 fix/workspace-isolation
 docs/security-policy
@@ -262,7 +259,7 @@ Agent actions should eventually be attributable to:
 
 ```text
 workspace
-workstream
+issue
 provider
 actor
 ```
@@ -306,7 +303,7 @@ Feature requests should explain the underlying problem before proposing a specif
 
 Prefer:
 
-> When several agents work on the same Workstream, it is difficult to see which one currently needs human input.
+> When an agent cannot continue without a product choice, the answer should stay with the Issue for the next session.
 
 over:
 
