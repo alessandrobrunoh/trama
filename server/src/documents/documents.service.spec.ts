@@ -20,10 +20,8 @@ import {
   DocumentRevisionEntity,
   IssueEntity,
   ProjectEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import type { EventsService } from '../events/events.service.js';
-import type { WorkstreamBus } from '../events/workstream-bus.js';
 import { DocumentsService } from './documents.service.js';
 
 type Row = Record<string, unknown> & { id: string };
@@ -142,16 +140,6 @@ function setup(opts: { raceOnce?: boolean } = {}) {
     ],
     IssueEntity,
   );
-  const workstreams = fakeRepo<WorkstreamEntity & Row>(
-    [
-      {
-        id: 'wk_1',
-        key: 'AUTH-1',
-        workspaceId: WS,
-      } as unknown as WorkstreamEntity & Row,
-    ],
-    WorkstreamEntity,
-  );
   const queries: { sql: string; params?: unknown[] }[] = [];
   const byEntity = new Map<unknown, unknown>([
     [DocumentEntity, docs],
@@ -159,7 +147,6 @@ function setup(opts: { raceOnce?: boolean } = {}) {
     [ArtifactEntity, arts],
     [ProjectEntity, projects],
     [IssueEntity, issues],
-    [WorkstreamEntity, workstreams],
   ]);
   const manager = {
     getRepository: (e: unknown) => byEntity.get(e),
@@ -173,8 +160,6 @@ function setup(opts: { raceOnce?: boolean } = {}) {
     query: async () => [],
   } as unknown as DataSource;
   const events = { record: vi.fn(async () => ({})), publish: vi.fn() };
-  const touch = vi.fn(async () => undefined);
-  const bus = { touch } as unknown as WorkstreamBus;
   const uploads = {
     assertAttachable: vi.fn(async () => undefined),
     retained: vi.fn(async () => undefined),
@@ -182,25 +167,22 @@ function setup(opts: { raceOnce?: boolean } = {}) {
     releaseIds: vi.fn(async () => undefined),
   };
   const refs = {
-    workstreams: async () => undefined,
     repositories: async () => undefined,
   } as unknown as RefsService;
   const artifactsService = new ArtifactsService(
     ds,
     refs,
     events as unknown as EventsService,
-    bus,
     arts as unknown as Repository<ArtifactEntity>,
   );
   const service = new DocumentsService(
     ds,
     events as unknown as EventsService,
-    bus,
     artifactsService,
     uploads as never,
     docs as unknown as Repository<DocumentEntity>,
   );
-  return { service, docs, revs, arts, events, queries, touch, uploads };
+  return { service, docs, revs, arts, events, queries, uploads };
 }
 
 describe('DocumentsService.create', () => {
@@ -302,7 +284,7 @@ describe('DocumentsService.create', () => {
   it('does not create the document when an owner does not exist', async () => {
     const { service, docs } = setup();
     await expect(
-      service.create(ctx(), { title: 'Spec', workstreamId: 'NOPE-9' }),
+      service.create(ctx(), { title: 'Spec', issueId: 'in_missing' }),
     ).rejects.toBeInstanceOf(NotFoundException);
     await expect(
       service.create(ctx(), { title: 'Spec', projectId: 'pj_x' }),
@@ -523,16 +505,14 @@ describe('revisions', () => {
 });
 
 describe('artifact linking', () => {
-  it('renames the attached artifacts and touches their workstreams when the title changes', async () => {
-    const { service, arts, touch } = setup();
+  it('renames artifacts attached directly to an Issue when the document title changes', async () => {
+    const { service, arts } = setup();
     const doc = await service.create(ctx(), {
       title: 'Spec',
-      workstreamId: 'AUTH-1',
+      issueId: 'BUG-1',
     });
-    touch.mockClear();
     await service.update(ctx(), doc.id, { baseVersion: 1, title: 'Spec v2' });
     expect(arts.rows[0]).toMatchObject({ title: 'Spec v2' });
-    expect(touch).toHaveBeenCalledWith(WS, 'wk_1', 'artifact.updated');
   });
 
   it('attach is idempotent and needs exactly one owner; detach removes only that link', async () => {

@@ -27,16 +27,13 @@ import {
   DocumentEntity,
   IssueEntity,
   ProjectEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus } from '../events/workstream-bus.js';
 import { isWorkspaceUploadUrl } from '../uploads/upload-rules.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 
 /** `null` detaches an owner (PATCH); `undefined` leaves it alone. */
 export interface ArtifactInput {
-  workstreamId?: string | null;
   projectId?: string | null;
   issueId?: string | null;
   repositoryId?: string | null;
@@ -56,7 +53,6 @@ export interface ArtifactInput {
 }
 
 export interface ArtifactFilter {
-  workstreamId?: string;
   projectId?: string;
   issueId?: string;
   repositoryId?: string;
@@ -94,10 +90,9 @@ export function isHttpUrl(value: string | null | undefined): boolean {
 
 /** The owner ids of an artifact row (only the ones that are set). */
 export function artifactOwners(
-  row: Pick<ArtifactEntity, 'workstreamId' | 'projectId' | 'issueId'>,
+  row: Pick<ArtifactEntity, 'projectId' | 'issueId'>,
 ) {
   return {
-    ...(row.workstreamId ? { workstreamId: row.workstreamId } : {}),
     ...(row.projectId ? { projectId: row.projectId } : {}),
     ...(row.issueId ? { issueId: row.issueId } : {}),
   };
@@ -109,7 +104,6 @@ export class ArtifactsService {
     private readonly ds: DataSource,
     private readonly refs: RefsService,
     private readonly events: EventsService,
-    private readonly bus: WorkstreamBus,
     @InjectRepository(ArtifactEntity)
     private readonly repo: Repository<ArtifactEntity>,
     @Optional()
@@ -122,8 +116,6 @@ export class ArtifactsService {
       .createQueryBuilder('a')
       .where('a.workspaceId = :workspaceId', { workspaceId })
       .orderBy('a.createdAt', 'DESC');
-    if (f.workstreamId)
-      qb.andWhere('a.workstreamId = :w', { w: f.workstreamId });
     if (f.projectId) qb.andWhere('a.projectId = :p', { p: f.projectId });
     if (f.issueId) qb.andWhere('a.issueId = :i', { i: f.issueId });
     if (f.repositoryId)
@@ -149,25 +141,6 @@ export class ArtifactsService {
     if (!row || projectHidden(currentAccess(), row.projectId))
       throw notFound('Artifact', id);
     return row;
-  }
-
-  /** Resolves a workstream by id or key; 404 when unknown. */
-  async resolveWorkstreamId(
-    workspaceId: string,
-    idOrKey: string,
-  ): Promise<string> {
-    const repo = this.ds.getRepository(WorkstreamEntity);
-    const row = /^[A-Za-z][A-Za-z0-9]*-\d+$/.test(idOrKey)
-      ? await repo.findOne({
-          where: { workspaceId, key: idOrKey.toUpperCase() },
-          select: { id: true },
-        })
-      : await repo.findOne({
-          where: { workspaceId, id: idOrKey },
-          select: { id: true },
-        });
-    if (!row) throw notFound('Workstream', idOrKey);
-    return row.id;
   }
 
   /** 404 when the project does not exist in the workspace. */
@@ -211,13 +184,10 @@ export class ArtifactsService {
   private async validateOwners(
     workspaceId: string,
     o: {
-      workstreamId?: string | null;
       projectId?: string | null;
       issueId?: string | null;
     },
   ) {
-    if (o.workstreamId)
-      await this.refs.workstreams(workspaceId, [o.workstreamId]);
     if (
       o.projectId &&
       !(await this.ds
@@ -273,15 +243,13 @@ export class ArtifactsService {
     if (!input.documentId) return null;
     if (input.kind !== 'document')
       throw new BadRequestException('documentId needs kind "document"');
-    const doc = await this.ds
-      .getRepository(DocumentEntity)
-      .findOne({
-        where: { workspaceId, id: input.documentId },
-        select: { id: true, title: true },
-      });
+    const doc = await this.ds.getRepository(DocumentEntity).findOne({
+      where: { workspaceId, id: input.documentId },
+      select: { id: true, title: true },
+    });
     if (!doc)
       throw new BadRequestException(`Unknown document "${input.documentId}"`);
-    for (const owner of ['workstreamId', 'projectId', 'issueId'] as const) {
+    for (const owner of ['projectId', 'issueId'] as const) {
       if (
         input[owner] &&
         (await this.repo.existsBy({
@@ -300,9 +268,9 @@ export class ArtifactsService {
     actor: ActorRef,
     input: ArtifactInput & { kind: ArtifactKind },
   ) {
-    if (!input.workstreamId && !input.projectId && !input.issueId)
+    if (!input.projectId && !input.issueId)
       throw new BadRequestException(
-        'An artifact needs at least one owner: workstreamId, projectId or issueId',
+        'An artifact needs at least one owner: projectId or issueId',
       );
     this.assertLinkUrl(input.kind, input.url);
     await this.validate(workspaceId, input);
@@ -315,7 +283,6 @@ export class ArtifactsService {
       this.repo.create({
         id: uid('ar'),
         workspaceId,
-        workstreamId: input.workstreamId ?? null,
         projectId: input.projectId ?? null,
         issueId: input.issueId ?? null,
         repositoryId: input.repositoryId ?? null,
@@ -346,7 +313,6 @@ export class ArtifactsService {
       actor,
       type: 'artifact.attached',
       subject: { type: 'artifact', id: row.id },
-      workstreamId: row.workstreamId ?? undefined,
       data: {
         kind: row.kind,
         title: row.title,
@@ -356,8 +322,6 @@ export class ArtifactsService {
       },
     });
     if (row.review === 'requested') await this.reviewRequested(row, actor);
-    if (row.workstreamId)
-      await this.bus.touch(workspaceId, row.workstreamId, 'artifact.attached');
     return row;
   }
 
@@ -368,7 +332,6 @@ export class ArtifactsService {
         actor,
         type: 'review.requested',
         subject: { type: 'artifact', id: row.id },
-        workstreamId: row.workstreamId ?? undefined,
         data: {
           title: row.title,
           externalId: row.externalId,
@@ -386,7 +349,6 @@ export class ArtifactsService {
     patch: ArtifactInput,
   ) {
     const row = await this.get(workspaceId, id);
-    const before = artifactOwners(row);
     await this.validate(workspaceId, patch);
     const fields: string[] = [];
     const changes: Record<string, [unknown, unknown]> = {};
@@ -407,7 +369,6 @@ export class ArtifactsService {
     if (patch.description !== undefined)
       set('description', patch.description?.trim() || null);
     for (const k of [
-      'workstreamId',
       'projectId',
       'issueId',
       'repositoryId',
@@ -428,9 +389,9 @@ export class ArtifactsService {
       fields.push('uploadId');
     }
     if (!fields.length) return row;
-    if (!row.workstreamId && !row.projectId && !row.issueId)
+    if (!row.projectId && !row.issueId)
       throw new BadRequestException(
-        'An artifact needs at least one owner: workstreamId, projectId or issueId',
+        'An artifact needs at least one owner: projectId or issueId',
       );
     this.assertLinkUrl(row.kind, row.url, row.uploadId);
     row.updatedAt = new Date();
@@ -440,7 +401,6 @@ export class ArtifactsService {
       actor,
       type: 'artifact.updated',
       subject: { type: 'artifact', id },
-      workstreamId: row.workstreamId ?? undefined,
       data: {
         title: row.title,
         externalId: row.externalId,
@@ -451,12 +411,6 @@ export class ArtifactsService {
     if (released) await this.uploads?.releaseIds(workspaceId, [released]);
     if (changes.review && row.review === 'requested')
       await this.reviewRequested(row, actor);
-    // Both the workstream it left and the one it joined care about the change.
-    const touched = new Set(
-      [before.workstreamId, row.workstreamId].filter((w): w is string => !!w),
-    );
-    for (const w of touched)
-      await this.bus.touch(workspaceId, w, 'artifact.updated');
     return row;
   }
 
@@ -474,10 +428,7 @@ export class ArtifactsService {
       actor,
       type: 'artifact.deleted',
       subject: { type: 'artifact', id },
-      workstreamId: row.workstreamId ?? undefined,
       data: { title: row.title, ...artifactOwners(row) },
     });
-    if (row.workstreamId)
-      await this.bus.touch(workspaceId, row.workstreamId, 'artifact.deleted');
   }
 }

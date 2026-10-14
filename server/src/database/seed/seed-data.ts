@@ -361,6 +361,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.view(ale, 'Project roadmap', 'project', { filters: [{ field: 'status', op: 'not_in', value: ['completed', 'canceled'] }], layout: 'timeline', shared: true, created: 7 });
 
   // ───────── ~12 weeks of finished/running/canceled issues with estimates (statistics → Estimates & time)
+  b.finalize();
   if (opts.mockHistory !== false) addMockHistoryToSeed(b.data, now);
 
   b.adoptLabels();

@@ -7,7 +7,6 @@ import {
   PrimaryColumn,
 } from 'typeorm';
 import type {
-  AcceptanceCriterion,
   ActorRef,
   ArtifactKind,
   ArtifactProvider,
@@ -15,7 +14,6 @@ import type {
   CiState,
   CustomerStatus,
   DecisionStatus,
-  DependencyNodeType,
   ExecutionProvider,
   ExternalRef,
   FavoriteType,
@@ -27,7 +25,7 @@ import type {
   IssueStatus,
   MemberAccess,
   NotificationChannels,
-  NotificationKind,
+  NotificationRecordKind,
   Priority,
   ProjectHealth,
   ProjectStatus,
@@ -35,7 +33,7 @@ import type {
   Role,
   SavedView,
   SharingSettings,
-  SubjectRef,
+  LegacySubjectRef,
   TeamEditPolicy,
   TokenScope,
   ApiPermission,
@@ -44,12 +42,8 @@ import type {
   ViewFilter,
   ViewLayout,
   WorkspaceSettings,
-  DeliveryState,
-  WorkstreamCompletion,
-  WorkstreamStatus,
 } from '../../contracts/domain.js';
 import { resolveWorkspaceSettings } from '../../contracts/domain.js';
-import { statusSourceOf } from '../../status/completion-proof.js';
 import { Wire } from './wire.js';
 
 export { Wire };
@@ -71,7 +65,8 @@ export class UserEntity extends Wire {
   @Column({ type: 'varchar' }) passwordHash: string;
   @Column({ type: 'integer', default: 0 }) avatarHue: number;
   /** Per notification kind and channel; missing entries use the defaults (see resolveNotificationSettings). */
-  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) notificationSettings: Partial<Record<string, Partial<NotificationChannels>>>;
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT })
+  notificationSettings: Partial<Record<string, Partial<NotificationChannels>>>;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   protected override hidden() {
@@ -93,7 +88,9 @@ export class SessionEntity {
 }
 
 @Entity('workspaces')
-@ForeignKey(() => UserEntity, ['primaryOwnerId'], ['id'], { onDelete: 'SET NULL' })
+@ForeignKey(() => UserEntity, ['primaryOwnerId'], ['id'], {
+  onDelete: 'SET NULL',
+})
 export class WorkspaceEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) name: string;
@@ -101,7 +98,8 @@ export class WorkspaceEntity extends Wire {
   @Column({ type: 'varchar' })
   slug: string;
   /** Stored partially (only what was customized); `toJSON` and `resolved()` fill in the defaults. */
-  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) settings: Partial<WorkspaceSettings>;
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT })
+  settings: Partial<WorkspaceSettings>;
   /** The user who owns the workspace (its creator until ownership is transferred); see `member-rules.ts`. */
   @Column({ type: 'varchar', nullable: true }) primaryOwnerId: string | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
@@ -138,8 +136,12 @@ export class MembershipEntity extends Wire {
 
 /** Pending (or finished) invitation by email. Only the sha256 of the secret link token is stored. */
 @Entity('invites')
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
-@ForeignKey(() => UserEntity, ['invitedByUserId'], ['id'], { onDelete: 'SET NULL' })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => UserEntity, ['invitedByUserId'], ['id'], {
+  onDelete: 'SET NULL',
+})
 export class InviteEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Index('IDX_invites_workspace')
@@ -328,66 +330,6 @@ export class DocumentRevisionEntity extends Wire {
   }
 }
 
-// ───────────────────────────── workstreams ─────────────────────────────
-
-@Entity('workstreams')
-@Index('UQ_workstreams_workspace_key', ['workspaceId', 'key'], {
-  unique: true,
-})
-@Index('IDX_workstreams_workspace_team', ['workspaceId', 'ownerTeamId'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-@ForeignKey(() => TeamEntity, ['ownerTeamId'], ['id'], { onDelete: 'RESTRICT' })
-@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
-@Index('IDX_workstreams_project', ['projectId'])
-@ForeignKey(() => UserEntity, ['accountableUserId'], ['id'], {
-  onDelete: 'SET NULL',
-})
-export class WorkstreamEntity extends Wire {
-  @PrimaryColumn({ type: 'varchar' }) id: string;
-  @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) key: string;
-  @Column({ type: 'integer' }) number: number;
-  @Column({ type: 'varchar' }) title: string;
-  @Column({ type: 'text', nullable: true }) description: string | null;
-  @Column({ type: 'text', default: '' }) objective: string;
-  @Column({ type: 'text', nullable: true }) context: string | null;
-  @Column({ type: 'varchar' }) deltaThreadUrl: string;
-  @Column({ type: 'varchar' }) ownerTeamId: string;
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY })
-  participatingTeamIds: string[];
-  @Column({ type: 'varchar', nullable: true }) accountableUserId: string | null;
-  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) repositoryIds: string[];
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY })
-  acceptanceCriteria: AcceptanceCriterion[];
-  @Column({ type: 'varchar', default: 'none' }) priority: Priority;
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];
-  @Column({ type: 'varchar', default: 'draft' }) status: WorkstreamStatus;
-  @Column({ type: 'varchar', default: 'draft' })
-  derivedStatus: WorkstreamStatus;
-  /** Delivery evidence (PR / release / deployment); separate from the outcome `status`. */
-  @Column({ type: 'varchar', default: 'none' }) delivery: DeliveryState;
-  /** Outcome achieved? and the gaps if not. Recomputed with `status` (see StatusService). */
-  @Column({ type: 'jsonb', default: () => `'{"achieved":false,"gaps":[]}'` })
-  completion: WorkstreamCompletion;
-  /** Grandfathered by migration: was shipped with no criteria before that stopped being derivable. */
-  @Column({ type: 'boolean', default: false }) legacyShipped: boolean;
-  @Column({ type: 'varchar', nullable: true }) statusOverride: WorkstreamStatus | null;
-  @Column({ type: 'timestamptz', nullable: true }) startDate: Date | null;
-  @Column({ type: 'timestamptz', nullable: true }) targetDate: Date | null;
-  @Column({ type: 'varchar' }) createdById: string;
-  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
-  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
-  @Column({ type: 'timestamptz', nullable: true }) shippedAt: Date | null;
-
-  /** `statusSource` is computed from the stored fields, never persisted, so it cannot go stale. */
-  override toJSON(): Record<string, unknown> {
-    return { ...super.toJSON(), statusSource: statusSourceOf(this) };
-  }
-}
-
 @Entity('milestones')
 @Index('IDX_milestones_workspace', ['workspaceId'])
 @Index('IDX_milestones_project', ['projectId'])
@@ -411,20 +353,22 @@ export class MilestoneEntity extends Wire {
 
 @Entity('input_requests')
 @Index('IDX_input_requests_workspace', ['workspaceId'])
-@Index('IDX_input_requests_workstream', ['workstreamId'])
+@Index('IDX_input_requests_issue', ['issueId'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
-@ForeignKey(() => WorkstreamEntity, ['workstreamId'], ['id'], {
-  onDelete: 'CASCADE',
-})
+@ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => UserEntity, ['assigneeUserId'], ['id'], {
   onDelete: 'SET NULL',
 })
 export class InputRequestEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) workstreamId: string;
+  /** Required for new rows; null only for unlinked legacy history. */
+  @Column({ type: 'varchar', nullable: true }) issueId: string | null;
+  /** Historical provenance only; never used to scope new requests. */
+  @Column({ type: 'varchar', nullable: true }) legacyWorkstreamKey:
+    string | null;
   @Column({ type: 'text' }) question: string;
   @Column({ type: 'jsonb', nullable: true }) options: string[] | null;
   @Column({ type: 'jsonb' }) requestedBy: ActorRef;
@@ -449,7 +393,9 @@ export class InputRequestEntity extends Wire {
 })
 @ForeignKey(() => TeamEntity, ['teamId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => UserEntity, ['assigneeId'], ['id'], { onDelete: 'SET NULL' })
-@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
+  onDelete: 'SET NULL',
+})
 @Index('IDX_issues_project', ['projectId'])
 export class IssueEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
@@ -467,7 +413,7 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) workstreamIds: string[];
+  @Column({ type: 'text', nullable: true }) goal: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) milestoneIds: string[];
   @Column({ type: 'double precision', nullable: true }) estimate: number | null;
   @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
@@ -489,9 +435,13 @@ export class IssueEntity extends Wire {
 // ───────────────────────────── customers ─────────────────────────────
 
 @Entity('customers')
-@Index('UQ_customers_workspace_domain', ['workspaceId', 'domain'], { unique: true })
+@Index('UQ_customers_workspace_domain', ['workspaceId', 'domain'], {
+  unique: true,
+})
 @Index('IDX_customers_workspace', ['workspaceId'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 export class CustomerEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
@@ -517,9 +467,16 @@ export class CustomerEntity extends Wire {
 @Index('IDX_customer_requests_issue', ['issueId'])
 @Index('IDX_customer_requests_project', ['projectId'])
 @Index('IDX_customer_requests_customer', ['customerId'])
-@Check('CK_customer_requests_target', '("issueId" IS NULL) <> ("projectId" IS NULL)')
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
-@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], { onDelete: 'CASCADE' })
+@Check(
+  'CK_customer_requests_target',
+  '("issueId" IS NULL) <> ("projectId" IS NULL)',
+)
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 @ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'CASCADE' })
 @ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'CASCADE' })
 export class CustomerRequestEntity extends Wire {
@@ -544,10 +501,16 @@ export class CustomerRequestEntity extends Wire {
 
 /** A person following a customer: told about new, important and delivered requests. Private to them. */
 @Entity('customer_subscriptions')
-@Index('UQ_customer_subscriptions_pair', ['customerId', 'userId'], { unique: true })
+@Index('UQ_customer_subscriptions_pair', ['customerId', 'userId'], {
+  unique: true,
+})
 @Index('IDX_customer_subscriptions_user', ['workspaceId', 'userId'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
-@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => CustomerEntity, ['customerId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 @ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
 export class CustomerSubscriptionEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
@@ -565,7 +528,6 @@ export class CustomerSubscriptionEntity extends Wire {
 
 @Entity('artifacts')
 @Index('IDX_artifacts_workspace', ['workspaceId'])
-@Index('IDX_artifacts_workstream', ['workstreamId'])
 @Index('IDX_artifacts_project', ['projectId'])
 @Index('IDX_artifacts_issue', ['issueId'])
 @Index('IDX_artifacts_upload', ['uploadId'])
@@ -573,12 +535,10 @@ export class CustomerSubscriptionEntity extends Wire {
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
-// Owners are detached with SET NULL; a trigger (see the ArtifactOwners migration) deletes an artifact whose
-// last owner goes away, and a CHECK keeps at least one owner set.
-@ForeignKey(() => WorkstreamEntity, ['workstreamId'], ['id'], {
+// Issue/project owners are detached with SET NULL. Legacy provenance is not an active owner.
+@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
   onDelete: 'SET NULL',
 })
-@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'SET NULL' })
 @ForeignKey(() => RepositoryEntity, ['repositoryId'], ['id'], {
   onDelete: 'SET NULL',
@@ -586,10 +546,11 @@ export class CustomerSubscriptionEntity extends Wire {
 export class ArtifactEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  /** Owners: at least one of workstreamId / projectId / issueId is set. */
-  @Column({ type: 'varchar', nullable: true }) workstreamId: string | null;
   @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'varchar', nullable: true }) issueId: string | null;
+  /** Historical provenance for artifacts formerly owned only by a workstream. */
+  @Column({ type: 'varchar', nullable: true }) legacyWorkstreamKey:
+    string | null;
   @Column({ type: 'varchar', nullable: true }) repositoryId: string | null;
   @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'varchar' }) kind: ArtifactKind;
@@ -622,7 +583,9 @@ export class ArtifactEntity extends Wire {
  */
 @Entity('uploads')
 @Index('IDX_uploads_workspace', ['workspaceId', 'createdAt'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 export class UploadEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
@@ -645,7 +608,7 @@ export class UploadEntity extends Wire {
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
-@ForeignKey(() => WorkstreamEntity, ['originWorkstreamId'], ['id'], {
+@ForeignKey(() => IssueEntity, ['originIssueId'], ['id'], {
   onDelete: 'SET NULL',
 })
 export class DecisionEntity extends Wire {
@@ -657,11 +620,11 @@ export class DecisionEntity extends Wire {
   @Column({ type: 'text' }) statement: string;
   @Column({ type: 'text', nullable: true }) rationale: string | null;
   @Column({ type: 'varchar', default: 'proposed' }) status: DecisionStatus;
-  @Column({ type: 'varchar', nullable: true }) originWorkstreamId:
-    | string
-    | null;
-  @Column({ type: 'jsonb', default: EMPTY_ARRAY })
-  relatedWorkstreamIds: string[];
+  @Column({ type: 'varchar', nullable: true }) originIssueId: string | null;
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) relatedIssueIds: string[];
+  @Column({ type: 'jsonb', default: EMPTY_ARRAY }) legacyWorkstreamKeys: string[];
+  @Column({ type: 'varchar', nullable: true }) legacyWorkstreamKey:
+    string | null;
   @Column({ type: 'varchar', nullable: true }) supersededById: string | null;
   @Column({ type: 'jsonb' }) proposedBy: ActorRef;
   @Column({ type: 'varchar', nullable: true }) decidedById: string | null;
@@ -671,7 +634,7 @@ export class DecisionEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
 }
 
-/** Workstream → workstream edge. No FKs on from/to; services clean up. */
+/** Dependency edge. No FKs on from/to; services clean up. */
 @Entity('dependencies')
 @Index(
   'UQ_dependencies_edge',
@@ -686,9 +649,9 @@ export class DecisionEntity extends Wire {
 export class DependencyEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) fromType: DependencyNodeType;
+  @Column({ type: 'varchar' }) fromType: string;
   @Column({ type: 'varchar' }) fromId: string;
-  @Column({ type: 'varchar' }) toType: DependencyNodeType;
+  @Column({ type: 'varchar' }) toType: string;
   @Column({ type: 'varchar' }) toId: string;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 }
@@ -703,17 +666,16 @@ export class DependencyEntity extends Wire {
 export class CommentEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'jsonb' }) subject: SubjectRef;
+  @Column({ type: 'jsonb' }) subject: LegacySubjectRef;
   @Column({ type: 'jsonb' }) author: ActorRef;
   @Column({ type: 'text' }) body: string;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
 }
 
-/** Append-only. No FK on workstreamId so history survives workstream deletion. */
+/** Append-only event history. */
 @Entity('domain_events')
 @Index('IDX_events_workspace_at', ['workspaceId', 'at'])
-@Index('IDX_events_workstream_at', ['workspaceId', 'workstreamId', 'at'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
@@ -723,9 +685,13 @@ export class DomainEventEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) at: Date;
   @Column({ type: 'jsonb' }) actor: ActorRef;
   @Column({ type: 'varchar' }) type: string;
-  @Column({ type: 'jsonb' }) subject: SubjectRef;
-  @Column({ type: 'varchar', nullable: true }) workstreamId: string | null;
-  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) data: Record<string, unknown>;
+  @Column({ type: 'jsonb' }) subject: LegacySubjectRef;
+  @Column({ type: 'varchar', nullable: true }) legacyWorkstreamKey:
+    string | null;
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) data: Record<
+    string,
+    unknown
+  >;
 }
 
 // ───────────────────────────── views, tokens, attention, counters, integrations ─────────────────────────────
@@ -749,7 +715,11 @@ export class SavedViewEntity extends Wire {
   @Column({ type: 'varchar', default: 'list' }) layout: ViewLayout;
   /** Mirror of `sharing.visibility !== 'private'` (legacy flag); `sharing` is the source of truth. */
   @Column({ type: 'boolean', default: false }) shared: boolean;
-  @Column({ type: 'jsonb', default: () => `'{"visibility":"private","grants":[]}'` }) sharing: SharingSettings;
+  @Column({
+    type: 'jsonb',
+    default: () => `'{"visibility":"private","grants":[]}'`,
+  })
+  sharing: SharingSettings;
   /** sha256 (hex) of the public link token: the only thing the public endpoint looks up by. */
   @Column({ type: 'varchar', nullable: true }) publicTokenHash: string | null;
   /** The token itself, encrypted at rest, so managers can copy the link again. */
@@ -778,7 +748,8 @@ export class ApiTokenEntity extends Wire {
   @Column({ type: 'jsonb' }) actor: ActorRef;
   @Column({ type: 'varchar', default: 'write' }) scope: TokenScope;
   /** Explicit permission list; only set when `scope = 'custom'`. */
-  @Column({ type: 'jsonb', nullable: true }) permissions: ApiPermission[] | null;
+  @Column({ type: 'jsonb', nullable: true }) permissions:
+    ApiPermission[] | null;
   @Column({ type: 'jsonb' }) limits: TokenLimits;
   @Column({ type: 'varchar', nullable: true }) createdByUserId: string | null;
   @Column({ type: 'timestamptz', nullable: true }) lastUsedAt: Date | null;
@@ -793,17 +764,19 @@ export class ApiTokenEntity extends Wire {
 /** A message for one person about something that happened in a workspace. */
 @Entity('notifications')
 @Index('IDX_notifications_user', ['userId', 'workspaceId', 'createdAt'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 @ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
 export class NotificationEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
   @Column({ type: 'varchar' }) userId: string;
-  @Column({ type: 'varchar' }) kind: NotificationKind;
+  @Column({ type: 'varchar' }) kind: NotificationRecordKind;
   @Column({ type: 'varchar' }) title: string;
   @Column({ type: 'text', nullable: true }) body: string | null;
   @Column({ type: 'jsonb' }) actor: ActorRef;
-  @Column({ type: 'jsonb' }) subject: SubjectRef;
+  @Column({ type: 'jsonb' }) subject: LegacySubjectRef;
   @Column({ type: 'varchar' }) link: string;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) readAt: Date | null;
@@ -834,8 +807,12 @@ export class PushSubscriptionEntity extends Wire {
 
 /** A person's pinned entity (unique per user, workspace, type and subject). */
 @Entity('favorites')
-@Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], { unique: true })
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], { onDelete: 'CASCADE' })
+@Index('UQ_favorites_subject', ['userId', 'workspaceId', 'type', 'subjectId'], {
+  unique: true,
+})
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
 @ForeignKey(() => UserEntity, ['userId'], ['id'], { onDelete: 'CASCADE' })
 export class FavoriteEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
@@ -894,13 +871,14 @@ export class IntegrationConnectionEntity extends Wire {
   /** Encrypted webhook secret. */
   @Column({ type: 'text', nullable: true }) webhookSecret: string | null;
   @Column({ type: 'varchar', default: 'connected' }) status:
-    | 'connected'
-    | 'error'
-    | 'disconnected';
+    'connected' | 'error' | 'disconnected';
   @Column({ type: 'timestamptz', nullable: true }) lastSyncAt: Date | null;
   @Column({ type: 'text', nullable: true }) lastError: string | null;
   /** Provider-specific, non-secret settings. */
-  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) config: Record<string, unknown>;
+  @Column({ type: 'jsonb', default: EMPTY_OBJECT }) config: Record<
+    string,
+    unknown
+  >;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   /** Contract field: whether a webhook secret is configured. */
@@ -975,7 +953,6 @@ export const ENTITIES = [
   ProjectUpdateEntity,
   DocumentEntity,
   DocumentRevisionEntity,
-  WorkstreamEntity,
   MilestoneEntity,
   InputRequestEntity,
   IssueEntity,

@@ -5,7 +5,6 @@ import {
   DecisionEntity,
   IssueEntity,
   RepositoryEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import type { ChatContextDto } from './ai.dto.js';
@@ -15,8 +14,6 @@ export class AiContextService {
   constructor(
     @InjectRepository(IssueEntity)
     private readonly issues: Repository<IssueEntity>,
-    @InjectRepository(WorkstreamEntity)
-    private readonly workstreams: Repository<WorkstreamEntity>,
     @InjectRepository(RepositoryEntity)
     private readonly projects: Repository<RepositoryEntity>,
     @InjectRepository(DecisionEntity)
@@ -64,21 +61,6 @@ export class AiContextService {
           status: item.status,
           priority: item.priority,
           kind: item.kind,
-        },
-      });
-    }
-    if (context.kind === 'workstream') {
-      const item = await this.workstreams.findOne({ where });
-      if (!item) throw new NotFoundException('Workstream not found');
-      return JSON.stringify({
-        ...base,
-        workstream: {
-          key: item.key,
-          title: item.title,
-          description: item.description?.slice(0, 10000),
-          objective: item.objective?.slice(0, 4000),
-          status: item.status,
-          targetDate: item.targetDate,
         },
       });
     }

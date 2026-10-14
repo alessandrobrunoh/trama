@@ -28,15 +28,13 @@ import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
 import {
   IssueEntity,
   MilestoneEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus } from '../events/workstream-bus.js';
 import {
-  WorkstreamsService,
-  type WorkstreamInput,
-} from '../workstreams/workstreams.service.js';
-import { loadStatusCatalog, requireStatus, statusFilterIds } from '../status/status-catalog.js';
+  loadStatusCatalog,
+  requireStatus,
+  statusFilterIds,
+} from '../status/status-catalog.js';
 import { LabelsService } from '../workspaces/labels.service.js';
 import {
   applyProjectScope,
@@ -54,6 +52,7 @@ export interface IssueInput {
   body?: string | null;
   source?: IssueSource;
   reporterName?: string | null;
+  goal?: string | null;
   assigneeId?: string | null;
   teamId?: string | null;
   /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
@@ -62,14 +61,13 @@ export interface IssueInput {
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
   externalUrl?: string | null;
-  workstreamIds?: string[];
   milestoneIds?: string[];
   labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
 }
 
-/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+/** One change applied to every issue of a bulk request. Labels are added / removed. */
 export interface BulkIssuePatch {
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
@@ -79,33 +77,17 @@ export interface BulkIssuePatch {
   projectId?: string | null;
   addLabels?: string[];
   removeLabels?: string[];
-  addWorkstreamIds?: string[];
-  removeWorkstreamIds?: string[];
 }
 
 /** An update validated and applied to the row in memory, waiting to be persisted and announced. */
 interface PreparedUpdate {
   row: IssueEntity;
   patch: IssueInput;
-  before: Set<string>;
   from: IssueStatus;
   fromKey: string;
   fromKind: IssueKind;
   previousAssigneeId: string | null;
   rekey: boolean;
-  /** Bulk requests also announce `issue.linked` on every workstream the issue was added to. */
-  announceLinks?: boolean;
-}
-
-export interface LinkIssueInput {
-  workstreamIds?: string[];
-  createWorkstream?: WorkstreamInput & {
-    title: string;
-    ownerTeamId: string;
-    deltaThreadUrl?: string;
-  };
-  /** Optional explicit status (catalog id or legacy enum). Without it, linking leaves the status unchanged. */
-  status?: string;
 }
 
 const KEY_RE = /^[A-Za-z]+-\d+$/;
@@ -159,8 +141,6 @@ export class IssuesService {
     private readonly refs: RefsService,
     private readonly counters: CountersService,
     private readonly events: EventsService,
-    private readonly bus: WorkstreamBus,
-    private readonly workstreams: WorkstreamsService,
     private readonly labels: LabelsService,
     @InjectRepository(IssueEntity)
     private readonly repo: Repository<IssueEntity>,
@@ -174,7 +154,10 @@ export class IssuesService {
     return requireStatus(catalog, stored, 'status');
   }
 
-  private async issueStatusType(workspaceId: string, stored: string): Promise<IssueStatus> {
+  private async issueStatusType(
+    workspaceId: string,
+    stored: string,
+  ): Promise<IssueStatus> {
     return (await this.resolveIssueStatus(workspaceId, stored)).type;
   }
 
@@ -187,7 +170,6 @@ export class IssuesService {
       teamId?: string;
       assigneeId?: string;
       projectId?: string;
-      workstreamId?: string;
       milestoneId?: string;
     } & DemandFilter & {
         q?: string;
@@ -204,26 +186,27 @@ export class IssuesService {
     if (f.kind) qb.andWhere('i.kind = :k', { k: f.kind });
     if (f.status || f.open) {
       const catalog = (await loadStatusCatalog(this.ds, workspaceId)).issue;
-      if (f.status) qb.andWhere('i.status IN (:...st)', { st: statusFilterIds(catalog, f.status) });
+      if (f.status)
+        qb.andWhere('i.status IN (:...st)', {
+          st: statusFilterIds(catalog, f.status),
+        });
       if (f.open) {
         qb.andWhere('i.status IN (:...open)', {
-          open: statusIdsForTypes(catalog, ['backlog', 'todo', 'in_progress', 'in_review']),
+          open: statusIdsForTypes(catalog, [
+            'backlog',
+            'todo',
+            'in_progress',
+            'in_review',
+          ]),
         });
       }
     }
-    if (f.priority?.length) qb.andWhere('i.priority IN (:...pr)', { pr: f.priority });
+    if (f.priority?.length)
+      qb.andWhere('i.priority IN (:...pr)', { pr: f.priority });
     if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
-    // Same meaning as the client's `issuesByProject`: planned under the project, or linked to one of its workstreams.
     if (f.projectId)
-      qb.andWhere(
-        `(i.projectId = :p OR EXISTS (SELECT 1 FROM workstreams pw WHERE pw."workspaceId" = i."workspaceId" AND pw."projectId" = :p AND i."workstreamIds" @> jsonb_build_array(pw.id)))`,
-        { p: f.projectId },
-      );
-    if (f.workstreamId)
-      qb.andWhere('i.workstreamIds @> :w::jsonb', {
-        w: JSON.stringify([f.workstreamId]),
-      });
+      qb.andWhere('i.projectId = :p', { p: f.projectId });
     if (f.milestoneId)
       qb.andWhere('i.milestoneIds @> :m::jsonb', {
         m: JSON.stringify([f.milestoneId]),
@@ -260,33 +243,14 @@ export class IssuesService {
     return row;
   }
 
-  /** Projects an issue may take milestones from: its own plus those its workstreams carry out. */
-  private async milestoneProjects(
-    workspaceId: string,
-    projectId: string | null,
-    workstreamIds: readonly string[],
-  ) {
-    const streams = workstreamIds.length
-      ? await this.ds
-          .getRepository(WorkstreamEntity)
-          .findBy({ workspaceId, id: In([...workstreamIds]) })
-      : [];
-    const projects = new Set(
-      streams.map((w) => w.projectId).filter((p): p is string => !!p),
-    );
-    if (projectId) projects.add(projectId);
-    return projects;
-  }
-
   /**
-   * Milestones must exist, belong to the issue's project or to a project of a workstream the issue
-   * is linked to, and an issue may be in at most one milestone per project.
+   * Milestones must exist and belong to the issue's project; an issue may be
+   * in at most one milestone per project.
    */
   private async assertMilestones(
     workspaceId: string,
     milestoneIds: readonly string[],
     projectId: string | null,
-    workstreamIds: readonly string[],
   ) {
     if (!milestoneIds.length) return;
     const rows = await this.ds
@@ -296,16 +260,12 @@ export class IssuesService {
       throw new BadRequestException(
         `Unknown milestone in: ${milestoneIds.join(', ')}`,
       );
-    const projects = await this.milestoneProjects(
-      workspaceId,
-      projectId,
-      workstreamIds,
-    );
+    const projects = new Set(projectId ? [projectId] : []);
     const seen = new Set<string>();
     for (const m of rows) {
       if (!projects.has(m.projectId))
         throw new BadRequestException(
-          `Milestone "${m.name}" belongs to a project that is neither this issue's project nor one its workstreams carry out`,
+          `Milestone "${m.name}" does not belong to this issue's project`,
         );
       if (seen.has(m.projectId))
         throw new BadRequestException(
@@ -325,10 +285,22 @@ export class IssuesService {
       workspaceId,
       [input.teamId].filter((x): x is string => !!x),
     );
-    await this.refs.projects(workspaceId, [input.projectId].filter((x): x is string => !!x));
-    const resolved = await this.resolveIssueStatus(workspaceId, input.status ?? 'backlog');
+    await this.refs.projects(
+      workspaceId,
+      [input.projectId].filter((x): x is string => !!x),
+    );
+    const resolved = await this.resolveIssueStatus(
+      workspaceId,
+      input.status ?? 'backlog',
+    );
     const status = resolved.id as IssueStatus;
-    const assigneeId = claimAssignee(actor, null, resolved.type, input.assigneeId ?? null, input.assigneeId !== undefined);
+    const assigneeId = claimAssignee(
+      actor,
+      null,
+      resolved.type,
+      input.assigneeId ?? null,
+      input.assigneeId !== undefined,
+    );
     await this.refs.users(workspaceId, [assigneeId]);
     await this.uploads?.assertAttachable(workspaceId, input.body);
     const facts: Pick<IssueEntity, 'startedAt' | 'completedAt'> = {
@@ -353,6 +325,7 @@ export class IssuesService {
           body: input.body ?? null,
           source: input.source ?? (actor.type === 'agent' ? 'agent' : 'manual'),
           reporterName: input.reporterName ?? null,
+          goal: input.goal ?? null,
           reporterId: actor.type === 'user' ? (actor.id ?? null) : null,
           assigneeId,
           teamId: input.teamId ?? null,
@@ -437,7 +410,7 @@ export class IssuesService {
   /**
    * Apply one patch to many issues all-or-nothing: every issue is validated first, the writes
    * happen in one transaction, and the events are recorded once it committed (a failure leaves
-   * nothing behind). Labels and workstreams are added / removed, not replaced.
+   * nothing behind). Labels are added / removed, not replaced.
    */
   async updateMany(
     workspaceId: string,
@@ -448,23 +421,10 @@ export class IssuesService {
     const touchesAnything = Object.values(patch).some((v) => v !== undefined);
     if (!touchesAnything)
       throw new BadRequestException('patch must change at least one field');
-    const add = unique(patch.addWorkstreamIds);
-    const remove = unique(patch.removeWorkstreamIds);
-    if (add.some((id) => remove.includes(id)))
-      throw new BadRequestException(
-        'A workstream cannot be both added and removed',
-      );
     const addLabels = unique(patch.addLabels);
     const removeLabels = unique(patch.removeLabels);
     if (addLabels.some((id) => removeLabels.includes(id)))
       throw new BadRequestException('A label cannot be both added and removed');
-    if (add.length) {
-      const dupes = rows.filter((r) => r.duplicateOfId).map((r) => r.key);
-      if (dupes.length)
-        throw new BadRequestException(
-          `Duplicates cannot be linked to a workstream: ${dupes.join(', ')}`,
-        );
-    }
     // One lookup per reference for the whole batch instead of one per issue.
     await this.refs.teams(
       workspaceId,
@@ -475,7 +435,6 @@ export class IssuesService {
       workspaceId,
       [patch.projectId].filter((x): x is string => !!x),
     );
-    await this.refs.workstreams(workspaceId, add);
     await this.labels.assign(
       workspaceId,
       [...addLabels, ...removeLabels],
@@ -495,14 +454,9 @@ export class IssuesService {
         next.labels = unique([...row.labels, ...addLabels]).filter(
           (l) => !removeLabels.includes(l),
         );
-      if (add.length || remove.length)
-        next.workstreamIds = unique([...row.workstreamIds, ...add]).filter(
-          (w) => !remove.includes(w),
-        );
-      prepared.push({
-        ...(await this.prepareUpdate(workspaceId, actor, row, next, true)),
-        announceLinks: true,
-      });
+      prepared.push(
+        await this.prepareUpdate(workspaceId, actor, row, next, true),
+      );
     }
     await this.ds.transaction(async (m) => {
       await m.save(rows.map((r) => r));
@@ -530,9 +484,7 @@ export class IssuesService {
         workspaceId,
         [patch.projectId].filter((x): x is string => !!x),
       );
-      await this.refs.workstreams(workspaceId, patch.workstreamIds);
     }
-    const before = new Set(row.workstreamIds);
     const from = row.status;
     const fromKey = row.key;
     const fromKind = row.kind;
@@ -541,13 +493,13 @@ export class IssuesService {
       if (patch.duplicateOfId === null) {
         duplicateOfId = null;
       } else {
-        if (patch.status !== undefined && (await this.resolveIssueStatus(workspaceId, patch.status)).type !== 'canceled')
+        if (
+          patch.status !== undefined &&
+          (await this.resolveIssueStatus(workspaceId, patch.status)).type !==
+            'canceled'
+        )
           throw new BadRequestException(
             'Marking an issue as a duplicate sets its status to "canceled"',
-          );
-        if (patch.workstreamIds?.length)
-          throw new BadRequestException(
-            'Cannot link workstreams when marking an issue as a duplicate',
           );
         const target = await this.get(workspaceId, patch.duplicateOfId);
         if (target.id === row.id)
@@ -557,10 +509,6 @@ export class IssuesService {
       }
     }
 
-    const nextWorkstreamIds =
-      patch.workstreamIds !== undefined
-        ? unique(patch.workstreamIds)
-        : row.workstreamIds;
     const nextProjectId =
       patch.projectId !== undefined ? patch.projectId : row.projectId;
     let nextMilestoneIds =
@@ -572,18 +520,12 @@ export class IssuesService {
         workspaceId,
         nextMilestoneIds,
         nextProjectId,
-        nextWorkstreamIds,
       );
     } else if (
-      (patch.workstreamIds !== undefined || patch.projectId !== undefined) &&
+      patch.projectId !== undefined &&
       row.milestoneIds.length
     ) {
-      // Leaving a project (clearing it, or unlinking its last workstream) drops that project's milestone.
-      const projects = await this.milestoneProjects(
-        workspaceId,
-        nextProjectId,
-        nextWorkstreamIds,
-      );
+      const projects = new Set(nextProjectId ? [nextProjectId] : []);
       const kept = new Set(
         (
           await this.ds
@@ -601,13 +543,12 @@ export class IssuesService {
     if (patch.estimate !== undefined) row.estimate = patch.estimate;
     if (patch.body !== undefined) row.body = patch.body;
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
+    if (patch.goal !== undefined) row.goal = patch.goal;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
     if (patch.teamId !== undefined) row.teamId = patch.teamId;
     if (patch.projectId !== undefined) row.projectId = patch.projectId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
-    if (patch.workstreamIds !== undefined)
-      row.workstreamIds = unique(patch.workstreamIds);
     if (patch.labels !== undefined)
       row.labels =
         (await this.labels.assign(
@@ -624,7 +565,13 @@ export class IssuesService {
       toType = resolved.type;
       if (resolved.id !== from) applyStatusFacts(row, resolved.type);
     }
-    const claimed = claimAssignee(actor, fromType, toType, row.assigneeId, patch.assigneeId !== undefined);
+    const claimed = claimAssignee(
+      actor,
+      fromType,
+      toType,
+      row.assigneeId,
+      patch.assigneeId !== undefined,
+    );
     if (claimed !== row.assigneeId) {
       await this.refs.users(workspaceId, [claimed]);
       row.assigneeId = claimed;
@@ -634,7 +581,6 @@ export class IssuesService {
     return {
       row,
       patch,
-      before,
       from,
       fromKey,
       fromKind,
@@ -707,130 +653,8 @@ export class IssuesService {
         actor,
         type: 'issue.status_changed',
         subject: { type: 'issue', id: row.id },
-        workstreamId: row.workstreamIds[0] ?? null,
         data: { key: row.key, from, to: row.status },
       });
-    if (p.announceLinks)
-      for (const workstreamId of row.workstreamIds.filter(
-        (w) => !p.before.has(w),
-      ))
-        await this.events.record({
-          workspaceId,
-          actor,
-          type: 'issue.linked',
-          subject: { type: 'issue', id: row.id },
-          workstreamId,
-          data: { key: row.key, workstreamIds: row.workstreamIds },
-        });
-    const touched = new Set([...p.before, ...row.workstreamIds]);
-    await this.bus.touchMany(workspaceId, touched, 'issue.updated');
-  }
-
-  /**
-   * Attach the issue to existing workstreams and/or a newly created one (`createWorkstream`,
-   * created atomically). Linking is organizational and never changes the status by itself; only an
-   * explicit `status` does (moving to `in_progress` then assigns the acting user if unassigned).
-   */
-  async link(
-    workspaceId: string,
-    actor: ActorRef,
-    idOrKey: string,
-    input: LinkIssueInput,
-  ) {
-    const row = await this.get(workspaceId, idOrKey);
-    if (row.duplicateOfId)
-      throw new BadRequestException(
-        'A duplicate issue cannot be linked to a workstream',
-      );
-    if (!input.createWorkstream && !input.workstreamIds?.length)
-      throw new BadRequestException(
-        'workstreamIds or createWorkstream is required',
-      );
-    if (
-      input.status !== undefined &&
-      (await this.resolveIssueStatus(workspaceId, input.status)).type === 'canceled'
-    )
-      throw new BadRequestException(
-        'Cancel the issue with PATCH instead of linking it',
-      );
-    await this.refs.workstreams(workspaceId, input.workstreamIds);
-
-    let created: Awaited<ReturnType<WorkstreamsService['create']>> | undefined;
-    const previous = row.workstreamIds;
-    const from = row.status;
-    const previousAssigneeId = row.assigneeId;
-    const next = input.status !== undefined ? await this.resolveIssueStatus(workspaceId, input.status) : null;
-    const nextStatus = (next?.id ?? row.status) as IssueStatus;
-    const fromType = await this.issueStatusType(workspaceId, from);
-    const nextAssignee = claimAssignee(actor, fromType, next?.type ?? fromType, row.assigneeId, false);
-    if (nextAssignee !== row.assigneeId) await this.refs.users(workspaceId, [nextAssignee]);
-    await this.ds.transaction(async (m) => {
-      const ids = unique([
-        ...(row.workstreamIds ?? []),
-        ...(input.workstreamIds ?? []),
-      ]);
-      if (input.createWorkstream) {
-        created = await this.workstreams.create(
-          workspaceId,
-          actor,
-          input.createWorkstream,
-          {
-            manager: m,
-            data: { fromIssue: row.key },
-          },
-        );
-        ids.push(created.id);
-      }
-      row.workstreamIds = ids;
-      row.assigneeId = nextAssignee;
-      row.status = nextStatus;
-      if (row.status !== from) applyStatusFacts(row, next?.type ?? fromType);
-      row.updatedAt = new Date();
-      await m.save(row);
-    });
-    if (created) await created.after?.();
-    const targets = row.workstreamIds.length ? row.workstreamIds : [null];
-    for (const workstreamId of targets)
-      await this.events.record({
-        workspaceId,
-        actor,
-        type: 'issue.linked',
-        subject: { type: 'issue', id: row.id },
-        workstreamId,
-        data: {
-          key: row.key,
-          workstreamIds: row.workstreamIds,
-          createdWorkstreamId: created?.id,
-        },
-      });
-    if (row.status !== from)
-      await this.events.record({
-        workspaceId,
-        actor,
-        type: 'issue.status_changed',
-        subject: { type: 'issue', id: row.id },
-        workstreamId: row.workstreamIds[0] ?? null,
-        data: { key: row.key, from, to: row.status },
-      });
-    if (row.assigneeId !== previousAssigneeId)
-      await this.events.record({
-        workspaceId,
-        actor,
-        type: 'issue.updated',
-        subject: { type: 'issue', id: row.id },
-        workstreamId: row.workstreamIds[0] ?? null,
-        data: {
-          key: row.key,
-          fields: ['assigneeId'],
-          assignee: { from: previousAssigneeId, to: row.assigneeId },
-        },
-      });
-    await this.bus.touchMany(
-      workspaceId,
-      [...previous, ...row.workstreamIds],
-      'issue.linked',
-    );
-    return row;
   }
 
   /**
@@ -931,10 +755,9 @@ export class IssuesService {
       subject: { type: 'issue', id: row.id },
       data: { key: row.key, title: row.title },
     });
-    await this.bus.touchMany(workspaceId, row.workstreamIds, 'issue.deleted');
   }
 
-  /** Delete many issues in one transaction; events and workstream refreshes follow the commit. */
+  /** Delete many issues in one transaction; events follow the commit. */
   async removeMany(
     workspaceId: string,
     actor: ActorRef,
@@ -961,10 +784,5 @@ export class IssuesService {
         subject: { type: 'issue', id: row.id },
         data: { key: row.key, title: row.title },
       });
-    await this.bus.touchMany(
-      workspaceId,
-      rows.flatMap((r) => r.workstreamIds),
-      'issue.deleted',
-    );
   }
 }

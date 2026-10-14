@@ -23,8 +23,6 @@ function makeService(options: { clash?: boolean } = {}) {
     {} as never,
     { record, publish } as never,
     {} as never,
-    {} as never,
-    {} as never,
     { findOneBy: async () => row, save } as never,
   );
   return { service, row, record, publish };
@@ -60,7 +58,7 @@ describe('IssuesService external reference', () => {
     const { service } = makeService({ clash: true });
     const err = await service.setExternalRef('ws_1', actor, 'iss_1', ref).catch((e: unknown) => e as Error);
     expect(err).toBeInstanceOf(ConflictException);
-    expect(err.message).toContain('FEAT-9');
+    expect((err as Error).message).toContain('FEAT-9');
   });
 
   it('refreshes the mirrored status quietly (no domain event) and refuses an unlinked issue', async () => {

@@ -17,7 +17,7 @@ export interface ArtifactCandidate {
   hasConflicts?: boolean;
   headSha?: string;
   headBranch?: string;
-  /** Free text scanned (case-sensitively) for workstream keys: title, body. */
+  /** Free text scanned (case-sensitively) for Issue keys: title, body. */
   texts: string[];
   /** Branch names, scanned case-insensitively (`auth-42/replay`). */
   branchTexts: string[];

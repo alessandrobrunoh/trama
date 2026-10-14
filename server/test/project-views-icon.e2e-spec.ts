@@ -6,7 +6,6 @@ describe('project icon, project views and the project issue filter', () => {
   let c: Client;
   let viewer: Client;
   let w: string;
-  let teamId: string;
   beforeAll(async () => {
     app = await createTestApp();
     const server = app.getHttpServer();
@@ -14,7 +13,6 @@ describe('project icon, project views and the project issue filter', () => {
     c = owner.client;
     const ws = (await c.post('/api/workspaces', { name: 'Views Co' }).expect(201)).body;
     w = `/api/w/${ws.slug}`;
-    teamId = (await c.post(`${w}/teams`, { name: 'Core', key: 'CORE', memberIds: [owner.user.id] }).expect(201)).body.id;
     const v = await Client.signup(server, 'Vic Viewer');
     await c.post(`${w}/members`, { email: v.email, role: 'viewer' }).expect(201);
     viewer = v.client;
@@ -22,8 +20,6 @@ describe('project icon, project views and the project issue filter', () => {
   afterAll(() => app.close());
 
   const mkProject = async (name: string, extra: object = {}) => (await c.post(`${w}/projects`, { name, ...extra }).expect(201)).body;
-  const mkWs = async (title: string, projectId?: string) =>
-    (await c.post(`${w}/workstreams`, { title, ownerTeamId: teamId, deltaThreadUrl: 'https://delta.dev/t/e2e', projectId }).expect(201)).body;
   const mkIssue = async (title: string, extra: object = {}) => (await c.post(`${w}/issues`, { kind: 'bug', title, ...extra }).expect(201)).body;
 
   describe('project icon', () => {
@@ -54,12 +50,11 @@ describe('project icon, project views and the project issue filter', () => {
   });
 
   describe('views: project entity and timeline layout', () => {
-    it('accepts the project entity and the timeline layout for project and workstream views', async () => {
+    it('accepts the project entity and timeline layout', async () => {
       const v = (await c.post(`${w}/views`, { name: 'Roadmap', entity: 'project', layout: 'timeline' }).expect(201)).body;
       expect(v).toMatchObject({ entity: 'project', layout: 'timeline' });
       await c.post(`${w}/views`, { name: 'Projects list', entity: 'project' }).expect(201);
       await c.post(`${w}/views`, { name: 'Projects board', entity: 'project', layout: 'board', filters: [{ field: 'status', op: 'is', value: 'started' }] }).expect(201);
-      await c.post(`${w}/views`, { name: 'Streams gantt', entity: 'workstream', layout: 'timeline' }).expect(201);
       expect((await c.get(`${w}/views/${v.id}`).expect(200)).body.layout).toBe('timeline');
     });
 
@@ -85,38 +80,16 @@ describe('project icon, project views and the project issue filter', () => {
   });
 
   describe('GET /issues?projectId=', () => {
-    it('includes issues linked to the project\'s workstreams, once each, and nothing else', async () => {
+    it('returns only issues directly assigned to the project', async () => {
       const P = await mkProject('Filtered');
       const Q = await mkProject('Other');
-      const wp = await mkWs('Project stream', P.id);
-      const wq = await mkWs('Other stream', Q.id);
       const direct = await mkIssue('direct', { projectId: P.id });
-      const viaWs = await mkIssue('via workstream');
-      const both = await mkIssue('both', { projectId: P.id });
-      const twoStreams = await mkIssue('two streams');
-      const wp2 = await mkWs('Second project stream', P.id);
-      const foreign = await mkIssue('foreign');
       const plain = await mkIssue('plain');
-      const mixed = await mkIssue('mixed', { projectId: Q.id });
-
-      await c.post(`${w}/issues/${viaWs.key}/link`, { workstreamIds: [wp.id] }).expect(200);
-      await c.post(`${w}/issues/${both.key}/link`, { workstreamIds: [wp.id] }).expect(200);
-      await c.post(`${w}/issues/${twoStreams.key}/link`, { workstreamIds: [wp.id, wp2.id] }).expect(200);
-      await c.post(`${w}/issues/${foreign.key}/link`, { workstreamIds: [wq.id] }).expect(200);
-      await c.post(`${w}/issues/${mixed.key}/link`, { workstreamIds: [wq.id] }).expect(200);
 
       const keys = async (q: string) => ((await c.get(`${w}/issues?${q}`).expect(200)).body as { key: string }[]).map((i) => i.key).sort();
-      expect(await keys(`projectId=${P.id}`)).toEqual([direct.key, viaWs.key, both.key, twoStreams.key].sort());
-      expect(await keys(`projectId=${Q.id}`)).toEqual([foreign.key, mixed.key].sort());
-
-      // composes with the other filters
-      expect(await keys(`projectId=${P.id}&workstreamId=${wp2.id}`)).toEqual([twoStreams.key]);
-      await c.patch(`${w}/issues/${viaWs.key}`, { status: 'done' }).expect(200);
-      expect(await keys(`projectId=${P.id}&open=true`)).toEqual([direct.key, both.key, twoStreams.key].sort());
-
-      // unlinking takes the issue out; unknown projects match nothing
-      await c.patch(`${w}/issues/${twoStreams.key}`, { workstreamIds: [] }).expect(200);
-      expect(await keys(`projectId=${P.id}&open=true`)).toEqual([direct.key, both.key].sort());
+      expect(await keys(`projectId=${P.id}`)).toEqual([direct.key.key]);
+      expect(await keys(`projectId=${Q.id}`)).toEqual([]);
+      expect(await keys(`projectId=${P.id}&open=true`)).toEqual([direct.key]);
       expect(await keys('projectId=pj_missing')).toEqual([]);
       expect(await keys('')).toContain(plain.key);
     });

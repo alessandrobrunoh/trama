@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import type { MemberResource } from '../contracts/domain.js';
 import { canView, currentAccess, projectHidden } from '../auth/member-access.js';
 
-export const SEARCH_TYPES = ['workstream', 'project', 'issue', 'customer', 'decision', 'artifact', 'document', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['project', 'issue', 'customer', 'decision', 'artifact', 'document', 'repository', 'team'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -12,14 +12,14 @@ export interface SearchResult {
   key?: string;
   title: string;
   subtitle: string;
-  workstreamKey?: string;
+  legacyWorkstreamKey?: string;
   score: number;
 }
 
 interface Spec {
   type: SearchType;
   from: string;
-  /** SQL columns selected as id, key, title, subtitle, workstreamKey, body */
+  /** SQL columns selected as id, key, title, subtitle, legacyWorkstreamKey, body */
   select: string;
   /** searchable columns: [column, role] */
   fields: [string, 'key' | 'title' | 'body'][];
@@ -29,65 +29,58 @@ interface Spec {
 
 const SPECS: Spec[] = [
   {
-    type: 'workstream',
-    from: `"workstreams" x JOIN "teams" t ON t."id" = x."ownerTeamId"`,
-    select: `x."id" AS id, x."key" AS key, x."title" AS title, x."status" || ' · ' || t."name" AS subtitle, NULL AS "workstreamKey", COALESCE(x."description", x."objective") AS body, x."projectId" AS "projectId"`,
-    fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."description"', 'body'], ['x."objective"', 'body']],
-    rank: 0,
-  },
-  {
     type: 'project',
     from: `"projects" x`,
-    select: `x."id", NULL AS key, x."name" AS title, x."status" AS subtitle, NULL AS "workstreamKey", COALESCE(x."summary", x."description") AS body, x."id" AS "projectId"`,
+    select: `x."id", NULL AS key, x."name" AS title, x."status" AS subtitle, NULL AS "legacyWorkstreamKey", COALESCE(x."summary", x."description") AS body, x."id" AS "projectId"`,
     fields: [['x."name"', 'title'], ['x."summary"', 'body'], ['x."description"', 'body']],
     rank: 1,
   },
   {
     type: 'issue',
     from: `"issues" x`,
-    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "workstreamKey", x."body" AS body, x."projectId" AS "projectId"`,
+    select: `x."id", x."key", x."title", x."kind" || ' · ' || x."status" AS subtitle, NULL AS "legacyWorkstreamKey", x."body" AS body, x."projectId" AS "projectId"`,
     fields: [['x."key"', 'key'], ['x."aliases"::text', 'key'], ['x."title"', 'title'], ['x."body"', 'body']],
     rank: 3,
   },
   {
     type: 'customer',
     from: `"customers" x`,
-    select: `x."id", NULL AS key, x."name" AS title, x."domain" AS subtitle, NULL AS "workstreamKey", NULL AS body`,
+    select: `x."id", NULL AS key, x."name" AS title, x."domain" AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
     fields: [['x."name"', 'title'], ['x."domain"', 'title']],
     rank: 3,
   },
   {
     type: 'decision',
-    from: `"decisions" x LEFT JOIN "workstreams" dw ON dw."id" = x."originWorkstreamId"`,
-    select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "workstreamKey", x."statement" AS body, dw."projectId" AS "projectId"`,
+    from: `"decisions" x LEFT JOIN "issues" i ON i."id" = x."originIssueId"`,
+    select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "legacyWorkstreamKey", x."statement" AS body, i."projectId" AS "projectId"`,
     fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."statement"', 'body']],
     rank: 2,
   },
   {
     type: 'artifact',
-    from: `"artifacts" x LEFT JOIN "workstreams" w ON w."id" = x."workstreamId"`,
-    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, w."key" AS "workstreamKey", COALESCE(x."url", x."description") AS body, COALESCE(x."projectId", w."projectId") AS "projectId"`,
+    from: `"artifacts" x LEFT JOIN "issues" i ON i."id" = x."issueId"`,
+    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, x."legacyWorkstreamKey" AS "legacyWorkstreamKey", COALESCE(x."url", x."description") AS body, COALESCE(x."projectId", i."projectId") AS "projectId"`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
     rank: 4,
   },
   {
     type: 'document',
     from: `"documents" x`,
-    select: `x."id", NULL AS key, x."title", CASE WHEN x."archivedAt" IS NULL THEN 'document' ELSE 'document · archived' END AS subtitle, NULL AS "workstreamKey", NULL AS body`,
+    select: `x."id", NULL AS key, x."title", CASE WHEN x."archivedAt" IS NULL THEN 'document' ELSE 'document · archived' END AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
     fields: [['x."title"', 'title']],
     rank: 4,
   },
   {
     type: 'repository',
     from: `"repositories" x`,
-    select: `x."id", NULL AS key, x."fullName" AS title, x."provider" AS subtitle, NULL AS "workstreamKey", NULL AS body`,
+    select: `x."id", NULL AS key, x."fullName" AS title, x."provider" AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
     fields: [['x."fullName"', 'title']],
     rank: 5,
   },
   {
     type: 'team',
     from: `"teams" x`,
-    select: `x."id", x."key", x."name" AS title, 'Team' AS subtitle, NULL AS "workstreamKey", x."description" AS body`,
+    select: `x."id", x."key", x."name" AS title, 'Team' AS subtitle, NULL AS "legacyWorkstreamKey", x."description" AS body`,
     fields: [['x."key"', 'key'], ['x."name"', 'title'], ['x."description"', 'body']],
     rank: 6,
   },
@@ -100,13 +93,12 @@ interface Row {
   key: string | null;
   title: string;
   subtitle: string;
-  workstreamKey: string | null;
+  legacyWorkstreamKey: string | null;
   body: string | null;
   projectId?: string | null;
 }
 
 const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
-  workstream: 'workstreams',
   project: 'projects',
   issue: 'issues',
   customer: 'customers',
@@ -114,7 +106,7 @@ const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
   artifact: 'artifacts',
   document: 'documents',
 };
-const PROJECT_SCOPED = new Set<SearchType>(['workstream', 'project', 'issue', 'decision', 'artifact']);
+const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'decision', 'artifact']);
 
 /** Scores a row: exact key 100, key prefix 80, key contains 60, title exact 70, prefix 55, contains 40, body 20. */
 export function scoreRow(q: string, row: Pick<Row, 'key' | 'title' | 'body'>): number {
@@ -166,7 +158,7 @@ export class SearchService {
           ...(r.key ? { key: r.key } : {}),
           title: r.title,
           subtitle: r.subtitle,
-          ...(r.workstreamKey ? { workstreamKey: r.workstreamKey } : {}),
+          ...(r.legacyWorkstreamKey ? { legacyWorkstreamKey: r.legacyWorkstreamKey } : {}),
           score: scoreRow(query, r),
           rank: spec.rank,
         }));

@@ -18,7 +18,6 @@ function build(role: Role, manageIntegrations: Role = 'admin') {
   const service = new SnapshotService(
     ds as never,
     { list: vi.fn().mockResolvedValue([]) } as never,
-    { forUser: vi.fn().mockResolvedValue([]) } as never,
     {
       attachProjectCounts: vi.fn().mockImplementation((_ws: string, rows: unknown[]) => rows),
       attachCounts: vi.fn().mockImplementation((_ws: string, rows: unknown[]) => rows),

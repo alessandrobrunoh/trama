@@ -1,187 +1,232 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { DataSource, In } from 'typeorm';
-import { hasAdminPower, type WorkspaceContext } from '../auth/request-context.js';
-import { findWorkspaceRole, roleHasAdminPower } from '../contracts/domain.js';
-import type { AttentionItem } from '../contracts/domain.js';
 import {
-  AgentEntity,
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { AttentionItem, AttentionKind } from '../contracts/domain.js';
+import {
   ArtifactEntity,
   AttentionStateEntity,
   DecisionEntity,
-  DependencyEntity,
   InputRequestEntity,
   IssueEntity,
-  MembershipEntity,
-  TeamEntity,
-  UserEntity,
-  WorkspaceEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
-import { EventsService } from '../events/events.service.js';
-import { computeAttention, itemState, sortItems, type AttentionData, type RawAttentionItem } from './attention-rules.js';
-
-export interface AttentionOptions {
-  scope?: 'mine' | 'all';
-  state?: 'open' | 'snoozed' | 'dismissed' | 'active';
-}
-
-/** Event-log timestamps for "since": when the underlying condition started. */
-const SINCE_SQL = `
-  SELECT 'review_requested:' || (subject->>'id') AS id, max(at) AS at FROM domain_events
-    WHERE "workspaceId" = $1 AND type = 'review.requested' GROUP BY 1
-  UNION ALL
-  SELECT 'ci_failed:' || (subject->>'id'), max(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND type = 'artifact.updated' AND data->'changes'->'ci'->>1 = 'failing' GROUP BY 1
-  UNION ALL
-  SELECT 'conflict:' || (subject->>'id'), max(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND type = 'artifact.updated' AND data->'changes'->'hasConflicts'->>1 = 'true' GROUP BY 1
-  UNION ALL
-  SELECT 'ready_to_land:' || (subject->>'id'), max(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND type = 'artifact.updated' AND data->'changes'->'review'->>1 = 'approved' GROUP BY 1
-  UNION ALL
-  SELECT 'blocked:' || (subject->>'id'), max(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND type = 'execution.state_changed' AND data->>'to' IN ('blocked', 'failed') GROUP BY 1
-  UNION ALL
-  SELECT 'ready_to_ship:' || "workstreamId", max(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND "workstreamId" IS NOT NULL AND (
-      (type = 'criterion.updated' AND data->>'state' = 'met')
-      OR (type = 'artifact.updated' AND data->'changes'->'state'->>1 = 'merged')) GROUP BY 1
-  UNION ALL
-  SELECT 'proof_missing:' || "workstreamId", min(at) FROM domain_events
-    WHERE "workspaceId" = $1 AND "workstreamId" IS NOT NULL AND type = 'artifact.updated'
-      AND data->'changes'->'state'->>1 IN ('merged', 'healthy', 'published') GROUP BY 1`;
+import {
+  canView,
+  currentAccess,
+  projectHidden,
+} from '../auth/member-access.js';
+import { In, type Repository } from 'typeorm';
 
 @Injectable()
 export class AttentionService {
   constructor(
-    private readonly ds: DataSource,
-    private readonly events: EventsService,
+    @InjectRepository(IssueEntity)
+    private readonly issues: Repository<IssueEntity>,
+    @InjectRepository(InputRequestEntity)
+    private readonly requests: Repository<InputRequestEntity>,
+    @InjectRepository(DecisionEntity)
+    private readonly decisions: Repository<DecisionEntity>,
+    @InjectRepository(ArtifactEntity)
+    private readonly artifacts: Repository<ArtifactEntity>,
+    @InjectRepository(AttentionStateEntity)
+    private readonly states: Repository<AttentionStateEntity>,
   ) {}
 
-  /**
-   * AttentionItems for the caller (PLAN.md §3). Agents have none (human attention).
-   * `scope: 'all'` (admin+) returns every item of the workspace.
-   */
-  async forUser(ctx: WorkspaceContext, opts: AttentionOptions = {}): Promise<AttentionItem[]> {
-    if (!ctx.userId) return [];
-    if (opts.scope === 'all' && !hasAdminPower(ctx))
-      throw new ForbiddenException('scope=all requires the admin role');
-    const raw = await this.compute(ctx.workspace.id);
-    const mine = opts.scope === 'all' ? raw : raw.filter((i) => i.audience.has(ctx.userId!));
-    return this.merge(ctx, mine, opts.state);
+  async list(workspaceId: string, userId: string): Promise<AttentionItem[]> {
+    const access = currentAccess();
+    if (!canView('issues', access)) return [];
+
+    const issueRows = await this.issues.findBy({ workspaceId });
+    const visibleIssues = issueRows.filter(
+      (issue) => !projectHidden(access, issue.projectId),
+    );
+    const issueIds = new Set(visibleIssues.map((issue) => issue.id));
+    if (issueIds.size === 0) return [];
+    const issueById = new Map(visibleIssues.map((issue) => [issue.id, issue]));
+    const items: AttentionItem[] = [];
+
+    if (canView('input-requests', access)) {
+      const requests = await this.requests.find({
+        where: { workspaceId, issueId: In([...issueIds]), state: 'open' },
+      });
+      for (const request of requests) {
+        if (request.assigneeUserId && request.assigneeUserId !== userId)
+          continue;
+        const issue = issueById.get(request.issueId!);
+        if (!issue) continue;
+        items.push({
+          id: `input_requested:${request.id}`,
+          kind: 'input_requested',
+          severity: 'medium',
+          title: request.question,
+          detail: `Question on ${issue.key}: ${issue.title}`,
+          issueId: issue.id,
+          inputRequestId: request.id,
+          since: request.createdAt.toISOString(),
+          state: 'open',
+        });
+      }
+    }
+
+    if (canView('decisions', access)) {
+      const decisions = await this.decisions.find({
+        where: {
+          workspaceId,
+          originIssueId: In([...issueIds]),
+          status: 'proposed',
+        },
+      });
+      for (const decision of decisions) {
+        const issue = issueById.get(decision.originIssueId!);
+        if (!issue) continue;
+        items.push({
+          id: `needs_decision:${decision.id}`,
+          kind: 'needs_decision',
+          severity: 'medium',
+          title: decision.title,
+          detail: `Proposed decision on ${issue.key}: ${decision.statement}`,
+          issueId: issue.id,
+          decisionId: decision.id,
+          since: decision.createdAt.toISOString(),
+          state: 'open',
+        });
+      }
+    }
+
+    if (canView('artifacts', access)) {
+      const artifacts = await this.artifacts.find({
+        where: { workspaceId, issueId: In([...issueIds]) },
+      });
+      for (const artifact of artifacts) {
+        const issue = issueById.get(artifact.issueId!);
+        if (!issue) continue;
+        if (artifact.review === 'requested') {
+          items.push(
+            this.artifactItem(
+              'review_requested',
+              artifact,
+              issue,
+              'Review requested',
+            ),
+          );
+        }
+        if (artifact.ci === 'failing') {
+          items.push(
+            this.artifactItem('ci_failed', artifact, issue, 'CI failing'),
+          );
+        }
+      }
+    }
+
+    const itemIds = items.map((item) => item.id);
+    const saved = itemIds.length
+      ? await this.states.findBy({ workspaceId, userId, itemId: In(itemIds) })
+      : [];
+    const stateById = new Map(saved.map((state) => [state.itemId, state]));
+    return items
+      .map((item) => {
+        const state = stateById.get(item.id);
+        if (!state || state.since.getTime() !== new Date(item.since).getTime())
+          return item;
+        if (
+          state.state === 'snoozed' &&
+          state.snoozedUntil &&
+          state.snoozedUntil <= new Date()
+        )
+          return item;
+        return {
+          ...item,
+          state: state.state,
+          ...(state.snoozedUntil
+            ? { snoozedUntil: state.snoozedUntil.toISOString() }
+            : {}),
+        };
+      })
+      .sort((a, b) => {
+        const severity = { high: 0, medium: 1, low: 2 };
+        return (
+          severity[a.severity] - severity[b.severity] ||
+          new Date(a.since).getTime() - new Date(b.since).getTime()
+        );
+      });
   }
 
-  private async merge(ctx: WorkspaceContext, raw: RawAttentionItem[], filter?: AttentionOptions['state']): Promise<AttentionItem[]> {
-    const rows = await this.ds
-      .getRepository(AttentionStateEntity)
-      .find({ where: { userId: ctx.userId, workspaceId: ctx.workspace.id } });
-    const byId = new Map(rows.map((r) => [r.itemId, r]));
-    const now = new Date();
-    const out = sortItems(raw).map((i): AttentionItem => {
-      const s = itemState(i, byId.get(i.id), now);
-      const { audience: _audience, since, ...rest } = i;
-      return {
-        ...rest,
-        since: since.toISOString(),
-        state: s.state,
-        ...(s.snoozedUntil ? { snoozedUntil: s.snoozedUntil.toISOString() } : {}),
-      };
-    });
-    if (!filter) return out;
-    return out.filter((i) => (filter === 'active' ? i.state !== 'dismissed' : i.state === filter));
+  async dismiss(
+    workspaceId: string,
+    userId: string,
+    itemId: string,
+  ): Promise<void> {
+    const item = (await this.list(workspaceId, userId)).find(
+      (candidate) => candidate.id === itemId,
+    );
+    if (!item) throw new NotFoundException('Attention item not found');
+    await this.saveState(workspaceId, userId, item, 'dismissed', null);
   }
 
-  private async find(ctx: WorkspaceContext, id: string): Promise<AttentionItem> {
-    if (!ctx.userId) throw new ForbiddenException('Attention is for people, not agents');
-    let item = (await this.forUser(ctx)).find((i) => i.id === id);
-    if (!item && hasAdminPower(ctx)) item = (await this.forUser(ctx, { scope: 'all' })).find((i) => i.id === id);
-    if (!item) throw new NotFoundException(`Attention item "${id}" not found`);
-    return item;
+  async snooze(
+    workspaceId: string,
+    userId: string,
+    itemId: string,
+    until: string,
+  ): Promise<void> {
+    const snoozedUntil = new Date(until);
+    if (!Number.isFinite(snoozedUntil.getTime()) || snoozedUntil <= new Date())
+      throw new BadRequestException('snoozedUntil must be a future date');
+    const item = (await this.list(workspaceId, userId)).find(
+      (candidate) => candidate.id === itemId,
+    );
+    if (!item) throw new NotFoundException('Attention item not found');
+    await this.saveState(workspaceId, userId, item, 'snoozed', snoozedUntil);
   }
 
-  private notify(ctx: WorkspaceContext, item: AttentionItem): void {
-    this.events.publish(ctx.workspace.id, { type: 'attention', entity: 'workstream', id: item.workstreamId ?? item.id });
+  async restore(
+    workspaceId: string,
+    userId: string,
+    itemId: string,
+  ): Promise<AttentionItem> {
+    const item = (await this.list(workspaceId, userId)).find(
+      (candidate) => candidate.id === itemId,
+    );
+    if (!item) throw new NotFoundException('Attention item not found');
+    await this.states.delete({ workspaceId, userId, itemId });
+    return { ...item, state: 'open', snoozedUntil: undefined };
   }
 
-  async dismiss(ctx: WorkspaceContext, id: string): Promise<AttentionItem> {
-    const item = await this.find(ctx, id);
-    await this.ds.getRepository(AttentionStateEntity).save({
-      userId: ctx.userId!,
-      workspaceId: ctx.workspace.id,
-      itemId: id,
-      state: 'dismissed',
-      snoozedUntil: null,
-      since: new Date(item.since),
-    });
-    this.notify(ctx, item);
-    return { ...item, state: 'dismissed', snoozedUntil: undefined };
-  }
-
-  async snooze(ctx: WorkspaceContext, id: string, until: string): Promise<AttentionItem> {
-    const when = new Date(until);
-    if (Number.isNaN(when.getTime()) || when.getTime() <= Date.now())
-      throw new BadRequestException('`until` must be a date in the future');
-    const item = await this.find(ctx, id);
-    await this.ds.getRepository(AttentionStateEntity).save({
-      userId: ctx.userId!,
-      workspaceId: ctx.workspace.id,
-      itemId: id,
-      state: 'snoozed',
-      snoozedUntil: when,
-      since: new Date(item.since),
-    });
-    this.notify(ctx, item);
-    return { ...item, state: 'snoozed', snoozedUntil: when.toISOString() };
-  }
-
-  async restore(ctx: WorkspaceContext, id: string): Promise<AttentionItem> {
-    if (!ctx.userId) throw new ForbiddenException('Attention is for people, not agents');
-    await this.ds
-      .getRepository(AttentionStateEntity)
-      .delete({ userId: ctx.userId, workspaceId: ctx.workspace.id, itemId: id });
-    const item = await this.find(ctx, id);
-    this.notify(ctx, item);
-    return item;
-  }
-
-  /** Loads the workspace and derives every item (all audiences). */
-  async compute(workspaceId: string): Promise<RawAttentionItem[]> {
-    const where = { workspaceId };
-    const db = this.ds;
-    const [teams, agents, memberships, workstreams, inputRequests, artifacts, decisions, dependencies, issues, sinceRows] =
-      await Promise.all([
-        db.getRepository(TeamEntity).find({ where }),
-        db.getRepository(AgentEntity).find({ where }),
-        db.getRepository(MembershipEntity).find({ where }),
-        db.getRepository(WorkstreamEntity).find({ where }),
-        db.getRepository(InputRequestEntity).find({ where: { workspaceId, state: 'open' } }),
-        db.getRepository(ArtifactEntity).find({ where }),
-        db.getRepository(DecisionEntity).find({ where: { workspaceId, status: 'proposed' } }),
-        db.getRepository(DependencyEntity).find({ where }),
-        db.getRepository(IssueEntity).find({ where: { workspaceId, status: 'backlog' } }),
-        db.query<{ id: string; at: Date }[]>(SINCE_SQL, [workspaceId]),
-      ]);
-    const [userRows, workspace] = await Promise.all([
-      db.getRepository(UserEntity).find({ where: { id: In(memberships.map((m) => m.userId)) } }),
-      db.getRepository(WorkspaceEntity).findOneBy({ id: workspaceId }),
-    ]);
-    const names = new Map<string, string>();
-    for (const u of userRows) names.set(u.id, u.name);
-    for (const a of agents) names.set(a.id, a.name);
-    const roles = workspace?.resolved().roles ?? [];
-    const data: AttentionData = {
-      now: new Date(),
-      teams,
-      names,
-      adminIds: memberships.filter((m) => roleHasAdminPower(findWorkspaceRole(roles, m.role))).map((m) => m.userId),
-      workstreams,
-      inputRequests,
-      artifacts,
-      decisions,
-      dependencies,
-      issues,
-      since: new Map(sinceRows.map((r) => [r.id, new Date(r.at)])),
+  private artifactItem(
+    kind: Extract<AttentionKind, 'review_requested' | 'ci_failed'>,
+    artifact: ArtifactEntity,
+    issue: IssueEntity,
+    message: string,
+  ): AttentionItem {
+    return {
+      id: `${kind}:${artifact.id}`,
+      kind,
+      severity: kind === 'ci_failed' ? 'high' : 'medium',
+      title: artifact.title,
+      detail: `${message} on ${issue.key}: ${issue.title}`,
+      artifactId: artifact.id,
+      issueId: issue.id,
+      since: artifact.updatedAt.toISOString(),
+      state: 'open',
     };
-    return computeAttention(data);
+  }
+
+  private async saveState(
+    workspaceId: string,
+    userId: string,
+    item: AttentionItem,
+    state: AttentionStateEntity['state'],
+    snoozedUntil: Date | null,
+  ): Promise<void> {
+    await this.states.save({
+      workspaceId,
+      userId,
+      itemId: item.id,
+      state,
+      snoozedUntil,
+      since: new Date(item.since),
+    });
   }
 }

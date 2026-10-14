@@ -2,7 +2,6 @@ import { BadRequestException, NotFoundException } from '@nestjs/common';
 import type { DataSource } from 'typeorm';
 import { describe, expect, it } from 'vitest';
 import type { EventsService } from '../events/events.service.js';
-import type { WorkstreamBus } from '../events/workstream-bus.js';
 import type { UploadEntity } from '../database/entities/index.js';
 import type { UploadCaller } from './upload-rules.js';
 import { UploadsService, type IncomingUpload } from './uploads.service.js';
@@ -91,7 +90,6 @@ function setup(
   const service = new UploadsService(
     ds,
     { record: async () => undefined } as unknown as EventsService,
-    { touch: async () => undefined } as unknown as WorkstreamBus,
     uploads as never,
     {} as never,
   );

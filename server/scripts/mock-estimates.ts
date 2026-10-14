@@ -18,7 +18,6 @@ import {
   MilestoneEntity,
   TeamEntity,
   WorkspaceEntity,
-  WorkstreamEntity,
 } from '../src/database/entities/index.js';
 import {
   MOCK_EVENT_PREFIX,
@@ -83,7 +82,6 @@ async function main() {
       estimateScale: resolveScale(resolveWorkspaceSettings(ws.settings).estimateScale),
       userIds: memberships.filter((x) => x.role !== 'viewer').map((x) => x.userId),
       teamIds: (await ds.getRepository(TeamEntity).findBy({ workspaceId })).map((t) => t.id),
-      workstreams: (await ds.getRepository(WorkstreamEntity).findBy({ workspaceId })).map((w) => ({ id: w.id, key: w.key, ownerTeamId: w.ownerTeamId, status: w.status, projectId: w.projectId })),
       milestones: (await ds.getRepository(MilestoneEntity).findBy({ workspaceId })).map((m) => ({ id: m.id, projectId: m.projectId })),
       issueCounters,
       existingIssues: real,

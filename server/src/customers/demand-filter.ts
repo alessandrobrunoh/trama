@@ -29,24 +29,29 @@ export type DemandTarget = 'issueId' | 'projectId';
 
 /**
  * Which requests belong to the row (`cr` is the request alias). An issue: its own. A project: its own plus those
- * on its issues, planned under it or linked to one of its workstreams (the meaning of the client's `issuesByProject`).
+ * on its directly assigned issues.
  */
 export function demandScope(alias: string, target: DemandTarget): string {
-  if (!/^[a-z][a-z0-9_]*$/i.test(alias)) throw new Error(`Bad SQL alias "${alias}"`);
+  if (!/^[a-z][a-z0-9_]*$/i.test(alias))
+    throw new Error(`Bad SQL alias "${alias}"`);
   const same = `cr."workspaceId" = ${alias}."workspaceId"`;
   if (target === 'issueId') return `${same} AND cr."issueId" = ${alias}.id`;
   return (
     `${same} AND (cr."projectId" = ${alias}.id OR cr."issueId" IN (` +
-    `SELECT di.id FROM issues di WHERE di."workspaceId" = ${alias}."workspaceId" AND (di."projectId" = ${alias}.id OR EXISTS (` +
-    `SELECT 1 FROM workstreams dw WHERE dw."workspaceId" = di."workspaceId" AND dw."projectId" = ${alias}.id ` +
-    `AND di."workstreamIds" @> jsonb_build_array(dw.id)))))`
+    `SELECT di.id FROM issues di WHERE di."workspaceId" = ${alias}."workspaceId" ` +
+    `AND di."projectId" = ${alias}.id))`
   );
 }
 
 /** Whole numbers only; anything else is dropped rather than interpolated or compared. */
-const count = (n: number | undefined): n is number => n !== undefined && Number.isFinite(n) && n >= 1;
+const count = (n: number | undefined): n is number =>
+  n !== undefined && Number.isFinite(n) && n >= 1;
 
-export function demandConditions(alias: string, target: DemandTarget, f: DemandFilter): DemandCondition[] {
+export function demandConditions(
+  alias: string,
+  target: DemandTarget,
+  f: DemandFilter,
+): DemandCondition[] {
   const out: DemandCondition[] = [];
   const own = demandScope(alias, target);
 
@@ -74,7 +79,11 @@ export function demandConditions(alias: string, target: DemandTarget, f: DemandF
       params: { dmMinRequests: Math.floor(f.minRequests) },
     });
   }
-  if (f.minRevenue !== undefined && Number.isFinite(f.minRevenue) && f.minRevenue > 0) {
+  if (
+    f.minRevenue !== undefined &&
+    Number.isFinite(f.minRevenue) &&
+    f.minRevenue > 0
+  ) {
     out.push({
       sql:
         `(SELECT COALESCE(SUM(c.revenue), 0) FROM customers c WHERE c."workspaceId" = ${alias}."workspaceId" AND c.id IN ` +

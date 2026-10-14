@@ -163,7 +163,6 @@ describe('who can see a file', () => {
       'artifacts:view',
       'comments:view',
       'projects:view',
-      'workstreams:view',
     ],
   } as MemberAccess;
 

@@ -21,7 +21,9 @@ describe('DraftBox', () => {
   it('returns what was stored, across instances (tabs and reloads)', () => {
     const storage = memory();
     new DraftBox(storage).set('acme:comment:issue:in_1', 'half a thought');
-    expect(new DraftBox(storage).get('acme:comment:issue:in_1')).toBe('half a thought');
+    expect(new DraftBox(storage).get('acme:comment:issue:in_1')).toBe(
+      'half a thought',
+    );
     expect(new DraftBox(storage).get('acme:comment:issue:in_2')).toBeNull();
   });
 
@@ -64,7 +66,9 @@ describe('DraftBox', () => {
   it('survives corrupt or unavailable storage', () => {
     expect(new DraftBox(memory('{not json')).get('a')).toBeNull();
     expect(new DraftBox(memory('[1,2]')).get('a')).toBeNull();
-    expect(new DraftBox(memory(JSON.stringify({ a: { value: 1 } }))).get('a')).toBeNull();
+    expect(
+      new DraftBox(memory(JSON.stringify({ a: { value: 1 } }))).get('a'),
+    ).toBeNull();
     const none = new DraftBox(null);
     none.set('a', 'x');
     expect(none.get('a')).toBeNull();
@@ -83,13 +87,17 @@ describe('DraftBox', () => {
 
 describe('visitedRef', () => {
   it('recognises detail pages, with or without tabs and query', () => {
-    expect(visitedRef('/acme/issues/BUG-12')).toEqual({ slug: 'acme', type: 'issue', ref: 'BUG-12' });
-    expect(visitedRef('/acme/workstreams/AUTH-4/activity?x=1#top')).toEqual({
+    expect(visitedRef('/acme/issues/BUG-12')).toEqual({
       slug: 'acme',
-      type: 'workstream',
-      ref: 'AUTH-4',
+      type: 'issue',
+      ref: 'BUG-12',
     });
-    expect(visitedRef('/acme/projects/pj_1')).toEqual({ slug: 'acme', type: 'project', ref: 'pj_1' });
+    expect(visitedRef('/acme/workstreams/AUTH-4/activity?x=1#top')).toBeNull();
+    expect(visitedRef('/acme/projects/pj_1')).toEqual({
+      slug: 'acme',
+      type: 'project',
+      ref: 'pj_1',
+    });
     expect(visitedRef('/acme/decisions/ADR-7')?.type).toBe('decision');
     expect(visitedRef('/acme/repositories/rp_1')?.type).toBe('repository');
     expect(visitedRef('/acme/teams/AUTH')?.type).toBe('team');

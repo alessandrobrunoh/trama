@@ -1,8 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { Client, TokenClient, createTestApp } from './app.js';
 
-const DELTA = 'https://delta.dev/t/e2e';
-
 describe('permission policies, team roles and token scopes', () => {
   let app: INestApplication;
   let server: ReturnType<INestApplication['getHttpServer']>;
@@ -66,24 +64,18 @@ describe('permission policies, team roles and token scopes', () => {
       await member.delete(`${w}/teams/${t.id}`).expect(403);
     });
 
-    it('can lock down issue / workstream deletion and decision acceptance', async () => {
+    it('can lock down issue deletion and decision acceptance', async () => {
       const { owner, admin, member, w } = await setup();
-      const team = (await owner.post(`${w}/teams`, { name: 'Core', key: 'CORE' }).expect(201)).body;
       const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Crash' }).expect(201)).body;
       const decision = (await member.post(`${w}/decisions`, { title: 'Use X', statement: 'We use X' }).expect(201)).body;
-      const ws = (await member.post(`${w}/workstreams`, { title: 'W', ownerTeamId: team.id, deltaThreadUrl: DELTA }).expect(201)).body;
 
-      const drop = new Set(['deleteIssues', 'acceptDecisions', 'deleteWorkstreams', 'createIssues']);
+      const drop = new Set(['deleteIssues', 'acceptDecisions', 'createIssues']);
       await setCaps(owner, w, 'member', (await roleCaps(owner, w, 'member')).filter((cap) => !drop.has(cap)));
-      await setCaps(owner, w, 'admin', (await roleCaps(owner, w, 'admin')).filter((cap) => cap !== 'deleteWorkstreams'));
       await member.delete(`${w}/issues/${issue.key}`).expect(403);
       await member.post(`${w}/decisions/${decision.key}/accept`).expect(403);
-      await member.delete(`${w}/workstreams/${ws.key}`).expect(403);
       await member.post(`${w}/issues`, { kind: 'bug', title: 'Another' }).expect(403);
-      await admin.delete(`${w}/workstreams/${ws.key}`).expect(403);
       await admin.post(`${w}/decisions/${decision.key}/accept`).expect(200);
       await admin.delete(`${w}/issues/${issue.key}`).expect(204);
-      await owner.delete(`${w}/workstreams/${ws.key}`).expect(204);
     });
 
     it('only roles with inviteMembers can invite, and not into a stronger role; shared views follow manageSharedViews', async () => {
@@ -147,26 +139,17 @@ describe('permission policies, team roles and token scopes', () => {
       expect(t.memberIds).toEqual([member2.id]);
     });
 
-    it('editPolicy "members": only team members, leads and admins edit its workstreams', async () => {
+    it('editPolicy "members": only team members, leads and admins edit its issues', async () => {
       const { owner, admin, member, member2, w, team } = await teamSetup();
-      const body = { title: 'Locked', ownerTeamId: team.id, deltaThreadUrl: DELTA };
-      await member2.post(`${w}/workstreams`, body).expect(403);
-      const ws = (await member.post(`${w}/workstreams`, body).expect(201)).body;
-      await admin.post(`${w}/workstreams`, { ...body, title: 'By admin' }).expect(201);
+      const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Locked', teamId: team.id }).expect(201)).body;
+      await member2.patch(`${w}/issues/${issue.key}`, { title: 'Hacked' }).expect(403);
+      await member2.delete(`${w}/issues/${issue.key}`).expect(403);
+      await member2.get(`${w}/issues/${issue.key}`).expect(200);
+      await member.patch(`${w}/issues/${issue.key}`, { title: 'Fine' }).expect(200);
+      await admin.patch(`${w}/issues/${issue.key}`, { title: 'Admin edit' }).expect(200);
 
-      await member2.patch(`${w}/workstreams/${ws.key}`, { title: 'Hacked' }).expect(403);
-      await member2.post(`${w}/workstreams/${ws.key}/criteria`, { text: 'x' }).expect(403);
-      await member2.delete(`${w}/workstreams/${ws.key}`).expect(403);
-      await member2.get(`${w}/workstreams/${ws.key}`).expect(200); // reading is never restricted
-      await member.patch(`${w}/workstreams/${ws.key}`, { title: 'Fine' }).expect(200);
-
-      // moving a workstream INTO a restricted team needs membership of it too
-      const free = (await member2.post(`${w}/workstreams`, { title: 'Free', ownerTeamId: (await owner.get(`${w}/teams/OPEN`)).body.id, deltaThreadUrl: DELTA }).expect(201)).body;
-      await member2.patch(`${w}/workstreams/${free.key}`, { ownerTeamId: team.id }).expect(403);
-
-      // switch to "workspace": everyone can edit again
       await owner.patch(`${w}/teams/SEC`, { editPolicy: 'workspace' }).expect(200);
-      await member2.patch(`${w}/workstreams/${ws.key}`, { title: 'Now open' }).expect(200);
+      await member2.patch(`${w}/issues/${issue.key}`, { title: 'Now open' }).expect(200);
     });
 
     it('editPolicy "members" also protects the team\'s issues; issues without a team stay open', async () => {
@@ -187,9 +170,9 @@ describe('permission policies, team roles and token scopes', () => {
       const theirs = (await owner.post(`${w}/agents`, { name: 'Theirs', provider: 'codex', ownerUserId: member2.id }).expect(201)).body;
       const mineTok = new TokenClient(server, (await owner.post(`${w}/tokens`, { name: 'a', agentId: mine.id }).expect(201)).body.secret);
       const theirsTok = new TokenClient(server, (await owner.post(`${w}/tokens`, { name: 'b', agentId: theirs.id }).expect(201)).body.secret);
-      const body = { title: 'Agent work', ownerTeamId: team.id, deltaThreadUrl: DELTA };
-      await theirsTok.post(`${w}/workstreams`, body).expect(403);
-      await mineTok.post(`${w}/workstreams`, body).expect(201);
+      const body = { kind: 'bug', title: 'Agent work', teamId: team.id };
+      await theirsTok.post(`${w}/issues`, body).expect(403);
+      await mineTok.post(`${w}/issues`, body).expect(201);
 
       await member.patch(`${w}/teams/SEC`, { description: 'Led by member' }).expect(200);
       await member2.patch(`${w}/teams/SEC`, { description: 'Not a lead' }).expect(403);
@@ -245,7 +228,7 @@ describe('permission policies, team roles and token scopes', () => {
       await owner.post(`${w}/tokens`, { name: 'bot', agentId: agent.id, scope: 'admin' }).expect(400);
       const bot = (await owner.post(`${w}/tokens`, { name: 'bot', agentId: agent.id, scope: 'read' }).expect(201)).body;
       const readBot = new TokenClient(server, bot.secret);
-      await readBot.get(`${w}/workstreams`).expect(200);
+      await readBot.get(`${w}/issues`).expect(200);
       await readBot.post(`${w}/issues`, { kind: 'bug', title: 'x' }).expect(403);
 
       const listed = (await owner.get(`${w}/tokens`).expect(200)).body as { scope: string }[];

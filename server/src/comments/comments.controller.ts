@@ -1,11 +1,42 @@
-import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsNotEmpty, IsOptional, IsString, Max, MaxLength, Min, MinLength, ValidateNested } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsNotEmpty,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+  ValidateNested,
+} from 'class-validator';
 import { Ctx, Roles, type WorkspaceContext } from '../auth/request-context.js';
 import { COMMENT_PAGE_SIZE, type SubjectType } from '../contracts/domain.js';
 import { CommentsService } from './comments.service.js';
 
-const SUBJECTS: SubjectType[] = ['workstream', 'issue', 'artifact', 'decision', 'input_request', 'repository', 'team', 'project', 'project_update', 'document'];
+const SUBJECTS: SubjectType[] = [
+  'issue',
+  'artifact',
+  'decision',
+  'input_request',
+  'repository',
+  'team',
+  'project',
+  'project_update',
+  'document',
+];
 
 class SubjectDto {
   @IsIn(SUBJECTS) type: SubjectType;
@@ -29,7 +60,12 @@ class ListCommentsQuery {
 export class PageCommentsQuery {
   @IsIn(SUBJECTS) subjectType: SubjectType;
   @IsString() @IsNotEmpty() @MaxLength(64) subjectId: string;
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(COMMENT_PAGE_SIZE.max) limit?: number;
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(COMMENT_PAGE_SIZE.max)
+  limit?: number;
   @IsOptional() @IsString() @MaxLength(200) cursor?: string;
 }
 
@@ -59,7 +95,11 @@ export class CommentsController {
   }
 
   @Patch(':id')
-  update(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Body() dto: UpdateCommentDto) {
+  update(
+    @Ctx() ctx: WorkspaceContext,
+    @Param('id') id: string,
+    @Body() dto: UpdateCommentDto,
+  ) {
     return this.service.update(ctx, id, dto.body);
   }
 

@@ -1,5 +1,4 @@
 import { MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { AgentContextModule } from './agent-context/agent-context.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { ArtifactsModule } from './artifacts/artifacts.module.js';
 import { AttentionModule } from './attention/attention.module.js';
@@ -11,11 +10,9 @@ import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { DecisionsModule } from './decisions/decisions.module.js';
 import { DocumentsModule } from './documents/documents.module.js';
-import { DependenciesModule } from './dependencies/dependencies.module.js';
 import { EventsModule } from './events/events.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
-import { GraphModule } from './graph/graph.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PublicConfigController } from './public-config.controller.js';
 import { ImportersModule } from './importers/importers.module.js';
@@ -32,14 +29,12 @@ import { ProjectUpdatesModule } from './project-updates/project-updates.module.j
 import { RepositoriesModule } from './repositories/repositories.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
-import { StatusModule } from './status/status.module.js';
 import { TeamsModule } from './teams/teams.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
 import { ViewsModule } from './views/views.module.js';
 import { OutgoingWebhooksModule } from './outgoing-webhooks/outgoing-webhooks.module.js';
 import { WebhooksModule } from './webhooks/webhooks.module.js';
 import { WorkspacesModule } from './workspaces/workspaces.module.js';
-import { WorkstreamsModule } from './workstreams/workstreams.module.js';
 
 @Module({
   imports: [
@@ -56,7 +51,6 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     RepositoriesModule,
     ProjectsModule,
     ProjectUpdatesModule,
-    WorkstreamsModule,
     InputRequestsModule,
     IssuesModule,
     CustomersModule,
@@ -66,15 +60,11 @@ import { WorkstreamsModule } from './workstreams/workstreams.module.js';
     UploadsModule,
     DocumentsModule,
     DecisionsModule,
-    DependenciesModule,
     CommentsModule,
     ViewsModule,
-    StatusModule,
     AttentionModule,
     InsightsModule,
-    GraphModule,
     SearchModule,
-    AgentContextModule,
     AiModule,
     SnapshotModule,
     IntegrationsModule,

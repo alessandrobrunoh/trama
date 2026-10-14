@@ -17,13 +17,6 @@ class DraftOptionDto {
   @IsString() @MaxLength(240) label: string;
 }
 
-class DraftWorkstreamOptionDto {
-  @IsString() @MaxLength(160) id: string;
-  @IsString() @MaxLength(40) key: string;
-  @IsString() @MaxLength(240) title: string;
-  @IsString() @MaxLength(500) objective: string;
-}
-
 class DraftSimilarIssueDto {
   @IsString() @MaxLength(40) key: string;
   @IsString() @MaxLength(240) title: string;
@@ -34,21 +27,45 @@ class DraftSimilarIssueDto {
 }
 
 class IssueDraftOptionsDto {
-  @IsArray() @ArrayMaxSize(10) @IsString({ each: true }) @MaxLength(40, { each: true }) kinds: string[];
-  @IsArray() @ArrayMaxSize(5) @IsString({ each: true }) @MaxLength(40, { each: true }) priorities: string[];
-  @IsArray() @ArrayMaxSize(12) @IsNumber({}, { each: true }) estimates: number[];
-  @IsArray() @ArrayMaxSize(50) @ValidateNested({ each: true }) @Type(() => DraftOptionDto) teams: DraftOptionDto[];
-  @IsArray() @ArrayMaxSize(100) @ValidateNested({ each: true }) @Type(() => DraftOptionDto) assignees: DraftOptionDto[];
-  @IsArray() @ArrayMaxSize(8) @ValidateNested({ each: true }) @Type(() => DraftWorkstreamOptionDto) workstreams: DraftWorkstreamOptionDto[];
-  @IsArray() @ArrayMaxSize(4) @ValidateNested({ each: true }) @Type(() => DraftSimilarIssueDto) similar: DraftSimilarIssueDto[];
+  @IsArray()
+  @ArrayMaxSize(10)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  kinds: string[];
+  @IsArray()
+  @ArrayMaxSize(5)
+  @IsString({ each: true })
+  @MaxLength(40, { each: true })
+  priorities: string[];
+  @IsArray()
+  @ArrayMaxSize(12)
+  @IsNumber({}, { each: true })
+  estimates: number[];
+  @IsArray()
+  @ArrayMaxSize(50)
+  @ValidateNested({ each: true })
+  @Type(() => DraftOptionDto)
+  teams: DraftOptionDto[];
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ValidateNested({ each: true })
+  @Type(() => DraftOptionDto)
+  assignees: DraftOptionDto[];
+  @IsArray()
+  @ArrayMaxSize(4)
+  @ValidateNested({ each: true })
+  @Type(() => DraftSimilarIssueDto)
+  similar: DraftSimilarIssueDto[];
 }
 
 export class SuggestionDto {
-  @IsIn(['issue', 'workstream', 'decision']) kind:
-    'issue' | 'workstream' | 'decision';
+  @IsIn(['issue', 'decision']) kind: 'issue' | 'decision';
   @IsString() @MaxLength(300) title: string;
   @IsString() @MaxLength(12000) description: string;
-  @IsOptional() @ValidateNested() @Type(() => IssueDraftOptionsDto) issueOptions?: IssueDraftOptionsDto;
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => IssueDraftOptionsDto)
+  issueOptions?: IssueDraftOptionsDto;
 }
 
 class MessageDto {
@@ -57,8 +74,8 @@ class MessageDto {
 }
 
 export class ChatContextDto {
-  @IsIn(['page', 'issue', 'workstream', 'project', 'decision']) kind:
-    'page' | 'issue' | 'workstream' | 'project' | 'decision';
+  @IsIn(['page', 'issue', 'project', 'decision']) kind:
+    'page' | 'issue' | 'project' | 'decision';
   @IsString() @MaxLength(160) label: string;
   @IsOptional() @IsString() @MaxLength(160) id?: string;
 }

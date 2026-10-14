@@ -126,10 +126,10 @@ export const Can = (capability: Capability) =>
   SetMetadata(CAPABILITY_KEY, capability);
 
 /**
- * The route mutates something owned by a team (`workstream` → its owner team, `issue` → its team):
+ * The route mutates something owned by a team (an `issue` → its team):
  * the team's `editPolicy` is enforced by PolicyGuard on top of the workspace role.
  */
-export const EditsTeamWork = (kind: 'workstream' | 'issue') =>
+export const EditsTeamWork = (kind: 'issue') =>
   SetMetadata(TEAM_SCOPE_KEY, kind);
 
 /** A non-workspace route that `custom` (fine-grained) tokens may call, e.g. `GET /auth/token`. */

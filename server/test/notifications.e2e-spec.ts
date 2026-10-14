@@ -20,7 +20,6 @@ describe('notifications', () => {
   let dev: Client;
   let devId: string;
   let slug: string;
-  let teamId: string;
   const base = () => `/api/w/${slug}`;
   const inbox = async (c: Client) => (await c.get(`${base()}/notifications`).expect(200)).body as { items: Notification[]; unread: number };
 
@@ -29,7 +28,6 @@ describe('notifications', () => {
     const o = await Client.signup(app.getHttpServer(), 'Olivia Owner');
     owner = o.client;
     slug = (await owner.post('/api/workspaces', { name: 'Notify Co' }).expect(201)).body.slug;
-    teamId = (await owner.post(`${base()}/teams`, { name: 'Core', key: 'CORE', memberIds: [o.user.id] }).expect(201)).body.id;
     const d = await Client.signup(app.getHttpServer(), 'Dev Dana');
     dev = d.client;
     devId = d.user.id;
@@ -74,14 +72,10 @@ describe('notifications', () => {
   });
 
   it('routes questions, review requests and failing CI to the right person', async () => {
-    const ws = (
-      await owner
-        .post(`${base()}/workstreams`, { title: 'Harden auth', ownerTeamId: teamId, deltaThreadUrl: 'https://delta.dev/t/n', accountableUserId: devId })
-        .expect(201)
-    ).body;
-    await owner.post(`${base()}/input-requests`, { workstreamId: ws.id, question: 'Keep the polyfill?' }).expect(201);
+    const issue = (await owner.post(`${base()}/issues`, { title: 'Harden auth', kind: 'bug', assigneeId: devId }).expect(201)).body;
+    await owner.post(`${base()}/input-requests`, { issueId: issue.id, question: 'Keep the polyfill?' }).expect(201);
     const pr = (
-      await owner.post(`${base()}/artifacts`, { workstreamId: ws.id, kind: 'pull_request', title: 'PR #7', state: 'open', ci: 'pending', review: 'none' }).expect(201)
+      await owner.post(`${base()}/artifacts`, { issueId: issue.id, kind: 'pull_request', title: 'PR #7', state: 'open', ci: 'pending', review: 'none' }).expect(201)
     ).body;
     await owner.patch(`${base()}/artifacts/${pr.id}`, { review: 'requested' }).expect(200);
     await owner.patch(`${base()}/artifacts/${pr.id}`, { ci: 'failing' }).expect(200);
@@ -89,10 +83,10 @@ describe('notifications', () => {
     const { items } = await eventually(
       () => inbox(dev),
       (v) => ['input_requested', 'review_requested', 'ci_failed'].every((k) => v.items.some((n) => n.kind === k)),
-      'the three workstream notifications',
+      'the three issue notifications',
     );
     const by = (kind: string) => items.find((n) => n.kind === kind)!;
-    expect(by('input_requested')).toMatchObject({ body: 'Keep the polyfill?', link: `workstreams/${ws.key}` });
+    expect(by('input_requested')).toMatchObject({ body: 'Keep the polyfill?', link: `issues/${issue.key}` });
     expect(by('review_requested').title).toBe('Review requested: PR #7');
     expect(by('ci_failed').title).toBe('Checks are failing: PR #7');
   });

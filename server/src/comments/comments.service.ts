@@ -25,10 +25,8 @@ import {
   CommentEntity,
   IssueEntity,
   MilestoneEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { WorkstreamBus } from '../events/workstream-bus.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 import {
   decodeCommentCursor,
@@ -41,7 +39,6 @@ export class CommentsService {
   constructor(
     private readonly refs: RefsService,
     private readonly events: EventsService,
-    private readonly bus: WorkstreamBus,
     @InjectRepository(CommentEntity)
     private readonly repo: Repository<CommentEntity>,
     @Optional()
@@ -193,17 +190,10 @@ export class CommentsService {
         actor: ctx.actor,
         type: 'comment.created',
         subject,
-        workstreamId: resolved.workstreamId,
         data: { commentId: row.id, excerpt: row.body.slice(0, 200) },
       },
       { type: 'created', entity: 'comment', id: row.id },
     );
-    if (resolved.workstreamId)
-      await this.bus.touch(
-        ctx.workspace.id,
-        resolved.workstreamId,
-        'comment.created',
-      );
     await this.uploads?.retained(ctx.workspace.id, null, row.body);
     return row;
   }
@@ -258,18 +248,14 @@ export class CommentsService {
     const entity =
       type === 'issue'
         ? IssueEntity
-        : type === 'workstream'
-          ? WorkstreamEntity
-          : type === 'milestone'
-            ? MilestoneEntity
-            : null;
+        : type === 'milestone'
+          ? MilestoneEntity
+          : null;
     if (!entity) return;
-    const row = await this.repo.manager
-      .getRepository(entity)
-      .findOne({
-        where: { workspaceId, id },
-        select: { id: true, projectId: true },
-      });
+    const row = await this.repo.manager.getRepository(entity).findOne({
+      where: { workspaceId, id },
+      select: { id: true, projectId: true },
+    });
     if (!row || projectHidden(currentAccess(), row.projectId))
       throw notFound(type, id);
   }

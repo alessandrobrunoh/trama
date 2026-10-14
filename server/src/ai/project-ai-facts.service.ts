@@ -10,15 +10,19 @@ import {
   MilestoneEntity,
   ProjectEntity,
   UserEntity,
-  WorkstreamEntity,
 } from '../database/entities/index.js';
 import { record } from './ai-provider.js';
-import { clip, type FactsIssue, type ProjectFacts } from './project-ai.logic.js';
+import {
+  clip,
+  type FactsIssue,
+  type ProjectFacts,
+} from './project-ai.logic.js';
 
 const MAX_PROJECT_ISSUES = 500;
 const MAX_CANDIDATES = 150;
 
-const iso = (value: Date | null | undefined): string | null => (value ? value.toISOString() : null);
+const iso = (value: Date | null | undefined): string | null =>
+  value ? value.toISOString() : null;
 const isHealth = (value: unknown): value is ProjectHealth =>
   typeof value === 'string' && (PROJECT_HEALTHS as string[]).includes(value);
 
@@ -27,63 +31,74 @@ const isHealth = (value: unknown): value is ProjectHealth =>
 export class ProjectAiFactsService {
   constructor(
     private readonly ds: DataSource,
-    @InjectRepository(MilestoneEntity) private readonly milestones: Repository<MilestoneEntity>,
-    @InjectRepository(WorkstreamEntity) private readonly workstreams: Repository<WorkstreamEntity>,
-    @InjectRepository(IssueEntity) private readonly issues: Repository<IssueEntity>,
-    @InjectRepository(InputRequestEntity) private readonly inputRequests: Repository<InputRequestEntity>,
-    @InjectRepository(DecisionEntity) private readonly decisions: Repository<DecisionEntity>,
-    @InjectRepository(DomainEventEntity) private readonly events: Repository<DomainEventEntity>,
-    @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
+    @InjectRepository(MilestoneEntity)
+    private readonly milestones: Repository<MilestoneEntity>,
+    @InjectRepository(IssueEntity)
+    private readonly issues: Repository<IssueEntity>,
+    @InjectRepository(InputRequestEntity)
+    private readonly inputRequests: Repository<InputRequestEntity>,
+    @InjectRepository(DecisionEntity)
+    private readonly decisions: Repository<DecisionEntity>,
+    @InjectRepository(DomainEventEntity)
+    private readonly events: Repository<DomainEventEntity>,
+    @InjectRepository(UserEntity)
+    private readonly users: Repository<UserEntity>,
   ) {}
 
   /** `withCandidates`: also load open issues outside the project (for the `issues` suggestion). */
-  async gather(project: ProjectEntity, withCandidates: boolean): Promise<ProjectFacts> {
+  async gather(
+    project: ProjectEntity,
+    withCandidates: boolean,
+  ): Promise<ProjectFacts> {
     const workspaceId = project.workspaceId;
-    const [milestones, workstreams] = await Promise.all([
-      this.milestones.find({ where: { workspaceId, projectId: project.id }, order: { sortOrder: 'ASC' }, take: 50 }),
-      this.workstreams.find({ where: { workspaceId, projectId: project.id }, order: { createdAt: 'ASC' }, take: 100 }),
+    const [milestones, issues] = await Promise.all([
+      this.milestones.find({
+        where: { workspaceId, projectId: project.id },
+        order: { sortOrder: 'ASC' },
+        take: 50,
+      }),
+      this.issues.find({
+        where: { workspaceId, projectId: project.id },
+        order: { updatedAt: 'DESC' },
+        take: MAX_PROJECT_ISSUES,
+      }),
     ]);
-    const streamIds = workstreams.map((w) => w.id);
-    const streamKey = new Map(workstreams.map((w) => [w.id, w.key]));
-
-    const issueQuery = this.issues
-      .createQueryBuilder('i')
-      .where('i.workspaceId = :workspaceId', { workspaceId });
-    if (streamIds.length) {
-      issueQuery.andWhere(
-        `(i.projectId = :projectId OR EXISTS (SELECT 1 FROM jsonb_array_elements_text(i.workstreamIds) AS w(id) WHERE w.id IN (:...streamIds)))`,
-        { projectId: project.id, streamIds },
-      );
-    } else {
-      issueQuery.andWhere('i.projectId = :projectId', { projectId: project.id });
-    }
-    const [issues, inputRequests, decisions, events, updates, candidates] = await Promise.all([
-      issueQuery.orderBy('i.updatedAt', 'DESC').take(MAX_PROJECT_ISSUES).getMany(),
-      streamIds.length
-        ? this.inputRequests.find({
-            where: { workspaceId, workstreamId: In(streamIds), state: 'open' },
-            order: { createdAt: 'ASC' },
-            take: 50,
-          })
-        : [],
-      streamIds.length
-        ? this.decisions.find({
-            where: { workspaceId, originWorkstreamId: In(streamIds) },
-            order: { createdAt: 'DESC' },
-            take: 10,
-          })
-        : [],
-      this.recentEvents(workspaceId, project.id, streamIds),
-      this.recentUpdates(workspaceId, project.id),
-      withCandidates ? this.candidateIssues(workspaceId, new Set(streamIds)) : [],
-    ]);
+    const issueIds = issues.map((i) => i.id);
+    const [inputRequests, decisions, events, updates, candidates] =
+      await Promise.all([
+        issueIds.length
+          ? this.inputRequests.find({
+              where: {
+                workspaceId,
+                issueId: In(issueIds),
+                state: 'open',
+              },
+              order: { createdAt: 'ASC' },
+              take: 50,
+            })
+          : [],
+        issueIds.length
+          ? this.decisions.find({
+              where: { workspaceId, originIssueId: In(issueIds) },
+              order: { createdAt: 'DESC' },
+              take: 10,
+            })
+          : [],
+        this.recentEvents(workspaceId, project.id, issueIds),
+        this.recentUpdates(workspaceId, project.id),
+        withCandidates ? this.candidateIssues(workspaceId) : [],
+      ]);
 
     const userIds = new Set<string>();
     if (project.leadId) userIds.add(project.leadId);
-    for (const i of [...issues, ...candidates]) if (i.assigneeId) userIds.add(i.assigneeId);
+    for (const i of [...issues, ...candidates])
+      if (i.assigneeId) userIds.add(i.assigneeId);
     const names = new Map<string, string>();
     if (userIds.size)
-      for (const u of await this.users.find({ where: { id: In([...userIds]) }, select: { id: true, name: true } }))
+      for (const u of await this.users.find({
+        where: { id: In([...userIds]) },
+        select: { id: true, name: true },
+      }))
         names.set(u.id, u.name);
 
     const toIssue = (i: IssueEntity): FactsIssue => ({
@@ -94,7 +109,6 @@ export class ProjectAiFactsService {
       priority: i.priority,
       assigneeId: i.assigneeId,
       assignee: i.assigneeId ? (names.get(i.assigneeId) ?? null) : null,
-      workstreamIds: i.workstreamIds ?? [],
       milestoneIds: i.milestoneIds ?? [],
       updatedAt: i.updatedAt.toISOString(),
     });
@@ -112,32 +126,42 @@ export class ProjectAiFactsService {
         description: project.description,
         status: project.status,
         priority: project.priority,
-        health: isHealth(latest?.health) ? latest.health : isHealth(rowHealth) ? rowHealth : null,
+        health: isHealth(latest?.health)
+          ? latest.health
+          : isHealth(rowHealth)
+            ? rowHealth
+            : null,
         lead: project.leadId ? (names.get(project.leadId) ?? null) : null,
         startDate: iso(project.startDate),
         targetDate: iso(project.targetDate),
         createdAt: project.createdAt.toISOString(),
-        lastUpdateAt: latest?.createdAt ?? (rowLast instanceof Date ? rowLast.toISOString() : typeof rowLast === 'string' ? rowLast : null),
+        lastUpdateAt:
+          latest?.createdAt ??
+          (rowLast instanceof Date
+            ? rowLast.toISOString()
+            : typeof rowLast === 'string'
+              ? rowLast
+              : null),
       },
-      milestones: milestones.map((m) => ({ id: m.id, name: m.name, targetDate: iso(m.targetDate) })),
-      workstreams: workstreams.map((w) => {
-        const asked = inputRequests.filter((r) => r.workstreamId === w.id);
-        return {
-          id: w.id,
-          key: w.key,
-          title: w.title,
-          status: w.status,
-          objective: w.objective,
-          targetDate: iso(w.targetDate),
-          openInputRequests: asked.length,
-          oldestInputRequestAt: asked.length ? asked[0].createdAt.toISOString() : null,
-        };
-      }),
+      milestones: milestones.map((m) => ({
+        id: m.id,
+        name: m.name,
+        targetDate: iso(m.targetDate),
+      })),
       issues: issues.map(toIssue),
-      updates: updates.map((u) => ({ health: u.health, body: u.body, createdAt: u.createdAt })),
-      decisions: decisions.map((d) => ({ key: d.key, title: d.title, status: d.status, at: d.createdAt.toISOString() })),
+      updates: updates.map((u) => ({
+        health: u.health,
+        body: u.body,
+        createdAt: u.createdAt,
+      })),
+      decisions: decisions.map((d) => ({
+        key: d.key,
+        title: d.title,
+        status: d.status,
+        at: d.createdAt.toISOString(),
+      })),
       inputRequests: inputRequests.map((r) => ({
-        workstreamKey: streamKey.get(r.workstreamId) ?? '',
+        issueKey: issues.find((i) => i.id === r.issueId)?.key ?? '',
         question: r.question,
         createdAt: r.createdAt.toISOString(),
       })),
@@ -150,21 +174,30 @@ export class ProjectAiFactsService {
     };
   }
 
-  private async candidateIssues(workspaceId: string, streamIds: ReadonlySet<string>): Promise<IssueEntity[]> {
+  private async candidateIssues(workspaceId: string): Promise<IssueEntity[]> {
     const rows = await this.issues.find({
       where: { workspaceId, status: Not(In(['done', 'canceled'])) },
       order: { updatedAt: 'DESC' },
       take: MAX_CANDIDATES * 3,
     });
     return rows
-      .filter((i) => !i.projectId && !i.duplicateOfId && !(i.workstreamIds ?? []).some((id) => streamIds.has(id)))
+      .filter((i) => !i.projectId && !i.duplicateOfId)
       .slice(0, MAX_CANDIDATES);
   }
 
-  private recentEvents(workspaceId: string, projectId: string, streamIds: string[]) {
-    const query = this.events.createQueryBuilder('e').where('e.workspaceId = :workspaceId', { workspaceId });
-    if (streamIds.length)
-      query.andWhere(`(e.workstreamId IN (:...streamIds) OR e.subject ->> 'id' = :projectId)`, { streamIds, projectId });
+  private recentEvents(
+    workspaceId: string,
+    projectId: string,
+    issueIds: string[],
+  ) {
+    const query = this.events
+      .createQueryBuilder('e')
+      .where('e.workspaceId = :workspaceId', { workspaceId });
+    if (issueIds.length)
+      query.andWhere(
+        `(e.subject ->> 'id' IN (:...issueIds) OR e.subject ->> 'id' = :projectId)`,
+        { issueIds, projectId },
+      );
     else query.andWhere(`e.subject ->> 'id' = :projectId`, { projectId });
     return query.orderBy('e.at', 'DESC').take(25).getMany();
   }
@@ -181,7 +214,12 @@ export class ProjectAiFactsService {
       for (const entry of rows) {
         const row = record(entry);
         const at = row?.['createdAt'];
-        const date = at instanceof Date ? at : typeof at === 'string' ? new Date(at) : null;
+        const date =
+          at instanceof Date
+            ? at
+            : typeof at === 'string'
+              ? new Date(at)
+              : null;
         if (!row || !date || Number.isNaN(date.getTime())) continue;
         out.push({
           health: isHealth(row['health']) ? row['health'] : 'on_track',

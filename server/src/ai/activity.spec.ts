@@ -6,7 +6,6 @@ describe('describeTool', () => {
     expect(describeTool('list_issues')).toBe('Looked at issues');
     expect(describeTool('get_issue')).toBe('Looked at issue');
     expect(describeTool('create_issue')).toBe('Created issue');
-    expect(describeTool('update_workstream')).toBe('Updated workstream');
     expect(describeTool('answer_input_request')).toBe('Answered input request');
     expect(describeTool('delete_view')).toBe('Deleted view');
     expect(describeTool('search')).toBe('Searched the workspace');
@@ -24,14 +23,29 @@ describe('ActivityLog', () => {
     log.tool('list_issues', false);
     log.tool('list_teams', false, false, 'HTTP 403: nope');
     log.tool('create_issue', true, true);
-    log.tool('create_issue', true, false, "HTTP 400:\n kind must be one of bug|feature");
+    log.tool(
+      'create_issue',
+      true,
+      false,
+      'HTTP 400:\n kind must be one of bug|feature',
+    );
     const a = log.result()!;
     expect(a.steps).toEqual([
       { kind: 'note', label: 'Checking your issues' },
       { kind: 'read', label: 'Looked at issues', count: 2 },
-      { kind: 'read', label: 'Looked at teams', ok: false, detail: 'HTTP 403: nope' },
+      {
+        kind: 'read',
+        label: 'Looked at teams',
+        ok: false,
+        detail: 'HTTP 403: nope',
+      },
       { kind: 'write', label: 'Created issue', ok: true },
-      { kind: 'write', label: 'Created issue', ok: false, detail: 'HTTP 400: kind must be one of bug|feature' },
+      {
+        kind: 'write',
+        label: 'Created issue',
+        ok: false,
+        detail: 'HTTP 400: kind must be one of bug|feature',
+      },
     ]);
     expect(a.seconds).toBeGreaterThanOrEqual(1);
   });

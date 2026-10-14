@@ -1,7 +1,6 @@
 import type { ViewEntity, ViewLayout } from '../contracts/domain.js';
 
 export const VIEW_ENTITIES: readonly ViewEntity[] = [
-  'workstream',
   'issue',
   'decision',
   'project',
@@ -9,12 +8,11 @@ export const VIEW_ENTITIES: readonly ViewEntity[] = [
 export const VIEW_LAYOUTS: readonly ViewLayout[] = [
   'list',
   'board',
-  'graph',
   'timeline',
 ];
 
 /** Entities that carry dates, so a timeline (Gantt) layout makes sense for them. */
-const TIMELINE_ENTITIES: readonly ViewEntity[] = ['workstream', 'project'];
+const TIMELINE_ENTITIES: readonly ViewEntity[] = ['project'];
 
 /** Why `layout` cannot be used with `entity`, or null when the combination is valid. */
 export function viewLayoutProblem(

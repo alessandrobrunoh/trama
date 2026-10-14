@@ -9,7 +9,7 @@ import { TeamsService } from './teams.service.js';
 
 class CreateTeamDto {
   @IsString() @MinLength(1) @MaxLength(80) name: string;
-  /** Uppercase identifier prefix (AUTH, WEB…). Immutable after creation: workstream keys depend on it. */
+  /** Uppercase identifier prefix (AUTH, WEB…). Immutable after creation. */
   @Matches(/^[A-Z][A-Z0-9]{1,7}$/, { message: 'key must be 2-8 uppercase letters/digits' }) key: string;
   @IsOptional() @IsString() @MaxLength(32) color?: string;
   @IsOptional() @IsString() @MaxLength(500) description?: string;

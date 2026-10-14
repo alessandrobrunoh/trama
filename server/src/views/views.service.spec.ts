@@ -1,5 +1,5 @@
 import 'reflect-metadata';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it, vi } from 'vitest';
@@ -22,8 +22,7 @@ describe('view rules', () => {
     expect(VIEW_LAYOUTS).toContain('timeline');
   });
 
-  it('allows the timeline only for workstream and project views', () => {
-    expect(viewLayoutProblem('workstream', 'timeline')).toBeNull();
+  it('allows the timeline only for project views', () => {
     expect(viewLayoutProblem('project', 'timeline')).toBeNull();
     expect(viewLayoutProblem('issue', 'timeline')).toMatch(/timeline/);
     expect(viewLayoutProblem('decision', 'timeline')).toMatch(/timeline/);
@@ -46,9 +45,8 @@ describe('view DTOs', () => {
         name: 'Q4',
         entity: 'workstream',
         layout: 'timeline',
-        filters: [{ field: 'projectId', op: 'in', value: ['pj_1'] }],
       }),
-    ).toEqual([]);
+    ).toContain('entity');
   });
 
   it('rejects unknown entities and layouts', async () => {
@@ -113,6 +111,28 @@ describe('ViewsService layout/entity validation', () => {
     );
   });
 
+  it('rejects new Workstream views and hides legacy ones', async () => {
+    const fresh = make();
+    await expect(
+      fresh.service.create(ctx, {
+        name: 'Legacy',
+        entity: 'workstream' as never,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    const legacy = make({
+      id: 'v1',
+      workspaceId: 'w1',
+      ownerId: 'u1',
+      shared: false,
+      entity: 'workstream',
+      layout: 'list',
+    });
+    await expect(legacy.service.get(ctx, 'v1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+  });
+
   it('refuses a timeline of issues', async () => {
     const { repo, service } = make();
     await expect(
@@ -127,7 +147,7 @@ describe('ViewsService layout/entity validation', () => {
       workspaceId: 'w1',
       ownerId: 'u1',
       shared: false,
-      entity: 'workstream',
+      entity: 'project',
       layout: 'timeline',
     };
     const a = make({ ...row });

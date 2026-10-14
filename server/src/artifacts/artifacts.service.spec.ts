@@ -4,14 +4,12 @@ import { describe, expect, it, vi } from 'vitest';
 import type { RefsService } from '../common/refs.service.js';
 import type { ArtifactEntity } from '../database/entities/index.js';
 import type { EventsService } from '../events/events.service.js';
-import type { WorkstreamBus } from '../events/workstream-bus.js';
 import { ArtifactsService, isHttpUrl } from './artifacts.service.js';
 
 const ACTOR = { type: 'user', id: 'u_1' } as const;
 
 function setup(existing: Partial<ArtifactEntity> | null = null) {
   const record = vi.fn(async () => ({}));
-  const touch = vi.fn(async () => undefined);
   const row = existing
     ? ({
         id: 'ar_1',
@@ -32,17 +30,15 @@ function setup(existing: Partial<ArtifactEntity> | null = null) {
     query: async () => [],
   } as unknown as DataSource;
   const refs = {
-    workstreams: async () => undefined,
     repositories: async () => undefined,
   } as unknown as RefsService;
   const service = new ArtifactsService(
     ds,
     refs,
     { record } as unknown as EventsService,
-    { touch } as unknown as WorkstreamBus,
     repo,
   );
-  return { service, record, touch };
+  return { service, record };
 }
 
 describe('isHttpUrl', () => {
@@ -105,7 +101,7 @@ describe('ArtifactsService owners', () => {
   });
 
   it('lets a document carry only a description, and reports the owners in the event', async () => {
-    const { service, record, touch } = setup();
+    const { service, record } = setup();
     const row = await service.create('ws_1', ACTOR, {
       kind: 'document',
       title: 'Notes',
@@ -117,45 +113,30 @@ describe('ArtifactsService owners', () => {
       description: 'why',
       issueId: 'in_1',
       projectId: 'pj_1',
-      workstreamId: null,
     });
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'artifact.attached',
-        workstreamId: undefined,
         data: expect.objectContaining({ issueId: 'in_1', projectId: 'pj_1' }),
       }),
     );
-    expect(touch).not.toHaveBeenCalled();
-  });
-
-  it('touches the workstream when the artifact has one', async () => {
-    const { service, touch } = setup();
-    await service.create('ws_1', ACTOR, {
-      kind: 'document',
-      title: 'Notes',
-      workstreamId: 'wk_1',
-    });
-    expect(touch).toHaveBeenCalledWith('ws_1', 'wk_1', 'artifact.attached');
   });
 
   it('refuses to detach the last owner and keeps the others when detaching one', async () => {
     const { service, record } = setup({
-      workstreamId: 'wk_1',
-      projectId: null,
-      issueId: null,
-    });
-    await expect(
-      service.update('ws_1', ACTOR, 'ar_1', { workstreamId: null }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    const { service: s2, record: r2 } = setup({
-      workstreamId: 'wk_1',
       projectId: 'pj_1',
       issueId: null,
     });
     await expect(
-      s2.update('ws_1', ACTOR, 'ar_1', { workstreamId: null }),
-    ).resolves.toMatchObject({ projectId: 'pj_1', workstreamId: null });
+      service.update('ws_1', ACTOR, 'ar_1', { projectId: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    const { service: s2, record: r2 } = setup({
+      projectId: 'pj_1',
+      issueId: 'in_1',
+    });
+    await expect(
+      s2.update('ws_1', ACTOR, 'ar_1', { issueId: null }),
+    ).resolves.toMatchObject({ projectId: 'pj_1', issueId: null });
     expect(r2).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'artifact.updated',
@@ -199,7 +180,6 @@ describe('ArtifactsService document artifacts', () => {
       query: async () => [],
     } as unknown as DataSource;
     const refs = {
-      workstreams: async () => undefined,
       repositories: async () => undefined,
     } as unknown as RefsService;
     return {
@@ -207,7 +187,6 @@ describe('ArtifactsService document artifacts', () => {
         ds,
         refs,
         { record } as unknown as EventsService,
-        { touch: async () => undefined } as unknown as WorkstreamBus,
         repo,
       ),
     };
@@ -295,7 +274,6 @@ describe('ArtifactsService issue artifact counts', () => {
       {} as DataSource,
       {} as RefsService,
       {} as EventsService,
-      {} as WorkstreamBus,
       repo,
     );
     return { service, query, repo };
