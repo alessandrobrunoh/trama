@@ -779,7 +779,6 @@ export class DocumentEditor {
         }
       }
     };
-    take(this.store.workstreams(), (w) => (match(w.key, w.title) ? [w.title, w.key, w.key] : null));
     take(this.store.issues(), (i) => (match(i.key, i.title) ? [i.title, i.key, i.key] : null));
     take(this.store.decisions(), (d) => (match(d.key, d.title) ? [d.title, d.key, d.key] : null));
     const slug = this.store.slug() ?? '';

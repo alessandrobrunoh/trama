@@ -17,13 +17,19 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { LABEL_NAME_MAX, LABEL_SWATCHES, type LabelScope, type WorkspaceLabel } from '../../../core/contracts/domain';
+import {
+  LABEL_NAME_MAX,
+  LABEL_SWATCHES,
+  type LabelScope,
+  type StoredLabelScope,
+  type WorkspaceLabel,
+} from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { EmptyState } from '../../../shared/empty-state';
 import { LabelCatalog, describeUsage, type LabelUsage } from '../../../shared/label-catalog';
 import { LabelChip } from '../../../shared/label-chip';
-import { Picker, type PickOption } from '../../workstreams/picker';
+import { Picker, type PickOption } from '../../../shared/picker';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
@@ -33,10 +39,10 @@ type Dialog =
 
 type Sort = 'name' | 'usage';
 type ScopeFilter = 'all' | LabelScope;
+type ActiveLabelScope = LabelScope;
 
-const SCOPE_NOUN: Record<LabelScope, string> = {
+const SCOPE_NOUN: Record<ActiveLabelScope, string> = {
   issue: 'Issue',
-  workstream: 'Workstream',
   project: 'Project',
 };
 
@@ -44,7 +50,7 @@ const HEX = /^#[0-9a-f]{6}$/i;
 
 const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`;
 
-/** What a delete or merge touches, in words: "12 issues, 3 workstreams". */
+/** What a delete or merge touches, in words: "12 issues, 3 projects". */
 const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').replaceAll(' · ', ', ');
 
 /**
@@ -57,7 +63,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
   imports: [NgTemplateOutlet, HlmButtonImports, HlmDialogImports, HlmDropdownMenuImports, HlmInputImports, LucideDynamicIcon, LabelChip, EmptyState, Picker, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-6' },
   template: `
-    <app-section-header title="Labels" description="Each label applies to issues, workstreams, or projects. Templates are issue labels; their name and scope stay fixed.">
+    <app-section-header title="Labels" description="Each label applies to issues or projects. Templates are issue labels; their name and scope stay fixed.">
       <div actions>
         @if (catalog.canCreate()) {
           <button hlmBtn size="sm" (click)="openForm(null)">
@@ -218,6 +224,17 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                 <div class="grid gap-2">
                   <span class="text-muted-foreground text-xs font-medium" id="label-scope-label">Applies to</span>
                   <div class="bg-muted/50 inline-flex w-fit rounded-md border p-0.5" role="radiogroup" aria-labelledby="label-scope-label">
+                    @if (editing()?.scope === 'workstream') {
+                      <button
+                        type="button"
+                        role="radio"
+                        class="bg-background text-foreground h-7 rounded-[5px] px-2.5 text-xs shadow-xs"
+                        aria-checked="true"
+                        disabled
+                      >
+                        Legacy
+                      </button>
+                    }
                     @for (s of scopes; track s.id) {
                       <button
                         type="button"
@@ -368,16 +385,14 @@ export class LabelsSection {
     { id: 'name', label: 'Name' },
     { id: 'usage', label: 'Most used' },
   ];
-  protected readonly scopeFilter = signal<ScopeFilter>('all');
-  protected readonly scopeFilters: { id: ScopeFilter; label: string }[] = [
+  protected readonly scopeFilter = signal<'all' | ActiveLabelScope>('all');
+  protected readonly scopeFilters: { id: 'all' | ActiveLabelScope; label: string }[] = [
     { id: 'all', label: 'All' },
     { id: 'issue', label: 'Issues' },
-    { id: 'workstream', label: 'Workstreams' },
     { id: 'project', label: 'Projects' },
   ];
-  protected readonly scopes: { id: LabelScope; label: string }[] = [
+  protected readonly scopes: { id: ActiveLabelScope; label: string }[] = [
     { id: 'issue', label: 'Issues' },
-    { id: 'workstream', label: 'Workstreams' },
     { id: 'project', label: 'Projects' },
   ];
 
@@ -385,7 +400,7 @@ export class LabelsSection {
   protected readonly busy = signal(false);
   protected readonly formName = signal('');
   protected readonly formColor = signal<string>(LABEL_SWATCHES[0]);
-  protected readonly formScope = signal<LabelScope>('issue');
+  protected readonly formScope = signal<StoredLabelScope>('issue');
   protected readonly mergeInto = signal('');
 
   protected readonly swatches = LABEL_SWATCHES;
@@ -447,8 +462,8 @@ export class LabelsSection {
     return !cur || name !== cur.name || this.formColor().toLowerCase() !== cur.color || scopeChanged;
   });
 
-  protected scopeNoun(scope: LabelScope): string {
-    return SCOPE_NOUN[scope];
+  protected scopeNoun(scope: StoredLabelScope): string {
+    return scope === 'workstream' ? 'Legacy' : SCOPE_NOUN[scope];
   }
 
   protected usageText(id: string): string {
@@ -500,10 +515,10 @@ export class LabelsSection {
       ok = await this.store.updateLabel(cur.id, {
         ...(name !== cur.name ? { name } : {}),
         ...(color !== cur.color ? { color } : {}),
-        ...(!cur.template && scope !== cur.scope ? { scope } : {}),
+        ...(!cur.template && scope !== cur.scope && scope !== 'workstream' ? { scope } : {}),
       });
     } else {
-      ok = !!(await this.catalog.create(name, color, scope));
+      ok = scope !== 'workstream' && !!(await this.catalog.create(name, color, scope));
     }
     this.busy.set(false);
     if (!ok) return;

@@ -14,10 +14,10 @@ import { LucidePencil, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { TramaStore } from '../../core';
-import { Kbd } from '../../shared/kbd';
-import { Markdown } from '../../shared/markdown';
-import { UploadFile } from '../../shared/upload-file';
+import { TramaStore } from '../core';
+import { Kbd } from './kbd';
+import { Markdown } from './markdown';
+import { UploadFile } from './upload-file';
 
 /** Single line of text that turns into an input on click (Enter saves, Esc cancels, blur saves). */
 @Component({

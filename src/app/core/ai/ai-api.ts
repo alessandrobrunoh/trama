@@ -23,7 +23,7 @@ export interface SuperGrokLogin {
   error?: string | null;
 }
 export interface AiDraft {
-  kind: 'issue' | 'workstream' | 'decision';
+  kind: 'issue' | 'decision';
   title: string;
   description: string;
   issueOptions?: AiIssueDraftOptions;
@@ -34,7 +34,6 @@ export interface AiIssueDraftOptions {
   estimates: number[];
   teams: { id: string; label: string }[];
   assignees: { id: string; label: string }[];
-  workstreams: { id: string; key: string; title: string; objective: string }[];
   similar: {
     key: string;
     title: string;
@@ -49,8 +48,7 @@ export type AiIssueDraftSuggestion =
   | { field: 'kind'; value: string; why: string }
   | { field: 'estimate'; value: number; why: string }
   | { field: 'teamId'; value: string; label: string; why: string }
-  | { field: 'assigneeId'; value: string; label: string; why: string }
-  | { field: 'workstreamId'; value: string; label: string; why: string };
+  | { field: 'assigneeId'; value: string; label: string; why: string };
 export interface AiIssueDraftTriage {
   suggestions: AiIssueDraftSuggestion[];
 }
@@ -91,7 +89,7 @@ export type ChatStreamEvent =
   | { type: 'error'; message: string };
 
 export interface ChatContext {
-  kind: 'page' | 'issue' | 'workstream' | 'project' | 'decision';
+  kind: 'page' | 'issue' | 'project' | 'decision';
   label: string;
   id?: string;
 }

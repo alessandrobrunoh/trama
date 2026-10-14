@@ -28,9 +28,9 @@ import { SiteHeader } from '../landing/site-header';
             Where Trama is going
           </h1>
           <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-            Our first goal is to prove the workstream model in real teams. Everything else comes
-            after. Dates are deliberately absent: we would rather ship when it's right than hit a
-            number we made up.
+            We're building an issue-first workspace where plans, decisions and human input stay
+            attached to the work they concern. Dates are deliberately absent: we would rather ship
+            when it's right than hit a number we made up.
           </p>
           <a
             routerLink="/changelog"

@@ -16,14 +16,6 @@ export interface NextMilestone {
 export class MilestoneInfo {
   private readonly store = inject(TramaStore);
 
-  /** Whether a workstream measures progress in points (else issue counts). */
-  readonly pointsByWorkstream = computed(() => {
-    const scale = this.store.estimateScale();
-    const map = new Map<string, boolean>();
-    for (const [id, issues] of this.store.issuesByWorkstream()) map.set(id, usesPoints(issues, scale));
-    return map;
-  });
-
   /** Whether a project measures progress in points (else issue counts). */
   readonly pointsByProject = computed(() => {
     const scale = this.store.estimateScale();
@@ -56,17 +48,6 @@ export class MilestoneInfo {
     for (const [wsId, list] of this.store.milestonesByProject()) {
       const i = list.findIndex((m) => !stats.get(m.id)?.complete);
       if (i >= 0) out.set(wsId, { ms: list[i], n: i + 1, stats: stats.get(list[i].id)!, state: states.get(list[i].id)! });
-    }
-    return out;
-  });
-
-  /** The next open milestone of the project a workstream carries out. */
-  readonly nextByWorkstream = computed(() => {
-    const byProject = this.nextByProject();
-    const out = new Map<string, NextMilestone>();
-    for (const w of this.store.workstreams()) {
-      const next = w.projectId ? byProject.get(w.projectId) : undefined;
-      if (next) out.set(w.id, next);
     }
     return out;
   });

@@ -27,11 +27,10 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Estimate } from '../../shared/estimate';
 import { KeyChip } from '../../shared/key-chip';
 import { StatusIcon } from '../../shared/status';
-import { EditableMarkdown } from '../workstreams/inline-edit';
-import { Picker } from '../workstreams/picker';
-import { DATE_PRESETS } from '../workstreams/ws-menu';
-import { issueOptions } from '../workstreams/ws-model';
-import { WsDatePicker } from '../workstreams/ws-parts';
+import { EditableMarkdown } from '../../shared/inline-edit';
+import { Picker } from '../../shared/picker';
+import { DATE_PRESETS, DatePicker } from '../../shared/date-picker';
+import { issueOptions } from '../../shared/picker-options';
 import { MilestoneActions } from './milestone-actions';
 import { MilestoneIcon } from './milestone-icon';
 import { fmtNum, progressLabel } from './milestone-model';
@@ -56,7 +55,7 @@ import { ProgressChart } from './progress-chart';
     StatusIcon,
     EditableMarkdown,
     Picker,
-    WsDatePicker,
+    DatePicker,
     MilestoneIcon,
     ProgressChart,
   ],
@@ -105,7 +104,7 @@ import { ProgressChart } from './progress-chart';
       }
       <span class="text-muted-foreground shrink-0 text-xs tabular-nums max-sm:hidden" [hlmTooltip]="tip()" position="bottom">{{ label() }}</span>
 
-      <app-ws-date-picker
+      <app-date-picker
         class="shrink-0"
         label="Milestone target date"
         align="end"
@@ -119,7 +118,7 @@ import { ProgressChart } from './progress-chart';
         } @else if (canEdit()) {
           <svg [lucideIcon]="cal" [size]="13" class="text-muted-foreground opacity-0 group-hover/ms:opacity-70"></svg>
         }
-      </app-ws-date-picker>
+      </app-date-picker>
       @if (canEdit()) {
         <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground opacity-0 group-hover/ms:opacity-100 focus-visible:opacity-100 max-md:opacity-100" [attr.aria-label]="'Actions for ' + m.name" [hlmDropdownMenuTrigger]="menu">
           <svg [lucideIcon]="more" [size]="14"></svg>
@@ -240,7 +239,7 @@ export class MilestoneRow {
 
   readonly ms = input.required<Milestone>();
   readonly project = input.required<Project>();
-  /** Show without any editing (the workstream page lists its project's milestones this way). */
+  /** Show without any editing. */
   readonly readonly = input(false);
   /** Position among the project's milestones (for move up / down). */
   readonly index = input(0);

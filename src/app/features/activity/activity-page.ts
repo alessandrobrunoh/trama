@@ -1,18 +1,39 @@
-import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  effect,
+  inject,
+  input,
+  signal,
+  untracked,
+} from '@angular/core';
 import { Router } from '@angular/router';
-import { LucideActivity, LucideBot, LucideDynamicIcon, LucideUser, LucideUsers, LucideX } from '@lucide/angular';
+import {
+  LucideActivity,
+  LucideBot,
+  LucideDynamicIcon,
+  LucideUser,
+  LucideUsers,
+  LucideX,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { TramaStore, type DomainEvent } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
-import { EVENT_CATEGORY_LABEL, EventLine, eventCategory, type EventCategory } from '../overview/event-line';
-import { Picker, type PickOption } from '../workstreams/picker';
+import {
+  EVENT_CATEGORY_LABEL,
+  EventLine,
+  eventCategory,
+  type EventCategory,
+} from '../overview/event-line';
+import { Picker, type PickOption } from '../../shared/picker';
 
 type TypeFilter = 'all' | Exclude<EventCategory, 'other'>;
 
-const TYPE_TABS: TypeFilter[] = ['all', 'workstream', 'issue', 'decision', 'artifact', 'comment', 'input'];
+const TYPE_TABS: TypeFilter[] = ['all', 'issue', 'decision', 'artifact', 'comment', 'input'];
 
 interface DayGroup {
   key: string;
@@ -50,12 +71,24 @@ function dayLabel(iso: string, now = new Date()): string {
 @Component({
   selector: 'app-activity-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideDynamicIcon, HlmButtonImports, HlmSpinner, PageHeader, EmptyState, EventLine, Picker],
+  imports: [
+    LucideDynamicIcon,
+    HlmButtonImports,
+    HlmSpinner,
+    PageHeader,
+    EmptyState,
+    EventLine,
+    Picker,
+  ],
   host: { class: 'flex min-h-full flex-col' },
   template: `
     <app-page-header title="Activity" [description]="description()">
       <div class="flex flex-wrap items-center gap-x-1 gap-y-2 border-b px-4 py-2 sm:px-6">
-        <div class="-ms-1 flex flex-wrap items-center gap-0.5" role="tablist" aria-label="Event type">
+        <div
+          class="-ms-1 flex flex-wrap items-center gap-0.5"
+          role="tablist"
+          aria-label="Event type"
+        >
           @for (t of typeTabs; track t) {
             <button
               type="button"
@@ -105,7 +138,13 @@ function dayLabel(iso: string, now = new Date()): string {
           {{ showSystem() ? 'Automated shown' : 'Automated hidden' }}
         </button>
         @if (filtered()) {
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 gap-1 px-2 text-xs" (click)="clear()">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="sm"
+            class="text-muted-foreground h-7 gap-1 px-2 text-xs"
+            (click)="clear()"
+          >
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
           </button>
         }
@@ -120,7 +159,7 @@ function dayLabel(iso: string, now = new Date()): string {
         [description]="
           filtered()
             ? 'Nothing in the loaded history matches these filters. Load older activity or clear the filters.'
-            : 'Creating workstreams, triaging issues, recording decisions and linking pull requests all show up here.'
+            : 'Reporting issues, recording decisions and linking pull requests all show up here.'
         "
       >
         <div class="flex flex-wrap justify-center gap-2">
@@ -141,13 +180,19 @@ function dayLabel(iso: string, now = new Date()): string {
       <div class="mx-auto w-full max-w-4xl px-4 pb-10 sm:px-6">
         @for (g of groups(); track g.key) {
           <section [attr.aria-label]="g.label" class="pt-5">
-            <h2 class="bg-background/95 text-muted-foreground sticky top-0 z-[1] -mx-2 flex items-baseline gap-2 px-2 py-1.5 text-xs font-medium backdrop-blur">
+            <h2
+              class="bg-background/95 text-muted-foreground sticky top-0 z-[1] -mx-2 flex items-baseline gap-2 px-2 py-1.5 text-xs font-medium backdrop-blur"
+            >
               {{ g.label }}
               <span class="text-meta tabular-nums">{{ g.events.length }}</span>
             </h2>
             <div class="flex flex-col">
               @for (e of g.events; track e.id) {
-                <app-event-line [event]="e" [slug]="slug()" class="hover:bg-hover -mx-2 rounded-md px-2" />
+                <app-event-line
+                  [event]="e"
+                  [slug]="slug()"
+                  class="hover:bg-hover -mx-2 rounded-md px-2"
+                />
               }
             </div>
           </section>
@@ -211,26 +256,36 @@ export class ActivityPage {
   }
 
   protected readonly actorOptions = computed<PickOption[]>(() => [
-    ...this.store.users().map((u) => ({ value: `user:${u.id}`, label: u.name, kind: 'actor' as const, hint: 'person' })),
-    ...this.store.agents().map((a) => ({ value: `agent:${a.id}`, label: a.name, kind: 'actor' as const, hint: 'agent' })),
+    ...this.store.users().map((u) => ({
+      value: `user:${u.id}`,
+      label: u.name,
+      kind: 'actor' as const,
+      hint: 'person',
+    })),
+    ...this.store.agents().map((a) => ({
+      value: `agent:${a.id}`,
+      label: a.name,
+      kind: 'actor' as const,
+      hint: 'agent',
+    })),
   ]);
   protected readonly teamOptions = computed<PickOption[]>(() =>
-    this.store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team' as const, hint: t.key })),
+    this.store
+      .teams()
+      .map((t) => ({ value: t.id, label: t.name, kind: 'team' as const, hint: t.key })),
   );
 
   protected readonly filtered = computed(
-    () => this.type() !== 'all' || this.actors().length > 0 || this.teams().length > 0 || !this.showSystem(),
+    () =>
+      this.type() !== 'all' ||
+      this.actors().length > 0 ||
+      this.teams().length > 0 ||
+      !this.showSystem(),
   );
 
-  /** Teams an event touches (owner + participating teams of its workstream, the issue's team). */
+  /** Teams an event touches directly. */
   private teamsOf(e: DomainEvent): string[] {
     const out: string[] = [];
-    const ws = e.workstreamId ? this.store.workstreamById().get(e.workstreamId) : undefined;
-    if (ws) out.push(ws.ownerTeamId, ...ws.participatingTeamIds);
-    if (e.subject.type === 'workstream') {
-      const w = this.store.workstreamById().get(e.subject.id);
-      if (w) out.push(w.ownerTeamId, ...w.participatingTeamIds);
-    }
     if (e.subject.type === 'issue') {
       const i = this.store.issueById().get(e.subject.id);
       if (i?.teamId) out.push(i.teamId);
@@ -290,7 +345,13 @@ export class ActivityPage {
   protected readonly oldestLabel = computed(() => {
     const ev = this.store.events();
     const last = ev[ev.length - 1];
-    return last ? new Date(last.at).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+    return last
+      ? new Date(last.at).toLocaleDateString([], {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        })
+      : '';
   });
 
   protected typeLabel(t: TypeFilter): string {
@@ -299,7 +360,11 @@ export class ActivityPage {
 
   protected setType(t: TypeFilter): void {
     this.type.set(t);
-    void this.router.navigate([], { queryParams: { type: t === 'all' ? null : t }, queryParamsHandling: 'merge', replaceUrl: true });
+    void this.router.navigate([], {
+      queryParams: { type: t === 'all' ? null : t },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected clear(): void {
@@ -307,7 +372,11 @@ export class ActivityPage {
     this.actors.set([]);
     this.teams.set([]);
     this.showSystem.set(true);
-    void this.router.navigate([], { queryParams: { type: null, actor: null, team: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    void this.router.navigate([], {
+      queryParams: { type: null, actor: null, team: null },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected async loadMore(): Promise<void> {

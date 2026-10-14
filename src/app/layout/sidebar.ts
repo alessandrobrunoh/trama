@@ -11,7 +11,6 @@ import {
   LucideEllipsis,
   LucideBox,
   LucideFolderGit2,
-  LucideHexagon,
   LucideLayers,
   LucideLock,
   LucideScale,
@@ -89,7 +88,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         aria-label="Account menu"
       >
         <app-actor-avatar [actor]="meRef()" [size]="36" />
-        <span class="min-w-0 flex-1 truncate text-base font-medium">{{ session.user()?.name ?? 'Account' }}</span>
+        <span class="min-w-0 flex-1 truncate text-base font-medium">{{
+          session.user()?.name ?? 'Account'
+        }}</span>
         <svg [lucideIcon]="chevrons" [size]="17" class="text-muted-foreground shrink-0"></svg>
       </button>
       <button
@@ -113,7 +114,11 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           aria-label="Switch workspace"
         >
           <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 shrink-0 dark:hidden" />
-          <img src="/icons/trama-symbol-white.svg" alt="" class="hidden size-5 shrink-0 dark:block" />
+          <img
+            src="/icons/trama-symbol-white.svg"
+            alt=""
+            class="hidden size-5 shrink-0 dark:block"
+          />
           <span class="min-w-0 truncate text-[13px] font-semibold">{{ wsName() }}</span>
           <svg [lucideIcon]="chevronDown" [size]="13" class="text-muted-foreground shrink-0"></svg>
         </button>
@@ -160,7 +165,12 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           >
             <svg [lucideIcon]="more" [size]="15"></svg>
             <span class="flex-1 text-start">More</span>
-            <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!moreOpen()" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
+            <span
+              class="inline-flex shrink-0 transition-transform"
+              [class.-rotate-90]="!moreOpen()"
+              aria-hidden="true"
+              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
+            ></span>
           </button>
           @if (moreOpen()) {
             <ul hlmSidebarMenu id="sidebar-more" class="gap-px">
@@ -175,9 +185,20 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       <!-- Favorites: only once something is pinned -->
       @if (favorites.entries().length) {
         <div class="mt-4 max-md:mt-2">
-          <button type="button" class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('favorites')" [attr.aria-expanded]="!ui.isFolded('favorites')">
+          <button
+            type="button"
+            class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium"
+            (click)="ui.toggleFolded('favorites')"
+            [attr.aria-expanded]="!ui.isFolded('favorites')"
+          >
             Favorites
-            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('favorites')" [class.opacity-0]="!ui.isFolded('favorites')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
+            <span
+              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
+              [class.-rotate-90]="ui.isFolded('favorites')"
+              [class.opacity-0]="!ui.isFolded('favorites')"
+              aria-hidden="true"
+              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
+            ></span>
           </button>
           @if (!ui.isFolded('favorites')) {
             <ul hlmSidebarMenu class="gap-px">
@@ -193,20 +214,53 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                     closeMobileSidebarOnClick
                   >
                     @switch (e.type) {
-                      @case ('issue') { <app-status-icon entity="issue" [status]="$any(e.status)" /> }
-                      @case ('workstream') { <app-status-icon entity="workstream" [status]="$any(e.status)" /> }
-                      @case ('decision') { <svg [lucideIcon]="decisionIcon" [size]="14" class="text-entity-decision shrink-0"></svg> }
+                      @case ('issue') {
+                        <app-status-icon entity="issue" [status]="$any(e.status)" />
+                      }
+                      @case ('decision') {
+                        <svg
+                          [lucideIcon]="decisionIcon"
+                          [size]="14"
+                          class="text-entity-decision shrink-0"
+                        ></svg>
+                      }
                       @case ('team') {
-                        <span class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white" [style.background]="e.color" aria-hidden="true">{{ e.label.slice(0, 1) }}</span>
+                        <span
+                          class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white"
+                          [style.background]="e.color"
+                          aria-hidden="true"
+                          >{{ e.label.slice(0, 1) }}</span
+                        >
                       }
                       @case ('project') {
-                        @if (store.getProject(e.subjectId); as pj) { <app-project-glyph [project]="pj" [size]="14" /> }
-                        @else { <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                        @if (store.getProject(e.subjectId); as pj) {
+                          <app-project-glyph [project]="pj" [size]="14" />
+                        } @else {
+                          <svg
+                            [lucideIcon]="projectIcon"
+                            [size]="14"
+                            class="text-muted-foreground shrink-0"
+                          ></svg>
+                        }
                       }
-                      @case ('repository') { <svg [lucideIcon]="repoIcon" [size]="14" class="text-muted-foreground shrink-0"></svg> }
-                      @case ('view') { <svg [lucideIcon]="layers" [size]="14" class="text-muted-foreground shrink-0"></svg> }
+                      @case ('repository') {
+                        <svg
+                          [lucideIcon]="repoIcon"
+                          [size]="14"
+                          class="text-muted-foreground shrink-0"
+                        ></svg>
+                      }
+                      @case ('view') {
+                        <svg
+                          [lucideIcon]="layers"
+                          [size]="14"
+                          class="text-muted-foreground shrink-0"
+                        ></svg>
+                      }
                       @case ('customer') {
-                        @if (store.getCustomer(e.subjectId); as cu) { <app-customer-avatar [customer]="cu" [size]="14" /> }
+                        @if (store.getCustomer(e.subjectId); as cu) {
+                          <app-customer-avatar [customer]="cu" [size]="14" />
+                        }
                       }
                     }
                     <span class="flex-1 truncate">{{ e.label }}</span>
@@ -230,9 +284,20 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       <!-- Teams -->
       <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
-          <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('teams')" [attr.aria-expanded]="!ui.isFolded('teams')">
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium"
+            (click)="ui.toggleFolded('teams')"
+            [attr.aria-expanded]="!ui.isFolded('teams')"
+          >
             Your teams
-            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('teams')" [class.opacity-0]="!ui.isFolded('teams')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
+            <span
+              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
+              [class.-rotate-90]="ui.isFolded('teams')"
+              [class.opacity-0]="!ui.isFolded('teams')"
+              aria-hidden="true"
+              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
+            ></span>
           </button>
           <a
             [routerLink]="['/', slug(), 'teams']"
@@ -272,7 +337,13 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                     >{{ t.key.slice(0, 1) }}</span
                   >
                   <span class="truncate">{{ t.name }}</span>
-                  <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!open"><svg [lucideIcon]="chevronDown" [size]="12" class="text-muted-foreground shrink-0"></svg></span>
+                  <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!open"
+                    ><svg
+                      [lucideIcon]="chevronDown"
+                      [size]="12"
+                      class="text-muted-foreground shrink-0"
+                    ></svg
+                  ></span>
                 </button>
                 @if (open) {
                   <ul class="mt-px flex flex-col gap-px pl-[18px]">
@@ -280,18 +351,23 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                       <li>
                         <a
                           hlmSidebarMenuButton
-                          [routerLink]="sub.segment ? ['/', slug(), sub.segment] : ['/', slug(), 'teams', t.key]"
+                          [routerLink]="
+                            sub.segment ? ['/', slug(), sub.segment] : ['/', slug(), 'teams', t.key]
+                          "
                           [queryParams]="sub.segment ? { team: t.id } : null"
                           [isActive]="isTeamLinkActive(t.id, t.key, sub.segment)"
                           closeMobileSidebarOnClick
                         >
-                          <svg [lucideIcon]="sub.icon" [size]="14" class="text-muted-foreground"></svg>
+                          <svg
+                            [lucideIcon]="sub.icon"
+                            [size]="14"
+                            class="text-muted-foreground"
+                          ></svg>
                           <span class="flex-1 truncate">{{ sub.label }}</span>
                           @if (sub.segment === 'issues' && openIssuesByTeam().get(t.id); as n) {
-                            <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
-                          }
-                          @if (sub.segment === 'workstreams' && activeWsByTeam().get(t.id); as n) {
-                            <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
+                            <span class="text-muted-foreground text-[11px] tabular-nums">{{
+                              n
+                            }}</span>
                           }
                         </a>
                       </li>
@@ -309,9 +385,20 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       <!-- Views -->
       <div class="mt-4 max-md:mt-3">
         <div class="group/sec flex items-center">
-          <button type="button" class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium" (click)="ui.toggleFolded('views')" [attr.aria-expanded]="!ui.isFolded('views')">
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium"
+            (click)="ui.toggleFolded('views')"
+            [attr.aria-expanded]="!ui.isFolded('views')"
+          >
             Views
-            <span class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100" [class.-rotate-90]="ui.isFolded('views')" [class.opacity-0]="!ui.isFolded('views')" aria-hidden="true"><svg [lucideIcon]="chevronDown" [size]="12"></svg></span>
+            <span
+              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
+              [class.-rotate-90]="ui.isFolded('views')"
+              [class.opacity-0]="!ui.isFolded('views')"
+              aria-hidden="true"
+              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
+            ></span>
           </button>
           <a
             [routerLink]="['/', slug(), 'views']"
@@ -343,16 +430,29 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                   [isActive]="vla.isActive"
                   closeMobileSidebarOnClick
                 >
-                  <svg [lucideIcon]="viewIcon(v.entity)" [size]="14" class="text-muted-foreground"></svg>
+                  <svg
+                    [lucideIcon]="viewIcon(v.entity)"
+                    [size]="14"
+                    class="text-muted-foreground"
+                  ></svg>
                   <span class="flex-1 truncate">{{ v.name }}</span>
                   @if (!v.shared) {
-                    <svg [lucideIcon]="lock" [size]="11" class="text-muted-foreground/70" aria-label="Private"></svg>
+                    <svg
+                      [lucideIcon]="lock"
+                      [size]="11"
+                      class="text-muted-foreground/70"
+                      aria-label="Private"
+                    ></svg>
                   }
                 </a>
               </li>
             } @empty {
               <li>
-                <button type="button" class="text-muted-foreground hover:text-foreground px-2 py-1 text-xs" (click)="ui.openCreate('view')">
+                <button
+                  type="button"
+                  class="text-muted-foreground hover:text-foreground px-2 py-1 text-xs"
+                  (click)="ui.openCreate('view')"
+                >
                   Save a filter as a view…
                 </button>
               </li>
@@ -376,7 +476,10 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     </div>
 
     <!-- footer: user menu + help -->
-    <div hlmSidebarFooter class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden">
+    <div
+      hlmSidebarFooter
+      class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden"
+    >
       <button
         type="button"
         class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
@@ -386,7 +489,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         aria-label="User menu"
       >
         <app-actor-avatar [actor]="meRef()" [size]="20" />
-        <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{{ session.user()?.name ?? 'Account' }}</span>
+        <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{{
+          session.user()?.name ?? 'Account'
+        }}</span>
       </button>
       <button
         type="button"
@@ -407,13 +512,22 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           [routerLink]="['/', slug(), item.segment]"
           routerLinkActive
           #rla="routerLinkActive"
-          [routerLinkActiveOptions]="{ paths: 'subset', queryParams: 'ignored', fragment: 'ignored', matrixParams: 'ignored' }"
+          [routerLinkActiveOptions]="{
+            paths: 'subset',
+            queryParams: 'ignored',
+            fragment: 'ignored',
+            matrixParams: 'ignored',
+          }"
           [isActive]="rla.isActive && !teamScoped()"
           [tooltip]="item.label"
           [attr.title]="item.hint ?? null"
           closeMobileSidebarOnClick
         >
-          <svg [lucideIcon]="item.icon" [size]="15" class="text-muted-foreground group-data-active/menu-button:text-foreground"></svg>
+          <svg
+            [lucideIcon]="item.icon"
+            [size]="15"
+            class="text-muted-foreground group-data-active/menu-button:text-foreground"
+          ></svg>
           <span class="flex-1 truncate">{{ item.label }}</span>
           @if (badge(item.badge); as n) {
             @if (ui.sidebarBadgeStyle() === 'dot') {
@@ -424,7 +538,10 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                 [attr.aria-label]="n + ' pending'"
               ></span>
             } @else if (item.badge === 'inbox') {
-              <span class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ n }}</span>
+              <span
+                class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums"
+                >{{ n }}</span
+              >
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
             }
@@ -475,13 +592,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             <span class="flex flex-1 flex-col">
               <span>New issue</span>
               <span class="text-muted-foreground text-[11px]">A bug, request or incident</span>
-            </span>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('workstream')">
-            <svg [lucideIcon]="wsIcon" [size]="14" class="text-entity-workstream"></svg>
-            <span class="flex flex-1 flex-col">
-              <span>New workstream</span>
-              <span class="text-muted-foreground text-[11px]">An outcome that resolves issues</span>
             </span>
           </button>
           <button hlmDropdownMenuItem (triggered)="ui.openCreate('decision')">
@@ -554,12 +664,20 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           <button hlmDropdownMenuItem (triggered)="openPublic('/roadmap')">
             <svg [lucideIcon]="mapIcon" [size]="14"></svg>
             Roadmap
-            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
+            <svg
+              [lucideIcon]="externalIcon"
+              [size]="12"
+              class="text-muted-foreground ms-auto"
+            ></svg>
           </button>
           <button hlmDropdownMenuItem (triggered)="openPublic('/blog')">
             <svg [lucideIcon]="bookIcon" [size]="14"></svg>
             Blog
-            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
+            <svg
+              [lucideIcon]="externalIcon"
+              [size]="12"
+              class="text-muted-foreground ms-auto"
+            ></svg>
           </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
@@ -660,7 +778,6 @@ export class AppSidebar {
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
   protected readonly issueIcon = LucideCircleDot;
-  protected readonly wsIcon = LucideHexagon;
   protected readonly decisionIcon = LucideScale;
   protected readonly layers = LucideLayers;
   protected readonly closeIcon = LucideX;
@@ -669,7 +786,6 @@ export class AppSidebar {
   protected readonly usersIcon = LucideUsers;
   protected readonly teamLinks = [
     { label: 'Issues', segment: 'issues', icon: LucideCircleDot },
-    { label: 'Workstreams', segment: 'workstreams', icon: LucideHexagon },
     { label: 'Team page', segment: '', icon: LucideUsers },
   ] as const;
 
@@ -697,24 +813,24 @@ export class AppSidebar {
     }
     return m;
   });
-  protected readonly activeWsByTeam = computed(() => {
-    const m = new Map<string, number>();
-    for (const w of this.store.workstreams()) {
-      if (w.status === 'shipped' || w.status === 'canceled' || w.status === 'draft') continue;
-      m.set(w.ownerTeamId, (m.get(w.ownerTeamId) ?? 0) + 1);
-    }
-    return m;
-  });
 
   protected isTeamLinkActive(teamId: string, teamKey: string, segment: string): boolean {
     const [path, query = ''] = this.url().split('?');
     const segs = path.split('/').filter(Boolean);
-    if (!segment) return segs[1] === 'teams' && decodeURIComponent(segs[2] ?? '').toUpperCase() === teamKey.toUpperCase();
-    return segs[1] === segment && segs.length === 2 && new URLSearchParams(query).get('team') === teamId;
+    if (!segment)
+      return (
+        segs[1] === 'teams' &&
+        decodeURIComponent(segs[2] ?? '').toUpperCase() === teamKey.toUpperCase()
+      );
+    return (
+      segs[1] === segment && segs.length === 2 && new URLSearchParams(query).get('team') === teamId
+    );
   }
 
   protected viewIcon(entity: string): LucideIcon {
-    return entity === 'issue' ? LucideCircleDot : entity === 'decision' ? LucideScale : LucideHexagon;
+    if (entity === 'issue') return LucideCircleDot;
+    if (entity === 'decision') return LucideScale;
+    return entity === 'project' ? LucideBox : LucideLayers;
   }
   protected readonly chevrons = LucideChevronsUpDown;
   protected readonly search = LucideSearch;
@@ -739,7 +855,9 @@ export class AppSidebar {
     { mode: 'system', label: 'System', icon: LucideMonitor },
   ];
 
-  protected readonly slug = computed(() => this.store.slug() ?? this.session.workspace()?.slug ?? '');
+  protected readonly slug = computed(
+    () => this.store.slug() ?? this.session.workspace()?.slug ?? '',
+  );
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );

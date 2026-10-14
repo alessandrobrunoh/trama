@@ -110,7 +110,7 @@ Sub menus: `[hlmDropdownMenuSubTrigger]="sub"` on an item + `<ng-template #sub><
 ```html
 <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="open.set(false)">
   <hlm-dialog-content *hlmDialogPortal="let ctx" class="sm:max-w-lg">
-    <hlm-dialog-header><h2 hlmDialogTitle>New workstream</h2><p hlmDialogDescription>…</p></hlm-dialog-header>
+    <hlm-dialog-header><h2 hlmDialogTitle>New issue</h2><p hlmDialogDescription>…</p></hlm-dialog-header>
     …form…
     <hlm-dialog-footer><button hlmBtn variant="outline" hlmDialogClose>Cancel</button><button hlmBtn>Create</button></hlm-dialog-footer>
   </hlm-dialog-content>
@@ -128,7 +128,6 @@ Light is `:root`, dark is `:root.dark` (class set by `ThemeService`). All are us
 - Charts: `chart-1` … `chart-5`
 - Tones (palette behind statuses): `tone-neutral|slate|blue|amber|orange|violet|red|teal|green`
 - **Status colors** (muted, same meaning in both modes: neutral = not started, blue = active, amber = waiting on a human, violet = review, red = broken, teal = ready, green = done):
-  - WorkstreamStatus: `status-draft|planned|working|needs-input|in-review|blocked|ready-to-land|shipped|canceled`
   - ExecutionState extras: `status-queued|running|failed|completed`
   - IssueStatus: `status-backlog|todo|in-progress|in-review|done|canceled`; DecisionStatus: `status-proposed|accepted|superseded|rejected`
   - Artifact/CI: `status-passing|failing|pending|healthy|degraded`
@@ -143,7 +142,7 @@ All standalone, OnPush, signal inputs, no raw HTML.
 
 | selector | class | inputs |
 |---|---|---|
-| `<app-status-icon>` | `StatusIcon` | `status` (any Workstream/Execution/Issue/Decision/Artifact/CI state), `size=14` |
+| `<app-status-icon>` | `StatusIcon` | `status` (any Issue/Decision/Artifact/CI state), `size=14` |
 | `<app-status-badge>` | `StatusBadge` | `status`, `label?`, `iconOnly?` — tinted pill |
 | `<app-status-label>` | `StatusLabel` | `status`, `label?` — icon + text, no pill |
 | `<app-priority-icon>` | `PriorityIcon` | `priority`, `showLabel?` |
@@ -162,12 +161,12 @@ All standalone, OnPush, signal inputs, no raw HTML.
 | `<app-issue-kind>` | `IssueKindLabel` | `kind`, `showLabel?` |
 | pipes | `relativeTime`, `shortDate`, `fullDate` | `{{ iso | relativeTime }}` |
 
-Status labels also available as `statusLabel(status)`, providers as `providerLabel()`. Enum labels/ordering for pickers come from `core/meta.ts` (`WORKSTREAM_STATUS_META`…).
+Status labels also available as `statusLabel(status)`, providers as `providerLabel()`. Enum labels/ordering for pickers come from `core/meta.ts`.
 
 ## Layout hooks (`src/app/layout`)
 
 - `AppShell` (`layout/app-shell.ts`) is the router parent of `/:workspaceSlug`: Spartan sidebar (sheet on mobile), top bar, scrolling content, command palette (⌘K), shortcuts dialog (`?`), confirm-delete dialog (`ui.setConfirmDelete`). Pages render *inside* the scroll area; page root should be a plain block (`min-h-full`) or `flex h-full min-h-0 flex-col` for full-height layouts.
 - **Top bar actions**: `<ng-template appTopBarActions><button hlmBtn size="sm">New</button></ng-template>` inside a page (import `TopBarActions` from `layout/page-chrome`).
-- **Breadcrumbs**: derived from the URL (`Workstreams › AUTH-42`). Override in a page: `usePageCrumbs(() => [{ label: 'Workstreams', link: ['/', slug(), 'workstreams'] }, { label: ws()?.key ?? '', mono: true }])`.
+- **Breadcrumbs**: derived from the URL. Override in a page: `usePageCrumbs(() => [{ label: 'Issues', link: ['/', slug(), 'issues'] }, { label: issue()?.key ?? '', mono: true }])`.
 - **Global overlays still to build by the feature layer** (the shell does NOT mount them): the *create dialog* (`ui.modal() === 'create'`, `ui.createKind()`, `ui.createDefaults()`) and the `/` search dialog* (`ui.modal() === 'search'`). Add their components to `AppShell`'s `imports` + template (one-line additive change).
 - Theme: `inject(ThemeService)` → `mode()`, `resolved()`, `isDark()`, `set('light'|'dark'|'system')`, `toggle()`. ⌘J works through core's `ThemeToggle` (flipping `html.dark`), which `ThemeService` adopts.

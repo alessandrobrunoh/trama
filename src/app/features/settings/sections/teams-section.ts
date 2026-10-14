@@ -17,7 +17,7 @@ import { SECTION_KIT } from './section-kit';
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Teams" description="Teams own workstreams and triage issues. A team's key prefixes its workstreams, like AUTH-12. Each team has leads and an edit policy, set on the team page.">
+      <app-section-header title="Teams" description="Teams organize issue triage. A team's key prefixes issue identifiers, like AUTH-12. Each team has leads and an edit policy, set on the team page.">
         @if (canAdmin()) {
           <button actions hlmBtn size="sm" (click)="ui.openCreate('team')">
             <svg [lucideIcon]="plus" [size]="14"></svg> New team
@@ -41,7 +41,7 @@ import { SECTION_KIT } from './section-kit';
                 <span [title]="r.policyHint">{{ r.policy }}</span>
               </div>
             </div>
-            <span class="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:inline">{{ r.workstreams }} ws · {{ r.issues }} issues</span>
+            <span class="text-muted-foreground hidden shrink-0 text-xs tabular-nums sm:inline">{{ r.issues }} issues</span>
             @if (r.members.length) {
               <app-avatar-stack [actors]="r.members" [max]="4" [size]="20" class="shrink-0" />
             } @else {
@@ -74,7 +74,6 @@ export class TeamsSection {
       .map((team: Team) => ({
         team,
         members: team.memberIds.map((id) => ({ type: 'user' as const, id })),
-        workstreams: this.store.workstreamsByOwnerTeam().get(team.id)?.length ?? 0,
         issues: this.store.issuesByTeam().get(team.id)?.length ?? 0,
         leads: team.leadIds.length,
         policy: team.editPolicy === 'members' ? 'Members edit' : 'Everyone edits',

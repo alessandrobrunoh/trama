@@ -10,8 +10,6 @@ import {
   TramaStore,
   PRIORITIES,
   PRIORITY_META,
-  WORKSTREAM_STATUS_FLOW,
-  WORKSTREAM_STATUS_META,
   type InsightSignalId,
   type InsightsQuery,
 } from '../../core';
@@ -21,45 +19,40 @@ import type { ChartSlice } from './charts/chart-utils';
 import { ContributorsView } from './contributors-view';
 import { DonutChart } from './charts/donut-chart';
 import { EstimatesView } from './estimates-view';
-import { FlowView, type FlowDrill } from './flow-view';
 import { HealthView } from './health-view';
 import { IssueExtras } from './issue-extras';
 import { KpiTile } from './charts/kpi-tile';
 import { Sparkline } from './charts/sparkline';
 import { StackBar } from './charts/stack-bar';
 import { TimeChart } from './charts/time-chart';
-import { PERIODS, issueInsights, workstreamInsights, type Kpi, type Period, type SeriesBlock } from './insights';
+import { PERIODS, issueInsights, type Kpi, type Period, type SeriesBlock } from './insights';
 import { filterWork } from './perf';
-import { ISSUE_COLOR, PRIORITY_COLOR, WS_COLOR } from './stats-colors';
+import { ISSUE_COLOR, PRIORITY_COLOR } from './stats-colors';
 import type { Distribution, StatsModel } from './stats-model';
 import { EMPTY_TIMELINE, type Timeline } from './timeline';
 import { EMPTY_WORK } from './work';
-import { WsExtras } from './ws-extras';
 
-export type StatsScope = 'health' | 'flow' | 'contributors' | 'issues' | 'workstreams' | 'estimates';
-const SCOPES: readonly StatsScope[] = ['health', 'flow', 'contributors', 'issues', 'workstreams', 'estimates'];
-/** Scopes backed by the insights API (health signals, flow metrics, people and agents). */
-const INSIGHT_SCOPES: readonly StatsScope[] = ['health', 'flow', 'contributors'];
-const FLOW_DRILLS: readonly FlowDrill[] = ['cycle', 'lead', 'workstream', 'aging'];
+export type StatsScope = 'health' | 'contributors' | 'issues' | 'estimates';
+const SCOPES: readonly StatsScope[] = ['health', 'contributors', 'issues', 'estimates'];
+/** Scopes backed by the insights API (health signals and contributor activity). */
+const INSIGHT_SCOPES: readonly StatsScope[] = ['health', 'contributors'];
 const STALE_CHOICES = [3, 7, 14, 30] as const;
 
 const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
   health: { label: 'Health', blurb: 'Where the problems are right now: stuck, stale and overdue work, and who everything waits on.' },
-  flow: { label: 'Flow', blurb: 'How work moves: cycle and lead time, throughput, aging work in progress and cumulative flow.' },
   contributors: { label: 'People & agents', blurb: 'Who changes things, and where agents get stuck. Agents are actors, never assignees.' },
   issues: { label: 'Issues', blurb: 'Demand: what comes in, how fast it clears, and what is waiting.' },
-  workstreams: { label: 'Workstreams', blurb: 'Outcomes: what gets delivered, how long it takes, and where it stalls.' },
   estimates: { label: 'Estimates & time', blurb: 'How long work really takes, and how well estimates predict it.' },
 };
 
 /**
  * Renders a {@link StatsModel}. `strip` is the one-line summary used above a list; `full` is the
- * Insights-style board with a scope toggle (issues = demand, workstreams = outcomes) and a period.
+ * Insights-style board with issue, health, contributor and estimate scopes.
  */
 @Component({
   selector: 'app-stats-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, BarList, ChartCard, ContributorsView, DonutChart, EstimatesView, FlowView, HealthView, IssueExtras, KpiTile, Sparkline, StackBar, TimeChart, WsExtras],
+  imports: [NgTemplateOutlet, RouterLink, BarList, ChartCard, ContributorsView, DonutChart, EstimatesView, HealthView, IssueExtras, KpiTile, Sparkline, StackBar, TimeChart],
   host: { class: 'block' },
   template: `
     @if (variant() === 'strip') {
@@ -195,9 +188,6 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
               @case ('health') {
                 <app-health-view [report]="rep" [slug]="slug()" [query]="insightQuery()" [selected]="signal()" (selectedChange)="setSignal($event)" />
               }
-              @case ('flow') {
-                <app-flow-view [report]="rep" [slug]="slug()" [drill]="drill()" (drillChange)="setDrill($event)" />
-              }
               @case ('contributors') {
                 <app-contributors-view [report]="rep" [slug]="slug()" />
               }
@@ -286,106 +276,6 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
           <app-issue-extras [work]="filteredWork()" [period]="period()" [now]="nowMs()" [scale]="scale()" />
         }
 
-        @if (wsView(); as v) {
-          <ng-container *ngTemplateOutlet="kpiRow; context: { $implicit: v.kpis }" />
-
-          <div class="grid gap-4 lg:grid-cols-3">
-            <app-chart-card
-              class="lg:col-span-2"
-              title="Created vs shipped"
-              [subtitle]="periodLong()"
-              [empty]="flowEmpty(v.flow) ? 'No workstreams created or shipped in this period.' : undefined"
-            >
-              <app-time-chart
-                mode="line"
-                [series]="v.flow.series"
-                [labels]="v.flow.labels"
-                [tooltipTitles]="v.flow.titles"
-                ariaLabel="Workstreams created and shipped over time"
-              />
-            </app-chart-card>
-
-            <app-chart-card title="Status now" subtitle="All workstreams, current state" [empty]="wsStatus().length ? undefined : 'No workstreams yet.'">
-              <app-donut-chart [slices]="wsStatus()" centerLabel="workstreams" />
-              @if (wsPriority().length) {
-                <h4 class="text-muted-foreground mt-5 mb-2 text-xs">By priority</h4>
-                <app-stack-bar [slices]="wsPriority()" [legend]="true" />
-              }
-            </app-chart-card>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-3">
-            <app-chart-card
-              class="lg:col-span-2"
-              title="Active workstreams by status"
-              subtitle="Shipped and canceled excluded"
-              [note]="v.stock?.note"
-              [empty]="v.stock ? undefined : v.stockUnavailable"
-            >
-              @if (v.stock; as st) {
-                <app-time-chart
-                  mode="stacked"
-                  [series]="st.series"
-                  [labels]="st.labels"
-                  [tooltipTitles]="st.titles"
-                  ariaLabel="Active workstreams by status over time"
-                />
-              }
-            </app-chart-card>
-
-            <app-chart-card
-              title="Cycle time"
-              subtitle="Planned to shipped, workstreams shipped in this period"
-              [note]="v.cycleNote"
-              [empty]="v.cycle ? undefined : 'Nothing shipped with a Planned step in this period.'"
-            >
-              @if (v.cycle; as c) {
-                <app-time-chart
-                  mode="bars"
-                  [series]="c.series"
-                  [labels]="c.labels"
-                  [tooltipTitles]="c.titles"
-                  [height]="170"
-                  ariaLabel="Shipped workstreams by cycle time"
-                />
-              }
-            </app-chart-card>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-2">
-            <app-chart-card
-              title="Time blocked"
-              subtitle="Days spent in Blocked, per workstream"
-              [note]="v.blockedNote"
-              [empty]="v.blocked.length ? undefined : 'No blocked time in this period.'"
-            >
-              <app-bar-list [rows]="v.blocked" ariaLabel="Blocked time by workstream" />
-            </app-chart-card>
-
-            <app-chart-card
-              title="Criteria progress"
-              subtitle="Acceptance criteria met on active workstreams"
-              [empty]="v.criteria.length ? undefined : 'No acceptance criteria on active workstreams.'"
-            >
-              @if (criteriaSlices().length) {
-                <app-stack-bar class="mb-3" [slices]="criteriaSlices()" [legend]="true" />
-              }
-              <app-bar-list [rows]="v.criteria" [max]="100" ariaLabel="Criteria met per workstream" />
-            </app-chart-card>
-          </div>
-
-          <div class="grid gap-4 lg:grid-cols-2">
-            <app-chart-card title="Active by team" subtitle="Current" [empty]="v.activeByTeam.length ? undefined : 'No active workstreams.'">
-              <app-bar-list [rows]="v.activeByTeam" ariaLabel="Active workstreams by team" />
-            </app-chart-card>
-            <app-chart-card title="Shipped by team" [subtitle]="periodLong()" [empty]="v.shippedByTeam.length ? undefined : 'Nothing shipped in this period.'">
-              <app-bar-list [rows]="v.shippedByTeam" defaultColor="var(--chart-2)" ariaLabel="Shipped workstreams by team" />
-            </app-chart-card>
-          </div>
-
-          <app-ws-extras [data]="work()" [wsIds]="wsIds()" [now]="nowMs()" />
-        }
-
         @if (scope() === 'estimates') {
           <app-estimates-view [work]="filteredWork()" [period]="period()" [now]="nowMs()" [scale]="scale()" [periodLong]="periodLong()" />
         }
@@ -401,7 +291,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
         }
 
         @if (!scopes().length && !deliveryDists().length) {
-          <p class="text-meta rounded-lg border border-dashed py-12 text-center">Nothing to chart yet. Statistics appear once issues or workstreams exist.</p>
+          <p class="text-meta rounded-lg border border-dashed py-12 text-center">Nothing to chart yet. Statistics appear once issues exist.</p>
         }
 
         @if (model().cards.length && !filtered() && !insightScope() && scope() !== 'estimates') {
@@ -447,7 +337,7 @@ export class StatsBoard {
   readonly variant = input<'full' | 'strip'>('full');
   /** Where "All statistics" goes. Empty hides the link. */
   readonly moreLink = input<readonly string[]>([]);
-  /** Limit the scope toggle (e.g. a single workstream only has issue demand). Defaults to what the data has. */
+  /** Limit the available views for embedding contexts. */
   readonly onlyScopes = input<readonly StatsScope[] | undefined>(undefined, { alias: 'scopes' });
   /** Keep scope, period, person and team in the URL query (the statistics page). */
   readonly syncUrl = input(false);
@@ -473,7 +363,6 @@ export class StatsBoard {
   protected readonly stale = signal<number>(7);
   /** Health tile or flow figure whose items are open. */
   protected readonly signal = signal<InsightSignalId | null>(null);
-  protected readonly drill = signal<FlowDrill | null>(null);
   protected readonly staleChoices = STALE_CHOICES;
 
   constructor() {
@@ -492,8 +381,6 @@ export class StatsBoard {
         this.stale.set((STALE_CHOICES as readonly number[]).includes(stale) ? stale : 7);
         const sig = q.get('signal');
         this.signal.set(INSIGHT_SIGNAL_IDS.includes(sig as InsightSignalId) ? (sig as InsightSignalId) : null);
-        const drill = q.get('drill');
-        this.drill.set(FLOW_DRILLS.includes(drill as FlowDrill) ? (drill as FlowDrill) : null);
       });
     });
   }
@@ -519,19 +406,13 @@ export class StatsBoard {
     return {
       ...tl,
       issues: tl.issues.filter((i) => (!p || i.assigneeId === p) && (!t || i.teamId === t)),
-      workstreams: tl.workstreams.filter((w) => (!p || w.accountableId === p) && (!t || w.teamId === t)),
     };
   });
   protected readonly filteredWork = computed(() => filterWork(this.work().issues, { person: this.personId(), team: this.teamId() }));
-  protected readonly wsIds = computed<ReadonlySet<string> | null>(() =>
-    this.filtered() ? new Set(this.timeline().workstreams.map((w) => w.id)) : null,
-  );
-
   protected readonly scopes = computed<StatsScope[]>(() => {
     const raw = this.rawTimeline();
     const out: StatsScope[] = this.insights() && this.variant() === 'full' ? [...INSIGHT_SCOPES] : [];
     if (raw.issues.length) out.push('issues');
-    if (raw.workstreams.length) out.push('workstreams');
     if (this.work().issues.length) out.push('estimates');
     const only = this.onlyScopes();
     return only ? out.filter((s) => only.includes(s)) : out;
@@ -564,10 +445,6 @@ export class StatsBoard {
   protected readonly issueView = computed(() =>
     this.variant() === 'full' && this.scope() === 'issues' ? issueInsights(this.timeline(), this.period()) : null,
   );
-  protected readonly wsView = computed(() =>
-    this.variant() === 'full' && this.scope() === 'workstreams' ? workstreamInsights(this.timeline(), this.period()) : null,
-  );
-
   protected readonly periodLong = computed(() => PERIODS.find((p) => p.id === this.period())?.long ?? '');
 
   // strip
@@ -592,26 +469,14 @@ export class StatsBoard {
       ? PRIORITIES.map((p) => ({ key: p, label: PRIORITY_META[p].label, value: this.timeline().issues.filter((i) => i.priority === p).length, color: PRIORITY_COLOR[p] })).filter((x) => x.value > 0)
       : this.slicesOf('Issue priority'),
   );
-  protected readonly wsStatus = computed<ChartSlice[]>(() =>
-    this.filtered()
-      ? WORKSTREAM_STATUS_FLOW.map((st) => ({ key: st, label: WORKSTREAM_STATUS_META[st].label, value: this.timeline().workstreams.filter((w) => w.status === st).length, color: WS_COLOR[st] })).filter((x) => x.value > 0)
-      : this.slicesOf('Workstream status'),
-  );
-  protected readonly wsPriority = computed<ChartSlice[]>(() =>
-    this.filtered()
-      ? PRIORITIES.map((p) => ({ key: p, label: PRIORITY_META[p].label, value: this.timeline().workstreams.filter((w) => w.priority === p).length, color: PRIORITY_COLOR[p] })).filter((x) => x.value > 0)
-      : this.slicesOf('Workstream priority'),
-  );
-  protected readonly criteriaSlices = computed(() => this.slicesOf('Acceptance criteria'));
-
   protected readonly deliveryDists = computed(() =>
     this.filtered()
       ? []
-      : this.model().distributions.filter((d) => d.title === 'Artifacts' || d.title === 'Decisions' || (d.title === 'Acceptance criteria' && !this.scopes().includes('workstreams'))),
+      : this.model().distributions.filter((d) => d.title === 'Artifacts' || d.title === 'Decisions'),
   );
-  /** Artifacts & decisions belong to delivery: show them with workstreams, or when there is no workstream scope. */
+  /** Artifacts and decisions are useful delivery context alongside issue statistics. */
   protected readonly showDelivery = computed(
-    () => this.variant() === 'full' && !this.insightScope() && this.deliveryDists().length > 0 && (this.scope() === 'workstreams' || !this.scopes().includes('workstreams')),
+    () => this.variant() === 'full' && !this.insightScope() && this.deliveryDists().length > 0,
   );
 
   protected setScope(s: StatsScope): void {
@@ -641,10 +506,6 @@ export class StatsBoard {
   protected setSignal(id: InsightSignalId | null): void {
     this.signal.set(id);
     this.sync({ signal: id });
-  }
-  protected setDrill(id: FlowDrill | null): void {
-    this.drill.set(id);
-    this.sync({ drill: id });
   }
   protected clearFilters(): void {
     this.person.set('all');

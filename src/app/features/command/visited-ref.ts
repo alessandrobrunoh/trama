@@ -1,10 +1,9 @@
 // Which record a detail-page URL shows (feeds "recently viewed"). Pure, so it can be unit tested.
-export type VisitType = 'issue' | 'workstream' | 'decision' | 'project' | 'repository' | 'team';
+export type VisitType = 'issue' | 'decision' | 'project' | 'repository' | 'team';
 
 /** Detail routes `/:slug/<area>/:ref` that count as a visit. */
 const VISIT_AREAS: Record<string, VisitType> = {
   issues: 'issue',
-  workstreams: 'workstream',
   decisions: 'decision',
   projects: 'project',
   repositories: 'repository',

@@ -55,7 +55,7 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
         <ol class="text-muted-foreground mt-3 grid gap-2 text-xs leading-snug sm:grid-cols-3">
           <li><strong class="text-foreground font-medium">1. Register it.</strong> Give it a name, its runtime and an owner who is accountable for it.</li>
           <li><strong class="text-foreground font-medium">2. Give it a token.</strong> A token is its credential. Pick read-only or write; agents never go above member.</li>
-          <li><strong class="text-foreground font-medium">3. Follow its work.</strong> Open an agent to see its activity, the workstreams it touched and how to connect it.</li>
+          <li><strong class="text-foreground font-medium">3. Follow its work.</strong> Open an agent to see its activity and how to connect it.</li>
         </ol>
       </div>
 

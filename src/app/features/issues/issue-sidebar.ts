@@ -1,108 +1,11 @@
-// Right-hand sidebar pieces of the issue page: linked workstreams as mini cards, and the
-// "Time & estimate" card that answers "how much does this issue really cost?".
+// Right-hand sidebar pieces of the issue page, including the "Time & estimate" card that answers
+// "how much does this issue really cost?".
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucideHexagon, LucidePlus, LucideTimer } from '@lucide/angular';
+import { LucideDynamicIcon, LucideTimer } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, formatEstimate, fullDateTime, formatSpan, relativeTime, type Issue } from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { StatusIcon } from '../../shared/status';
-import { MilestoneIcon } from '../milestones/milestone-icon';
-import { MilestoneInfo } from '../milestones/milestone-stats';
 import { REF_MIN } from '../stats/perf';
-import { IssueActions } from './issue-actions';
 import { issueCost, type CostVerdict } from './issue-cost';
-
-// ───────────────────────── linked workstreams ─────────────────────────
-
-/** Each linked workstream as a mini card (status hexagon, key, title, issue progress, accountable) + its milestone line. */
-@Component({
-  selector: 'app-issue-side-workstreams',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmTooltip, LucideDynamicIcon, StatusIcon, ActorAvatar, MilestoneIcon],
-  host: { class: 'block' },
-  template: `
-    <div class="mb-2 flex items-center gap-1.5 px-0.5">
-      <svg [lucideIcon]="hex" [size]="13" [strokeWidth]="1.75" class="text-entity-workstream"></svg>
-      <h3 class="text-muted-foreground text-xs font-medium">Workstreams</h3>
-      @if (cards().length) {
-        <span class="text-muted-foreground/70 text-xs tabular-nums">{{ cards().length }}</span>
-      }
-    </div>
-    <div class="flex flex-col gap-2">
-      @for (c of cards(); track c.ws.id) {
-        <a
-          [routerLink]="['/', slug(), 'workstreams', c.ws.key]"
-          class="bg-card border-border hover:border-border-strong hover:bg-hover focus-visible:ring-ring flex flex-col gap-1.5 rounded-lg border px-2.5 py-2 outline-none transition-colors focus-visible:ring-2"
-        >
-          <span class="flex items-center gap-1.5">
-            <app-status-icon [status]="c.ws.status" entity="workstream" />
-            <span class="text-muted-foreground font-mono text-xs">{{ c.ws.key }}</span>
-            <span class="flex-1"></span>
-            @if (c.ws.accountableUserId) {
-              <app-actor-avatar [actor]="{ type: 'user', id: c.ws.accountableUserId }" [size]="18" />
-            }
-          </span>
-          <span class="truncate text-[13px] leading-snug font-medium">{{ c.ws.title }}</span>
-          @if (c.total) {
-            <span class="flex items-center gap-2" [hlmTooltip]="c.done + ' of ' + c.total + ' issues done'">
-              <span class="bg-muted h-1 flex-1 overflow-hidden rounded-full">
-                <span class="bg-status-shipped block h-full rounded-full" [style.width.%]="(c.done / c.total) * 100"></span>
-              </span>
-              <span class="text-muted-foreground text-[11px] tabular-nums">{{ c.done }}/{{ c.total }}</span>
-            </span>
-          }
-          @for (m of c.milestones; track m.id) {
-            <span class="text-muted-foreground flex min-w-0 items-center gap-1.5 text-xs">
-              <app-milestone-icon [fraction]="m.fraction" [state]="m.state" [size]="12" />
-              <span class="font-mono">{{ m.n }}</span>
-              <span class="truncate">{{ m.name }}</span>
-            </span>
-          }
-        </a>
-      } @empty {
-        <p class="text-muted-foreground px-0.5 text-xs">Not part of any workstream yet.</p>
-      }
-      @if (canAdd()) {
-        <button
-          type="button"
-          class="border-border-strong text-muted-foreground hover:bg-accent hover:text-foreground flex h-8 items-center justify-center gap-1.5 rounded-lg border border-dashed text-xs transition-colors"
-          (click)="actions.openPrompt('workstream', [issue().id])"
-        >
-          <svg [lucideIcon]="plus" [size]="13"></svg> Add to workstream
-        </button>
-      }
-    </div>
-  `,
-})
-export class IssueSideWorkstreams {
-  private readonly store = inject(TramaStore);
-  private readonly milestones = inject(MilestoneInfo);
-  protected readonly actions = inject(IssueActions);
-  readonly issue = input.required<Issue>();
-  protected readonly hex = LucideHexagon;
-  protected readonly plus = LucidePlus;
-  protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly canAdd = computed(() => this.store.can('member') && !this.issue().duplicateOfId);
-
-  protected readonly cards = computed(() => {
-    const issue = this.issue();
-    const byWs = this.store.issuesByWorkstream();
-    const stats = this.milestones.stats();
-    const states = this.milestones.states();
-    return issue.workstreamIds.flatMap((id) => {
-      const ws = this.store.workstreamById().get(id);
-      if (!ws) return [];
-      const counted = (byWs.get(id) ?? []).filter((i) => i.status !== 'canceled');
-      const ms = (issue.milestoneIds ?? []).flatMap((mid) => {
-        const m = this.store.getMilestone(mid);
-        if (!m || !ws.projectId || m.projectId !== ws.projectId) return [];
-        return [{ id: m.id, n: this.milestones.ordinal(m), name: m.name, fraction: stats.get(m.id)?.fraction ?? 0, state: states.get(m.id) ?? 'idle' }];
-      });
-      return [{ ws, total: counted.length, done: counted.filter((i) => i.status === 'done').length, milestones: ms }];
-    });
-  });
-}
 
 // ───────────────────────── time & estimate ─────────────────────────
 

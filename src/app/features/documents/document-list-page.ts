@@ -32,7 +32,7 @@ import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { DocumentRow } from './document-row';
 import { Documents } from './documents.service';
 
@@ -202,7 +202,7 @@ const SORT_LABEL: Record<Sort, string> = {
           <app-empty-state
             [icon]="fileIcon"
             title="No documents yet"
-            description="Write the spec, the plan or the notes that do not belong in a repository. Paste Markdown to start, then attach the document to the project, workstream or issue it explains."
+            description="Write the spec, the plan or the notes that do not belong in a repository. Paste Markdown to start, then attach the document to the project or issue it explains."
           >
             @if (canCreate()) {
               <button hlmBtn size="sm" (click)="create()">

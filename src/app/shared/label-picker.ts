@@ -1,5 +1,5 @@
 // Label picker: search, tick several, and create a label from what you typed. Used on the detail
-// pages of issues, workstreams, projects and repositories, and as the label filter on lists.
+// pages of issues, projects and repositories, and as the label filter on lists.
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTag } from '@lucide/angular';
@@ -121,7 +121,7 @@ import { LabelChip, LabelChips } from './label-chip';
             @if (otherScope(); as o) {
               “{{ o.name }}” is a {{ o.scope }} label.
             } @else if (!scope()) {
-              Labels apply to issues, workstreams, and projects.
+              Labels apply to issues and projects.
             } @else if (inScope().length === 0) {
               No {{ scope() }} labels yet.
             } @else {

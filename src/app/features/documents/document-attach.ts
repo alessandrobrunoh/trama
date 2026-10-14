@@ -16,7 +16,6 @@ import {
   LucideDynamicIcon,
   LucideFilePlus,
   LucideFileText,
-  LucideHexagon,
   LucidePaperclip,
   LucideSearch,
   type LucideIcon,
@@ -37,11 +36,10 @@ import {
 import { isEmojiIcon } from '../projects/project-glyph';
 import { Documents } from './documents.service';
 
-type OwnerType = 'project' | 'workstream' | 'issue';
+type OwnerType = 'project' | 'issue';
 
 const OWNER_ICON: Record<OwnerType, LucideIcon> = {
   project: LucideBox,
-  workstream: LucideHexagon,
   issue: LucideCircleDot,
 };
 
@@ -56,17 +54,6 @@ export function describeLink(store: TramaStore, link: DocumentLink) {
           label: p.name,
           mono: false,
           route: ['/', slug, 'projects', p.id],
-        }
-      : null;
-  }
-  if (link.workstreamId) {
-    const w = store.getWorkstream(link.workstreamId);
-    return w
-      ? {
-          type: 'workstream' as const,
-          label: w.key,
-          mono: true,
-          route: ['/', slug, 'workstreams', w.key],
         }
       : null;
   }
@@ -85,13 +72,12 @@ export const OWNER_ICONS = OWNER_ICON;
 export function linksTo(link: DocumentLink, owner: DocumentOwnerInput): boolean {
   return (
     (!!owner.projectId && link.projectId === owner.projectId) ||
-    (!!owner.workstreamId && link.workstreamId === owner.workstreamId) ||
     (!!owner.issueId && link.issueId === owner.issueId)
   );
 }
 
 /**
- * Dialog that attaches `document` to a project, workstream or issue: pick what, done. The document page opens it
+ * Dialog that attaches `document` to a project or issue: pick what, done. The document page opens it
  * from "Attach". Already attached places are left out.
  */
 @Component({
@@ -182,7 +168,6 @@ export class DocumentOwnerDialog {
   protected readonly searchIcon = LucideSearch;
   protected readonly types: { type: OwnerType; label: string; icon: LucideIcon }[] = [
     { type: 'project', label: 'Project', icon: LucideBox },
-    { type: 'workstream', label: 'Workstream', icon: LucideHexagon },
     { type: 'issue', label: 'Issue', icon: LucideCircleDot },
   ];
   protected readonly type = signal<OwnerType>('project');
@@ -200,12 +185,7 @@ export class DocumentOwnerDialog {
             .projects()
             .filter((p) => !has((l) => l.projectId, p.id))
             .map((p) => ({ id: p.id, label: p.name, hint: p.status }))
-        : this.type() === 'workstream'
-          ? this.store
-              .workstreams()
-              .filter((w) => !has((l) => l.workstreamId, w.id))
-              .map((w) => ({ id: w.id, label: w.title, hint: w.key }))
-          : this.store
+        : this.store
               .issues()
               .filter((i) => !has((l) => l.issueId, i.id))
               .map((i) => ({ id: i.id, label: i.title, hint: i.key }));
@@ -222,11 +202,7 @@ export class DocumentOwnerDialog {
     if (this.busy()) return;
     this.busy.set(true);
     const owner: DocumentOwnerInput =
-      this.type() === 'project'
-        ? { projectId: id }
-        : this.type() === 'workstream'
-          ? { workstreamId: id }
-          : { issueId: id };
+      this.type() === 'project' ? { projectId: id } : { issueId: id };
     try {
       this.attached.emit(await this.documents.attach(this.document().id, owner));
       this.open.set(false);
@@ -238,7 +214,7 @@ export class DocumentOwnerDialog {
   }
 }
 
-/** Dialog that attaches an existing document to `owner` (an issue, workstream or project page). */
+/** Dialog that attaches an existing document to `owner` (an issue or project page). */
 @Component({
   selector: 'app-document-picker-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -395,7 +371,7 @@ export class DocumentPickerDialog {
 }
 
 /**
- * "Documents" button for the Artifacts section of a project, workstream or issue: write a new document there or
+ * "Documents" button for the Artifacts section of a project or issue: write a new document there or
  * attach an existing one. Shown to people who can edit.
  *   <app-document-actions [owner]="{ issueId: issue().id }" />
  */

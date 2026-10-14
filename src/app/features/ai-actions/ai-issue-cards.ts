@@ -210,11 +210,6 @@ export class AiTriageCard implements OnInit, OnDestroy {
         fromKind: base.kind,
       });
     }
-    for (const w of t.workstreams) {
-      const ws = this.store.getWorkstream(w.key);
-      if (!ws || base.workstreamIds.includes(ws.id)) continue;
-      out.push({ id: `ws:${ws.key}`, label: 'Workstream', change: { type: 'workstream', value: ws.key }, from: 'Not linked', to: ws.key, why: w.why, wsTitle: ws.title });
-    }
     return out;
   });
   protected readonly pending = computed(() => this.rows().filter((r) => !this.applied().has(r.id)));
@@ -374,7 +369,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
     @if (ai.available()) {
       <section aria-label="AI" class="flex flex-col gap-2">
         <div class="flex items-center gap-1.5 px-0.5">
-          <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-entity-workstream"></svg>
+          <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-primary"></svg>
           <h3 class="text-muted-foreground text-xs font-medium">AI</h3>
           <svg
             [lucideIcon]="info"
@@ -392,7 +387,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
             label="Suggest properties"
             variant="outline"
             size="xs"
-            tooltip="Priority, estimate, type and workstreams"
+            tooltip="Priority, estimate and type"
             [disabled]="!canEdit()"
             disabledReason="You cannot edit this issue"
             (pressed)="show('triage')"

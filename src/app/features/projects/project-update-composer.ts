@@ -5,7 +5,7 @@ import { TramaStore, type Project, type ProjectHealth } from '../../core';
 import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
-import { CommentInput } from '../workstreams/comment-input';
+import { CommentInput } from '../../shared/comment-input';
 import { ProjectAiDraftButton } from './project-ai';
 import { ProjectHealthPicker } from './project-health';
 

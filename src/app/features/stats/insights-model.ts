@@ -1,4 +1,4 @@
-// Helpers shared by the health, flow and contributors views: how a severity looks, where an item links to.
+// Helpers shared by the health and contributors views.
 import {
   LucideCircleCheck,
   LucideInfo,
@@ -29,8 +29,6 @@ export const SEVERITY_RANK: Record<InsightSeverity, number> = { critical: 0, war
 /** Router link of an item, relative to the app root; `null` when it has no page. */
 export function itemLink(slug: string, item: InsightItem): string[] | null {
   switch (item.type) {
-    case 'workstream':
-      return item.key ? ['/', slug, 'workstreams', item.key] : null;
     case 'issue':
       return item.key ? ['/', slug, 'issues', item.key] : null;
     case 'decision':
@@ -39,7 +37,7 @@ export function itemLink(slug: string, item: InsightItem): string[] | null {
     case 'project':
       return item.projectId ? ['/', slug, 'projects', item.projectId] : null;
     case 'artifact':
-      return item.workstreamKey ? ['/', slug, 'workstreams', item.workstreamKey] : null;
+      return null;
   }
 }
 
@@ -49,7 +47,6 @@ export function actorRef(a: InsightActor | undefined): ActorRef | null {
 }
 
 const TYPE_LABEL: Record<InsightItem['type'], string> = {
-  workstream: 'Workstream',
   issue: 'Issue',
   decision: 'Decision',
   milestone: 'Milestone',

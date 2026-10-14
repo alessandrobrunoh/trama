@@ -70,7 +70,7 @@ const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_d
             <svg [lucideIcon]="check" [size]="20" class="text-tone-green shrink-0" aria-hidden="true"></svg>
             <div>
               <p class="text-sm font-medium">No problems found</p>
-              <p class="text-meta">Every health signal is clear for this scope. Flow and contributors show how work is moving.</p>
+              <p class="text-meta">Every health signal is clear for this scope. Issue statistics show how demand is changing.</p>
             </div>
           </div>
         }
@@ -119,7 +119,7 @@ const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_d
           title="Who everything waits on"
           subtitle="Days spent waiting, summed over open questions, undecided decisions and PRs without review"
           [empty]="bottleneckRows().length ? undefined : 'Nobody is waiting on anyone.'"
-          note="Pick a person to see what is waiting on them. Reviews count against the accountable person of the workstream."
+          note="Pick a person to see what is waiting on them. Review activity is counted against its recorded owner."
         >
           <app-bar-list
             [rows]="bottleneckRows()"

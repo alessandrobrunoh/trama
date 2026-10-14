@@ -41,7 +41,7 @@ interface ViewSection {
       <app-empty-state
         [icon]="layers"
         title="No saved views"
-        description="A view is a saved filter over issues, workstreams, projects or decisions, shown as a list, a board or (for workstreams and projects) a timeline. Private views stay yours; shared ones show up for everyone."
+        description="A view is a saved filter over issues, projects or decisions, shown as a list, a board or timeline. Private views stay yours; shared ones show up for everyone."
       >
         @if (canEdit()) {
           <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New view</button>
@@ -65,7 +65,7 @@ interface ViewSection {
               <svg
                 [lucideIcon]="entityIcon(v)"
                 [size]="14"
-                [class]="v.entity === 'workstream' ? 'text-entity-workstream' : v.entity === 'decision' ? 'text-entity-decision' : v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
+                [class]="v.entity === 'decision' ? 'text-entity-decision' : v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
                 class="shrink-0"
               ></svg>
               <span class="min-w-0 shrink truncate text-sm">{{ v.name }}</span>
@@ -110,7 +110,10 @@ export class ViewListPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly views = computed(() =>
-    this.store.views().slice().sort((a, b) => a.name.localeCompare(b.name)),
+    this.store
+      .views()
+      .slice()
+      .sort((a, b) => a.name.localeCompare(b.name)),
   );
   protected readonly sections = computed<ViewSection[]>(() => {
     const me = this.store.me()?.id;

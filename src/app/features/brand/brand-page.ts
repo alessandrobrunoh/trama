@@ -141,8 +141,8 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
       <section class="mt-20" aria-labelledby="colours">
         <h2 id="colours" class="text-2xl font-semibold tracking-[-0.02em]">Colours</h2>
         <p class="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-relaxed">
-          Trama is mostly ink and paper, with one terracotta accent. Workstream violet and decision
-          amber identify the two concepts that make Trama different. Click a swatch to copy its hex
+          Trama is mostly ink and paper, with one terracotta accent. Violet and amber are secondary
+          palette colors. Click a swatch to copy its hex
           value.
         </p>
         <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -277,7 +277,7 @@ export class BrandPage {
     { name: 'Night', hex: '#0E0F11', role: 'Dark surfaces' },
     { name: 'Graphite', hex: '#1B1C1F', role: 'Body text on light' },
     { name: 'Mist', hex: '#F4F4F6', role: 'Light surfaces and sidebar' },
-    { name: 'Workstream Violet', hex: '#7C5CC4', role: 'Workstreams' },
+    { name: 'Violet', hex: '#7C5CC4', role: 'Secondary accent' },
     { name: 'Decision Amber', hex: '#B7791F', role: 'Decisions' },
   ];
 

@@ -8,7 +8,7 @@ import { Kbd } from '../../shared/kbd';
 import { timelineViewLink } from '../views/view-model';
 import { OverviewModel } from './overview-model';
 
-/** "Good morning, Ada", today's date with a one-sentence status, and the three quick actions. */
+/** Greeting, today's date with an issue-focused summary, and quick actions. */
 @Component({
   selector: 'app-overview-greeting',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -27,11 +27,6 @@ import { OverviewModel } from './overview-model';
       @if (store.allowed('createIssues')) {
         <button hlmBtn size="sm" (click)="ui.openCreate('issue')">
           <svg [lucideIcon]="plus" [size]="14"></svg> New issue <app-kbd keys="c" class="max-sm:hidden" />
-        </button>
-      }
-      @if (store.allowed('createWorkstreams')) {
-        <button hlmBtn size="sm" variant="outline" (click)="ui.openCreate('workstream')">
-          <svg [lucideIcon]="plus" [size]="14"></svg> New workstream
         </button>
       }
       <a hlmBtn size="sm" variant="ghost" [routerLink]="timelineLink()">

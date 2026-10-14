@@ -24,8 +24,8 @@ import { EntityRefs } from '../../shared/entity-ref';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
-import { CommentInput } from '../workstreams/comment-input';
-import { CommentThread } from '../workstreams/comments';
+import { CommentInput } from '../../shared/comment-input';
+import { CommentThread } from '../../shared/comments';
 import { ProjectHealthBadge, ProjectHealthPicker } from './project-health';
 
 @Component({

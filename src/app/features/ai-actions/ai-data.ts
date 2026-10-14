@@ -8,26 +8,20 @@ import {
   TramaStore,
   PRIORITIES,
   PRIORITY_META,
-  WORKSTREAM_STATUS_META,
   estimateOptions,
   type DomainEvent,
   type Issue,
-  type Workstream,
 } from '../../core';
 import { MilestoneInfo } from '../milestones/milestone-stats';
-import { dayOf, todayDay } from '../milestones/milestone-model';
-import { describeEvent } from '../workstreams/activity-format';
-import { explainStatus, issueCounts } from '../workstreams/ws-model';
+import { todayDay } from '../milestones/milestone-model';
 import {
   boundedLines,
   clip,
   oneLine,
   type EstimateChoice,
-  type PromptCandidate,
   type PromptDigest,
   type PromptIssue,
   type PromptSimilar,
-  type PromptWorkstream,
 } from './prompts';
 import { rankByOverlap } from './similar';
 
@@ -76,10 +70,6 @@ export function issuePromptData(store: TramaStore, issue: Issue): PromptIssue {
     priority: PRIORITY_META[issue.priority]?.label ?? issue.priority,
     estimate: issue.estimate ?? null,
     assignee: issue.assigneeId ? store.getUser(issue.assigneeId)?.name : undefined,
-    workstreams: issue.workstreamIds.flatMap((id) => {
-      const w = store.workstreamById().get(id);
-      return w ? [`${w.key} ${w.title}`] : [];
-    }),
     createdAt: dayStr(issue.createdAt),
     digest: issueDigest(store, issue),
   };
@@ -87,19 +77,12 @@ export function issuePromptData(store: TramaStore, issue: Issue): PromptIssue {
 
 export interface TriageInputs {
   estimates: EstimateChoice[] | null;
-  candidates: PromptCandidate[];
   similar: PromptSimilar[];
 }
 
-/** ≤8 active workstreams and ≤4 finished issues ranked by word overlap with `issue`. */
+/** Up to four finished issues ranked by word overlap with `issue`. */
 export function triageInputs(store: TramaStore, issue: Issue): TriageInputs {
   const query = `${issue.title}\n${issue.body ?? ''}`;
-
-  const linked = new Set(issue.workstreamIds);
-  const active = store.workstreams().filter((w) => !linked.has(w.id) && w.status !== 'shipped' && w.status !== 'canceled');
-  const candidates = rankByOverlap(query, active, (w) => `${w.title} ${w.title} ${w.objective} ${w.description ?? ''}`, 8, 0.05).map(
-    ({ item: w }): PromptCandidate => ({ key: w.key, title: oneLine(w.title, 120), status: WORKSTREAM_STATUS_META[w.status]?.label ?? w.status }),
-  );
 
   const finished = store
     .issues()
@@ -115,111 +98,7 @@ export function triageInputs(store: TramaStore, issue: Issue): TriageInputs {
       cycleDays: i.startedAt && i.completedAt ? Math.max(0, Math.round((daysBetween(i.startedAt, i.completedAt) + Number.EPSILON) * 10) / 10) : null,
     }),
   );
-  return { estimates: estimateChoices(store), candidates, similar };
-}
-
-// ───────────────────────────── workstreams ─────────────────────────────
-
-const keyTitle = (i: Pick<Issue, 'key' | 'title'>): string => `${i.key} ${i.title}`;
-
-export function workstreamPromptData(store: TramaStore, info: MilestoneInfo, ws: Workstream): PromptWorkstream {
-  const today = new Date().toISOString();
-  const issues = (store.issuesByWorkstream().get(ws.id) ?? []).filter((i) => i.status !== 'canceled');
-  const counts = issueCounts(issues);
-  const open = (s: Issue['status']) => issues.filter((i) => i.status === s);
-  const inProgress = [...open('in_progress'), ...open('in_review')];
-  const todo = [...open('todo'), ...open('backlog')];
-  const recentDone = open('done').sort((a, b) => ((a.completedAt ?? '') < (b.completedAt ?? '') ? 1 : -1));
-
-  const criteria = ws.acceptanceCriteria;
-  const milestones = (store.milestonesByWorkstream().get(ws.id) ?? []).map((m) => ({
-    name: m.name,
-    targetDate: m.targetDate ? dayStr(m.targetDate) : undefined,
-    percent: info.stats().get(m.id)?.percent ?? 0,
-    state: info.states().get(m.id) ?? 'idle',
-  }));
-  const questions = (store.inputRequestsByWorkstream().get(ws.id) ?? []).filter((r) => r.state === 'open');
-
-  const signals = workstreamSignals(store, ws, issues, milestones, questions.length);
-  const events: DomainEvent[] = (store.eventsByWorkstream().get(ws.id) ?? []).slice(0, 10).reverse();
-  const recent = events.map((e) => {
-    const line = describeEvent(store, e);
-    return `${dayStr(e.at)} ${store.actorName(e.actor)} ${line.verb}${line.detail ? `: ${line.detail}` : ''}`;
-  });
-
-  return {
-    key: ws.key,
-    title: ws.title,
-    status: WORKSTREAM_STATUS_META[ws.status]?.label ?? ws.status,
-    statusNote: ws.statusOverride ? 'status set manually' : undefined,
-    priority: PRIORITY_META[ws.priority]?.label ?? ws.priority,
-    objective: ws.objective,
-    description: ws.description,
-    targetDate: ws.targetDate ? dayStr(ws.targetDate) : undefined,
-    accountable: ws.accountableUserId ? store.getUser(ws.accountableUserId)?.name : undefined,
-    criteria: {
-      met: criteria.filter((c) => c.state === 'met').length,
-      total: criteria.length,
-      open: criteria.filter((c) => c.state !== 'met').map((c) => c.text),
-    },
-    issues: {
-      done: counts.issuesDone,
-      inProgress: counts.issuesActive,
-      todo: counts.issuesTotal - counts.issuesDone - counts.issuesActive,
-      total: counts.issuesTotal,
-      doneList: recentDone.map(keyTitle),
-      inProgressList: inProgress.map(keyTitle),
-      todoList: todo.map(keyTitle),
-    },
-    milestones,
-    openQuestions: questions.map((q) => `${q.question} (open ${Math.max(0, daysBetween(q.createdAt, Date.now()))}d)`),
-    signals,
-    recent,
-    today: dayStr(today),
-  };
-}
-
-/** Plain-language risk signals: blocked, overdue, failing CI, stale work, old questions. */
-function workstreamSignals(
-  store: TramaStore,
-  ws: Workstream,
-  issues: readonly Issue[],
-  milestones: readonly { name: string; state: string; percent: number }[],
-  openQuestions: number,
-): string[] {
-  const out: string[] = [];
-  const finished = ws.status === 'shipped' || ws.status === 'canceled';
-  if (!finished) {
-    if (ws.status === 'blocked' || ws.status === 'needs_input') out.push(...explainStatus(store, ws).reasons.slice(0, 3));
-    if (ws.targetDate) {
-      const left = dayOf(ws.targetDate) - todayDay();
-      if (left < 0) out.push(`Target date passed ${-left} day(s) ago`);
-      else if (left <= 14) out.push(`Target date in ${left} day(s)`);
-    }
-    for (const m of milestones) if (m.state === 'overdue') out.push(`Milestone "${m.name}" is overdue (${m.percent}% done)`);
-    const stale = issues.filter((i) => (i.status === 'in_progress' || i.status === 'in_review') && daysBetween(i.updatedAt, Date.now()) >= 10);
-    if (stale.length) out.push(`${stale.length} issue(s) in progress without an update for 10+ days: ${stale.slice(0, 3).map((i) => i.key).join(', ')}`);
-  }
-  for (const a of store.artifactsByWorkstream().get(ws.id) ?? []) {
-    if (a.kind !== 'pull_request' && a.kind !== 'merge_request') continue;
-    if (a.state !== 'open' && a.state !== 'draft') continue;
-    const label = a.externalId ? `${a.externalId} ` : '';
-    if (a.ci === 'failing') out.push(`${label}${oneLine(a.title, 80)}: CI failing`);
-    else if (a.hasConflicts) out.push(`${label}${oneLine(a.title, 80)}: merge conflicts`);
-    else if (a.review === 'changes_requested') out.push(`${label}${oneLine(a.title, 80)}: changes requested`);
-  }
-  if (openQuestions) out.push(`${openQuestions} open question(s) waiting for an answer`);
-  return out;
-}
-
-export function breakdownInputs(store: TramaStore, ws: Workstream) {
-  return {
-    ws: { key: ws.key, title: ws.title, objective: ws.objective, description: ws.description, context: ws.context },
-    existingTitles: (store.issuesByWorkstream().get(ws.id) ?? []).map((i) => i.title),
-    estimates: estimateChoices(store),
-    kinds: KIND_LIST,
-    priorities: PRIORITY_LIST,
-  };
+  return { estimates: estimateChoices(store), similar };
 }
 
 // ───────────────────────────── standup digest ─────────────────────────────
@@ -230,7 +109,6 @@ export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest
   const ageDays = (iso: string) => Math.max(0, Math.floor((now - new Date(iso).getTime()) / DAY));
   const within = (iso: string | undefined, days: number) => !!iso && now - new Date(iso).getTime() <= days * DAY;
   const issues = store.issues().filter((i) => !i.duplicateOfId);
-  const wsLabel = (w: Workstream) => `${w.key} ${oneLine(w.title, 80)}`;
 
   const last24h: string[] = [];
   const last7d: string[] = [];
@@ -240,26 +118,16 @@ export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest
     if (within(i.createdAt, 7)) push(i.createdAt, `New: ${i.key} ${oneLine(i.title, 90)}`);
   }
   for (const e of store.events()) {
-    if (e.type !== 'workstream.status_changed' || !within(e.at, 7)) continue;
-    const ws = store.workstreamById().get(e.subject.id);
-    if (ws) push(e.at, `${wsLabel(ws)} moved to ${WORKSTREAM_STATUS_META[String(e.data['to']) as Workstream['status']]?.label ?? String(e.data['to'])}`);
+    if (e.type !== 'issue.status_changed' || !within(e.at, 7)) continue;
+    const issue = e.subject.type === 'issue' ? store.getIssue(e.subject.id) : undefined;
+    if (issue) push(e.at, `${issue.key} moved to ${ISSUE_STATUS_META[issue.status]?.label ?? issue.status}`);
   }
 
-  const today = todayDay();
   const atRisk: { rank: number; line: string }[] = [];
-  for (const w of store.workstreams()) {
-    if (w.status === 'shipped' || w.status === 'canceled' || w.status === 'draft') continue;
-    const c = issueCounts(store.issuesByWorkstream().get(w.id) ?? []);
-    const bits: string[] = [];
-    let rank = 9;
-    if (w.status === 'blocked') (bits.push('blocked'), (rank = 0));
-    else if (w.status === 'needs_input') (bits.push('waiting for input'), (rank = 2));
-    if (w.targetDate) {
-      const left = dayOf(w.targetDate) - today;
-      if (left < 0) (bits.push(`target passed ${-left}d ago`), (rank = Math.min(rank, 1)));
-      else if (left <= 7 && c.issuesDone < c.issuesTotal) (bits.push(`target in ${left}d with ${c.issuesTotal - c.issuesDone} issue(s) left`), (rank = Math.min(rank, 3)));
-    }
-    if (bits.length) atRisk.push({ rank, line: `${wsLabel(w)}: ${bits.join('; ')} (${c.issuesDone}/${c.issuesTotal} issues done)` });
+  for (const issue of issues) {
+    if (issue.status !== 'in_progress' && issue.status !== 'in_review') continue;
+    const age = ageDays(issue.updatedAt);
+    if (age >= 10) atRisk.push({ rank: age, line: `${issue.key} ${oneLine(issue.title, 80)}: no update for ${age}d` });
   }
   atRisk.sort((a, b) => a.rank - b.rank);
 
@@ -277,8 +145,8 @@ export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest
     .slice(0, 5)
     .map((i) => `${i.key} ${oneLine(i.title, 80)}: ${ISSUE_STATUS_META[i.status].label.toLowerCase()}, untouched ${ageDays(i.updatedAt)}d`);
   for (const q of store.openInputRequests().slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).slice(0, 3)) {
-    const w = store.workstreamById().get(q.workstreamId);
-    waiting.push(`Question on ${w?.key ?? 'a workstream'}: "${oneLine(q.question, 100)}" open ${ageDays(q.createdAt)}d`);
+    const issue = q.issueId ? store.getIssue(q.issueId) : undefined;
+    waiting.push(`Question${issue ? ` on ${issue.key}` : ''}: "${oneLine(q.question, 100)}" open ${ageDays(q.createdAt)}d`);
   }
 
   const cap = (xs: string[], n: number) => xs.slice(0, n).map((x) => clip(x, 220));
@@ -290,7 +158,6 @@ export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest
     waitingLongest: cap(waiting, 8),
     counts: {
       issuesOpen: issues.filter((i) => i.status !== 'done' && i.status !== 'canceled').length,
-      workstreamsActive: store.workstreams().filter((w) => w.status !== 'shipped' && w.status !== 'canceled' && w.status !== 'draft').length,
     },
   };
 }

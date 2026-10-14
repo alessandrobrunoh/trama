@@ -112,7 +112,7 @@ type Row = IntegrationDetail & { detailed: boolean };
     <div>
       <app-section-header
         title="Integrations"
-        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on workstreams automatically, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
+        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on issues and projects, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
       >
         @if (canAdmin() && !connecting()) {
           <button actions hlmBtn size="sm" (click)="openConnect()">
@@ -190,7 +190,7 @@ type Row = IntegrationDetail & { detailed: boolean };
           </span>
           <div>
             <p class="text-[13px] font-medium">Nothing connected yet</p>
-            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import repositories and see pull requests and CI on your workstreams.</p>
+            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import repositories and see pull requests and CI on issues and projects.</p>
           </div>
           @if (canAdmin()) {
             <button hlmBtn size="sm" (click)="openConnect()"><svg [lucideIcon]="plus" [size]="14"></svg> Connect</button>

@@ -21,14 +21,13 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon, type AnyStatus } from '../../shared/status';
 import type { IssueActions, IssuePromptField } from './issue-actions';
-import { isOpenWorkstream } from './issue-model';
 
 export interface IssueOption {
   /** '' = none (unassign, no team). */
   value: string;
   label: string;
   glyph:
-    'status' | 'priority' | 'user' | 'team' | 'workstream' | 'issue' | 'project' | 'label' | 'none';
+    'status' | 'priority' | 'user' | 'team' | 'issue' | 'project' | 'label' | 'none';
   /** Swatch of a label. */
   color?: string;
   status?: string;
@@ -43,7 +42,6 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
   team: 'Move to team…',
   project: 'Move to project…',
   label: 'Toggle label…',
-  workstream: 'Add to workstream…',
   duplicate: 'Mark as duplicate of…',
 };
 
@@ -109,26 +107,6 @@ export function promptOptions(
         color: l.color,
         search: l.name,
       }));
-    case 'workstream': {
-      const linked = new Set(issues.flatMap((i) => i.workstreamIds));
-      return store
-        .workstreams()
-        .filter((w) => isOpenWorkstream(w, store.settings().statuses.workstream) || linked.has(w.id))
-        .slice()
-        .sort(
-          (a, b) =>
-            Number(linked.has(b.id)) - Number(linked.has(a.id)) ||
-            (a.updatedAt < b.updatedAt ? 1 : -1),
-        )
-        .map((w) => ({
-          value: w.id,
-          label: w.title,
-          glyph: 'workstream',
-          status: w.status,
-          hint: w.key,
-          search: `${w.key} ${w.title}`,
-        }));
-    }
     case 'duplicate': {
       const self = new Set(issues.map((i) => i.id));
       return store
@@ -165,8 +143,6 @@ export function currentValues(field: IssuePromptField, issues: readonly Issue[])
         return [i.projectId ?? ''];
       case 'label':
         return i.labels;
-      case 'workstream':
-        return i.workstreamIds;
       case 'duplicate':
         return i.duplicateOfId ? [i.duplicateOfId] : [];
     }
@@ -202,9 +178,6 @@ export function applyOption(
       actions.toggleLabel(ids, value);
       // Labels are a multi-select: the list stays open to toggle more.
       return false;
-    case 'workstream':
-      actions.toggleWorkstream(ids, value);
-      return true;
     case 'duplicate':
       if (ids.length === 1) actions.markDuplicate(ids[0], value);
       return true;
@@ -225,9 +198,6 @@ export function applyOption(
       }
       @case ('issue') {
         <app-status-icon [status]="asStatus(o.status)" entity="issue" />
-      }
-      @case ('workstream') {
-        <app-status-icon [status]="asStatus(o.status)" entity="workstream" />
       }
       @case ('priority') {
         <app-priority-icon [priority]="asPriority(o.value)" />

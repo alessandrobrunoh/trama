@@ -75,7 +75,7 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
         </div>
       </div>
     </div>
-    <!-- Labelled actions (Accept, Reject, + Workstream…) get a full-width row so they are real touch targets. -->
+    <!-- Labelled actions get a full-width row so they are real touch targets. -->
     <div class="mobile-header__row" #row>
       @if (chrome.actions(); as tpl) {
         <ng-container *ngTemplateOutlet="tpl" />

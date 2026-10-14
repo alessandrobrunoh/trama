@@ -14,7 +14,7 @@ import {
   normalizeHttpUrl,
   type CustomerStatus,
 } from '../../core';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { splitDomains } from './customer-model';
 
 type TargetKind = 'issue' | 'project';

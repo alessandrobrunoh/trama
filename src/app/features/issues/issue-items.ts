@@ -12,8 +12,7 @@ import {
   LucideUserRoundX,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { TramaStore, Viewport, fullDate, haptic, issueProjectIds, shortDate, type Issue } from '../../core';
-import { EntityChip } from '../../shared/entity-chip';
+import { TramaStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
@@ -56,24 +55,13 @@ abstract class IssueItemBase {
   });
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
-    return { kind: !h.has('kind'), workstreams: !h.has('workstreams'), project: !h.has('project'), labels: !h.has('labels'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
+    return { kind: !h.has('kind'), project: !h.has('project'), labels: !h.has('labels'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
   });
   protected readonly team = computed(() => {
     const id = this.issue().teamId;
     return id ? this.store.getTeam(id) : undefined;
   });
-  protected readonly wsIds = computed(() => this.issue().workstreamIds.filter((id) => this.store.workstreamById().has(id)));
-  protected readonly wsShown = computed(() => this.wsIds().slice(0, 2));
-  protected readonly wsMore = computed(() => {
-    const rest = this.wsIds().slice(2);
-    return rest.length ? { n: rest.length, keys: rest.map((id) => this.store.getWorkstream(id)?.key ?? '').join(', ') } : null;
-  });
-  /** Projects of the issue: its own, then those of its workstreams (same meaning as the project filter). */
-  protected readonly projectIds = computed(() => issueProjectIds(this.issue(), this.store.workstreamById()));
-  protected readonly projectMore = computed(() => {
-    const rest = this.projectIds().slice(1);
-    return rest.length ? { n: rest.length, names: rest.map((id) => this.store.getProject(id)?.name ?? '').join(', ') } : null;
-  });
+  protected readonly projectId = computed(() => this.issue().projectId);
   /** Shown when the issue is estimated and the workspace still uses estimates (or the value is kept anyway). */
   protected readonly hasEstimate = computed(() => this.issue().estimate !== undefined && this.issue().estimate !== null);
   protected readonly date = computed(() => shortDate(this.issue()[this.dateField()]));
@@ -95,11 +83,11 @@ abstract class IssueItemBase {
   }
 }
 
-/** One dense list row: ☐ · priority · type · key · status · title · workstreams · team · assignee · date. */
+/** One dense list row: ☐ · priority · type · key · status · title · project · team · assignee · date. */
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -167,9 +155,6 @@ abstract class IssueItemBase {
               @if (i.priority !== 'none') {
                 <app-priority-icon [priority]="i.priority" />
               }
-              @if (wsShown()[0]; as id) {
-                <app-entity-chip class="min-w-0" type="workstream" [ref]="id" compact />
-              }
               <span class="ml-auto shrink-0 tabular-nums">{{ date() }}</span>
             </span>
           </span>
@@ -235,22 +220,9 @@ abstract class IssueItemBase {
       @if (hasEstimate()) {
         <app-estimate class="relative text-xs max-sm:hidden" [value]="i.estimate" />
       }
-      @if (s.workstreams && wsIds().length) {
-        <span class="relative flex shrink-0 items-center gap-1 max-md:hidden">
-          @for (id of wsShown(); track id) {
-            <app-entity-chip type="workstream" [ref]="id" compact />
-          }
-          @if (wsMore(); as m) {
-            <span class="text-muted-foreground border-border-strong rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.keys">+{{ m.n }}</span>
-          }
-        </span>
-      }
-      @if (s.project && projectIds().length) {
+      @if (s.project && projectId(); as pid) {
         <span class="relative flex min-w-0 shrink-0 items-center gap-1 max-lg:hidden">
-          <app-project-chip [projectId]="projectIds()[0]" />
-          @if (projectMore(); as m) {
-            <span class="text-muted-foreground border-border-strong rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.names">+{{ m.n }}</span>
-          }
+          <app-project-chip [projectId]="pid" />
         </span>
       }
       @if (s.labels && i.labels.length) {
@@ -348,7 +320,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, EntityChip, Estimate, LabelChips],
+  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -397,19 +369,8 @@ export class IssueRow extends IssueItemBase {
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-1.5">
         <app-issue-prop class="border-border relative -ml-0.5 rounded-md border" [issue]="i" field="priority" />
-        @if (s.workstreams) {
-          @for (id of wsShown(); track id) {
-            <app-entity-chip class="relative" type="workstream" [ref]="id" compact />
-          }
-          @if (wsMore(); as m) {
-            <span class="text-muted-foreground border-border-strong relative rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.keys">+{{ m.n }}</span>
-          }
-        }
-        @if (s.project && projectIds().length) {
-          <app-project-chip [projectId]="projectIds()[0]" />
-          @if (projectMore(); as m) {
-            <span class="text-muted-foreground border-border-strong relative rounded-full border px-1.5 text-[11px] leading-5" [hlmTooltip]="m.names">+{{ m.n }}</span>
-          }
+        @if (s.project && projectId(); as pid) {
+          <app-project-chip [projectId]="pid" />
         }
         @if (s.labels && i.labels.length) {
           <app-label-chips class="relative" [ids]="i.labels" [max]="2" />

@@ -85,7 +85,7 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
 const INTERACTIVE = 'button, a[href], [role="button"], [role="menuitem"], [role="option"], summary, [role="tab"]';
 
 /** Detail routes where Esc goes back to the list: /:slug/<area>/:id. */
-const ESC_UP = /^\/([^/]+)\/(workstreams|issues|decisions|projects|repositories|teams|views)\/[^/?#]+/;
+const ESC_UP = /^\/([^/]+)\/(issues|decisions|projects|repositories|teams|views)\/[^/?#]+/;
 
 @Injectable({ providedIn: 'root' })
 export class KeyboardShortcuts {
@@ -152,24 +152,22 @@ export class KeyboardShortcuts {
         return { kind: 'issue', defaults: {} };
       case 'issues':
         return { kind: 'issue', defaults: key ? {} : this.teamDefault() };
-      case 'workstreams':
-        return { kind: 'workstream', defaults: key ? {} : this.teamDefault() };
       case 'decisions':
         return { kind: 'decision', defaults: {} };
       case 'views':
         return { kind: 'view', defaults: {} };
       case 'teams':
         return key
-          ? { kind: 'workstream', defaults: { ownerTeamId: this.trama.getTeam(key)?.id } }
+          ? { kind: 'issue', defaults: { teamId: this.trama.getTeam(key)?.id } }
           : { kind: 'team', defaults: {} };
       case 'projects':
-        return key ? { kind: 'workstream', defaults: { projectId: key } } : { kind: 'project', defaults: {} };
+        return key ? { kind: 'issue', defaults: { projectId: key } } : { kind: 'project', defaults: {} };
       case 'repositories':
         return key
-          ? { kind: 'workstream', defaults: { repositoryIds: [key] } }
+          ? { kind: 'issue', defaults: {} }
           : { kind: 'repository', defaults: {} };
       default:
-        return { kind: 'workstream', defaults: {} };
+        return { kind: 'issue', defaults: {} };
     }
   }
 

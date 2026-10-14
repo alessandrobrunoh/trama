@@ -28,7 +28,9 @@ import { SiteHeader } from '../landing/site-header';
         What's new in Trama
       </h1>
       <p class="text-muted-foreground mt-4 max-w-xl text-[15px] leading-relaxed">
-        Every user-visible change, newest first.
+        Release history, newest first; each entry describes Trama as it was when that change shipped.
+        Today, Issues are granular units of work, with optional Goals, Plans and Documents. Human
+        input requests use Question or Decision mode.
       </p>
       <a
         routerLink="/roadmap"

@@ -8,7 +8,6 @@ import type {
   ArtifactState,
   ApiToken,
   CiState,
-  CriterionState,
   CustomerStatus,
   Decision,
   EstimateScale,
@@ -26,7 +25,6 @@ import type {
   TokenLimits,
   WeekStart,
   OutgoingWebhook,
-  DependencyNodeType,
   ExecutionProvider,
   GitProvider,
   ID,
@@ -54,8 +52,6 @@ import type {
   ViewFilter,
   ViewLayout,
   Workspace,
-  Workstream,
-  WorkstreamStatus,
 } from '../contracts/domain';
 
 // ───── auth ─────
@@ -97,7 +93,6 @@ export interface UpdateWorkspaceSettingsInput {
   timeZone?: string;
   iconColor?: string | null;
   iconInitial?: string | null;
-  deltaThreads?: boolean;
 }
 export interface CreateLabelInput {
   name: string;
@@ -198,7 +193,7 @@ export interface CreateTeamInput {
   leadIds?: ID[];
   editPolicy?: TeamEditPolicy;
 }
-/** The team key is immutable (workstream keys depend on it). */
+/** The team key is immutable. */
 export interface UpdateTeamInput {
   name?: string;
   color?: string;
@@ -325,58 +320,10 @@ export interface UpdateProjectUpdateInput {
   body?: string;
 }
 
-// ───── workstreams ─────
-export interface CreateWorkstreamInput {
-  title: string;
-  description?: string;
-  objective?: string;
-  context?: string;
-  /** https link on delta.dev. Optional: a workstream can exist before its Delta thread. A supplied value must be valid. */
-  deltaThreadUrl?: string;
-  ownerTeamId: ID;
-  participatingTeamIds?: ID[];
-  accountableUserId?: ID;
-  /** Repositories default to the project's when omitted; otherwise they must be a subset of them. */
-  projectId?: ID;
-  repositoryIds?: ID[];
-  acceptanceCriteria?: { text: string; state?: CriterionState }[];
-  priority?: Priority;
-  labels?: string[];
-  startDate?: ISODate;
-  targetDate?: ISODate;
-  statusOverride?: string;
-}
-export interface UpdateWorkstreamInput {
-  title?: string;
-  description?: string | null;
-  objective?: string;
-  context?: string | null;
-  deltaThreadUrl?: string;
-  ownerTeamId?: ID;
-  participatingTeamIds?: ID[];
-  accountableUserId?: ID | null;
-  projectId?: ID | null;
-  repositoryIds?: ID[];
-  /** Replace the whole checklist (prefer the criterion methods for single edits). */
-  acceptanceCriteria?: { id?: ID; text: string; state?: CriterionState }[];
-  priority?: Priority;
-  labels?: string[];
-  startDate?: ISODate | null;
-  targetDate?: ISODate | null;
-  statusOverride?: string | null;
-}
-export interface CriterionInput {
-  text: string;
-  state?: CriterionState;
-}
-export interface CriterionPatch extends Partial<CriterionInput> {
-  /** Proof for the criterion; `null` clears it. Never changes the state. */
-  evidence?: { artifactIds?: ID[]; note?: string | null } | null;
-}
-
 // ───── input requests ─────
 export interface CreateInputRequestInput {
-  workstreamId: ID;
+  /** Omit only for legacy, unlinked human requests. */
+  issueId?: ID;
   question: string;
   options?: string[];
   assigneeUserId?: ID;
@@ -393,6 +340,8 @@ export interface CreateIssueInput {
   kind: IssueKind;
   title: string;
   body?: string;
+  /** Desired result, not a technical plan. */
+  goal?: string;
   source?: IssueSource;
   reporterName?: string;
   assigneeId?: ID;
@@ -413,6 +362,7 @@ export interface UpdateIssueInput {
   /** Story points (non-negative). `null` clears. */
   estimate?: number | null;
   body?: string | null;
+  goal?: string | null;
   assigneeId?: ID | null;
   teamId?: ID | null;
   /** `null` clears it and drops that project's milestone. */
@@ -421,15 +371,14 @@ export interface UpdateIssueInput {
   status?: string;
   reporterName?: string | null;
   externalUrl?: string | null;
-  workstreamIds?: ID[];
-  /** At most one per project; only milestones of the issue's project or of the projects of the linked workstreams. */
+  /** At most one per project; milestones must belong to the issue's project. */
   milestoneIds?: ID[];
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
   /** Workspace label ids. Replaces the whole list. */
   labels?: ID[];
 }
-/** One change applied to every issue of a bulk request. Labels and workstreams are added / removed. */
+/** One change applied to every issue of a bulk request. */
 export interface BulkIssuePatch {
   status?: string;
   priority?: Priority;
@@ -438,15 +387,6 @@ export interface BulkIssuePatch {
   projectId?: ID | null;
   addLabels?: ID[];
   removeLabels?: ID[];
-  addWorkstreamIds?: ID[];
-  removeWorkstreamIds?: ID[];
-}
-export interface LinkIssueInput {
-  workstreamIds?: ID[];
-  /** Create a workstream from this issue (title + ownerTeamId required). */
-  createWorkstream?: CreateWorkstreamInput;
-  /** Defaults to `in_progress` when the issue is `backlog` or `todo`. */
-  status?: IssueStatus;
 }
 
 // ───── milestones ─────
@@ -466,7 +406,7 @@ export interface UpdateMilestoneInput {
 }
 
 // ───── artifacts ─────
-/** Fields shared by every artifact creation route; the owner comes from the route or from `CreateArtifactInput`. */
+/** Fields shared by project- and issue-owned artifact creation routes; owner comes from the path. */
 export interface CreateArtifactFields {
   repositoryId?: ID;
   kind: ArtifactKind;
@@ -481,10 +421,6 @@ export interface CreateArtifactFields {
   review?: ReviewState;
   hasConflicts?: boolean;
   environment?: string;
-}
-/** `POST /artifacts`: attach to a workstream (the original route). */
-export interface CreateArtifactInput extends CreateArtifactFields {
-  workstreamId: ID;
 }
 /** `POST /projects/:id/artifacts` and `POST /issues/:idOrKey/artifacts`: the owner is in the path. */
 export type CreateOwnedArtifactInput = CreateArtifactFields;
@@ -509,9 +445,8 @@ export interface CreateDecisionInput {
   rationale?: string;
   /** Default `proposed`; people can also record it directly as accepted / rejected. */
   status?: 'draft' | 'proposed' | 'accepted' | 'rejected';
-  originWorkstreamId?: ID;
-  originExecutionId?: ID;
-  relatedWorkstreamIds?: ID[];
+  originIssueId: ID;
+  relatedIssueIds?: ID[];
   tags?: string[];
 }
 export interface UpdateDecisionInput {
@@ -519,19 +454,12 @@ export interface UpdateDecisionInput {
   statement?: string;
   status?: 'proposed';
   rationale?: string | null;
-  originWorkstreamId?: ID | null;
-  originExecutionId?: ID | null;
-  relatedWorkstreamIds?: ID[];
+  originIssueId?: ID | null;
+  relatedIssueIds?: ID[];
   tags?: string[];
 }
 
-// ───── dependencies / comments ─────
-export interface CreateDependencyInput {
-  fromType: DependencyNodeType;
-  fromId: ID;
-  toType: DependencyNodeType;
-  toId: ID;
-}
+// ───── comments ─────
 export interface CreateCommentInput {
   subject: SubjectRef;
   body: string;
@@ -539,7 +467,6 @@ export interface CreateCommentInput {
 
 // ───── events / attention / views ─────
 export interface EventsQuery {
-  workstreamId?: ID;
   /** `type:id`, e.g. `execution:ex_1`. */
   subject?: string;
   /** Event type prefix, e.g. `issue.` or `decision.accepted`. */
@@ -593,35 +520,8 @@ export interface UpdateViewInput {
   sharing?: SharingInput;
 }
 
-// ───── graph / search ─────
-export type GraphNodeType = 'workstream' | 'execution' | 'artifact' | 'decision' | 'issue';
-export interface GraphNode {
-  id: ID;
-  type: GraphNodeType;
-  label: string;
-  /** Workstream status / execution state / artifact state. */
-  status?: string;
-  /** Workstream key for workstream nodes. */
-  key?: string;
-  /** Parent node (execution → workstream / parent execution, artifact → execution/workstream). */
-  parentId?: ID;
-  teamId?: ID;
-  [extra: string]: unknown;
-}
-export interface GraphEdge {
-  id?: ID;
-  from: ID;
-  to: ID;
-  /** `contains` (hierarchy), `dependency` (from blocks to), `artifact`. */
-  kind: 'contains' | 'dependency' | 'artifact' | string;
-  [extra: string]: unknown;
-}
-export interface GraphResponse {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-}
+// ───── search ─────
 export interface SearchResults {
-  workstreams: Workstream[];
   issues: Issue[];
   decisions: Decision[];
   artifacts: Artifact[];
@@ -703,9 +603,8 @@ export interface CreateDocumentInput {
   title: string;
   body?: string;
   icon?: string | null;
-  /** Attach on creation (project id, workstream id or key, issue id or key). */
+  /** Attach on creation (project id or issue id/key). */
   projectId?: ID;
-  workstreamId?: ID;
   issueId?: ID;
 }
 export interface UpdateDocumentInput {
@@ -718,7 +617,6 @@ export interface UpdateDocumentInput {
 export interface DocumentsQuery {
   q?: string;
   projectId?: ID;
-  workstreamId?: ID;
   issueId?: ID;
   attached?: boolean;
   archived?: 'false' | 'only' | 'all';
@@ -730,7 +628,6 @@ export interface DocumentsQuery {
 }
 export interface DocumentOwnerInput {
   projectId?: ID;
-  workstreamId?: ID;
   issueId?: ID;
 }
 

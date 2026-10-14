@@ -12,14 +12,13 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { TramaStore, type ActorRef } from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { EstimateGlyph } from '../../shared/estimate';
-import { PriorityIcon } from '../../shared/priority-icon';
-import { ProviderIcon, type AnyProvider } from '../../shared/provider-icon';
-import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
-import { ProjectGlyph } from '../projects/project-glyph';
-import type { Priority } from '../../core';
+import { TramaStore, type ActorRef, type Priority } from '../core';
+import { ActorAvatar } from './actor-avatar';
+import { EstimateGlyph } from './estimate';
+import { PriorityIcon } from './priority-icon';
+import { ProviderIcon, type AnyProvider } from './provider-icon';
+import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
+import { ProjectGlyph } from '../features/projects/project-glyph';
 
 export type PickKind =
   | 'plain'
@@ -45,7 +44,7 @@ export interface PickOption {
   search?: string;
   /** Status glyph when it differs from `value` (kind `status`). */
   status?: string;
-  /** Glyph family for `status` options (workstreams = hexagons, issues = circles). */
+  /** Glyph family for status options. */
   statusEntity?: StatusEntity;
   /** Git provider for `repo` options. */
   provider?: string;

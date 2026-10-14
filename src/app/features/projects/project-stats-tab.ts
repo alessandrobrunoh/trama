@@ -16,7 +16,7 @@ import { projectStats, type ProjectStats } from './project-stats-model';
 
 /**
  * Insights of a project, Linear-style: KPIs, burn-up, velocity, breakdowns and milestone progress.
- * Everything is derived from the issues, milestones and workstreams already loaded in the store.
+ * Everything is derived from the project's issues and milestones.
  */
 @Component({
   selector: 'app-project-stats-tab',
@@ -30,7 +30,7 @@ import { projectStats, type ProjectStats } from './project-stats-model';
           <app-empty-state
             [icon]="chartIcon"
             title="No data to chart yet"
-            description="Insights appear once issues are planned under this project or linked to one of its workstreams."
+            description="Insights appear once issues are planned under this project."
           />
         } @else {
           <section aria-label="Key numbers" class="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -52,13 +52,6 @@ import { projectStats, type ProjectStats } from './project-stats-model';
               label="Unassigned"
               [value]="'' + s.kpis.unassigned"
               hint="Open issues without an assignee"
-            />
-            <app-kpi-tile
-              label="Blocked"
-              [value]="'' + s.kpis.blockedWorkstreams"
-              [hint]="
-                s.kpis.blockedWorkstreams === 1 ? 'Workstream blocked' : 'Workstreams blocked'
-              "
             />
             <app-kpi-tile
               label="Velocity"
@@ -160,7 +153,6 @@ export class ProjectStatsTab {
     return projectStats({
       project: p,
       issues: this.store.issuesByProject().get(p.id) ?? [],
-      workstreams: this.store.workstreams().filter((w) => w.projectId === p.id),
       milestones: this.store.milestonesByProject().get(p.id) ?? [],
       userName: (id) => this.store.getUser(id)?.name,
       weekStartsOn: this.store.weekStartsOn(),

@@ -1,4 +1,4 @@
-// One drag-and-drop board, shared by issues and workstreams.
+// One drag-and-drop board for issue lists.
 import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Directive, TemplateRef, contentChild, input, output, signal } from '@angular/core';

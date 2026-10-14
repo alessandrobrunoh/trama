@@ -15,7 +15,6 @@ import {
   LucideCircleDot,
   LucideDynamicIcon,
   LucideEllipsis,
-  LucideHexagon,
   LucidePlus,
   LucideLink,
   LucideTrash2,
@@ -45,16 +44,14 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Markdown } from '../../shared/markdown';
 import { StatusLabel } from '../../shared/status';
 import { IssueRow } from '../issues/issue-items';
-import { WorkstreamRow } from '../workstreams/workstream-items';
-import { buildSummary } from '../workstreams/ws-model';
 import { ProviderIcon } from '../../shared/provider-icon';
 import { ProjectMilestones } from '../milestones/project-milestones';
 import { EventLine } from '../overview/event-line';
-import { CommentThread } from '../workstreams/comments';
-import { EditableMarkdown, InlineText } from '../workstreams/inline-edit';
-import { Picker } from '../workstreams/picker';
-import { priorityOptions, repoOptions, teamOptions, userOptions } from '../workstreams/ws-model';
-import { WsDatePicker } from '../workstreams/ws-parts';
+import { CommentThread } from '../../shared/comments';
+import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
+import { Picker } from '../../shared/picker';
+import { priorityOptions, repoOptions, teamOptions, userOptions } from '../../shared/picker-options';
+import { DatePicker } from '../../shared/date-picker';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
 import { projectWorkState } from '../customers/customer-model';
@@ -103,9 +100,8 @@ const ACTIVITY_CAP = 20;
     DemandSummary,
     InlineText,
     Picker,
-    WsDatePicker,
+    DatePicker,
     EventLine,
-    WorkstreamRow,
     ProjectMilestones,
     HlmTabsImports,
     HlmTooltip,
@@ -256,7 +252,7 @@ const ACTIVITY_CAP = 20;
               <app-empty-state
                 [icon]="issueIcon"
                 title="No issues in this project"
-                description="Issues planned under this project, or linked to one of its workstreams, show up here."
+                description="Issues planned under this project show up here."
               >
                 @if (canCreateIssue()) {
                   <button hlmBtn size="sm" (click)="newIssue()">
@@ -367,40 +363,6 @@ const ACTIVITY_CAP = 20;
 
               <app-project-milestones [project]="p" />
 
-              <section class="min-w-0">
-                <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
-                  Workstreams
-                  <span class="text-muted-foreground font-normal tabular-nums">{{
-                    workstreams().length
-                  }}</span>
-                  @if (canCreateWorkstream()) {
-                    <button
-                      hlmBtn
-                      variant="ghost"
-                      size="xs"
-                      class="text-muted-foreground ml-auto h-6 gap-1 px-2 text-xs font-normal"
-                      (click)="newWorkstream()"
-                    >
-                      <svg [lucideIcon]="plus" [size]="12"></svg>New workstream
-                    </button>
-                  }
-                </h2>
-                @if (workstreams().length) {
-                  <div class="-mx-4 border-t sm:-mx-6">
-                    @for (s of workstreams(); track s.ws.id) {
-                      <app-workstream-row [summary]="s" />
-                    }
-                  </div>
-                } @else {
-                  <div
-                    class="text-muted-foreground flex items-center gap-2 rounded-md border border-dashed px-3 py-4 text-[13px]"
-                  >
-                    <svg [lucideIcon]="hexagon" [size]="15" [strokeWidth]="1.5"></svg>
-                    No workstream carries out this project yet.
-                  </div>
-                }
-              </section>
-
               <section>
                 <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
                   Repositories
@@ -428,7 +390,7 @@ const ACTIVITY_CAP = 20;
                   </div>
                 } @else {
                   <p class="text-muted-foreground text-[13px]">
-                    No repository yet. Link the ones this project's workstreams land in.
+                    No repository yet. Link the repositories used by this project.
                   </p>
                 }
               </section>
@@ -547,7 +509,7 @@ const ACTIVITY_CAP = 20;
                 />
               </app-property-row>
               <app-property-row label="Start date">
-                <app-ws-date-picker
+                <app-date-picker
                   class="min-w-0 flex-1"
                   label="Start date"
                   triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm"
@@ -560,10 +522,10 @@ const ACTIVITY_CAP = 20;
                   } @else {
                     <span class="text-muted-foreground">Not set</span>
                   }
-                </app-ws-date-picker>
+                </app-date-picker>
               </app-property-row>
               <app-property-row label="Target date">
-                <app-ws-date-picker
+                <app-date-picker
                   class="min-w-0 flex-1"
                   label="Target date"
                   triggerClass="h-auto min-h-8 w-full justify-start px-1.5 py-1 text-sm"
@@ -581,7 +543,7 @@ const ACTIVITY_CAP = 20;
                   } @else {
                     <span class="text-muted-foreground">No date</span>
                   }
-                </app-ws-date-picker>
+                </app-date-picker>
               </app-property-row>
               <app-property-row label="Created">
                 <span class="text-muted-foreground px-1.5 text-xs">{{
@@ -623,7 +585,6 @@ export class ProjectDetailPage {
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
   protected readonly plus = LucidePlus;
-  protected readonly hexagon = LucideHexagon;
   protected readonly alertIcon = LucideCircleAlert;
   protected readonly activityIcon = LucideActivity;
   protected readonly issueIcon = LucideCircleDot;
@@ -695,13 +656,6 @@ export class ProjectDetailPage {
       (a) => a.documentId,
     ).length,
   }));
-  protected readonly canCreateWorkstream = computed(() => this.store.allowed('createWorkstreams'));
-  protected readonly workstreams = computed(() => {
-    const id = this.project()?.id;
-    return id
-      ? (this.store.workstreamsByProject().get(id) ?? []).map((ws) => buildSummary(this.store, ws))
-      : [];
-  });
   protected readonly activity = computed(() => {
     const id = this.project()?.id;
     if (!id) return [] as DomainEvent[];
@@ -755,11 +709,6 @@ export class ProjectDetailPage {
   protected update(patch: Parameters<TramaStore['updateProject']>[1]): void {
     const p = this.project();
     if (p) void this.store.updateProject(p.id, patch);
-  }
-
-  protected newWorkstream(): void {
-    const id = this.project()?.id;
-    if (id) this.ui.openCreate('workstream', { projectId: id });
   }
 
   protected setStatus(v: string | undefined): void {

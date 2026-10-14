@@ -5,9 +5,7 @@ import type {
   ArtifactKind,
   AttentionKind,
   AttentionSeverity,
-  CriterionState,
   DecisionStatus,
-  DeliveryState,
   ExecutionProvider,
   IssueKind,
   IssueStatus,
@@ -16,7 +14,6 @@ import type {
   ProjectStatus,
   LegacyRole,
   ViewLayout,
-  WorkstreamStatus,
 } from './contracts/domain';
 
 export const APP_NAME = 'Trama';
@@ -34,43 +31,6 @@ export interface Meta {
 export function statusVar(value: string): string {
   return `var(--status-${value.replace(/_/g, '-')})`;
 }
-
-export const WORKSTREAM_STATUS_META: Record<WorkstreamStatus, Meta> = {
-  blocked: { label: 'Blocked', tone: 'danger', order: 0 },
-  needs_input: { label: 'Needs input', tone: 'warning', order: 1 },
-  ready_to_land: { label: 'Ready to land', tone: 'success', order: 2 },
-  in_review: { label: 'In review', tone: 'accent', order: 3 },
-  working: { label: 'Working', tone: 'info', order: 4 },
-  planned: { label: 'Planned', tone: 'neutral', order: 5 },
-  draft: { label: 'Draft', tone: 'muted', order: 6 },
-  shipped: { label: 'Shipped', tone: 'success', order: 7 },
-  canceled: { label: 'Canceled', tone: 'muted', order: 8 },
-};
-export const WORKSTREAM_STATUSES = sortedKeys(WORKSTREAM_STATUS_META);
-
-/**
- * Delivery evidence (PR / release / deployment), shown beside, never instead of, the outcome status.
- * `merged` etc. mean the code landed; only `status === 'shipped'` means the outcome is achieved.
- */
-export const DELIVERY_STATE_META: Record<DeliveryState, Meta> = {
-  none: { label: 'Nothing delivered', tone: 'muted', order: 0 },
-  in_review: { label: 'PR in review', tone: 'accent', order: 1 },
-  merged: { label: 'PR merged', tone: 'info', order: 2 },
-  released: { label: 'Released', tone: 'info', order: 3 },
-  deployed: { label: 'Deployed', tone: 'success', order: 4 },
-};
-/** Board / overview column order (flow order rather than urgency order). */
-export const WORKSTREAM_STATUS_FLOW: WorkstreamStatus[] = [
-  'draft',
-  'planned',
-  'working',
-  'needs_input',
-  'in_review',
-  'blocked',
-  'ready_to_land',
-  'shipped',
-  'canceled',
-];
 
 export const PROJECT_STATUS_META: Record<ProjectStatus, Meta> = {
   backlog: { label: 'Backlog', tone: 'muted', order: 0 },
@@ -92,8 +52,7 @@ export const PROJECT_HEALTH_META: Record<ProjectHealth, Meta> = {
 export const VIEW_LAYOUT_META: Record<ViewLayout, { label: string; order: number }> = {
   list: { label: 'List', order: 0 },
   board: { label: 'Board', order: 1 },
-  graph: { label: 'Graph', order: 2 },
-  timeline: { label: 'Timeline', order: 3 },
+  timeline: { label: 'Timeline', order: 2 },
 };
 export const VIEW_LAYOUTS = sortedKeys(VIEW_LAYOUT_META);
 
@@ -163,12 +122,6 @@ export const DECISION_STATUS_META: Record<DecisionStatus, Meta> = {
 };
 export const DECISION_STATUSES = sortedKeys(DECISION_STATUS_META);
 
-export const CRITERION_STATE_META: Record<CriterionState, { label: string }> = {
-  pending: { label: 'Pending' },
-  in_progress: { label: 'In progress' },
-  met: { label: 'Met' },
-};
-
 export const ATTENTION_KIND_META: Record<
   AttentionKind,
   { label: string; groupTitle: string; defaultSeverity: AttentionSeverity; order: number }
@@ -186,45 +139,19 @@ export const ATTENTION_KIND_META: Record<
     order: 1,
   },
   ci_failed: { label: 'CI failed', groupTitle: 'CI failed', defaultSeverity: 'high', order: 2 },
-  blocked: { label: 'Blocked', groupTitle: 'Blocked', defaultSeverity: 'high', order: 3 },
   review_requested: {
     label: 'Review requested',
     groupTitle: 'Review requested',
     defaultSeverity: 'medium',
-    order: 4,
+    order: 3,
   },
   conflict: {
     label: 'Conflict',
     groupTitle: 'Merge conflicts',
     defaultSeverity: 'medium',
-    order: 5,
+    order: 4,
   },
-  ready_to_land: {
-    label: 'Ready to land',
-    groupTitle: 'Ready to land',
-    defaultSeverity: 'medium',
-    order: 6,
-  },
-  deadline: { label: 'Deadline', groupTitle: 'Deadlines', defaultSeverity: 'medium', order: 7 },
-  dependency: {
-    label: 'Waiting on dependency',
-    groupTitle: 'Waiting on others',
-    defaultSeverity: 'low',
-    order: 8,
-  },
-  ready_to_ship: {
-    label: 'Ready to ship',
-    groupTitle: 'Ready to ship',
-    defaultSeverity: 'low',
-    order: 9,
-  },
-  proof_missing: {
-    label: 'Proof missing',
-    groupTitle: 'Proof missing',
-    defaultSeverity: 'low',
-    order: 10,
-  },
-  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 11 },
+  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 5 },
 };
 export const ATTENTION_KINDS = sortedKeys(ATTENTION_KIND_META);
 export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, low: 2 };
@@ -244,7 +171,7 @@ export const ROLE_DETAILS: Record<LegacyRole, string> = {
   admin:
     'Manages people and structure: members, teams, repositories, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
   member:
-    'Does the everyday work: creates and edits workstreams, issues, decisions and comments. What else a member may do is set in Roles & permissions.',
+    'Does the everyday work: creates and edits issues, decisions and comments. What else a member may do is set in Roles & permissions.',
   viewer: 'Read-only. Can browse everything in the workspace but cannot change anything.',
 };
 

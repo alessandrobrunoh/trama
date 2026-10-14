@@ -2,7 +2,6 @@
 import {
   LucideBox,
   LucideCircle,
-  LucideHexagon,
   LucideScale,
   type LucideIcon,
 } from '@lucide/angular';
@@ -14,7 +13,6 @@ import {
   PRIORITY_META,
   PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
-  WORKSTREAM_STATUS_META,
   resolveStatusEntry,
   type ActorRef,
   type FieldDef,
@@ -41,22 +39,19 @@ export interface ViewGroup {
 }
 
 export const ENTITY_LABEL: Record<ViewEntity, string> = {
-  workstream: 'Workstreams',
   issue: 'Issues',
   decision: 'Decisions',
   project: 'Projects',
 };
 
-/** Hexagon = workstreams (outcomes), circle = issues (demand), scale = decisions. */
+/** Circle = issues, scale = decisions, box = projects. */
 export const ENTITY_ICON: Record<ViewEntity, LucideIcon> = {
-  workstream: LucideHexagon,
   issue: LucideCircle,
   decision: LucideScale,
   project: LucideBox,
 };
 
 export const STATUS_ENTITY: Record<ViewEntity, StatusEntity> = {
-  workstream: 'workstream',
   issue: 'issue',
   decision: 'other',
   project: 'other',
@@ -95,13 +90,11 @@ export function fieldLabel(entity: ViewEntity, field: string): string {
 function enumLabel(entity: ViewEntity, field: string, value: string): string | undefined {
   if (field === 'status') {
     const t =
-      entity === 'workstream'
-        ? WORKSTREAM_STATUS_META
-        : entity === 'issue'
-          ? ISSUE_STATUS_META
-          : entity === 'project'
-            ? PROJECT_STATUS_META
-            : DECISION_STATUS_META;
+      entity === 'issue'
+        ? ISSUE_STATUS_META
+        : entity === 'project'
+          ? PROJECT_STATUS_META
+          : DECISION_STATUS_META;
     return (t as Record<string, { label: string }>)[value]?.label;
   }
   if (field === 'health')
@@ -118,7 +111,6 @@ export function statusColumnIds(store: TramaStore, entity: ViewEntity, field: st
   const catalog = store.settings().statuses;
   if (field === 'health') return catalog.projectHealth.map((entry) => entry.id);
   if (entity === 'issue') return catalog.issue.map((entry) => entry.id);
-  if (entity === 'workstream') return catalog.workstream.map((entry) => entry.id);
   if (entity === 'project') return catalog.project.map((entry) => entry.id);
   return catalog.decision.map((entry) => entry.id);
 }
@@ -134,11 +126,9 @@ export function valueLabel(store: TramaStore, entity: ViewEntity, field: string,
         ? catalog.projectHealth
         : entity === 'issue'
           ? catalog.issue
-          : entity === 'workstream'
-            ? catalog.workstream
-            : entity === 'project'
-              ? catalog.project
-              : catalog.decision;
+          : entity === 'project'
+            ? catalog.project
+            : catalog.decision;
     const named = resolveStatusEntry(entries, value)?.name;
     if (named) return named;
   }
@@ -160,10 +150,6 @@ export function valueLabel(store: TramaStore, entity: ViewEntity, field: string,
       return store.getCustomer(value)?.name ?? value;
     case 'customerTier':
       return store.settings().customerTiers.find((t) => t.id === value)?.name ?? value;
-    case 'workstream': {
-      const w = store.getWorkstream(value);
-      return w ? `${w.key} ${w.title}` : value;
-    }
   }
   return value;
 }
@@ -183,10 +169,6 @@ export function valueGlyph(
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (def?.refersTo === 'team') return { actor: { type: 'team', id: value } };
   if (def?.refersTo === 'user') return { actor: { type: 'user', id: value } };
-  if (def?.refersTo === 'workstream') {
-    const w = store.getWorkstream(value);
-    return w ? { status: w.status, statusEntity: 'workstream' } : {};
-  }
   return {};
 }
 
@@ -230,17 +212,14 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
         ? catalog.projectHealth
         : entity === 'issue'
           ? catalog.issue
-          : entity === 'workstream'
-            ? catalog.workstream
-            : entity === 'project'
-              ? catalog.project
-              : catalog.decision;
+          : entity === 'project'
+            ? catalog.project
+            : catalog.decision;
     return entries.map((entry) => opt(entry.id));
   }
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));
   if (field === 'labels') {
-    const scope =
-      entity === 'issue' || entity === 'workstream' || entity === 'project' ? entity : null;
+    const scope = entity === 'issue' || entity === 'project' ? entity : null;
     return store
       .settings()
       .labels.filter((l) => !l.archived && (scope === null || l.scope === scope))
@@ -262,11 +241,6 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
       return [...none, ...store.repositories().map((r) => opt(r.id))];
     case 'project':
       return [...none, ...store.projects().map((p) => opt(p.id))];
-    case 'workstream':
-      return [
-        ...none,
-        ...store.workstreams().map((w) => opt(w.id, { label: w.key, hint: w.title, mono: true })),
-      ];
     case 'milestone':
       return store
         .milestones()
@@ -312,12 +286,10 @@ export function describeFilters(store: TramaStore, view: SavedView): string {
   return view.filters.map((f) => describeFilter(store, view.entity, f)).join(' · ');
 }
 
-/** Router commands to the workspace's timeline: its first timeline view (workstreams first), else the views list. */
+/** Router commands to the first timeline view, or the views list when none exists. */
 export function timelineViewLink(store: TramaStore): string[] {
   const views = store.views();
-  const view =
-    views.find((v) => v.layout === 'timeline' && v.entity === 'workstream') ??
-    views.find((v) => v.layout === 'timeline');
+  const view = views.find((v) => v.layout === 'timeline');
   const base = ['/', store.slug() ?? '', 'views'];
   return view ? [...base, view.id] : base;
 }

@@ -59,6 +59,13 @@ import { BLOG_POSTS, findPost } from './blog-posts';
             <p class="text-muted-foreground mt-4 text-[17px] leading-relaxed text-pretty">
               {{ p.description }}
             </p>
+            @if (p.slug === 'introducing-trama') {
+              <p class="bg-muted text-muted-foreground mt-5 rounded-md px-3 py-2 text-[13px] leading-relaxed">
+                Historical launch announcement (October 2026). This article describes Trama at launch;
+                today, Issues are granular units of work, with optional Goals, Plans and Documents.
+                Human input requests use Question or Decision mode.
+              </p>
+            }
             <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
               <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 dark:hidden" />
               <img src="/icons/trama-symbol-white.svg" alt="" class="hidden size-5 dark:block" />
@@ -110,7 +117,8 @@ import { BLOG_POSTS, findPost } from './blog-posts';
         <aside class="border-border bg-card mt-16 rounded-2xl border p-6 text-center sm:p-8">
           <h2 class="text-xl font-semibold tracking-tight">Try Trama with your team</h2>
           <p class="text-muted-foreground mx-auto mt-2 max-w-md text-[14px]">
-            Create a workspace, group your first issues into a workstream, and invite an agent.
+            Create a workspace, start with an issue, and invite an agent. Add a Goal or supporting
+            Plan or Document only when useful.
           </p>
           <div class="mt-5 flex flex-wrap justify-center gap-2">
             <a hlmBtn routerLink="/register">Get started</a>

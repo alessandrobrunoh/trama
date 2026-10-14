@@ -82,7 +82,6 @@ export interface PromptIssue {
   priority: string;
   estimate?: number | null;
   assignee?: string;
-  workstreams: readonly string[];
   createdAt: string;
   /** Recent comments and status history, newest last, already bounded (see `boundedLines`). */
   digest: string;
@@ -91,12 +90,6 @@ export interface PromptIssue {
 export interface EstimateChoice {
   value: number;
   label: string;
-}
-
-export interface PromptCandidate {
-  key: string;
-  title: string;
-  status: string;
 }
 
 export interface PromptSimilar {
@@ -109,40 +102,13 @@ export interface PromptSimilar {
   cycleDays?: number | null;
 }
 
-export interface PromptWorkstream {
-  key: string;
-  title: string;
-  status: string;
-  statusNote?: string;
-  priority: string;
-  objective: string;
-  description?: string;
-  targetDate?: string;
-  accountable?: string;
-  criteria: { met: number; total: number; open: readonly string[] };
-  issues: {
-    done: number;
-    inProgress: number;
-    todo: number;
-    total: number;
-    doneList: readonly string[];
-    inProgressList: readonly string[];
-    todoList: readonly string[];
-  };
-  milestones: readonly { name: string; targetDate?: string; percent: number; state: string }[];
-  openQuestions: readonly string[];
-  signals: readonly string[];
-  recent: readonly string[];
-  today: string;
-}
-
 export interface PromptDigest {
   today: string;
   window: { last24h: readonly string[]; last7d: readonly string[] };
   atRisk: readonly string[];
   overdueMilestones: readonly string[];
   waitingLongest: readonly string[];
-  counts: { issuesOpen: number; workstreamsActive: number };
+  counts: { issuesOpen: number };
 }
 
 // ───────────────────────────── builders ─────────────────────────────
@@ -161,7 +127,6 @@ export function triagePrompt(
     issue: PromptIssue;
     /** `null` when the workspace does not use estimates. */
     estimates: readonly EstimateChoice[] | null;
-    candidates: readonly PromptCandidate[];
     similar: readonly PromptSimilar[];
     kinds: readonly string[];
     priorities: readonly string[];
@@ -172,55 +137,15 @@ export function triagePrompt(
     ? `{"value": one of ${JSON.stringify(input.estimates.map((e) => e.value))}, "why": string} or null`
     : 'always null (this workspace does not use estimates)';
   return envelope(
-    'Suggest triage properties for this issue. Calibrate the estimate with the similar finished issues (their estimate and cycle time). Suggest workstreams only from the candidates list, using their exact key.',
+    'Suggest triage properties for this issue. Calibrate the estimate with the similar finished issues (their estimate and cycle time).',
     `{"priority": {"value": one of ${JSON.stringify(input.priorities)}, "why": string} or null,
  "estimate": ${est},
- "kind": {"value": one of ${JSON.stringify(input.kinds)}, "why": string} or null,
- "workstreams": [{"key": string (from candidates), "why": string}] (at most 3, may be empty)}
+ "kind": {"value": one of ${JSON.stringify(input.kinds)}, "why": string} or null}
 Every "why" is one short sentence (max 140 characters) that cites the evidence.`,
     {
       issue: issueData(input.issue),
       estimateScale: input.estimates,
-      candidateWorkstreams: input.candidates.slice(0, 8),
       similarFinishedIssues: input.similar.slice(0, 4),
-    },
-    locale,
-  );
-}
-
-export function updatePrompt(ws: PromptWorkstream, locale?: string): string {
-  return envelope(
-    'Write a short stakeholder status update for this workstream (markdown, at most about 180 words). Use exactly these sections in this order: "## Done", "## In progress", "## Risks", "## Next". Use short bullets that cite issue keys. Write "Nothing to report" for an empty section. Be factual and calm, do not over-promise.',
-    '{"markdown": string}',
-    cleanWorkstream(ws),
-    locale,
-  );
-}
-
-export function breakdownPrompt(
-  input: {
-    ws: { key: string; title: string; objective: string; description?: string; context?: string };
-    existingTitles: readonly string[];
-    estimates: readonly EstimateChoice[] | null;
-    kinds: readonly string[];
-    priorities: readonly string[];
-  },
-  locale?: string,
-): string {
-  const est = input.estimates?.length ? `one of ${JSON.stringify(input.estimates.map((e) => e.value))} or null` : 'always null';
-  return envelope(
-    'Propose 3 to 7 new issues that, together with the existing ones, would achieve the objective of this workstream. Each issue is one independently shippable piece of work. Do not repeat or rephrase an existing issue.',
-    `{"issues": [{"title": string (max 120 characters, imperative), "kind": one of ${JSON.stringify(input.kinds)}, "priority": one of ${JSON.stringify(input.priorities)}, "estimate": ${est}, "description": string (one sentence)}]}`,
-    {
-      workstream: {
-        key: input.ws.key,
-        title: clip(input.ws.title, LIMITS.title),
-        objective: clip(input.ws.objective, 1500),
-        description: clip(input.ws.description, 2000),
-        context: clip(input.ws.context, 1000),
-      },
-      estimateScale: input.estimates,
-      existingIssueTitles: input.existingTitles.slice(0, 40).map((t) => oneLine(t, 140)),
     },
     locale,
   );
@@ -237,28 +162,6 @@ export function digestPrompt(d: PromptDigest, locale?: string): string {
 
 // ───────────────────────────── helpers ─────────────────────────────
 
-function cleanWorkstream(w: PromptWorkstream): PromptWorkstream {
-  const list = (xs: readonly string[], n: number) => xs.slice(0, n).map((x) => oneLine(x, 160));
-  return {
-    ...w,
-    title: oneLine(w.title, LIMITS.title),
-    statusNote: w.statusNote ? oneLine(w.statusNote, 240) : undefined,
-    objective: clip(w.objective, 1200),
-    description: w.description ? clip(w.description, 1500) : undefined,
-    criteria: { ...w.criteria, open: list(w.criteria.open, 8) },
-    issues: {
-      ...w.issues,
-      doneList: list(w.issues.doneList, 8),
-      inProgressList: list(w.issues.inProgressList, 8),
-      todoList: list(w.issues.todoList, 8),
-    },
-    milestones: w.milestones.slice(0, 8).map((m) => ({ ...m, name: oneLine(m.name, 80) })),
-    openQuestions: list(w.openQuestions, 5),
-    signals: list(w.signals, 8),
-    recent: list(w.recent, 10),
-  };
-}
-
 function issueData(i: PromptIssue): Record<string, unknown> {
   return {
     key: i.key,
@@ -269,7 +172,6 @@ function issueData(i: PromptIssue): Record<string, unknown> {
     priority: i.priority,
     estimate: i.estimate ?? null,
     assignee: i.assignee ?? null,
-    workstreams: i.workstreams.slice(0, 5).map((w) => oneLine(w, 140)),
     createdAt: i.createdAt,
     recentActivity: clip(i.digest, LIMITS.digest),
   };

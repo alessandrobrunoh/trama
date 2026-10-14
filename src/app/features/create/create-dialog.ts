@@ -13,21 +13,18 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import {
   LucideBuilding2,
-  LucideCalendar,
   LucideCircleUser,
   LucideDynamicIcon,
   LucideBox,
   LucideFolderGit2,
   LucideLayers,
   LucideScale,
-  LucideLink2,
   LucideTag,
   LucideUsers,
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmDatePickerImports } from '@spartan-ng/helm/date-picker';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
@@ -43,7 +40,6 @@ import {
   type ViewEntity,
   type ViewFilter,
   type ViewLayout,
-  type WorkstreamStatus,
 } from '../../core/contracts/domain';
 import {
   ISSUE_KIND_META,
@@ -52,8 +48,6 @@ import {
   ISSUE_STATUS_META,
   PRIORITIES,
   PRIORITY_META,
-  WORKSTREAM_STATUS_FLOW,
-  WORKSTREAM_STATUS_META,
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
 import { formatBytes } from '../../core/format';
@@ -63,20 +57,20 @@ import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { StatusIcon } from '../../shared/status';
 import { UploadFile } from '../../shared/upload-file';
 import { issueEstimateOptions } from '../issues/issue-model';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
 import { DraftSuggestions } from '../ai/draft-suggestions';
 import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 
-type ComposerKind = 'issue' | 'workstream' | 'decision';
+type ComposerKind = 'issue' | 'decision';
 
 /** Kinds whose records can own file/image artifacts, so the dialog accepts attachments for them. */
-const ATTACHABLE = new Set<CreateKind>(['issue', 'workstream', 'project']);
+const ATTACHABLE = new Set<CreateKind>(['issue', 'project']);
 
 interface KindDef {
   kind: ComposerKind;
   label: string;
-  /** One-line explanation shown under the switcher (the issue ≠ workstream distinction). */
+  /** One-line explanation shown under the switcher. */
   blurb: string;
   example: string;
 }
@@ -88,12 +82,6 @@ const SWITCHER: KindDef[] = [
     label: 'Issue',
     blurb: "A problem or request: what's wrong or needed.",
     example: 'BUG-142',
-  },
-  {
-    kind: 'workstream',
-    label: 'Workstream',
-    blurb: "An outcome that resolves issues: what we're trying to accomplish.",
-    example: 'AUTH-42',
   },
   {
     kind: 'decision',
@@ -109,8 +97,8 @@ const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = 
   view: { label: 'View', icon: LucideLayers },
 };
 
-const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'graph', 'timeline'];
-const VIEW_ENTITIES: readonly ViewEntity[] = ['workstream', 'issue', 'decision', 'project'];
+const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'timeline'];
+const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'decision', 'project'];
 
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] =>
@@ -121,17 +109,13 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
   typeof v === 'string' && (list as readonly string[]).includes(v) ? (v as T) : undefined;
 
 /**
- * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues,
- * workstreams and decisions (title · description · property chips), plus compact forms for
+ * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues
+ * and decisions (title · description · property chips), plus compact forms for
  * team / repository / view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
- *   issue:      status, priority, teamId (or ownerTeamId), kind, assigneeId, workstreamIds[], title, body
- *               → workstreamIds are linked right after create (keeping the chosen status).
- *   workstream: status (sent as statusOverride unless 'planned' = derivable), title, description,
- *               ownerTeamId, projectId, repositoryIds[], issueIds[], priority, accountableUserId, deltaThreadUrl
- *               → issueIds are linked to the new workstream right after create.
- *   decision:   workstreamId (origin), title, statement, rationale, tags (string[] or "a, b")
+ *   issue:      status, priority, teamId, kind, assigneeId, projectId, title, body and optional goal
+ *   decision:   title, statement, rationale, required primary issue, tags (string[] or "a, b")
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
  *
  * After create we close and toast with an "Open" action instead of navigating away (Linear
@@ -146,9 +130,8 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     HlmDialogImports,
     HlmButtonImports,
     HlmInputImports,
-    HlmTextareaImports,
-    HlmDatePickerImports,
     HlmSwitchImports,
+    HlmTextareaImports,
     HlmSpinner,
     LucideDynamicIcon,
     StatusIcon,
@@ -209,14 +192,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       @switch (k.kind) {
                         @case ('issue') {
                           <app-status-icon entity="issue" status="todo" [size]="13" />
-                        }
-                        @case ('workstream') {
-                          <app-status-icon
-                            entity="workstream"
-                            status="planned"
-                            [size]="13"
-                            class="text-entity-workstream"
-                          />
                         }
                         @default {
                           <svg [lucideIcon]="scale" [size]="13" class="text-entity-decision"></svg>
@@ -293,6 +268,20 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 name="body"
                 aria-label="Description"
               ></textarea>
+              @if (kind() === 'issue') {
+                <div class="border-border-strong mt-2 border-t pt-2">
+                  <label for="cr-goal" class="text-muted-foreground text-xs font-medium">Goal <span class="font-normal">(optional)</span></label>
+                  <textarea
+                    id="cr-goal"
+                    class="placeholder:text-muted-foreground/60 field-sizing-content max-h-32 min-h-12 w-full resize-none bg-transparent py-1 text-sm leading-relaxed outline-none"
+                    rows="2"
+                    placeholder="The desired result, not a technical plan."
+                    [(ngModel)]="goal"
+                    name="goal"
+                    aria-label="Goal"
+                  ></textarea>
+                </div>
+              }
               @if (err('statement'); as e) {
                 <p class="text-destructive text-xs" role="alert">{{ e }}</p>
               }
@@ -305,29 +294,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   name="rationale"
                   aria-label="Rationale"
                 ></textarea>
-              }
-              @if (kind() === 'workstream' && deltaEnabled()) {
-                <div
-                  class="focus-within:border-ring/60 mt-1 flex h-8 items-center gap-2 rounded-md border px-2"
-                  [class.border-destructive]="!!err('delta')"
-                >
-                  <svg
-                    [lucideIcon]="linkIcon"
-                    [size]="13"
-                    class="text-muted-foreground shrink-0"
-                  ></svg>
-                  <input
-                    class="placeholder:text-muted-foreground/70 min-w-0 flex-1 bg-transparent font-mono text-xs outline-none"
-                    placeholder="Delta thread (optional) · https://delta.dev/t/…"
-                    [(ngModel)]="deltaUrl"
-                    name="delta"
-                    autocomplete="off"
-                    aria-label="Delta thread URL"
-                  />
-                </div>
-                @if (err('delta'); as e) {
-                  <p class="text-destructive text-xs" role="alert">{{ e }}</p>
-                }
               }
               @if (canAttach()) {
                 <div
@@ -428,15 +394,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     clearLabel="Unassigned"
                     (valueChange)="assigneeId.set($event[0] ?? '')"
                   />
-                  <app-picker
-                    variant="pill"
-                    label="Workstreams"
-                    [multiple]="true"
-                    [options]="workstreamOptions()"
-                    [value]="workstreamIds()"
-                    (valueChange)="workstreamIds.set($event)"
-                    searchPlaceholder="Link to workstreams…"
-                  />
                   @if (projectOptions().length) {
                     <app-picker
                       variant="pill"
@@ -449,80 +406,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     />
                   }
                 }
-                @case ('workstream') {
-                  <app-picker
-                    variant="pill"
-                    label="Status"
-                    [searchable]="false"
-                    [options]="wsStatusOptions"
-                    [value]="opt(wsStatus())"
-                    [clearable]="true"
-                    clearLabel="Derived (automatic)"
-                    (valueChange)="wsStatus.set($event[0] ?? '')"
-                  />
-                  <app-picker
-                    variant="pill"
-                    label="Priority"
-                    [searchable]="false"
-                    [options]="priorityOptions"
-                    [value]="[priority()]"
-                    (valueChange)="setOne(priority, $event)"
-                  />
-                  <app-picker
-                    variant="pill"
-                    label="Accountable"
-                    [icon]="userIcon"
-                    [options]="userOptions()"
-                    [value]="opt(accountableId())"
-                    [clearable]="true"
-                    clearLabel="Nobody yet"
-                    (valueChange)="accountableId.set($event[0] ?? '')"
-                  />
-                  @if (projectOptions().length) {
-                    <app-picker
-                      variant="pill"
-                      label="Project"
-                      [options]="projectOptions()"
-                      [value]="opt(projectId())"
-                      [clearable]="true"
-                      clearLabel="No project"
-                      (valueChange)="onProject($event[0])"
-                    />
-                  }
-                  @if (repoOptions().length) {
-                    <app-picker
-                      variant="pill"
-                      label="Repositories"
-                      [multiple]="true"
-                      [options]="repoOptions()"
-                      [value]="repositoryIds()"
-                      (valueChange)="repositoryIds.set($event)"
-                    />
-                  }
-                  <app-picker
-                    variant="pill"
-                    label="Issues"
-                    [multiple]="true"
-                    [options]="issueOptions()"
-                    [value]="issueIds()"
-                    (valueChange)="issueIds.set($event)"
-                    searchPlaceholder="Issues this resolves…"
-                  />
-                  <hlm-date-picker
-                    [date]="targetDate()"
-                    (dateChange)="targetDate.set($event ?? undefined)"
-                    align="start"
-                  >
-                    <hlm-date-picker-trigger
-                      variant="outline"
-                      [showTrigger]="false"
-                      class="h-7 gap-1.5 px-2 text-xs font-normal"
-                      [class.border-dashed]="!targetDate()"
-                      [class.bg-accent]="!!targetDate()"
-                      >Target date</hlm-date-picker-trigger
-                    >
-                  </hlm-date-picker>
-                }
                 @case ('decision') {
                   <app-picker
                     variant="pill"
@@ -534,12 +417,10 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   />
                   <app-picker
                     variant="pill"
-                    label="Origin"
-                    [options]="workstreamOptions()"
-                    [value]="opt(workstreamId())"
-                    [clearable]="true"
-                    clearLabel="No origin"
-                    (valueChange)="workstreamId.set($event[0] ?? '')"
+                    label="Primary issue (required)"
+                    [options]="issueOptions()"
+                    [value]="opt(originIssueId())"
+                    (valueChange)="originIssueId.set($event[0] ?? '')"
                   />
                   <label
                     class="border-border-strong focus-within:border-ring/60 flex h-7 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs"
@@ -561,8 +442,8 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 }
               }
             </div>
-            @if (err('team'); as e) {
-              <p class="text-destructive -mt-2 px-5 pb-3 text-xs" role="alert">{{ e }}</p>
+            @if (err('issue'); as e) {
+              <p class="text-destructive px-5 pb-2 text-xs" role="alert">{{ e }}</p>
             }
           } @else {
             <div class="flex flex-col gap-3 px-4 pt-2 pb-4">
@@ -605,7 +486,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     ></textarea>
                   </app-form-row>
                   <p class="text-muted-foreground text-xs">
-                    The key prefixes workstream ids (PLAT-12) and cannot be changed later.
+                    The key prefixes issue ids (PLAT-12) and cannot be changed later.
                   </p>
                 }
                 @case ('repository') {
@@ -779,7 +660,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 export class CreateDialog {
   protected readonly ui = inject(UiStore);
   private readonly store = inject(TramaStore);
-  protected readonly deltaEnabled = computed(() => this.store.deltaThreads());
   /** Workspace default team (Settings → General), if it still exists. */
   private defaultTeam(): string {
     const id = this.store.settings().defaultTeamId;
@@ -794,11 +674,9 @@ export class CreateDialog {
 
   protected readonly switcher = SWITCHER;
   protected readonly scale = LucideScale;
-  protected readonly linkIcon = LucideLink2;
   protected readonly tagIcon = LucideTag;
   protected readonly userIcon = LucideCircleUser;
   protected readonly teamIcon = LucideUsers;
-  protected readonly calendarIcon = LucideCalendar;
   protected readonly closeIcon = LucideX;
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
@@ -812,8 +690,8 @@ export class CreateDialog {
   // ── form state (shared across kinds; reset on open, carried over on switch) ──
   protected readonly title = signal('');
   protected readonly text = signal('');
+  protected readonly goal = signal('');
   protected readonly text2 = signal('');
-  protected readonly deltaUrl = signal('');
   protected readonly tags = signal('');
   protected readonly priority = signal<string>('none');
   // issue
@@ -828,26 +706,19 @@ export class CreateDialog {
   );
   protected readonly assigneeId = signal('');
   protected readonly teamId = signal('');
-  protected readonly workstreamIds = signal<string[]>([]);
-  // workstream
-  protected readonly wsStatus = signal(''); // '' = derived
-  protected readonly ownerTeamId = signal('');
-  protected readonly accountableId = signal('');
-  protected readonly targetDate = signal<Date | undefined>(undefined);
   protected readonly repositoryIds = signal<string[]>([]);
   protected readonly projectId = signal('');
-  protected readonly issueIds = signal<string[]>([]);
   /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
   protected readonly attachments = signal<File[]>([]);
   protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
   // decision
-  protected readonly workstreamId = signal('');
+  protected readonly originIssueId = signal('');
   protected readonly decisionStatus = signal<string>('proposed');
   // team / repository / view
   protected readonly teamKey = signal('');
   private teamKeyTouched = false;
   protected readonly gitProvider = signal<string>('github');
-  protected readonly viewEntity = signal<string>('workstream');
+  protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
   protected readonly shared = signal(true);
   private viewExtras: {
@@ -878,14 +749,6 @@ export class CreateDialog {
       statusEntity: 'issue' as const,
     }));
   }
-  protected get wsStatusOptions(): PickOption[] {
-    return this.store.settings().statuses.workstream.map((s) => ({
-      value: s.id,
-      label: s.name,
-      kind: 'status' as const,
-      statusEntity: 'workstream' as const,
-    }));
-  }
   protected readonly issueKindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,
@@ -897,14 +760,13 @@ export class CreateDialog {
   ];
   protected readonly gitProviderOptions: Option[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label }));
   protected readonly viewEntityOptions: Option[] = [
-    { value: 'workstream', label: 'Workstreams' },
     { value: 'issue', label: 'Issues' },
     { value: 'decision', label: 'Decisions' },
     { value: 'project', label: 'Projects' },
   ];
-  /** Layouts of a view; the timeline needs dates, so only workstreams and projects offer it. */
+  /** Timeline views use project dates. */
   protected readonly viewLayoutOptions = computed<Option[]>(() => {
-    const dated = this.viewEntity() === 'workstream' || this.viewEntity() === 'project';
+    const dated = this.viewEntity() === 'project';
     return [
       { value: 'list', label: 'List' },
       { value: 'board', label: 'Board' },
@@ -937,32 +799,9 @@ export class CreateDialog {
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
       .map((p) => ({ value: p.id, label: p.name, kind: 'plain' })),
   );
-  /** Open workstreams first (hexagon glyphs). */
-  protected readonly workstreamOptions = computed<PickOption[]>(() => {
-    const done = (s: WorkstreamStatus) => s === 'shipped' || s === 'canceled';
-    return [...this.store.workstreams()]
-      .sort(
-        (a, b) =>
-          Number(done(a.status)) - Number(done(b.status)) ||
-          a.key.localeCompare(b.key, undefined, { numeric: true }),
-      )
-      .map((w) => ({
-        value: w.id,
-        label: w.title,
-        hint: w.key,
-        search: `${w.key} ${w.title}`,
-        kind: 'status' as const,
-        status: w.status,
-        statusEntity: 'workstream' as const,
-      }));
-  });
-  /** Open issues (circle glyphs); closed ones only when already selected. */
+  /** Issues offered as decision origins; closed issues remain selectable. */
   protected readonly issueOptions = computed<PickOption[]>(() => {
-    const picked = new Set(this.issueIds());
-    return this.store
-      .issues()
-      .filter((i) => picked.has(i.id) || (i.status !== 'done' && i.status !== 'canceled'))
-      .map((i) => ({
+    return this.store.issues().map((i) => ({
         value: i.id,
         label: i.title,
         hint: i.key,
@@ -975,8 +814,6 @@ export class CreateDialog {
 
   protected readonly titlePlaceholder = computed(() => {
     switch (this.kind()) {
-      case 'workstream':
-        return 'Outcome, e.g. Stabilize authentication before v2';
       case 'decision':
         return 'Decision, e.g. Use opaque session tokens';
       default:
@@ -985,8 +822,6 @@ export class CreateDialog {
   });
   protected readonly bodyPlaceholder = computed(() => {
     switch (this.kind()) {
-      case 'workstream':
-        return 'What does done look like? Markdown supported.';
       case 'decision':
         return 'What was decided?';
       default:
@@ -1014,6 +849,7 @@ export class CreateDialog {
       const draft = {
         title: this.title(),
         text: this.text(),
+        goal: this.goal(),
         text2: this.text2(),
         priority: this.priority(),
         issueKind: this.issueKind(),
@@ -1021,12 +857,11 @@ export class CreateDialog {
         assigneeId: this.assigneeId(),
         projectId: this.projectId(),
         tags: this.tags(),
-        deltaUrl: this.deltaUrl(),
       };
       const kind = this.kind();
       untracked(() => {
         // Nothing to keep until there is a title or a description.
-        const hasText = !!(draft.title.trim() || draft.text.trim());
+        const hasText = !!(draft.title.trim() || draft.text.trim() || draft.goal.trim());
         this.drafts.set(this.draftKey(kind), hasText ? draft : null);
       });
     });
@@ -1040,11 +875,12 @@ export class CreateDialog {
   private restoreDraft(kind: CreateKind, d: Record<string, unknown>): void {
     this.restored.set(false);
     if (!SWITCHER.some((k) => k.kind === kind)) return;
-    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement'])) return;
+    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement']) || asStr(d['goal'])) return;
     const draft = this.drafts.get<Record<string, unknown>>(this.draftKey(kind));
-    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim())) return;
+    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim() || asStr(draft['goal']).trim())) return;
     this.title.set(asStr(draft['title']));
     this.text.set(asStr(draft['text']));
+    this.goal.set(asStr(draft['goal']));
     this.text2.set(asStr(draft['text2']));
     this.priority.set(oneOf(PRIORITIES, draft['priority']) ?? this.priority());
     this.issueKind.set(oneOf(ISSUE_KINDS, draft['issueKind']) ?? this.issueKind());
@@ -1052,7 +888,6 @@ export class CreateDialog {
     if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
     if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
     this.tags.set(asStr(draft['tags']));
-    this.deltaUrl.set(asStr(draft['deltaUrl']));
     this.restored.set(true);
   }
 
@@ -1068,8 +903,8 @@ export class CreateDialog {
     this.kind.set(kind);
     this.title.set(asStr(d['title']) || asStr(d['name']));
     this.text.set(asStr(d['body']) || asStr(d['description']) || asStr(d['statement']));
+    this.goal.set(asStr(d['goal']));
     this.text2.set(asStr(d['rationale']));
-    this.deltaUrl.set(asStr(d['deltaThreadUrl']));
     this.tags.set(asTags(d['tags']).join(', '));
     this.priority.set(oneOf(PRIORITIES, d['priority']) ?? 'none');
 
@@ -1081,27 +916,12 @@ export class CreateDialog {
     this.assigneeId.set(
       this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '',
     );
-    this.teamId.set(asStr(d['teamId']) || asStr(d['ownerTeamId']) || this.defaultTeam());
-    this.workstreamIds.set(
-      asArr(d['workstreamIds']).flatMap((r) => this.store.getWorkstream(r)?.id ?? []),
-    );
-
-    const ws = oneOf(WORKSTREAM_STATUS_FLOW, d['status']);
-    this.wsStatus.set(ws && ws !== 'planned' ? ws : '');
-    const myTeam =
-      this.defaultTeam() || (this.store.myTeams()[0]?.id ?? this.store.teams()[0]?.id ?? '');
-    this.ownerTeamId.set(asStr(d['ownerTeamId']) || asStr(d['teamId']) || myTeam);
-    this.accountableId.set(
-      this.store.userById().has(asStr(d['accountableUserId'])) ? asStr(d['accountableUserId']) : '',
-    );
-    this.targetDate.set(undefined);
+    this.teamId.set(asStr(d['teamId']) || this.defaultTeam());
     this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
     this.repositoryIds.set(
       asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
     );
-    this.issueIds.set(asArr(d['issueIds']).flatMap((r) => this.store.getIssue(r)?.id ?? []));
-
-    this.workstreamId.set(this.store.getWorkstream(asStr(d['workstreamId']))?.id ?? '');
+    this.originIssueId.set(this.store.getIssue(asStr(d['originIssueId']))?.id ?? '');
     this.decisionStatus.set(
       d['status'] === 'accepted' && kind === 'decision' ? 'accepted' : 'proposed',
     );
@@ -1111,7 +931,7 @@ export class CreateDialog {
     this.gitProvider.set('github');
     this.attachments.set([]);
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
-    this.viewEntity.set(entity ?? 'workstream');
+    this.viewEntity.set(entity ?? 'issue');
     this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
     this.shared.set(this.canShare() && (typeof d['shared'] === 'boolean' ? d['shared'] : true));
     this.viewExtras = {
@@ -1147,10 +967,8 @@ export class CreateDialog {
     return bits.join(' · ');
   }
 
-  /** The breadcrumb team: the issue's team, or the workstream's owner team. */
-  protected readonly headerTeamId = computed(() =>
-    this.kind() === 'workstream' ? this.ownerTeamId() : this.teamId(),
-  );
+  /** The team preselected for a new issue. */
+  protected readonly headerTeamId = computed(() => this.teamId());
 
   /** What the draft already has, so quick suggestions skip no-ops. */
   protected readonly suggestionCurrent = computed(() => ({
@@ -1159,7 +977,6 @@ export class CreateDialog {
     estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
     teamId: this.teamId(),
     assigneeId: this.assigneeId(),
-    workstreamId: this.workstreamIds(),
   }));
 
   protected addQuestion(question: string): void {
@@ -1169,7 +986,6 @@ export class CreateDialog {
   protected setHeaderTeam(id: string): void {
     // Keep both in step so switching kind carries the team over.
     if (id || this.kind() === 'issue') this.teamId.set(id);
-    if (id) this.ownerTeamId.set(id);
   }
 
   protected opt(v: string): string[] {
@@ -1194,7 +1010,7 @@ export class CreateDialog {
 
   /** Upload the picked files onto the new record. The store toasts each failure itself. */
   private async uploadAttachments(
-    target: { type: 'issue' | 'workstream' | 'project'; id: string },
+    target: { type: 'issue' | 'project'; id: string },
   ): Promise<void> {
     for (const file of this.attachments())
       await this.store.uploadArtifactFile(target, file);
@@ -1245,7 +1061,7 @@ export class CreateDialog {
     this.teamKey.set(v);
   }
 
-  protected err(field: 'title' | 'team' | 'statement' | 'key' | 'delta'): string | null {
+  protected err(field: 'title' | 'statement' | 'key' | 'issue'): string | null {
     if (!this.submitted()) return null;
     if (this.draftAttempt() && field === 'statement') return null;
     const k = this.kind();
@@ -1253,21 +1069,15 @@ export class CreateDialog {
       case 'title':
         return this.title().trim()
           ? null
-          : k === 'issue' || k === 'workstream' || k === 'decision'
+          : k === 'issue' || k === 'decision'
             ? 'Give it a title.'
             : 'Required.';
-      case 'delta':
-        if (k !== 'workstream' || !this.deltaEnabled()) return null;
-        if (!this.deltaUrl().trim()) return null;
-        return /^https:\/\/([a-z0-9-]+\.)*delta\.dev(\/|$)/i.test(this.deltaUrl().trim())
-          ? null
-          : 'The Delta thread must be an https link on delta.dev.';
-      case 'team':
-        if (k !== 'workstream') return null;
-        return this.ownerTeamId() ? null : 'Pick the owner team.';
       case 'statement':
         if (k !== 'decision') return null;
         return this.text().trim() ? null : 'Say what was decided.';
+      case 'issue':
+        if (k !== 'decision') return null;
+        return this.originIssueId() ? null : 'Choose the primary issue for this decision.';
       case 'key':
         if (k !== 'team') return null;
         return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
@@ -1277,7 +1087,9 @@ export class CreateDialog {
   }
 
   private valid(): boolean {
-    return (['title', 'team', 'statement', 'key', 'delta'] as const).every((f) => !this.err(f));
+    return (['title', 'statement', 'key', 'issue'] as const).every(
+      (f) => !this.err(f),
+    );
   }
 
   private focusTitle(): void {
@@ -1301,11 +1113,6 @@ export class CreateDialog {
       case 'assigneeId':
         this.assigneeId.set(suggestion.value);
         break;
-      case 'workstreamId':
-        this.workstreamIds.update((ids) =>
-          ids.includes(suggestion.value) ? ids : [...ids, suggestion.value],
-        );
-        break;
     }
   }
 
@@ -1319,10 +1126,7 @@ export class CreateDialog {
     ev.stopPropagation();
     if (this.busy()) return;
     if (asDraft) {
-      if (
-        !this.title().trim() ||
-        (this.kind() === 'workstream' && (!this.ownerTeamId() || !!this.err('delta')))
-      ) {
+      if (!this.title().trim() || (this.kind() === 'decision' && !this.originIssueId())) {
         this.submitted.set(true);
         return;
       }
@@ -1344,6 +1148,7 @@ export class CreateDialog {
             kind: this.issueKind() as IssueKind,
             title,
             body: this.text().trim() || undefined,
+            goal: this.goal().trim() || undefined,
             priority: this.priority() as Priority,
             status,
             teamId: this.teamId() || undefined,
@@ -1352,32 +1157,8 @@ export class CreateDialog {
             projectId: this.projectId() || undefined,
           });
           if (i) {
-            const links = this.workstreamIds();
-            if (links.length) await this.store.linkIssue(i.id, { workstreamIds: links });
             await this.uploadAttachments({ type: 'issue', id: i.id });
             done = { label: `${i.key} created`, path: ['issues', i.key] };
-          }
-          break;
-        }
-        case 'workstream': {
-          const w = await this.store.createWorkstream({
-            title,
-            description: this.text().trim() || undefined,
-            deltaThreadUrl: this.deltaEnabled() ? this.deltaUrl().trim() || undefined : undefined,
-            ownerTeamId: this.ownerTeamId(),
-            priority: this.priority() as Priority,
-            accountableUserId: this.accountableId() || undefined,
-            projectId: this.projectId() || undefined,
-            repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
-            targetDate: this.targetDate()?.toISOString(),
-            statusOverride: asDraft ? 'draft' : (this.wsStatus() as WorkstreamStatus) || undefined,
-          });
-          if (w) {
-            await Promise.all(
-              this.issueIds().map((id) => this.store.linkIssue(id, { workstreamIds: [w.id] })),
-            );
-            await this.uploadAttachments({ type: 'workstream', id: w.id });
-            done = { label: `${w.key} created`, path: ['workstreams', w.key] };
           }
           break;
         }
@@ -1387,7 +1168,7 @@ export class CreateDialog {
             statement: this.text().trim(),
             rationale: this.text2().trim() || undefined,
             status: asDraft ? 'draft' : (this.decisionStatus() as 'proposed' | 'accepted'),
-            originWorkstreamId: this.workstreamId() || undefined,
+            originIssueId: this.originIssueId(),
             tags: asTags(this.tags()),
           });
           if (d)
@@ -1443,7 +1224,6 @@ export class CreateDialog {
       }
       if (!done) return; // the store already toasted the failure; keep the form open
       if (asDraft && this.kind() === 'issue') done.label = `${done.path[1]} saved as draft`;
-      if (asDraft && this.kind() === 'workstream') done.label = `${done.path[1]} saved as draft`;
       const commands = ['/', slug, ...done.path];
       // Linear behaviour: stay where you are, offer "Open" in the toast.
       // Views and teams are destinations of their own, so those still navigate.
@@ -1460,7 +1240,6 @@ export class CreateDialog {
         this.title.set('');
         this.text.set('');
         this.text2.set('');
-        this.issueIds.set([]);
         this.attachments.set([]);
         this.submitted.set(false);
         this.draftAttempt.set(false);

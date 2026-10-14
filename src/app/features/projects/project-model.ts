@@ -11,7 +11,7 @@ import {
 } from '../../core/contracts/domain';
 import { PROJECT_HEALTH_META } from '../../core/meta';
 import type { TramaStore } from '../../core/stores/trama.store';
-import type { PickOption } from '../workstreams/picker';
+import type { PickOption } from '../../shared/picker';
 
 export interface ProjectStatusMeta {
   label: string;

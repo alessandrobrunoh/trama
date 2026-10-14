@@ -1,6 +1,16 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucideEllipsis, LucideFolderGit2, LucideHexagon, LucideInbox, LucideLink, LucidePlus, LucideTrash2, LucideUsers, LucideX } from '@lucide/angular';
+import {
+  LucideDynamicIcon,
+  LucideEllipsis,
+  LucideFolderGit2,
+  LucideInbox,
+  LucideLink,
+  LucidePlus,
+  LucideTrash2,
+  LucideUsers,
+  LucideX,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
@@ -15,14 +25,12 @@ import { ProviderIcon } from '../../shared/provider-icon';
 import { StatusIcon } from '../../shared/status';
 import { AppSelect, type Option } from '../create/form-kit';
 import { IssueRow } from '../issues/issue-items';
-import { InlineText } from '../workstreams/inline-edit';
-import { Picker } from '../workstreams/picker';
-import { buildSummary } from '../workstreams/ws-model';
-import { WorkstreamRow } from '../workstreams/workstream-items';
+import { InlineText } from '../../shared/inline-edit';
+import { Picker } from '../../shared/picker';
 import { TeamColorPicker } from './team-colors';
 
-type TeamTab = 'workstreams' | 'issues' | 'members' | 'repositories';
-const TABS: TeamTab[] = ['workstreams', 'issues', 'members', 'repositories'];
+type TeamTab = 'issues' | 'members' | 'repositories';
+const TABS: TeamTab[] = ['issues', 'members', 'repositories'];
 const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 
 @Component({
@@ -42,7 +50,6 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
     StatusIcon,
     InlineText,
     Picker,
-    WorkstreamRow,
     IssueRow,
     TeamColorPicker,
     AppSelect,
@@ -56,12 +63,14 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
             <svg [lucideIcon]="plus" [size]="14"></svg><span>Issue</span>
           </button>
         }
-        @if (canNewWorkstream()) {
-          <button hlmBtn size="sm" (click)="newWorkstream()">
-            <svg [lucideIcon]="plus" [size]="14"></svg><span>Workstream</span>
-          </button>
-        }
-        <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="more" aria-label="Team actions">
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
+          [hlmDropdownMenuTrigger]="more"
+          aria-label="Team actions"
+        >
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
         </button>
         <ng-template #more>
@@ -80,9 +89,21 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 
       <header class="px-4 pt-5 sm:px-6">
         <div class="flex min-w-0 items-center gap-2">
-          <app-team-color-picker [color]="t.color" [canEdit]="canManage()" [size]="14" (colorChange)="saveColor($event)" />
-          <app-inline-text class="min-w-0 flex-1" label="name" textClass="text-xl font-semibold tracking-tight" [value]="t.name" [canEdit]="canManage()" (save)="saveName($event)" />
-          <app-key-chip [value]="t.key" hlmTooltip="The key prefixes this team's workstream keys and cannot change" />
+          <app-team-color-picker
+            [color]="t.color"
+            [canEdit]="canManage()"
+            [size]="14"
+            (colorChange)="saveColor($event)"
+          />
+          <app-inline-text
+            class="min-w-0 flex-1"
+            label="name"
+            textClass="text-xl font-semibold tracking-tight"
+            [value]="t.name"
+            [canEdit]="canManage()"
+            (save)="saveName($event)"
+          />
+          <app-key-chip [value]="t.key" hlmTooltip="Team key" />
         </div>
         <app-inline-text
           class="mt-1 block"
@@ -95,19 +116,33 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
           (save)="saveDescription($event)"
         />
         <div class="text-muted-foreground mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-          <span class="flex items-center gap-1.5"><app-status-icon status="working" entity="workstream" [size]="12" /> {{ activeOwned() }} active workstreams</span>
-          <span class="flex items-center gap-1.5"><app-status-icon status="todo" entity="issue" [size]="12" /> {{ openIssues() }} open issues</span>
-          <span>{{ t.memberIds.length }} {{ t.memberIds.length === 1 ? 'member' : 'members' }}</span>
-          <span>Key <span class="font-mono">{{ t.key }}</span> · workstreams are numbered {{ t.key }}-1, {{ t.key }}-2…</span>
+          <span class="flex items-center gap-1.5"
+            ><app-status-icon status="todo" entity="issue" [size]="12" /> {{ openIssues() }} open
+            issues</span
+          >
+          <span
+            >{{ t.memberIds.length }} {{ t.memberIds.length === 1 ? 'member' : 'members' }}</span
+          >
+          <span
+            >Key <span class="font-mono">{{ t.key }}</span></span
+          >
         </div>
 
-        <nav class="-mb-px mt-4 flex gap-4 overflow-x-auto border-b" role="tablist" aria-label="Team sections">
+        <nav
+          class="-mb-px mt-4 flex gap-4 overflow-x-auto border-b"
+          role="tablist"
+          aria-label="Team sections"
+        >
           @for (x of tabs; track x) {
             <button
               type="button"
               role="tab"
               class="hover:text-foreground -mb-px flex shrink-0 items-center gap-1.5 border-b-2 py-2 text-[13px] transition-colors"
-              [class]="tab() === x ? 'border-foreground text-foreground font-medium' : 'text-muted-foreground border-transparent'"
+              [class]="
+                tab() === x
+                  ? 'border-foreground text-foreground font-medium'
+                  : 'text-muted-foreground border-transparent'
+              "
               [attr.aria-selected]="tab() === x"
               (click)="setTab(x)"
             >
@@ -120,32 +155,6 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
 
       <div class="min-w-0 flex-1 pb-8">
         @switch (tab()) {
-          @case ('workstreams') {
-            @if (owned().length || participating().length) {
-              @if (owned().length) {
-                <h2 class="text-muted-foreground bg-muted/30 border-b px-4 py-1.5 text-xs font-medium sm:px-6">Owned · {{ owned().length }}</h2>
-                @for (s of owned(); track s.ws.id) {
-                  <app-workstream-row [summary]="s" />
-                }
-              }
-              @if (participating().length) {
-                <h2 class="text-muted-foreground bg-muted/30 border-b px-4 py-1.5 text-xs font-medium sm:px-6">Participating · {{ participating().length }}</h2>
-                @for (s of participating(); track s.ws.id) {
-                  <app-workstream-row [summary]="s" />
-                }
-              }
-            } @else {
-              <app-empty-state
-                [icon]="layers"
-                title="No workstreams yet"
-                [description]="'Workstreams (hexagons) are the outcomes ' + t.name + ' owns and ships — a goal with acceptance criteria, agents and pull requests. Their keys start with ' + t.key + '-.'"
-              >
-                @if (canNewWorkstream()) {
-                  <button hlmBtn size="sm" (click)="newWorkstream()"><svg [lucideIcon]="plus" [size]="14"></svg>New workstream</button>
-                }
-              </app-empty-state>
-            }
-          }
           @case ('issues') {
             @if (issues().length) {
               @for (i of issues(); track i.id) {
@@ -155,16 +164,20 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
               <app-empty-state
                 [icon]="inbox"
                 title="No issues for this team"
-                [description]="'Issues (circles) are incoming demand — bugs, requests and incidents — that ' + t.name + ' triages. Link one to a workstream when the team commits to an outcome.'"
+                description="Issues are the team's planned work, requests and incidents."
               >
                 @if (canNewIssue()) {
-                  <button hlmBtn size="sm" variant="outline" (click)="newIssue()"><svg [lucideIcon]="plus" [size]="14"></svg>New issue</button>
+                  <button hlmBtn size="sm" variant="outline" (click)="newIssue()">
+                    <svg [lucideIcon]="plus" [size]="14"></svg>New issue
+                  </button>
                 }
               </app-empty-state>
             }
           }
           @case ('members') {
-            <div class="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
+            <div
+              class="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6"
+            >
               <div class="min-w-0">
                 <div class="text-[13px] font-medium">Who can edit this team's work</div>
                 <div class="text-muted-foreground text-xs leading-snug">
@@ -173,15 +186,24 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
               </div>
               @if (canManage()) {
                 <div class="sm:w-56 sm:shrink-0">
-                  <app-select size="sm" label="Edit policy" [options]="policyOptions" [value]="t.editPolicy" (valueChange)="setPolicy($event)" />
+                  <app-select
+                    size="sm"
+                    label="Edit policy"
+                    [options]="policyOptions"
+                    [value]="t.editPolicy"
+                    (valueChange)="setPolicy($event)"
+                  />
                 </div>
               } @else {
-                <span class="text-muted-foreground text-xs">{{ policyMeta(t.editPolicy).label }}</span>
+                <span class="text-muted-foreground text-xs">{{
+                  policyMeta(t.editPolicy).label
+                }}</span>
               }
             </div>
             <div class="flex items-center justify-between gap-2 border-b px-4 py-2 sm:px-6">
               <span class="text-muted-foreground text-xs">
-                Team <strong class="text-foreground font-medium">leads</strong> can edit the team and its members. Members see its attention items and can be assigned its work.
+                Team <strong class="text-foreground font-medium">leads</strong> can edit the team
+                and its members. Members see its attention items and can be assigned its work.
               </span>
               @if (canManage()) {
                 <app-picker
@@ -195,19 +217,34 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
               }
             </div>
             @for (m of members(); track m.id) {
-              <div class="hover:bg-muted/40 group flex items-center gap-3 border-b px-4 py-2 sm:px-6">
+              <div
+                class="hover:bg-muted/40 group flex items-center gap-3 border-b px-4 py-2 sm:px-6"
+              >
                 <app-actor-avatar [actor]="{ type: 'user', id: m.id }" [size]="24" />
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-[13px] font-medium">{{ m.name }}</span>
                   <span class="text-muted-foreground block truncate text-xs">{{ m.email }}</span>
                 </span>
-                <span class="text-muted-foreground hidden w-16 text-right text-xs sm:block" title="Workspace role">{{ m.role }}</span>
+                <span
+                  class="text-muted-foreground hidden w-16 text-right text-xs sm:block"
+                  title="Workspace role"
+                  >{{ m.role }}</span
+                >
                 @if (canManage()) {
                   <div class="w-28 shrink-0">
-                    <app-select size="sm" [attr.aria-label]="'Team role of ' + m.name" label="Team role" [options]="teamRoleOptions" [value]="m.lead ? 'lead' : 'member'" (valueChange)="setLead(m.id, $event === 'lead')" />
+                    <app-select
+                      size="sm"
+                      [attr.aria-label]="'Team role of ' + m.name"
+                      label="Team role"
+                      [options]="teamRoleOptions"
+                      [value]="m.lead ? 'lead' : 'member'"
+                      (valueChange)="setLead(m.id, $event === 'lead')"
+                    />
                   </div>
                 } @else {
-                  <span class="text-muted-foreground w-16 text-right text-xs">{{ m.lead ? 'Lead' : 'Member' }}</span>
+                  <span class="text-muted-foreground w-16 text-right text-xs">{{
+                    m.lead ? 'Lead' : 'Member'
+                  }}</span>
                 }
                 @if (canManage()) {
                   <button
@@ -224,27 +261,46 @@ const OPEN_ISSUE = new Set(['backlog', 'todo', 'in_progress', 'in_review']);
                 }
               </div>
             } @empty {
-              <app-empty-state [icon]="usersIcon" title="No members yet" description="Add the people who own this team's workstreams and triage its issues." />
+              <app-empty-state
+                [icon]="usersIcon"
+                title="No members yet"
+                description="Add the people who work on this team's issues."
+              />
             }
           }
           @case ('repositories') {
             @for (p of repositories(); track p.id) {
-              <a class="hover:bg-muted/60 flex items-center gap-2.5 border-b px-4 py-2 sm:px-6" [routerLink]="['/', slug(), 'repositories', p.id]">
+              <a
+                class="hover:bg-muted/60 flex items-center gap-2.5 border-b px-4 py-2 sm:px-6"
+                [routerLink]="['/', slug(), 'repositories', p.id]"
+              >
                 <app-provider-icon [provider]="p.provider" [size]="14" />
                 <span class="min-w-0 flex-1 truncate font-mono text-[13px]">{{ p.fullName }}</span>
                 <span class="text-muted-foreground font-mono text-xs">{{ p.defaultBranch }}</span>
               </a>
             } @empty {
-              <app-empty-state [icon]="folder" title="No repositories" description="The repositories this team's workstreams land in. Assign a team on a repository's page." >
-                <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'repositories']">Browse repositories</a>
+              <app-empty-state
+                [icon]="folder"
+                title="No repositories"
+                description="The repositories used by this team. Assign a team on a repository's page."
+              >
+                <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'repositories']"
+                  >Browse repositories</a
+                >
               </app-empty-state>
             }
           }
         }
       </div>
     } @else {
-      <app-empty-state [icon]="usersIcon" title="Team not found" description="It may have been deleted.">
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'teams']">Back to teams</a>
+      <app-empty-state
+        [icon]="usersIcon"
+        title="Team not found"
+        description="It may have been deleted."
+      >
+        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'teams']"
+          >Back to teams</a
+        >
       </app-empty-state>
     }
   `,
@@ -269,16 +325,20 @@ export class TeamDetailPage {
   protected readonly linkIcon = LucideLink;
   protected readonly inbox = LucideInbox;
   protected readonly folder = LucideFolderGit2;
-  protected readonly layers = LucideHexagon;
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly team = computed(() => this.store.getTeam(this.key()));
   /** Edit the team itself: the `manageTeams` capability, or being one of its leads. */
-  protected readonly canManage = computed(() => this.store.allowed('manageTeams') || this.store.isTeamLead(this.team()?.id));
+  protected readonly canManage = computed(
+    () => this.store.allowed('manageTeams') || this.store.isTeamLead(this.team()?.id),
+  );
   protected readonly canDelete = computed(() => this.store.allowed('manageTeams'));
-  protected readonly canNewIssue = computed(() => this.store.allowed('createIssues') && this.store.canEditTeamWork(this.team()?.id));
-  protected readonly canNewWorkstream = computed(() => this.store.allowed('createWorkstreams') && this.store.canEditTeamWork(this.team()?.id));
-  protected readonly policyOptions: Option[] = (Object.keys(TEAM_EDIT_POLICIES) as TeamEditPolicy[]).map((p) => ({ value: p, label: TEAM_EDIT_POLICIES[p].label }));
+  protected readonly canNewIssue = computed(
+    () => this.store.allowed('createIssues') && this.store.canEditTeamWork(this.team()?.id),
+  );
+  protected readonly policyOptions: Option[] = (
+    Object.keys(TEAM_EDIT_POLICIES) as TeamEditPolicy[]
+  ).map((p) => ({ value: p, label: TEAM_EDIT_POLICIES[p].label }));
   protected readonly teamRoleOptions: Option[] = [
     { value: 'member', label: 'Member' },
     { value: 'lead', label: 'Lead' },
@@ -288,20 +348,9 @@ export class TeamDetailPage {
   }
   protected readonly tab = computed<TeamTab>(() => {
     const t = this.tabParam();
-    return TABS.includes(t as TeamTab) ? (t as TeamTab) : 'workstreams';
+    return TABS.includes(t as TeamTab) ? (t as TeamTab) : 'issues';
   });
 
-  protected readonly owned = computed(() => {
-    const id = this.team()?.id;
-    return id ? (this.store.workstreamsByOwnerTeam().get(id) ?? []).map((ws) => buildSummary(this.store, ws)) : [];
-  });
-  protected readonly participating = computed(() => {
-    const id = this.team()?.id;
-    return id ? (this.store.workstreamsByParticipatingTeam().get(id) ?? []).map((ws) => buildSummary(this.store, ws)) : [];
-  });
-  protected readonly activeOwned = computed(
-    () => this.owned().filter((s) => s.ws.status !== 'shipped' && s.ws.status !== 'canceled').length,
-  );
   protected readonly issues = computed(() => {
     const id = this.team()?.id;
     if (!id) return [];
@@ -310,7 +359,9 @@ export class TeamDetailPage {
       (a, b) => order(a.status) - order(b.status) || (a.updatedAt < b.updatedAt ? 1 : -1),
     );
   });
-  protected readonly openIssues = computed(() => this.issues().filter((i) => OPEN_ISSUE.has(i.status)).length);
+  protected readonly openIssues = computed(
+    () => this.issues().filter((i) => OPEN_ISSUE.has(i.status)).length,
+  );
   protected readonly members = computed(() => {
     const t = this.team();
     if (!t) return [];
@@ -319,7 +370,13 @@ export class TeamDetailPage {
       .filter((u) => !!u)
       .map((u) => {
         const role = this.store.membershipByUserId().get(u.id)?.role;
-        return { id: u.id, name: u.name, email: u.email, role: workspaceRoleName(this.store.settings().roles, role), lead: t.leadIds.includes(u.id) };
+        return {
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          role: workspaceRoleName(this.store.settings().roles, role),
+          lead: t.leadIds.includes(u.id),
+        };
       })
       .sort((a, b) => a.name.localeCompare(b.name));
   });
@@ -328,7 +385,12 @@ export class TeamDetailPage {
     return this.store
       .users()
       .filter((u) => !ids.has(u.id) && this.store.membershipByUserId().has(u.id))
-      .map((u) => ({ value: u.id, label: u.name, kind: 'user' as const, search: `${u.name} ${u.email}` }));
+      .map((u) => ({
+        value: u.id,
+        label: u.name,
+        kind: 'user' as const,
+        search: `${u.name} ${u.email}`,
+      }));
   });
   protected readonly repositories = computed(() => {
     const id = this.team()?.id;
@@ -345,12 +407,10 @@ export class TeamDetailPage {
   ]);
 
   protected tabLabel(t: TeamTab): string {
-    return t === 'workstreams' ? 'Workstreams' : t === 'issues' ? 'Issues' : t === 'members' ? 'Members' : 'Repositories';
+    return t === 'issues' ? 'Issues' : t === 'members' ? 'Members' : 'Repositories';
   }
   protected tabCount(t: TeamTab): number {
     switch (t) {
-      case 'workstreams':
-        return this.owned().length + this.participating().length;
       case 'issues':
         return this.issues().length;
       case 'members':
@@ -360,16 +420,22 @@ export class TeamDetailPage {
     }
   }
   protected setTab(t: TeamTab): void {
-    void this.router.navigate([], { queryParams: { tab: t === 'workstreams' ? null : t }, queryParamsHandling: 'merge', replaceUrl: true });
+    void this.router.navigate([], {
+      queryParams: { tab: t === 'issues' ? null : t },
+      queryParamsHandling: 'merge',
+      replaceUrl: true,
+    });
   }
 
   protected saveName(name: string): void {
     const t = this.team();
-    if (t && name.trim() && name.trim() !== t.name) void this.store.updateTeam(t.id, { name: name.trim() });
+    if (t && name.trim() && name.trim() !== t.name)
+      void this.store.updateTeam(t.id, { name: name.trim() });
   }
   protected saveDescription(description: string): void {
     const t = this.team();
-    if (t && description.trim() !== (t.description ?? '')) void this.store.updateTeam(t.id, { description: description.trim() || null });
+    if (t && description.trim() !== (t.description ?? ''))
+      void this.store.updateTeam(t.id, { description: description.trim() || null });
   }
   protected saveColor(color: string): void {
     const t = this.team();
@@ -382,7 +448,11 @@ export class TeamDetailPage {
   }
   protected removeMember(userId: string): void {
     const t = this.team();
-    if (t) void this.store.updateTeam(t.id, { memberIds: t.memberIds.filter((id) => id !== userId), leadIds: t.leadIds.filter((id) => id !== userId) });
+    if (t)
+      void this.store.updateTeam(t.id, {
+        memberIds: t.memberIds.filter((id) => id !== userId),
+        leadIds: t.leadIds.filter((id) => id !== userId),
+      });
   }
   protected setLead(userId: string, lead: boolean): void {
     const t = this.team();
@@ -394,14 +464,11 @@ export class TeamDetailPage {
   }
   protected setPolicy(value: string): void {
     const t = this.team();
-    if (t && value !== t.editPolicy) void this.store.updateTeam(t.id, { editPolicy: value as TeamEditPolicy });
+    if (t && value !== t.editPolicy)
+      void this.store.updateTeam(t.id, { editPolicy: value as TeamEditPolicy });
   }
   protected copyLink(): void {
     void this.clipboard.copy(location.href, 'Link copied');
-  }
-  protected newWorkstream(): void {
-    const t = this.team();
-    if (t) this.ui.openCreate('workstream', { ownerTeamId: t.id });
   }
   protected newIssue(): void {
     const t = this.team();
@@ -412,7 +479,7 @@ export class TeamDetailPage {
     if (!t) return;
     this.ui.setConfirmDelete({
       title: `Delete ${t.name}?`,
-      description: 'Only possible while it owns no workstreams. Issues and repositories are detached from it.',
+      description: 'Issues and repositories are detached from the team.',
       onConfirm: async () => {
         const ok = await this.store.deleteTeam(t.id);
         if (ok) await this.router.navigate(['/', this.slug(), 'teams']);

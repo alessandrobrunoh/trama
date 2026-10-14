@@ -25,7 +25,6 @@ const SIDEBAR_SECTIONS = ['personal', 'workspace'] as const;
 
 /** What the global "create" dialog creates. */
 export type CreateKind =
-  | 'workstream'
   | 'issue'
   | 'decision'
   | 'artifact'
@@ -40,7 +39,7 @@ export type CustomerDialogState =
   | { kind: 'customer' }
   | { kind: 'request'; customerId?: string; issueId?: string; projectId?: string };
 
-/** Prefill for the create dialog, e.g. `{ workstreamId }`, `{ ownerTeamId }`, `{ kind: 'bug' }`. */
+/** Prefill for the create dialog, e.g. `{ teamId }`, `{ projectId }`, `{ kind: 'bug' }`. */
 export type CreateDefaults = Record<string, unknown>;
 
 export interface ConfirmDeleteState {
@@ -116,7 +115,7 @@ export class UiStore {
   readonly mobileSidebarOpen = signal(false);
   readonly modal = signal<ModalKind>(null);
   readonly customerDialog = signal<CustomerDialogState>({ kind: 'customer' });
-  readonly createKind = signal<CreateKind>('workstream');
+  readonly createKind = signal<CreateKind>('issue');
   readonly createDefaults = signal<CreateDefaults>({});
   readonly confirmDelete = signal<ConfirmDeleteState | null>(null);
   /** True right after "g" is pressed (G-chord pending); show a hint if you like. */

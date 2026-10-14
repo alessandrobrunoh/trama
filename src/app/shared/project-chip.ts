@@ -1,4 +1,4 @@
-// Linkable project pill for issue and workstream rows and cards: project glyph + name.
+// Linkable project pill for issue rows and cards: project glyph + name.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { TramaStore } from '../core';

@@ -30,7 +30,7 @@ import { AiActions, SETUP_MESSAGE } from './ai-actions.service';
         [tooltipDisabled]="!tip()"
         (click)="pressed.emit()"
       >
-        <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-entity-workstream" [class.motion-safe:animate-pulse]="loading()"></svg>
+        <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-primary" [class.motion-safe:animate-pulse]="loading()"></svg>
         @if (!iconOnly()) {
           <span>{{ label() }}</span>
         }

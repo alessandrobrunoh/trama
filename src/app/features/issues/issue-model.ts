@@ -18,11 +18,9 @@ import {
   type Issue,
   type IssueStatus,
   type TramaStore,
-  type Workstream,
-  type WorkstreamStatus,
 } from '../../core';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
-import type { PickOption } from '../workstreams/picker';
+import type { PickOption } from '../../shared/picker';
 
 export const SOURCE_LABEL: Record<string, string> = {
   manual: 'Manual',
@@ -38,11 +36,6 @@ export const isClosedIssue = (i: Pick<Issue, 'status'>, entries?: readonly Statu
   const type = statusTypeOf(entries ?? defaultStatusCatalog().issue, i.status);
   return type === 'done' || type === 'canceled';
 };
-export const isOpenWorkstream = (w: Workstream, entries?: readonly StatusEntry<WorkstreamStatus>[]): boolean => {
-  const type = statusTypeOf(entries ?? defaultStatusCatalog().workstream, w.status);
-  return type !== 'shipped' && type !== 'canceled';
-};
-
 // ───────────────────────── picker options ─────────────────────────
 
 export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>
@@ -93,32 +86,6 @@ export const issueKindOptions = (): PickOption[] =>
     hint: ISSUE_KIND_META[k].prefix,
   }));
 
-/** Workstreams as picker options (hexagon glyph + key hint), open ones first. */
-export function workstreamPickOptions(
-  store: TramaStore,
-  exclude: readonly string[] = [],
-): PickOption[] {
-  const skip = new Set(exclude);
-  return store
-    .workstreams()
-    .filter((w) => !skip.has(w.id))
-    .slice()
-    .sort(
-      (a, b) =>
-        Number(isOpenWorkstream(b)) - Number(isOpenWorkstream(a)) ||
-        (a.updatedAt < b.updatedAt ? 1 : -1),
-    )
-    .map((w) => ({
-      value: w.id,
-      label: w.title,
-      hint: w.key,
-      kind: 'status',
-      status: w.status,
-      statusEntity: 'workstream',
-      search: `${w.key} ${w.title}`,
-    }));
-}
-
 // ───────────────────────── view tabs ─────────────────────────
 
 export type IssueViewTab = 'all' | 'active' | 'backlog' | 'done' | 'draft';
@@ -161,7 +128,6 @@ export type IssueGroup =
   | 'priority'
   | 'teamId'
   | 'assigneeId'
-  | 'workstreamIds'
   | 'projectId'
   | 'customerId'
   | 'customerTierId'
@@ -177,7 +143,7 @@ export type IssueSort =
   | 'requestCount'
   | 'customerRevenue';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'workstreams' | 'project' | 'labels' | 'team' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'project' | 'labels' | 'team' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -195,7 +161,6 @@ export const GROUPS: readonly IssueGroup[] = [
   'priority',
   'teamId',
   'assigneeId',
-  'workstreamIds',
   'projectId',
   'customerId',
   'customerTierId',
@@ -212,7 +177,7 @@ export const SORTS: readonly IssueSort[] = [
   'requestCount',
   'customerRevenue',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'workstreams', 'project', 'labels', 'team', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'team', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
@@ -220,7 +185,6 @@ export const GROUP_LABEL: Record<IssueGroup, string> = {
   priority: 'Priority',
   teamId: 'Team',
   assigneeId: 'Assignee',
-  workstreamIds: 'Workstream',
   projectId: 'Project',
   customerId: 'Customer',
   customerTierId: 'Customer tier',
@@ -239,7 +203,6 @@ export const SORT_LABEL: Record<IssueSort, string> = {
 };
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
-  workstreams: 'Workstreams',
   project: 'Project',
   labels: 'Labels',
   team: 'Team',
@@ -292,11 +255,6 @@ export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | 
       return store.teams().map((t) => t.id);
     case 'assigneeId':
       return store.users().map((u) => u.id);
-    case 'workstreamIds':
-      return store
-        .workstreams()
-        .filter((workstream) => isOpenWorkstream(workstream, store.settings().statuses.workstream))
-        .map((w) => w.id);
     case 'projectId':
       return store
         .projects()
@@ -319,8 +277,6 @@ export function groupLabel(store: TramaStore, group: IssueGroup, key: string): s
       return key ? (store.getTeam(key)?.name ?? 'Unknown team') : 'No team';
     case 'assigneeId':
       return key ? (store.getUser(key)?.name ?? 'Unknown') : 'Unassigned';
-    case 'workstreamIds':
-      return key ? (store.getWorkstream(key)?.title ?? 'Unknown workstream') : 'No workstream';
     case 'projectId':
       return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
     case 'customerId':

@@ -2,9 +2,9 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  computed,
   ElementRef,
   afterNextRender,
+  computed,
   inject,
   input,
   model,
@@ -13,20 +13,18 @@ import {
   viewChild,
 } from '@angular/core';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
-import { TramaStore, Preferences, type ActorRef } from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { replaceEmojiShortcodes } from '../../shared/emoji';
+import { TramaStore, Preferences, type ActorRef } from '../core';
+import { ActorAvatar } from './actor-avatar';
+import { replaceEmojiShortcodes } from './emoji';
 
 interface Suggestion {
   id: string;
-  /** Text that replaces the typed trigger (`@Ada Lovelace`, `AUTH-42`). */
   insert: string;
   label: string;
   hint?: string;
   actor?: ActorRef;
 }
 
-/** `@` or `#` at the start of a word, followed by the characters typed so far. */
 const TRIGGER = /(^|\s)([@#])([^\s@#]*)$/;
 const MAX_SUGGESTIONS = 8;
 const PER_KIND = 4;
@@ -96,9 +94,7 @@ export class CommentInput {
   readonly value = model('');
   readonly placeholder = input('');
   readonly label = input('');
-  /** Focus the field (caret at the end) as soon as it is rendered. */
   readonly autofocus = input(false);
-  /** Keys the suggestion list did not use (Enter to send, Escape to cancel…). */
   readonly keyed = output<KeyboardEvent>();
 
   protected readonly listId = `comment-input-${CommentInput.nextId++}`;
@@ -107,56 +103,61 @@ export class CommentInput {
   private readonly trigger = signal<{ char: '@' | '#'; query: string; start: number } | null>(null);
 
   protected readonly suggestions = computed<Suggestion[]>(() => {
-    const t = this.trigger();
-    if (!t) return [];
-    const q = t.query.toLowerCase();
-    const match = (...parts: string[]) => !q || parts.some((p) => p.toLowerCase().includes(q));
+    const trigger = this.trigger();
+    if (!trigger) return [];
+    const query = trigger.query.toLowerCase();
+    const match = (...parts: string[]) => !query || parts.some((part) => part.toLowerCase().includes(query));
     const out: Suggestion[] = [];
-    if (t.char === '@') {
-      for (const m of this.store.members()) {
-        if (match(m.user.name))
+    if (trigger.char === '@') {
+      for (const member of this.store.members()) {
+        if (match(member.user.name)) {
           out.push({
-            id: m.user.id,
-            insert: `@${m.user.name}`,
-            label: m.user.name,
-            hint: m.membership.role,
-            actor: { type: 'user', id: m.user.id },
+            id: member.user.id,
+            insert: `@${member.user.name}`,
+            label: member.user.name,
+            hint: member.membership.role,
+            actor: { type: 'user', id: member.user.id },
           });
+        }
       }
-      for (const a of this.store.agents()) {
-        if (match(a.name))
+      for (const agent of this.store.agents()) {
+        if (match(agent.name)) {
           out.push({
-            id: a.id,
-            insert: `@${a.name}`,
-            label: a.name,
+            id: agent.id,
+            insert: `@${agent.name}`,
+            label: agent.name,
             hint: 'agent',
-            actor: { type: 'agent', id: a.id },
+            actor: { type: 'agent', id: agent.id },
           });
+        }
       }
       return out.slice(0, MAX_SUGGESTIONS);
     }
-    const take = <T extends { id: string }>(rows: readonly T[], f: (r: T) => Suggestion | null) => {
-      let n = 0;
-      for (const r of rows) {
-        if (n >= PER_KIND) break;
-        const s = f(r);
-        if (s) {
-          out.push(s);
-          n++;
+    const take = <T extends { id: string }>(rows: readonly T[], toSuggestion: (row: T) => Suggestion | null) => {
+      let count = 0;
+      for (const row of rows) {
+        if (count >= PER_KIND) break;
+        const suggestion = toSuggestion(row);
+        if (suggestion) {
+          out.push(suggestion);
+          count++;
         }
       }
     };
-    take(this.store.workstreams(), (w) =>
-      match(w.key, w.title) ? { id: w.id, insert: w.key, label: w.title, hint: w.key } : null,
+    take(this.store.issues(), (issue) =>
+      match(issue.key, issue.title)
+        ? { id: issue.id, insert: issue.key, label: issue.title, hint: issue.key }
+        : null,
     );
-    take(this.store.issues(), (i) =>
-      match(i.key, i.title) ? { id: i.id, insert: i.key, label: i.title, hint: i.key } : null,
+    take(this.store.decisions(), (decision) =>
+      match(decision.key, decision.title)
+        ? { id: decision.id, insert: decision.key, label: decision.title, hint: decision.key }
+        : null,
     );
-    take(this.store.decisions(), (d) =>
-      match(d.key, d.title) ? { id: d.id, insert: d.key, label: d.title, hint: d.key } : null,
-    );
-    take(this.store.repositories(), (r) =>
-      match(r.fullName) ? { id: r.id, insert: r.fullName, label: r.fullName, hint: 'repo' } : null,
+    take(this.store.repositories(), (repository) =>
+      match(repository.fullName)
+        ? { id: repository.id, insert: repository.fullName, label: repository.fullName, hint: 'repo' }
+        : null,
     );
     return out.slice(0, MAX_SUGGESTIONS);
   });
@@ -166,9 +167,9 @@ export class CommentInput {
   constructor() {
     afterNextRender(() => {
       if (!this.autofocus()) return;
-      const el = this.field().nativeElement;
-      el.focus();
-      el.setSelectionRange(el.value.length, el.value.length);
+      const element = this.field().nativeElement;
+      element.focus();
+      element.setSelectionRange(element.value.length, element.value.length);
     });
   }
 
@@ -176,86 +177,84 @@ export class CommentInput {
     this.field().nativeElement.focus();
   }
 
-  /** Insert text at the caret (an uploaded image or file). */
   insert(text: string): void {
-    const el = this.field().nativeElement;
-    const start = el.selectionStart ?? el.value.length;
-    const end = el.selectionEnd ?? start;
-    const next = `${el.value.slice(0, start)}${text}${el.value.slice(end)}`;
-    el.value = next;
-    el.setSelectionRange(start + text.length, start + text.length);
+    const element = this.field().nativeElement;
+    const start = element.selectionStart ?? element.value.length;
+    const end = element.selectionEnd ?? start;
+    const next = `${element.value.slice(0, start)}${text}${element.value.slice(end)}`;
+    element.value = next;
+    element.setSelectionRange(start + text.length, start + text.length);
     this.value.set(next);
-    el.focus();
+    element.focus();
   }
 
   protected onInput(): void {
-    const el = this.field().nativeElement;
+    const element = this.field().nativeElement;
     if (this.prefs.emojiShortcodes()) {
-      const caret = el.selectionStart;
-      const before = replaceEmojiShortcodes(el.value.slice(0, caret));
-      const next = before + replaceEmojiShortcodes(el.value.slice(caret));
-      if (next !== el.value) {
-        el.value = next;
-        el.setSelectionRange(before.length, before.length);
+      const caret = element.selectionStart;
+      const before = replaceEmojiShortcodes(element.value.slice(0, caret));
+      const next = before + replaceEmojiShortcodes(element.value.slice(caret));
+      if (next !== element.value) {
+        element.value = next;
+        element.setSelectionRange(before.length, before.length);
       }
     }
-    this.value.set(el.value);
+    this.value.set(element.value);
     this.dismissed.set(false);
     this.refresh();
   }
 
-  /** Re-reads the word before the caret to decide whether a suggestion list applies. */
   protected refresh(): void {
-    const el = this.field().nativeElement;
-    const upto = el.value.slice(0, el.selectionStart);
-    const m = TRIGGER.exec(upto);
-    const next = m
-      ? { char: m[2] as '@' | '#', query: m[3], start: upto.length - m[3].length - 1 }
+    const element = this.field().nativeElement;
+    const upto = element.value.slice(0, element.selectionStart);
+    const match = TRIGGER.exec(upto);
+    const next = match
+      ? { char: match[2] as '@' | '#', query: match[3], start: upto.length - match[3].length - 1 }
       : null;
-    const prev = this.trigger();
-    if (next?.char !== prev?.char || next?.query !== prev?.query) this.active.set(0);
+    const previous = this.trigger();
+    if (next?.char !== previous?.char || next?.query !== previous?.query) this.active.set(0);
     this.trigger.set(next);
     if (!next) this.dismissed.set(false);
   }
 
-  protected onKeydown(ev: KeyboardEvent): void {
-    if (this.open() && !ev.isComposing) {
-      const n = this.suggestions().length;
-      switch (ev.key) {
+  protected onKeydown(event: KeyboardEvent): void {
+    if (this.open() && !event.isComposing) {
+      const count = this.suggestions().length;
+      switch (event.key) {
         case 'ArrowDown':
-          ev.preventDefault();
-          this.active.update((i) => (i + 1) % n);
+          event.preventDefault();
+          this.active.update((index) => (index + 1) % count);
           return;
         case 'ArrowUp':
-          ev.preventDefault();
-          this.active.update((i) => (i - 1 + n) % n);
+          event.preventDefault();
+          this.active.update((index) => (index - 1 + count) % count);
           return;
         case 'Enter':
         case 'Tab':
-          if (ev.shiftKey || ev.metaKey || ev.ctrlKey) break;
-          ev.preventDefault();
+          if (event.shiftKey || event.metaKey || event.ctrlKey) break;
+          event.preventDefault();
           this.pick(this.suggestions()[this.active()]);
           return;
         case 'Escape':
-          ev.preventDefault();
-          ev.stopPropagation();
+          event.preventDefault();
+          event.stopPropagation();
           this.dismissed.set(true);
           return;
       }
     }
-    this.keyed.emit(ev);
+    this.keyed.emit(event);
   }
 
-  protected pick(s: Suggestion | undefined): void {
-    const t = this.trigger();
-    if (!s || !t) return;
-    const el = this.field().nativeElement;
-    const end = el.selectionStart;
-    const next = `${el.value.slice(0, t.start)}${s.insert} ${el.value.slice(end)}`;
-    const caret = t.start + s.insert.length + 1;
-    el.value = next;
-    el.setSelectionRange(caret, caret);
-    el.focus();
+  protected pick(suggestion: Suggestion | undefined): void {
+    const trigger = this.trigger();
+    if (!suggestion || !trigger) return;
+    const element = this.field().nativeElement;
+    const end = element.selectionStart;
+    const next = `${element.value.slice(0, trigger.start)}${suggestion.insert} ${element.value.slice(end)}`;
+    const caret = trigger.start + suggestion.insert.length + 1;
+    element.value = next;
+    element.setSelectionRange(caret, caret);
+    element.focus();
     this.value.set(next);
     this.trigger.set(null);
   }

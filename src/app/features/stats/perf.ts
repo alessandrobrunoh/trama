@@ -676,7 +676,7 @@ export function throughput(
   return { labels: ax.labels, titles: ax.titles, series, total: inRange.length };
 }
 
-// ───────────────────────────── workstreams: milestones ─────────────────────────────
+// ───────────────────────────── project milestones ─────────────────────────────
 
 export type MilestoneState = 'done' | 'overdue' | 'at_risk' | 'on_track' | 'no_date' | 'empty';
 
@@ -685,7 +685,6 @@ export interface MilestoneRow {
   name: string;
   projectId: string;
   projectName: string;
-  workstreamIds: string[];
   target?: number;
   total: number;
   done: number;
@@ -696,8 +695,8 @@ export interface MilestoneRow {
   detail: string;
 }
 
-/** Completion rate of a workstream over the last 28 days (issues per day). */
-export function wsRate(issues: readonly WorkRec[], now: number): number {
+/** Recent issue completion rate for a milestone (issues per day). */
+function issueRate(issues: readonly WorkRec[], now: number): number {
   const windowStart = now - 28 * DAY;
   const first = issues.length ? Math.min(...issues.map((i) => i.created)) : now;
   const days = Math.max(7, Math.min(28, (now - first) / DAY));
@@ -707,9 +706,10 @@ export function wsRate(issues: readonly WorkRec[], now: number): number {
 
 export function milestoneRows(data: WorkData, now: number): MilestoneRow[] {
   const byId = new Map(data.issues.map((i) => [i.id, i] as const));
-  const byWs = new Map<string, WorkRec[]>();
-  for (const i of data.issues) for (const w of i.workstreamIds) byWs.set(w, [...(byWs.get(w) ?? []), i]);
-  return data.milestones.map((m) => milestoneRow(m, m.issueIds.flatMap((id) => byId.get(id) ?? []), wsRate([...new Map(m.workstreamIds.flatMap((w) => byWs.get(w) ?? []).map((i) => [i.id, i] as const)).values()], now), now));
+  return data.milestones.map((m) => {
+    const issues = m.issueIds.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : []));
+    return milestoneRow(m, issues, issueRate(issues, now), now);
+  });
 }
 
 function milestoneRow(m: MilestoneRec, issues: readonly WorkRec[], rate: number, now: number): MilestoneRow {
@@ -722,10 +722,10 @@ function milestoneRow(m: MilestoneRec, issues: readonly WorkRec[], rate: number,
   const pct = total ? Math.round((doneSize / total) * 100) : 0;
   const remaining = live.length - done.length;
   const projected = remaining > 0 && rate > 0 ? now + (remaining / rate) * DAY : undefined;
-  const base = { id: m.id, name: m.name, projectId: m.projectId, projectName: m.projectName, workstreamIds: m.workstreamIds, target: m.target, total, done: doneSize, pct, basis, projected };
+  const base = { id: m.id, name: m.name, projectId: m.projectId, projectName: m.projectName, target: m.target, total, done: doneSize, pct, basis, projected };
   if (!live.length) return { ...base, state: 'empty', detail: 'No issues in this milestone yet.' };
   if (remaining === 0) return { ...base, state: 'done', detail: 'All issues are done.' };
-  const rateText = rate > 0 ? `${+(rate * 7).toFixed(1)} issues/week lately` : 'nothing completed in the workstream recently';
+  const rateText = rate > 0 ? `${+(rate * 7).toFixed(1)} issues/week lately` : 'no issues completed recently';
   if (m.target !== undefined && now > m.target) return { ...base, state: 'overdue', detail: `Target date passed with ${remaining} issue${remaining === 1 ? '' : 's'} open.` };
   if (m.target === undefined)
     return { ...base, state: 'no_date', detail: projected ? `At ${rateText}, ${remaining} open issue${remaining === 1 ? '' : 's'} take until ${format(projected, 'MMM d')}.` : `No target date; ${rateText}.` };

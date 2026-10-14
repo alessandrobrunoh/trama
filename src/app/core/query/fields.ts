@@ -7,7 +7,6 @@ import type {
   Issue,
   Project,
   ViewEntity,
-  Workstream,
 } from '../contracts/domain';
 import {
   DECISION_STATUS_META,
@@ -16,11 +15,9 @@ import {
   PRIORITY_META,
   PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
-  WORKSTREAM_STATUS_META,
 } from '../meta';
 
 export type EntityOf = {
-  workstream: Workstream;
   issue: Issue;
   decision: Decision;
   project: Project;
@@ -29,8 +26,6 @@ export type Queryable = EntityOf[ViewEntity];
 
 /** Extra data a field accessor may need beyond the item itself. */
 export interface QueryContext {
-  /** Needed by an issue's `projectId` (to include the projects of its workstreams). */
-  workstreamById?: ReadonlyMap<ID, Workstream>;
   /**
    * Customer demand per issue and project id (see `buildDemandIndex`). Needed by the customer fields of issues
    * and projects; without it they have no value.
@@ -47,7 +42,7 @@ export interface FieldDef {
   /** Fixed value set for enums (in display order). */
   values?: readonly string[];
   /** For `id` / `multi-id` fields: the TramaStore collection the ids come from. */
-  refersTo?: 'team' | 'user' | 'repository' | 'project' | 'workstream' | 'milestone' | 'actor' | 'customer' | 'customerTier';
+  refersTo?: 'team' | 'user' | 'repository' | 'project' | 'milestone' | 'issue' | 'actor' | 'customer' | 'customerTier';
   sortable: boolean;
   groupable: boolean;
 }
@@ -80,22 +75,6 @@ const isDemandField = (field: string): boolean =>
   field === 'customerId' || field === 'customerTierId' || field in DEMAND_NUMBER;
 
 export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
-  workstream: [
-    { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(WORKSTREAM_STATUS_META), sortable: true, groupable: true },
-    { field: 'ownerTeamId', label: 'Owner team', kind: 'id', refersTo: 'team', sortable: true, groupable: true },
-    { field: 'participatingTeamIds', label: 'Participating teams', kind: 'multi-id', refersTo: 'team', sortable: false, groupable: false },
-    { field: 'teamId', label: 'Any team (owner or participating)', kind: 'multi-id', refersTo: 'team', sortable: false, groupable: false },
-    { field: 'accountableUserId', label: 'Accountable', kind: 'id', refersTo: 'user', sortable: true, groupable: true },
-    { field: 'priority', label: 'Priority', kind: 'enum', values: keysByOrder(PRIORITY_META), sortable: true, groupable: true },
-    { field: 'labels', label: 'Labels', kind: 'tags', sortable: false, groupable: false },
-    { field: 'projectId', label: 'Project', kind: 'id', refersTo: 'project', sortable: false, groupable: true },
-    { field: 'repositoryIds', label: 'Repositories', kind: 'multi-id', refersTo: 'repository', sortable: false, groupable: false },
-    { field: 'startDate', label: 'Start date', kind: 'date', sortable: true, groupable: false },
-    { field: 'targetDate', label: 'Target date', kind: 'date', sortable: true, groupable: false },
-    { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
-    { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
-    { field: 'updatedAt', label: 'Updated', kind: 'date', sortable: true, groupable: false },
-  ],
   issue: [
     { field: 'kind', label: 'Type', kind: 'enum', values: keysByOrder(ISSUE_KIND_META), sortable: true, groupable: true },
     { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(ISSUE_STATUS_META), sortable: true, groupable: true },
@@ -114,7 +93,7 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
   decision: [
     { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(DECISION_STATUS_META), sortable: true, groupable: true },
     { field: 'tags', label: 'Tags', kind: 'tags', sortable: false, groupable: false },
-    { field: 'originWorkstreamId', label: 'Origin workstream', kind: 'id', refersTo: 'workstream', sortable: false, groupable: true },
+    { field: 'originIssueId', label: 'Origin issue', kind: 'id', refersTo: 'issue', sortable: false, groupable: true },
     { field: 'title', label: 'Title', kind: 'text', sortable: true, groupable: false },
     { field: 'decidedAt', label: 'Decided', kind: 'date', sortable: true, groupable: false },
     { field: 'createdAt', label: 'Created', kind: 'date', sortable: true, groupable: false },
@@ -141,18 +120,9 @@ export function fieldDef(entity: ViewEntity, field: string): FieldDef | undefine
   return FIELD_DEFS[entity].find((f) => f.field === field);
 }
 
-/**
- * Projects an issue belongs to: its own `projectId` first, then the projects of its workstreams
- * (the same meaning as TramaStore.issuesByProject). Without `workstreamById`, only its own project.
- */
-export function issueProjectIds(issue: Issue, workstreamById?: ReadonlyMap<ID, Workstream>): string[] {
-  const ids = new Set<string>();
-  if (issue.projectId) ids.add(issue.projectId);
-  for (const w of issue.workstreamIds) {
-    const p = workstreamById?.get(w)?.projectId;
-    if (p) ids.add(p);
-  }
-  return [...ids];
+/** Project assigned directly to an issue. */
+export function issueProjectIds(issue: Issue): string[] {
+  return issue.projectId ? [issue.projectId] : [];
 }
 
 /**
@@ -168,15 +138,7 @@ export function fieldValues(entity: ViewEntity, item: Queryable, field: string, 
     // Numbers are 0 for work nobody asked for, so "at least 1" and sorting just work. No context, no value.
     return ctx.demand ? [String(demand?.[DEMAND_NUMBER[field]] ?? 0)] : [];
   }
-  if (entity === 'workstream' && field === 'status') {
-    const override = any['statusOverride'];
-    if (typeof override === 'string' && override) return [override];
-  }
-  if (entity === 'workstream' && field === 'teamId') {
-    const w = item as Workstream;
-    return [w.ownerTeamId, ...w.participatingTeamIds];
-  }
-  if (entity === 'issue' && field === 'projectId') return issueProjectIds(item as Issue, ctx.workstreamById);
+  if (entity === 'issue' && field === 'projectId') return issueProjectIds(item as Issue);
   const raw = any[field];
   if (raw === undefined || raw === null || raw === '') return [];
   if (Array.isArray(raw)) return raw.map(String);

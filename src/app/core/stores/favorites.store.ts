@@ -17,13 +17,13 @@ export interface FavoriteEntry {
   favorite: Favorite;
   type: FavoriteType;
   subjectId: ID;
-  /** Main text: an issue / workstream / decision title, a team, repository or view name. */
+  /** Main text: an issue / decision title, a team, repository or view name. */
   label: string;
   /** Key such as `BUG-142` or `AUTH-12`, when the entity has one. */
   key?: string;
   /** Router commands below `/:workspaceSlug`. */
   link: string[];
-  /** Status to draw next to the label (issues and workstreams). */
+  /** Status to draw next to the label. */
   status?: string;
   /** Team color. */
   color?: string;
@@ -50,7 +50,7 @@ export class FavoritesStore {
     { initialValue: this.router.url },
   );
 
-  /** The entity the current page is about (an issue, workstream, project, decision, team, repository, view or customer), if any. */
+  /** The entity the current page is about, if any. */
   readonly current = computed<{ type: FavoriteType; id: ID } | null>(() => {
     const [path] = this.url().split(/[?#]/);
     const [, section, ref, ...more] = path.split('/').filter(Boolean);
@@ -60,7 +60,6 @@ export class FavoritesStore {
     const found = (type: FavoriteType, id: ID | undefined) => (id ? { type, id } : null);
     switch (section) {
       case 'issues': return found('issue', n.getIssue(key)?.id);
-      case 'workstreams': return found('workstream', n.getWorkstream(key)?.id);
       case 'projects': return found('project', n.getProject(key)?.id);
       case 'decisions': return found('decision', n.getDecision(key)?.id);
       case 'teams': return found('team', n.getTeam(key)?.id);
@@ -180,10 +179,6 @@ export class FavoritesStore {
         const i = this.trama.getIssue(favorite.subjectId);
         return i ? { ...base, label: i.title, key: i.key, link: ['issues', i.key], status: i.status } : null;
       }
-      case 'workstream': {
-        const w = this.trama.getWorkstream(favorite.subjectId);
-        return w ? { ...base, label: w.title, key: w.key, link: ['workstreams', w.key], status: w.status } : null;
-      }
       case 'decision': {
         const d = this.trama.getDecision(favorite.subjectId);
         return d ? { ...base, label: d.title, key: d.key, link: ['decisions', d.key] } : null;
@@ -209,5 +204,6 @@ export class FavoritesStore {
         return c ? { ...base, label: c.name, link: ['customers', c.id], ...(c.logoUrl ? { logoUrl: c.logoUrl } : {}) } : null;
       }
     }
+    return null;
   }
 }

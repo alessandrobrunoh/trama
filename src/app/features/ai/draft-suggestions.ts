@@ -225,30 +225,19 @@ export class DraftSuggestions {
   private readonly applied = signal<string[]>([]);
   /** Local hints the person already took: kept while they keep typing. */
   private readonly appliedLocal = signal<string[]>([]);
-  /** Instant hints from the typed text, plus workstreams ranked locally. AI answers win per field. */
+  /** Instant hints from the typed text. AI answers win per field. */
   private readonly localItems = computed<AiIssueDraftSuggestion[]>(() => {
     if (this.kind() !== 'issue') return [];
     const title = this.title();
     const description = this.description();
     if (title.trim().length + description.trim().length < 3) return [];
     const options = this.issueOptions();
-    const items = localTriage(title, description, options);
-    for (const ws of options.workstreams.slice(0, 2))
-      items.push({
-        field: 'workstreamId',
-        value: ws.id,
-        label: `${ws.key} · ${ws.title}`,
-        why: 'Overlaps with this workstream.',
-      });
-    return items;
+    return localTriage(title, description, options);
   });
   protected readonly visibleTriage = computed(() => {
     const ai = this.suggestion()?.triage?.suggestions ?? [];
-    const aiFields = new Set(ai.filter((i) => i.field !== 'workstreamId').map((i) => i.field));
-    const hasAiWorkstreams = ai.some((i) => i.field === 'workstreamId');
-    const local = this.localItems().filter((i) =>
-      i.field === 'workstreamId' ? !hasAiWorkstreams : !aiFields.has(i.field),
-    );
+    const aiFields = new Set(ai.map((i) => i.field));
+    const local = this.localItems().filter((i) => !aiFields.has(i.field));
     const key = (item: AiIssueDraftSuggestion) => `${item.field}:${item.value}`;
     const current = this.current();
     const already = (item: AiIssueDraftSuggestion) => {
@@ -322,7 +311,6 @@ export class DraftSuggestions {
       estimate: 'Estimate',
       teamId: 'Team',
       assigneeId: 'Assignee',
-      workstreamId: 'Related workstream',
     }[field];
   }
 
@@ -405,21 +393,6 @@ export class DraftSuggestions {
       .users()
       .slice(0, 100)
       .map((user) => ({ id: user.id, label: user.name }));
-    const activeWorkstreams = this.store
-      .workstreams()
-      .filter((workstream) => workstream.status !== 'shipped' && workstream.status !== 'canceled');
-    const workstreams = rankByOverlap(
-      query,
-      activeWorkstreams,
-      (workstream) => `${workstream.title} ${workstream.objective} ${workstream.description ?? ''}`,
-      8,
-      0.04,
-    ).map(({ item }) => ({
-      id: item.id,
-      key: item.key,
-      title: item.title,
-      objective: item.objective.slice(0, 500),
-    }));
     const finishedIssues = this.store
       .issues()
       .filter((issue) => issue.status === 'done' && !issue.duplicateOfId);
@@ -456,7 +429,6 @@ export class DraftSuggestions {
           : estimateOptions(this.store.estimateScale()).map((option) => option.value),
       teams,
       assignees,
-      workstreams,
       similar,
     };
   }

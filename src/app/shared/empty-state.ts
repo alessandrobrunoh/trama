@@ -5,7 +5,7 @@ import { HlmEmptyImports } from '@spartan-ng/helm/empty';
 /**
  * Centered empty / zero state. Project buttons (Spartan `hlmBtn`) into the default slot.
  *   <app-empty-state [icon]="inboxIcon" title="Nothing needs you" description="You're all caught up.">
- *     <button hlmBtn size="sm">Create workstream</button>
+ *     <button hlmBtn size="sm">Create issue</button>
  *   </app-empty-state>
  */
 @Component({

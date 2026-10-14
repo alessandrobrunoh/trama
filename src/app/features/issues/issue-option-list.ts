@@ -1,4 +1,4 @@
-// Searchable option list (status / priority / assignee / team / workstream / duplicate) for one or more
+// Searchable option list (status / priority / assignee / team / duplicate) for one or more
 // issues. Used inside the row/card popovers and the keyboard command dialog. Digits 1–9 pick directly.
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
@@ -25,7 +25,7 @@ const CREATE = '__create:';
           @for (o of options(); track o.value; let n = $index) {
             <button hlmCommandItem [value]="o.search + ' ' + o.value" (selected)="pick(o)">
               <app-issue-option-glyph [option]="o" />
-              @if (o.hint && (field() === 'workstream' || field() === 'duplicate')) {
+              @if (o.hint && field() === 'duplicate') {
                 <span class="text-muted-foreground shrink-0 font-mono text-[11px]">{{ o.hint }}</span>
               }
               <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>

@@ -69,14 +69,12 @@ export type MemberAction = 'view' | 'create' | 'update' | 'delete';
 export type MemberResource =
   | 'projects'
   | 'milestones'
-  | 'workstreams'
   | 'issues'
   | 'documents'
   | 'artifacts'
   | 'views'
   | 'comments'
   | 'decisions'
-  | 'dependencies'
   | 'input-requests'
   | 'customers';
 
@@ -130,12 +128,6 @@ export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
     description: 'Targets inside a project.',
     actions: MEMBER_ACTIONS,
   },
-  workstreams: {
-    group: 'Work',
-    label: 'Workstreams',
-    description: 'Create them, or only change the ones this person can see.',
-    actions: MEMBER_ACTIONS,
-  },
   issues: {
     group: 'Work',
     label: 'Issues',
@@ -173,16 +165,10 @@ export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
     description: 'Propose or edit a decision. Accepting one still follows Roles & permissions.',
     actions: MEMBER_ACTIONS,
   },
-  dependencies: {
-    group: 'Collaboration',
-    label: 'Dependencies',
-    description: 'Links between workstreams and issues.',
-    actions: MEMBER_ACTIONS,
-  },
   'input-requests': {
     group: 'Collaboration',
     label: 'Input requests',
-    description: 'Questions asked on a workstream.',
+    description: 'Questions attached to issues.',
     actions: MEMBER_ACTIONS,
   },
   customers: {
@@ -197,14 +183,12 @@ export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
 export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
   'projects',
   'milestones',
-  'workstreams',
   'issues',
   'documents',
   'artifacts',
   'views',
   'comments',
   'decisions',
-  'dependencies',
   'input-requests',
   'customers',
 ];
@@ -370,12 +354,13 @@ export const NOTIFICATION_KINDS = [
   'review_requested',
   'ci_failed',
   'comment',
-  'workstream_update',
   'customer_request',
   'customer_important',
   'customer_delivered',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
+/** Stored notifications from the retired Workstream updater remain readable as legacy inbox rows. */
+export type NotificationRecordKind = NotificationKind | 'workstream_update';
 
 export const NOTIFICATION_KIND_META: Record<
   NotificationKind,
@@ -384,28 +369,24 @@ export const NOTIFICATION_KIND_META: Record<
   assigned: { label: 'Assigned to me', description: 'An issue is assigned to you.' },
   input_requested: {
     label: 'Questions for me',
-    description: 'Someone, or an agent, asks you a question on a workstream.',
+    description: 'Someone, or an agent, asks you a question assigned to you.',
   },
   decision_proposed: {
     label: 'Decisions to review',
-    description: 'A decision is proposed on a workstream you are accountable for.',
+    description: 'A decision is proposed on an issue you are assigned to.',
   },
   review_requested: {
     label: 'Review requested',
-    description: 'A pull request on a workstream you are accountable for needs a review.',
+    description: 'A pull request attached to your issue needs a review.',
   },
   ci_failed: {
     label: 'Failing checks',
-    description: 'CI fails on a workstream you are accountable for.',
+    description: 'CI fails on an artifact attached to your issue.',
   },
   comment: {
     label: 'Comments',
     description:
-      'New comments on issues you are assigned or reported, and on workstreams you are accountable for.',
-  },
-  workstream_update: {
-    label: 'Workstream updates',
-    description: 'A workstream you are accountable for ships, becomes blocked or is ready to land.',
+      'New comments on issues you are assigned or reported.',
   },
   customer_request: {
     label: 'Customer requests',
@@ -451,14 +432,14 @@ export interface Notification {
   /** `ntf_…` */
   id: ID;
   workspaceId: ID;
-  kind: NotificationKind;
+  kind: NotificationRecordKind;
   title: string;
   /** A short excerpt (a comment, a question), when there is one. */
   body?: string;
   /** Who caused it. */
   actor: ActorRef;
   /** The record it is about. */
-  subject: SubjectRef;
+  subject: LegacySubjectRef;
   /** Where it leads, relative to the workspace, e.g. `issues/BUG-142`. */
   link: string;
   createdAt: ISODate;
@@ -476,7 +457,6 @@ export interface NotificationList {
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
 export const FAVORITE_TYPES = [
   'issue',
-  'workstream',
   'project',
   'decision',
   'team',
@@ -494,7 +474,7 @@ export interface Favorite {
   id: ID;
   workspaceId: ID;
   type: FavoriteType;
-  /** Id (not key) of the issue, workstream, project, decision, team, repository or view. */
+  /** Id (not key) of the issue, project, decision, team, repository or view. */
   subjectId: ID;
   createdAt: ISODate;
 }
@@ -583,7 +563,7 @@ export interface Team {
   memberIds: ID[];
   /** Team leads (a subset of `memberIds`). Leads may edit their team in the workspace settings of the team. */
   leadIds: ID[];
-  /** Who may edit the workstreams / issues owned by this team. Workspace admins and owners always can. */
+  /** Who may edit Issues owned by this team. Workspace admins and owners always can. */
   editPolicy: TeamEditPolicy;
 }
 
@@ -623,7 +603,7 @@ export interface Repository {
 
 // ───────────────────────────── Projects ─────────────────────────────
 
-/** Linear-style project lifecycle. Planning-level: independent of workstream status. */
+/** Linear-style project lifecycle. Planning-level and independent of Issue status. */
 export type ProjectStatus =
   'backlog' | 'planned' | 'in_progress' | 'paused' | 'completed' | 'canceled';
 export const PROJECT_STATUSES: ProjectStatus[] = [
@@ -637,7 +617,7 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
 
 /**
  * A planned outcome (Linear-style): what we want to achieve, by when, in which repositories.
- * Workstreams are the execution of a project; milestones belong to the project.
+ * Issues and milestones belong directly to the project.
  */
 export interface Project {
   /** `pj_…` */
@@ -660,7 +640,7 @@ export interface Project {
   leadId?: ID;
   /** Teams involved. */
   teamIds: ID[];
-  /** Where the work happens. A workstream of this project picks its repositories from this list. */
+  /** Repositories where this project's Issues are implemented. */
   repositoryIds: ID[];
   /** Workspace label ids (`WorkspaceSettings.labels`). */
   labels: ID[];
@@ -710,24 +690,16 @@ export interface ProjectUpdate {
 /** An artifact reached from a project, with the chain that links it back to where it was attached. */
 export interface ProjectContextArtifact {
   artifact: Artifact;
-  /**
-   * Chain from the project down to the artifact's owner, e.g. [project, workstream, issue] for a PR attached to
-   * an issue that is part of a workstream of the project. A one-element chain means it is attached to the project itself.
-   */
+  /** Chain from the project down to the artifact's owner. */
   path: SubjectRef[];
 }
 
-/**
- * GET /w/:slug/projects/:id/context — the whole tree under a project in one response ("mega context"):
- * Project → workstreams → issues → artifacts (+ the project's own artifacts, issues and updates).
- * Every item is reachable from the project and carries the ids needed to trace it back.
- */
+/** GET /w/:slug/projects/:id/context — project-owned and issue-owned context. */
 export interface ProjectContext {
   project: Project;
   milestones: Milestone[];
   updates: ProjectUpdate[];
-  workstreams: Workstream[];
-  /** Issues with `projectId` = project OR linked to one of its workstreams. */
+  /** Issues with `projectId` = project. */
   issues: Issue[];
   artifacts: ProjectContextArtifact[];
   decisions: Decision[];
@@ -762,7 +734,6 @@ export interface ProjectAiRisk {
   detail: string;
   severity: AttentionSeverity;
   issueId?: ID;
-  workstreamId?: ID;
 }
 export interface ProjectAiRisks {
   kind: 'risks';
@@ -772,140 +743,7 @@ export interface ProjectAiRisks {
 export type ProjectAiResult =
   ProjectAiUpdateDraft | ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
 
-// ───────────────────────────── Workstreams ─────────────────────────────
-
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
-
-/**
- * Outcome status, derived from artifacts / input requests / decisions / dependencies / criteria.
- * `shipped` means the outcome is achieved (criteria met, no blockers, nothing waiting on a person),
- * not merely that code landed: see {@link DeliveryState} for that.
- * Any status can be pinned manually via `statusOverride` (the board does this). `null` clears it.
- */
-export type WorkstreamStatus =
-  | 'draft'
-  | 'planned'
-  | 'working'
-  | 'needs_input'
-  | 'in_review'
-  | 'blocked'
-  | 'ready_to_land'
-  | 'shipped'
-  | 'canceled';
-
-/**
- * How far the code got, derived from artifacts only (highest evidence wins):
- * `deployed` (healthy deployment) > `released` (published release) > `merged` (every live PR
- * merged) > `in_review` (an open PR) > `none`. This is delivery evidence, not the outcome:
- * a merged PR never makes a workstream `shipped` unless its criteria are met and nothing
- * blocks it or waits on a person.
- */
-export type DeliveryState = 'none' | 'in_review' | 'merged' | 'released' | 'deployed';
-
-/**
- * Where a workstream's effective `status` comes from, so a `shipped` is never mistaken for proof:
- * - `derived`: computed from the facts (criteria, delivery, blockers, people);
- * - `override`: pinned by hand through `statusOverride`; the facts may say otherwise (`derivedStatus`);
- * - `legacy`: a historic `shipped` with no acceptance criteria, kept as it was when "no criteria never
- *   ships" was introduced (see `legacyShipped`).
- */
-export type StatusSource = 'derived' | 'override' | 'legacy';
-
-export type CriterionState = 'pending' | 'in_progress' | 'met';
-
-/**
- * Why a workstream is not (yet) a finished outcome. Computed by the server; clients show it and
- * never re-derive it. `shipped` (derived) means no gaps.
- * - `no_criteria`: nothing defines "done" yet (add at least one acceptance criterion).
- * - `criteria_pending`: some criterion is not `met`.
- * - `blocked`: a failing/conflicting open PR or an unresolved dependency.
- * - `needs_input`: an open input request or a proposed decision waits on a person.
- * - `no_delivery`: no merged/released/deployed work and not every linked issue is done.
- */
-export type CompletionGap =
-  'no_criteria' | 'criteria_pending' | 'blocked' | 'needs_input' | 'no_delivery';
-export interface WorkstreamCompletion {
-  /** True when the outcome is achieved by the facts (ignores any manual `statusOverride`). */
-  achieved: boolean;
-  gaps: CompletionGap[];
-}
-/** Proof attached to a criterion. Artifacts must belong to the same workstream. */
-export interface CriterionEvidence {
-  artifactIds: ID[];
-  /** Short free-text verification (e.g. "checked manually on staging"). */
-  note?: string;
-}
-export interface AcceptanceCriterion {
-  id: ID;
-  text: string;
-  state: CriterionState;
-  /**
-   * Optional proof. Signalled, never required: a `met` criterion without evidence is shown as
-   * "no proof", not rejected. Linking an artifact (a PR, say) never changes `state`.
-   */
-  evidence?: CriterionEvidence;
-  /** Who set the criterion to `met` (user or agent). Set by the server, cleared when it leaves `met`. */
-  verifiedBy?: ActorRef;
-  verifiedAt?: ISODate;
-}
-
-export interface Workstream {
-  id: ID;
-  workspaceId: ID;
-  /** `${ownerTeam.key}-${number}`, e.g. AUTH-42; numbering is per owner team. */
-  key: string;
-  number: number;
-  title: string;
-  /** What this workstream is (markdown). */
-  description?: string;
-  /** The outcome that needs to happen (markdown). */
-  objective: string;
-  /** Why this work exists (markdown). */
-  context?: string;
-  /**
-   * Delta thread that carries this workstream (a chat on delta.dev).
-   * Required: one workstream is linked to one Delta thread.
-   */
-  deltaThreadUrl: string;
-  ownerTeamId: ID;
-  participatingTeamIds: ID[];
-  accountableUserId?: ID;
-  /** The project this workstream carries out (at most one). */
-  projectId?: ID;
-  /** Always a subset of the project's `repositoryIds` when `projectId` is set. */
-  repositoryIds: ID[];
-  acceptanceCriteria: AcceptanceCriterion[];
-  priority: Priority;
-  /** Workspace label ids (`WorkspaceSettings.labels`), not free text. */
-  labels: ID[];
-  /** Effective status (override ?? derived). Computed by the server. */
-  status: WorkstreamStatus;
-  /** The derived status, ignoring the override. Computed by the server. */
-  derivedStatus: WorkstreamStatus;
-  /**
-   * Delivery state (PR / release / deployment evidence), separate from the outcome `status`.
-   * Computed by the server; `status === 'shipped'` additionally requires the outcome gates.
-   */
-  delivery: DeliveryState;
-  /** Whether the outcome is achieved and what is missing, computed from the facts (not from the override). */
-  completion: WorkstreamCompletion;
-  /**
-   * Set once by a migration on workstreams that were already `shipped` with no acceptance criteria
-   * when "no criteria never ships" was introduced. They keep shipping; everything else needs a criterion.
-   */
-  legacyShipped?: boolean;
-  /** A manual pin. When set, `status` is this value and `derivedStatus` is what the facts say. */
-  statusOverride?: WorkstreamStatus;
-  /** Whether `status` is derived from the facts, pinned by hand, or a historic shipped (see {@link StatusSource}). Computed by the server. */
-  statusSource: StatusSource;
-  /** When work is planned to begin (timeline start). */
-  startDate?: ISODate;
-  targetDate?: ISODate;
-  createdById: ID;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-  shippedAt?: ISODate;
-}
 
 /** Linear-style milestone inside a project. An issue is in at most one milestone per project. */
 export interface Milestone {
@@ -926,10 +764,11 @@ export interface Milestone {
 
 export type InputRequestState = 'open' | 'answered' | 'dismissed';
 
-/** A question on a workstream that needs a human answer. */
+/** A human question. New records belong to an issue; legacy-only rows retain their former key. */
 export interface InputRequest {
   id: ID;
-  workstreamId: ID;
+  issueId?: ID;
+  legacyWorkstreamKey?: string;
   question: string;
   /** Optional suggested answers. */
   options?: string[];
@@ -958,8 +797,7 @@ export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
 };
 
 /**
- * Tracker status, independent of workstream status.
- * `backlog` is unscheduled demand; linking an issue into a workstream does not change its status; moving it to `in_progress` is a separate, intentional action.
+ * Tracker status. `backlog` is unscheduled demand.
  */
 export type IssueStatus =
   'draft' | 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'done' | 'canceled';
@@ -967,7 +805,6 @@ export type IssueSource = 'manual' | 'github' | 'gitlab' | 'linear' | 'email' | 
 
 /**
  * A unit of demand: one bug, request, incident, or task.
- * Several issues can contribute to one workstream; an issue is not the unit of execution.
  */
 export interface Issue {
   id: ID;
@@ -982,22 +819,17 @@ export interface Issue {
   /** Free-text reporter (customer, email…) when not a workspace user. */
   reporterName?: string;
   reporterId?: ID;
-  /**
-   * Person responsible for this issue. Distinct from workstream accountability.
-   * When a user moves an unassigned issue to `in_progress`, the server sets this to that user.
-   */
+  /** When a user moves an unassigned issue to `in_progress`, the server sets this to that user. */
   assigneeId?: ID;
   teamId?: ID;
   priority: Priority;
   status: IssueStatus;
-  /** Workstreams this issue contributes to (many issues → one workstream, and the reverse). */
-  workstreamIds: ID[];
-  /** Project this issue is planned under. Independent of `workstreamIds`; deleting the project clears it. */
+  /** Optional outcome or goal this issue contributes to. */
+  goal?: string;
+  /** Project this issue is planned under; deleting the project clears it. */
   projectId?: ID;
   /**
-   * Milestones this issue is in: at most one per project, and only milestones of `projectId` or of the
-   * projects of the workstreams in `workstreamIds`. Clearing `projectId` or unlinking the last
-   * workstream of a project drops that project's milestone.
+   * Milestones this issue is in: at most one per project, and only milestones of `projectId`.
    */
   milestoneIds: ID[];
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
@@ -1027,6 +859,19 @@ export interface Issue {
   artifactCount?: number;
   createdAt: ISODate;
   updatedAt: ISODate;
+}
+
+/** Issue-owned context, with a plan summary only when the issue has plan artifacts or decisions. */
+export interface IssueContext {
+  issue: Issue;
+  planSummary?: {
+    artifactCount: number;
+    latestArtifact?: Artifact;
+    decisions: Decision[];
+  };
+  decisions: Decision[];
+  inputRequests: InputRequest[];
+  artifacts: Artifact[];
 }
 
 /** An issue is delivered to the customers who asked for it once it is done (canceled is not delivery). */
@@ -1294,8 +1139,8 @@ export interface IntakeItem {
 }
 
 /**
- * How much customers want something: the requests on one issue or project (or, rolled up, on a whole
- * workstream), seen through the customers who made them. Derived, never stored.
+ * How much customers want something: the requests on one issue or project, seen through the customers
+ * who made them. Derived, never stored.
  */
 export interface Demand {
   /** Distinct customers who asked, in the order of their first request. */
@@ -1464,18 +1309,14 @@ export type ArtifactState =
 export type CiState = 'pending' | 'passing' | 'failing';
 export type ReviewState = 'none' | 'requested' | 'approved' | 'changes_requested';
 
-/**
- * Something the work produced or points to: a PR, a build, a document, a link.
- * Attached to at least one owner: a project, a workstream and/or an issue. A project sees the artifacts of
- * its own, of its workstreams and of the issues under it (see `ProjectContext`); an issue that belongs to a
- * workstream of a project makes its artifacts part of that project (a tree: project → workstream/issue → artifact).
- */
+/** Something a project or issue produced or points to: a PR, a build, a document, a link. */
 export interface Artifact {
   id: ID;
-  /** Owner. At least one of `projectId` / `workstreamId` / `issueId` is always set. */
-  workstreamId?: ID;
+  /** At least one of `projectId` / `issueId` is always set. */
   projectId?: ID;
   issueId?: ID;
+  /** Provenance for artifacts retained from a retired Workstream owner. */
+  legacyWorkstreamKey?: string;
   repositoryId?: ID;
   /** Short note on what it is / why it is attached (markdown allowed). */
   description?: string;
@@ -1516,7 +1357,7 @@ export const DOCUMENT_LIMITS = {
 
 /**
  * A page of markdown that lives in Trama (specs, plans, notes that are not in a repository). It belongs to the
- * workspace; it is linked to projects, workstreams and issues by `document` artifacts (`links`), so it shows up
+ * workspace; it is linked to projects and issues by `document` artifacts (`links`), so it shows up
  * in their Artifacts and there is no second "parent" to keep in sync. Edits are optimistic: every change names the
  * `version` it was based on and a stale write is refused with 409.
  */
@@ -1536,7 +1377,7 @@ export interface Document {
   archivedAt?: ISODate;
   createdAt: ISODate;
   updatedAt: ISODate;
-  /** The projects / workstreams / issues the document is attached to. Set on single reads. */
+  /** The projects / issues the document is attached to. Set on single reads. */
   links?: DocumentLink[];
 }
 
@@ -1544,7 +1385,6 @@ export interface Document {
 export interface DocumentLink {
   artifactId: ID;
   projectId?: ID;
-  workstreamId?: ID;
   issueId?: ID;
 }
 
@@ -1592,8 +1432,12 @@ export interface Decision {
   /** Why (markdown). */
   rationale?: string;
   status: DecisionStatus;
-  originWorkstreamId?: ID;
-  relatedWorkstreamIds: ID[];
+  /** Primary issue for new decisions. Absent only on legacy history without an issue association. */
+  originIssueId?: ID;
+  relatedIssueIds: ID[];
+  /** Former Workstream keys retained only for legacy history. */
+  legacyWorkstreamKey?: string;
+  legacyWorkstreamKeys?: string[];
   supersededById?: ID;
   proposedBy: ActorRef;
   decidedById?: ID;
@@ -1606,26 +1450,21 @@ export interface Decision {
 // ───────────────────────────── Plans (a convention, not a gate) ─────────────────────────────
 
 /**
- * A workstream's implementation plan is a `document` artifact attached to it whose title starts with "Plan":
- * a Trama document (preferred; its `version` is the revision) or a link to a file in the repository (the
- * artifact's `externalId` is the commit sha). Nothing is stored on the workstream and nothing blocks work.
+ * An Issue's optional implementation plan is a `document` artifact attached to it whose title starts with
+ * "Plan": a Trama document (preferred; its `version` is the revision) or a repository file (the artifact's
+ * `externalId` is the commit sha). Nothing is stored separately or blocks work.
  */
 export function isPlanArtifact(a: Pick<Artifact, 'kind' | 'title'>): boolean {
   return a.kind === 'document' && /^\s*plan\b/i.test(a.title);
 }
 
-/**
- * The approval of a plan is an ordinary decision with the workstream as origin whose title starts with "Plan"
- * (or that is tagged `plan`) and that cites the revision: "Plan for AUTH-42 approved at v3" (Trama document) or
- * "... approved at 3f2a9c1" (commit sha). The agent proposes it, a person accepts it; while it is `proposed`
- * the workstream is already `needs_input`.
- */
+/** A human-approved Plan revision is recorded as a Decision on its Issue. */
 export function isPlanDecision(d: Pick<Decision, 'title' | 'tags'>): boolean {
   return /^\s*plan\b/i.test(d.title) || d.tags.some((t) => t.toLowerCase() === 'plan');
 }
 
-/** One plan of a workstream, with the revision a person approved (if any) and whether it moved on since. */
-export interface WorkstreamPlan {
+/** One Issue plan, its latest approved revision (if any), and whether it has changed since. */
+export interface IssuePlan {
   artifactId: ID;
   title: string;
   /** Repository file or page the plan lives at (absent for a Trama document). */
@@ -1649,7 +1488,7 @@ type PlanArtifact = Pick<Artifact, 'id' | 'kind' | 'title'> & {
   externalId?: string | null;
 };
 type PlanDecision = Pick<Decision, 'key' | 'title' | 'statement' | 'tags' | 'status'> & {
-  originWorkstreamId?: string | null;
+  originIssueId?: string | null;
   createdAt: ISODate | Date;
   decidedAt?: ISODate | Date | null;
 };
@@ -1673,22 +1512,21 @@ function citedShas(text: string): string[] {
 const sameSha = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
 
 /**
- * Finds the plans among a workstream's artifacts and matches the approval decisions to them. Pure, so the
- * server (briefing, `get_context`) and the app show the same facts. `documentVersions` holds the current
- * `version` of each Trama document plan; `decisions` may hold any decisions, only those that originate in
- * `workstreamId` count.
+ * Finds plans among an Issue's artifacts and matches approval Decisions to them. Pure, so the server and
+ * app show the same facts. `documentVersions` holds current Trama document revisions; only Decisions whose
+ * primary Issue is the requested Issue count.
  */
-export function resolveWorkstreamPlans(input: {
-  workstreamId: ID;
+export function resolveIssuePlans(input: {
+  issueId: ID;
   artifacts: readonly PlanArtifact[];
   decisions: readonly PlanDecision[];
   documentVersions: ReadonlyMap<ID, number>;
-}): WorkstreamPlan[] {
+}): IssuePlan[] {
   const plans = input.artifacts.filter(isPlanArtifact);
   const decisions = input.decisions
-    .filter((d) => d.originWorkstreamId === input.workstreamId && isPlanDecision(d))
+    .filter((d) => d.originIssueId === input.issueId && isPlanDecision(d))
     .sort((a, b) => timeOf(b) - timeOf(a));
-  return plans.map((a): WorkstreamPlan => {
+  return plans.map((a): IssuePlan => {
     const docVersion = a.documentId ? input.documentVersions.get(a.documentId) : undefined;
     const sha =
       !a.documentId && a.externalId && /^[0-9a-f]{7,40}$/i.test(a.externalId)
@@ -1736,25 +1574,9 @@ export function resolveWorkstreamPlans(input: {
   });
 }
 
-// ───────────────────────────── Dependencies ─────────────────────────────
-
-export type DependencyNodeType = 'workstream';
-
-/** `from` blocks `to` until `from` is shipped. */
-export interface Dependency {
-  id: ID;
-  workspaceId: ID;
-  fromType: DependencyNodeType;
-  fromId: ID;
-  toType: DependencyNodeType;
-  toId: ID;
-  createdAt: ISODate;
-}
-
 // ───────────────────────────── Comments & events ─────────────────────────────
 
 export type SubjectType =
-  | 'workstream'
   | 'issue'
   | 'customer'
   | 'customer_request'
@@ -1774,10 +1596,13 @@ export interface SubjectRef {
   id: ID;
 }
 
+/** Historical comments and events may still point at the retired Workstream entity. */
+export type LegacySubjectRef = SubjectRef | { type: 'workstream'; id: ID };
+
 export interface Comment {
   id: ID;
   workspaceId: ID;
-  subject: SubjectRef;
+  subject: LegacySubjectRef;
   author: ActorRef;
   body: string;
   createdAt: ISODate;
@@ -1801,7 +1626,7 @@ export interface CommentPage {
  * each author left on each subject. Enough for counts and "who contributed" without loading any body.
  */
 export interface CommentIndexEntry {
-  subject: SubjectRef;
+  subject: LegacySubjectRef;
   author: ActorRef;
   count: number;
 }
@@ -1809,10 +1634,10 @@ export interface CommentIndexEntry {
 /**
  * Append-only activity log (event-based activity model). Written by the server
  * on every mutation and by integrations/agents. `type` examples:
- * workstream.created, workstream.updated, workstream.status_changed,
- * criterion.updated, input.requested, input.answered, artifact.attached,
- * artifact.updated, decision.proposed, decision.accepted, issue.created,
- * issue.status_changed, issue.rekeyed, issue.linked, milestone.created, milestone.updated, milestone.deleted, dependency.added, comment.created, review.requested.
+ * input.requested, input.answered, artifact.attached, artifact.updated,
+ * decision.proposed, decision.accepted, issue.created, issue.status_changed,
+ * issue.rekeyed, milestone.created, milestone.updated, milestone.deleted,
+ * comment.created, review.requested.
  */
 export interface DomainEvent {
   id: ID;
@@ -1820,8 +1645,9 @@ export interface DomainEvent {
   at: ISODate;
   actor: ActorRef;
   type: string;
-  subject: SubjectRef;
-  workstreamId?: ID;
+  subject: LegacySubjectRef;
+  /** Provenance for events retained from a retired Workstream association. */
+  legacyWorkstreamKey?: string;
   data: Record<string, unknown>;
 }
 
@@ -1831,14 +1657,8 @@ export type AttentionKind =
   | 'input_requested'
   | 'needs_decision'
   | 'review_requested'
-  | 'blocked'
   | 'ci_failed'
   | 'conflict'
-  | 'dependency'
-  | 'deadline'
-  | 'ready_to_land'
-  | 'ready_to_ship'
-  | 'proof_missing'
   | 'triage';
 
 export type AttentionSeverity = 'high' | 'medium' | 'low';
@@ -1851,7 +1671,6 @@ export interface AttentionItem {
   severity: AttentionSeverity;
   title: string;
   detail: string;
-  workstreamId?: ID;
   artifactId?: ID;
   decisionId?: ID;
   inputRequestId?: ID;
@@ -1874,15 +1693,9 @@ export type InsightRange = (typeof INSIGHT_RANGES)[number];
  * cause it, so a lead (or an agent) can act on them. Definitions live in {@link INSIGHT_SIGNALS}.
  */
 export type InsightSignalId =
-  | 'blocked_workstreams'
   | 'needs_input'
-  | 'stale_workstreams'
   | 'stale_issues'
-  | 'delivered_outcome_open'
-  | 'shipped_without_proof'
   | 'overdue_milestones'
-  | 'overdue_workstreams'
-  | 'scope_creep'
   | 'prs_stuck_in_review'
   | 'ci_failing'
   | 'undecided_decisions'
@@ -1892,60 +1705,26 @@ export interface InsightSignalMeta {
   label: string;
   /** What exactly is counted. Shown in the UI and returned to agents. */
   definition: string;
-  /** Singular noun of an item, for "3 workstreams". */
+  /** Singular noun used to describe the counted items. */
   unit: string;
 }
 
 export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
-  blocked_workstreams: {
-    label: 'Blocked workstreams',
-    definition: 'Open workstreams whose status is Blocked, with the time since they entered it.',
-    unit: 'workstream',
-  },
   needs_input: {
     label: 'Waiting for input',
-    definition: 'Open input requests, by how long they have waited and who has to answer.',
+    definition: 'Open Issue questions and proposed Decisions, by how long they have waited.',
     unit: 'question',
-  },
-  stale_workstreams: {
-    label: 'Stale workstreams',
-    definition:
-      'In-flight workstreams (working, in review, blocked, needs input, ready to land) with no activity by a person or an agent for the stale threshold.',
-    unit: 'workstream',
   },
   stale_issues: {
     label: 'Stale issues',
     definition: 'Issues In Progress or In Review that were not updated for the stale threshold.',
     unit: 'issue',
   },
-  delivered_outcome_open: {
-    label: 'Delivered, outcome open',
-    definition:
-      'Workstreams whose code is merged, released or deployed but whose outcome is not shipped yet: criteria, issues, blockers or people are still open.',
-    unit: 'workstream',
-  },
-  shipped_without_proof: {
-    label: 'Shipped without proof',
-    definition:
-      "Shipped workstreams that would not ship under today's rules: a historic shipped with no acceptance criteria, a criterion that is met without evidence, or a status pinned to Shipped while the facts say otherwise. Read-only: nothing changes status.",
-    unit: 'workstream',
-  },
   overdue_milestones: {
     label: 'Overdue milestones',
     definition:
       'Milestones past their target date that still have open issues, in projects that are not completed or canceled.',
     unit: 'milestone',
-  },
-  overdue_workstreams: {
-    label: 'Overdue workstreams',
-    definition: 'Open workstreams past their target date.',
-    unit: 'workstream',
-  },
-  scope_creep: {
-    label: 'Scope creep',
-    definition:
-      'Open workstreams that gained at least two issues after they started (first move out of Draft or Planned) inside the selected range.',
-    unit: 'workstream',
   },
   prs_stuck_in_review: {
     label: 'PRs stuck in review',
@@ -1973,18 +1752,15 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
 
 export const INSIGHT_SIGNAL_IDS = Object.keys(INSIGHT_SIGNALS) as InsightSignalId[];
 
-export type InsightItemType =
-  'workstream' | 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
+export type InsightItemType = 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
 
 /** One thing that causes a signal (or sits in a flow list). Enough to render a row and link to it. */
 export interface InsightItem {
   type: InsightItemType;
   id: ID;
-  /** Human key (AUTH-42, BUG-7, ADR-3) when the type has one. */
+  /** Human key (BUG-7, ADR-3) when the type has one. */
   key?: string;
   title: string;
-  /** Workstream the item belongs to, so the UI can link to the right page. */
-  workstreamKey?: string;
   /** Project of a milestone or project item. */
   projectId?: ID;
   /** When the condition started. */
@@ -2065,15 +1841,12 @@ export interface ThroughputBucket {
   start: ISODate;
   end: ISODate;
   issuesDone: number;
-  workstreamsShipped: number;
 }
 
 export interface InsightWipRow {
   actor: InsightActor;
   /** Issues In Progress or In Review assigned to the person (people only). */
   issues: number;
-  /** Open workstreams: accountable (people) or touched in the last 7 days (agents). */
-  workstreams: number;
   overloaded: boolean;
   items: InsightItem[];
 }
@@ -2095,13 +1868,12 @@ export interface CumulativeFlow {
 export interface InsightFlow {
   issueCycle: FlowDuration;
   issueLead: FlowDuration;
-  workstreamLead: FlowDuration;
   throughput: ThroughputBucket[];
-  previousThroughput: { issuesDone: number; workstreamsShipped: number };
+  previousThroughput: { issuesDone: number };
   wip: {
     people: InsightWipRow[];
     agents: InsightWipRow[];
-    limits: { issues: number; workstreams: number };
+    limits: { issues: number };
   };
   aging: { baselineDays?: number; baselineSamples: number; items: AgingItem[] };
   cumulativeFlow?: CumulativeFlow;
@@ -2154,9 +1926,9 @@ export interface InsightsReport {
 
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
-export type ViewEntity = 'workstream' | 'issue' | 'decision' | 'project';
-/** `timeline` (Gantt) is a layout of a saved view, offered for workstream and project views. */
-export type ViewLayout = 'list' | 'board' | 'graph' | 'timeline';
+export type ViewEntity = 'issue' | 'decision' | 'project';
+/** `timeline` (Gantt) is a layout of a saved view, offered for project views. */
+export type ViewLayout = 'list' | 'board' | 'timeline';
 
 export interface ViewFilter {
   field: string;
@@ -2299,12 +2071,12 @@ export type TeamEditPolicy = 'workspace' | 'members';
 export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; description: string }> = {
   workspace: {
     label: 'Everyone in the workspace',
-    description: "Any member (or above) can edit this team's workstreams and issues.",
+    description: "Any member (or above) can edit this team's issues.",
   },
   members: {
     label: 'Team members only',
     description:
-      'Only people on this team (and workspace admins) can edit its workstreams and issues.',
+      'Only people on this team (and workspace admins) can edit its issues.',
   },
 };
 
@@ -2317,7 +2089,7 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
   write: {
     label: 'Write',
     description:
-      'Create and update work (workstreams, issues, comments…) with at most the member role. Cannot change workspace settings.',
+      'Create and update Issues, comments and other work records with at most the member role. Cannot change workspace settings.',
   },
   admin: {
     label: 'Admin',
@@ -2341,7 +2113,6 @@ export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
 export type ApiResource =
   | 'workspace'
   | 'projects'
-  | 'workstreams'
   | 'issues'
   | 'customers'
   | 'decisions'
@@ -2349,12 +2120,10 @@ export type ApiResource =
   | 'comments'
   | 'artifacts'
   | 'documents'
-  | 'dependencies'
   | 'input-requests'
   | 'views'
   | 'attention'
   | 'search'
-  | 'graph'
   | 'events'
   | 'snapshot'
   | 'insights'
@@ -2376,7 +2145,6 @@ export interface ApiResourceMeta {
 const RWD = ['read', 'write', 'delete'] as const;
 export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   projects: { label: 'Projects', group: 'Work', actions: RWD },
-  workstreams: { label: 'Workstreams', group: 'Work', actions: RWD },
   issues: { label: 'Issues', group: 'Work', actions: RWD },
   customers: { label: 'Customers', group: 'Work', actions: RWD },
   decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
@@ -2384,12 +2152,10 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
   documents: { label: 'Documents', group: 'Work', actions: RWD },
-  dependencies: { label: 'Dependencies', group: 'Work', actions: RWD },
   'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
   views: { label: 'Views', group: 'Work', actions: RWD },
   attention: { label: 'Attention', group: 'Work', actions: ['read', 'write'] },
   search: { label: 'Search', group: 'Insight', actions: ['read'] },
-  graph: { label: 'Graph', group: 'Insight', actions: ['read'] },
   events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
   snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
   insights: { label: 'Insights', group: 'Insight', actions: ['read'] },
@@ -2411,7 +2177,6 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
 const WORK: ApiResource[] = [
   'projects',
-  'workstreams',
   'issues',
   'customers',
   'decisions',
@@ -2419,7 +2184,6 @@ const WORK: ApiResource[] = [
   'comments',
   'artifacts',
   'documents',
-  'dependencies',
   'input-requests',
   'views',
   'attention',
@@ -2473,8 +2237,6 @@ export const MAX_TOKEN_LIMITS: TokenLimits = {
 /** Capabilities a workspace role can include (Settings → Roles & permissions). Each role has its own set. */
 export type Capability =
   | 'manageProjects'
-  | 'createWorkstreams'
-  | 'deleteWorkstreams'
   | 'createIssues'
   | 'deleteIssues'
   | 'manageCustomers'
@@ -2500,8 +2262,6 @@ export interface CapabilityMeta {
 
 export const CAPABILITIES: Capability[] = [
   'manageProjects',
-  'createWorkstreams',
-  'deleteWorkstreams',
   'createIssues',
   'deleteIssues',
   'manageCustomers',
@@ -2519,8 +2279,6 @@ export const CAPABILITIES: Capability[] = [
 
 export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   manageProjects: { group: 'Work', label: 'Manage projects', description: 'Create, edit and delete projects and their milestones.' },
-  createWorkstreams: { group: 'Work', label: 'Create workstreams', description: 'Start a new workstream.' },
-  deleteWorkstreams: { group: 'Work', label: 'Delete workstreams', description: 'Permanently delete a workstream with its input requests, artifacts and comments.' },
   createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
   deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
   manageCustomers: { group: 'Work', label: 'Manage customers', description: 'Create and edit customers, archive them, and link or unlink their feedback on issues.' },
@@ -2539,8 +2297,6 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
 /** Today's behaviour: everyday work for members, structure and access for admins. */
 export const DEFAULT_PERMISSIONS: PermissionMap = {
   manageProjects: 'member',
-  createWorkstreams: 'member',
-  deleteWorkstreams: 'member',
   createIssues: 'member',
   deleteIssues: 'member',
   manageCustomers: 'member',
@@ -2557,15 +2313,19 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
 };
 
 /** Which records a label can be added to. */
-export type LabelScope = 'issue' | 'workstream' | 'project';
-export const LABEL_SCOPES: readonly LabelScope[] = ['issue', 'workstream', 'project'];
+export type LabelScope = 'issue' | 'project';
+/** Former Workstream-scoped labels are preserved, but are not assignable to active records. */
+export type StoredLabelScope = LabelScope | 'workstream';
+export const LABEL_SCOPES: readonly LabelScope[] = ['issue', 'project'];
 
 const LABEL_SCOPE_VALUES = new Set<string>(LABEL_SCOPES);
 
 /** Missing or unknown scope is `issue`, which is also what every template uses. */
-function asLabelScope(value: unknown): LabelScope {
+function asLabelScope(value: unknown): StoredLabelScope {
   return typeof value === 'string' && LABEL_SCOPE_VALUES.has(value)
     ? (value as LabelScope)
+    : value === 'workstream'
+      ? 'workstream'
     : 'issue';
 }
 
@@ -2581,7 +2341,7 @@ export interface WorkspaceLabel {
    * Exactly one record type. An assignment that does not match stays on the record and still renders,
    * but that id cannot be added again.
    */
-  scope: LabelScope;
+  scope: StoredLabelScope;
   /**
    * Archived labels stay on what already carries them but are no longer offered when assigning.
    * Only ever `true`; an active label omits the field.
@@ -2590,7 +2350,7 @@ export interface WorkspaceLabel {
 }
 
 /** A stored label may predate scopes. `resolveLabelCatalog` fills the gap. */
-type StoredLabel = Omit<WorkspaceLabel, 'scope'> & { scope?: LabelScope };
+type StoredLabel = Omit<WorkspaceLabel, 'scope'> & { scope?: StoredLabelScope };
 
 /** Always available. Ids are stable so existing assignments survive a settings rewrite. Scope is `issue`. */
 export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
@@ -2715,14 +2475,14 @@ export function assignLabelIds(
  */
 export function adoptFreeTextLabels(
   stored: readonly StoredLabel[] | null | undefined,
-  groups: readonly { scope: LabelScope; labels: readonly string[] }[],
+  groups: readonly { scope: StoredLabelScope; labels: readonly string[] }[],
 ): { catalog: WorkspaceLabel[]; groups: string[][]; lookup: Map<string, string> } {
   let catalog = resolveLabelCatalog(stored);
   const byName = new Map(catalog.map((label) => [label.name.toLowerCase(), label.id]));
   const taken = new Set(catalog.map((label) => label.id));
   const lookup = new Map<string, string>();
   let colorAt = catalog.filter((label) => !label.template).length;
-  const mapOne = (raw: string, scope: LabelScope): string => {
+  const mapOne = (raw: string, scope: StoredLabelScope): string => {
     const name = raw.trim();
     if (!name) return '';
     const known = lookup.get(name) ?? (taken.has(name) ? name : byName.get(name.toLowerCase()));
@@ -2954,31 +2714,22 @@ export function roleAllows(role: WorkspaceRole | null | undefined, gate: RoleGat
 /** One catalog per subject. The type is the semantic value boards and done/canceled already understand. */
 export type StatusSubject =
   | 'issue'
-  | 'workstream'
   | 'project'
   | 'decision'
-  | 'project_health'
-  | 'delivery'
-  | 'criterion';
+  | 'project_health';
 
 export const STATUS_SUBJECTS: readonly StatusSubject[] = [
   'issue',
-  'workstream',
   'project',
   'decision',
   'project_health',
-  'delivery',
-  'criterion',
 ];
 
 export const STATUS_SUBJECT_LABEL: Record<StatusSubject, string> = {
   issue: 'Issues',
-  workstream: 'Workstreams',
   project: 'Projects',
   decision: 'Decisions',
   project_health: 'Project health',
-  delivery: 'Delivery',
-  criterion: 'Acceptance criteria',
 };
 
 export const STATUS_NAME_MAX = 40;
@@ -3014,22 +2765,16 @@ export interface StatusEntry<T extends string = string> {
 
 export interface StatusCatalog {
   issue: StatusEntry<IssueStatus>[];
-  workstream: StatusEntry<WorkstreamStatus>[];
   project: StatusEntry<ProjectStatus>[];
   decision: StatusEntry<DecisionStatus>[];
   projectHealth: StatusEntry<ProjectHealth>[];
-  delivery: StatusEntry<DeliveryState>[];
-  criterion: StatusEntry<CriterionState>[];
 }
 
 export const STATUS_CATALOG_KEY: Record<StatusSubject, keyof StatusCatalog> = {
   issue: 'issue',
-  workstream: 'workstream',
   project: 'project',
   decision: 'decision',
   project_health: 'projectHealth',
-  delivery: 'delivery',
-  criterion: 'criterion',
 };
 
 interface StatusSeed<T extends string> {
@@ -3045,7 +2790,6 @@ const BLUE = '#3f6bd6';
 const AMBER = '#9c6712';
 const VIOLET = '#7c5cc4';
 const RED = '#c93535';
-const TEAL = '#0f7a6f';
 const GREEN = '#28793f';
 
 const ISSUE_STATUS_SEEDS: readonly StatusSeed<IssueStatus>[] = [
@@ -3055,18 +2799,6 @@ const ISSUE_STATUS_SEEDS: readonly StatusSeed<IssueStatus>[] = [
   { type: 'in_progress', name: 'In Progress', icon: 'circle-dot', color: BLUE },
   { type: 'in_review', name: 'In Review', icon: 'circle-ellipsis', color: VIOLET },
   { type: 'done', name: 'Done', icon: 'circle-check', color: GREEN },
-  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
-];
-
-const WORKSTREAM_STATUS_SEEDS: readonly StatusSeed<WorkstreamStatus>[] = [
-  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
-  { type: 'planned', name: 'Planned', icon: 'circle', color: SLATE },
-  { type: 'working', name: 'Working', icon: 'circle-dot', color: BLUE },
-  { type: 'needs_input', name: 'Needs input', icon: 'circle-help', color: AMBER },
-  { type: 'in_review', name: 'In review', icon: 'circle-ellipsis', color: VIOLET },
-  { type: 'blocked', name: 'Blocked', icon: 'circle-minus', color: RED },
-  { type: 'ready_to_land', name: 'Ready to land', icon: 'circle-arrow-up', color: TEAL },
-  { type: 'shipped', name: 'Shipped', icon: 'circle-check', color: GREEN },
   { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
 ];
 
@@ -3093,28 +2825,11 @@ const PROJECT_HEALTH_SEEDS: readonly StatusSeed<ProjectHealth>[] = [
   { type: 'off_track', name: 'Off track', icon: 'circle-alert', color: RED },
 ];
 
-const DELIVERY_STATE_SEEDS: readonly StatusSeed<DeliveryState>[] = [
-  { type: 'none', name: 'Nothing delivered', icon: 'circle-dashed', color: NEUTRAL },
-  { type: 'in_review', name: 'PR in review', icon: 'git-pull-request', color: VIOLET },
-  { type: 'merged', name: 'PR merged', icon: 'git-merge', color: BLUE },
-  { type: 'released', name: 'Released', icon: 'tag', color: BLUE },
-  { type: 'deployed', name: 'Deployed', icon: 'rocket', color: GREEN },
-];
-
-const CRITERION_STATE_SEEDS: readonly StatusSeed<CriterionState>[] = [
-  { type: 'pending', name: 'Pending', icon: 'circle', color: NEUTRAL },
-  { type: 'in_progress', name: 'In progress', icon: 'circle-dot', color: BLUE },
-  { type: 'met', name: 'Met', icon: 'circle-check', color: GREEN },
-];
-
 const STATUS_TYPES: Record<StatusSubject, readonly string[]> = {
   issue: ISSUE_STATUS_SEEDS.map((s) => s.type),
-  workstream: WORKSTREAM_STATUS_SEEDS.map((s) => s.type),
   project: PROJECT_STATUS_SEEDS.map((s) => s.type),
   decision: DECISION_STATUS_SEEDS.map((s) => s.type),
   project_health: PROJECT_HEALTH_SEEDS.map((s) => s.type),
-  delivery: DELIVERY_STATE_SEEDS.map((s) => s.type),
-  criterion: CRITERION_STATE_SEEDS.map((s) => s.type),
 };
 
 function seedEntries<T extends string>(rows: readonly StatusSeed<T>[]): StatusEntry<T>[] {
@@ -3125,12 +2840,9 @@ function seedEntries<T extends string>(rows: readonly StatusSeed<T>[]): StatusEn
 export function defaultStatusCatalog(): StatusCatalog {
   return {
     issue: seedEntries(ISSUE_STATUS_SEEDS),
-    workstream: seedEntries(WORKSTREAM_STATUS_SEEDS),
     project: seedEntries(PROJECT_STATUS_SEEDS),
     decision: seedEntries(DECISION_STATUS_SEEDS),
     projectHealth: seedEntries(PROJECT_HEALTH_SEEDS),
-    delivery: seedEntries(DELIVERY_STATE_SEEDS),
-    criterion: seedEntries(CRITERION_STATE_SEEDS),
   };
 }
 
@@ -3178,12 +2890,9 @@ export function resolveStatusCatalog(stored?: Partial<StatusCatalog> | null): St
   const defaults = defaultStatusCatalog();
   return {
     issue: normalizeStatusEntries('issue', stored?.issue, defaults.issue),
-    workstream: normalizeStatusEntries('workstream', stored?.workstream, defaults.workstream),
     project: normalizeStatusEntries('project', stored?.project, defaults.project),
     decision: normalizeStatusEntries('decision', stored?.decision, defaults.decision),
     projectHealth: normalizeStatusEntries('project_health', stored?.projectHealth, defaults.projectHealth),
-    delivery: normalizeStatusEntries('delivery', stored?.delivery, defaults.delivery),
-    criterion: normalizeStatusEntries('criterion', stored?.criterion, defaults.criterion),
   };
 }
 
@@ -3234,7 +2943,7 @@ export function statusStoredValues<T extends string>(entry: StatusEntry<T>, entr
 export interface WorkspaceSettings {
   /** Roles people and invitations can hold. A new workspace stores the four old ranks; older settings without `roles` are migrated on read. */
   roles: WorkspaceRole[];
-  /** Team preselected when creating issues and workstreams. */
+  /** Team preselected when creating issues. */
   defaultTeamId?: ID;
   /** Scale offered for issue estimates. Estimates are stored as numbers either way. */
   estimateScale: EstimateScale;
@@ -3245,11 +2954,6 @@ export interface WorkspaceSettings {
   iconColor?: string;
   /** 1-2 characters shown in the workspace icon (defaults to the name's initial). */
   iconInitial?: string;
-  /**
-   * Whether workstreams are linked to a Delta thread. Recommended for teams working in Delta. When off,
-   * the thread is hidden everywhere and no longer required to create a workstream.
-   */
-  deltaThreads: boolean;
   /** Template labels plus any custom labels. Assign these ids; do not invent names. */
   labels: WorkspaceLabel[];
   /** Customer tiers configured for this workspace, in display order. Empty until an admin adds some. */
@@ -3263,7 +2967,6 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   estimateScale: 'fibonacci',
   weekStart: 'monday',
   timeZone: 'auto',
-  deltaThreads: true,
   labels: LABEL_TEMPLATES.map((label) => ({ ...label })),
   customerTiers: [],
   statuses: defaultStatusCatalog(),
@@ -3280,7 +2983,13 @@ export type StoredWorkspaceSettings = Partial<Omit<WorkspaceSettings, 'roles'>> 
 export function resolveWorkspaceSettings(raw?: StoredWorkspaceSettings | null): WorkspaceSettings {
   const r = raw ?? {};
   const roles = Array.isArray(r.roles) ? normalizeWorkspaceRoles(r.roles) : migrateLegacyRoles(r.permissions, r.roleGrants);
-  const { permissions: _permissions, roleGrants: _roleGrants, roles: _roles, ...rest } = r;
+  const {
+    permissions: _permissions,
+    roleGrants: _roleGrants,
+    roles: _roles,
+    deltaThreads: _deltaThreads,
+    ...rest
+  } = r as StoredWorkspaceSettings & { deltaThreads?: unknown };
   return {
     ...DEFAULT_WORKSPACE_SETTINGS,
     ...rest,
@@ -3295,7 +3004,7 @@ export function resolveWorkspaceSettings(raw?: StoredWorkspaceSettings | null): 
 
 /**
  * A custom integration: Trama POSTs a signed JSON body to `url` for every domain event that matches `events`.
- * Body: `{ id, event, workspace, at, actor, subject, workstreamId?, data }`.
+ * Body: `{ id, event, workspace, at, actor, subject, data }`.
  * Headers: `X-Trama-Event`, `X-Trama-Delivery`, `X-Trama-Signature: sha256=<hex hmac of the raw body with the secret>`.
  */
 export interface OutgoingWebhook {
@@ -3339,23 +3048,12 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
     events: ['project_update.created', 'project_update.updated', 'project_update.deleted'],
   },
   {
-    entity: 'workstream',
-    label: 'Workstreams',
-    events: [
-      'workstream.created',
-      'workstream.updated',
-      'workstream.status_changed',
-      'workstream.deleted',
-    ],
-  },
-  {
     entity: 'issue',
     label: 'Issues',
     events: [
       'issue.created',
       'issue.updated',
       'issue.status_changed',
-      'issue.linked',
       'issue.deleted',
     ],
   },
@@ -3414,11 +3112,6 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
     ],
   },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
-  {
-    entity: 'dependency',
-    label: 'Dependencies',
-    events: ['dependency.added', 'dependency.removed'],
-  },
   { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
   {
     entity: 'repository',
@@ -3459,7 +3152,6 @@ export interface WorkspaceSnapshot {
   teams: Team[];
   repositories: Repository[];
   projects: Project[];
-  workstreams: Workstream[];
   milestones: Milestone[];
   inputRequests: InputRequest[];
   issues: Issue[];
@@ -3469,7 +3161,6 @@ export interface WorkspaceSnapshot {
   customerRequests: CustomerRequest[];
   artifacts: Artifact[];
   decisions: Decision[];
-  dependencies: Dependency[];
   /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
   /** Present only in `index` mode. */
@@ -3488,7 +3179,6 @@ export interface LiveEvent {
     | SubjectType
     | 'comment'
     | 'view'
-    | 'dependency'
     | 'membership'
     | 'invite'
     | 'favorite'

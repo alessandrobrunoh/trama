@@ -22,13 +22,13 @@ import {
   fullDate,
   type Comment,
   type SubjectRef,
-} from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { EntityRefs } from '../../shared/entity-ref';
-import { Kbd } from '../../shared/kbd';
-import { Markdown } from '../../shared/markdown';
-import { RelativeTimePipe } from '../../shared/pipes';
-import { UploadFile } from '../../shared/upload-file';
+} from '../core';
+import { ActorAvatar } from './actor-avatar';
+import { EntityRefs } from './entity-ref';
+import { Kbd } from './kbd';
+import { Markdown } from './markdown';
+import { RelativeTimePipe } from './pipes';
+import { UploadFile } from './upload-file';
 import { CommentInput } from './comment-input';
 
 @Component({

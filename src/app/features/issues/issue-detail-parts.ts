@@ -1,5 +1,5 @@
-// Building blocks of the issue page: title + description editors, the "contributes to" workstreams
-// section and the merged activity / comments feed.
+// Building blocks of the issue page: title + description editors and the merged activity / comments
+// feed.
 import {
   ChangeDetectionStrategy,
   Component,
@@ -12,16 +12,11 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
   LucideCircleDot,
   LucideDynamicIcon,
-  LucideHexagon,
   LucidePencil,
-  LucidePlus,
-  LucideSparkles,
-  LucideX,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -30,7 +25,6 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUS_META,
   TramaStore,
-  WORKSTREAM_STATUS_META,
   fullDate,
   type Comment,
   type DomainEvent,
@@ -44,9 +38,7 @@ import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { StatusIcon } from '../../shared/status';
-import { CommentComposer, CommentItem, CommentsLoader } from '../workstreams/comments';
-import { buildSummary } from '../workstreams/ws-model';
-import { IssueActions } from './issue-actions';
+import { CommentComposer, CommentItem, CommentsLoader } from '../../shared/comments';
 
 // ───────────────────────── title ─────────────────────────
 
@@ -319,171 +311,6 @@ export class IssueDescription {
   }
 }
 
-// ───────────────────────── workstreams ─────────────────────────
-
-/** "This issue contributes to these outcomes": linked workstreams with status + progress. */
-@Component({
-  selector: 'app-issue-workstreams',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    RouterLink,
-    HlmButtonImports,
-    HlmTooltip,
-    LucideDynamicIcon,
-    StatusIcon,
-    ActorAvatar,
-    Kbd,
-  ],
-  host: { class: 'block' },
-  template: `
-    @let i = issue();
-    <div class="mb-2 flex items-center gap-2">
-      <svg [lucideIcon]="hex" [size]="15" class="text-entity-workstream"></svg>
-      <h2 class="text-sm font-semibold">Workstreams</h2>
-      @if (rows().length) {
-        <span class="text-muted-foreground text-xs tabular-nums">{{ rows().length }}</span>
-      }
-      @if (canEdit() && !i.duplicateOfId) {
-        <span class="ml-auto flex items-center gap-1">
-          <button
-            hlmBtn
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
-            hlmTooltip="Add to workstream · W"
-            (click)="actions.openPrompt('workstream', [i.id])"
-          >
-            <svg [lucideIcon]="plus" [size]="13"></svg> Add
-          </button>
-        </span>
-      }
-    </div>
-    <p class="text-muted-foreground mb-3 text-xs">
-      This issue is the problem. Workstreams are the outcomes that resolve it; their status moves on
-      its own.
-    </p>
-
-    @if (rows().length) {
-      <ul class="border-border flex flex-col overflow-hidden rounded-lg border">
-        @for (r of rows(); track r.ws.id) {
-          <li
-            class="group/ws hover:bg-hover relative flex min-h-11 items-center gap-2.5 border-b px-3 text-[13px] last:border-b-0"
-          >
-            <a
-              [routerLink]="['/', slug(), 'workstreams', r.ws.key]"
-              class="absolute inset-0"
-              [attr.aria-label]="r.ws.key + ' ' + r.ws.title"
-            ></a>
-            <app-status-icon [status]="r.ws.status" entity="workstream" />
-            <span class="text-muted-foreground w-[4.5rem] shrink-0 font-mono text-xs">{{
-              r.ws.key
-            }}</span>
-            <span class="min-w-0 flex-1 truncate font-medium">{{ r.ws.title }}</span>
-            <span class="text-muted-foreground shrink-0 text-xs max-sm:hidden">{{
-              r.statusLabel
-            }}</span>
-            @if (r.total) {
-              <span
-                class="flex w-24 shrink-0 items-center gap-1.5 max-md:hidden"
-                [attr.aria-label]="r.met + ' of ' + r.total + ' acceptance criteria met'"
-              >
-                <span class="bg-muted h-1 flex-1 overflow-hidden rounded-full">
-                  <span
-                    class="bg-status-shipped block h-full rounded-full"
-                    [style.width.%]="(r.met / r.total) * 100"
-                  ></span>
-                </span>
-                <span class="text-muted-foreground text-[11px] tabular-nums"
-                  >{{ r.met }}/{{ r.total }}</span
-                >
-              </span>
-            }
-            @if (r.ws.accountableUserId) {
-              <app-actor-avatar
-                [actor]="{ type: 'user', id: r.ws.accountableUserId }"
-                [size]="18"
-                class="max-sm:hidden"
-              />
-            }
-            @if (canEdit()) {
-              <button
-                type="button"
-                class="text-muted-foreground hover:bg-accent hover:text-foreground relative flex size-6 shrink-0 items-center justify-center rounded-md opacity-0 group-hover/ws:opacity-100 focus-visible:opacity-100"
-                [attr.aria-label]="'Remove from ' + r.ws.key"
-                [hlmTooltip]="'Remove from ' + r.ws.key"
-                (click)="actions.unlink([i.id], r.ws.id)"
-              >
-                <svg [lucideIcon]="xIcon" [size]="13"></svg>
-              </button>
-            }
-          </li>
-        }
-      </ul>
-    } @else {
-      <div class="border-border rounded-lg border border-dashed px-4 py-4">
-        <p class="text-sm">Not part of any workstream yet.</p>
-        <p class="text-muted-foreground mt-0.5 text-xs">
-          @if (i.duplicateOfId) {
-            Duplicates follow their original issue and can’t be linked.
-          } @else {
-            When the team decides to act on this, add it to the workstream that will resolve it, or
-            start a new one.
-          }
-        </p>
-        @if (canEdit() && !i.duplicateOfId) {
-          <div class="mt-3 flex flex-wrap gap-2">
-            <button
-              hlmBtn
-              size="sm"
-              variant="outline"
-              class="h-7 gap-1.5 text-xs"
-              (click)="actions.openPrompt('workstream', [i.id])"
-            >
-              <svg [lucideIcon]="hex" [size]="13" class="text-entity-workstream"></svg> Add to
-              workstream <app-kbd keys="w" class="opacity-70" />
-            </button>
-            <button
-              hlmBtn
-              size="sm"
-              variant="ghost"
-              class="h-7 gap-1.5 text-xs"
-              (click)="actions.createWorkstreamFrom(i)"
-            >
-              <svg [lucideIcon]="sparkles" [size]="13"></svg> Create workstream from issue
-            </button>
-          </div>
-        }
-      </div>
-    }
-  `,
-})
-export class IssueWorkstreams {
-  private readonly store = inject(TramaStore);
-  protected readonly actions = inject(IssueActions);
-  readonly issue = input.required<Issue>();
-  protected readonly hex = LucideHexagon;
-  protected readonly plus = LucidePlus;
-  protected readonly xIcon = LucideX;
-  protected readonly sparkles = LucideSparkles;
-  protected readonly canEdit = computed(() => this.store.can('member'));
-  protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly rows = computed(() =>
-    this.issue().workstreamIds.flatMap((id) => {
-      const ws = this.store.workstreamById().get(id);
-      if (!ws) return [];
-      const s = buildSummary(this.store, ws);
-      return [
-        {
-          ws,
-          met: s.criteriaMet,
-          total: s.criteriaTotal,
-          statusLabel: WORKSTREAM_STATUS_META[ws.status].label,
-        },
-      ];
-    }),
-  );
-}
-
 // ───────────────────────── activity ─────────────────────────
 
 interface EventView {
@@ -491,7 +318,6 @@ interface EventView {
   verb: string;
   from?: IssueStatus;
   to?: IssueStatus;
-  workstreams?: string[];
 }
 
 const FIELD_VERB: Record<string, string> = {
@@ -502,7 +328,6 @@ const FIELD_VERB: Record<string, string> = {
   priority: 'changed the priority',
   reporterName: 'updated the reporter',
   externalUrl: 'updated the external link',
-  workstreamIds: 'changed the linked workstreams',
   duplicateOfId: 'changed the duplicate relation',
 };
 
@@ -525,22 +350,8 @@ function describe(ev: DomainEvent): EventView | null {
       const verbs = fields.map((f) => FIELD_VERB[f] ?? `updated ${f}`);
       return { icon: LucidePencil, verb: verbs.length ? verbs.join(', ') : 'updated the issue' };
     }
-    case 'issue.linked': {
-      const created =
-        typeof d['createdWorkstreamId'] === 'string' ? d['createdWorkstreamId'] : undefined;
-      if (created)
-        return {
-          icon: LucideSparkles,
-          verb: 'created a workstream from this issue',
-          workstreams: [created],
-        };
-      const ids = Array.isArray(d['workstreamIds']) ? (d['workstreamIds'] as string[]) : [];
-      return {
-        icon: LucideHexagon,
-        verb: 'added the issue to',
-        workstreams: ev.workstreamId ? [ev.workstreamId] : ids,
-      };
-    }
+    case 'issue.linked':
+      return { icon: LucideCircleDot, verb: 'recorded a legacy issue link' };
     case 'comment.created':
       return null; // the comment itself is in the feed
     default:
@@ -609,9 +420,6 @@ type FeedItem =
                     statusLabel(f.view.to)
                   }}</span
                 >
-              }
-              @for (w of f.view.workstreams ?? []; track w) {
-                <app-entity-chip type="workstream" [ref]="w" compact />
               }
               <span aria-hidden="true">·</span>
               <time [attr.datetime]="f.at" [hlmTooltip]="full(f.at)">{{

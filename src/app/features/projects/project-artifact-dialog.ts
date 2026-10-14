@@ -25,7 +25,7 @@ import {
 } from '../../core';
 import { statusLabel } from '../../shared/status';
 import { UploadFile } from '../../shared/upload-file';
-import { Picker, type PickOption } from '../workstreams/picker';
+import { Picker, type PickOption } from '../../shared/picker';
 
 /** What a new artifact gets attached to. */
 export type ArtifactTarget = { type: 'project'; id: string } | { type: 'issue'; key: string };
