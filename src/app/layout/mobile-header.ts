@@ -63,7 +63,7 @@ const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
           <app-favorite-button [type]="t.type" [subjectId]="t.id" />
         }
         @if (sync.live() === 'reconnecting' || sync.lastError()) {
-          <span class="mobile-header__sync" role="status">
+          <span class="mobile-header__sync" role="status" [title]="sync.lastError() ?? sync.label()">
             <span class="bg-status-needs-input size-2 rounded-full"></span>
             <span class="sr-only">{{ sync.label() }}</span>
           </span>
