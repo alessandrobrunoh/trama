@@ -982,6 +982,12 @@ html[data-keyboard='open'] .mobile-fab {
     display: none;
   }
 }
+/* Horizontal scrollers without a scrollbar: fade the trailing edge so a clipped chip reads as "more to scroll",
+   and pad the end so the last item clears the fade once scrolled all the way. */
+@utility scroll-fade-x {
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  padding-inline-end: 1.5rem;
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,

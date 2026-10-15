@@ -99,7 +99,7 @@ const SORT_LABEL: Record<Sort, string> = {
         />
       </div>
       <div
-        class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
+        class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
       >
         <button
           type="button"
