@@ -22,5 +22,6 @@ import { AttentionService } from './attention.service.js';
   ],
   controllers: [AttentionController],
   providers: [AttentionService],
+  exports: [AttentionService],
 })
 export class AttentionModule {}

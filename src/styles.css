@@ -904,6 +904,11 @@ html[data-keyboard='open'] .mobile-fab {
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
+  /* Native checkboxes and radios take the brand color instead of the browser's blue. */
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--primary);
+  }
   html,
   body {
     height: 100%;
@@ -976,6 +981,12 @@ html[data-keyboard='open'] .mobile-fab {
   &::-webkit-scrollbar {
     display: none;
   }
+}
+/* Horizontal scrollers without a scrollbar: fade the trailing edge so a clipped chip reads as "more to scroll",
+   and pad the end so the last item clears the fade once scrolled all the way. */
+@utility scroll-fade-x {
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+  padding-inline-end: 1.5rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

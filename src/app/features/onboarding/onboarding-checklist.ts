@@ -5,6 +5,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { TramaStore } from '../../core/stores/trama.store';
 import { OnboardingStore, type OnboardingStep } from '../../core/stores/onboarding.store';
 import { UiStore } from '../../core/stores/ui.store';
+import { Viewport } from '../../core/viewport';
 
 /**
  * "Get started" card for workspaces that are still being set up: six steps from the first team to a connected
@@ -28,7 +29,7 @@ import { UiStore } from '../../core/stores/ui.store';
         >
           <div class="bg-primary h-full rounded-full" [style.width.%]="percent()"></div>
         </div>
-        <p class="min-w-0 flex-1 text-[13px]">
+        <p class="min-w-0 flex-1 truncate text-[13px]">
           <span class="font-medium">{{ onboarding.complete() ? 'You are all set' : 'Get started' }}</span>
           <span class="text-muted-foreground ms-2 tabular-nums">{{ onboarding.doneCount() }}/{{ onboarding.total() }}</span>
           @if (onboarding.next(); as next) {
@@ -36,10 +37,10 @@ import { UiStore } from '../../core/stores/ui.store';
           }
         </p>
         @if (onboarding.next(); as next) {
-          <button type="button" hlmBtn size="sm" class="h-7 px-2.5 text-xs" (click)="run(next)">{{ next.cta }}</button>
+          <button type="button" hlmBtn size="sm" class="h-7 px-2.5 text-xs" (click)="run(next)">{{ cta(next) }}</button>
         }
         <button type="button" hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 px-2 text-xs" (click)="expanded.set(true)">
-          All steps
+          <span class="max-sm:sr-only">All steps</span>
           <svg [lucideIcon]="moreIcon" [size]="12"></svg>
         </button>
         <button type="button" hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-7" aria-label="Dismiss the setup checklist" title="Dismiss. You can bring it back from the help menu." (click)="onboarding.dismiss()">
@@ -106,7 +107,7 @@ import { UiStore } from '../../core/stores/ui.store';
                   @if (step.done) { <span class="sr-only">(done)</span> }
                 </p>
                 @if (!step.done) {
-                  <p class="text-muted-foreground mt-0.5 text-xs leading-snug">{{ step.description }}</p>
+                  <p class="text-muted-foreground mt-0.5 text-xs leading-snug">{{ description(step) }}</p>
                 }
               </div>
               @if (!step.done) {
@@ -118,7 +119,7 @@ import { UiStore } from '../../core/stores/ui.store';
                   class="h-7 shrink-0 px-2.5 text-xs"
                   (click)="run(step)"
                 >
-                  {{ step.cta }}
+                  {{ cta(step) }}
                 </button>
               }
             </li>
@@ -133,6 +134,7 @@ export class OnboardingChecklist {
   private readonly ui = inject(UiStore);
   private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
+  private readonly viewport = inject(Viewport);
 
   /** A one-line bar (the Inbox) instead of the full card; "All steps" opens the card. */
   readonly compact = input(false, { transform: booleanAttribute });
@@ -143,6 +145,17 @@ export class OnboardingChecklist {
   protected readonly percent = computed(() =>
     this.onboarding.total() ? (this.onboarding.doneCount() / this.onboarding.total()) * 100 : 0,
   );
+
+  /** Phones have no ⌘K: the command bar opens from Search in the bottom bar. */
+  protected cta(step: OnboardingStep): string {
+    return step.action.kind === 'command-bar' && this.viewport.isMobile() ? 'Open search' : step.cta;
+  }
+
+  protected description(step: OnboardingStep): string {
+    return step.action.kind === 'command-bar' && this.viewport.isMobile()
+      ? 'Tap Search to jump anywhere, find anything, or create without leaving the page.'
+      : step.description;
+  }
 
   protected run(step: OnboardingStep): void {
     const action = step.action;

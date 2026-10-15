@@ -119,7 +119,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             alt=""
             class="hidden size-5 shrink-0 dark:block"
           />
-          <span class="min-w-0 truncate text-[13px] font-semibold">{{ wsName() }}</span>
+          <span class="min-w-0 truncate text-[13px] font-semibold" [title]="wsName()">{{ wsName() }}</span>
           <svg [lucideIcon]="chevronDown" [size]="13" class="text-muted-foreground shrink-0"></svg>
         </button>
         <button
@@ -495,7 +495,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       </button>
       <button
         type="button"
-        class="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md"
+        class="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-open:bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
         [hlmDropdownMenuTrigger]="helpMenu"
         align="start"
         side="top"

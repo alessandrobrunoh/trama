@@ -65,7 +65,7 @@ import { ALL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
     }
 
     @if (sync.live() === 'reconnecting' || sync.lastError()) {
-      <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status">
+      <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status" [title]="sync.lastError() ?? sync.label()">
         <span class="bg-status-needs-input size-1.5 rounded-full"></span>
         <span class="max-sm:hidden">{{ sync.label() }}</span>
       </span>

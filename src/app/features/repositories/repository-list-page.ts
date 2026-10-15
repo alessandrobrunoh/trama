@@ -72,7 +72,7 @@ const PROVIDERS: PickOption[] = GIT_PROVIDERS.map((p) => ({
     <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
       <app-search-input noun="repositories" [(value)]="search" />
       <div
-        class="scrollbar-none flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
+        class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
       >
         <app-picker
           variant="chip"

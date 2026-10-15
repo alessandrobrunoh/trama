@@ -163,6 +163,8 @@ export interface MemberRow {
 }
 
 const REFETCH_DEBOUNCE_MS = 400;
+/** Ceiling of the backoff between retries of a failed snapshot refetch. */
+const REFETCH_RETRY_MAX_MS = 30_000;
 
 function newest<T extends { at: string }>(a: T, b: T): number {
   return b.at < a.at ? -1 : b.at > a.at ? 1 : 0;
@@ -635,6 +637,8 @@ export class TramaStore {
 
   private loading: { slug: string; promise: Promise<LoadResult> } | null = null;
   private refetchTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Consecutive failed refetches; drives the retry backoff. */
+  private refetchFailures = 0;
   /** Issue ids removed from the UI whose server delete is still waiting (Undo window). */
   private readonly stagedDeletes = new Set<string>();
   /** Bumped when a write starts and when it settles; a refetch started before is stale. */
@@ -684,6 +688,7 @@ export class TramaStore {
   reset(): void {
     if (this.refetchTimer) clearTimeout(this.refetchTimer);
     this.refetchTimer = null;
+    this.refetchFailures = 0;
     this.slug.set(null);
     this.status.set('idle');
     this.loadError.set(null);
@@ -721,9 +726,16 @@ export class TramaStore {
       // A write started/finished meanwhile: this snapshot may predate it. Try again.
       if (this.epoch !== startEpoch || this.pending > 0) return this.scheduleRefetch(REFETCH_DEBOUNCE_MS);
       this.applySnapshot(snapshot, true);
+      this.refetchFailures = 0;
       if (this.status() === 'error') this.status.set('ready');
     } catch (e) {
-      this.sync.lastError.set(ApiError.from(e).message);
+      const err = ApiError.from(e);
+      this.sync.lastError.set(err.message);
+      // Retry until a refetch succeeds. A phone waking up (visibilitychange) or a proxy hiccup fails the
+      // first request; without a retry the "Sync error" chip stays until an unrelated live event arrives.
+      if (this.slug() === slug && !err.isUnauthorized && !err.isForbidden && !err.isNotFound) {
+        this.scheduleRefetch(Math.min(REFETCH_RETRY_MAX_MS, 1000 * 2 ** this.refetchFailures++));
+      }
     }
   }
 
@@ -768,7 +780,7 @@ export class TramaStore {
     const older = merge ? this._events().filter((e) => !s.events.some((n) => n.id === e.id)) : [];
     const oldest = s.events.reduce((m, e) => (e.at < m ? e.at : m), '9999');
     list(this._events, [...s.events, ...older.filter((e) => e.at < oldest)].sort(newest));
-    list(this._attention, s.attention);
+    list(this._attention, s.attention ?? []);
     list(this._views, s.views);
     list(this._integrations, s.integrations);
     this.sync.lastSyncedAt.set(new Date().toISOString());

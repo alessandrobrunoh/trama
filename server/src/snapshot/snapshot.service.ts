@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In } from 'typeorm';
+import { AttentionService } from '../attention/attention.service.js';
 import { canDo, type WorkspaceContext } from '../auth/request-context.js';
 import { scopeSnapshot } from '../auth/member-access.js';
 import type { Role, SnapshotCommentsMode } from '../contracts/domain.js';
@@ -33,6 +34,7 @@ export class SnapshotService {
     private readonly views: ViewsService,
     private readonly customers: CustomersService,
     private readonly comments: CommentsService,
+    private readonly attention: AttentionService,
   ) {}
 
   /** Everything the client needs to boot a workspace (see WorkspaceSnapshot in contracts/domain.ts). */
@@ -71,6 +73,7 @@ export class SnapshotService {
       events,
       views,
       integrations,
+      attention,
     ] = await Promise.all([
       this.ds
         .getRepository(UserEntity)
@@ -105,6 +108,7 @@ export class SnapshotService {
             .getRepository(IntegrationConnectionEntity)
             .find({ where, order: { createdAt: 'ASC' } })
         : Promise.resolve([]),
+      this.attention.list(workspaceId, me.id),
     ]);
     const built = {
       workspace: ctx.workspace,
@@ -126,6 +130,7 @@ export class SnapshotService {
       comments,
       ...(commentIndex ? { commentIndex } : {}),
       events,
+      attention,
       views,
       integrations,
     };

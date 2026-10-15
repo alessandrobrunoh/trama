@@ -21,6 +21,7 @@ import { apiInterceptor } from './core/api/api.interceptor';
 import { Notifier } from './core/notify/notifier';
 import { RecentItems } from './features/command/recent.service';
 import { LiveSync } from './core/sync/live-sync.service';
+import { AppUpdates } from './core/sync/app-updates.service';
 import { provideServiceWorker } from '@angular/service-worker';
 
 export const appConfig: ApplicationConfig = {
@@ -58,6 +59,10 @@ export const appConfig: ApplicationConfig = {
     // Record opened detail pages as "recently viewed" for the command palette.
     provideAppInitializer(() => {
       inject(RecentItems);
+    }),
+    // Offer a reload when the service worker has a newer build (no-op when the worker is disabled).
+    provideAppInitializer(() => {
+      inject(AppUpdates);
     }),
     provideLucideConfig({ size: 16, strokeWidth: 1.75 }),
     provideServiceWorker('ngsw-worker.js', {
