@@ -5,9 +5,11 @@ import { IntegrationConnectionEntity, type UserEntity } from '../database/entiti
 import { SnapshotService } from './snapshot.service.js';
 
 const connection = { id: 'ic_1', provider: 'github', account: 'acme', status: 'connected', lastError: null };
+const attentionItem = { id: 'input_requested:ir_1', kind: 'input_requested', state: 'open' };
 
 function build(role: Role, manageIntegrations: Role = 'admin') {
   const queried: unknown[] = [];
+  const attention = { list: vi.fn().mockResolvedValue([attentionItem]) };
   const ds = {
     getRepository: (entity: unknown) => {
       queried.push(entity);
@@ -23,12 +25,13 @@ function build(role: Role, manageIntegrations: Role = 'admin') {
       attachCounts: vi.fn().mockImplementation((_ws: string, rows: unknown[]) => rows),
     } as never,
     { listAll: vi.fn().mockResolvedValue([]), index: vi.fn().mockResolvedValue([]) } as never,
+    attention as never,
   );
   const ctx = {
     role,
     workspace: { id: 'ws_1', resolved: () => ({ permissions: { manageIntegrations } }) },
   } as unknown as WorkspaceContext;
-  return { run: () => service.build(ctx, { id: 'usr_1' } as UserEntity, role), queried };
+  return { run: () => service.build(ctx, { id: 'usr_1' } as UserEntity, role), queried, attention };
 }
 
 describe('SnapshotService integrations', () => {
@@ -50,5 +53,14 @@ describe('SnapshotService integrations', () => {
   it('follows the workspace permission setting', async () => {
     expect((await build('member', 'member').run()).integrations).toEqual([connection]);
     expect((await build('member', 'owner').run()).integrations).toEqual([]);
+  });
+});
+
+describe('SnapshotService attention', () => {
+  // The client merges `attention` like every other list; a missing field breaks every refetch.
+  it("includes the current user's attention items", async () => {
+    const { run, attention } = build('member');
+    expect((await run()).attention).toEqual([attentionItem]);
+    expect(attention.list).toHaveBeenCalledWith('ws_1', 'usr_1');
   });
 });
