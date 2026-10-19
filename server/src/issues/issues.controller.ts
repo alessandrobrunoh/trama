@@ -41,6 +41,7 @@ import {
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
+import { projectHidden } from '../auth/member-access.js';
 import {
   CUSTOMER_REVENUE_MAX,
   isPlanArtifact,
@@ -104,6 +105,8 @@ class CreateIssueDto {
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
+  /** Id or key of the parent issue. */
+  @IsOptional() @IsString() parentId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
@@ -129,6 +132,8 @@ class UpdateIssueDto {
   @Clearable() @IsString() teamId?: string | null;
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
+  /** Id or key of the parent issue. `null` makes this issue a root issue. */
+  @Clearable() @IsString() parentId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
@@ -307,7 +312,12 @@ export class IssuesController {
   ) {
     const rows = await this.service.getMany(ctx.workspace.id, dto.ids);
     await this.assertTeams(ctx, rows);
-    await this.service.removeMany(ctx.workspace.id, actor, rows);
+    await this.service.removeMany(
+      ctx.workspace.id,
+      actor,
+      rows,
+      (affected) => this.assertTeams(ctx, affected),
+    );
     return { deleted: rows.map((r) => r.id) };
   }
 
@@ -341,6 +351,7 @@ export class IssuesController {
     @Res({ passthrough: true }) res?: Response,
   ) {
     const issue = await this.service.get(ctx.workspace.id, idOrKey);
+    await this.hideInvisibleParents(ctx, issue);
     const [artifacts, decisions, requests] = await Promise.all([
       canReadArtifacts(auth)
         ? this.artifacts.list(ctx.workspace.id, { issueId: issue.id })
@@ -405,7 +416,12 @@ export class IssuesController {
   ) {
     return this.withCounts(
       ctx,
-      await this.service.create(ctx.workspace.id, actor, dto),
+      await this.service.create(
+        ctx.workspace.id,
+        actor,
+        dto,
+        (parents) => this.assertTeams(ctx, parents, dto.teamId),
+      ),
     );
   }
 
@@ -418,49 +434,85 @@ export class IssuesController {
   ) {
     return this.withCounts(
       ctx,
-      await this.service.update(ctx.workspace.id, actor, idOrKey, dto),
+      await this.service.update(
+        ctx.workspace.id,
+        actor,
+        idOrKey,
+        dto,
+        (affected) => this.assertTeams(ctx, affected, dto.teamId),
+      ),
     );
   }
 
   @Delete(':idOrKey')
   @Can('deleteIssues')
   @HttpCode(204)
-  remove(
+  async remove(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,
     @Param('idOrKey') idOrKey: string,
   ) {
-    return this.service.remove(ctx.workspace.id, actor, idOrKey);
+    return this.service.remove(
+      ctx.workspace.id,
+      actor,
+      idOrKey,
+      (affected) => this.assertTeams(ctx, affected),
+    );
   }
 
   /** The team edit policy of every team the request touches (current teams of the issues and the one they move to). */
   private async assertTeams(
     ctx: WorkspaceContext,
-    rows: readonly { teamId?: string | null }[],
+    rows: readonly {
+      teamId?: string | null;
+      projectId?: string | null;
+    }[],
     moveTo?: string | null,
   ) {
-    const teams = new Set<string>();
-    for (const r of rows) if (r.teamId) teams.add(r.teamId);
-    if (moveTo) teams.add(moveTo);
-    for (const id of teams) await this.permissions.assertTeamEdit(ctx, id);
+    const teams = new Map<string, boolean>();
+    const add = (teamId: string | null | undefined, conceal: boolean): void => {
+      if (teamId)
+        teams.set(teamId, (teams.get(teamId) ?? false) || conceal);
+    };
+    for (const row of rows)
+      add(row.teamId, projectHidden(ctx.access, row.projectId));
+    if (moveTo) add(moveTo, false);
+    for (const [id, conceal] of teams)
+      await this.permissions.assertTeamEdit(ctx, id, { conceal });
   }
 
-  private async withCounts<T extends { id: string }>(
+  private async withCounts<T extends { id: string; parentId?: string | null }>(
     ctx: WorkspaceContext,
     rows: T,
   ): Promise<T>;
-  private async withCounts<T extends { id: string }>(
+  private async withCounts<T extends { id: string; parentId?: string | null }>(
     ctx: WorkspaceContext,
     rows: T[],
   ): Promise<T[]>;
-  private async withCounts<T extends { id: string }>(
+  private async withCounts<T extends { id: string; parentId?: string | null }>(
     ctx: WorkspaceContext,
     rows: T | T[],
   ) {
-    await this.customers.attachCounts(
-      ctx.workspace.id,
-      Array.isArray(rows) ? rows : [rows],
-    );
+    const list = Array.isArray(rows) ? rows : [rows];
+    await this.customers.attachCounts(ctx.workspace.id, list);
+    await this.hideInvisibleParents(ctx, list);
     return rows;
+  }
+
+  private async hideInvisibleParents<
+    T extends { id: string; parentId?: string | null },
+  >(ctx: WorkspaceContext, rows: T | T[]): Promise<void> {
+    const list = Array.isArray(rows) ? rows : [rows];
+    const parentIds = [
+      ...new Set(list.flatMap((row) => (row.parentId ? [row.parentId] : []))),
+    ];
+    if (!parentIds.length) return;
+    const visibleParentIds = await this.service.visibleParentIds(
+      ctx.workspace.id,
+      parentIds,
+    );
+    for (const row of list)
+      if (row.parentId && !visibleParentIds.has(row.parentId))
+        row.parentId = null;
   }
 }

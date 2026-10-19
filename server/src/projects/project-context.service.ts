@@ -54,6 +54,23 @@ export class ProjectContextService {
       where: { workspaceId, projectId },
       order: { number: 'ASC' },
     });
+    const parentIds = [
+      ...new Set(issues.flatMap((issue) => (issue.parentId ? [issue.parentId] : []))),
+    ];
+    if (parentIds.length) {
+      const parents = await repo(IssueEntity).find({
+        where: { workspaceId, id: In(parentIds) },
+        select: { id: true, projectId: true },
+      });
+      const visibleParentIds = new Set(
+        parents
+          .filter((parent) => !projectHidden(currentAccess(), parent.projectId))
+          .map((parent) => parent.id),
+      );
+      for (const issue of issues)
+        if (issue.parentId && !visibleParentIds.has(issue.parentId))
+          issue.parentId = null;
+    }
     const issueIds = issues.map((i) => i.id);
 
     const [artifacts, decisions, inputRequests] = await Promise.all([

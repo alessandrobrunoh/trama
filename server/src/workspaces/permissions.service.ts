@@ -6,6 +6,7 @@ import {
   type AppRequest,
   type WorkspaceContext,
 } from '../auth/request-context.js';
+import { projectHidden } from '../auth/member-access.js';
 import {
   AgentEntity,
   IssueEntity,
@@ -73,6 +74,7 @@ export class PermissionsService {
   async assertTeamEdit(
     ctx: WorkspaceContext,
     teamId: string | null | undefined,
+    options: { conceal?: boolean } = {},
   ): Promise<void> {
     if (!teamId) return;
     const team = await this.teams.findOneBy({
@@ -82,13 +84,15 @@ export class PermissionsService {
     if (!team) return;
     if (!(await this.canEditTeamWork(ctx, team)))
       throw new ForbiddenException(
-        `Team ${team.key} only lets its members and leads edit its work`,
+        options.conceal
+          ? 'You are not allowed to change this issue hierarchy'
+          : `Team ${team.key} only lets its members and leads edit its work`,
       );
   }
 
   /**
-   * Called by AccessGuard for routes marked `@EditsTeamWork(kind)`: resolves the team(s) the request
-   * touches (the current owner team and the one it moves to) and enforces their edit policy.
+   * Called by AccessGuard for routes marked `@EditsTeamWork(kind)`: checks the current issue and
+   * destination team. Parent teams are checked in the locked issue transaction to avoid stale reads.
    */
   async enforceTeamScope(
     kind: 'issue',
@@ -113,10 +117,13 @@ export class PermissionsService {
           },
         )
         .getOne();
-      if (issue?.teamId) ids.add(issue.teamId);
+      // Guards run before the member-access interceptor; use the access resolved into ctx by this guard.
+      if (issue?.teamId && !projectHidden(ctx.access, issue.projectId))
+        ids.add(issue.teamId);
     }
     const next = str(body.teamId);
-    if (next) ids.add(next);
+    const parentChange = Object.prototype.hasOwnProperty.call(body, 'parentId');
+    if (next && !parentChange) ids.add(next);
     for (const id of ids) await this.assertTeamEdit(ctx, id);
   }
 }

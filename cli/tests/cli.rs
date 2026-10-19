@@ -1424,6 +1424,12 @@ fn commands_and_schema_describe_the_whole_surface() {
     let s = out_json(&run.run(&["schema", "create_issue"]));
     assert_eq!(s["command"], "trama issue create");
     assert_eq!(s["inputSchema"]["required"], json!(["kind", "title"]));
+    assert_eq!(s["inputSchema"]["properties"]["parentId"]["type"], "string");
+    let s = out_json(&run.run(&["schema", "update_issue"]));
+    assert_eq!(
+        s["inputSchema"]["properties"]["parentId"]["type"],
+        json!(["string", "null"])
+    );
     assert_eq!(code(&run.run(&["schema", "issue", "nope"])), 2);
     assert_eq!(code(&run.run(&["commands", "nope"])), 2);
 }

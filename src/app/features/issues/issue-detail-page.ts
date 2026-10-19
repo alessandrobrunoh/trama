@@ -40,6 +40,7 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, fullDate, isTypingTarget, usePageShortcuts } from '../../core';
 import { ApiClient } from '../../core/api/api-client';
 import type { IssueContext } from '../../core/contracts/domain';
+import { UiStore } from '../../core/stores/ui.store';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { EntityChip } from '../../shared/entity-chip';
@@ -291,6 +292,49 @@ import { LabelPicker } from '../../shared/label-picker';
             </div>
 
             <app-issue-goal [issue]="i" [canEdit]="canEdit()" />
+            @if (parentIssue() || subIssues().length || store.allowed('createIssues')) {
+              <section
+                aria-labelledby="issue-sub-issues-heading"
+                class="border-border min-w-0 rounded-lg border px-4 py-3"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <h2 id="issue-sub-issues-heading" class="text-sm font-semibold">Sub-issues</h2>
+                  @if (store.allowed('createIssues')) {
+                    <button
+                      hlmBtn
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      class="shrink-0"
+                      [attr.aria-label]="'Create sub-issue of ' + i.key"
+                      (click)="ui.openCreate('issue', { parentId: i.id })"
+                    >
+                      Add sub-issue
+                    </button>
+                  }
+                </div>
+                @if (parentIssue(); as parent) {
+                  <div class="mt-3 min-w-0">
+                    <h3 class="text-muted-foreground mb-1 text-xs font-medium">Parent issue</h3>
+                    <app-entity-chip class="max-w-full" type="issue" [ref]="parent.id" />
+                  </div>
+                }
+                <div class="mt-3 min-w-0">
+                  <h3 class="text-muted-foreground mb-1 text-xs font-medium">Direct sub-issues</h3>
+                  @if (subIssues().length) {
+                    <ul role="list" class="flex min-w-0 flex-col gap-1">
+                      @for (child of subIssues(); track child.id) {
+                        <li class="min-w-0">
+                          <app-entity-chip class="max-w-full" type="issue" [ref]="child.id" />
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <p class="text-muted-foreground text-xs">No direct sub-issues.</p>
+                  }
+                </div>
+              </section>
+            }
             @if (planSummary(); as plan) {
               <section
                 aria-labelledby="issue-plan-heading"
@@ -585,6 +629,7 @@ export class IssueDetailPage {
   private readonly document = inject(DOCUMENT);
   private readonly api = inject(ApiClient);
   protected readonly store = inject(TramaStore);
+  protected readonly ui = inject(UiStore);
   protected readonly workState = issueWorkState;
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
@@ -602,6 +647,14 @@ export class IssueDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly issue = computed(() => this.store.getIssue(this.key()));
+  protected readonly parentIssue = computed(() => {
+    const parentId = this.issue()?.parentId;
+    return parentId ? this.store.issueById().get(parentId) : undefined;
+  });
+  protected readonly subIssues = computed(() => {
+    const issueId = this.issue()?.id;
+    return issueId ? this.store.issues().filter((issue) => issue.parentId === issueId) : [];
+  });
   protected readonly facts = computed(() => {
     const issue = this.issue();
     return issue ? issueFacts(this.store, issue.id) : [];

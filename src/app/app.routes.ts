@@ -233,6 +233,12 @@ export const routes: Routes = [
           import('./features/documents/document-list-page').then((m) => m.DocumentListPage),
       },
       {
+        path: 'releases',
+        title: 'Releases · Trama',
+        loadComponent: () =>
+          import('./features/releases/release-list-page').then((m) => m.ReleaseListPage),
+      },
+      {
         path: 'documents/:id',
         title: 'Document · Trama',
         loadComponent: () =>

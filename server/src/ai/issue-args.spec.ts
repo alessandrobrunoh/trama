@@ -37,6 +37,35 @@ describe('normalizeIssueToolArgs', () => {
     });
   });
 
+  it('passes parent references through and keeps null available to clear on update', () => {
+    expect(
+      normalizeIssueToolArgs('create_issue', {
+        title: 'Child task',
+        kind: 'bug',
+        parentId: 'BUG-1',
+      }),
+    ).toEqual({
+      args: { title: 'Child task', kind: 'bug', parentId: 'BUG-1' },
+    });
+    expect(
+      normalizeIssueToolArgs('update_issue', {
+        idOrKey: 'BUG-2',
+        parentId: null,
+      }),
+    ).toEqual({ args: { idOrKey: 'BUG-2', parentId: null } });
+  });
+
+  it('rejects non-string parent references before the issues API call', () => {
+    expect(
+      normalizeIssueToolArgs('update_issue', {
+        idOrKey: 'BUG-2',
+        parentId: { id: 'BUG-1' },
+      }),
+    ).toEqual({
+      error: 'parentId must be an issue id or key, or null to clear it.',
+    });
+  });
+
   it('refuses a kind or title the issues API would reject, without calling it', () => {
     expect(
       normalizeIssueToolArgs('create_issue', { title: '   ', kind: 'bug' }),

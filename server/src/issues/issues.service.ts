@@ -58,6 +58,8 @@ export interface IssueInput {
   teamId?: string | null;
   /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
   projectId?: string | null;
+  /** Id or key of the parent issue. `null` makes this issue a root issue. */
+  parentId?: string | null;
   priority?: Priority;
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
@@ -90,6 +92,9 @@ interface PreparedUpdate {
   previousAssigneeId: string | null;
   rekey: boolean;
 }
+
+type IssueTeamRef = Pick<IssueEntity, 'id' | 'teamId' | 'projectId' | 'parentId'>;
+type IssueTeamAuthorizer = (affectedIssues: readonly IssueTeamRef[]) => Promise<void>;
 
 const KEY_RE = /^[A-Za-z]+-\d+$/;
 const STARTED: ReadonlySet<IssueStatus> = new Set(['in_progress', 'in_review']);
@@ -257,6 +262,34 @@ export class IssuesService {
     return row;
   }
 
+  /** Parent ids may be returned only when the caller can also see the referenced issue. */
+  async visibleParentIds(
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Set<string>> {
+    if (!ids.length) return new Set();
+    const parents = await this.repo.find({
+      where: { workspaceId, id: In([...ids]) },
+      select: { id: true, projectId: true },
+    });
+    return new Set(
+      parents
+        .filter((parent) => !projectHidden(currentAccess(), parent.projectId))
+        .map((parent) => parent.id),
+    );
+  }
+
+  private async hideInvisibleParent<T extends { parentId?: string | null }>(
+    workspaceId: string,
+    issue: T,
+  ): Promise<T> {
+    if (issue.parentId) {
+      const visible = await this.visibleParentIds(workspaceId, [issue.parentId]);
+      if (!visible.has(issue.parentId)) issue.parentId = null;
+    }
+    return issue;
+  }
+
   /**
    * Milestones must exist and belong to the issue's project; an issue may be
    * in at most one milestone per project.
@@ -289,12 +322,118 @@ export class IssuesService {
     }
   }
 
+  /** Resolve a parent in this workspace and enforce the same project visibility as issue reads. */
+  private async resolveParentId(
+    workspaceId: string,
+    childId: string | null,
+    parentRef: string | null,
+  ): Promise<string | null> {
+    if (parentRef === null) return null;
+    const parent = await this.get(workspaceId, parentRef);
+    if (parent.id === childId)
+      throw new BadRequestException('An issue cannot be its own parent');
+    return parent.id;
+  }
+
+  /** Locking the workspace serializes all parent-link changes with each other and with deletion. */
+  private async lockIssueHierarchy(
+    manager: EntityManager,
+    workspaceId: string,
+  ): Promise<void> {
+    await manager.query(
+      `SELECT "id" FROM "workspaces" WHERE "id" = $1 FOR UPDATE`,
+      [workspaceId],
+    );
+  }
+
+  /** Read the current relationship before locking the complete, id-sorted set of related rows. */
+  private async readIssueRelation(
+    manager: EntityManager,
+    workspaceId: string,
+    issueId: string,
+  ): Promise<IssueTeamRef> {
+    const [row] = (await manager.query(
+      `SELECT "id", "teamId", "projectId", "parentId" FROM "issues" WHERE "workspaceId" = $1 AND "id" = $2`,
+      [workspaceId, issueId],
+    )) as IssueTeamRef[];
+    if (!row) throw notFound('Issue', issueId);
+    return row;
+  }
+
+  private async lockIssueRelations(
+    manager: EntityManager,
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, IssueTeamRef>> {
+    if (!ids.length) return new Map();
+    const rows = (await manager.query(
+      `SELECT "id", "teamId", "projectId", "parentId" FROM "issues"
+       WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])
+       ORDER BY "id" FOR UPDATE`,
+      [workspaceId, unique(ids)],
+    )) as IssueTeamRef[];
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  /**
+   * Serialize parent changes in a workspace and reject links to descendants. The recursive query
+   * walks upward from the proposed parent, so depth is not bounded by application code.
+   */
+  private async assertParentLink(
+    manager: EntityManager,
+    workspaceId: string,
+    childId: string,
+    parentId: string,
+  ): Promise<void> {
+    await this.lockIssueHierarchy(manager, workspaceId);
+    await this.assertParentLinkLocked(manager, workspaceId, childId, parentId);
+  }
+
+  /** Parent graph lock must already be held. */
+  private async assertParentLinkLocked(
+    manager: EntityManager,
+    workspaceId: string,
+    childId: string,
+    parentId: string,
+  ): Promise<void> {
+    const [state] = (await manager.query(
+      `WITH RECURSIVE parent_chain ("id", "parentId", "path", "cycle") AS (
+        SELECT i."id", i."parentId", ARRAY[i."id"]::character varying[], false
+        FROM "issues" i
+        WHERE i."workspaceId" = $1 AND i."id" = $2
+        UNION ALL
+        SELECT p."id", p."parentId", c."path" || p."id",
+               p."id" = ANY(c."path")
+        FROM "issues" p
+        JOIN parent_chain c ON p."id" = c."parentId"
+        WHERE p."workspaceId" = $1 AND NOT c."cycle"
+      )
+      SELECT count(*) > 0 AS "found",
+             COALESCE(bool_or("id" = $3), false) AS "includesChild",
+             COALESCE(bool_or("cycle"), false) AS "containsCycle"
+      FROM parent_chain`,
+      [workspaceId, parentId, childId],
+    )) as {
+      found: boolean;
+      includesChild: boolean;
+      containsCycle: boolean;
+    }[];
+    if (!state?.found) throw notFound('Issue', parentId);
+    if (state.includesChild || state.containsCycle)
+      throw new BadRequestException('Issue hierarchy cannot contain cycles');
+  }
+
   async create(
     workspaceId: string,
     actor: ActorRef,
     input: IssueInput & { kind: IssueKind; title: string },
+    authorizeParent: IssueTeamAuthorizer,
   ) {
     assertCanUseProject(input.projectId ?? null);
+    const parentId =
+      input.parentId == null
+        ? null
+        : await this.resolveParentId(workspaceId, null, input.parentId);
     await this.refs.teams(
       workspaceId,
       [input.teamId].filter((x): x is string => !!x),
@@ -323,6 +462,17 @@ export class IssuesService {
     };
     applyStatusFacts(facts, resolved.type);
     const row = await this.ds.transaction(async (m) => {
+      const id = uid('in');
+      let parent: IssueTeamRef | undefined;
+      if (parentId !== null) {
+        await this.assertParentLink(m, workspaceId, id, parentId);
+        parent = (
+          await this.lockIssueRelations(m, workspaceId, [parentId])
+        ).get(parentId);
+        if (!parent || projectHidden(currentAccess(), parent.projectId))
+          throw notFound('Issue', parentId);
+      }
+      await authorizeParent(parent ? [parent] : []);
       const number = await this.counters.next(
         m,
         workspaceId,
@@ -330,7 +480,7 @@ export class IssuesService {
       );
       return m.save(
         m.create(IssueEntity, {
-          id: uid('in'),
+          id,
           workspaceId,
           key: `${ISSUE_KEY_PREFIX[input.kind]}-${number}`,
           number,
@@ -344,6 +494,7 @@ export class IssuesService {
           assigneeId,
           teamId: input.teamId ?? null,
           projectId: input.projectId ?? null,
+          parentId,
           priority: input.priority ?? 'none',
           status,
           estimate: input.estimate ?? null,
@@ -378,14 +529,75 @@ export class IssuesService {
     actor: ActorRef,
     idOrKey: string,
     patch: IssueInput,
+    authorizeParents: IssueTeamAuthorizer,
   ) {
     const row = await this.get(workspaceId, idOrKey);
     if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
+    if (patch.parentId !== undefined) {
+      patch = {
+        ...patch,
+        parentId: await this.resolveParentId(workspaceId, row.id, patch.parentId),
+      };
+    }
     const previousBody = row.body;
     const prepared = await this.prepareUpdate(workspaceId, actor, row, patch);
     if (patch.body !== undefined)
       await this.uploads?.assertAttachable(workspaceId, row.body);
     await this.ds.transaction(async (m) => {
+      if (prepared.patch.parentId !== undefined) {
+        await this.lockIssueHierarchy(m, workspaceId);
+        const observed = await this.readIssueRelation(m, workspaceId, row.id);
+        const relationIds = unique([
+          row.id,
+          ...(observed.parentId ? [observed.parentId] : []),
+          ...(prepared.patch.parentId ? [prepared.patch.parentId] : []),
+        ]);
+        const relations = await this.lockIssueRelations(
+          m,
+          workspaceId,
+          relationIds,
+        );
+        const current = relations.get(row.id);
+        if (!current || projectHidden(currentAccess(), current.projectId))
+          throw notFound('Issue', row.id);
+        if (current.parentId !== observed.parentId)
+          throw new ConflictException('Issue hierarchy changed; retry the update');
+
+        const affected: IssueTeamRef[] = [current];
+        if (current.parentId) {
+          const previousParent = relations.get(current.parentId);
+          if (!previousParent) throw notFound('Issue', current.parentId);
+          // The controller conceals the team-policy error if this old parent is project-hidden.
+          affected.push(previousParent);
+        }
+        if (prepared.patch.parentId) {
+          const nextParent = relations.get(prepared.patch.parentId);
+          if (!nextParent || projectHidden(currentAccess(), nextParent.projectId))
+            throw notFound('Issue', prepared.patch.parentId);
+          await this.assertParentLinkLocked(
+            m,
+            workspaceId,
+            row.id,
+            prepared.patch.parentId,
+          );
+          affected.push(nextParent);
+        }
+        await authorizeParents(affected);
+        if (prepared.patch.teamId === undefined) row.teamId = current.teamId;
+        if (prepared.patch.projectId === undefined)
+          row.projectId = current.projectId;
+        row.parentId = prepared.patch.parentId;
+      } else {
+        const current = await this.lockIssueRelations(m, workspaceId, [row.id]);
+        const relation = current.get(row.id);
+        if (!relation || projectHidden(currentAccess(), relation.projectId))
+          throw notFound('Issue', row.id);
+        if (prepared.patch.teamId === undefined)
+          row.teamId = relation.teamId;
+        if (prepared.patch.projectId === undefined)
+          row.projectId = relation.projectId;
+        row.parentId = relation.parentId;
+      }
       await this.rekey(m, workspaceId, prepared);
       await m.save(row);
     });
@@ -473,6 +685,16 @@ export class IssuesService {
       );
     }
     await this.ds.transaction(async (m) => {
+      const ids = rows.map((row) => row.id);
+      const parents = (await m.query(
+        `SELECT "id", "parentId" FROM "issues" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[]) ORDER BY "id" FOR UPDATE`,
+        [workspaceId, ids],
+      )) as { id: string; parentId: string | null }[];
+      const parentByIssue = new Map(parents.map((row) => [row.id, row.parentId]));
+      if (parentByIssue.size !== ids.length)
+        throw new NotFoundException('An issue in the batch no longer exists');
+      for (const p of prepared)
+        p.row.parentId = parentByIssue.get(p.row.id) ?? null;
       await m.save(rows.map((r) => r));
     });
     for (const p of prepared) await this.recordUpdate(workspaceId, actor, p);
@@ -561,6 +783,7 @@ export class IssuesService {
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
     if (patch.teamId !== undefined) row.teamId = patch.teamId;
     if (patch.projectId !== undefined) row.projectId = patch.projectId;
+    if (patch.parentId !== undefined) row.parentId = patch.parentId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
     if (patch.labels !== undefined)
@@ -689,7 +912,14 @@ export class IssuesService {
       row.externalUrl = null;
     row.updatedAt = new Date();
     try {
-      await this.repo.save(row);
+      await this.repo.update(
+        { workspaceId, id: row.id },
+        {
+          externalRef: row.externalRef,
+          externalUrl: row.externalUrl,
+          updatedAt: row.updatedAt,
+        },
+      );
     } catch (e) {
       if (isUniqueViolation(e) && ref) {
         const other = await this.ds
@@ -706,20 +936,24 @@ export class IssuesService {
       }
       throw e;
     }
+    const updated = await this.hideInvisibleParent(
+      workspaceId,
+      await this.get(workspaceId, row.id),
+    );
     await this.events.record({
       workspaceId,
       actor,
       type: 'issue.updated',
-      subject: { type: 'issue', id: row.id },
+      subject: { type: 'issue', id: updated.id },
       data: {
-        key: row.key,
+        key: updated.key,
         fields: ['externalRef'],
         external: ref
           ? { provider: ref.provider, key: ref.key, origin: ref.origin }
           : null,
       },
     });
-    return row;
+    return updated;
   }
 
   /** Stores a freshly read external status. Quiet on purpose (no domain event): it is a mirror, not a change of the work. */
@@ -737,60 +971,73 @@ export class IssuesService {
         'This issue is not linked to an external issue',
       );
     row.externalRef = { ...row.externalRef, ...patch };
-    await this.repo.save(row);
+    await this.repo.update(
+      { workspaceId, id: row.id },
+      { externalRef: row.externalRef },
+    );
+    const updated = await this.hideInvisibleParent(
+      workspaceId,
+      await this.get(workspaceId, row.id),
+    );
     this.events.publish(workspaceId, {
       type: 'updated',
       entity: 'issue',
-      id: row.id,
+      id: updated.id,
     });
-    return row;
+    return updated;
   }
 
-  async remove(workspaceId: string, actor: ActorRef, idOrKey: string) {
+  async remove(
+    workspaceId: string,
+    actor: ActorRef,
+    idOrKey: string,
+    authorize: IssueTeamAuthorizer,
+  ) {
     const row = await this.get(workspaceId, idOrKey);
-    const lost =
-      (await this.uploads?.idsLostWith(workspaceId, { issueId: row.id }, [
-        row.body,
-      ])) ?? [];
-    await this.ds.query(
-      `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = $2`,
-      [workspaceId, row.id],
+    let lost: string[] = [];
+    const { removed: [removed], detached } = await this.ds.transaction(async (manager) =>
+      this.deleteRows(manager, workspaceId, [row.id], idOrKey, authorize, async (targets) => {
+        const target = targets[0];
+        lost =
+          (await this.uploads?.idsLostWith(workspaceId, { issueId: target.id }, [
+            target.body,
+          ])) ?? [];
+      }),
     );
-    await this.ds.query(
-      `UPDATE "issues" SET "duplicateOfId" = NULL WHERE "workspaceId" = $1 AND "duplicateOfId" = $2`,
-      [workspaceId, row.id],
-    );
-    await this.repo.delete({ id: row.id });
     await this.uploads?.releaseIds(workspaceId, lost);
     await this.events.record({
       workspaceId,
       actor,
       type: 'issue.deleted',
-      subject: { type: 'issue', id: row.id },
-      data: { key: row.key, title: row.title },
+      subject: { type: 'issue', id: removed.id },
+      data: { key: removed.key, title: removed.title },
     });
+    for (const issue of detached)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.updated',
+        subject: { type: 'issue', id: issue.id },
+        data: { key: issue.key, fields: ['parentId'] },
+      });
   }
 
-  /** Delete many issues in one transaction; events follow the commit. */
+  /**
+   * Delete many issues in one transaction. Authorize every parent/child whose relationship will
+   * change while the workspace hierarchy and affected issue rows are locked.
+   */
   async removeMany(
     workspaceId: string,
     actor: ActorRef,
     rows: readonly IssueEntity[],
+    authorize: IssueTeamAuthorizer,
   ) {
     const ids = rows.map((r) => r.id);
     if (!ids.length) return;
-    await this.ds.transaction(async (m) => {
-      await m.query(
-        `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
-        [workspaceId, ids],
-      );
-      await m.query(
-        `UPDATE "issues" SET "duplicateOfId" = NULL WHERE "workspaceId" = $1 AND "duplicateOfId" = ANY($2)`,
-        [workspaceId, ids],
-      );
-      await m.delete(IssueEntity, { workspaceId, id: In(ids) });
-    });
-    for (const row of rows)
+    const { removed, detached } = await this.ds.transaction((manager) =>
+      this.deleteRows(manager, workspaceId, ids, ids[0], authorize),
+    );
+    for (const row of removed)
       await this.events.record({
         workspaceId,
         actor,
@@ -798,5 +1045,81 @@ export class IssuesService {
         subject: { type: 'issue', id: row.id },
         data: { key: row.key, title: row.title },
       });
+    for (const issue of detached)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.updated',
+        subject: { type: 'issue', id: issue.id },
+        data: { key: issue.key, fields: ['parentId'] },
+      });
+  }
+
+  private async deleteRows(
+    manager: EntityManager,
+    workspaceId: string,
+    ids: readonly string[],
+    issueRef: string,
+    authorize: IssueTeamAuthorizer,
+    beforeDelete?: (targets: readonly IssueEntity[]) => Promise<void>,
+  ): Promise<{ removed: IssueEntity[]; detached: IssueEntity[] }> {
+    await this.lockIssueHierarchy(manager, workspaceId);
+    const targetRelations = (await manager.query(
+      `SELECT "id", "parentId" FROM "issues" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])`,
+      [workspaceId, ids],
+    )) as Pick<IssueEntity, 'id' | 'parentId'>[];
+    if (targetRelations.length !== ids.length)
+      throw notFound('Issue', issueRef);
+
+    const parentIds = unique(
+      targetRelations.flatMap((target) =>
+        target.parentId ? [target.parentId] : [],
+      ),
+    );
+    const affected = (await manager.query(
+      `SELECT * FROM "issues"
+       WHERE "workspaceId" = $1
+         AND ("id" = ANY($2::varchar[]) OR "parentId" = ANY($2::varchar[]) OR "id" = ANY($3::varchar[]))
+       ORDER BY "id" FOR UPDATE`,
+      [workspaceId, ids, parentIds],
+    )) as IssueEntity[];
+    const targetIds = new Set(ids);
+    const targets = affected.filter((issue) => targetIds.has(issue.id));
+    if (targets.length !== ids.length) throw notFound('Issue', issueRef);
+    const observedParentById = new Map(
+      targetRelations.map((target) => [target.id, target.parentId]),
+    );
+    if (targets.some((target) => observedParentById.get(target.id) !== target.parentId))
+      throw new ConflictException('Issue hierarchy changed; retry the delete');
+    if (affected.some((issue) => projectHidden(currentAccess(), issue.projectId)))
+      throw notFound('Issue', issueRef);
+
+    await authorize(affected);
+    await beforeDelete?.(targets);
+    const detached = affected.filter(
+      (issue) => !!issue.parentId && targetIds.has(issue.parentId) && !targetIds.has(issue.id),
+    );
+    if (detached.length) {
+      const updatedAt = new Date();
+      await manager.update(
+        IssueEntity,
+        { workspaceId, id: In(detached.map((issue) => issue.id)) },
+        { parentId: null, updatedAt },
+      );
+      for (const issue of detached) {
+        issue.parentId = null;
+        issue.updatedAt = updatedAt;
+      }
+    }
+    await manager.query(
+      `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
+      [workspaceId, ids],
+    );
+    await manager.query(
+      `UPDATE "issues" SET "duplicateOfId" = NULL WHERE "workspaceId" = $1 AND "duplicateOfId" = ANY($2)`,
+      [workspaceId, ids],
+    );
+    await manager.delete(IssueEntity, { workspaceId, id: In([...ids]) });
+    return { removed: targets, detached };
   }
 }

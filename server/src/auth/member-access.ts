@@ -154,7 +154,11 @@ interface Ref {
 export interface AccessSnapshot {
   projects: { id: string }[];
   milestones: { id: string; projectId: string }[];
-  issues: { id: string; projectId?: string | null }[];
+  issues: {
+    id: string;
+    projectId?: string | null;
+    parentId?: string | null;
+  }[];
   artifacts: {
     id: string;
     projectId?: string | null;
@@ -192,10 +196,20 @@ export function scopeSnapshot<T extends AccessSnapshot>(
   const issues = allows(access, 'issues')
     ? snapshot.issues.filter((row) => projectOk(row.projectId))
     : [];
+  const issueIds = new Set(issues.map((row) => row.id));
+  const scopedIssues = issues.map((issue) => {
+    if (!issue.parentId || issueIds.has(issue.parentId)) return issue;
+    // Keep entity serialization behavior (e.g. Wire.toJSON omitting null fields).
+    const scoped = Object.assign(
+      Object.create(Object.getPrototypeOf(issue)) as typeof issue,
+      issue,
+    );
+    scoped.parentId = null;
+    return scoped;
+  });
   const milestones = allows(access, 'milestones')
     ? snapshot.milestones.filter((row) => projectOk(row.projectId))
     : [];
-  const issueIds = new Set(issues.map((row) => row.id));
   const projectIds = new Set(projects.map((row) => row.id));
   const milestoneIds = new Set(milestones.map((row) => row.id));
   const artifacts = allows(access, 'artifacts')
@@ -247,7 +261,7 @@ export function scopeSnapshot<T extends AccessSnapshot>(
   return {
     ...snapshot,
     projects,
-    issues,
+    issues: scopedIssues,
     milestones,
     artifacts,
     decisions,

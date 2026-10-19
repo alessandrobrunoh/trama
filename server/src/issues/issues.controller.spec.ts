@@ -5,7 +5,10 @@ import { IssuesController } from './issues.controller.js';
 
 function makeController(count: number) {
   const issue = { id: 'in_1' } as IssueEntity;
-  const service = { get: vi.fn(async () => issue) };
+  const service = {
+    get: vi.fn(async () => issue),
+    visibleParentIds: vi.fn(async () => new Set<string>()),
+  };
   const customers = { attachCounts: vi.fn(async () => undefined) };
   const permissions = { assertTeamEdit: vi.fn(async () => undefined) };
   const artifacts = { countForIssue: vi.fn(async () => count) };
@@ -66,9 +69,107 @@ describe('IssuesController.get', () => {
     expect(issue).not.toHaveProperty('artifactCount');
     expect(artifacts.countForIssue).not.toHaveBeenCalled();
   });
+
+  it('hides a parent id when the caller cannot see the parent issue', async () => {
+    const issue = { id: 'in_child', parentId: 'in_hidden' } as IssueEntity;
+    const visibleParentIds = vi.fn(async () => new Set<string>());
+    const controller = new IssuesController(
+      {
+        get: vi.fn(async () => issue),
+        visibleParentIds,
+      } as never,
+      { attachCounts: vi.fn(async () => undefined) } as never,
+      {} as never,
+      { countForIssue: vi.fn(async () => 0) } as never,
+      {} as never,
+      {} as never,
+    );
+
+    await controller.get(ctx, session, 'BUG-1');
+
+    expect(visibleParentIds).toHaveBeenCalledWith('ws_1', ['in_hidden']);
+    expect(issue.parentId).toBeNull();
+  });
+});
+
+describe('IssuesController sub-issue team authorization', () => {
+  it('checks the parent team transactionally for create and reparent writes', async () => {
+    type TeamAuthorizer = (
+      rows: readonly { teamId?: string | null }[],
+    ) => Promise<void>;
+    const service = {
+      create: vi.fn(async (
+        _workspaceId: string,
+        _actor: unknown,
+        _dto: unknown,
+        authorize: TeamAuthorizer,
+      ) => {
+        await authorize([{ teamId: 'tm_locked' }]);
+        return { id: 'in_child', parentId: 'in_parent' };
+      }),
+      update: vi.fn(async (
+        _workspaceId: string,
+        _actor: unknown,
+        _idOrKey: string,
+        _dto: unknown,
+        authorize: TeamAuthorizer,
+      ) => {
+        await authorize([{ teamId: 'tm_locked' }]);
+        return { id: 'in_child', parentId: 'in_parent' };
+      }),
+    };
+    const controller = new IssuesController(
+      service as never,
+      { attachCounts: vi.fn(async () => undefined) } as never,
+      {
+        assertTeamEdit: vi.fn(async (_ctx: unknown, _team: string) => {
+          throw new Error('Team policy rejected the hierarchy change');
+        }),
+      } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      controller.create(ctx, session.actor, {
+        kind: 'bug',
+        title: 'Child',
+      } as never),
+    ).rejects.toThrow('Team policy rejected');
+    await expect(
+      controller.update(ctx, session.actor, 'BUG-1', {
+        parentId: 'in_parent',
+      } as never),
+    ).rejects.toThrow('Team policy rejected');
+
+    expect(service.create).toHaveBeenCalledTimes(1);
+    expect(service.update).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('IssuesController.context', () => {
+  it('hides a parent id when the caller cannot see the parent issue', async () => {
+    const issue = { id: 'in_child', parentId: 'in_hidden' } as IssueEntity;
+    const visibleParentIds = vi.fn(async () => new Set<string>());
+    const controller = new IssuesController(
+      {
+        get: vi.fn(async () => issue),
+        visibleParentIds,
+      } as never,
+      {} as never,
+      {} as never,
+      { list: vi.fn(async () => []) } as never,
+      { list: vi.fn(async () => []) } as never,
+      { list: vi.fn(async () => []) } as never,
+    );
+
+    const result = await controller.context(ctx, session, 'BUG-1');
+
+    expect(visibleParentIds).toHaveBeenCalledWith('ws_1', ['in_hidden']);
+    expect(result.issue.parentId).toBeNull();
+  });
+
   it('returns issue-owned context with open requests and an optional plan summary', async () => {
     const issue = { id: 'in_1' } as IssueEntity;
     const artifact = { id: 'ar_1', kind: 'document', title: 'Plan: rollout' };

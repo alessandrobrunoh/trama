@@ -316,7 +316,14 @@ async fn record_decision_does_not_duplicate_an_existing_title() {
 async fn create_issue_blocks_exact_duplicates_unless_forced() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
         ("GET", "/search") => j(json!({ "results": [{ "type": "issue", "id": "in_1", "key": "BUG-1", "title": "Login times out", "subtitle": "bug · backlog" }] })),
-        ("POST", "/issues") => j(json!({ "id": "in_2", "key": "BUG-2", "title": "Login times out", "kind": "bug", "status": "backlog" })),
+        ("POST", "/issues") => j(json!({
+            "id": "in_2",
+            "key": "BUG-2",
+            "title": "Login times out",
+            "kind": "bug",
+            "status": "backlog",
+            "parentId": "in_parent"
+        })),
         _ => not_found(),
     });
     let s = server(&mock);
@@ -328,13 +335,34 @@ async fn create_issue_blocks_exact_duplicates_unless_forced() {
     assert_eq!(v["existing"]["key"], "BUG-1");
     assert!(mock.writes().is_empty());
 
-    let (err, text) = call(&s, &a, "create_issue", json!({ "kind": "bug", "title": "login times out", "force": true })).await;
+    let (err, text) = call(
+        &s,
+        &a,
+        "create_issue",
+        json!({
+            "kind": "bug",
+            "title": "login times out",
+            "parentId": "in_parent",
+            "force": true
+        }),
+    )
+    .await;
     assert!(!err, "{text}");
     let v = parsed(&text);
     assert_eq!(v["created"], true);
     assert_eq!(v["similarOpenIssues"][0]["key"], "BUG-1");
+    assert_eq!(v["issue"]["parentId"], "in_parent");
     let w = mock.writes();
-    assert_eq!(w[0].body, json!({ "title": "login times out", "kind": "bug", "source": "agent" }), "source defaults to agent and force is not sent");
+    assert_eq!(
+        w[0].body,
+        json!({
+            "title": "login times out",
+            "kind": "bug",
+            "parentId": "in_parent",
+            "source": "agent"
+        }),
+        "source defaults to agent and force is not sent"
+    );
 }
 
 // ── start_work ──

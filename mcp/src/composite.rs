@@ -253,7 +253,23 @@ fn norm(s: &str) -> String {
 }
 
 fn issue_summary(v: &Value) -> Value {
-    pick(v, &["key", "id", "title", "kind", "status", "priority", "assigneeId", "projectId", "teamId", "goal", "duplicateOfId"])
+    pick(
+        v,
+        &[
+            "key",
+            "id",
+            "title",
+            "kind",
+            "status",
+            "priority",
+            "assigneeId",
+            "projectId",
+            "teamId",
+            "goal",
+            "parentId",
+            "duplicateOfId",
+        ],
+    )
 }
 
 // ───────────────────────────── resolving keys and ids ─────────────────────────────
@@ -569,7 +585,23 @@ async fn create_issue(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     }
 
     let mut body = Map::new();
-    for k in ["title", "body", "goal", "reporterName", "assigneeId", "teamId", "projectId", "priority", "status", "externalUrl", "estimate", "kind", "source", "labels"] {
+    for k in [
+        "title",
+        "body",
+        "goal",
+        "reporterName",
+        "assigneeId",
+        "teamId",
+        "projectId",
+        "parentId",
+        "priority",
+        "status",
+        "externalUrl",
+        "estimate",
+        "kind",
+        "source",
+        "labels",
+    ] {
         if let Some(v) = a.get(k) {
             body.insert(k.into(), v.clone());
         }
