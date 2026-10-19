@@ -10,6 +10,7 @@ import {
   ProjectEntity,
   ProjectUpdateEntity,
 } from '../database/entities/index.js';
+import { memberAccessStore } from '../auth/member-access.js';
 import {
   assembleProjectContext,
   projectContextMarkdown,
@@ -183,6 +184,40 @@ describe('ProjectContextService', () => {
     expect(ctx.artifacts.map((a) => a.artifact.id)).toEqual(['ar_1']);
     expect(ctx.decisions.map((d) => d.id)).toEqual(['dc_1']);
     expect(ctx.inputRequests.map((r) => r.id)).toEqual(['ir_1']);
+  });
+
+  it('hides parent ids for Issues whose parent is outside project access', async () => {
+    const child = issue(1, { projectId: 'pj_1', parentId: 'in_2' });
+    const hiddenParent = issue(2, { projectId: 'pj_2' });
+    const entities = new Map<unknown, readonly unknown[]>([
+      [MilestoneEntity, []],
+      [ArtifactEntity, []],
+      [DecisionEntity, []],
+      [InputRequestEntity, []],
+      [ProjectUpdateEntity, []],
+    ]);
+    const ds = {
+      getRepository: (entity: unknown) => ({
+        findOneBy: async () => (entity === ProjectEntity ? project() : null),
+        find: async (options?: { select?: unknown }) =>
+          entity === IssueEntity
+            ? options?.select
+              ? [hiddenParent]
+              : [child]
+            : (entities.get(entity) ?? []),
+      }),
+    } as unknown as DataSource;
+    const access = {
+      projects: { all: false, projectIds: ['pj_1'] },
+      includeUnassigned: false,
+      grants: [],
+    };
+
+    const ctx = await memberAccessStore.run(access, () =>
+      new ProjectContextService(ds).build(WS, 'pj_1'),
+    );
+
+    expect(ctx.issues[0].parentId).toBeNull();
   });
 
   it('404s for an unknown project', async () => {

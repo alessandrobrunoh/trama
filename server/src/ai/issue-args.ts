@@ -85,6 +85,13 @@ export function normalizeIssueToolArgs(name: string, args: Record<string, unknow
     return { error: `kind must be one of: ${KIND_LIST}.` };
   }
 
+  if (
+    next.parentId !== undefined &&
+    next.parentId !== null &&
+    typeof next.parentId !== 'string'
+  )
+    return { error: 'parentId must be an issue id or key, or null to clear it.' };
+
   for (const [field, max] of [
     ['body', BODY_MAX],
     ['reporterName', REPORTER_MAX],

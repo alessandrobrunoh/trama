@@ -164,6 +164,97 @@ describe('permission policies, team roles and token scopes', () => {
       await member2.patch(`${w}/issues/${free.key}`, { title: 'Still ok' }).expect(200);
     });
 
+    it('checks the parent team edit policy when creating or reparenting an issue', async () => {
+      const { member, member2, w, team } = await teamSetup();
+      const parent = (
+        await member.post(`${w}/issues`, {
+          kind: 'feature',
+          title: 'Restricted parent',
+          teamId: team.id,
+        }).expect(201)
+      ).body;
+
+      await member2
+        .post(`${w}/issues`, {
+          kind: 'bug',
+          title: 'Unauthorized child',
+          parentId: parent.id,
+        })
+        .expect(403);
+      const child = (
+        await member2
+          .post(`${w}/issues`, { kind: 'bug', title: 'Unlinked issue' })
+          .expect(201)
+      ).body;
+      await member2.patch(`${w}/issues/${child.id}`, { parentId: parent.id }).expect(403);
+
+      const authorizedChild = (
+        await member.post(`${w}/issues`, {
+          kind: 'bug',
+          title: 'Authorized child',
+          parentId: parent.id,
+        }).expect(201)
+      ).body;
+      expect(authorizedChild.parentId).toBe(parent.id);
+
+      await member.patch(`${w}/teams/${team.id}`, { memberIds: [] }).expect(200);
+      await member.patch(`${w}/issues/${authorizedChild.id}`, { parentId: null }).expect(403);
+    });
+
+    it('checks both sides of a hierarchy before deletes detach parent links', async () => {
+      const { owner, member, member2, w, team } = await teamSetup();
+      const otherTeam = (
+        await owner.post(`${w}/teams`, {
+          name: 'Other secure',
+          key: 'OTHER',
+          memberIds: [member2.id],
+          leadIds: [member2.id],
+          editPolicy: 'members',
+        }).expect(201)
+      ).body;
+      const parent = (
+        await member.post(`${w}/issues`, {
+          kind: 'feature',
+          title: 'Secure parent',
+          teamId: team.id,
+        }).expect(201)
+      ).body;
+      const child = (
+        await owner.post(`${w}/issues`, {
+          kind: 'bug',
+          title: 'Other team child',
+          teamId: otherTeam.id,
+          parentId: parent.id,
+        }).expect(201)
+      ).body;
+
+      await member.delete(`${w}/issues/${parent.id}`).expect(403);
+      expect((await owner.get(`${w}/issues/${child.id}`).expect(200)).body.parentId).toBe(
+        parent.id,
+      );
+
+      const secondParent = (
+        await member.post(`${w}/issues`, {
+          kind: 'feature',
+          title: 'Secure parent for child delete',
+          teamId: team.id,
+        }).expect(201)
+      ).body;
+      const secondChild = (
+        await owner.post(`${w}/issues`, {
+          kind: 'bug',
+          title: 'Unassigned child',
+          parentId: secondParent.id,
+        }).expect(201)
+      ).body;
+      await member2
+        .post(`${w}/issues/bulk-delete`, { ids: [secondChild.id] })
+        .expect(403);
+      expect((await owner.get(`${w}/issues/${secondChild.id}`).expect(200)).body.parentId).toBe(
+        secondParent.id,
+      );
+    });
+
     it('agents count through their owner; a lead may edit their own team but not delete it', async () => {
       const { owner, member, member2, w, team } = await teamSetup();
       const mine = (await owner.post(`${w}/agents`, { name: 'Mine', provider: 'claude_code', ownerUserId: member.id }).expect(201)).body;

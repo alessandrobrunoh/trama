@@ -30,16 +30,17 @@ import { Picker, type PickOption } from '../../shared/picker';
 /** What a new artifact gets attached to. */
 export type ArtifactTarget = { type: 'project'; id: string } | { type: 'issue'; key: string };
 
-/** Kinds that make sense for a hand-written document / link (no CI, no review). */
-export const DOC_ARTIFACT_KINDS: readonly ArtifactKind[] = [
+/** Kinds that can be created directly by a person (no CI or review workflow). */
+export const MANUAL_ARTIFACT_KINDS: readonly ArtifactKind[] = [
   'document',
   'link',
   'file',
   'design',
   'image',
+  'release',
 ];
 
-const DOC_STATES: ArtifactState[] = ['draft', 'published'];
+const EDITABLE_STATES: ArtifactState[] = ['draft', 'published'];
 
 const TARGET_LABEL: Record<ArtifactTarget['type'], string> = {
   project: 'this project',
@@ -74,7 +75,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
 }
 
 /**
- * Dialog to attach a document / link / file / design / image to a project or an issue, or to edit one
+ * Dialog to attach a document / link / file / design / image / release to a project or an issue, or to edit one
  * (title, URL, description, state).
  *   <app-project-artifact-dialog [(open)]="open" [target]="{ type: 'project', id: p.id }" />
  */
@@ -100,14 +101,14 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
       >
         <hlm-dialog-header>
           <h2 hlmDialogTitle>
-            {{ editing() ? 'Edit ' + kindLabel().toLowerCase() : 'Add document / link' }}
+            {{ editing() ? 'Edit ' + kindLabel().toLowerCase() : 'Add artifact' }}
           </h2>
           <p hlmDialogDescription>
             @if (editing()) {
               Update how this item is shown. The linked page itself is not touched.
             } @else {
-              Attach a spec, a link, a design or a file to {{ targetLabel() }}. It becomes part of
-              the shared context.
+              Attach a document, link, design, file or release artifact to {{ targetLabel() }}. It
+              becomes part of the shared context.
             }
           </p>
         </hlm-dialog-header>
@@ -145,7 +146,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
               hlmInput
               id="pad-title"
               autocomplete="off"
-              placeholder="Product requirements, Figma file, Runbook…"
+              placeholder="Product requirements, Figma file, v2.1 release…"
               [value]="title()"
               (input)="title.set($any($event.target).value)"
             />
@@ -175,7 +176,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
             }
           </div>
 
-          @if (!editing()) {
+          @if (!editing() && kind() !== 'release') {
             <div class="flex min-w-0 items-center gap-2">
               <app-upload-file label="Upload a file" [busy]="busy()" (file)="pickFile($event)" />
               @if (fileName()) {
@@ -206,7 +207,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
               hlmTextarea
               id="pad-desc"
               rows="4"
-              placeholder="What is this and why does it matter for the project?"
+              placeholder="What is this and why does it matter for the project or issue?"
               [value]="description()"
               (input)="description.set($any($event.target).value)"
             ></textarea>
@@ -232,11 +233,11 @@ export class ProjectArtifactDialog {
   readonly artifact = input<Artifact>();
   readonly saved = output<Artifact>();
 
-  protected readonly kindOptions: PickOption[] = DOC_ARTIFACT_KINDS.map((k) => ({
+  protected readonly kindOptions: PickOption[] = MANUAL_ARTIFACT_KINDS.map((k) => ({
     value: k,
     label: ARTIFACT_KIND_META[k].label,
   }));
-  protected readonly stateOptions: PickOption[] = DOC_STATES.map((s) => ({
+  protected readonly stateOptions: PickOption[] = EDITABLE_STATES.map((s) => ({
     value: s,
     label: statusLabel(s),
     kind: 'status',
@@ -256,7 +257,7 @@ export class ProjectArtifactDialog {
   /** Items with their own state vocabulary (a PR, a build…) keep it; the picker only covers draft / published. */
   protected readonly stateEditable = computed(() => {
     const a = this.artifact();
-    return !a || DOC_STATES.includes(a.state);
+    return !a || EDITABLE_STATES.includes(a.state);
   });
   protected readonly targetLabel = computed(() => TARGET_LABEL[this.target().type]);
   protected readonly kindLabel = computed(() => ARTIFACT_KIND_META[this.kind()].label);
@@ -275,7 +276,7 @@ export class ProjectArtifactDialog {
         this.title.set(a?.title ?? '');
         this.url.set(a?.url ?? '');
         this.description.set(a?.description ?? '');
-        this.state.set(a && DOC_STATES.includes(a.state) ? a.state : 'published');
+        this.state.set(a && EDITABLE_STATES.includes(a.state) ? a.state : 'published');
         this.busy.set(false);
         this.touched.set(false);
         this.clearFile();
@@ -284,7 +285,9 @@ export class ProjectArtifactDialog {
   }
 
   protected setKind(k: string | undefined): void {
-    if (k) this.kind.set(k as ArtifactKind);
+    if (!k) return;
+    this.kind.set(k as ArtifactKind);
+    if (k === 'release') this.clearFile();
   }
 
   protected pickFile(file: File): void {
@@ -329,7 +332,7 @@ export class ProjectArtifactDialog {
           url: url || null,
           description: this.description().trim() || null,
           // Non-document kinds keep their own state vocabulary; only touch it for the draft/published pair.
-          ...(DOC_STATES.includes(current.state) ? { state: this.state() } : {}),
+          ...(EDITABLE_STATES.includes(current.state) ? { state: this.state() } : {}),
         };
         if (await this.store.updateArtifact(current.id, patch)) {
           const next = this.store.artifactById().get(current.id);

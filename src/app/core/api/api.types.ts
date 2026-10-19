@@ -342,6 +342,8 @@ export interface CreateIssueInput {
   body?: string;
   /** Desired result, not a technical plan. */
   goal?: string;
+  /** Parent issue id when creating a sub-issue. */
+  parentId?: ID;
   source?: IssueSource;
   reporterName?: string;
   assigneeId?: ID;

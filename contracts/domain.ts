@@ -841,6 +841,8 @@ export interface Issue {
   labels: ID[];
   /** Previous keys (changing `kind` re-keys the issue); lookups by key also match these. */
   aliases: string[];
+  /** Parent issue id; sub-issues are independent and may be nested to any depth. */
+  parentId?: ID;
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;

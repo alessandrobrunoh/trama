@@ -66,7 +66,7 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | `list_repositories` | Registered git repositories (maps a checkout to its project) |
 | `list_projects` | Projects; filter by repository to find the project of a checkout |
 | `create_issue` | File an issue (duplicate-checked) |
-| `update_issue` | Change an issue's status, priority, assignee, labels, duplicate marker… |
+| `update_issue` | Change an issue's status, priority, assignee, labels, parent, duplicate marker… |
 | `start_work` | Pick up an issue: context, safety checks, marks the start |
 | `report_progress` | Record artifacts, issue status, project update and a comment |
 | `ask_human` | Ask a person one question (an input request), once |

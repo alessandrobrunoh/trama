@@ -158,7 +158,7 @@ describe('project scope', () => {
         { id: 'ms_2', projectId: 'pj_2' },
       ],
       issues: [
-        { id: 'in_1', projectId: 'pj_1' },
+        { id: 'in_1', projectId: 'pj_1', parentId: 'in_2' },
         { id: 'in_2', projectId: 'pj_2' },
         { id: 'in_3', projectId: null },
       ],
@@ -183,6 +183,7 @@ describe('project scope', () => {
     });
     expect(scoped.projects.map((p) => p.id)).toEqual(['pj_1']);
     expect(scoped.issues.map((i) => i.id)).toEqual(['in_1']);
+    expect(scoped.issues[0].parentId).toBeNull();
     expect(scoped.comments.map((c) => c.subject.id)).toEqual(['in_1']);
     expect(scoped.customerRequests).toEqual([]);
     expect(scoped.decisions).toEqual([]);

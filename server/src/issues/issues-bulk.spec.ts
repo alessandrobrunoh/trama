@@ -26,6 +26,7 @@ function issue(id: string, over: Partial<IssueEntity> = {}): IssueEntity {
     assigneeId: null,
     teamId: null,
     projectId: null,
+    parentId: null,
     duplicateOfId: null,
     milestoneIds: [] as string[],
     labels: [] as string[],
@@ -38,13 +39,37 @@ function issue(id: string, over: Partial<IssueEntity> = {}): IssueEntity {
 }
 
 function makeService(opts: { failSave?: boolean } = {}) {
+  const byId = new Map<string, IssueEntity>();
   const save = vi.fn(async (r: unknown) => {
     if (opts.failSave) throw new Error('db down');
     return r;
   });
-  const query = vi.fn(async (_sql: string, _params?: unknown[]) => undefined);
+  const query = vi.fn(async (sql: string, params?: unknown[]) => {
+    if (sql.startsWith('SELECT "id", "parentId"')) {
+      const ids = params?.[1] as string[];
+      return ids.map((id) => ({
+        id,
+        parentId: byId.get(id)?.parentId ?? null,
+      }));
+    }
+    if (sql.startsWith('SELECT * FROM "issues"')) {
+      const ids = params?.[1] as string[];
+      if (sql.includes('"parentId" = ANY')) {
+        const parentIds = params?.[2] as string[];
+        return [...byId.values()].filter(
+          (row) =>
+            ids.includes(row.id) ||
+            ids.includes(row.parentId ?? '') ||
+            parentIds.includes(row.id),
+        );
+      }
+      return [...byId.values()].filter((row) => ids.includes(row.id));
+    }
+    return undefined;
+  });
   const del = vi.fn(async () => undefined);
-  const manager = { save, query, delete: del };
+  const update = vi.fn(async () => undefined);
+  const manager = { save, query, update, delete: del };
   const transaction = vi.fn(async (fn: (m: unknown) => Promise<void>) => fn(manager));
   const record = vi.fn(async () => undefined);
   const refs = {
@@ -53,7 +78,6 @@ function makeService(opts: { failSave?: boolean } = {}) {
     projects: vi.fn(async () => undefined),
   };
   const labels = { assign: vi.fn(async (_w: string, ids?: string[]) => ids) };
-  const byId = new Map<string, IssueEntity>();
   const repo = { findOneBy: vi.fn(async ({ id }: { id: string }) => byId.get(id) ?? null) };
   const service = new IssuesService(
     { transaction } as never,
@@ -63,7 +87,7 @@ function makeService(opts: { failSave?: boolean } = {}) {
     labels as never,
     repo as never,
   );
-  return { service, byId, save, query, del, transaction, record, refs, labels };
+  return { service, byId, save, query, update, del, transaction, record, refs, labels };
 }
 
 const eventTypes = (record: ReturnType<typeof vi.fn>) =>
@@ -154,6 +178,16 @@ describe('IssuesService.updateMany', () => {
     expect(rows.map((r) => r.labels)).toEqual([['lb_1', 'lb_3'], ['lb_3']]);
   });
 
+  it('preserves the current parent when a bulk update saves a stale issue row', async () => {
+    const { service, byId } = makeService();
+    const stale = issue('in_child', { parentId: 'in_old_parent' });
+    byId.set('in_child', issue('in_child', { parentId: 'in_current_parent' }));
+
+    await service.updateMany('ws_1', actor, [stale], { priority: 'high' });
+
+    expect(stale.parentId).toBe('in_current_parent');
+  });
+
   it('rejects a label that is both added and removed', async () => {
     const { service } = makeService();
     await expect(
@@ -180,24 +214,76 @@ describe('IssuesService.updateMany', () => {
 });
 
 describe('IssuesService.removeMany', () => {
-  it('deletes comments, duplicate links and issues in one transaction, then records events', async () => {
-    const { service, transaction, query, del, record } = makeService();
-    await service.removeMany('ws_1', actor, [
+  it('checks related issues, then deletes comments, duplicate links and issues in one transaction', async () => {
+    const { service, transaction, query, del, record, byId } = makeService();
+    const rows = [
       issue('in_a'),
       issue('in_b'),
-    ]);
+    ];
+    for (const row of rows) byId.set(row.id, row);
+    const authorize = vi.fn(async () => undefined);
+    await service.removeMany('ws_1', actor, rows, authorize);
+
     expect(transaction).toHaveBeenCalledTimes(1);
-    expect(query).toHaveBeenCalledTimes(2);
-    expect(String(query.mock.calls[0][0])).toContain('comments');
-    expect(query.mock.calls[0][1]).toEqual(['ws_1', ['in_a', 'in_b']]);
+    expect(authorize).toHaveBeenCalledWith(expect.arrayContaining(rows));
+    const commentDelete = query.mock.calls.find((call) =>
+      String(call[0]).includes('"comments"'),
+    );
+    expect(commentDelete?.[1]).toEqual(['ws_1', ['in_a', 'in_b']]);
+    expect(
+      query.mock.calls.some((call) => String(call[0]).includes('"duplicateOfId"')),
+    ).toBe(true);
     expect(del).toHaveBeenCalledTimes(1);
     expect(eventTypes(record)).toEqual(['issue.deleted', 'issue.deleted']);
+  });
+
+  it('leaves issues untouched when related-team authorization rejects a hierarchy delete', async () => {
+    const { service, byId, del, record } = makeService();
+    const parent = issue('in_parent', { teamId: 'tm_locked' });
+    const child = issue('in_child', { parentId: parent.id });
+    byId.set(parent.id, parent);
+    byId.set(child.id, child);
+    const authorize = vi.fn(async (affected: readonly IssueEntity[]) => {
+      expect(affected.map((row) => row.id).sort()).toEqual(['in_child', 'in_parent']);
+      throw new ForbiddenException('team policy');
+    });
+
+    await expect(
+      service.removeMany('ws_1', actor, [child], authorize),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(del).not.toHaveBeenCalled();
+    expect(record).not.toHaveBeenCalled();
+  });
+
+  it('detaches surviving children and records the hierarchy change when deleting a parent', async () => {
+    const { service, byId, update, record } = makeService();
+    const parent = issue('in_parent');
+    const child = issue('in_child', { parentId: parent.id });
+    byId.set(parent.id, parent);
+    byId.set(child.id, child);
+
+    await service.removeMany('ws_1', actor, [parent], async () => undefined);
+
+    expect(child.parentId).toBeNull();
+    expect(update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ parentId: null, updatedAt: expect.any(Date) }),
+    );
+    expect(eventTypes(record)).toEqual(['issue.deleted', 'issue.updated']);
+    expect(record.mock.calls[1][0]).toMatchObject({
+      subject: { type: 'issue', id: 'in_child' },
+      data: { fields: ['parentId'] },
+    });
   });
 
   it('records nothing when the transaction fails', async () => {
     const { service, record, transaction } = makeService();
     transaction.mockRejectedValueOnce(new Error('db down'));
-    await expect(service.removeMany('ws_1', actor, [issue('in_a')])).rejects.toThrow('db down');
+    await expect(
+      service.removeMany('ws_1', actor, [issue('in_a')], async () => undefined),
+    ).rejects.toThrow('db down');
     expect(record).not.toHaveBeenCalled();
   });
 });
@@ -208,7 +294,15 @@ describe('IssuesController bulk', () => {
     const service = {
       getMany: vi.fn(async () => rows),
       updateMany: vi.fn(async (_w: string, _a: unknown, r: IssueEntity[]) => r),
-      removeMany: vi.fn(async () => undefined),
+      removeMany: vi.fn(
+        async (
+          _w: string,
+          _a: unknown,
+          affected: IssueEntity[],
+          authorize: (rows: readonly IssueEntity[]) => Promise<void>,
+        ) => authorize(affected),
+      ),
+      visibleParentIds: vi.fn(async () => new Set<string>()),
     };
     const permissions = {
       assertTeamEdit: vi.fn(async (_c: unknown, team: string) => {
@@ -264,6 +358,14 @@ describe('IssuesController bulk', () => {
     expect(await ok.controller.bulkDelete(ctx, actor, { ids: ['in_a', 'in_b'] })).toEqual({
       deleted: ['in_a', 'in_b'],
     });
+
+    const relatedLocked = makeController([issue('in_parent')]);
+    relatedLocked.service.removeMany.mockImplementation(async (_w, _a, _rows, authorize) =>
+      authorize([issue('in_parent'), issue('in_child', { teamId: 'tm_locked' })]),
+    );
+    await expect(
+      relatedLocked.controller.bulkDelete(ctx, actor, { ids: ['in_parent'] }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

@@ -13,7 +13,13 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
 @Component({
   selector: 'app-issue-artifacts',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, LucideDynamicIcon, ProjectArtifactDialog, ProjectArtifactRow, DocumentActions],
+  imports: [
+    HlmButtonImports,
+    LucideDynamicIcon,
+    ProjectArtifactDialog,
+    ProjectArtifactRow,
+    DocumentActions,
+  ],
   host: { class: 'block' },
   template: `
     <div class="mb-2 flex items-center gap-2">
@@ -24,14 +30,8 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
       @if (canEdit()) {
         <span class="ml-auto flex items-center gap-1">
           <app-document-actions [owner]="{ issueId: issue().id }" />
-          <button
-            hlmBtn
-            size="sm"
-            variant="ghost"
-            class="h-7 gap-1.5 text-xs"
-            (click)="openAdd()"
-          >
-            <svg [lucideIcon]="plus" [size]="13"></svg> Add document / link
+          <button hlmBtn size="sm" variant="ghost" class="h-7 gap-1.5 text-xs" (click)="openAdd()">
+            <svg [lucideIcon]="plus" [size]="13"></svg> Add artifact
           </button>
         </span>
       }
@@ -53,7 +53,8 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
       <div class="border-border flex items-center gap-3 rounded-lg border border-dashed px-4 py-3">
         <svg [lucideIcon]="pkg" [size]="16" class="text-muted-foreground shrink-0"></svg>
         <p class="text-muted-foreground min-w-0 flex-1 text-xs">
-          No artifacts yet. Attach the spec, a design or a link that gives context for this issue.
+          No artifacts yet. Attach a spec, design, link or release artifact to keep useful context
+          with this issue.
         </p>
       </div>
     }

@@ -31,6 +31,7 @@ import { MemberAccess1793720000000 } from './1793720000000-MemberAccess.js';
 import { Uploads1793730000000 } from './1793730000000-Uploads.js';
 import { IssueFirst1793740000000 } from './1793740000000-IssueFirst.js';
 import { RemoveWorkstreams1793750000000 } from './1793750000000-RemoveWorkstreams.js';
+import { IssueParents1793760000000 } from './1793760000000-IssueParents.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -67,4 +68,5 @@ export const MIGRATIONS = [
   Uploads1793730000000,
   IssueFirst1793740000000,
   RemoveWorkstreams1793750000000,
+  IssueParents1793760000000,
 ];

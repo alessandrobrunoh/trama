@@ -81,7 +81,7 @@
     "readOnly": false,
     "visibleIf": ["issues:write"],
     "uses": ["search", "create_issue"],
-    "description": "File one issue after checking for duplicates. Issues are the sole unit of work; set a concise goal when it helps clarify the desired result. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
+    "description": "File one issue after checking for duplicates. Issues are the sole unit of work; set a concise goal when it helps clarify the desired result. Use parentId to create a sub-issue; sub-issues keep independent statuses and can be nested. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -92,6 +92,7 @@
         "priority": { "type": "string", "enum": ["none", "urgent", "high", "medium", "low"] },
         "status": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Default backlog." },
         "projectId": { "type": "string" },
+        "parentId": { "type": "string", "description": "Id or key of the parent issue." },
         "teamId": { "type": "string" },
         "assigneeId": { "type": "string", "description": "Leave empty for backlog issues." },
         "labels": { "type": "array", "items": { "type": "string" }, "description": "Workspace label ids." },
@@ -107,9 +108,9 @@
   },
   {
     "name": "update_issue",
-    "summary": "Change an issue's status, priority, assignee, labels, duplicate marker…",
+    "summary": "Change an issue's status, priority, assignee, labels, parent, duplicate marker…",
     "kind": "catalog",
-    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, kind (re-keys it), duplicateOfId (marks a duplicate of another issue). null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"BUG-142\",\"status\":\"in_review\"}."
+    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (re-keys it), duplicateOfId (marks a duplicate of another issue). Sub-issues keep independent statuses and can be nested. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"BUG-142\",\"status\":\"in_review\"}."
   },
   {
     "name": "start_work",

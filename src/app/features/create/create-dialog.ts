@@ -61,6 +61,7 @@ import { Picker, type PickOption } from '../../shared/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
 import { DraftSuggestions } from '../ai/draft-suggestions';
 import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
+import { EntityChip } from '../../shared/entity-chip';
 
 type ComposerKind = 'issue' | 'decision';
 
@@ -114,7 +115,8 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
  * team / repository / view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
- *   issue:      status, priority, teamId, kind, assigneeId, projectId, title, body and optional goal
+ *   issue:      status, priority, teamId, kind, assigneeId, projectId, parentId, title, body,
+ *               and optional goal
  *   decision:   title, statement, rationale, required primary issue, tags (string[] or "a, b")
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
  *
@@ -140,6 +142,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     FormRow,
     DraftSuggestions,
     UploadFile,
+    EntityChip,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -268,6 +271,14 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 name="body"
                 aria-label="Description"
               ></textarea>
+              @if (kind() === 'issue' && parentId()) {
+                <p
+                  class="bg-muted/50 text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 rounded-md px-3 py-2 text-xs"
+                >
+                  This issue will be a sub-issue of
+                  <app-entity-chip class="max-w-full" type="issue" [ref]="parentId()" />.
+                </p>
+              }
               @if (kind() === 'issue') {
                 <div class="border-border-strong mt-2 border-t pt-2">
                   <label for="cr-goal" class="text-muted-foreground text-xs font-medium">Goal <span class="font-normal">(optional)</span></label>
@@ -708,6 +719,8 @@ export class CreateDialog {
   protected readonly teamId = signal('');
   protected readonly repositoryIds = signal<string[]>([]);
   protected readonly projectId = signal('');
+  /** Parent issue supplied by the opening context; not persisted in the generic issue draft. */
+  protected readonly parentId = signal('');
   /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
   protected readonly attachments = signal<File[]>([]);
   protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
@@ -918,6 +931,7 @@ export class CreateDialog {
     );
     this.teamId.set(asStr(d['teamId']) || this.defaultTeam());
     this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
+    this.parentId.set(asStr(d['parentId']));
     this.repositoryIds.set(
       asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
     );
@@ -1155,6 +1169,7 @@ export class CreateDialog {
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
+            parentId: this.parentId() || undefined,
           });
           if (i) {
             await this.uploadAttachments({ type: 'issue', id: i.id });

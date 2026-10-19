@@ -166,7 +166,7 @@ type TreeRow =
           @if (canEdit()) {
             <app-document-actions variant="outline" [owner]="{ projectId: project().id }" />
             <button hlmBtn size="sm" (click)="openAdd()">
-              <svg [lucideIcon]="plusIcon" [size]="14"></svg>Add document / link
+              <svg [lucideIcon]="plusIcon" [size]="14"></svg>Add artifact
             </button>
           }
         </span>
@@ -210,10 +210,10 @@ type TreeRow =
         <app-empty-state
           [icon]="pkgIcon"
           title="No context yet"
-          description="Documents and links attached to the project, and the pull requests, builds and docs of its issues, all show up here."
+          description="Documents, links and release artifacts attached to the project, along with the pull requests, builds and docs of its issues, show up here."
         >
           @if (canEdit()) {
-            <button hlmBtn size="sm" (click)="openAdd()">Add document / link</button>
+            <button hlmBtn size="sm" (click)="openAdd()">Add artifact</button>
           }
         </app-empty-state>
       } @else if (shown() === 0) {
@@ -300,7 +300,7 @@ type TreeRow =
                 Nothing attached to the project itself yet.
                 @if (canEdit()) {
                   <button type="button" class="text-primary hover:underline" (click)="openAdd()">
-                    Add a document or link
+                    Add a document, link or release
                   </button>
                 }
               </div>

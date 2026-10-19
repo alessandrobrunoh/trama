@@ -397,6 +397,8 @@ export class InputRequestEntity extends Wire {
   onDelete: 'SET NULL',
 })
 @Index('IDX_issues_project', ['projectId'])
+@Index('UQ_issues_workspace_id', ['workspaceId', 'id'], { unique: true })
+@Index('IDX_issues_parent', ['parentId'])
 export class IssueEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
@@ -420,6 +422,8 @@ export class IssueEntity extends Wire {
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) aliases: string[];
+  /** Migration FK requires parent and child to share a workspace; deleting the parent clears only this column. */
+  @Column({ type: 'varchar', nullable: true }) parentId: string | null;
   @Column({ type: 'varchar', nullable: true }) duplicateOfId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;
   /** Pointer to the issue in an external tracker (see importers). Unique per workspace through a partial index on provider + id. */

@@ -365,10 +365,20 @@ mod tests {
 
     #[test]
     fn builds_path_query_and_body() {
-        let call = tool("update_issue").build_call(&json!({ "idOrKey": "BUG 1/2", "status": "done", "estimate": null })).unwrap();
+        let call = tool("update_issue")
+            .build_call(&json!({
+                "idOrKey": "BUG 1/2",
+                "status": "done",
+                "estimate": null,
+                "parentId": null
+            }))
+            .unwrap();
         assert_eq!(call.method, Method::Patch);
         assert_eq!(call.path, "/issues/BUG%201%2F2");
-        assert_eq!(call.body, Some(json!({ "status": "done", "estimate": null })));
+        assert_eq!(
+            call.body,
+            Some(json!({ "status": "done", "estimate": null, "parentId": null }))
+        );
 
         let call = tool("list_issues").build_call(&json!({ "kind": "bug", "q": "login" })).unwrap();
         assert_eq!(call.path, "/issues");
@@ -402,9 +412,11 @@ mod tests {
     fn nullable_only_on_optional_patch_fields() {
         let s = tool("update_issue").input_schema();
         assert_eq!(s["properties"]["status"]["type"], json!(["string", "null"]));
+        assert_eq!(s["properties"]["parentId"]["type"], json!(["string", "null"]));
         assert_eq!(s["properties"]["idOrKey"]["type"], json!("string"));
         let s = tool("create_issue").input_schema();
         assert_eq!(s["properties"]["status"]["type"], json!("string"));
+        assert_eq!(s["properties"]["parentId"]["type"], json!("string"));
         assert!(s["required"].as_array().unwrap().contains(&json!("kind")));
     }
 

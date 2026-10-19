@@ -25,7 +25,7 @@ import { TramaStore, UiStore, type Artifact, type SubjectRef } from '../../core'
 import { ArtifactIcon, CiChip, ConflictChip, ReviewChip } from '../../shared/artifact';
 import { isWorkspaceUploadUrl } from '../../core/upload-url';
 import { Markdown } from '../../shared/markdown';
-import { RelativeTimePipe } from '../../shared/pipes';
+import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { ProviderIcon } from '../../shared/provider-icon';
 import { StatusBadge } from '../../shared/status';
 
@@ -106,6 +106,7 @@ const LONG_DESCRIPTION = 140;
     Markdown,
     ProviderIcon,
     StatusBadge,
+    FullDatePipe,
     RelativeTimePipe,
   ],
   host: { class: 'hover:bg-hover block border-b' },
@@ -118,7 +119,12 @@ const LONG_DESCRIPTION = 140;
       <span class="flex min-w-0 flex-1 items-center gap-2 max-sm:basis-full">
         <app-artifact-icon [kind]="a.kind" [state]="a.state" [size]="16" />
         @if (showProvider()) {
-          <app-provider-icon [provider]="a.provider" [size]="12" class="text-muted-foreground" />
+          <app-provider-icon
+            [provider]="a.provider"
+            [size]="12"
+            [showLabel]="showProviderLabel()"
+            class="text-muted-foreground"
+          />
         }
         @if (a.externalId) {
           <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ a.externalId }}</span>
@@ -191,7 +197,12 @@ const LONG_DESCRIPTION = 140;
             }
           </nav>
         }
-        <span class="max-md:hidden">{{ a.updatedAt | relativeTime }}</span>
+        <time
+          [attr.datetime]="a.updatedAt"
+          [attr.title]="a.updatedAt | fullDate"
+          [class]="dateAlwaysVisible() ? '' : 'max-md:hidden'"
+          >{{ a.updatedAt | relativeTime }}</time
+        >
       </span>
 
       @if (editable()) {
@@ -256,6 +267,10 @@ export class ProjectArtifactRow {
   readonly indent = input(16);
   /** Show the edit / remove menu. */
   readonly editable = input(false);
+  /** Show a provider's text label in addition to its icon. */
+  readonly showProviderLabel = input(false);
+  /** Keep the updated date visible at narrow viewport widths. */
+  readonly dateAlwaysVisible = input(false);
   readonly edit = output<Artifact>();
 
   protected readonly ext = LucideExternalLink;
@@ -272,7 +287,9 @@ export class ProjectArtifactRow {
   protected hosted(url: string): boolean {
     return isWorkspaceUploadUrl(url);
   }
-  protected readonly showProvider = computed(() => SHOW_PROVIDER.has(this.artifact().provider));
+  protected readonly showProvider = computed(
+    () => this.showProviderLabel() || SHOW_PROVIDER.has(this.artifact().provider),
+  );
   protected readonly chain = computed(() => {
     const mode = this.origin();
     if (mode === 'none') return [];
