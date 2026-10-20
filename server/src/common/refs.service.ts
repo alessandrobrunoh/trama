@@ -11,6 +11,8 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
+  ReleaseEntity,
+  ReleasePipelineEntity,
   DocumentEntity,
   ProjectUpdateEntity,
   RepositoryEntity,
@@ -99,6 +101,14 @@ export class RefsService {
           exists: await db.getRepository(MilestoneEntity).existsBy(where),
         };
       }
+      case 'release':
+        return {
+          exists: await db.getRepository(ReleaseEntity).existsBy(where),
+        };
+      case 'release_pipeline':
+        return {
+          exists: await db.getRepository(ReleasePipelineEntity).existsBy(where),
+        };
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };
       case 'customer':

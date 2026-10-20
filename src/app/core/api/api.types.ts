@@ -375,6 +375,8 @@ export interface UpdateIssueInput {
   externalUrl?: string | null;
   /** At most one per project; milestones must belong to the issue's project. */
   milestoneIds?: ID[];
+  /** Upcoming (or completed) release this issue ships in. `null` clears. */
+  releaseId?: ID | null;
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
   /** Workspace label ids. Replaces the whole list. */
@@ -405,6 +407,37 @@ export interface UpdateMilestoneInput {
   description?: string | null;
   targetDate?: ISODate | null;
   sortOrder?: number;
+}
+
+// ───── releases ─────
+export interface CreateReleasePipelineInput {
+  name: string;
+  type?: 'continuous' | 'scheduled';
+  teamId?: ID;
+  moveOpenIssuesToNext?: boolean;
+}
+export interface UpdateReleasePipelineInput {
+  name?: string;
+  type?: 'continuous' | 'scheduled';
+  teamId?: ID | null;
+  moveOpenIssuesToNext?: boolean;
+}
+export interface CreateReleaseInput {
+  pipelineId: ID;
+  name: string;
+  notes?: string;
+  targetAt?: ISODate;
+}
+export interface UpdateReleaseInput {
+  name?: string;
+  notes?: string | null;
+  targetAt?: ISODate | null;
+  status?: 'draft' | 'canceled';
+}
+export interface CompleteReleaseInput {
+  moveOpenIssuesToDone?: boolean;
+  targetStatusId?: string;
+  moveOpenIssuesToNext?: boolean;
 }
 
 // ───── artifacts ─────

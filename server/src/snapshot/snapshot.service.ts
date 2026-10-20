@@ -19,6 +19,8 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
+  ReleaseEntity,
+  ReleasePipelineEntity,
   RepositoryEntity,
   TeamEntity,
   UserEntity,
@@ -68,6 +70,8 @@ export class SnapshotService {
       customerRequests,
       artifacts,
       decisions,
+      releasePipelines,
+      releases,
       comments,
       commentIndex,
       events,
@@ -89,17 +93,17 @@ export class SnapshotService {
       all(CustomerRequestEntity, { createdAt: 'ASC' }),
       all(ArtifactEntity, { createdAt: 'ASC' }),
       all(DecisionEntity, { number: 'ASC' }),
+      all(ReleasePipelineEntity, { createdAt: 'ASC' }),
+      all(ReleaseEntity, { createdAt: 'ASC' }),
       slimComments ? Promise.resolve([]) : this.comments.listAll(workspaceId),
       slimComments
         ? this.comments.index(workspaceId)
         : Promise.resolve(undefined),
-      this.ds
-        .getRepository(DomainEventEntity)
-        .find({
-          where,
-          order: { at: 'DESC', id: 'DESC' },
-          take: SNAPSHOT_EVENTS,
-        }),
+      this.ds.getRepository(DomainEventEntity).find({
+        where,
+        order: { at: 'DESC', id: 'DESC' },
+        take: SNAPSHOT_EVENTS,
+      }),
       this.views.list(ctx),
       // account, baseUrl, status and lastError of the git connections are for whoever manages them
       // (same gate as GET /integrations); everyone else gets an empty list
@@ -127,6 +131,8 @@ export class SnapshotService {
       customerRequests,
       artifacts,
       decisions,
+      releasePipelines,
+      releases,
       comments,
       ...(commentIndex ? { commentIndex } : {}),
       events,

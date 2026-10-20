@@ -142,6 +142,12 @@ export function valueLabel(store: TramaStore, entity: ViewEntity, field: string,
       return store.getRepository(value)?.fullName ?? value;
     case 'project':
       return store.getProject(value)?.name ?? value;
+    case 'release': {
+      const r = store.getRelease(value);
+      if (!r) return value;
+      const pipeline = store.getReleasePipeline(r.pipelineId);
+      return pipeline ? `${pipeline.name} · ${r.name}` : r.name;
+    }
     case 'milestone': {
       const m = store.getMilestone(value);
       return m ? m.name : value;
@@ -241,6 +247,13 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
       return [...none, ...store.repositories().map((r) => opt(r.id))];
     case 'project':
       return [...none, ...store.projects().map((p) => opt(p.id))];
+    case 'release':
+      return [
+        ...none,
+        ...store.releases().map((r) =>
+          opt(r.id, { hint: store.getReleasePipeline(r.pipelineId)?.name }),
+        ),
+      ];
     case 'milestone':
       return store
         .milestones()

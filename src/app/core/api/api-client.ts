@@ -51,6 +51,8 @@ import type {
   Membership,
   Milestone,
   OutgoingWebhook,
+  Release,
+  ReleasePipeline,
   Project,
   ProjectAiKind,
   ProjectAiResult,
@@ -86,6 +88,11 @@ import type {
   CreateInviteInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
+  CompleteReleaseInput,
+  CreateReleaseInput,
+  CreateReleasePipelineInput,
+  UpdateReleaseInput,
+  UpdateReleasePipelineInput,
   UpdateInputRequestInput,
   CreateCustomerInput,
   BulkIssuePatch,
@@ -560,9 +567,7 @@ export class ApiClient {
     get: (slug: string, idOrKey: string) =>
       this.get<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}`),
     context: (slug: string, idOrKey: string) =>
-      this.get<IssueContext>(
-        `${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/context`,
-      ),
+      this.get<IssueContext>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/context`),
     create: (slug: string, input: CreateIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/issues`, input),
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
@@ -610,6 +615,28 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/milestones/${id}`),
   };
 
+  readonly releasePipelines = {
+    list: (slug: string) => this.get<ReleasePipeline[]>(`${this.w(slug)}/releases/pipelines`),
+    create: (slug: string, input: CreateReleasePipelineInput) =>
+      this.post<ReleasePipeline>(`${this.w(slug)}/releases/pipelines`, input),
+    update: (slug: string, id: ID, input: UpdateReleasePipelineInput) =>
+      this.patch<ReleasePipeline>(`${this.w(slug)}/releases/pipelines/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/releases/pipelines/${id}`),
+  };
+
+  readonly releases = {
+    list: (slug: string, pipelineId?: ID) =>
+      this.get<Release[]>(`${this.w(slug)}/releases`, { pipelineId }),
+    get: (slug: string, id: ID) => this.get<Release>(`${this.w(slug)}/releases/${id}`),
+    create: (slug: string, input: CreateReleaseInput) =>
+      this.post<Release>(`${this.w(slug)}/releases`, input),
+    update: (slug: string, id: ID, input: UpdateReleaseInput) =>
+      this.patch<Release>(`${this.w(slug)}/releases/${id}`, input),
+    complete: (slug: string, id: ID, input: CompleteReleaseInput = {}) =>
+      this.post<Release>(`${this.w(slug)}/releases/${id}/complete`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/releases/${id}`),
+  };
+
   readonly artifacts = {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
     update: (slug: string, id: ID, input: UpdateArtifactInput) =>
@@ -630,15 +657,12 @@ export class ApiClient {
         markdown: string;
       }>(`${this.w(slug)}/uploads`, file),
     /** Attach the file as an image or file artifact. The URL form is unchanged. */
-    attach: (
-      slug: string,
-      target: { type: 'issue' | 'project'; id: string },
-      file: File,
-    ) => {
+    attach: (slug: string, target: { type: 'issue' | 'project'; id: string }, file: File) => {
       const id = encodeURIComponent(target.id);
-      const path = target.type === 'issue'
-        ? `${this.w(slug)}/issues/${id}/artifacts/upload`
-        : `${this.w(slug)}/projects/${id}/artifacts/upload`;
+      const path =
+        target.type === 'issue'
+          ? `${this.w(slug)}/issues/${id}/artifacts/upload`
+          : `${this.w(slug)}/projects/${id}/artifacts/upload`;
       return this.postForm<Artifact>(path, file);
     },
     discard: (slug: string, id: string, o?: RequestOptions) =>

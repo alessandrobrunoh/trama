@@ -30,6 +30,11 @@ import type {
   UpdateCustomerTierInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
+  CompleteReleaseInput,
+  CreateReleaseInput,
+  CreateReleasePipelineInput,
+  UpdateReleaseInput,
+  UpdateReleasePipelineInput,
   CreateIntegrationInput,
   IntegrationDetail,
   IntegrationWithWebhook,
@@ -96,6 +101,8 @@ import type {
   ProjectContext,
   ProjectContextArtifact,
   ProjectUpdate,
+  Release,
+  ReleasePipeline,
   Repository,
   Role,
   SavedView,
@@ -253,6 +260,8 @@ export class TramaStore {
   private readonly _repositories = signal<readonly Repository[]>([]);
   private readonly _projects = signal<readonly Project[]>([]);
   private readonly _milestones = signal<readonly Milestone[]>([]);
+  private readonly _releasePipelines = signal<readonly ReleasePipeline[]>([]);
+  private readonly _releases = signal<readonly Release[]>([]);
   private readonly _inputRequests = signal<readonly InputRequest[]>([]);
   private readonly _issues = signal<readonly Issue[]>([]);
   private readonly _customers = signal<readonly Customer[]>([]);
@@ -276,6 +285,8 @@ export class TramaStore {
   readonly projects = this._projects.asReadonly();
   /** All milestones, ordered by project then `sortOrder`. */
   readonly milestones = this._milestones.asReadonly();
+  readonly releasePipelines = this._releasePipelines.asReadonly();
+  readonly releases = this._releases.asReadonly();
   readonly inputRequests = this._inputRequests.asReadonly();
   readonly issues = this._issues.asReadonly();
   readonly customers = this._customers.asReadonly();
@@ -314,6 +325,8 @@ export class TramaStore {
     return map;
   });
   readonly milestoneById = computed(() => indexById(this._milestones()));
+  readonly releasePipelineById = computed(() => indexById(this._releasePipelines()));
+  readonly releaseById = computed(() => indexById(this._releases()));
   readonly artifactById = computed(() => indexById(this._artifacts()));
   readonly decisionById = computed(() => indexById(this._decisions()));
   readonly decisionByKey = computed(
@@ -380,6 +393,10 @@ export class TramaStore {
   readonly issuesByMilestone = computed(() =>
     groupBy(this._issues(), (i) => (i.milestoneIds?.length ? i.milestoneIds : undefined)),
   );
+  /** Releases of a pipeline (by pipeline id). */
+  readonly releasesByPipeline = computed(() => groupBy(this._releases(), (r) => r.pipelineId));
+  /** Issues assigned to a release (by release id). */
+  readonly issuesByRelease = computed(() => groupBy(this._issues(), (i) => i.releaseId));
   readonly issuesByTeam = computed(() => groupBy(this._issues(), (i) => i.teamId));
   /** Each project with its directly planned issues and attached artifacts. */
   readonly projectArtifactTree = computed(() => {
@@ -528,6 +545,12 @@ export class TramaStore {
   }
   getMilestone(id: string | null | undefined): Milestone | undefined {
     return id ? this.milestoneById().get(id) : undefined;
+  }
+  getReleasePipeline(id: string | null | undefined): ReleasePipeline | undefined {
+    return id ? this.releasePipelineById().get(id) : undefined;
+  }
+  getRelease(id: string | null | undefined): Release | undefined {
+    return id ? this.releaseById().get(id) : undefined;
   }
   /** By id or key (`ADR-7`). */
   getDecision(ref: string | null | undefined): Decision | undefined {
@@ -697,7 +720,8 @@ export class TramaStore {
     this._myRole.set(null);
     for (const c of [
       this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
-      this._milestones, this._inputRequests, this._issues, this._customers,
+      this._milestones, this._releasePipelines, this._releases, this._inputRequests, this._issues,
+      this._customers,
       this._customerRequests, this._artifacts,
       this._decisions, this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
@@ -762,6 +786,8 @@ export class TramaStore {
     list(this._repositories, s.repositories);
     list(this._projects, s.projects ?? []);
     list(this._milestones, s.milestones ?? []);
+    list(this._releasePipelines, s.releasePipelines ?? []);
+    list(this._releases, s.releases ?? []);
     list(this._inputRequests, s.inputRequests);
     // Issues waiting for their delayed delete stay hidden even if a refetch still lists them.
     list(this._issues, this.stagedDeletes.size ? s.issues.filter((i) => !this.stagedDeletes.has(i.id)) : s.issues);
@@ -1233,6 +1259,84 @@ export class TramaStore {
     for (const i of this._issues().filter((x) => x.milestoneIds?.some((m) => gone.has(m))))
       tx.patch(this._issues, i.id, { milestoneIds: i.milestoneIds.filter((m) => !gone.has(m)) });
     for (const id of ids) tx.remove(this._milestones, id);
+  }
+
+  // ─────────────────────────── releases ───────────────────────────
+
+  async createReleasePipeline(
+    input: CreateReleasePipelineInput,
+  ): Promise<ReleasePipeline | undefined> {
+    return this.write('create release pipeline', (s) => this.api.releasePipelines.create(s, input), {
+      onResult: (p) => this.upsert(this._releasePipelines, p),
+    });
+  }
+
+  async updateReleasePipeline(id: ID, patch: UpdateReleasePipelineInput): Promise<boolean> {
+    if (!this.releasePipelineById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._releasePipelines, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write(
+      'update release pipeline',
+      (s) => this.api.releasePipelines.update(s, id, patch),
+      { tx, onResult: (p) => this.upsert(this._releasePipelines, p) },
+    ).then((r) => !!r);
+  }
+
+  async deleteReleasePipeline(id: ID): Promise<boolean> {
+    if (!this.releasePipelineById().has(id)) return false;
+    const tx = this.tx();
+    this.dropReleases(
+      tx,
+      this._releases().filter((r) => r.pipelineId === id).map((r) => r.id),
+    );
+    tx.remove(this._releasePipelines, id);
+    return this.ok('delete release pipeline', (s) => this.api.releasePipelines.remove(s, id), {
+      tx,
+    });
+  }
+
+  async createRelease(input: CreateReleaseInput): Promise<Release | undefined> {
+    return this.write('create release', (s) => this.api.releases.create(s, input), {
+      onResult: (r) => this.upsert(this._releases, r),
+    });
+  }
+
+  async updateRelease(id: ID, patch: UpdateReleaseInput): Promise<boolean> {
+    if (!this.releaseById().has(id)) return false;
+    const tx = this.tx();
+    tx.patch(this._releases, id, { ...patch, updatedAt: this.nowIso() });
+    return this.write('update release', (s) => this.api.releases.update(s, id, patch), {
+      tx,
+      onResult: (r) => this.upsert(this._releases, r),
+    }).then((r) => !!r);
+  }
+
+  async completeRelease(id: ID, input: CompleteReleaseInput = {}): Promise<Release | undefined> {
+    if (!this.releaseById().has(id)) return undefined;
+    return this.write('complete release', (s) => this.api.releases.complete(s, id, input), {
+      onResult: (r) => this.upsert(this._releases, r),
+    });
+  }
+
+  async deleteRelease(id: ID): Promise<boolean> {
+    if (!this.releaseById().has(id)) return false;
+    const tx = this.tx();
+    this.dropReleases(tx, [id]);
+    return this.ok('delete release', (s) => this.api.releases.remove(s, id), { tx });
+  }
+
+  /** Assign or clear `issue.releaseId`. */
+  async setIssueRelease(issueId: ID, releaseId: ID | null): Promise<boolean> {
+    return this.updateIssue(issueId, { releaseId });
+  }
+
+  private dropReleases(tx: ReturnType<TramaStore['tx']>, ids: readonly ID[]): void {
+    if (!ids.length) return;
+    const gone = new Set(ids);
+    for (const i of this._issues().filter((x) => x.releaseId && gone.has(x.releaseId))) {
+      tx.patch(this._issues, i.id, { releaseId: null });
+    }
+    for (const id of ids) tx.remove(this._releases, id);
   }
 
   // ─────────────────────────── artifacts ───────────────────────────

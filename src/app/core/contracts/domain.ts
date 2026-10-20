@@ -760,6 +760,44 @@ export interface Milestone {
   updatedAt: ISODate;
 }
 
+export type ReleasePipelineType = 'continuous' | 'scheduled';
+export type ReleaseStatus = 'draft' | 'released' | 'canceled';
+
+/** Groups releases (continuous or a dated schedule). Owned by an optional team. */
+export interface ReleasePipeline {
+  /** `rpl_…` */
+  id: ID;
+  workspaceId: ID;
+  name: string;
+  type: ReleasePipelineType;
+  /** Ownership; suggested statuses still come from the workspace catalog, not the team. */
+  teamId?: ID;
+  /** When completing a scheduled release, leftover open issues move to the next draft. */
+  moveOpenIssuesToNext: boolean;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+/** A version (or SHA) in a pipeline. Issues join it via `Issue.releaseId`. */
+export interface Release {
+  /** `rel_…` */
+  id: ID;
+  workspaceId: ID;
+  pipelineId: ID;
+  /** Version or SHA. */
+  name: string;
+  status: ReleaseStatus;
+  /** Markdown release notes. */
+  notes?: string;
+  /** Scheduled pipelines only. */
+  targetAt?: ISODate;
+  releasedAt?: ISODate;
+  /** Set on reads. */
+  issueCount?: number;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
 // ───────────────────────────── Input requests ─────────────────────────
 
 export type InputRequestState = 'open' | 'answered' | 'dismissed';
@@ -832,6 +870,8 @@ export interface Issue {
    * Milestones this issue is in: at most one per project, and only milestones of `projectId`.
    */
   milestoneIds: ID[];
+  /** Upcoming (or completed) release this issue ships in. One at a time; null/absent is unassigned. */
+  releaseId?: ID;
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
   estimate?: number;
   /** First time the status entered in_progress / in_review. Kept when moved back. */
@@ -1591,7 +1631,9 @@ export type SubjectType =
   | 'project_update'
   | 'milestone'
   | 'import'
-  | 'document';
+  | 'document'
+  | 'release'
+  | 'release_pipeline';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -2119,6 +2161,7 @@ export type ApiResource =
   | 'customers'
   | 'decisions'
   | 'milestones'
+  | 'releases'
   | 'comments'
   | 'artifacts'
   | 'documents'
@@ -2151,6 +2194,7 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   customers: { label: 'Customers', group: 'Work', actions: RWD },
   decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
+  releases: { label: 'Releases', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
   documents: { label: 'Documents', group: 'Work', actions: RWD },
@@ -2183,6 +2227,7 @@ const WORK: ApiResource[] = [
   'customers',
   'decisions',
   'milestones',
+  'releases',
   'comments',
   'artifacts',
   'documents',
@@ -3163,6 +3208,8 @@ export interface WorkspaceSnapshot {
   customerRequests: CustomerRequest[];
   artifacts: Artifact[];
   decisions: Decision[];
+  releasePipelines: ReleasePipeline[];
+  releases: Release[];
   /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
   /** Present only in `index` mode. */

@@ -29,6 +29,7 @@ import {
   DocumentEntity,
   IssueEntity,
   MilestoneEntity,
+  ReleaseEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import {
@@ -65,6 +66,8 @@ export interface IssueInput {
   status?: string;
   externalUrl?: string | null;
   milestoneIds?: string[];
+  /** Draft release in this workspace. `null` clears it. */
+  releaseId?: string | null;
   labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
@@ -78,6 +81,7 @@ export interface BulkIssuePatch {
   assigneeId?: string | null;
   teamId?: string | null;
   projectId?: string | null;
+  releaseId?: string | null;
   addLabels?: string[];
   removeLabels?: string[];
 }
@@ -177,6 +181,7 @@ export class IssuesService {
       assigneeId?: string;
       projectId?: string;
       milestoneId?: string;
+      releaseId?: string;
     } & DemandFilter & {
         q?: string;
         priority?: Priority[];
@@ -217,6 +222,7 @@ export class IssuesService {
       qb.andWhere('i.milestoneIds @> :m::jsonb', {
         m: JSON.stringify([f.milestoneId]),
       });
+    if (f.releaseId) qb.andWhere('i.releaseId = :releaseId', { releaseId: f.releaseId });
     for (const c of demandConditions('i', 'issueId', f))
       qb.andWhere(c.sql, c.params);
     applyProjectScope(qb, 'i', 'projectId');
@@ -320,6 +326,27 @@ export class IssuesService {
         );
       seen.add(m.projectId);
     }
+  }
+
+  /**
+   * A release must exist in this workspace. Issues may only join a draft;
+   * `null` clears the assignment.
+   */
+  private async assertRelease(
+    workspaceId: string,
+    releaseId: string | null,
+  ): Promise<string | null> {
+    if (!releaseId) return null;
+    const row = await this.ds
+      .getRepository(ReleaseEntity)
+      .findOneBy({ workspaceId, id: releaseId });
+    if (!row)
+      throw new BadRequestException(
+        `Unknown release "${releaseId}" in this workspace`,
+      );
+    if (row.status !== 'draft')
+      throw new BadRequestException('Issues can only join a draft release');
+    return row.id;
   }
 
   /** Resolve a parent in this workspace and enforce the same project visibility as issue reads. */
@@ -442,6 +469,10 @@ export class IssuesService {
       workspaceId,
       [input.projectId].filter((x): x is string => !!x),
     );
+    const releaseId = await this.assertRelease(
+      workspaceId,
+      input.releaseId ?? null,
+    );
     const resolved = await this.resolveIssueStatus(
       workspaceId,
       input.status ?? 'backlog',
@@ -494,6 +525,7 @@ export class IssuesService {
           assigneeId,
           teamId: input.teamId ?? null,
           projectId: input.projectId ?? null,
+          releaseId,
           parentId,
           priority: input.priority ?? 'none',
           status,
@@ -676,6 +708,7 @@ export class IssuesService {
       if (patch.assigneeId !== undefined) next.assigneeId = patch.assigneeId;
       if (patch.teamId !== undefined) next.teamId = patch.teamId;
       if (patch.projectId !== undefined) next.projectId = patch.projectId;
+      if (patch.releaseId !== undefined) next.releaseId = patch.releaseId;
       if (addLabels.length || removeLabels.length)
         next.labels = unique([...row.labels, ...addLabels]).filter(
           (l) => !removeLabels.includes(l),
@@ -783,6 +816,8 @@ export class IssuesService {
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
     if (patch.teamId !== undefined) row.teamId = patch.teamId;
     if (patch.projectId !== undefined) row.projectId = patch.projectId;
+    if (patch.releaseId !== undefined)
+      row.releaseId = await this.assertRelease(workspaceId, patch.releaseId);
     if (patch.parentId !== undefined) row.parentId = patch.parentId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;

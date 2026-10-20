@@ -49,6 +49,7 @@ import { Kbd } from '../../shared/kbd';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
 import { IssueMilestoneProp } from '../milestones/milestone-chips';
+import { IssueReleaseProp } from '../releases/issue-release-prop';
 import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
@@ -87,6 +88,7 @@ import { LabelPicker } from '../../shared/label-picker';
     RelativeTimePipe,
     PropertyRow,
     IssueMilestoneProp,
+    IssueReleaseProp,
     IssueExternalRef,
     Picker,
     InlineText,
@@ -476,6 +478,7 @@ import { LabelPicker } from '../../shared/label-picker';
                 </app-property-row>
               }
               <app-issue-milestone-prop [issue]="i" />
+              <app-issue-release-prop [issue]="i" />
               <app-property-row label="Labels" [icon]="tagGlyph">
                 <app-label-picker
                   #labelPicker

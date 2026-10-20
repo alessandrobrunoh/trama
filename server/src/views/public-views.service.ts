@@ -21,6 +21,7 @@ import {
   IssueEntity,
   MembershipEntity,
   ProjectEntity,
+  ReleaseEntity,
   SavedViewEntity,
   TeamEntity,
   UserEntity,
@@ -216,7 +217,7 @@ export class PublicViewsService {
     }
   }
 
-  /** Display names for the teams, people and projects the returned rows point at. */
+  /** Display names for the teams, people, projects and releases the returned rows point at. */
   private async namesFor(
     workspaceId: string,
     entity: ViewEntity,
@@ -226,6 +227,7 @@ export class PublicViewsService {
       team: new Map(),
       user: new Map(),
       project: new Map(),
+      release: new Map(),
     };
     const need = new Set<RefKind>();
     for (const field of [
@@ -248,6 +250,11 @@ export class PublicViewsService {
         .getRepository(ProjectEntity)
         .find({ where: { workspaceId } }))
         names.project.set(p.id, p.name);
+    if (need.has('release'))
+      for (const r of await this.ds
+        .getRepository(ReleaseEntity)
+        .find({ where: { workspaceId } }))
+        names.release.set(r.id, r.name);
     if (need.has('user')) {
       const members = await this.ds
         .getRepository(MembershipEntity)

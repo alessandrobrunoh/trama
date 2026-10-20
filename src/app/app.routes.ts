@@ -239,6 +239,18 @@ export const routes: Routes = [
           import('./features/releases/release-list-page').then((m) => m.ReleaseListPage),
       },
       {
+        path: 'releases/:pipelineId',
+        title: 'Releases · Trama',
+        loadComponent: () =>
+          import('./features/releases/release-list-page').then((m) => m.ReleaseListPage),
+      },
+      {
+        path: 'releases/:pipelineId/:releaseId',
+        title: 'Release · Trama',
+        loadComponent: () =>
+          import('./features/releases/release-detail-page').then((m) => m.ReleaseDetailPage),
+      },
+      {
         path: 'documents/:id',
         title: 'Document · Trama',
         loadComponent: () =>

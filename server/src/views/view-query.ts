@@ -7,7 +7,7 @@ import type { Demand, ViewEntity, ViewFilter } from '../contracts/domain.js';
 type Row = Record<string, unknown>;
 type FieldKind =
   'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date' | 'number';
-export type RefKind = 'team' | 'user' | 'project';
+export type RefKind = 'team' | 'user' | 'project' | 'release';
 
 interface FieldSpec {
   kind: FieldKind;
@@ -79,6 +79,7 @@ export const VIEW_FIELDS: Partial<
     priority: enumOf(PRIORITIES),
     source: enumOf(['manual', 'github', 'gitlab', 'email', 'api', 'agent']),
     projectId: ref('project'),
+    releaseId: ref('release'),
     milestoneIds: { kind: 'multi-id' },
     labels: tags,
     title: text,

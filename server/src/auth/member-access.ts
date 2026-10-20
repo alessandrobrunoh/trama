@@ -46,6 +46,7 @@ const POST_UPDATE = new Set([
   'attach',
   'detach',
   'publish',
+  'complete',
   'criteria',
   'merge',
   'external-ref',
