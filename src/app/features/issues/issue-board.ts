@@ -427,12 +427,10 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             [hlmContextMenuTrigger]="issueMenu"
             [hlmContextMenuTriggerData]="{ $implicit: i }"
             [disabled]="!canEdit()"
-            (mouseenter)="ui.setFocusedRow(i.id)"
           >
             @if (d().layout === 'list') {
               <app-issue-row
                 [issue]="i"
-                [focused]="ui.focusedRowId() === i.id"
                 [selected]="selectedSet().has(i.id)"
                 [selectable]="canEdit()"
                 [selecting]="selection().length > 0"
@@ -445,7 +443,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               <app-issue-card
                 class="mb-0"
                 [issue]="i"
-                [focused]="ui.focusedRowId() === i.id"
                 [selected]="selectedSet().has(i.id)"
                 [selectable]="canEdit()"
                 [selecting]="selection().length > 0"
