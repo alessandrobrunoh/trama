@@ -1,6 +1,17 @@
 // Issue list row and board card. The whole row/card is a link (an absolutely positioned <a>);
 // property glyphs sit above it and open inline pickers.
-import { ChangeDetectionStrategy, Component, Directive, computed, inject, input, output } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  Directive,
+  ElementRef,
+  NgZone,
+  computed,
+  inject,
+  input,
+  output,
+} from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideBuilding2,
@@ -12,7 +23,7 @@ import {
   LucideUserRoundX,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { TramaStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
+import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
@@ -29,8 +40,10 @@ import { IssueProp } from './issue-prop';
 @Directive()
 abstract class IssueItemBase {
   protected readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
   readonly issue = input.required<Issue>();
-  readonly focused = input(false);
+  // Keep focus consumption in the item: a hover must not recheck every binding on the board.
+  protected readonly focused = computed(() => this.ui.focusedRowId() === this.issue().id);
   readonly selected = input(false);
   /** Show selection checkboxes (on hover, or always while something is selected). */
   readonly selectable = input(false);
@@ -68,6 +81,17 @@ abstract class IssueItemBase {
   protected readonly dateTitle = computed(
     () => `${this.dateField() === 'createdAt' ? 'Created' : 'Updated'} ${fullDate(this.issue()[this.dateField()])}`,
   );
+
+  constructor() {
+    const element = inject(ElementRef<HTMLElement>).nativeElement;
+    const enter = (event: MouseEvent): void => {
+      // Moving over other cards during a drag must not change the keyboard action target.
+      if (event.buttons === 0) this.ui.setFocusedRow(this.issue().id);
+    };
+    // A template listener also marks the owning board dirty, even with OnPush.
+    inject(NgZone).runOutsideAngular(() => element.addEventListener('mouseenter', enter));
+    inject(DestroyRef).onDestroy(() => element.removeEventListener('mouseenter', enter));
+  }
 
   protected onLinkClick(e: MouseEvent): void {
     if (e.shiftKey && this.selectable()) {
