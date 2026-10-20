@@ -456,10 +456,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
                 @for (item of g.items; track item.id) {
                   @switch (v.entity) {
                     @case ('issue') {
-                      <app-issue-card
-                        [issue]="asIssue(item)"
-                        [focused]="ui.focusedRowId() === item.id"
-                      />
+                      <app-issue-card [issue]="asIssue(item)" />
                     }
                     @case ('project') {
                       <app-view-project-card
@@ -512,10 +509,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
             @for (item of g.items; track item.id) {
               @switch (v.entity) {
                 @case ('issue') {
-                  <app-issue-row
-                    [issue]="asIssue(item)"
-                    [focused]="ui.focusedRowId() === item.id"
-                  />
+                  <app-issue-row [issue]="asIssue(item)" />
                 }
                 @case ('project') {
                   <app-view-project-row
