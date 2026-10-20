@@ -10,7 +10,6 @@ import {
   LucideLayers,
   LucideLayoutDashboard,
   LucideMessageSquare,
-  LucideNetwork,
   LucidePlug,
   LucideRocket,
   LucideScale,
@@ -143,13 +142,6 @@ export const MORE_NAV: NavItem[] = [
     icon: LucideActivity,
     keys: 'g e',
     hint: 'Everything that happened, newest first',
-  },
-  {
-    segment: 'graph',
-    label: 'Graph',
-    icon: LucideNetwork,
-    keys: 'g x',
-    hint: 'Dependencies between issues and projects',
   },
   {
     segment: 'stats',
