@@ -1,11 +1,26 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import type { Role } from '../contracts/domain.js';
-import { IntegrationConnectionEntity, type UserEntity } from '../database/entities/index.js';
+import {
+  IntegrationConnectionEntity,
+  ReleaseEntity,
+  ReleasePipelineEntity,
+  type UserEntity,
+} from '../database/entities/index.js';
 import { SnapshotService } from './snapshot.service.js';
 
-const connection = { id: 'ic_1', provider: 'github', account: 'acme', status: 'connected', lastError: null };
-const attentionItem = { id: 'input_requested:ir_1', kind: 'input_requested', state: 'open' };
+const connection = {
+  id: 'ic_1',
+  provider: 'github',
+  account: 'acme',
+  status: 'connected',
+  lastError: null,
+};
+const attentionItem = {
+  id: 'input_requested:ir_1',
+  kind: 'input_requested',
+  state: 'open',
+};
 
 function build(role: Role, manageIntegrations: Role = 'admin') {
   const queried: unknown[] = [];
@@ -14,24 +29,41 @@ function build(role: Role, manageIntegrations: Role = 'admin') {
     getRepository: (entity: unknown) => {
       queried.push(entity);
       const rows = entity === IntegrationConnectionEntity ? [connection] : [];
-      return { find: vi.fn().mockResolvedValue(rows), findBy: vi.fn().mockResolvedValue([]) };
+      return {
+        find: vi.fn().mockResolvedValue(rows),
+        findBy: vi.fn().mockResolvedValue([]),
+      };
     },
   };
   const service = new SnapshotService(
     ds as never,
     { list: vi.fn().mockResolvedValue([]) } as never,
     {
-      attachProjectCounts: vi.fn().mockImplementation((_ws: string, rows: unknown[]) => rows),
-      attachCounts: vi.fn().mockImplementation((_ws: string, rows: unknown[]) => rows),
+      attachProjectCounts: vi
+        .fn()
+        .mockImplementation((_ws: string, rows: unknown[]) => rows),
+      attachCounts: vi
+        .fn()
+        .mockImplementation((_ws: string, rows: unknown[]) => rows),
     } as never,
-    { listAll: vi.fn().mockResolvedValue([]), index: vi.fn().mockResolvedValue([]) } as never,
+    {
+      listAll: vi.fn().mockResolvedValue([]),
+      index: vi.fn().mockResolvedValue([]),
+    } as never,
     attention as never,
   );
   const ctx = {
     role,
-    workspace: { id: 'ws_1', resolved: () => ({ permissions: { manageIntegrations } }) },
+    workspace: {
+      id: 'ws_1',
+      resolved: () => ({ permissions: { manageIntegrations } }),
+    },
   } as unknown as WorkspaceContext;
-  return { run: () => service.build(ctx, { id: 'usr_1' } as UserEntity, role), queried, attention };
+  return {
+    run: () => service.build(ctx, { id: 'usr_1' } as UserEntity, role),
+    queried,
+    attention,
+  };
 }
 
 describe('SnapshotService integrations', () => {
@@ -51,7 +83,9 @@ describe('SnapshotService integrations', () => {
   });
 
   it('follows the workspace permission setting', async () => {
-    expect((await build('member', 'member').run()).integrations).toEqual([connection]);
+    expect((await build('member', 'member').run()).integrations).toEqual([
+      connection,
+    ]);
     expect((await build('member', 'owner').run()).integrations).toEqual([]);
   });
 });
@@ -62,5 +96,16 @@ describe('SnapshotService attention', () => {
     const { run, attention } = build('member');
     expect((await run()).attention).toEqual([attentionItem]);
     expect(attention.list).toHaveBeenCalledWith('ws_1', 'usr_1');
+  });
+});
+
+describe('SnapshotService releases', () => {
+  it('includes release pipelines and releases', async () => {
+    const { run, queried } = build('member');
+    const snap = await run();
+    expect(snap.releasePipelines).toEqual([]);
+    expect(snap.releases).toEqual([]);
+    expect(queried).toContain(ReleasePipelineEntity);
+    expect(queried).toContain(ReleaseEntity);
   });
 });

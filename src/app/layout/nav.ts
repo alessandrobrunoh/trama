@@ -105,7 +105,7 @@ export const MORE_NAV: NavItem[] = [
     label: 'Releases',
     icon: LucideRocket,
     keys: 'g l',
-    hint: 'Release artifacts attached to issues and projects',
+    hint: 'Release pipelines, versions and changelog',
     keywords: 'versions shipped changelog',
   },
   {

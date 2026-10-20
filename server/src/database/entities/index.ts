@@ -29,6 +29,8 @@ import type {
   Priority,
   ProjectHealth,
   ProjectStatus,
+  ReleasePipelineType,
+  ReleaseStatus,
   ReviewState,
   Role,
   SavedView,
@@ -384,6 +386,50 @@ export class InputRequestEntity extends Wire {
   }
 }
 
+// ───────────────────────────── releases ─────────────────────────────
+
+@Entity('release_pipelines')
+@Index('IDX_release_pipelines_workspace', ['workspaceId'])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => TeamEntity, ['teamId'], ['id'], { onDelete: 'SET NULL' })
+export class ReleasePipelineEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'varchar', default: 'continuous' }) type: ReleasePipelineType;
+  @Column({ type: 'varchar', nullable: true }) teamId: string | null;
+  @Column({ type: 'boolean', default: false }) moveOpenIssuesToNext: boolean;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+}
+
+@Entity('releases')
+@Index('IDX_releases_workspace', ['workspaceId'])
+@Index('IDX_releases_pipeline', ['pipelineId'])
+@Index('UQ_releases_workspace_id', ['workspaceId', 'id'], { unique: true })
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => ReleasePipelineEntity, ['pipelineId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+export class ReleaseEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) id: string;
+  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar' }) pipelineId: string;
+  @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'varchar', default: 'draft' }) status: ReleaseStatus;
+  @Column({ type: 'text', nullable: true }) notes: string | null;
+  @Column({ type: 'timestamptz', nullable: true }) targetAt: Date | null;
+  @Column({ type: 'timestamptz', nullable: true }) releasedAt: Date | null;
+  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
+  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
+  /** Filled on read. Not a column. */
+  issueCount?: number;
+}
+
 // ───────────────────────────── issues ─────────────────────────────
 
 @Entity('issues')
@@ -396,7 +442,9 @@ export class InputRequestEntity extends Wire {
 @ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
   onDelete: 'SET NULL',
 })
+@ForeignKey(() => ReleaseEntity, ['releaseId'], ['id'], { onDelete: 'SET NULL' })
 @Index('IDX_issues_project', ['projectId'])
+@Index('IDX_issues_release', ['releaseId'])
 @Index('UQ_issues_workspace_id', ['workspaceId', 'id'], { unique: true })
 @Index('IDX_issues_parent', ['parentId'])
 export class IssueEntity extends Wire {
@@ -417,6 +465,7 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
   @Column({ type: 'text', nullable: true }) goal: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) milestoneIds: string[];
+  @Column({ type: 'varchar', nullable: true }) releaseId: string | null;
   @Column({ type: 'double precision', nullable: true }) estimate: number | null;
   @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
@@ -958,6 +1007,8 @@ export const ENTITIES = [
   DocumentEntity,
   DocumentRevisionEntity,
   MilestoneEntity,
+  ReleasePipelineEntity,
+  ReleaseEntity,
   InputRequestEntity,
   IssueEntity,
   CustomerEntity,

@@ -8,6 +8,7 @@ import {
   IssueEntity,
   MembershipEntity,
   ProjectEntity,
+  ReleaseEntity,
   SavedViewEntity,
   TeamEntity,
   UserEntity,
@@ -77,6 +78,7 @@ function setup(
     [IssueEntity, { find }],
     [DecisionEntity, { find: async () => [] }],
     [ProjectEntity, { find: async () => [{ id: 'p1', name: 'Apollo' }] }],
+    [ReleaseEntity, { find: async () => [{ id: 'rel_1', name: 'v1.4.0' }] }],
     [
       TeamEntity,
       {
@@ -213,6 +215,35 @@ describe('PublicViewsService', () => {
     );
     const out = await s.service.get(s.token);
     expect(out.groups[0].items.map((i) => i.key)).toEqual(['BUG-3', 'BUG-1']);
+  });
+
+  it('filters and groups issues by release with resolved names', async () => {
+    const filtered = setup(
+      { filters: [{ field: 'releaseId', op: 'is', value: 'rel_1' }] },
+      [
+        issue(1, { releaseId: 'rel_1' }),
+        issue(2),
+        issue(3, { releaseId: 'rel_1' }),
+      ],
+    );
+    const filteredOut = await filtered.service.get(filtered.token);
+    expect(filteredOut.groups[0].items.map((i) => i.key)).toEqual([
+      'BUG-1',
+      'BUG-3',
+    ]);
+
+    const grouped = setup({ groupBy: 'releaseId', filters: [] }, [
+      issue(1, { releaseId: 'rel_1' }),
+      issue(2),
+      issue(3, { releaseId: 'rel_1' }),
+    ]);
+    const groupedOut = await grouped.service.get(grouped.token);
+    expect(groupedOut.groups.map((g) => [g.key, g.label, g.items.length])).toEqual(
+      [
+        ['rel_1', 'v1.4.0', 2],
+        ['', '', 1],
+      ],
+    );
   });
 
   it('truncates long results', async () => {

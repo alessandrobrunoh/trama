@@ -459,6 +459,7 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
       priority: rng.weighted(PRIORITY_WEIGHTS),
       status: p.outcome,
       milestoneIds,
+      releaseId: null,
       aliases: [],
       estimate: p.tier === null ? null : values[p.tier],
       startedAt: startedAt === undefined ? null : ISO(startedAt),

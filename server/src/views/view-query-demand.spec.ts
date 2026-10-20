@@ -143,3 +143,42 @@ describe('customer demand in a view', () => {
     ).toHaveLength(1);
   });
 });
+
+describe('releaseId in a view', () => {
+  const issues = [
+    { id: 'in_a', title: 'A', releaseId: 'rel_1' },
+    { id: 'in_b', title: 'B', releaseId: 'rel_2' },
+    { id: 'in_c', title: 'C' },
+  ];
+
+  it('filters issues by release, including no release', () => {
+    expect(
+      applyFilters('issue', issues, [
+        { field: 'releaseId', op: 'is', value: 'rel_1' },
+      ]).map((r) => r.id),
+    ).toEqual(['in_a']);
+    expect(
+      applyFilters('issue', issues, [
+        { field: 'releaseId', op: 'is', value: '' },
+      ]).map((r) => r.id),
+    ).toEqual(['in_c']);
+    expect(
+      applyFilters('issue', issues, [
+        { field: 'releaseId', op: 'in', value: ['rel_1', 'rel_2'] },
+      ]).map((r) => r.id),
+    ).toEqual(['in_a', 'in_b']);
+  });
+
+  it('groups by releaseId', () => {
+    expect(
+      groupItems('issue', issues, 'releaseId').map((g) => [
+        g.key,
+        g.items.length,
+      ]),
+    ).toEqual([
+      ['rel_1', 1],
+      ['rel_2', 1],
+      ['', 1],
+    ]);
+  });
+});

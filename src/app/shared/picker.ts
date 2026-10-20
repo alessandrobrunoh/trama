@@ -54,6 +54,8 @@ export interface PickOption {
   fraction?: number;
   /** Dot color for `label` options (`#rrggbb`). */
   color?: string;
+  /** Consecutive options with the same group share a section header. */
+  group?: string;
 }
 
 /** "user:usr_1" → ActorRef. */
@@ -262,8 +264,8 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           }
           <div *hlmCommandEmptyState hlmCommandEmpty>No matches.</div>
           <hlm-command-list class="max-h-64">
-            <hlm-command-group>
-              @if (clearable() && (clearAlways() || selected().length > 0)) {
+            @if (clearable() && (clearAlways() || selected().length > 0)) {
+              <hlm-command-group>
                 <button hlmCommandItem value="__clear" (selected)="clear()">
                   <span class="text-muted-foreground min-w-0 flex-1 truncate">{{
                     clearLabel()
@@ -272,24 +274,34 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
                     <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
                   }
                 </button>
-              }
-              @for (o of options(); track o.value) {
-                <button
-                  hlmCommandItem
-                  [value]="(o.search ?? o.label) + ' ' + o.value"
-                  (selected)="pick(o)"
-                >
-                  <ng-container *ngTemplateOutlet="glyph; context: { $implicit: o }" />
-                  <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
-                  @if (o.hint) {
-                    <span class="text-muted-foreground font-mono text-[11px]">{{ o.hint }}</span>
-                  }
-                  @if (isSelected(o.value)) {
-                    <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
-                  }
-                </button>
-              }
-            </hlm-command-group>
+              </hlm-command-group>
+            }
+            @for (g of optionGroups(); track $index) {
+              <hlm-command-group>
+                @if (g.label) {
+                  <hlm-command-group-label
+                    class="text-muted-foreground px-2 pt-1.5 pb-0.5 text-[11px] font-medium"
+                    >{{ g.label }}</hlm-command-group-label
+                  >
+                }
+                @for (o of g.items; track o.value) {
+                  <button
+                    hlmCommandItem
+                    [value]="(o.search ?? o.label) + ' ' + o.value"
+                    (selected)="pick(o)"
+                  >
+                    <ng-container *ngTemplateOutlet="glyph; context: { $implicit: o }" />
+                    <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
+                    @if (o.hint) {
+                      <span class="text-muted-foreground font-mono text-[11px]">{{ o.hint }}</span>
+                    }
+                    @if (isSelected(o.value)) {
+                      <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
+                    }
+                  </button>
+                }
+              </hlm-command-group>
+            }
           </hlm-command-list>
           @if (create()) {
             <div class="border-t p-1">
@@ -398,6 +410,16 @@ export class Picker {
   protected readonly check = LucideCheck;
   protected readonly plus = LucidePlus;
 
+  protected readonly optionGroups = computed(() => {
+    const groups: { key: string; label: string | undefined; items: PickOption[] }[] = [];
+    for (const o of this.options()) {
+      const key = o.group ?? '';
+      const last = groups.at(-1);
+      if (last && last.key === key) last.items.push(o);
+      else groups.push({ key, label: o.group, items: [o] });
+    }
+    return groups;
+  });
   private readonly byValue = computed(() => new Map(this.options().map((o) => [o.value, o])));
   protected readonly selected = computed<PickOption[]>(() =>
     this.value().map((v) => this.byValue().get(v) ?? { value: v, label: v }),

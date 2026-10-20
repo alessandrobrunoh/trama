@@ -389,7 +389,7 @@ export class SeedBuilder {
     this.data.issues.push({
       id, workspaceId: this.workspaceId, key, number: o.number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', status: o.status,
-      goal: null, milestoneIds: o.milestones ?? [], aliases: [], estimate: o.estimate ?? null,
+      goal: null, milestoneIds: o.milestones ?? [], releaseId: null, aliases: [], estimate: o.estimate ?? null,
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,

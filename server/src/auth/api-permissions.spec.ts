@@ -38,6 +38,12 @@ describe('requiredPermission', () => {
         '/api/w/:slug/outgoing-webhooks/:id/deliveries',
       ),
     ).toBe('outgoing-webhooks:read');
+    expect(requiredPermission('POST', '/api/w/:slug/releases')).toBe(
+      'releases:write',
+    );
+    expect(
+      requiredPermission('POST', '/api/w/:slug/releases/:id/complete'),
+    ).toBe('releases:write');
   });
 
   it('keeps the issue-first insights routes read-only', () => {

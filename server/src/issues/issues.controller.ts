@@ -105,6 +105,7 @@ class CreateIssueDto {
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
+  @IsOptional() @IsString() releaseId?: string;
   /** Id or key of the parent issue. */
   @IsOptional() @IsString() parentId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
@@ -132,6 +133,8 @@ class UpdateIssueDto {
   @Clearable() @IsString() teamId?: string | null;
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
+  /** Draft release in this workspace. `null` clears it. */
+  @Clearable() @IsString() releaseId?: string | null;
   /** Id or key of the parent issue. `null` makes this issue a root issue. */
   @Clearable() @IsString() parentId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
@@ -174,6 +177,7 @@ export class BulkIssuePatchDto {
   @Clearable() @IsString() teamId?: string | null;
   /** `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
+  @Clearable() @IsString() releaseId?: string | null;
   @OptionalNotNull()
   @IsArray()
   @ArrayMaxSize(20)
@@ -206,6 +210,7 @@ class ListIssueQuery {
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() milestoneId?: string;
+  @IsOptional() @IsString() releaseId?: string;
   @IsOptional() @IsString() customerId?: string;
   /** At least this many distinct linked customers. */
   @IsOptional()
