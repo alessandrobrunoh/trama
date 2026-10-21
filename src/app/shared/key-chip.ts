@@ -1,7 +1,7 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 
 /**
- * Mono entity key: AUTH-42, BUG-142, ADR-7, a commit sha.
+ * Mono entity key: AUTH-42, CORA-142, ADR-7, a commit sha.
  *   <app-key-chip value="AUTH-42" />      or   <app-key-chip>AUTH-42</app-key-chip>
  */
 @Component({

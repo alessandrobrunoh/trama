@@ -75,16 +75,15 @@ export const PROVIDER_META: Record<ExecutionProvider, { label: string; order: nu
 };
 export const PROVIDERS = sortedKeys(PROVIDER_META);
 
-export const ISSUE_KIND_META: Record<IssueKind, { label: string; prefix: string; order: number }> =
-  {
-    incident: { label: 'Incident', prefix: 'INC', order: 0 },
-    security: { label: 'Security', prefix: 'SEC', order: 1 },
-    bug: { label: 'Bug', prefix: 'BUG', order: 2 },
-    feature: { label: 'Feature', prefix: 'FEAT', order: 3 },
-    tech_debt: { label: 'Tech debt', prefix: 'DEBT', order: 4 },
-    feedback: { label: 'Feedback', prefix: 'FB', order: 5 },
-    idea: { label: 'Idea', prefix: 'IDEA', order: 6 },
-  };
+export const ISSUE_KIND_META: Record<IssueKind, { label: string; order: number }> = {
+  incident: { label: 'Incident', order: 0 },
+  security: { label: 'Security', order: 1 },
+  bug: { label: 'Bug', order: 2 },
+  feature: { label: 'Feature', order: 3 },
+  tech_debt: { label: 'Tech debt', order: 4 },
+  feedback: { label: 'Feedback', order: 5 },
+  idea: { label: 'Idea', order: 6 },
+};
 export const ISSUE_KINDS = sortedKeys(ISSUE_KIND_META);
 
 export const ISSUE_STATUS_META: Record<IssueStatus, Meta> = {

@@ -45,6 +45,21 @@ function makeService(opts: { failSave?: boolean } = {}) {
     return r;
   });
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
+    if (sql.startsWith('SELECT "id", "teamId"')) {
+      const ids = params?.[1] as string[];
+      return ids.map((id) => {
+        const row = byId.get(id) ?? issue(id);
+        return {
+          id,
+          teamId: row.teamId,
+          projectId: row.projectId,
+          parentId: row.parentId,
+          key: row.key,
+          number: row.number,
+          aliases: row.aliases,
+        };
+      });
+    }
     if (sql.startsWith('SELECT "id", "parentId"')) {
       const ids = params?.[1] as string[];
       return ids.map((id) => ({

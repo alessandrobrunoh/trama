@@ -93,7 +93,7 @@ import { SiteHeader } from './site-header';
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="text-muted-foreground ml-3 truncate font-mono text-[11px]"
-                >trama / acme / issues / BUG-142</span
+                >trama / acme / issues / AUTH-142</span
               >
             </div>
             <div class="flex">
@@ -117,7 +117,7 @@ import { SiteHeader } from './site-header';
               <div class="min-w-0 flex-1 p-4 sm:p-6">
                 <div class="flex flex-wrap items-center gap-2 text-xs">
                   <span class="text-entity-issue inline-flex items-center gap-1 font-medium">
-                    <svg [lucideIcon]="openIcon" [size]="13"></svg> BUG-142
+                    <svg [lucideIcon]="openIcon" [size]="13"></svg> AUTH-142
                   </span>
                   <span
                     class="bg-tone-blue/12 text-tone-blue rounded-full px-2 py-0.5 text-[11px] font-medium"
@@ -242,8 +242,8 @@ import { SiteHeader } from './site-header';
                         </span>
                         <span
                           ><b class="font-medium">PR #311</b
-                          ><span class="text-muted-foreground"> merged · fixes </span>BUG-142,
-                          BUG-153</span
+                          ><span class="text-muted-foreground"> merged · fixes </span>AUTH-142,
+                          AUTH-153</span
                         >
                       </li>
                     </ul>
@@ -543,9 +543,9 @@ export class LandingPage {
   ];
 
   protected readonly issues = [
-    { key: 'BUG-142', title: 'Session expires unexpectedly', done: true },
-    { key: 'BUG-148', title: 'OAuth callback loops on Safari', done: false },
-    { key: 'BUG-153', title: 'Logout leaves a stale authentication cookie', done: true },
+    { key: 'AUTH-142', title: 'Session expires unexpectedly', done: true },
+    { key: 'AUTH-148', title: 'OAuth callback loops on Safari', done: false },
+    { key: 'AUTH-153', title: 'Logout leaves a stale authentication cookie', done: true },
   ];
 
   protected readonly ticketFlow = ['Issue', 'Assignee', 'Branch', 'PR', 'Done'];

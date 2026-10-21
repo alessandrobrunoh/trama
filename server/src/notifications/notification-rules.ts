@@ -53,7 +53,7 @@ export interface NotificationDraft {
   kind: NotificationKind;
   title: string;
   body?: string;
-  /** Relative to the workspace, e.g. `issues/BUG-142`. */
+  /** Relative to the workspace, e.g. `issues/AUTH-142`. */
   link: string;
   subject: LegacySubjectRef;
 }

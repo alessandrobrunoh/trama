@@ -13,8 +13,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import {
-  ISSUE_KEY_PREFIX,
   statusIdsForTypes,
+  UNASSIGNED_ISSUE_KEY_PREFIX,
   type ExternalRef,
   type ActorRef,
   type IssueKind,
@@ -45,10 +45,11 @@ import {
   projectHidden,
 } from '../auth/member-access.js';
 import { UploadsService } from '../uploads/uploads.service.js';
+import { allocateIssueNumbers, issueKeyPrefix, type IssueKeyChange } from './issue-keys.js';
 
 export interface IssueInput {
   title?: string;
-  /** Changing it re-keys the issue and keeps the old key as an alias. */
+  /** Issue classification; it does not affect the issue key. */
   kind?: IssueKind;
   estimate?: number | null;
   body?: string | null;
@@ -93,14 +94,19 @@ interface PreparedUpdate {
   from: IssueStatus;
   fromKey: string;
   fromKind: IssueKind;
+  fromProjectId: string | null;
   previousAssigneeId: string | null;
-  rekey: boolean;
+  projectChanged: boolean;
+  keyChange?: IssueKeyChange;
 }
 
-type IssueTeamRef = Pick<IssueEntity, 'id' | 'teamId' | 'projectId' | 'parentId'>;
+type IssueTeamRef = Pick<
+  IssueEntity,
+  'id' | 'teamId' | 'projectId' | 'parentId' | 'key' | 'number' | 'aliases'
+>;
 type IssueTeamAuthorizer = (affectedIssues: readonly IssueTeamRef[]) => Promise<void>;
 
-const KEY_RE = /^[A-Za-z]+-\d+$/;
+const KEY_RE = /^[A-Za-z][A-Za-z0-9]*-\d+$/;
 const STARTED: ReadonlySet<IssueStatus> = new Set(['in_progress', 'in_review']);
 const FINISHED: ReadonlySet<IssueStatus> = new Set(['done', 'canceled']);
 
@@ -248,7 +254,7 @@ export class IssuesService {
     return new Map(rows.map((d) => [d.id, d.version]));
   }
 
-  /** `idOrKey`: id (`in_…`), key (`BUG-142`) or an alias (an old key from before a kind change). */
+  /** `idOrKey`: id (`in_…`), key (`AUTH-142`) or a previous project key alias. */
   async get(workspaceId: string, idOrKey: string) {
     let row: IssueEntity | null;
     if (KEY_RE.test(idOrKey)) {
@@ -380,7 +386,8 @@ export class IssuesService {
     issueId: string,
   ): Promise<IssueTeamRef> {
     const [row] = (await manager.query(
-      `SELECT "id", "teamId", "projectId", "parentId" FROM "issues" WHERE "workspaceId" = $1 AND "id" = $2`,
+      `SELECT "id", "teamId", "projectId", "parentId", "key", "number", "aliases"
+         FROM "issues" WHERE "workspaceId" = $1 AND "id" = $2`,
       [workspaceId, issueId],
     )) as IssueTeamRef[];
     if (!row) throw notFound('Issue', issueId);
@@ -394,7 +401,7 @@ export class IssuesService {
   ): Promise<Map<string, IssueTeamRef>> {
     if (!ids.length) return new Map();
     const rows = (await manager.query(
-      `SELECT "id", "teamId", "projectId", "parentId" FROM "issues"
+      `SELECT "id", "teamId", "projectId", "parentId", "key", "number", "aliases" FROM "issues"
        WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])
        ORDER BY "id" FOR UPDATE`,
       [workspaceId, unique(ids)],
@@ -504,16 +511,23 @@ export class IssuesService {
           throw notFound('Issue', parentId);
       }
       await authorizeParent(parent ? [parent] : []);
-      const number = await this.counters.next(
+      const prefix = await issueKeyPrefix(
         m,
         workspaceId,
-        `issue:${input.kind}`,
+        input.projectId ?? null,
+      );
+      const [number] = await allocateIssueNumbers(
+        m,
+        this.counters,
+        workspaceId,
+        prefix,
+        1,
       );
       return m.save(
         m.create(IssueEntity, {
           id,
           workspaceId,
-          key: `${ISSUE_KEY_PREFIX[input.kind]}-${number}`,
+          key: `${prefix}-${number}`,
           number,
           kind: input.kind,
           title: input.title.trim(),
@@ -576,6 +590,11 @@ export class IssuesService {
     if (patch.body !== undefined)
       await this.uploads?.assertAttachable(workspaceId, row.body);
     await this.ds.transaction(async (m) => {
+      const targetPrefix =
+        prepared.patch.projectId !== undefined
+          ? await issueKeyPrefix(m, workspaceId, prepared.patch.projectId)
+          : undefined;
+      let relation: IssueTeamRef | undefined;
       if (prepared.patch.parentId !== undefined) {
         await this.lockIssueHierarchy(m, workspaceId);
         const observed = await this.readIssueRelation(m, workspaceId, row.id);
@@ -592,6 +611,7 @@ export class IssuesService {
         const current = relations.get(row.id);
         if (!current || projectHidden(currentAccess(), current.projectId))
           throw notFound('Issue', row.id);
+        relation = current;
         if (current.parentId !== observed.parentId)
           throw new ConflictException('Issue hierarchy changed; retry the update');
 
@@ -621,16 +641,33 @@ export class IssuesService {
         row.parentId = prepared.patch.parentId;
       } else {
         const current = await this.lockIssueRelations(m, workspaceId, [row.id]);
-        const relation = current.get(row.id);
-        if (!relation || projectHidden(currentAccess(), relation.projectId))
+        const lockedRelation = current.get(row.id);
+        if (!lockedRelation || projectHidden(currentAccess(), lockedRelation.projectId))
           throw notFound('Issue', row.id);
+        relation = lockedRelation;
         if (prepared.patch.teamId === undefined)
-          row.teamId = relation.teamId;
+          row.teamId = lockedRelation.teamId;
         if (prepared.patch.projectId === undefined)
-          row.projectId = relation.projectId;
-        row.parentId = relation.parentId;
+          row.projectId = lockedRelation.projectId;
+        row.parentId = lockedRelation.parentId;
       }
-      await this.rekey(m, workspaceId, prepared);
+      if (!relation) throw notFound('Issue', row.id);
+      prepared.fromKey = relation.key;
+      prepared.fromProjectId = relation.projectId;
+      row.key = relation.key;
+      row.number = relation.number;
+      row.aliases = relation.aliases;
+      prepared.projectChanged =
+        prepared.patch.projectId !== undefined &&
+        row.projectId !== relation.projectId;
+      prepared.keyChange = prepared.projectChanged
+        ? await this.rekey(
+            m,
+            workspaceId,
+            prepared,
+            targetPrefix ?? UNASSIGNED_ISSUE_KEY_PREFIX,
+          )
+        : undefined;
       await m.save(row);
     });
     if (patch.body !== undefined)
@@ -683,6 +720,7 @@ export class IssuesService {
     const removeLabels = unique(patch.removeLabels);
     if (addLabels.some((id) => removeLabels.includes(id)))
       throw new BadRequestException('A label cannot be both added and removed');
+    if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
     // One lookup per reference for the whole batch instead of one per issue.
     await this.refs.teams(
       workspaceId,
@@ -719,15 +757,35 @@ export class IssuesService {
     }
     await this.ds.transaction(async (m) => {
       const ids = rows.map((row) => row.id);
-      const parents = (await m.query(
-        `SELECT "id", "parentId" FROM "issues" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[]) ORDER BY "id" FOR UPDATE`,
-        [workspaceId, ids],
-      )) as { id: string; parentId: string | null }[];
-      const parentByIssue = new Map(parents.map((row) => [row.id, row.parentId]));
-      if (parentByIssue.size !== ids.length)
+      const targetPrefix =
+        patch.projectId !== undefined
+          ? await issueKeyPrefix(m, workspaceId, patch.projectId)
+          : undefined;
+      const relations = await this.lockIssueRelations(m, workspaceId, ids);
+      if (relations.size !== ids.length)
         throw new NotFoundException('An issue in the batch no longer exists');
-      for (const p of prepared)
-        p.row.parentId = parentByIssue.get(p.row.id) ?? null;
+      for (const p of prepared) {
+        const relation = relations.get(p.row.id)!;
+        p.fromKey = relation.key;
+        p.fromProjectId = relation.projectId;
+        p.row.key = relation.key;
+        p.row.number = relation.number;
+        p.row.aliases = relation.aliases;
+        if (p.patch.teamId === undefined) p.row.teamId = relation.teamId;
+        if (p.patch.projectId === undefined) p.row.projectId = relation.projectId;
+        p.row.parentId = relation.parentId;
+        p.projectChanged =
+          p.patch.projectId !== undefined &&
+          p.row.projectId !== relation.projectId;
+        p.keyChange = p.projectChanged
+          ? await this.rekey(
+              m,
+              workspaceId,
+              p,
+              targetPrefix ?? UNASSIGNED_ISSUE_KEY_PREFIX,
+            )
+          : undefined;
+      }
       await m.save(rows.map((r) => r));
     });
     for (const p of prepared) await this.recordUpdate(workspaceId, actor, p);
@@ -757,6 +815,7 @@ export class IssuesService {
     const from = row.status;
     const fromKey = row.key;
     const fromKind = row.kind;
+    const fromProjectId = row.projectId;
     let duplicateOfId = row.duplicateOfId;
     if (patch.duplicateOfId !== undefined) {
       if (patch.duplicateOfId === null) {
@@ -809,6 +868,7 @@ export class IssuesService {
     row.milestoneIds = nextMilestoneIds;
 
     if (patch.title !== undefined) row.title = patch.title.trim();
+    if (patch.kind !== undefined) row.kind = patch.kind;
     if (patch.estimate !== undefined) row.estimate = patch.estimate;
     if (patch.body !== undefined) row.body = patch.body;
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
@@ -856,28 +916,41 @@ export class IssuesService {
       from,
       fromKey,
       fromKind,
+      fromProjectId,
       previousAssigneeId,
-      rekey: patch.kind !== undefined && patch.kind !== fromKind,
+      projectChanged:
+        patch.projectId !== undefined && patch.projectId !== fromProjectId,
     };
   }
 
-  /** The key prefix follows the kind: take the next number of the new kind, keep the old key as an alias. */
+  /** The key prefix follows the project; keep the previous key as an alias. */
   private async rekey(
     m: EntityManager,
     workspaceId: string,
     p: PreparedUpdate,
-  ) {
-    if (!p.rekey) return;
-    const { row, patch } = p;
-    const number = await this.counters.next(
+    prefix: string,
+  ): Promise<IssueKeyChange> {
+    const { row } = p;
+    const [number] = await allocateIssueNumbers(
       m,
+      this.counters,
       workspaceId,
-      `issue:${patch.kind}`,
+      prefix,
+      1,
     );
-    row.aliases = unique([...row.aliases, p.fromKey]);
-    row.kind = patch.kind!;
+    const from = p.fromKey;
+    const to = `${prefix}-${number}`;
+    row.aliases = unique([...row.aliases, from]);
     row.number = number;
-    row.key = `${ISSUE_KEY_PREFIX[row.kind]}-${number}`;
+    row.key = to;
+    return {
+      issueId: row.id,
+      from,
+      to,
+      fromProjectId: p.fromProjectId,
+      toProjectId: row.projectId,
+      reason: 'project_changed',
+    };
   }
 
   private async recordUpdate(
@@ -885,13 +958,13 @@ export class IssuesService {
     actor: ActorRef,
     p: PreparedUpdate,
   ) {
-    const { row, patch, from, fromKey, fromKind, previousAssigneeId } = p;
+    const { row, patch, from, fromKind, previousAssigneeId } = p;
     const fields = Object.keys(patch)
       .filter((k) => (patch as Record<string, unknown>)[k] !== undefined)
-      .filter((k) => k !== 'status' && k !== 'kind');
+      .filter((k) => k !== 'status' && (k !== 'kind' || patch.kind !== fromKind));
     if (row.assigneeId !== previousAssigneeId && !fields.includes('assigneeId'))
       fields.push('assigneeId');
-    if (p.rekey)
+    if (p.keyChange)
       await this.events.record({
         workspaceId,
         actor,
@@ -899,10 +972,11 @@ export class IssuesService {
         subject: { type: 'issue', id: row.id },
         data: {
           key: row.key,
-          from: fromKey,
+          from: p.keyChange.from,
           to: row.key,
-          fromKind,
-          toKind: row.kind,
+          fromProjectId: p.keyChange.fromProjectId,
+          toProjectId: p.keyChange.toProjectId,
+          reason: p.keyChange.reason,
         },
       });
     if (fields.length)

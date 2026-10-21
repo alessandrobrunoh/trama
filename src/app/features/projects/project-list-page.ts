@@ -199,7 +199,10 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
             <span class="flex min-w-0 flex-1 items-center gap-2.5">
               <app-project-glyph [project]="p" [size]="16" />
               <span class="min-w-0">
-                <span class="block truncate text-sm font-medium">{{ p.name }}</span>
+                <span class="block truncate text-sm font-medium">
+                  <span class="text-muted-foreground mr-1.5 font-mono text-xs">{{ p.key }}</span>
+                  {{ p.name }}
+                </span>
                 @if (p.summary) {
                   <span class="text-muted-foreground block truncate text-xs">{{ p.summary }}</span>
                 }

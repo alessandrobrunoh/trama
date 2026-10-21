@@ -95,7 +95,7 @@ export class ConnectSnippets {
   protected readonly apiUrl = computed(() => (this.base.startsWith('/') && typeof location !== 'undefined' ? location.origin + this.base : this.base));
   protected readonly slug = computed(() => this.store.slug() ?? 'my-workspace');
   private readonly secret = computed(() => this.token() ?? 'trm_YOUR_TOKEN');
-  private readonly exampleKey = computed(() => this.store.issues()[0]?.key ?? 'BUG-142');
+  private readonly exampleKey = computed(() => this.store.issues()[0]?.key ?? 'CORA-142');
 
   protected readonly tabs = computed<{ id: Tab; label: string }[]>(() => [
     { id: 'mcp-cli', label: 'MCP · Claude Code' },

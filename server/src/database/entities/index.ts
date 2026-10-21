@@ -230,6 +230,7 @@ export class RepositoryEntity extends Wire {
 
 @Entity('projects')
 @Index('IDX_projects_workspace', ['workspaceId'])
+@Index('UQ_projects_workspace_key', ['workspaceId', 'key'], { unique: true })
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
@@ -238,6 +239,7 @@ export class ProjectEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
   @Column({ type: 'varchar' }) name: string;
+  @Column({ type: 'varchar', length: 4 }) key: string;
   @Column({ type: 'varchar', nullable: true }) summary: string | null;
   @Column({ type: 'text', nullable: true }) description: string | null;
   @Column({ type: 'varchar', default: '#6b7280' }) color: string;
@@ -896,7 +898,7 @@ export class AttentionStateEntity {
   @Column({ type: 'timestamptz' }) since: Date;
 }
 
-/** Atomic per-workspace sequences: `wskey:<teamKey>`, `issue:<kind>`, `adr`. */
+/** Atomic per-workspace sequences: `wskey:<teamKey>`, `issue-key:<prefix>`, `adr`. */
 @Entity('workspace_counters')
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',

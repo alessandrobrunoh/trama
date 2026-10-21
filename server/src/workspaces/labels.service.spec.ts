@@ -110,7 +110,7 @@ describe('workspace label management', () => {
     expect(events.publish).toHaveBeenCalledTimes(1);
   });
 
-  it('refuses to merge a template away, into itself, into an unknown or an archived label', async () => {
+  it('refuses to merge an unknown label, into itself, into an unknown or an archived label', async () => {
     const { service, ctx } = setup([
       custom('lb_a', 'Auth'),
       custom('lb_old', 'Old', { archived: true }),
@@ -155,32 +155,34 @@ describe('workspace label management', () => {
   });
 
   it('still refuses duplicate names, ignoring case', async () => {
-    const { service, ctx } = setup([custom('lb_a', 'Auth')]);
+    const { service, ctx } = setup([custom('lb_a', 'Bug')]);
     await expect(
       service.create(ctx, { name: 'bug', scope: 'issue' }),
     ).rejects.toBeInstanceOf(ConflictException);
   });
 
-  it('creates project labels and will not move a template', async () => {
-    const { service, ctx, ws } = setup();
+  it('creates project labels and lets legacy type labels be managed as custom labels', async () => {
+    const { service, ctx, ws } = setup([custom('lb_bug', 'Bug')]);
     await service.create(ctx, { name: 'Roadmap', scope: 'project' });
     expect(catalogOf(ws).find((l) => l.name === 'Roadmap')).toMatchObject({
       scope: 'project',
       template: false,
     });
-    await service.update(ctx, 'lb_bug', { color: '#111111' });
+    await service.update(ctx, 'lb_bug', { name: 'Defect', color: '#111111' });
     expect(catalogOf(ws).find((l) => l.id === 'lb_bug')).toMatchObject({
-      name: 'Bug',
+      name: 'Defect',
       scope: 'issue',
       color: '#111111',
     });
-    await expect(
-      service.update(ctx, 'lb_bug', { scope: 'project' }),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    await service.update(ctx, 'lb_bug', { scope: 'project' });
+    expect(catalogOf(ws).find((l) => l.id === 'lb_bug')?.scope).toBe('project');
   });
 
   it('rejects a label from another scope unless the record already has it', async () => {
-    const { service } = setup([custom('lb_a', 'Auth', { scope: 'project' })]);
+    const { service } = setup([
+      custom('lb_bug', 'Bug'),
+      custom('lb_a', 'Auth', { scope: 'project' }),
+    ]);
     await expect(service.assign('ws_1', ['lb_a'], 'issue')).rejects.toThrow(
       /does not apply to issues/,
     );

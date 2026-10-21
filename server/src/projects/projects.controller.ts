@@ -2,7 +2,12 @@ import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } fr
 import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, Max, Min, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
-import { CUSTOMER_REVENUE_MAX, type ActorRef, type Priority } from '../contracts/domain.js';
+import {
+  CUSTOMER_REVENUE_MAX,
+  PROJECT_KEY_MAX,
+  type ActorRef,
+  type Priority,
+} from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { PROJECT_ICON_MAX, PROJECT_ICON_PATTERN } from './project-icon.js';
 import { CustomersService } from '../customers/customers.service.js';
@@ -10,9 +15,11 @@ import { ProjectsService } from './projects.service.js';
 
 const PRIORITIES: Priority[] = ['none', 'urgent', 'high', 'medium', 'low'];
 const COLOR = /^#[0-9a-fA-F]{6}$/;
+const PROJECT_KEY = /^[A-Za-z][A-Za-z0-9]{0,3}$/;
 
 class CreateProjectDto {
   @IsString() @MinLength(1) @MaxLength(200) name: string;
+  @IsOptional() @IsString() @MaxLength(PROJECT_KEY_MAX) @Matches(PROJECT_KEY) key?: string;
   @IsOptional() @IsString() @MaxLength(300) summary?: string;
   @IsOptional() @IsString() @MaxLength(20000) description?: string;
   @IsOptional() @Matches(COLOR) color?: string;
@@ -30,6 +37,7 @@ class CreateProjectDto {
 
 class UpdateProjectDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(200) name?: string;
+  @OptionalNotNull() @IsString() @MaxLength(PROJECT_KEY_MAX) @Matches(PROJECT_KEY) key?: string;
   @Clearable() @IsString() @MaxLength(300) summary?: string | null;
   @Clearable() @IsString() @MaxLength(20000) description?: string | null;
   @OptionalNotNull() @Matches(COLOR) color?: string;

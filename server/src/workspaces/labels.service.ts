@@ -9,7 +9,6 @@ import {
   LABEL_NAME_MAX,
   LABEL_SCOPES,
   LABEL_SWATCHES,
-  LABEL_TEMPLATES,
   assignLabelIds,
   resolveLabelCatalog,
   type LabelScope,
@@ -141,8 +140,7 @@ export class LabelsService {
     const archived = patch.archived ?? current.archived === true;
     const next = catalog.map((label): WorkspaceLabel => {
       if (label.id !== id) return label;
-      const template =
-        label.template || LABEL_TEMPLATES.some((t) => t.id === id);
+      const template = label.template;
       const updated = {
         id,
         name,

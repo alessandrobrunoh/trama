@@ -172,7 +172,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       },
       {
         type: 'code',
-        text: 'AUTH-12  Stabilize authentication before v2\n\nIssues\n├── BUG-142  Session expires unexpectedly\n├── BUG-148  OAuth callback loops on Safari\n├── BUG-153  Logout leaves a stale cookie\n└── BUG-159  Refresh token occasionally fails\n\nWorkspace     Delta thread ↗\nAccountable   Alessandro\nContributors  Marco, Sara, claude-code\nArtifacts     PR #201, PR #204, ADR-021',
+        text: 'AUTH-12  Stabilize authentication before v2\n\nIssues\n├── AUTH-142  Session expires unexpectedly\n├── AUTH-148  OAuth callback loops on Safari\n├── AUTH-153  Logout leaves a stale cookie\n└── AUTH-159  Refresh token occasionally fails\n\nWorkspace     Delta thread ↗\nAccountable   Alessandro\nContributors  Marco, Sara, claude-code\nArtifacts     PR #201, PR #204, ADR-021',
       },
       {
         type: 'p',

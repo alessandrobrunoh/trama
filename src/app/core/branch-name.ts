@@ -40,7 +40,7 @@ export function branchUser(fullName: string | undefined): string {
 export interface BranchNameOptions {
   /** Handle for the `user/` prefix (already a slug, or a first name; it is slugified anyway). */
   user?: string;
-  /** Issue key: "BUG-142". */
+  /** Issue key: "AUTH-142". */
   key: string;
   title: string;
   format?: BranchFormat;

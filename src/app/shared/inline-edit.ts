@@ -33,6 +33,7 @@ import { UploadFile } from './upload-file';
         class="h-8 w-full"
         [class.font-mono]="mono()"
         [value]="draft()"
+        [attr.maxlength]="maxLength()"
         [attr.aria-label]="label()"
         [placeholder]="placeholder()"
         (input)="draft.set($any($event.target).value)"
@@ -65,6 +66,7 @@ export class InlineText {
   readonly placeholder = input('Empty');
   readonly canEdit = input(true);
   readonly mono = input(false);
+  readonly maxLength = input<number | null>(null);
   readonly textClass = input('text-sm');
   /** Allow saving an empty value. */
   readonly allowEmpty = input(false);

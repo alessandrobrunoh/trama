@@ -23,7 +23,7 @@ const LIST_CAPABILITIES: &str = "list_capabilities";
 const WORKSPACE_ARG: &str = "workspace";
 
 const INSTRUCTIONS_COMMON: &str = "Trama (coordination for human + AI engineering teams). \
-Items can be addressed by id (in_…, wk_…) or by key (BUG-142, AUTH-42, ADR-21, team key AUTH). \
+Items can be addressed by id (in_…, wk_…) or by key (CORA-142, AUTH-42, ADR-21, team key AUTH). \
 Tools you are not permitted to use are hidden; writes are limited by per-key caps (HTTP 429 means stop and report, never retry in a loop). \
 In update_* tools, null clears an optional field. Start with `whoami` if unsure what this key can do.";
 

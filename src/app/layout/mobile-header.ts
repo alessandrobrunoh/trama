@@ -26,7 +26,7 @@ import { PageChrome } from './page-chrome';
 const COLLAPSE_AT = 16;
 /** Ignore scrollers that barely scroll (chip rows, tiny panes): folding would make the page jump. */
 const MIN_SCROLL_RANGE = 160;
-/** Entity keys such as DEBT-23, AUTH-42, ADR-21. */
+/** Entity keys such as CORA-23, AUTH-42, ADR-21. */
 const KEY_RE = /^[A-Z][A-Z0-9]*-\d+$/;
 
 /**

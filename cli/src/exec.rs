@@ -41,7 +41,7 @@ fn dry_run(call: &Call, ctx: &Ctx) -> Result<()> {
     Ok(())
 }
 
-/// `label` names the command for the confirmation prompt (e.g. `issue delete BUG-1`).
+/// `label` names the command for the confirmation prompt (e.g. `issue delete CORA-1`).
 pub async fn run(label: &str, call: &Call, accept: &str, ctx: &Ctx) -> Result<()> {
     if ctx.dry_run {
         return dry_run(call, ctx);

@@ -640,7 +640,7 @@ export class IssueDetailPage {
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
-  /** Route param: issue key (`BUG-142`) or id. */
+  /** Route param: project-based issue key (`CORA-142`) or id. */
   readonly key = input<string>();
 
   private readonly titleEditor = viewChild<IssueTitle>('title');

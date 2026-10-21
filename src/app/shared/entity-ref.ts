@@ -31,7 +31,7 @@ function escapeRegExp(s: string): string {
 
 /**
  * Finds mentions of workspace records in plain text: issue / decision keys
- * (`BUG-142`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
+ * (`CORA-142`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
  * loaded record become interactive; everything else stays text.
  */
 @Injectable({ providedIn: 'root' })
