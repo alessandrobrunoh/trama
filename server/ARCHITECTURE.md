@@ -75,7 +75,7 @@ Fired (and awaited, so the response is consistent) after any change to a workstr
 
 ## Numbering
 
-`CountersService.next(manager, workspaceId, name)` is an atomic `INSERT … ON CONFLICT DO UPDATE … RETURNING` on `workspace_counters`: `wskey:<teamKey>` (workstream numbers per team key, so they survive deleting and recreating a team), `issue:<kind>` (BUG-142), `adr` (ADR-21). Call it inside the transaction that inserts the numbered row. Workstream creation uses `nextAbove(…, max number already used with that key prefix)`, so a key kept by a reassigned workstream can never be handed out again; a leftover unique violation is mapped to 409. Changing a workstream's owner team keeps its key. Changing an issue's `kind` takes the next number of the new kind and keeps the old key in `aliases` (lookups match aliases).
+Issue sequences use `issue-key:<prefix>` (`AUTH-142` or `UNPR-7`) and are atomic per workspace and prefix. `allocateIssueNumbers` checks retained aliases when first initializing a prefix counter, so a project tag can be reused without issuing an ambiguous old key. Project tags are unique in a workspace and limited to four characters; changing a tag or moving an issue re-keys affected issues and keeps prior keys in `aliases`. Changing an issue's `kind` only changes its classification. Workstream counters continue to use `wskey:<teamKey>` and `nextAbove(…, max number already used with that key prefix)`; decision numbers use `adr`.
 
 ## Database
 

@@ -232,7 +232,7 @@ export function projectContextMarkdown(
     ...(closed ? [`_${closed} more issues are done or canceled._`] : []),
   ]);
 
-  // Artifacts grouped by the chain that leads to their owner: "Project › BUG-12".
+  // Artifacts grouped by the chain that leads to their owner: "Project › CORA-12".
   const groups = new Map<string, ProjectContextData['artifacts']>();
   for (const row of ctx.artifacts) {
     const key = row.path.map(label).join(' › ');

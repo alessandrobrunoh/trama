@@ -23,6 +23,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
+import { PROJECT_KEY_MAX } from '../../core/contracts/domain';
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
@@ -157,6 +158,17 @@ const ACTIVITY_CAP = 20;
             [value]="p.name"
             [canEdit]="canManage()"
             (save)="update({ name: $event })"
+          />
+          <app-inline-text
+            class="w-14 shrink-0"
+            label="project tag"
+            textClass="text-muted-foreground bg-muted/60 rounded px-1.5 font-mono text-xs font-medium"
+            [value]="p.key"
+            [canEdit]="canManage()"
+            [maxLength]="projectKeyMax"
+            [mono]="true"
+            hlmTooltip="Project tag; changing it updates this project's issue keys"
+            (save)="update({ key: $event })"
           />
           <app-project-health class="shrink-0" [health]="p.health" />
           @if (updateOverdue()) {
@@ -594,6 +606,7 @@ export class ProjectDetailPage {
     return projectStatusOptions(this.store.settings().statuses.project);
   }
   protected readonly priorities = priorityOptions();
+  protected readonly projectKeyMax = PROJECT_KEY_MAX;
   protected readonly activityCap = ACTIVITY_CAP;
   protected readonly allActivity = signal(false);
   protected readonly iso = isoFromDate;

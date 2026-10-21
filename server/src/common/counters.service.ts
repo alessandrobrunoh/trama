@@ -3,7 +3,7 @@ import type { EntityManager } from 'typeorm';
 
 /**
  * Atomic per-workspace sequences (table `workspace_counters`):
- *   `issue:<kind>` issue numbers per kind (BUG-142)
+ *   `issue-key:<prefix>` issue numbers per project tag (AUTH-142) or `UNPR`
  *   `adr`          decision numbers (ADR-21)
  * Always call inside the transaction that inserts the numbered row.
  */

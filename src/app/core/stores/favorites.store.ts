@@ -19,7 +19,7 @@ export interface FavoriteEntry {
   subjectId: ID;
   /** Main text: an issue / decision title, a team, repository or view name. */
   label: string;
-  /** Key such as `BUG-142` or `AUTH-12`, when the entity has one. */
+  /** Key such as `CORA-142` or `ADR-12`, when the entity has one. */
   key?: string;
   /** Router commands below `/:workspaceSlug`. */
   link: string[];

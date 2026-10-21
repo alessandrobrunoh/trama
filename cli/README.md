@@ -12,12 +12,12 @@ the MCP server's shorter default tool list is a separate layer on top (`mcp/src/
 
 ```bash
 trama issue list --open --priority urgent,high --fields key,title,status
-trama issue context BUG-142               # markdown issue context
+trama issue context AUTH-142              # markdown issue context
 trama project context prj_…               # markdown "mega context" of a whole project
 trama project-update post prj_… --health on_track --file body=update.md
-trama artifact add --issue-id BUG-142 --kind pull_request --title "Fix login" --url https://…
+trama artifact add --issue-id AUTH-142 --kind pull_request --title "Fix login" --url https://…
 trama issue create --kind bug --title "Login times out" --file body=notes.md
-trama issue update BUG-142 --status in_progress --unset estimate
+trama issue update AUTH-142 --status in_progress --unset estimate
 ```
 
 ## Install
@@ -87,7 +87,7 @@ trama account list
 trama issue list --account work            # one row per issue, each stamped with its workspace
 trama issue list --all-workspaces         # every saved profile
 trama issue list --workspace acme,beta
-trama issue get BUG-142 --workspace acme   # a single workspace, by slug
+trama issue get AUTH-142 --workspace acme  # a single workspace, by slug
 ```
 
 Reads (`list`, `get`, `search`, the markdown briefings) run once per matching profile and merge the
@@ -108,7 +108,7 @@ Resources: `issue` `decision` `artifact` `document` `input-request` `comment` `p
 `project-update` `milestone` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
 `outgoing-webhook` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
 plus actions (`decision accept`, `input-request answer`, `issue context`, `project context`, `project artifacts`, …).
-Aliases: `issues`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`BUG-142`, `AUTH`, `ADR-21`).
+Aliases: `issues`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`, `ADR-21`).
 
 ```bash
 trama commands                      # every command with its HTTP route and permission
@@ -120,7 +120,7 @@ trama api GET /integrations -Q limit=5      # any route without a dedicated comm
 
 How flags are built from the catalog:
 
-- path parameters are positional (`trama issue update BUG-142 --status in_progress`); everything else is `--kebab-case`;
+- path parameters are positional (`trama issue update AUTH-142 --status in_progress`); everything else is `--kebab-case`;
 - enums are validated before sending; lists are comma-separated (`--label a,b`); booleans can be bare (`--open`) or explicit (`--open false`);
 - objects accept `type:id` for subjects (`--subject issue:iss_1`), `k=v,k=v`, JSON, or `@file`;
 - `--data '{…}'` / `@file.json` / `-` supplies a whole JSON body; explicit flags win over it;
@@ -136,7 +136,7 @@ Everything is predictable so an agent can use it without reading docs twice.
   `{"results":[…]}` envelopes handled). Terminal control characters in human-readable tables, Markdown context
   briefings, and text errors are escaped visibly to prevent terminal control/spoofing sequences. Explicit
   `-o raw`, JSON output modes, and JSON errors (`TRAMA_ERRORS=json`) remain machine-oriented and unescaped.
-- **Issue artifacts.** `trama issue get BUG-142 --fields key,title,status,artifactCount` includes a count for callers with
+- **Issue artifacts.** `trama issue get AUTH-142 --fields key,title,status,artifactCount` includes a count for callers with
   `artifacts:read`; zero means skip `trama issue artifacts`. The field is absent without artifact access.
 - **Errors.** JSON on stderr: `{"error":{"code","message","status","hint"}}` (plain text in a terminal), and a stable exit code:
 

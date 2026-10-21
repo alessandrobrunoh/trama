@@ -33,6 +33,11 @@ import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import {
   GIT_PROVIDERS,
   GIT_PROVIDER_META,
+  isProjectKey,
+  isReservedProjectKey,
+  PROJECT_KEY_MAX,
+  uniqueProjectKey,
+  UNASSIGNED_ISSUE_KEY_PREFIX,
   type GitProvider,
   type IssueKind,
   type IssueStatus,
@@ -82,7 +87,7 @@ const SWITCHER: KindDef[] = [
     kind: 'issue',
     label: 'Issue',
     blurb: "A problem or request: what's wrong or needed.",
-    example: 'BUG-142',
+    example: 'CORA-142',
   },
   {
     kind: 'decision',
@@ -539,13 +544,32 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     <input
                       hlmInput
                       placeholder="Checkout redesign"
-                      [(ngModel)]="title"
+                      [ngModel]="title()"
+                      (ngModelChange)="onProjectName($event)"
                       name="projectName"
                       autocomplete="off"
                       autofocus
                       aria-label="Project name"
                     />
                   </app-form-row>
+                  <app-form-row label="Tag" [error]="err('key')">
+                    <input
+                      hlmInput
+                      class="font-mono uppercase"
+                      placeholder="CORA"
+                      [ngModel]="projectKey()"
+                      (ngModelChange)="onProjectKey($event)"
+                      name="projectKey"
+                      [attr.maxlength]="projectKeyMax"
+                      autocomplete="off"
+                      autocapitalize="characters"
+                      spellcheck="false"
+                      aria-label="Project tag"
+                    />
+                  </app-form-row>
+                  <p class="text-muted-foreground -mt-1 text-xs">
+                    Prefixes issue keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
+                  </p>
                   <app-form-row label="Summary" [optional]="true">
                     <input
                       hlmInput
@@ -719,6 +743,8 @@ export class CreateDialog {
   protected readonly teamId = signal('');
   protected readonly repositoryIds = signal<string[]>([]);
   protected readonly projectId = signal('');
+  protected readonly projectKey = signal('');
+  protected readonly projectKeyMax = PROJECT_KEY_MAX;
   /** Parent issue supplied by the opening context; not persisted in the generic issue draft. */
   protected readonly parentId = signal('');
   /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
@@ -730,6 +756,7 @@ export class CreateDialog {
   // team / repository / view
   protected readonly teamKey = signal('');
   private teamKeyTouched = false;
+  private projectKeyTouched = false;
   protected readonly gitProvider = signal<string>('github');
   protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
@@ -765,7 +792,6 @@ export class CreateDialog {
   protected readonly issueKindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,
-    hint: ISSUE_KIND_META[k].prefix,
   }));
   protected readonly decisionStatusOptions: PickOption[] = [
     { value: 'proposed', label: 'Proposed', kind: 'status' },
@@ -810,7 +836,7 @@ export class CreateDialog {
     this.store
       .projects()
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
-      .map((p) => ({ value: p.id, label: p.name, kind: 'plain' })),
+      .map((p) => ({ value: p.id, label: p.name, hint: p.key, kind: 'plain' })),
   );
   /** Issues offered as decision origins; closed issues remain selectable. */
   protected readonly issueOptions = computed<PickOption[]>(() => {
@@ -942,6 +968,15 @@ export class CreateDialog {
 
     this.teamKey.set('');
     this.teamKeyTouched = false;
+    this.projectKeyTouched = false;
+    this.projectKey.set(
+      kind === 'project'
+        ? uniqueProjectKey(
+            asStr(d['name']) || asStr(d['title']),
+            this.store.projects().map((project) => project.key),
+          )
+        : '',
+    );
     this.gitProvider.set('github');
     this.attachments.set([]);
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
@@ -1075,6 +1110,22 @@ export class CreateDialog {
     this.teamKey.set(v);
   }
 
+  protected onProjectName(v: string): void {
+    this.title.set(v);
+    if (!this.projectKeyTouched)
+      this.projectKey.set(
+        uniqueProjectKey(
+          v,
+          this.store.projects().map((project) => project.key),
+        ),
+      );
+  }
+
+  protected onProjectKey(v: string): void {
+    this.projectKeyTouched = true;
+    this.projectKey.set(v.toUpperCase());
+  }
+
   protected err(field: 'title' | 'statement' | 'key' | 'issue'): string | null {
     if (!this.submitted()) return null;
     if (this.draftAttempt() && field === 'statement') return null;
@@ -1093,10 +1144,21 @@ export class CreateDialog {
         if (k !== 'decision') return null;
         return this.originIssueId() ? null : 'Choose the primary issue for this decision.';
       case 'key':
-        if (k !== 'team') return null;
-        return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
-          ? null
-          : '2 to 8 letters or digits, starting with a letter.';
+        if (k === 'team')
+          return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
+            ? null
+            : '2 to 8 letters or digits, starting with a letter.';
+        if (k === 'project') {
+          const key = this.projectKey().trim().toUpperCase();
+          if (!isProjectKey(key)) return 'Use 1 to 4 letters or digits, starting with a letter.';
+          if (isReservedProjectKey(key))
+            return key === UNASSIGNED_ISSUE_KEY_PREFIX
+              ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for issues without a project.`
+              : `${key} is reserved for decision identifiers.`;
+          if (this.store.projects().some((project) => project.key === key))
+            return `The tag ${key} is already used.`;
+        }
+        return null;
     }
   }
 
@@ -1214,6 +1276,7 @@ export class CreateDialog {
         case 'project': {
           const p = await this.store.createProject({
             name: title,
+            key: this.projectKey().trim().toUpperCase(),
             summary: this.text().trim() || undefined,
             repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
           });

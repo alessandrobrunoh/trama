@@ -55,7 +55,7 @@ pub fn build_call(args: &Value) -> Result<Call, String> {
         .ok_or("method must be one of GET, POST, PATCH, DELETE")?;
     let path = obj.get("path").and_then(Value::as_str).ok_or("path is required")?;
     if !valid_path(path) {
-        return Err("path must be workspace-relative like '/issues/BUG-1' (letters, digits and _-.~: only)".into());
+        return Err("path must be workspace-relative like '/issues/CORA-1' (letters, digits and _-.~: only)".into());
     }
     let mut query = Vec::new();
     if let Some(q) = obj.get("query") {

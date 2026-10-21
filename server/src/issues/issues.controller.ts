@@ -122,7 +122,7 @@ class CreateIssueDto {
 
 class UpdateIssueDto {
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
-  /** Changing the kind re-keys the issue (BUG-148 → FEAT-35); the old key stays valid as an alias. */
+  /** Changes the issue classification without changing its key. */
   @OptionalNotNull() @IsIn(KINDS) kind?: IssueKind;
   /** Story points: non-negative number, `null` clears. */
   @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;

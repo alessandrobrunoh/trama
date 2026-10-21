@@ -57,7 +57,7 @@ export class IssueActions {
     return ids.flatMap((id) => byId.get(id) ?? []);
   }
 
-  /** "BUG-142" or "3 issues". */
+  /** "CORA-142" or "3 issues". */
   subject(ids: readonly string[]): string {
     const list = this.issues(ids);
     return list.length === 1 ? list[0].key : `${list.length} issues`;
@@ -167,24 +167,19 @@ export class IssueActions {
     void this.router.navigate(['/', this.store.slug() ?? '', 'issues', issue.key]);
   }
 
-  /**
-   * Change the type after a confirmation: the key prefix follows the type, so the issue is re-keyed
-   * (the old key stays valid as an alias). The detail page swaps the URL to the new key.
-   */
+  /** Confirm a classification change; issue keys are tied to projects, not issue kinds. */
   changeKind(issue: Issue, kind: IssueKind | undefined, after?: (updated: Issue) => void): void {
     if (!kind || kind === issue.kind || !this.store.can('member')) return;
     const meta = ISSUE_KIND_META[kind];
-    // The server owns the counter; this mirrors it for the common case (no deletions at the top).
-    const next = this.store.issues().reduce((n, i) => (i.kind === kind ? Math.max(n, i.number) : n), 0) + 1;
     this.ui.setConfirmDelete({
       title: `Change type to ${meta.label}?`,
-      description: `${issue.key} will become ${meta.prefix}-${next}. The old key keeps working: links and mentions of ${issue.key} still open this issue.`,
+      description: `${issue.key} will stay the same; only the issue type will change.`,
       confirmLabel: 'Change type',
       destructive: false,
       onConfirm: async () => {
         const updated = await this.store.changeIssueKind(issue.id, kind);
         if (!updated) return;
-        this.notifier.success(`${issue.key} is now ${updated.key}`, { description: `Type: ${meta.label}` });
+        this.notifier.success(`${updated.key} type changed`, { description: meta.label });
         after?.(updated);
       },
     });

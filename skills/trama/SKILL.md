@@ -22,11 +22,17 @@ Question and Decision modes have distinct lifecycles. A Question awaits a human 
 
 Keep full transcripts and detailed execution logs in execution tools, not Trama. Store concise durable context, factual progress, and useful artifact links in Trama.
 
+## Repository scope
+
+Before resolving issues for a checkout, read `.trama` at the Git repository root. If it exists, matches the checkout's normalized remote, and contains a workspace and project ID, use that scope for issue lookups instead of searching all projects. The `trama-project-context` skill defines the setup questions, file format, and stale-mapping behavior. If `.trama` is absent or incomplete, follow that skill to ask the user and create it after they answer.
+
+When using a valid `.trama`, filter issue lookups by its `project_id`; use the configured workspace when selecting among workspaces. A user request to search across projects may override this default.
+
 ## Issues in this checkout
 
 “This project,” from a git checkout, means issues resolved through the registered repository and its associated Goal, when available. It is not a guess and is not the forge's own issue list.
 
-1. Read repository remotes and identify the host and `owner/name`, without credentials.
+1. If `.trama` is unavailable, read repository remotes and identify the host and `owner/name`, without credentials.
 2. Follow repository renames before matching.
 3. Use the available repository and Goal lookup tools to resolve the checkout.
 4. If no repository matches, say so. Do not silently switch to forge issues or create a repository.

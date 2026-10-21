@@ -7,16 +7,23 @@ import {
 } from '../contracts/domain.js';
 
 describe('workspace labels', () => {
-  it('always offers the four templates, and keeps a saved template color', () => {
+  it('starts without type labels and keeps a legacy type label as a custom label', () => {
+    expect(resolveLabelCatalog()).toEqual([]);
     const catalog = resolveLabelCatalog([
       {
         id: 'lb_bug',
-        name: 'Renamed',
+        name: 'Bug',
         color: '#111111',
-        template: true,
-        scope: 'project',
+        template: false,
+        scope: 'issue',
       },
-      { id: 'lb_custom', name: 'Auth', color: '#334455', template: false },
+      {
+        id: 'lb_custom',
+        name: 'Auth',
+        color: '#334455',
+        template: false,
+        scope: 'issue',
+      },
       {
         id: 'lb_road',
         name: 'Roadmap',
@@ -32,18 +39,10 @@ describe('workspace labels', () => {
         scope: 'elsewhere' as 'issue',
       },
     ]);
-    expect(catalog.map((label) => label.name)).toEqual([
-      'Bug',
-      'Feature',
-      'Improvement',
-      'Documentation',
-      'Auth',
-      'Roadmap',
-      'Nope',
-    ]);
-    expect(catalog[0]).toMatchObject({
+    expect(catalog.map((label) => label.name)).toEqual(['Bug', 'Auth', 'Roadmap', 'Nope']);
+    expect(catalog.find((label) => label.id === 'lb_bug')).toMatchObject({
       color: '#111111',
-      template: true,
+      template: false,
       scope: 'issue',
       name: 'Bug',
     });
@@ -56,7 +55,7 @@ describe('workspace labels', () => {
     expect(catalog.find((label) => label.id === 'lb_bad')?.scope).toBe('issue');
   });
 
-  it('turns free text into ids and reuses a template name', () => {
+  it('turns free text into custom ids, including names formerly supplied as templates', () => {
     const { catalog, groups, lookup } = adoptFreeTextLabels(undefined, [
       { scope: 'issue', labels: ['Bug', 'auth'] },
       { scope: 'issue', labels: ['auth', 'auth'] },
@@ -64,6 +63,10 @@ describe('workspace labels', () => {
     expect(groups[0][0]).toBe('lb_bug');
     expect(groups[1]).toEqual([groups[0][1]]);
     expect(lookup.get('auth')).toBe(groups[0][1]);
+    expect(catalog.find((label) => label.id === 'lb_bug')).toMatchObject({
+      name: 'Bug',
+      template: false,
+    });
     expect(catalog.find((label) => label.id === groups[0][1])?.name).toBe(
       'auth',
     );
@@ -88,6 +91,13 @@ describe('workspace labels', () => {
 
   it('rejects an unknown id, a label from another scope, and more than 20', () => {
     const catalog = resolveLabelCatalog([
+      {
+        id: 'lb_bug',
+        name: 'Bug',
+        color: '#e11d48',
+        template: false,
+        scope: 'issue',
+      },
       {
         id: 'lb_road',
         name: 'Roadmap',

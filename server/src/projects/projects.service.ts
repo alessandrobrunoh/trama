@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   Inject,
   Injectable,
@@ -7,15 +8,25 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
-import type { ActorRef, Priority, ProjectStatus } from '../contracts/domain.js';
+import {
+  isProjectKey,
+  isReservedProjectKey,
+  normalizeProjectKey,
+  uniqueProjectKey,
+  UNASSIGNED_ISSUE_KEY_PREFIX,
+  type ActorRef,
+  type Priority,
+  type ProjectStatus,
+} from '../contracts/domain.js';
 import {
   loadStatusCatalog,
   requireStatus,
   statusFilterIds,
 } from '../status/status-catalog.js';
 import { RefsService } from '../common/refs.service.js';
-import { notFound, toDate, uid, unique } from '../common/util.js';
-import { ProjectEntity } from '../database/entities/index.js';
+import { CountersService } from '../common/counters.service.js';
+import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
+import { IssueEntity, ProjectEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import {
   demandConditions,
@@ -29,9 +40,12 @@ import {
   projectHidden,
 } from '../auth/member-access.js';
 import { UploadsService } from '../uploads/uploads.service.js';
+import { rekeyIssues, type IssueKeyChange } from '../issues/issue-keys.js';
 
 export interface ProjectInput {
   name?: string;
+  /** Uppercase project tag used as the prefix for issue keys. */
+  key?: string;
   summary?: string | null;
   description?: string | null;
   color?: string;
@@ -64,6 +78,7 @@ export class ProjectsService {
   constructor(
     private readonly ds: DataSource,
     private readonly refs: RefsService,
+    private readonly counters: CountersService,
     private readonly events: EventsService,
     private readonly labels: LabelsService,
     @InjectRepository(ProjectEntity)
@@ -126,39 +141,48 @@ export class ProjectsService {
         'Your access cannot add projects outside its list',
       );
     await this.validate(workspaceId, input);
+    const key = await this.resolveProjectKey(workspaceId, input.name, input.key);
     const entry = await this.projectStatus(
       workspaceId,
       input.status ?? 'backlog',
     );
     const status = entry.id as ProjectStatus;
-    const row = await this.repo.save(
-      this.repo.create({
-        id: uid('pj'),
-        workspaceId,
-        name: input.name.trim(),
-        summary: input.summary?.trim() || null,
-        description: input.description ?? null,
-        color: input.color ?? '#6b7280',
-        icon: input.icon ?? null,
-        status,
-        priority: input.priority ?? 'none',
-        leadId: input.leadId ?? null,
-        teamIds: unique(input.teamIds),
-        repositoryIds: unique(input.repositoryIds),
-        labels:
-          (await this.labels.assign(workspaceId, input.labels, 'project')) ??
-          [],
-        startDate: toDate(input.startDate) ?? null,
-        targetDate: toDate(input.targetDate) ?? null,
-        completedAt: CLOSED.includes(entry.type) ? new Date() : null,
-      }),
-    );
+    let row: ProjectEntity;
+    try {
+      row = await this.repo.save(
+        this.repo.create({
+          id: uid('pj'),
+          workspaceId,
+          name: input.name.trim(),
+          key,
+          summary: input.summary?.trim() || null,
+          description: input.description ?? null,
+          color: input.color ?? '#6b7280',
+          icon: input.icon ?? null,
+          status,
+          priority: input.priority ?? 'none',
+          leadId: input.leadId ?? null,
+          teamIds: unique(input.teamIds),
+          repositoryIds: unique(input.repositoryIds),
+          labels:
+            (await this.labels.assign(workspaceId, input.labels, 'project')) ??
+            [],
+          startDate: toDate(input.startDate) ?? null,
+          targetDate: toDate(input.targetDate) ?? null,
+          completedAt: CLOSED.includes(entry.type) ? new Date() : null,
+        }),
+      );
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(`Project tag "${key}" is already used`);
+      throw error;
+    }
     await this.events.record({
       workspaceId,
       actor,
       type: 'project.created',
       subject: { type: 'project', id: row.id },
-      data: { name: row.name },
+      data: { name: row.name, key: row.key },
     });
     return row;
   }
@@ -172,8 +196,14 @@ export class ProjectsService {
     const row = await this.get(workspaceId, id);
     await this.validate(workspaceId, patch);
     const before = row.status;
+    const previousKey = row.key;
+    const nextKey =
+      patch.key === undefined
+        ? previousKey
+        : await this.resolveProjectKey(workspaceId, row.name, patch.key, id);
     const previousDescription = row.description;
     if (patch.name !== undefined) row.name = patch.name.trim();
+    if (patch.key !== undefined) row.key = nextKey;
     if (patch.summary !== undefined)
       row.summary = patch.summary?.trim() || null;
     if (patch.description !== undefined) {
@@ -207,7 +237,51 @@ export class ProjectsService {
         : null;
     }
     row.updatedAt = new Date();
-    await this.repo.save(row);
+    let issueKeyChanges: IssueKeyChange[] = [];
+    try {
+      if (nextKey !== previousKey) {
+        issueKeyChanges = await this.ds.transaction(async (m) => {
+          const locked = (await m.query(
+            `SELECT "key" FROM "projects" WHERE "workspaceId" = $1 AND "id" = $2 FOR UPDATE`,
+            [workspaceId, id],
+          )) as { key: string }[];
+          if (!locked[0]) throw notFound('Project', id);
+          if (locked[0].key !== previousKey)
+            throw new ConflictException('Project tag changed; retry the update');
+          const issues = await m
+            .getRepository(IssueEntity)
+            .createQueryBuilder('i')
+            .where('i.workspaceId = :workspaceId AND i.projectId = :projectId', {
+              workspaceId,
+              projectId: id,
+            })
+            .orderBy('i.createdAt', 'ASC')
+            .addOrderBy('i.id', 'ASC')
+            .setLock('pessimistic_write')
+            .getMany();
+          await m.save(ProjectEntity, row);
+          const changes = await rekeyIssues(
+            m,
+            this.counters,
+            workspaceId,
+            issues,
+            nextKey,
+            id,
+            'project_tag_changed',
+            row.updatedAt,
+          );
+          if (issues.length) await m.save(IssueEntity, issues);
+          return changes;
+        });
+      } else {
+        await this.repo.save(row);
+      }
+    } catch (error) {
+      if (isUniqueViolation(error))
+        throw new ConflictException(`Project tag "${nextKey}" is already used`);
+      throw error;
+    }
+    await this.recordIssueRekeys(workspaceId, actor, issueKeyChanges);
     await this.events.record({
       workspaceId,
       actor,
@@ -254,7 +328,35 @@ export class ProjectsService {
         [id],
       )
     ).map((r) => r.id);
+    let issueKeyChanges: IssueKeyChange[] = [];
     await this.ds.transaction(async (m) => {
+      const locked = (await m.query(
+        `SELECT "id" FROM "projects" WHERE "workspaceId" = $1 AND "id" = $2 FOR UPDATE`,
+        [workspaceId, id],
+      )) as { id: string }[];
+      if (!locked[0]) throw notFound('Project', id);
+      const issues = await m
+        .getRepository(IssueEntity)
+        .createQueryBuilder('i')
+        .where('i.workspaceId = :workspaceId AND i.projectId = :projectId', {
+          workspaceId,
+          projectId: id,
+        })
+        .orderBy('i.createdAt', 'ASC')
+        .addOrderBy('i.id', 'ASC')
+        .setLock('pessimistic_write')
+        .getMany();
+      issueKeyChanges = await rekeyIssues(
+        m,
+        this.counters,
+        workspaceId,
+        issues,
+        UNASSIGNED_ISSUE_KEY_PREFIX,
+        null,
+        'project_deleted',
+      );
+      for (const issue of issues) issue.projectId = null;
+      if (issues.length) await m.save(IssueEntity, issues);
       // project updates cascade with the project: drop their comments
       if (updateIds.length)
         await m.query(
@@ -275,12 +377,13 @@ export class ProjectsService {
       await m.delete(ProjectEntity, { id });
     });
     await this.uploads?.releaseIds(workspaceId, lost);
+    await this.recordIssueRekeys(workspaceId, actor, issueKeyChanges);
     await this.events.record({
       workspaceId,
       actor,
       type: 'project.deleted',
       subject: { type: 'project', id },
-      data: { name: row.name },
+      data: { name: row.name, key: row.key },
     });
   }
 
@@ -292,5 +395,58 @@ export class ProjectsService {
     await this.refs.teams(workspaceId, input.teamIds);
     await this.refs.repositories(workspaceId, input.repositoryIds);
     await this.refs.users(workspaceId, [input.leadId]);
+  }
+
+  private async resolveProjectKey(
+    workspaceId: string,
+    name: string,
+    value?: string,
+    excludeId?: string,
+  ): Promise<string> {
+    const key =
+      value === undefined
+        ? uniqueProjectKey(
+            name,
+            (await this.repo.find({ where: { workspaceId }, select: { key: true } })).map(
+              (project) => project.key,
+            ),
+          )
+        : normalizeProjectKey(value);
+    if (!isProjectKey(key))
+      throw new BadRequestException(
+        'Project tag must be 1 to 4 letters or digits, starting with a letter',
+      );
+    if (isReservedProjectKey(key))
+      throw new BadRequestException(
+        key === UNASSIGNED_ISSUE_KEY_PREFIX
+          ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for issues without a project`
+          : `${key} is reserved for decision identifiers`,
+      );
+    const existing = await this.repo.findOneBy({ workspaceId, key });
+    if (existing && existing.id !== excludeId)
+      throw new ConflictException(`Project tag "${key}" is already used`);
+    return key;
+  }
+
+  private async recordIssueRekeys(
+    workspaceId: string,
+    actor: ActorRef,
+    changes: readonly IssueKeyChange[],
+  ): Promise<void> {
+    for (const change of changes)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'issue.rekeyed',
+        subject: { type: 'issue', id: change.issueId },
+        data: {
+          key: change.to,
+          from: change.from,
+          to: change.to,
+          fromProjectId: change.fromProjectId,
+          toProjectId: change.toProjectId,
+          reason: change.reason,
+        },
+      });
   }
 }

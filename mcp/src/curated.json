@@ -6,11 +6,11 @@
     "readOnly": true,
     "visibleIf": ["issues:read", "projects:read", "decisions:read", "input-requests:read", "artifacts:read"],
     "uses": ["get_issue_context", "get_project_context", "get_decision", "get_input_request", "get_artifact", "list_issue_artifacts", "list_comments"],
-    "description": "Read one issue, project, decision, input request, or artifact by key or id. Issue context comes from the issue context endpoint; project context is markdown. Pass comments:true to include the issue thread. Use the input-request id to inspect a human's answer. Example: {\"id\":\"BUG-142\"}.",
+    "description": "Read one issue, project, decision, input request, or artifact by key or id. Issue context comes from the issue context endpoint; project context is markdown. Pass comments:true to include the issue thread. Use the input-request id to inspect a human's answer. Example: {\"id\":\"CORA-142\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Key or id: BUG-142, ADR-21, in_…, pj_…, ir_…, ar_…." },
+        "id": { "type": "string", "description": "Key or id: CORA-142, ADR-21, in_…, pj_…, ir_…, ar_…." },
         "type": { "type": "string", "enum": ["issue", "project", "decision", "input_request", "artifact"], "description": "Only when the kind cannot be inferred from the id." },
         "comments": { "type": "boolean", "description": "Issues only: include the comment thread (last 20)." }
       },
@@ -110,7 +110,7 @@
     "name": "update_issue",
     "summary": "Change an issue's status, priority, assignee, labels, parent, duplicate marker…",
     "kind": "catalog",
-    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (re-keys it), duplicateOfId (marks a duplicate of another issue). Sub-issues keep independent statuses and can be nested. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"BUG-142\",\"status\":\"in_review\"}."
+    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another issue). Changing project re-keys the issue and keeps its old key as an alias. Sub-issues keep independent statuses and can be nested. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
   },
   {
     "name": "start_work",

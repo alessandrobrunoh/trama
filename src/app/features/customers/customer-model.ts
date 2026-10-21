@@ -220,7 +220,7 @@ export function projectWorkState(status: string): RequestState {
 export interface WorkRow {
   kind: 'issue' | 'project';
   id: string;
-  /** `BUG-142` for issues; absent for projects. */
+  /** Project-based issue key such as `CORA-142`; absent for projects. */
   key?: string;
   title: string;
   status: string;

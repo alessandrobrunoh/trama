@@ -83,7 +83,6 @@ export const issueKindOptions = (): PickOption[] =>
   ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,
-    hint: ISSUE_KIND_META[k].prefix,
   }));
 
 // ───────────────────────── view tabs ─────────────────────────

@@ -227,6 +227,8 @@ fn references_are_classified_by_id_prefix_and_key_shape() {
     assert_eq!(candidates("fb-3", None), vec![Kind::Issue]);
     assert_eq!(candidates("ADR-21", None), vec![Kind::Decision]);
     assert_eq!(candidates("AUTH-42", None), vec![Kind::Issue]);
+    assert_eq!(candidates("A1C-42", None), vec![Kind::Issue]);
+    assert!(candidates("1ABC-42", None).is_empty());
     assert!(candidates("wk_abc", None).is_empty());
     assert_eq!(candidates("in_abc", None), vec![Kind::Issue]);
     assert_eq!(candidates("pj_abc", None), vec![Kind::Project]);

@@ -439,7 +439,7 @@ export interface Notification {
   actor: ActorRef;
   /** The record it is about. */
   subject: LegacySubjectRef;
-  /** Where it leads, relative to the workspace, e.g. `issues/BUG-142`. */
+  /** Where it leads, relative to the workspace, e.g. `issues/AUTH-142`. */
   link: string;
   createdAt: ISODate;
   /** Absent while unread. */
@@ -623,6 +623,8 @@ export interface Project {
   id: ID;
   workspaceId: ID;
   name: string;
+  /** Uppercase project tag used as the prefix for issue keys, e.g. `CORA-12`. */
+  key: string;
   /** One-line summary shown in lists. */
   summary?: string;
   /** Longer description (markdown). */
@@ -822,16 +824,67 @@ export interface InputRequest {
 
 export type IssueKind =
   'bug' | 'feature' | 'incident' | 'tech_debt' | 'feedback' | 'idea' | 'security';
-/** Key prefix per kind: BUG-142, FEAT-12, INC-3, DEBT-7, FB-20, IDEA-4, SEC-2 (numbering per kind). */
-export const ISSUE_KEY_PREFIX: Record<IssueKind, string> = {
-  bug: 'BUG',
-  feature: 'FEAT',
-  incident: 'INC',
-  tech_debt: 'DEBT',
-  feedback: 'FB',
-  idea: 'IDEA',
-  security: 'SEC',
-};
+/** Reserved prefix used by issues that are not assigned to a project. */
+export const UNASSIGNED_ISSUE_KEY_PREFIX = 'UNPR';
+/** Prefixes already used by non-project keys. */
+export const RESERVED_PROJECT_KEYS = [UNASSIGNED_ISSUE_KEY_PREFIX, 'ADR'] as const;
+export const PROJECT_KEY_MAX = 4;
+const PROJECT_KEY_PATTERN = /^[A-Z][A-Z0-9]{0,3}$/;
+
+export function normalizeProjectKey(value: string): string {
+  return value.trim().toUpperCase();
+}
+
+export function isProjectKey(value: string): boolean {
+  return PROJECT_KEY_PATTERN.test(value);
+}
+
+export function isReservedProjectKey(value: string): boolean {
+  return (RESERVED_PROJECT_KEYS as readonly string[]).includes(
+    normalizeProjectKey(value),
+  );
+}
+
+/** Suggests a short uppercase project tag from its name; callers can let people edit the suggestion. */
+export function suggestProjectKey(name: string): string {
+  const cleaned = name
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase();
+  const words = cleaned.split(/[^A-Z0-9]+/).filter(Boolean);
+  const word = words[0] ?? '';
+  const raw =
+    words.length > 1
+      ? words.map((part) => part[0] ?? '').join('')
+      : word.length > PROJECT_KEY_MAX && /[AEIOU]$/.test(word)
+        ? `${word
+            .slice(0, -1)
+            .replace(/[AEIOU]/g, '')
+            .slice(0, PROJECT_KEY_MAX - 1)}${word.charAt(word.length - 1)}`
+        : word.slice(0, PROJECT_KEY_MAX);
+  const candidate = (raw ?? '').replace(/[^A-Z0-9]/g, '').slice(0, PROJECT_KEY_MAX);
+  if (!candidate) return 'PROJ';
+  return /^[A-Z]/.test(candidate) ? candidate : `P${candidate}`.slice(0, PROJECT_KEY_MAX);
+}
+
+/** Generates a valid unused project tag, adding a short suffix when the name's suggestion is taken. */
+export function uniqueProjectKey(name: string, usedKeys: Iterable<string>): string {
+  const taken = new Set([...usedKeys].map((key) => key.toUpperCase()));
+  const base = suggestProjectKey(name);
+  if (!isReservedProjectKey(base) && !taken.has(base)) return base;
+
+  for (let n = 1; n < 36 ** (PROJECT_KEY_MAX - 1); n++) {
+    const suffix = n.toString(36).toUpperCase();
+    const candidate = `${base.slice(0, PROJECT_KEY_MAX - suffix.length)}${suffix}`;
+    if (
+      PROJECT_KEY_PATTERN.test(candidate) &&
+      !isReservedProjectKey(candidate) &&
+      !taken.has(candidate)
+    )
+      return candidate;
+  }
+  throw new Error('No available project tags remain');
+}
 
 /**
  * Tracker status. `backlog` is unscheduled demand.
@@ -879,7 +932,7 @@ export interface Issue {
   completedAt?: ISODate;
   /** Workspace label ids (`WorkspaceSettings.labels`). */
   labels: ID[];
-  /** Previous keys (changing `kind` re-keys the issue); lookups by key also match these. */
+  /** Previous keys (project changes re-key the issue); lookups by key also match these. */
   aliases: string[];
   /** Parent issue id; sub-issues are independent and may be nested to any depth. */
   parentId?: ID;
@@ -1814,7 +1867,7 @@ export type InsightItemType = 'issue' | 'decision' | 'milestone' | 'artifact' | 
 export interface InsightItem {
   type: InsightItemType;
   id: ID;
-  /** Human key (BUG-7, ADR-3) when the type has one. */
+  /** Human key (e.g. `CORA-7`, `ADR-3`) when the type has one. */
   key?: string;
   title: string;
   /** Project of a milestone or project item. */
@@ -2379,7 +2432,7 @@ export const LABEL_SCOPES: readonly LabelScope[] = ['issue', 'project'];
 
 const LABEL_SCOPE_VALUES = new Set<string>(LABEL_SCOPES);
 
-/** Missing or unknown scope is `issue`, which is also what every template uses. */
+/** Missing or unknown scope is `issue`. */
 function asLabelScope(value: unknown): StoredLabelScope {
   return typeof value === 'string' && LABEL_SCOPE_VALUES.has(value)
     ? (value as LabelScope)
@@ -2394,7 +2447,7 @@ export interface WorkspaceLabel {
   name: string;
   /** `#rrggbb`. */
   color: string;
-  /** Templates are always present and cannot be renamed, removed, merged away, archived, or moved off `issue`. */
+  /** Built-in labels are managed by the application rather than the workspace. */
   template: boolean;
   /**
    * Exactly one record type. An assignment that does not match stays on the record and still renders,
@@ -2411,19 +2464,8 @@ export interface WorkspaceLabel {
 /** A stored label may predate scopes. `resolveLabelCatalog` fills the gap. */
 type StoredLabel = Omit<WorkspaceLabel, 'scope'> & { scope?: StoredLabelScope };
 
-/** Always available. Ids are stable so existing assignments survive a settings rewrite. Scope is `issue`. */
-export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [
-  { id: 'lb_bug', name: 'Bug', color: '#e11d48', template: true, scope: 'issue' },
-  { id: 'lb_feature', name: 'Feature', color: '#2563eb', template: true, scope: 'issue' },
-  { id: 'lb_improvement', name: 'Improvement', color: '#16a34a', template: true, scope: 'issue' },
-  {
-    id: 'lb_documentation',
-    name: 'Documentation',
-    color: '#7c3aed',
-    template: true,
-    scope: 'issue',
-  },
-];
+/** No type labels are pre-created; workspace labels are user-defined. */
+export const LABEL_TEMPLATES: readonly WorkspaceLabel[] = [];
 
 /** Swatches offered when creating or recoloring a label. */
 export const LABEL_SWATCHES = [
@@ -2445,7 +2487,7 @@ export const LABEL_NAME_MAX = 40;
 export const LABEL_ASSIGN_MAX = 20;
 const LABEL_COLOR = /^#[0-9a-f]{6}$/;
 
-/** Templates first, then stored custom labels. Template names and scope cannot drift. */
+/** Configured built-in labels first, then stored workspace labels. */
 export function resolveLabelCatalog(stored?: readonly StoredLabel[] | null): WorkspaceLabel[] {
   const incoming = Array.isArray(stored) ? stored : [];
   const byId = new Map(
@@ -3013,7 +3055,7 @@ export interface WorkspaceSettings {
   iconColor?: string;
   /** 1-2 characters shown in the workspace icon (defaults to the name's initial). */
   iconInitial?: string;
-  /** Template labels plus any custom labels. Assign these ids; do not invent names. */
+  /** Workspace-defined labels. Assign these ids; do not invent names. */
   labels: WorkspaceLabel[];
   /** Customer tiers configured for this workspace, in display order. Empty until an admin adds some. */
   customerTiers: CustomerTier[];

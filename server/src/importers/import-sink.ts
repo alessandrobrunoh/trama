@@ -1,6 +1,5 @@
 import type { DataSource, EntityManager } from 'typeorm';
 import {
-  ISSUE_KEY_PREFIX,
   LABEL_SWATCHES,
   resolveLabelCatalog,
   type ActorRef,
@@ -22,6 +21,7 @@ import {
 } from '../database/entities/index.js';
 import type { MilestonesService } from '../milestones/milestones.service.js';
 import type { ProjectsService } from '../projects/projects.service.js';
+import { allocateIssueNumbers, issueKeyPrefix } from '../issues/issue-keys.js';
 import type { TeamsService } from '../teams/teams.service.js';
 import { ImportFatalError, type ImportSink } from './import-engine.js';
 import { ImportLinkEntity, type ImportLinkKind } from './entities.js';
@@ -323,16 +323,19 @@ export class TypeormImportSink implements ImportSink {
   async createIssue(n: NewIssue): Promise<'created' | 'exists'> {
     try {
       await this.ds.transaction(async (m) => {
-        const number = await this.deps.counters.next(
+        const prefix = await issueKeyPrefix(m, this.workspaceId, n.projectId);
+        const [number] = await allocateIssueNumbers(
           m,
+          this.deps.counters,
           this.workspaceId,
-          `issue:${n.kind}`,
+          prefix,
+          1,
         );
         await m.save(
           m.create(IssueEntity, {
             id: uid('in'),
             workspaceId: this.workspaceId,
-            key: `${ISSUE_KEY_PREFIX[n.kind]}-${number}`,
+            key: `${prefix}-${number}`,
             number,
             kind: n.kind,
             title: n.title,

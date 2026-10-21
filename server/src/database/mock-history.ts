@@ -8,7 +8,7 @@
 // can skip it and `--remove` can delete exactly it. A seeded PRNG makes the shape reproducible; all dates are
 // relative to `ctx.now`.
 import {
-  ISSUE_KEY_PREFIX,
+  UNASSIGNED_ISSUE_KEY_PREFIX,
   type ActorRef,
   type EstimateScale,
   type IssueKind,
@@ -56,8 +56,8 @@ export interface MockContext {
   teamIds: readonly string[];
   /** Milestones that already exist (they may receive some mock issues). */
   milestones: readonly { id: string; projectId: string }[];
-  /** Last used issue number per kind. */
-  issueCounters: Partial<Record<IssueKind, number>>;
+  /** Last used issue number per key prefix. */
+  issueCounters: Partial<Record<string, number>>;
   /** Real issues (not mock ones): they only get missing estimates / started / completed timestamps. */
   existingIssues: readonly MockExistingIssue[];
   seed?: number;
@@ -73,7 +73,7 @@ export interface MockHistory {
   events: Partial<DomainEventEntity>[];
   milestones: Partial<MilestoneEntity>[];
   patches: MockIssuePatch[];
-  /** `issue:<kind>` → new last number */
+  /** `issue-key:<prefix>` → new last number */
   counters: Record<string, number>;
 }
 
@@ -405,7 +405,9 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     const base = list[(n + hash(kind)) % list.length];
     return n >= list.length ? `${base} (follow-up ${Math.floor(n / list.length)})` : base;
   };
-  const numbers: Partial<Record<IssueKind, number>> = { ...ctx.issueCounters };
+  const numbers: Record<string, number> = {};
+  for (const [prefix, number] of Object.entries(ctx.issueCounters))
+    if (number !== undefined) numbers[prefix] = number;
   const people = ctx.userIds;
   const personWeights = people.map((_, i) => [i, [3, 3, 2, 2, 2, 1][i] ?? 1] as const);
   const person = (): string => people[rng.weighted(personWeights)];
@@ -413,9 +415,10 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
 
   ordered.forEach((p, n) => {
     const id = `${MOCK_ISSUE_PREFIX}${String(n + 1).padStart(2, '0')}`;
-    const number = (numbers[p.kind] ?? 0) + 1;
-    numbers[p.kind] = number;
-    const key = `${ISSUE_KEY_PREFIX[p.kind]}-${number}`;
+    const prefix = UNASSIGNED_ISSUE_KEY_PREFIX;
+    const number = (numbers[prefix] ?? 0) + 1;
+    numbers[prefix] = number;
+    const key = `${prefix}-${number}`;
     const title = nextTitle(p.kind);
     const source = rng.weighted(SOURCE_WEIGHTS);
     const external = source === 'email' || source === 'api';
@@ -481,8 +484,8 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     for (const [at, from, to] of path) push(at, actorOf(), 'issue.status_changed', { key, from, to });
   });
 
-  for (const [kind, n] of Object.entries(numbers) as [IssueKind, number][])
-    if (n !== (ctx.issueCounters[kind] ?? 0)) out.counters[`issue:${kind}`] = n;
+  for (const [prefix, n] of Object.entries(numbers))
+    if (n !== (ctx.issueCounters[prefix] ?? 0)) out.counters[`issue-key:${prefix}`] = n;
   return out;
 }
 
@@ -524,8 +527,10 @@ function startOfUtcDay(ms: number): number {
 export function addMockHistoryToSeed(data: SeedData, now: number): void {
   const workspaceId = data.workspace.id as string;
   const roleOf = new Map(data.memberships.map((m) => [m.userId as string, m.role]));
-  const counters: Partial<Record<IssueKind, number>> = {};
-  for (const kind of Object.keys(ISSUE_KEY_PREFIX) as IssueKind[]) counters[kind] = data.counters[`issue:${kind}`] ?? 0;
+  const counters: Partial<Record<string, number>> = {
+    [UNASSIGNED_ISSUE_KEY_PREFIX]:
+      data.counters[`issue-key:${UNASSIGNED_ISSUE_KEY_PREFIX}`] ?? 0,
+  };
   const history = generateMockHistory({
     now,
     workspaceId,

@@ -272,6 +272,8 @@ export interface UpdateCustomerTierInput {
 // ───── projects ─────
 export interface CreateProjectInput {
   name: string;
+  /** Uppercase tag used to prefix this project's issue keys. */
+  key?: string;
   summary?: string;
   description?: string;
   color?: string;
@@ -289,6 +291,8 @@ export interface CreateProjectInput {
 }
 export interface UpdateProjectInput {
   name?: string;
+  /** Uppercase tag used to prefix this project's issue keys. */
+  key?: string;
   summary?: string | null;
   description?: string | null;
   color?: string;
@@ -359,7 +363,7 @@ export interface CreateIssueInput {
 }
 export interface UpdateIssueInput {
   title?: string;
-  /** Re-keys the issue (BUG-148 → FEAT-35); the old key stays valid as an alias. */
+  /** Changes the issue classification without changing its key. */
   kind?: IssueKind;
   /** Story points (non-negative). `null` clears. */
   estimate?: number | null;

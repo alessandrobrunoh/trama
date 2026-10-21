@@ -317,7 +317,7 @@ export class TramaStore {
   readonly inputRequestById = computed(() => indexById(this._inputRequests()));
   readonly issueById = computed(() => indexById(this._issues()));
   readonly customerById = computed(() => indexById(this._customers()));
-  /** Upper-case current key (`BUG-142`) or alias (an old key from before a kind change) → issue. */
+  /** Uppercase current project key (`AUTH-142`) or an older project-key alias → issue. */
   readonly issueByKey = computed(() => {
     const map = new Map<string, Issue>();
     for (const i of this._issues()) for (const a of i.aliases ?? []) map.set(a.toUpperCase(), i);
@@ -535,7 +535,7 @@ export class TramaStore {
 
   // ─────────────────────────── point lookups (id or key) ───────────────────────────
 
-  /** By id, key (`BUG-142`) or alias (an old key from before a kind change). */
+  /** By id, current project key (`AUTH-142`) or an older project-key alias. */
   getIssue(ref: string | null | undefined): Issue | undefined {
     if (!ref) return undefined;
     return this.issueById().get(ref) ?? this.issueByKey().get(ref.toUpperCase());
@@ -1022,15 +1022,14 @@ export class TramaStore {
   }
 
   /**
-   * Optimistic, except `kind`: changing it re-keys the issue, so the server's answer (new `key`,
-   * old key in `aliases`) is applied when it arrives. Changing the project also drops milestones
-   * that no longer qualify locally.
+   * The server owns key changes when an issue moves projects. Changing the project also drops
+   * milestones that no longer qualify locally.
    */
   async updateIssue(id: ID, patch: UpdateIssueInput): Promise<boolean> {
     return !!(await this.patchIssue(id, patch));
   }
 
-  /** Change the kind (re-keys the issue). Resolves the updated issue (new key) or `undefined`. */
+  /** Change the issue classification without changing its key. */
   async changeIssueKind(id: ID, kind: IssueKind): Promise<Issue | undefined> {
     const current = this.issueById().get(id);
     if (!current || current.kind === kind) return current;
@@ -1050,8 +1049,7 @@ export class TramaStore {
 
   /** What the issue looks like right after `patch` (before the server answers). */
   private issueOptimistic(current: Issue, patch: UpdateIssueInput): Record<string, unknown> {
-    const { kind: _kind, ...local } = patch;
-    const optimistic: Record<string, unknown> = { ...local, updatedAt: this.nowIso() };
+    const optimistic: Record<string, unknown> = { ...patch, updatedAt: this.nowIso() };
     if (patch.projectId !== undefined && patch.milestoneIds === undefined) {
       const projects = new Set<string>();
       const ownProject = patch.projectId !== undefined ? patch.projectId : current.projectId;

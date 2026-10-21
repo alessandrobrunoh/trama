@@ -166,5 +166,5 @@ export class AppearanceSection {
   protected readonly branches = inject(BranchNames);
   protected readonly branchFormats = BRANCH_FORMATS;
   /** The preview issue; the “you” part comes from the signed-in user. */
-  protected readonly sample = { key: 'BUG-142', title: 'Remove deprecated v1 sessions table' };
+  protected readonly sample = { key: 'AUTH-142', title: 'Remove deprecated v1 sessions table' };
 }

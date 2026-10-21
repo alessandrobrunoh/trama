@@ -9,7 +9,7 @@ An Issue is the unit of work. One Issue should describe one problem or request. 
 
 ## Search before creating
 
-Use `search` or `find_work` to search existing Issues first. If a matching Issue exists, use `update_issue` or add a concise comment rather than creating a duplicate. Check for true duplicates and use the supported duplicate relationship instead of deleting the issue.
+Read `.trama` at the repository root first. If it matches the checkout, search within its saved project scope instead of searching every project. If it is missing or incomplete, follow `trama-project-context` to ask the user and create it after they reply. Use a project-filtered issue list or `find_work` with `scope: "issues"` and the project ID when supported; use global `search` only when the user asks for a cross-project search. If a matching Issue exists, use `update_issue` or add a concise comment rather than creating a duplicate. Check for true duplicates and use the supported duplicate relationship instead of deleting the issue.
 
 ## Create an Issue
 
@@ -25,7 +25,7 @@ For related work, search and read context for each Issue that may be affected. A
 
 ## Triage
 
-1. Find relevant Issues using `search` or `find_work`.
+1. Find relevant Issues within the saved project scope using `find_work` or a project-filtered issue list.
 2. Review duplicates, stale reports, missing information, priority, and classification.
 3. Present a concise proposed set of changes before making broad or ambiguous edits.
 4. Apply agreed changes using `triage_issues`, `create_issue`, or `update_issue` as appropriate, and verify their results.

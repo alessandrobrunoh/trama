@@ -1,0 +1,9 @@
+# Copy this file to .trama after completing Trama project setup.
+# This file contains project identifiers, never API keys or other credentials.
+schema_version = 1
+workspace = "workspace-slug"
+repository = "github.com/owner/repository"
+project_id = "prj_project-id"
+project_name = "Project name"
+goal_id = ""
+goal_name = ""
