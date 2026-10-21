@@ -122,7 +122,16 @@ export class ArtifactsService {
       qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
-    applyProjectScope(qb, 'a', 'projectId');
+    const access = currentAccess();
+    if (access && !access.projects.all) {
+      const ids = access.projects.projectIds;
+      const scope = ids.length
+        ? `(a."projectId" IN (:...memberProjectIds) OR EXISTS (SELECT 1 FROM issues i WHERE i.id = a."issueId" AND i."projectId" IN (:...memberProjectIds))${access.includeUnassigned ? ' OR (a."projectId" IS NULL AND a."issueId" IS NULL)' : ''})`
+        : access.includeUnassigned
+          ? '(a."projectId" IS NULL AND a."issueId" IS NULL)'
+          : '1 = 0';
+      qb.andWhere(scope, ids.length ? { memberProjectIds: ids } : undefined);
+    }
     return qb.getMany();
   }
 
@@ -138,14 +147,26 @@ export class ArtifactsService {
 
   async get(workspaceId: string, id: string) {
     const row = await this.repo.findOneBy({ workspaceId, id });
-    if (!row || projectHidden(currentAccess(), row.projectId))
-      throw notFound('Artifact', id);
+    if (!row || (await this.isHidden(row))) throw notFound('Artifact', id);
     return row;
   }
 
-  /** 404 when the project does not exist in the workspace. */
+  private async isHidden(row: ArtifactEntity): Promise<boolean> {
+    if (row.projectId) return projectHidden(currentAccess(), row.projectId);
+    if (row.issueId) {
+      const issue = await this.ds.getRepository(IssueEntity).findOne({
+        where: { id: row.issueId, workspaceId: row.workspaceId },
+        select: { projectId: true },
+      });
+      return projectHidden(currentAccess(), issue?.projectId);
+    }
+    return projectHidden(currentAccess(), null);
+  }
+
+  /** 404 when the project is absent or outside the caller's project scope. */
   async assertProject(workspaceId: string, projectId: string): Promise<void> {
     if (
+      projectHidden(currentAccess(), projectId) ||
       !(await this.ds
         .getRepository(ProjectEntity)
         .existsBy({ id: projectId, workspaceId }))
@@ -188,20 +209,24 @@ export class ArtifactsService {
       issueId?: string | null;
     },
   ) {
-    if (
-      o.projectId &&
-      !(await this.ds
-        .getRepository(ProjectEntity)
-        .existsBy({ id: o.projectId, workspaceId }))
-    )
-      throw new BadRequestException(`Unknown project "${o.projectId}"`);
-    if (
-      o.issueId &&
-      !(await this.ds
-        .getRepository(IssueEntity)
-        .existsBy({ id: o.issueId, workspaceId }))
-    )
-      throw new BadRequestException(`Unknown issue "${o.issueId}"`);
+    if (o.projectId) {
+      if (
+        projectHidden(currentAccess(), o.projectId) ||
+        !(await this.ds
+          .getRepository(ProjectEntity)
+          .existsBy({ id: o.projectId, workspaceId }))
+      )
+        throw new BadRequestException(`Unknown project "${o.projectId}"`);
+    }
+    if (o.issueId) {
+      const issue = await this.ds.getRepository(IssueEntity).findOne({
+        where: { id: o.issueId, workspaceId },
+        select: { id: true, projectId: true },
+      });
+      if (!issue) throw new BadRequestException(`Unknown issue "${o.issueId}"`);
+      if (projectHidden(currentAccess(), issue.projectId))
+        throw new BadRequestException(`Unknown issue "${o.issueId}"`);
+    }
   }
 
   private async validate(workspaceId: string, input: ArtifactInput) {

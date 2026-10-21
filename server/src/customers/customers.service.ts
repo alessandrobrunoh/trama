@@ -22,6 +22,8 @@ import {
 } from '../database/entities/index.js';
 import { demandScope } from './demand-filter.js';
 import { EventsService } from '../events/events.service.js';
+import { assertCanUseProject, currentAccess } from '../auth/member-access.js';
+import { decodeCommentCursor, encodeCommentCursor, parseCommentLimit } from '../comments/comment-cursor.js';
 
 export interface CustomerInput {
   name?: string;
@@ -75,6 +77,8 @@ export interface CustomerRequestFilter {
   issueId?: string;
   projectId?: string;
   important?: boolean;
+  limit?: number;
+  cursor?: string;
 }
 
 export interface CustomerRequestView {
@@ -255,30 +259,65 @@ export class CustomersService {
   /** Removes the customer and its requests. Issues and projects stay. */
   async remove(workspaceId: string, actor: ActorRef, id: string) {
     const row = await this.get(workspaceId, id);
+    const requests = await this.requests.find({
+      where: { workspaceId, customerId: row.id },
+    });
+    const issueIds = [...new Set(requests.flatMap((request) => request.issueId ? [request.issueId] : []))];
+    const issues = issueIds.length
+      ? await this.ds.getRepository(IssueEntity).findBy({ workspaceId, id: In(issueIds) })
+      : [];
+    const issueById = new Map(issues.map((issue) => [issue.id, issue]));
+    const projectIds = [
+      ...new Set(
+        requests.map((request) =>
+          request.projectId ?? (request.issueId ? issueById.get(request.issueId)?.projectId ?? null : null),
+        ),
+      ),
+    ];
     await this.customers.delete({ id: row.id });
     await this.events.record({
       workspaceId,
       actor,
       type: 'customer.deleted',
       subject: { type: 'customer', id: row.id },
-      data: { name: row.name, domain: row.domain },
+      data: { name: row.name, domain: row.domain, projectIds },
     });
   }
 
   async requestsFor(workspaceId: string, customerId: string): Promise<CustomerRequestView[]> {
     await this.get(workspaceId, customerId);
-    return this.listRequests(workspaceId, { customerId });
+    return (await this.listRequests(workspaceId, { customerId, limit: 100 })).items;
   }
 
   /** Requests of the workspace, newest first. Every filter narrows; none returns all. */
-  async listRequests(workspaceId: string, f: CustomerRequestFilter = {}): Promise<CustomerRequestView[]> {
-    const where: Record<string, unknown> = { workspaceId };
-    if (f.customerId) where['customerId'] = f.customerId;
-    if (f.issueId) where['issueId'] = f.issueId;
-    if (f.projectId) where['projectId'] = f.projectId;
-    if (f.important !== undefined) where['important'] = f.important;
-    const rows = await this.requests.find({ where, order: { createdAt: 'DESC', id: 'ASC' } });
-    return this.withTargets(workspaceId, rows);
+  async listRequests(workspaceId: string, f: CustomerRequestFilter = {}): Promise<{ items: CustomerRequestView[]; nextCursor: string | null }> {
+    const limit = parseCommentLimit(f.limit);
+    const qb = this.requests.createQueryBuilder('r')
+      .leftJoin(IssueEntity, 'targetIssue', 'targetIssue.id = r.issueId AND targetIssue.workspaceId = r.workspaceId')
+      .where('r.workspaceId = :workspaceId', { workspaceId })
+      .orderBy('r.createdAt', 'DESC').addOrderBy('r.id', 'ASC').take(limit + 1);
+    if (f.customerId) qb.andWhere('r.customerId = :customerId', { customerId: f.customerId });
+    if (f.issueId) qb.andWhere('r.issueId = :issueId', { issueId: f.issueId });
+    if (f.projectId) qb.andWhere('r.projectId = :projectId', { projectId: f.projectId });
+    if (f.important !== undefined) qb.andWhere('r.important = :important', { important: f.important });
+    if (f.cursor) {
+      const cursor = decodeCommentCursor(f.cursor);
+      qb.andWhere('(r.createdAt < :cursorDate OR (r.createdAt = :cursorDate AND r.id > :cursorId))', { cursorDate: cursor.at, cursorId: cursor.id });
+    }
+    const access = currentAccess();
+    if (access && !access.projects.all) {
+      const ids = access.projects.projectIds;
+      qb.andWhere(
+        `(r."projectId" IN (:...visibleProjectIds) OR (r."projectId" IS NULL AND "targetIssue"."projectId" IN (:...visibleProjectIds))${access.includeUnassigned ? ' OR (r."projectId" IS NULL AND "targetIssue"."projectId" IS NULL) OR (r."projectId" IS NULL AND r."issueId" IS NULL)' : ''})`,
+        { visibleProjectIds: ids.length ? ids : ['__none__'] },
+      );
+    }
+    const rows = await qb.getMany();
+    const pageRows = rows;
+    const hasMore = pageRows.length > limit;
+    const items = await this.withTargets(workspaceId, pageRows.slice(0, limit));
+    const last = pageRows[Math.min(limit, pageRows.length) - 1];
+    return { items, nextCursor: hasMore && last ? encodeCommentCursor({ at: last.createdAt, id: last.id }) : null };
   }
 
   async createRequest(workspaceId: string, actor: ActorRef, customerId: string, input: CustomerRequestInput) {
@@ -291,9 +330,11 @@ export class CustomersService {
     if (input.issueId) {
       issue = await this.ds.getRepository(IssueEntity).findOneBy({ workspaceId, id: input.issueId });
       if (!issue) throw notFound('Issue', input.issueId);
+      assertCanUseProject(issue.projectId);
     } else if (input.projectId) {
       project = await this.ds.getRepository(ProjectEntity).findOneBy({ workspaceId, id: input.projectId });
       if (!project) throw notFound('Project', input.projectId);
+      assertCanUseProject(project.id);
     }
     const now = new Date();
     const row = this.requests.create({
@@ -342,6 +383,7 @@ export class CustomersService {
     await this.get(workspaceId, customerId);
     const row = await this.requests.findOneBy({ workspaceId, customerId, id: requestId });
     if (!row) throw notFound('Customer request', requestId);
+    await this.assertRequestVisible(workspaceId, row);
     const fields: string[] = [];
     if (patch.body !== undefined) {
       const body = this.requestBody(patch.body);
@@ -380,6 +422,7 @@ export class CustomersService {
     await this.get(workspaceId, customerId);
     const row = await this.requests.findOneBy({ workspaceId, customerId, id: requestId });
     if (!row) throw notFound('Customer request', requestId);
+    await this.assertRequestVisible(workspaceId, row);
     await this.requests.delete({ id: row.id });
     await this.events.record({
       workspaceId,
@@ -527,5 +570,14 @@ export class CustomersService {
       };
       return [view];
     });
+  }
+
+  private async assertRequestVisible(workspaceId: string, row: CustomerRequestEntity): Promise<void> {
+    if (row.issueId) {
+      const issue = await this.ds.getRepository(IssueEntity).findOneBy({ workspaceId, id: row.issueId });
+      assertCanUseProject(issue?.projectId);
+    } else {
+      assertCanUseProject(row.projectId);
+    }
   }
 }

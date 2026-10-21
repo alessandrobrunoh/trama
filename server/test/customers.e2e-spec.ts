@@ -48,7 +48,25 @@ describe('customers', () => {
     const req = (await owner.post(`${base()}/customers/${customer.id}/requests`, { projectId: project.id, body: 'Faster setup' }).expect(201)).body;
     expect(req).toMatchObject({ projectId: project.id, project: { name: 'Onboarding' } });
     expect(req.issueId).toBeUndefined();
-    expect((await owner.get(`${base()}/customer-requests?projectId=${project.id}`).expect(200)).body).toHaveLength(1);
+    expect((await owner.get(`${base()}/customer-requests?projectId=${project.id}`).expect(200)).body.items).toHaveLength(1);
+  });
+
+  it('paginates the workspace request list with a stable bounded cursor', async () => {
+    const customer = (await owner.post(`${base()}/customers`, { name: 'Pages', domain: 'pages.dev' }).expect(201)).body;
+    const project = (await owner.post(`${base()}/projects`, { name: 'Page target' }).expect(201)).body;
+    for (const body of ['one', 'two', 'three']) {
+      await owner.post(`${base()}/customers/${customer.id}/requests`, { projectId: project.id, body }).expect(201);
+    }
+
+    const first = (await owner.get(`${base()}/customer-requests?projectId=${project.id}&limit=2`).expect(200)).body;
+    expect(first.items).toHaveLength(2);
+    expect(first.nextCursor).toEqual(expect.any(String));
+    const second = (await owner.get(`${base()}/customer-requests?projectId=${project.id}&limit=2&cursor=${encodeURIComponent(first.nextCursor)}`).expect(200)).body;
+    expect(second.items).toHaveLength(1);
+    expect(second.nextCursor).toBeNull();
+    const all = [...first.items, ...second.items];
+    expect(new Set(all.map((r: { id: string }) => r.id)).size).toBe(3);
+    await owner.get(`${base()}/customer-requests?limit=101`).expect(400);
   });
 
   it('links a customer to an issue, and unlinking keeps the issue', async () => {

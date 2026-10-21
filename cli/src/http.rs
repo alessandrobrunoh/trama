@@ -13,6 +13,32 @@ use crate::error::{CliError, Result};
 
 pub const USER_AGENT: &str = concat!("trama-cli/", env!("CARGO_PKG_VERSION"));
 const CLIENT_ID: &str = "trama-cli";
+const MAX_RESPONSE_BYTES: usize = 4 * 1024 * 1024;
+
+async fn bounded_body(mut res: reqwest::Response) -> Result<String> {
+    if res.content_length().is_some_and(|n| n > MAX_RESPONSE_BYTES as u64) {
+        return Err(CliError::network("API reply exceeds the 4 MiB response limit"));
+    }
+    let mut body = Vec::new();
+    loop {
+        let chunk = match res.chunk().await.map_err(|e| CliError::network(format!("could not read the reply: {}", describe(&e))))? {
+            Some(chunk) => chunk,
+            None => break,
+        };
+        if !append_bounded(&mut body, &chunk) {
+            return Err(CliError::network("API reply exceeds the 4 MiB response limit"));
+        }
+    }
+    String::from_utf8(body).map_err(|_| CliError::network("API reply is not valid UTF-8"))
+}
+
+fn append_bounded(body: &mut Vec<u8>, chunk: &[u8]) -> bool {
+    if body.len().saturating_add(chunk.len()) > MAX_RESPONSE_BYTES {
+        return false;
+    }
+    body.extend_from_slice(chunk);
+    true
+}
 
 pub const ACCEPT_JSON: &str = "application/json";
 pub const ACCEPT_MARKDOWN: &str = "text/markdown, application/json;q=0.5";
@@ -35,11 +61,16 @@ impl Reply {
         if self.body.trim().is_empty() {
             return Ok(Value::Null);
         }
-        serde_json::from_str(&self.body).map_err(|_| CliError::internal("the API sent a reply that is not JSON"))
+        serde_json::from_str(&self.body)
+            .map_err(|_| CliError::internal("the API sent a reply that is not JSON"))
     }
 
     pub fn into_result(self) -> Result<Reply> {
-        if (200..300).contains(&self.status) { Ok(self) } else { Err(CliError::from_http(self.status, &self.body)) }
+        if (200..300).contains(&self.status) {
+            Ok(self)
+        } else {
+            Err(CliError::from_http(self.status, &self.body))
+        }
     }
 }
 
@@ -56,7 +87,15 @@ pub struct Request<'a> {
 
 impl<'a> Request<'a> {
     pub fn get(path: &'a str) -> Self {
-        Self { method: Method::Get, path, query: &[], body: None, token: None, accept: ACCEPT_JSON, cookie: None }
+        Self {
+            method: Method::Get,
+            path,
+            query: &[],
+            body: None,
+            token: None,
+            accept: ACCEPT_JSON,
+            cookie: None,
+        }
     }
 
     pub fn token(mut self, token: &'a str) -> Self {
@@ -91,7 +130,10 @@ impl Api {
             .user_agent(USER_AGENT)
             .build()
             .map_err(|e| CliError::internal(format!("cannot build the HTTP client: {e}")))?;
-        Ok(Api { client, base: base.trim_end_matches('/').to_string() })
+        Ok(Api {
+            client,
+            base: base.trim_end_matches('/').to_string(),
+        })
     }
 
     pub fn base(&self) -> &str {
@@ -99,9 +141,24 @@ impl Api {
     }
 
     /// Workspace route (`/w/{slug}{call.path}`).
-    pub async fn workspace(&self, token: &str, slug: &str, call: &Call, accept: &str) -> Result<Reply> {
+    pub async fn workspace(
+        &self,
+        token: &str,
+        slug: &str,
+        call: &Call,
+        accept: &str,
+    ) -> Result<Reply> {
         let path = format!("/w/{}{}", encode_segment(slug), call.path);
-        self.send(&Request { method: call.method, path: &path, query: &call.query, body: call.body.as_ref(), token: Some(token), accept, cookie: None }).await
+        self.send(&Request {
+            method: call.method,
+            path: &path,
+            query: &call.query,
+            body: call.body.as_ref(),
+            token: Some(token),
+            accept,
+            cookie: None,
+        })
+        .await
     }
 
     /// One request, with bounded retries for idempotent reads. Non-2xx replies are returned, not raised.
@@ -146,12 +203,24 @@ impl Api {
         if let Some(body) = r.body {
             req = req.json(body);
         }
-        let res = req.send().await.map_err(|e| CliError::network(format!("{}: {}", describe(&e), self.base)))?;
+        let res = req
+            .send()
+            .await
+            .map_err(|e| CliError::network(format!("{}: {}", describe(&e), self.base)))?;
         let status = res.status().as_u16();
         let headers = res.headers().clone();
-        let content_type = headers.get(CONTENT_TYPE).and_then(|v| v.to_str().ok()).unwrap_or("").to_string();
-        let body = res.text().await.map_err(|e| CliError::network(format!("could not read the reply: {}", describe(&e))))?;
-        Ok(Reply { status, content_type, body, headers })
+        let content_type = headers
+            .get(CONTENT_TYPE)
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        let body = bounded_body(res).await?;
+        Ok(Reply {
+            status,
+            content_type,
+            body,
+            headers,
+        })
     }
 
     /// Opens a streaming GET (Server-Sent Events). The caller reads chunks.
@@ -174,7 +243,7 @@ impl Api {
             .map_err(|e| CliError::network(format!("{}: {}", describe(&e), self.base)))?;
         if !res.status().is_success() {
             let status = res.status().as_u16();
-            let body = res.text().await.unwrap_or_default();
+            let body = bounded_body(res).await.unwrap_or_default();
             return Err(CliError::from_http(status, &body));
         }
         Ok(res)
@@ -183,11 +252,15 @@ impl Api {
 
 /// Extracts `name=value` from the `Set-Cookie` headers of a reply.
 pub fn cookie_value(headers: &HeaderMap, name: &str) -> Option<String> {
-    headers.get_all(reqwest::header::SET_COOKIE).iter().filter_map(|v| v.to_str().ok()).find_map(|line| {
-        let first = line.split(';').next()?.trim();
-        let (k, v) = first.split_once('=')?;
-        (k == name && !v.is_empty()).then(|| format!("{k}={v}"))
-    })
+    headers
+        .get_all(reqwest::header::SET_COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .find_map(|line| {
+            let first = line.split(';').next()?.trim();
+            let (k, v) = first.split_once('=')?;
+            (k == name && !v.is_empty()).then(|| format!("{k}={v}"))
+        })
 }
 
 #[cfg(test)]
@@ -199,11 +272,30 @@ mod tests {
     fn reads_session_cookie() {
         let mut h = HeaderMap::new();
         h.append(SET_COOKIE, HeaderValue::from_static("other=1; Path=/"));
-        h.append(SET_COOKIE, HeaderValue::from_static("trama_session=abc123; HttpOnly; Path=/; SameSite=Lax"));
-        assert_eq!(cookie_value(&h, "trama_session").as_deref(), Some("trama_session=abc123"));
+        h.append(
+            SET_COOKIE,
+            HeaderValue::from_static("trama_session=abc123; HttpOnly; Path=/; SameSite=Lax"),
+        );
+        assert_eq!(
+            cookie_value(&h, "trama_session").as_deref(),
+            Some("trama_session=abc123")
+        );
         assert_eq!(cookie_value(&h, "missing"), None);
         h.clear();
-        h.append(SET_COOKIE, HeaderValue::from_static("trama_session=; Max-Age=0"));
+        h.append(
+            SET_COOKIE,
+            HeaderValue::from_static("trama_session=; Max-Age=0"),
+        );
         assert_eq!(cookie_value(&h, "trama_session"), None);
+    }
+
+    #[test]
+    fn response_byte_limit_accepts_boundary_and_rejects_before_parsing() {
+        let mut body = Vec::new();
+        assert!(append_bounded(&mut body, &vec![b' '; MAX_RESPONSE_BYTES]));
+        assert_eq!(body.len(), MAX_RESPONSE_BYTES);
+        assert!(!append_bounded(&mut body, b"x"));
+        assert_eq!(body.len(), MAX_RESPONSE_BYTES);
+        assert!(serde_json::from_slice::<Value>(&body).is_err());
     }
 }

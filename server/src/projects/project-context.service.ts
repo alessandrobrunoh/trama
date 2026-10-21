@@ -15,6 +15,7 @@ import {
 } from '../database/entities/index.js';
 import {
   assembleProjectContext,
+  CONTEXT_CAPS,
   projectContextMarkdown,
   type ProjectContextData,
 } from './project-context.logic.js';
@@ -55,7 +56,9 @@ export class ProjectContextService {
       order: { number: 'ASC' },
     });
     const parentIds = [
-      ...new Set(issues.flatMap((issue) => (issue.parentId ? [issue.parentId] : []))),
+      ...new Set(
+        issues.flatMap((issue) => (issue.parentId ? [issue.parentId] : [])),
+      ),
     ];
     if (parentIds.length) {
       const parents = await repo(IssueEntity).find({
@@ -106,10 +109,145 @@ export class ProjectContextService {
     });
   }
 
-  /** Markdown briefing for agents (`GET …/context.md`). */
+  /** Bounded Markdown briefing; JSON context remains the complete representation. */
   async markdown(workspaceId: string, projectId: string): Promise<string> {
-    const ctx = await this.build(workspaceId, projectId);
-    return projectContextMarkdown(ctx, { names: await this.names(ctx) });
+    const repo = <T extends object>(e: new () => T) => this.ds.getRepository(e);
+    const project = await repo(ProjectEntity).findOneBy({
+      workspaceId,
+      id: projectId,
+    });
+    if (!project || projectHidden(currentAccess(), project.id))
+      throw notFound('Project', projectId);
+
+    const [milestones, updates] = await Promise.all([
+      repo(MilestoneEntity).find({
+        where: { workspaceId, projectId },
+        order: { sortOrder: 'ASC', id: 'ASC' },
+        take: CONTEXT_CAPS.milestones,
+      }),
+      this.updates(workspaceId, projectId),
+    ]);
+    const issueRepo = repo(IssueEntity);
+    const [issues, issueCount, openIssueCount] = await Promise.all([
+      issueRepo.find({
+        where: { workspaceId, projectId },
+        order: { number: 'ASC', id: 'ASC' },
+        take: CONTEXT_CAPS.issues,
+      }),
+      issueRepo.countBy({ workspaceId, projectId }),
+      issueRepo
+        .createQueryBuilder('i')
+        .where('i.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('i.projectId = :projectId', { projectId })
+        .andWhere("i.status NOT IN ('done', 'canceled')")
+        .getCount(),
+    ]);
+    const issueTargetQuery = () =>
+      this.ds
+        .getRepository(IssueEntity)
+        .createQueryBuilder('i')
+        .select('i.id')
+        .where('i.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('i.projectId = :projectId', { projectId });
+    const artifactRepo = repo(ArtifactEntity);
+    const [
+      artifacts,
+      artifactCount,
+      decisions,
+      decisionCount,
+      inputRequests,
+      inputRequestCount,
+    ] = await Promise.all([
+      artifactRepo
+        .createQueryBuilder('a')
+        .where('a.workspaceId = :workspaceId', { workspaceId })
+        .andWhere(
+          '(a.projectId = :projectId OR a.issueId IN (' +
+            issueTargetQuery().getQuery() +
+            '))',
+          { projectId },
+        )
+        .setParameters(issueTargetQuery().getParameters())
+        .orderBy('a.createdAt', 'ASC')
+        .addOrderBy('a.id', 'ASC')
+        .take(CONTEXT_CAPS.artifacts)
+        .getMany(),
+      artifactRepo
+        .createQueryBuilder('a')
+        .where('a.workspaceId = :workspaceId', { workspaceId })
+        .andWhere(
+          '(a.projectId = :projectId OR a.issueId IN (' +
+            issueTargetQuery().getQuery() +
+            '))',
+          { projectId },
+        )
+        .setParameters(issueTargetQuery().getParameters())
+        .getCount(),
+      repo(DecisionEntity)
+        .createQueryBuilder('d')
+        .where('d.workspaceId = :workspaceId', { workspaceId })
+        .andWhere("d.status NOT IN ('rejected', 'draft')")
+        .andWhere(
+          '(d."originIssueId" IN (' +
+            issueTargetQuery().getQuery() +
+            ') OR d."relatedIssueIds" ?| ARRAY(SELECT "id" FROM "issues" WHERE "workspaceId" = :workspaceId AND "projectId" = :projectId))',
+          { projectId },
+        )
+        .setParameters(issueTargetQuery().getParameters())
+        .orderBy('d.number', 'ASC')
+        .addOrderBy('d.id', 'ASC')
+        .take(CONTEXT_CAPS.decisions)
+        .getMany(),
+      repo(DecisionEntity)
+        .createQueryBuilder('d')
+        .where('d.workspaceId = :workspaceId', { workspaceId })
+        .andWhere("d.status NOT IN ('rejected', 'draft')")
+        .andWhere(
+          '(d."originIssueId" IN (' +
+            issueTargetQuery().getQuery() +
+            ') OR d."relatedIssueIds" ?| ARRAY(SELECT "id" FROM "issues" WHERE "workspaceId" = :workspaceId AND "projectId" = :projectId))',
+          { projectId },
+        )
+        .setParameters(issueTargetQuery().getParameters())
+        .getCount(),
+      repo(InputRequestEntity)
+        .createQueryBuilder('r')
+        .where('r.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('r.state = :state', { state: 'open' })
+        .andWhere('r.issueId IN (' + issueTargetQuery().getQuery() + ')')
+        .setParameters(issueTargetQuery().getParameters())
+        .orderBy('r.createdAt', 'ASC')
+        .addOrderBy('r.id', 'ASC')
+        .take(CONTEXT_CAPS.inputRequests)
+        .getMany(),
+      repo(InputRequestEntity)
+        .createQueryBuilder('r')
+        .where('r.workspaceId = :workspaceId', { workspaceId })
+        .andWhere('r.state = :state', { state: 'open' })
+        .andWhere('r.issueId IN (' + issueTargetQuery().getQuery() + ')')
+        .setParameters(issueTargetQuery().getParameters())
+        .getCount(),
+    ]);
+    const ctx = assembleProjectContext({
+      project,
+      milestones,
+      updates,
+      issues,
+      artifacts,
+      decisions,
+      inputRequests,
+      includeUnmatchedAssociations: true,
+    });
+    return projectContextMarkdown(ctx, {
+      names: await this.names(ctx),
+      counts: {
+        issues: issueCount,
+        openIssues: openIssueCount,
+        artifacts: artifactCount,
+        decisions: decisionCount,
+        inputRequests: inputRequestCount,
+      },
+    });
   }
 
   /** Project updates live in their own table; an unreadable table must not break the whole context. */
@@ -118,13 +256,11 @@ export class ProjectContextService {
     projectId: string,
   ): Promise<ProjectUpdateEntity[]> {
     try {
-      return await this.ds
-        .getRepository(ProjectUpdateEntity)
-        .find({
-          where: { workspaceId, projectId },
-          order: { createdAt: 'DESC' },
-          take: UPDATES_LIMIT,
-        });
+      return await this.ds.getRepository(ProjectUpdateEntity).find({
+        where: { workspaceId, projectId },
+        order: { createdAt: 'DESC' },
+        take: UPDATES_LIMIT,
+      });
     } catch (e) {
       this.logger.warn(
         `Project updates unavailable for ${projectId}: ${(e as Error).message}`,

@@ -8,7 +8,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Client } from 'pg';
 import { Subject } from 'rxjs';
 import type { EntityManager, Repository } from 'typeorm';
-import type { ActorRef, LiveEvent, SubjectRef } from '../contracts/domain.js';
+import type {
+  ActorRef,
+  LegacySubjectRef,
+  LiveEvent,
+  SubjectRef,
+} from '../contracts/domain.js';
 import { databaseUrl } from '../database/data-source.options.js';
 import { DomainEventEntity } from '../database/entities/index.js';
 import { uid } from '../common/util.js';
@@ -30,6 +35,8 @@ export interface RecordEventInput {
 export interface PublishedEvent {
   workspaceId: string;
   event: LiveEvent;
+  /** Owner of the change; comment notifications differ from their comment entity id. */
+  subject?: LegacySubjectRef;
   /** When set, only this person's streams receive the event (private things, like notifications). */
   userId?: string;
 }
@@ -112,7 +119,10 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     try {
       await client.connect();
       await client.query(`LISTEN ${LIVE_CHANNEL}`);
-      if (this.stopping) return void (await client.end());
+      if (this.stopping) {
+        await client.end();
+        return;
+      }
       this.listener = client;
       this.listening = true;
       this.reconnectDelay = RECONNECT_MIN_MS;
@@ -154,7 +164,7 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     });
     await repo.save(row);
     if (!input.at) this.recorded.next(row);
-    if (live) this.publish(input.workspaceId, live);
+    if (live) this.publish(input.workspaceId, live, undefined, input.subject);
     return row;
   }
 
@@ -163,10 +173,12 @@ export class EventsService implements OnModuleInit, OnModuleDestroy {
     workspaceId: string,
     event: Pick<LiveEvent, 'type' | 'entity' | 'id'>,
     userId?: string,
+    subject?: LegacySubjectRef,
   ): void {
     const published: PublishedEvent = {
       workspaceId,
       userId,
+      subject,
       event: {
         ...event,
         clientId: requestStore.getStore()?.clientId,

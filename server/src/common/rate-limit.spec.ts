@@ -28,12 +28,30 @@ describe('RateLimiter', () => {
     expect(l.hit('b', 1, 60_000, 1_500).allowed).toBe(true);
   });
 
-  it('forgets expired buckets and caps memory', () => {
+  it('rejects new keys at capacity without evicting active counters', () => {
     const l = new RateLimiter(3);
-    for (let i = 0; i < 10; i++) l.hit(`k${i}`, 1, 60_000, 0);
-    expect(l.size).toBeLessThanOrEqual(3);
-    l.hit('later', 1, 1000, 120_000);
-    expect(l.size).toBe(1);
+    for (let i = 0; i < 3; i++) l.hit(`k${i}`, 1, 60_000, 0);
+    expect(l.hit('overflow', 1, 60_000, 1)).toMatchObject({ allowed: false, remaining: 0 });
+    expect(l.hit('k0', 1, 60_000, 2).allowed).toBe(false);
+    expect(l.size).toBe(3);
+  });
+
+  it('cleans expired entries incrementally and reuses freed capacity', () => {
+    const l = new RateLimiter(3);
+    l.hit('expired', 1, 1, 0);
+    l.hit('active-a', 1, 60_000, 0);
+    l.hit('active-b', 1, 60_000, 0);
+    expect(l.hit('new', 1, 60_000, 1000).allowed).toBe(true);
+    expect(l.hit('active-a', 1, 60_000, 1001).allowed).toBe(false);
+  });
+
+  it('bounds cleanup work when every bucket is live', () => {
+    const l = new RateLimiter(100_000);
+    for (let i = 0; i < 100_000; i++) l.hit(`k${i}`, 1, 60_000, 0);
+    const start = performance.now();
+    l.hit('k99999', 1, 60_000, 1000);
+    expect(performance.now() - start).toBeLessThan(100);
+    expect(l.size).toBe(100_000);
   });
 });
 

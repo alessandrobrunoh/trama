@@ -27,6 +27,45 @@ use protocol::{Account, Server};
 use upstream::{AuthError, Upstream};
 
 const MAX_REQUEST_BYTES: usize = 1024 * 1024;
+const MAX_BATCH_ITEMS: usize = 100;
+const MAX_BATCH_RESPONSE_BYTES: usize = 1024 * 1024;
+
+fn append_batch_reply(replies: &mut Vec<Value>, reply: Value) -> bool {
+    let mut candidate = replies.clone();
+    candidate.push(reply);
+    if serde_json::to_vec(&candidate).map_or(true, |body| body.len() > MAX_BATCH_RESPONSE_BYTES) {
+        return false;
+    }
+    *replies = candidate;
+    true
+}
+
+fn batch_item_count_allowed(count: usize) -> bool {
+    count <= MAX_BATCH_ITEMS
+}
+
+#[cfg(test)]
+mod limit_tests {
+    use super::*;
+
+    #[test]
+    fn batch_limits_cover_count_and_aggregate_bytes() {
+        assert!(batch_item_count_allowed(MAX_BATCH_ITEMS));
+        assert!(!batch_item_count_allowed(MAX_BATCH_ITEMS + 1));
+        let mut replies = Vec::new();
+        let simple = json!({"id":1});
+        for _ in 0..MAX_BATCH_ITEMS {
+            assert!(append_batch_reply(&mut replies, simple.clone()));
+        }
+        assert_eq!(replies.len(), MAX_BATCH_ITEMS);
+
+        let mut aggregate = Vec::new();
+        assert!(append_batch_reply(&mut aggregate, json!({"data":"x".repeat(MAX_BATCH_RESPONSE_BYTES - 20)})));
+        let before = aggregate.len();
+        assert!(!append_batch_reply(&mut aggregate, json!({"data":"x".repeat(64)})));
+        assert_eq!(aggregate.len(), before);
+    }
+}
 
 struct Config {
     api_url: String,
@@ -45,12 +84,48 @@ fn env(name: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
+#[cfg(test)]
+mod config_tests {
+    use super::Config;
+
+    #[test]
+    fn validates_api_transport_and_removes_sensitive_url_parts() {
+        assert!(Config::validate_api_url("http://api.example.test/api", false).is_err());
+        assert!(Config::validate_api_url("http://mcp:3000/api", false).is_err());
+        assert!(Config::validate_api_url("http://mcp:3000/api", true).is_ok());
+        assert!(Config::validate_api_url("http://localhost:3000/api", false).is_ok());
+        assert!(Config::validate_api_url("https://api.example.test/api?token=x", false).is_err());
+        assert!(Config::validate_api_url("https://user:pass@api.example.test/api", false).is_err());
+        assert_eq!(Config::validate_api_url("https://api.example.test/api", false).unwrap(), "https://api.example.test/api");
+    }
+}
+
 impl Config {
-    fn from_env() -> Result<Self, String> {
-        let api_url = env("TRAMA_API_URL").unwrap_or_else(|| "http://localhost:3000/api".into());
-        if !(api_url.starts_with("http://") || api_url.starts_with("https://")) {
-            return Err("TRAMA_API_URL must start with http:// or https://".into());
+    fn validate_api_url(api_url: &str, allow_internal_http: bool) -> Result<String, String> {
+        let parsed = reqwest::Url::parse(api_url).map_err(|_| "TRAMA_API_URL must be an absolute URL".to_string())?;
+        if !matches!(parsed.scheme(), "http" | "https")
+            || parsed.username() != ""
+            || parsed.password().is_some()
+            || parsed.query().is_some()
+            || parsed.fragment().is_some()
+            || parsed.host_str().is_none()
+        {
+            return Err("TRAMA_API_URL must be http(s) without userinfo, query, or fragment".into());
         }
+        let loopback = parsed
+            .host_str()
+            .is_some_and(|host| host.eq_ignore_ascii_case("localhost") || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback()));
+        if parsed.scheme() == "http" && !(loopback || allow_internal_http) {
+            return Err("TRAMA_API_URL requires HTTPS except for loopback or explicit TRAMA_MCP_ALLOW_INTERNAL_HTTP=true".into());
+        }
+        Ok(parsed.to_string().trim_end_matches('/').to_string())
+    }
+
+    fn from_env() -> Result<Self, String> {
+        let api_url = Self::validate_api_url(
+            &env("TRAMA_API_URL").unwrap_or_else(|| "http://localhost:3000/api".into()),
+            env("TRAMA_MCP_ALLOW_INTERNAL_HTTP").as_deref() == Some("true"),
+        )?;
         let bind = env("MCP_BIND")
             .unwrap_or_else(|| "127.0.0.1:8787".into())
             .parse()
@@ -174,9 +249,16 @@ async fn mcp_post(State(app): State<Arc<App>>, Query(query): Query<HashMap<Strin
     let profile = request_profile(app.server.profile(), &headers, &query);
     let reply = match message {
         Value::Array(items) if !items.is_empty() => {
+            if !batch_item_count_allowed(items.len()) {
+                return (StatusCode::BAD_REQUEST, Json(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32600, "message": "Batch item limit exceeded" } }))).into_response();
+            }
             let mut replies = Vec::new();
             for item in items {
-                replies.extend(app.server.handle_with(profile, &accounts, item).await);
+                if let Some(reply) = app.server.handle_with(profile, &accounts, item).await {
+                    if !append_batch_reply(&mut replies, reply) {
+                        return (StatusCode::BAD_REQUEST, Json(json!({ "jsonrpc": "2.0", "id": null, "error": { "code": -32600, "message": "Batch response limit exceeded" } }))).into_response();
+                    }
+                }
             }
             (!replies.is_empty()).then(|| Value::Array(replies))
         }
@@ -377,7 +459,7 @@ async fn start() -> Result<(), String> {
         profile = cfg.profile.as_str(),
         listed = server.listed_count(cfg.profile),
         catalog = server.tool_count(),
-        api = %cfg.api_url,
+        api = %reqwest::Url::parse(&cfg.api_url).map(|mut u| { u.set_path(""); u.to_string() }).unwrap_or_else(|_| "<invalid>".into()),
         "trama-mcp {}",
         env!("CARGO_PKG_VERSION")
     );

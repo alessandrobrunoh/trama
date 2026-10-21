@@ -34,11 +34,16 @@ export class AttentionService {
     private readonly states: Repository<AttentionStateEntity>,
   ) {}
 
-  async list(workspaceId: string, userId: string): Promise<AttentionItem[]> {
+  async list(
+    workspaceId: string,
+    userId: string,
+    snapshotRows?: { issues: IssueEntity[]; artifacts: ArtifactEntity[] },
+  ): Promise<AttentionItem[]> {
     const access = currentAccess();
     if (!canView('issues', access)) return [];
 
-    const issueRows = await this.issues.findBy({ workspaceId });
+    const issueRows =
+      snapshotRows?.issues ?? (await this.issues.findBy({ workspaceId }));
     const visibleIssues = issueRows.filter(
       (issue) => !projectHidden(access, issue.projectId),
     );
@@ -96,9 +101,22 @@ export class AttentionService {
     }
 
     if (canView('artifacts', access)) {
-      const artifacts = await this.artifacts.find({
-        where: { workspaceId, issueId: In([...issueIds]) },
-      });
+      const artifacts =
+        snapshotRows?.artifacts ??
+        (await this.artifacts.find({
+          where: [
+            {
+              workspaceId,
+              issueId: In([...issueIds]),
+              review: 'requested',
+            },
+            {
+              workspaceId,
+              issueId: In([...issueIds]),
+              ci: 'failing',
+            },
+          ],
+        }));
       for (const artifact of artifacts) {
         const issue = issueById.get(artifact.issueId!);
         if (!issue) continue;

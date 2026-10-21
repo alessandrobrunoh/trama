@@ -27,6 +27,8 @@ interface Bucket {
 export class RateLimiter {
   private readonly buckets = new Map<string, Bucket>();
   private lastSweep = 0;
+  private sweepCursor: Iterator<string> | undefined;
+  private static readonly SWEEP_BUDGET = 64;
 
   constructor(private readonly maxBuckets = 100_000) {}
 
@@ -34,6 +36,9 @@ export class RateLimiter {
     this.sweep(now);
     let b = this.buckets.get(key);
     if (!b || b.resetAt <= now) {
+      if (!b && this.buckets.size >= this.maxBuckets) {
+        return { allowed: false, remaining: 0, retryAfterSec: 1 };
+      }
       b = { count: 0, resetAt: now + windowMs };
       this.buckets.set(key, b);
     }
@@ -46,14 +51,19 @@ export class RateLimiter {
     return this.buckets.size;
   }
 
-  /** Drops expired buckets at most once a second; when still over the cap, the oldest go first. */
+  /** Incrementally checks a bounded number of entries; live counters are never evicted. */
   private sweep(now: number): void {
-    if (now - this.lastSweep < 1000 && this.buckets.size < this.maxBuckets) return;
+    if (now - this.lastSweep < 1000) return;
     this.lastSweep = now;
-    for (const [k, b] of this.buckets) if (b.resetAt <= now) this.buckets.delete(k);
-    for (const k of this.buckets.keys()) {
-      if (this.buckets.size < this.maxBuckets) break;
-      this.buckets.delete(k);
+    if (!this.sweepCursor) this.sweepCursor = this.buckets.keys();
+    for (let i = 0; i < RateLimiter.SWEEP_BUDGET; i++) {
+      const next = this.sweepCursor.next();
+      if (next.done) {
+        this.sweepCursor = this.buckets.keys();
+        break;
+      }
+      const bucket = this.buckets.get(next.value);
+      if (bucket && bucket.resetAt <= now) this.buckets.delete(next.value);
     }
   }
 }

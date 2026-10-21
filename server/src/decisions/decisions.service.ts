@@ -392,6 +392,12 @@ export class DecisionsService {
       );
       await m.delete(DecisionEntity, { id: row.id });
     });
-    await this.record(row, actor, 'decision.deleted', { title: row.title });
+    await this.record(row, actor, 'decision.deleted', {
+      title: row.title,
+      issueIds: [
+        ...(row.originIssueId ? [row.originIssueId] : []),
+        ...(row.relatedIssueIds ?? []),
+      ],
+    });
   }
 }

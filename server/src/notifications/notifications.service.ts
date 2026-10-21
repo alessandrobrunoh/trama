@@ -38,6 +38,7 @@ import {
 
 const DEDUPE_WINDOW_MS = 60_000;
 const KEEP_READ_FOR_MS = 90 * 24 * 60 * 60 * 1000;
+const DELIVERY_CONCURRENCY = 8;
 
 @Injectable()
 export class NotificationsService implements OnModuleInit {
@@ -152,8 +153,27 @@ export class NotificationsService implements OnModuleInit {
       .getRepository(WorkspaceEntity)
       .findOneBy({ id: event.workspaceId });
     if (!workspace) return;
-    for (const draft of drafts)
-      await this.deliver(workspace, event.actor, draft);
+    const recipients = [...new Set(drafts.map((draft) => draft.userId))];
+    const [users, memberships] = await Promise.all([
+      this.ds.getRepository(UserEntity).find({ where: { id: In(recipients) } }),
+      this.ds.getRepository(MembershipEntity).find({
+        where: { workspaceId: workspace.id, userId: In(recipients) },
+      }),
+    ]);
+    const usersById = new Map(users.map((user) => [user.id, user]));
+    const memberIds = new Set(
+      memberships.map((membership) => membership.userId),
+    );
+    for (let i = 0; i < drafts.length; i += DELIVERY_CONCURRENCY) {
+      await Promise.all(
+        drafts.slice(i, i + DELIVERY_CONCURRENCY).map((draft) =>
+          this.deliver(workspace, event.actor, draft, {
+            user: usersById.get(draft.userId),
+            isMember: memberIds.has(draft.userId),
+          }),
+        ),
+      );
+    }
   }
 
   /** Loads the records an event is about; null when the event cannot produce a notification. */
@@ -277,14 +297,12 @@ export class NotificationsService implements OnModuleInit {
     type: 'issue' | 'project',
     id: string,
   ): Promise<RuleContext['delivery'] | null> {
-    const requests = await this.ds
-      .getRepository(CustomerRequestEntity)
-      .find({
-        where: {
-          workspaceId,
-          ...(type === 'issue' ? { issueId: id } : { projectId: id }),
-        },
-      });
+    const requests = await this.ds.getRepository(CustomerRequestEntity).find({
+      where: {
+        workspaceId,
+        ...(type === 'issue' ? { issueId: id } : { projectId: id }),
+      },
+    });
     if (!requests.length) return null;
     let label: string;
     let link: string;
@@ -310,6 +328,12 @@ export class NotificationsService implements OnModuleInit {
     const subs = await this.ds
       .getRepository(CustomerSubscriptionEntity)
       .find({ where: { workspaceId, customerId: In(customerIds) } });
+    const subscribersByCustomer = new Map<string, string[]>();
+    for (const sub of subs) {
+      const ids = subscribersByCustomer.get(sub.customerId) ?? [];
+      ids.push(sub.userId);
+      subscribersByCustomer.set(sub.customerId, ids);
+    }
     return {
       target: { type, id, label, link },
       customers: customers
@@ -317,9 +341,7 @@ export class NotificationsService implements OnModuleInit {
         .map((c) => ({
           id: c.id,
           name: c.name,
-          subscriberIds: subs
-            .filter((s) => s.customerId === c.id)
-            .map((s) => s.userId),
+          subscriberIds: subscribersByCustomer.get(c.id) ?? [],
         })),
       requesterIds: [
         ...new Set(
@@ -338,32 +360,32 @@ export class NotificationsService implements OnModuleInit {
     workspace: WorkspaceEntity,
     actor: ActorRef,
     draft: NotificationDraft,
+    loaded: {
+      user: UserEntity | undefined;
+      isMember: boolean;
+    },
   ): Promise<void> {
-    const user = await this.ds
-      .getRepository(UserEntity)
-      .findOneBy({ id: draft.userId });
-    if (!user) return;
-    if (
-      !(await this.ds
-        .getRepository(MembershipEntity)
-        .existsBy({ workspaceId: workspace.id, userId: user.id }))
-    )
-      return;
+    const { user } = loaded;
+    if (!user || !loaded.isMember) return;
     const channels = resolveNotificationSettings(user.notificationSettings)[
       draft.kind
     ];
 
     if (channels.inApp) {
-      const repo = this.ds.getRepository(NotificationEntity);
-      const duplicate = await repo.existsBy({
-        workspaceId: workspace.id,
-        userId: user.id,
-        kind: draft.kind,
-        title: draft.title,
-        createdAt: MoreThan(new Date(Date.now() - DEDUPE_WINDOW_MS)),
-      });
-      if (!duplicate) {
-        const row = await repo.save(
+      const row = await this.ds.transaction(async (manager) => {
+        await manager.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+          JSON.stringify([workspace.id, user.id, draft.kind, draft.title]),
+        ]);
+        const repo = manager.getRepository(NotificationEntity);
+        const duplicate = await repo.existsBy({
+          workspaceId: workspace.id,
+          userId: user.id,
+          kind: draft.kind,
+          title: draft.title,
+          createdAt: MoreThan(new Date(Date.now() - DEDUPE_WINDOW_MS)),
+        });
+        if (duplicate) return null;
+        return repo.save(
           repo.create({
             id: uid('ntf'),
             workspaceId: workspace.id,
@@ -377,15 +399,17 @@ export class NotificationsService implements OnModuleInit {
             readAt: null,
           }),
         );
+      });
+      if (row) {
+        void this.ds.getRepository(NotificationEntity).delete({
+          userId: user.id,
+          readAt: LessThan(new Date(Date.now() - KEEP_READ_FOR_MS)),
+        });
         this.events.publish(
           workspace.id,
           { type: 'created', entity: 'notification', id: row.id },
           user.id,
         );
-        void repo.delete({
-          userId: user.id,
-          readAt: LessThan(new Date(Date.now() - KEEP_READ_FOR_MS)),
-        });
       }
     }
 

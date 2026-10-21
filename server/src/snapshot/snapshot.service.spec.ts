@@ -51,6 +51,7 @@ function build(role: Role, manageIntegrations: Role = 'admin') {
       index: vi.fn().mockResolvedValue([]),
     } as never,
     attention as never,
+    { filterEvents: vi.fn(async (_ws: string, rows: unknown[]) => rows) } as never,
   );
   const ctx = {
     role,
@@ -95,7 +96,10 @@ describe('SnapshotService attention', () => {
   it("includes the current user's attention items", async () => {
     const { run, attention } = build('member');
     expect((await run()).attention).toEqual([attentionItem]);
-    expect(attention.list).toHaveBeenCalledWith('ws_1', 'usr_1');
+    expect(attention.list).toHaveBeenCalledWith('ws_1', 'usr_1', {
+      issues: [],
+      artifacts: [],
+    });
   });
 });
 

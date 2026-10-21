@@ -138,7 +138,7 @@ stack is up. The API answers `GET /api/health` (database included). Logs: `docke
 | | `docker-compose.selfhost.yml` | `server/docker-compose.yml` |
 |---|---|---|
 | Routing and TLS | Bundled Caddy, any domain | Traefik on an external `proxy` network, fixed domain and labels |
-| Postgres user / password | `trama` / required, no default | `delta` / `${POSTGRES_PASSWORD:-delta}` |
+| Postgres user / password | `trama` / required, no default | `delta` / `POSTGRES_PASSWORD` required |
 | Configuration | One `.env` next to the file | `../.env` and `server/.env.production` |
 | Images | Pulled only, pinned with `TRAMA_VERSION` | Pulled `:latest` or built locally |
 | Postgres volume | `trama-pgdata` | `delta-pgdata` (do not mix the two) |

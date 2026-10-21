@@ -34,7 +34,13 @@ export class MailService {
   async send(mail: Mail): Promise<boolean> {
     if (!this.transport) return false;
     try {
-      await this.transport.sendMail({ from: this.from, ...mail });
+      await this.transport.sendMail({
+        from: this.from,
+        to: mail.to,
+        subject: mail.subject,
+        text: mail.text,
+        ...(mail.html === undefined ? {} : { html: mail.html }),
+      });
       return true;
     } catch (e) {
       this.log.warn(`Could not send "${mail.subject}": ${e instanceof Error ? e.message : String(e)}`);

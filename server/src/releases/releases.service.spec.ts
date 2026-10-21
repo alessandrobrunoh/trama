@@ -134,6 +134,7 @@ function setup(opts: {
     getRepository: (entity: unknown) => {
       if (entity === IssueEntity)
         return {
+          find: async () => issues,
           findBy: async (where: Record<string, unknown>) =>
             issues.filter((i) =>
               Object.entries(where).every(

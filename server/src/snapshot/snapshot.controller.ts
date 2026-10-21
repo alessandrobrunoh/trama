@@ -5,7 +5,7 @@ import { SNAPSHOT_COMMENTS_MODES, type SnapshotCommentsMode } from '../contracts
 import { SnapshotService } from './snapshot.service.js';
 
 export class SnapshotQuery {
-  /** `full` (default) inlines every comment; `index` leaves them out (see SnapshotCommentsMode). */
+  /** `full` inlines every comment; `index` is the bounded default (see SnapshotCommentsMode). */
   @IsOptional() @IsIn(SNAPSHOT_COMMENTS_MODES) comments?: SnapshotCommentsMode;
 }
 
@@ -17,6 +17,6 @@ export class SnapshotController {
   @Get()
   @RequireUser()
   get(@Ctx() ctx: WorkspaceContext, @Auth() auth: AuthInfo, @Query() q: SnapshotQuery) {
-    return this.service.build(ctx, auth.user!, ctx.role, { comments: q.comments ?? 'full' });
+    return this.service.build(ctx, auth.user!, ctx.role, { comments: q.comments ?? 'index' });
   }
 }

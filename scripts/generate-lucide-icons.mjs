@@ -17,13 +17,13 @@
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import ts from 'typescript';
 
+const icons = new Map();
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const target = join(root, 'src/app/ui/icons/lucide.ts');
-const lib = readFileSync(
-  join(root, 'node_modules/@lucide/angular/fesm2022/lucide-angular.mjs'),
-  'utf8',
-);
+const libPath = join(root, 'node_modules/@lucide/angular/fesm2022/lucide-angular.mjs');
+const lib = readFileSync(libPath, 'utf8');
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -34,7 +34,7 @@ function walk(dir, out = []) {
   return out;
 }
 
-const used = new Set();
+const used = new Set([...readFileSync(target, 'utf8').matchAll(/^export const (Lucide\w+)/gm)].map((match) => match[1]));
 for (const file of walk(join(root, 'src'))) {
   const text = readFileSync(file, 'utf8');
   for (const match of text.matchAll(
@@ -54,18 +54,59 @@ const aliases = new Map();
 for (const match of lib.matchAll(/^const (Lucide\w+) = (Lucide\w+);$/gm))
   aliases.set(match[1], match[2]);
 
-const icons = new Map();
+export function parseIconLiteral(source, name = 'icon') {
+  const file = ts.createSourceFile('icon.js', `(${source})`, ts.ScriptTarget.Latest, true, ts.ScriptKind.JS);
+  const expression = file.statements[0]?.expression;
+  if (!expression || !ts.isParenthesizedExpression(expression) || file.parseDiagnostics.length) {
+    throw new Error(`Malformed icon expression for ${name}`);
+  }
+  const read = (node) => {
+    if (ts.isParenthesizedExpression(node)) return read(node.expression);
+    if (ts.isStringLiteral(node) || ts.isNumericLiteral(node)) return ts.isStringLiteral(node) ? node.text : Number(node.text);
+    if (node.kind === ts.SyntaxKind.TrueKeyword) return true;
+    if (node.kind === ts.SyntaxKind.FalseKeyword) return false;
+    if (node.kind === ts.SyntaxKind.NullKeyword) return null;
+    if (ts.isArrayLiteralExpression(node)) {
+      if (node.elements.some(ts.isSpreadElement)) throw new Error('Spread elements are not literal data');
+      return node.elements.map(read);
+    }
+    if (ts.isObjectLiteralExpression(node)) {
+      const value = Object.create(null);
+      for (const property of node.properties) {
+        if (!ts.isPropertyAssignment(property) || !property.name ||
+            !(ts.isIdentifier(property.name) || ts.isStringLiteral(property.name) || ts.isNumericLiteral(property.name))) {
+          throw new Error('Object members must be literal properties');
+        }
+        const key = property.name.text;
+        if (Object.hasOwn(value, key)) throw new Error(`Duplicate key: ${key}`);
+        value[key] = read(property.initializer);
+      }
+      return value;
+    }
+    throw new Error('Expression is not literal icon data');
+  };
+  const value = read(expression);
+  if (!isIconData(value)) throw new Error(`Malformed icon data for ${name}`);
+  return value;
+}
+function isIconData(data) {
+  return data !== null && typeof data === 'object' && !Array.isArray(data) &&
+    typeof data.name === 'string' && typeof data.size === 'number' &&
+    Array.isArray(data.node) && data.node.every((entry) => Array.isArray(entry) &&
+      entry.length === 2 && typeof entry[0] === 'string' && entry[1] !== null &&
+      typeof entry[1] === 'object' && !Array.isArray(entry[1]));
+}
 function iconData(name) {
   if (icons.has(name)) return icons.get(name);
   const start = lib.indexOf(`var ${name} = class ${name} extends LucideIconBase {`);
   if (start < 0) return null;
   const marker = lib.indexOf('static icon = ', start);
-  if (marker < 0 || marker - start > 200) return null; // not an icon (e.g. LucideDynamicIcon)
+  if (marker < 0 || marker - start > 200) return null;
   const from = marker + 'static icon = '.length;
   const to = lib.indexOf(';\n\ticon = signal(', from);
-  const data = new Function(`return (${lib.slice(from, to)});`)();
-  icons.set(name, data);
-  return data;
+  if (to < from) return null;
+  const data = parseIconLiteral(lib.slice(from, to), name);
+  icons.set(name, data); return data;
 }
 
 const literal = (value) => {

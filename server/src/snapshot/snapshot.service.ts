@@ -26,6 +26,7 @@ import {
   UserEntity,
 } from '../database/entities/index.js';
 import { ViewsService } from '../views/views.service.js';
+import { EventVisibilityService } from '../events/event-visibility.service.js';
 
 export const SNAPSHOT_EVENTS = 500;
 
@@ -37,6 +38,7 @@ export class SnapshotService {
     private readonly customers: CustomersService,
     private readonly comments: CommentsService,
     private readonly attention: AttentionService,
+    private readonly eventVisibility: EventVisibilityService,
   ) {}
 
   /** Everything the client needs to boot a workspace (see WorkspaceSnapshot in contracts/domain.ts). */
@@ -77,7 +79,6 @@ export class SnapshotService {
       events,
       views,
       integrations,
-      attention,
     ] = await Promise.all([
       this.ds
         .getRepository(UserEntity)
@@ -112,8 +113,16 @@ export class SnapshotService {
             .getRepository(IntegrationConnectionEntity)
             .find({ where, order: { createdAt: 'ASC' } })
         : Promise.resolve([]),
-      this.attention.list(workspaceId, me.id),
     ]);
+    const attention = await this.attention.list(workspaceId, me.id, {
+      issues,
+      artifacts,
+    });
+    const visibleEvents = await this.eventVisibility.filterEvents(
+      workspaceId,
+      events,
+      ctx.access,
+    );
     const built = {
       workspace: ctx.workspace,
       me,
@@ -135,7 +144,7 @@ export class SnapshotService {
       releases,
       comments,
       ...(commentIndex ? { commentIndex } : {}),
-      events,
+      events: visibleEvents,
       attention,
       views,
       integrations,

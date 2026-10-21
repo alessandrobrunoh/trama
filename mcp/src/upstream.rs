@@ -12,6 +12,32 @@ use crate::catalog::{Call, Method};
 
 const WHOAMI_TTL: Duration = Duration::from_secs(30);
 const CACHE_MAX: usize = 1000;
+const MAX_UPSTREAM_BYTES: usize = 4 * 1024 * 1024;
+
+async fn bounded_body(mut res: reqwest::Response) -> Result<Vec<u8>, String> {
+    if res.content_length().is_some_and(|n| n > MAX_UPSTREAM_BYTES as u64) {
+        return Err("API reply exceeds the 4 MiB response limit".into());
+    }
+    let mut body = Vec::new();
+    loop {
+        let chunk = match res.chunk().await.map_err(|_| "could not read the API reply".to_string())? {
+            Some(chunk) => chunk,
+            None => break,
+        };
+        if !append_bounded(&mut body, &chunk) {
+            return Err("API reply exceeds the 4 MiB response limit".into());
+        }
+    }
+    Ok(body)
+}
+
+fn append_bounded(body: &mut Vec<u8>, chunk: &[u8]) -> bool {
+    if body.len().saturating_add(chunk.len()) > MAX_UPSTREAM_BYTES {
+        return false;
+    }
+    body.extend_from_slice(chunk);
+    true
+}
 
 /// What `GET /auth/token` says about the key.
 #[derive(Clone, Debug)]
@@ -97,7 +123,8 @@ impl Upstream {
                 )));
             }
         }
-        let raw: Value = res.json().await.map_err(|_| {
+        let bytes = bounded_body(res).await.map_err(AuthError::Unavailable)?;
+        let raw: Value = serde_json::from_slice(&bytes).map_err(|_| {
             AuthError::Unavailable("the API sent an invalid introspection reply".into())
         })?;
         let who = Arc::new(
@@ -148,11 +175,11 @@ impl Upstream {
             }
         };
         let status = res.status();
-        let text = match res.text().await {
-            Ok(t) => t,
+        let text = match bounded_body(res).await {
+            Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),
             Err(e) => {
                 return ToolOutput {
-                    text: format!("Could not read the API reply: {}", describe_transport(&e)),
+                    text: e,
                     is_error: true,
                 };
             }
@@ -274,5 +301,15 @@ mod tests {
         assert_eq!(who.slug, "acme");
         assert!(who.permissions.contains("issues:read") && who.permissions.len() == 1);
         assert!(parse_whoami(json!({ "workspace": {} })).is_none());
+    }
+
+    #[test]
+    fn upstream_byte_limit_accepts_boundary_and_rejects_oversize_before_json() {
+        let mut body = Vec::new();
+        assert!(append_bounded(&mut body, &vec![b' '; MAX_UPSTREAM_BYTES]));
+        assert_eq!(body.len(), MAX_UPSTREAM_BYTES);
+        assert!(!append_bounded(&mut body, b"x"));
+        assert_eq!(body.len(), MAX_UPSTREAM_BYTES);
+        assert!(serde_json::from_slice::<Value>(&body).is_err());
     }
 }

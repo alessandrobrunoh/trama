@@ -220,6 +220,19 @@ describe('import jobs', () => {
     await expect(s.service.start('ws_2', ADMIN, { ...request, credentialId: other })).resolves.toMatchObject({ workspaceId: 'ws_2' });
   });
 
+  it('maps a database unique-index conflict to a workspace conflict', async () => {
+    const s = setup();
+    const credentialId = await withCredential(s);
+    const repository = (s.service as unknown as { jobs: { save: (row: ImportJobEntity) => Promise<ImportJobEntity> } }).jobs;
+    const original = repository.save;
+    repository.save = async (row) => {
+      if (s.jobRows.some((job) => job.workspaceId === row.workspaceId)) throw Object.assign(new Error('duplicate'), { code: '23505' });
+      return original.call(repository, row);
+    };
+    await s.service.start('ws_1', ADMIN, { ...request, credentialId });
+    await expect(s.service.start('ws_1', ADMIN, { ...request, credentialId })).rejects.toBeInstanceOf(ConflictException);
+  });
+
   it('refuses to start without a credential for Linear', async () => {
     const s = setup();
     await expect(s.service.start('ws_1', ADMIN, request)).rejects.toBeInstanceOf(BadRequestException);

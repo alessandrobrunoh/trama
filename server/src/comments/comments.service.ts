@@ -33,6 +33,7 @@ import {
   encodeCommentCursor,
   parseCommentLimit,
 } from './comment-cursor.js';
+import { COMMENT_PAGE_SIZE } from '../contracts/domain.js';
 
 @Injectable()
 export class CommentsService {
@@ -65,6 +66,7 @@ export class CommentsService {
       qb.andWhere("c.subject->>'id' = :sid", { sid: f.subjectId });
     if (f.subjectType)
       qb.andWhere("c.subject->>'type' = :st", { st: f.subjectType });
+    qb.take(COMMENT_PAGE_SIZE.max);
     return qb.getMany();
   }
 
@@ -212,7 +214,7 @@ export class CommentsService {
       type: 'updated',
       entity: 'comment',
       id,
-    });
+    }, undefined, row.subject);
     return row;
   }
 
@@ -231,7 +233,7 @@ export class CommentsService {
       type: 'deleted',
       entity: 'comment',
       id,
-    });
+    }, undefined, row.subject);
   }
 
   /** A limited person can only read or write comments on work they are allowed to see. */

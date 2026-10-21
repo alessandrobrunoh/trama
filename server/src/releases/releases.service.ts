@@ -182,6 +182,18 @@ export class ReleasesService {
       throw new BadRequestException(
         'Delete or cancel every non-canceled release before deleting this pipeline',
       );
+    const pipelineReleases = await this.releases.find({
+      where: { workspaceId, pipelineId: id },
+      select: { id: true },
+    });
+    const releaseIds = pipelineReleases.map((release) => release.id);
+    const linkedIssues = releaseIds.length
+      ? await this.ds.getRepository(IssueEntity).find({
+          where: { workspaceId, releaseId: In(releaseIds) },
+          select: { projectId: true },
+        })
+      : [];
+    const projectIds = [...new Set(linkedIssues.map((issue) => issue.projectId))];
     await this.releases.delete({ workspaceId, pipelineId: id });
     await this.pipelines.delete({ id });
     await this.events.record({
@@ -189,7 +201,7 @@ export class ReleasesService {
       actor,
       type: 'release_pipeline.deleted',
       subject: { type: 'release_pipeline', id },
-      data: { name: row.name },
+      data: { name: row.name, projectIds },
     });
   }
 
@@ -278,6 +290,11 @@ export class ReleasesService {
 
   async removeRelease(workspaceId: string, actor: ActorRef, id: string) {
     const row = await this.getRelease(workspaceId, id);
+    const linkedIssues = await this.ds.getRepository(IssueEntity).find({
+      where: { workspaceId, releaseId: id },
+      select: { projectId: true },
+    });
+    const projectIds = [...new Set(linkedIssues.map((issue) => issue.projectId))];
     await this.ds.getRepository(IssueEntity).update(
       { workspaceId, releaseId: id },
       { releaseId: null, updatedAt: new Date() },
@@ -288,7 +305,7 @@ export class ReleasesService {
       actor,
       type: 'release.deleted',
       subject: { type: 'release', id },
-      data: { name: row.name, pipelineId: row.pipelineId },
+      data: { name: row.name, pipelineId: row.pipelineId, projectIds },
     });
   }
 

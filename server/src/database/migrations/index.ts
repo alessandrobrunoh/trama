@@ -34,6 +34,8 @@ import { RemoveWorkstreams1793750000000 } from './1793750000000-RemoveWorkstream
 import { IssueParents1793760000000 } from './1793760000000-IssueParents.js';
 import { Releases1793770000000 } from './1793770000000-Releases.js';
 import { ProjectIssueKeys1793780000000 } from './1793780000000-ProjectIssueKeys.js';
+import { CustomerRequestPageIndex1793781000000 } from './1793781000000-CustomerRequestPageIndex.js';
+import { UniqueActiveImport1793790000000 } from './1793790000000-UniqueActiveImport.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -73,4 +75,6 @@ export const MIGRATIONS = [
   IssueParents1793760000000,
   Releases1793770000000,
   ProjectIssueKeys1793780000000,
+  CustomerRequestPageIndex1793781000000,
+  UniqueActiveImport1793790000000,
 ];

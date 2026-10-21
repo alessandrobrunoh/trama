@@ -144,9 +144,9 @@ impl CliError {
         if as_json {
             eprintln!("{}", self.to_json());
         } else {
-            eprintln!("error: {}", self.message);
+            eprintln!("error: {}", crate::output::escape_terminal_controls(&self.message));
             if let Some(h) = &self.hint {
-                eprintln!("hint: {h}");
+                eprintln!("hint: {}", crate::output::escape_terminal_controls(h));
             }
         }
     }
@@ -214,6 +214,16 @@ mod tests {
         assert_eq!((code(401), code(403), code(404), code(409), code(429), code(400), code(502)), (3, 3, 4, 6, 5, 8, 7));
         let e = CliError::from_http(429, r#"{"message":"writesPerMinute exceeded"}"#);
         assert!(e.hint.unwrap().contains("do not retry"));
+    }
+
+    #[test]
+    fn text_errors_escape_terminal_controls_but_json_does_not() {
+        let error = CliError::new(Kind::Validation, "bad \u{1b}]0;spoof\u{7}\u{80}\u{9b}");
+        assert_eq!(
+            crate::output::escape_terminal_controls(&error.message),
+            r"bad \u{001B}]0;spoof\u{0007}\u{0080}\u{009B}"
+        );
+        assert_eq!(error.to_json()["error"]["message"], error.message);
     }
 
     #[test]
