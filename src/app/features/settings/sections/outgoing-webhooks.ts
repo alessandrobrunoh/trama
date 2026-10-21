@@ -47,7 +47,7 @@ X-Trama-Signature: sha256=9b74c9897bac…
   "at": "2026-10-08T09:30:00.000Z",
   "actor": { "type": "user", "id": "usr_…" },
   "subject": { "type": "issue", "id": "is_…" },
-  "data": { "key": "BUG-142", "title": "…" }
+  "data": { "key": "CORA-142", "title": "…" }
 }`;
 
 interface Draft {

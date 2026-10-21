@@ -315,8 +315,6 @@ impl Kind {
     }
 }
 
-const ISSUE_PREFIXES: &[&str] = &["BUG", "FEAT", "INC", "DEBT", "FB", "IDEA", "SEC"];
-
 fn kind_by_id_prefix(r: &str) -> Option<Kind> {
     match r.split_once('_')?.0 {
         "in" | "iss" => Some(Kind::Issue),
@@ -338,14 +336,15 @@ fn candidates(r: &str, hint: Option<Kind>) -> Vec<Kind> {
     }
     if let Some((prefix, number)) = r.rsplit_once('-')
         && !prefix.is_empty()
-        && prefix.chars().all(|c| c.is_ascii_alphabetic())
+        && prefix
+            .chars()
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic())
+        && prefix.chars().all(|c| c.is_ascii_alphanumeric())
         && !number.is_empty()
         && number.chars().all(|c| c.is_ascii_digit())
     {
         let up = prefix.to_ascii_uppercase();
-        if ISSUE_PREFIXES.contains(&up.as_str()) {
-            return vec![Kind::Issue];
-        }
         if up == "ADR" {
             return vec![Kind::Decision];
         }
@@ -374,7 +373,7 @@ impl Entity {
 async fn resolve(ex: &Exec<'_>, r: &str, hint: Option<Kind>, fetch: bool) -> Result<Entity, String> {
     let cands = candidates(r, hint);
     if cands.is_empty() {
-        return Err(format!("'{r}' is not an id or a key (expected e.g. AUTH-42, BUG-142, ADR-21, wk_…, in_…)"));
+        return Err(format!("'{r}' is not an id or a key (expected e.g. AUTH-42, CORA-142, ADR-21, wk_…, in_…)"));
     }
     let by_id = kind_by_id_prefix(r).is_some();
     if by_id && !fetch {
@@ -423,7 +422,7 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let hint = text(a, "type").and_then(Kind::parse);
     let cands = candidates(id, hint);
     if cands.is_empty() {
-        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, BUG-142, ADR-21, wk_…, in_…, pj_…)"));
+        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, CORA-142, ADR-21, wk_…, in_…, pj_…)"));
     }
     let mut missing = String::new();
     for kind in cands {

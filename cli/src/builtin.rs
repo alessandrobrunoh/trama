@@ -85,7 +85,7 @@ pub fn definitions() -> Vec<Command> {
             .about("Call any workspace route directly")
             .long_about("Escape hatch for routes without a dedicated command. PATH is relative to the workspace (e.g. /integrations); the key's permissions still apply.")
             .arg(Arg::new("method").value_name("METHOD").required(true).value_parser(clap::builder::PossibleValuesParser::new(["GET", "POST", "PATCH", "DELETE", "get", "post", "patch", "delete"])).help("HTTP method"))
-            .arg(Arg::new("path").value_name("PATH").required(true).help("Workspace-relative path, e.g. /issues/BUG-1"))
+            .arg(Arg::new("path").value_name("PATH").required(true).help("Workspace-relative path, e.g. /issues/CORA-1"))
             .arg(Arg::new("query").long("query").short('Q').value_name("KEY=VALUE").action(ArgAction::Append).help("Query parameter (repeatable)"))
             .arg(Arg::new("data").long("data").short('d').value_name("JSON").help("JSON body: inline, @file.json, or - for stdin"))
             .after_help("Example:\n  trama api GET /issues -Q open=true -Q limit=5\n  trama api POST /outgoing-webhooks/ow_1/test -d '{}'"),

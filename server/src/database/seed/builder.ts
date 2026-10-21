@@ -1,4 +1,8 @@
-import { GIT_PROVIDER_META, ISSUE_KEY_PREFIX } from '../../contracts/domain.js';
+import {
+  GIT_PROVIDER_META,
+  UNASSIGNED_ISSUE_KEY_PREFIX,
+  uniqueProjectKey,
+} from '../../contracts/domain.js';
 import type { WorkspaceSettings } from '../../contracts/domain.js';
 import type {
   ActorRef,
@@ -20,7 +24,7 @@ import type {
   ViewFilter,
   ViewLayout,
 } from '../../contracts/domain.js';
-import { uid } from '../../common/util.js';
+import { uid, unique } from '../../common/util.js';
 import type {
   AgentEntity,
   ArtifactEntity,
@@ -185,8 +189,12 @@ export class SeedBuilder {
   }): string {
     const id = uid('pj');
     const createdAt = this.at(o.created);
+    const key = uniqueProjectKey(
+      o.name,
+      this.data.projects.map((project) => project.key).filter((projectKey): projectKey is string => !!projectKey),
+    );
     this.data.projects.push({
-      id, workspaceId: this.workspaceId, name: o.name, summary: o.summary ?? null, description: o.description ?? null,
+      id, workspaceId: this.workspaceId, name: o.name, key, summary: o.summary ?? null, description: o.description ?? null,
       color: o.color ?? '#6b7280', status: o.status, priority: o.priority ?? 'medium', leadId: o.lead ?? null, teamIds: o.teams, repositoryIds: [],
       startDate: o.start !== undefined ? this.at(o.start) : null, targetDate: o.target !== undefined ? this.at(-o.target) : null,
       createdAt, updatedAt: createdAt, completedAt: o.status === 'completed' || o.status === 'canceled' ? createdAt : null,
@@ -371,6 +379,7 @@ export class SeedBuilder {
     reporter?: string;
     assignee?: string;
     team?: string;
+    project?: string;
     priority?: Priority;
     status: IssueStatus;
     workstreams?: string[];
@@ -384,12 +393,22 @@ export class SeedBuilder {
     movedBy?: string;
   }) {
     const id = uid('in');
-    const key = `${ISSUE_KEY_PREFIX[o.kind]}-${o.number}`;
-    this.bump(`issue:${o.kind}`, o.number);
+    const milestoneProjects = unique(
+      (o.milestones ?? [])
+        .map((milestoneId) => this.data.milestones.find((m) => m.id === milestoneId)?.projectId)
+        .filter((projectId): projectId is string => !!projectId),
+    );
+    const projectId = o.project ?? (milestoneProjects.length === 1 ? milestoneProjects[0] : null);
+    const project = this.data.projects.find((candidate) => candidate.id === projectId);
+    const prefix = project?.key ?? UNASSIGNED_ISSUE_KEY_PREFIX;
+    const counterName = `issue-key:${prefix}`;
+    const number = Math.max(o.number, (this.data.counters[counterName] ?? 0) + 1);
+    const key = `${prefix}-${number}`;
+    this.bump(counterName, number);
     this.data.issues.push({
-      id, workspaceId: this.workspaceId, key, number: o.number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
+      id, workspaceId: this.workspaceId, key, number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, teamId: o.team ?? null, priority: o.priority ?? 'none', status: o.status,
-      goal: null, milestoneIds: o.milestones ?? [], releaseId: null, aliases: [], estimate: o.estimate ?? null,
+      goal: null, projectId, milestoneIds: o.milestones ?? [], releaseId: null, aliases: [], estimate: o.estimate ?? null,
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,

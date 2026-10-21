@@ -153,7 +153,7 @@ export class ArtifactsService {
       throw notFound('Project', projectId);
   }
 
-  /** Resolves an issue by id, key (`BUG-12`) or alias; 404 when unknown. */
+  /** Resolves an issue by id, project key (`CORA-12`) or alias; 404 when unknown. */
   async resolveIssueId(workspaceId: string, idOrKey: string): Promise<string> {
     const repo = this.ds.getRepository(IssueEntity);
     let row: IssueEntity | null = null;

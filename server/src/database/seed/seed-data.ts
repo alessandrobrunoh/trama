@@ -70,7 +70,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
     title: 'Improve refresh token rotation',
     objective: 'Users remain authenticated while refresh tokens rotate safely.',
     context:
-      'Support reports (BUG-142, BUG-139) show users randomly redirected to login. Root cause: two refresh paths with no shared replay detection and no rotation grace window. We want deterministic, replay-safe rotation across api, web and auth-service.',
+      'Support reports (AUTH-142, AUTH-143) show users randomly redirected to login. Root cause: two refresh paths with no shared replay detection and no rotation grace window. We want deterministic, replay-safe rotation across api, web and auth-service.',
     owner: AUTH, participating: [API, WEB, SEC], accountable: maya, repos: [rAuth, rApi, rWeb], priority: 'high', labels: ['auth', 'reliability'],
     criteria: [
       ['Existing sessions survive rotation', 'met'],
@@ -345,7 +345,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.issue({ kind: 'idea', number: 4, title: 'Public status page', source: 'manual', reporter: tomas, team: INF, priority: 'low', status: 'canceled', created: 30, moved: 28, movedBy: ale });
   b.issue({ kind: 'security', number: 6, title: 'Outdated lodash in api (CVE-2026-1182)', source: 'github', team: SEC, priority: 'high', status: 'in_review', workstreams: [sec9], created: 9, moved: 9, movedBy: tomas });
   b.issue({ kind: 'security', number: 7, title: 'No rate limit on password reset endpoint', source: 'agent', team: SEC, priority: 'high', status: 'done', workstreams: [api58], created: 10, moved: 9, movedBy: tomas });
-  b.comment({ type: 'issue', id: bug142 }, null, user(maya), 'Linking this and BUG-139 to AUTH-42; same root cause (non-deterministic refresh).', 21);
+  b.comment({ type: 'issue', id: bug142 }, null, user(maya), 'Linking this and AUTH-143 to AUTH-42; same root cause (non-deterministic refresh).', 21);
 
   // ───────── decision comments
   b.comment({ type: 'decision', id: b.data.decisions.find((d) => d.number === 23)!.id! }, auth42, user(tomas), 'Good idea. Please also specify the key rotation story for the HMAC secret.', 1);

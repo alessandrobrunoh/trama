@@ -8,7 +8,7 @@ export type EntityChipType = 'issue' | 'decision';
 /**
  * Compact, linkable reference to another entity: status glyph · key · title.
  * Issue references use the same visual language as issue lists.
- *   <app-entity-chip type="issue" [ref]="'BUG-142'" compact />
+ *   <app-entity-chip type="issue" [ref]="'CORA-142'" compact />
  */
 @Component({
   selector: 'app-entity-chip',

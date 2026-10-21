@@ -854,9 +854,9 @@
   "method": "GET",
   "path": "/issues/{idOrKey}",
   "permission": "issues:read",
-  "description": "One issue (old keys still resolve). Includes visible artifactCount for callers with artifacts:read; 0 means skip list_issue_artifacts.",
+  "description": "One issue. Previous project keys and migrated legacy keys still resolve as aliases. Includes visible artifactCount for callers with artifacts:read; 0 means skip list_issue_artifacts.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
   }
  },
  {
@@ -898,9 +898,9 @@
   "method": "PATCH",
   "path": "/issues/{idOrKey}",
   "permission": "issues:write",
-  "description": "Partially update an issue. Changing kind re-keys it; duplicateOfId marks it a duplicate; parentId sets its parent; null clears optional fields.",
+  "description": "Partially update an issue. Changing project re-keys it and keeps the previous key as an alias; kind changes classification only. duplicateOfId marks it a duplicate; parentId sets its parent; null clears optional fields.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
+   "idOrKey": "path string! Issue id or key (e.g. CORA-142)",
    "title": "body string Title",
    "body": "body string Markdown body",
    "reporterName": "body string Reporter name",
@@ -912,7 +912,7 @@
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
-   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Kind (re-keys the issue)",
+   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Issue classification; does not change the key",
    "duplicateOfId": "body string Id or key of the original (null clears)",
    "labels": "body string[] Workspace label ids"
   }
@@ -924,7 +924,7 @@
   "permission": "issues:delete",
   "description": "Delete an issue.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
   }
  },
  {
@@ -1272,7 +1272,7 @@
   "permission": "artifacts:read",
   "description": "Artifacts attached to an issue.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)"
+   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
   }
  },
  {
@@ -1619,7 +1619,7 @@
   "permission": "issues:write",
   "description": "Link a Trama issue to a GitHub or Linear issue by URL, so its external status shows as a read-only badge (the Trama status is never changed). One external issue links to one Trama issue.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. BUG-142)",
+   "idOrKey": "path string! Issue id or key (e.g. CORA-142)",
    "url": "body string! https://github.com/owner/repo/issues/12 or https://linear.app/team/issue/ENG-123/..."
   }
  },

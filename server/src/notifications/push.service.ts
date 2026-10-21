@@ -9,7 +9,7 @@ import { PushSubscriptionEntity } from '../database/entities/index.js';
 export interface PushMessage {
   title: string;
   body?: string;
-  /** Path inside the web app, e.g. `/acme/issues/BUG-12`. */
+  /** Path inside the web app, e.g. `/acme/issues/CORA-12`. */
   path: string;
   /** Same tag replaces the previous notification instead of stacking. */
   tag?: string;
