@@ -155,40 +155,37 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     expect(evs.some((e) => e.subject.id === filed.id && e.data.fields.includes('assigneeId') && e.data.assignee?.to === me)).toBe(true);
   });
 
-  it('changing the kind re-keys the issue and keeps the old key working', async () => {
+  it('changing an issue kind does not change its project-scoped key', async () => {
     const bug = await mkIssue('bug', 'Actually a feature');
     const feat0 = await mkIssue('feature', 'Existing feature');
-    const rekeyed = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', title: 'Now a feature' }).expect(200)).body;
-    expect(rekeyed.id).toBe(bug.id);
-    expect(rekeyed.kind).toBe('feature');
-    expect(rekeyed.key).toBe(`FEAT-${feat0.number + 1}`);
-    expect(rekeyed.number).toBe(feat0.number + 1);
-    expect(rekeyed.aliases).toEqual([bug.key]);
-    expect(rekeyed.title).toBe('Now a feature');
+    const changed = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', title: 'Now a feature' }).expect(200)).body;
+    expect(changed.id).toBe(bug.id);
+    expect(changed.kind).toBe('feature');
+    expect(changed.key).toBe(bug.key);
+    expect(changed.number).toBe(bug.number);
+    expect(changed.aliases).toEqual([]);
+    expect(changed.title).toBe('Now a feature');
 
-    // old key (any case) and new key both resolve; the new key is what comes back
-    expect((await c.get(`${base()}/issues/${bug.key}`).expect(200)).body.key).toBe(rekeyed.key);
+    // Issue keys are based on project tags, not issue kinds.
+    expect((await c.get(`${base()}/issues/${bug.key}`).expect(200)).body.key).toBe(bug.key);
     expect((await c.get(`${base()}/issues/${bug.key.toLowerCase()}`).expect(200)).body.id).toBe(bug.id);
-    expect((await c.get(`${base()}/issues/${rekeyed.key}`).expect(200)).body.id).toBe(bug.id);
     expect((await c.get(`${base()}/issues?q=${bug.key}`).expect(200)).body.map((i: { id: string }) => i.id)).toContain(bug.id);
 
-    // PATCH through the old key works too; same kind is a no-op for the key
+    // Changing the classification again still leaves the key and aliases untouched.
     const same = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', priority: 'high' }).expect(200)).body;
-    expect(same.key).toBe(rekeyed.key);
-    expect(same.aliases).toEqual([bug.key]);
-
-    // new bugs never reuse the old number, and going back adds another alias
+    expect(same.key).toBe(bug.key);
+    expect(same.aliases).toEqual([]);
     const next = await mkIssue('bug', 'Next bug');
-    expect(next.number).toBe(bug.number + 1);
-    const back = (await c.patch(`${base()}/issues/${rekeyed.key}`, { kind: 'bug' }).expect(200)).body;
-    expect(back.key).toBe(`BUG-${next.number + 1}`);
-    expect(back.aliases).toEqual([bug.key, rekeyed.key]);
+    expect(next.number).toBe(feat0.number + 1);
+    const back = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'bug' }).expect(200)).body;
+    expect(back.key).toBe(bug.key);
+    expect(back.number).toBe(bug.number);
+    expect(back.aliases).toEqual([]);
 
     const evs = (await c.get(`${base()}/events?type=issue.rekeyed`).expect(200)).body as { subject: { id: string }; data: { from: string; to: string } }[];
     const mine = evs.filter((e) => e.subject.id === bug.id);
-    expect(mine.map((e) => `${e.data.from}>${e.data.to}`).sort((x, y) => x.localeCompare(y))).toEqual([`${bug.key}>${rekeyed.key}`, `${rekeyed.key}>${back.key}`].sort((x, y) => x.localeCompare(y)));
+    expect(mine).toEqual([]);
     await c.patch(`${base()}/issues/${bug.key}`, { kind: 'nonsense' }).expect(400);
-    await c.get(`${base()}/issues/BUG-9999`).expect(404);
   });
 
   it('commit and branch artifacts are no longer accepted', async () => {
