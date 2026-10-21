@@ -96,6 +96,8 @@ jobs:
             -v "$PWD/docker/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" \
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
       - name: Author's deployment file is still valid
+        env:
+          POSTGRES_PASSWORD: ci-password
         run: docker compose -f server/docker-compose.yml config --quiet
 
   images:
