@@ -9,7 +9,7 @@ This skill dispatches work to `trama` for concepts and rules, `trama-triage-issu
 
 ## 1. Identify the workspace and find the issue
 
-Call `whoami`. If several workspaces are connected, use `list_accounts` to select one for writes. Use `find_work` or `search` for matching Issues before creating anything; use `get_context` to read the matching Issue and Decision context. Read the workspace stamp on every result. Reuse or update a matching issue rather than creating a duplicate.
+Read `.trama` at the repository root first. If its repository matches the checkout, use the saved workspace and project ID to scope routine issue lookups; if the file is missing or incomplete, follow `trama-project-context` to ask the user for setup details. Call `whoami` as needed to verify access. If several workspaces are connected, use `list_accounts` to select one for writes. Prefer `find_work` with `scope: "issues"` and the saved project ID over global `search`; if its schema lacks that filter, discover `list_issues` with `list_capabilities` and call it through `run_tool`. Read the workspace stamp on every result. Reuse or update a matching issue rather than creating a duplicate.
 
 ## 2. Read the issue context
 

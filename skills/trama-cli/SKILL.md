@@ -14,7 +14,7 @@ trama whoami
 trama doctor
 trama commands
 trama schema issue create
-trama issue list --open --priority urgent,high --fields key,title,status
+trama issue list --open --project-id prj_1 --priority urgent,high --fields key,title,status
 trama issue context BUG-142
 trama issue get BUG-142
 trama issue create --kind bug --title "Login timeout" --goal "Login eventually succeeds"
@@ -45,7 +45,21 @@ If not signed in, ask the user to authenticate. Never print, log, or commit cred
 
 ## Read before writing
 
-Search for matching issues and read their context before creating or updating anything. When the user names multiple issues, read each one and update the ones affected. Resolve an optional Goal only when the repository mapping or user makes it clear; ask when there are multiple plausible choices.
+At the Git repository root, read `.trama` before looking up issues. It is TOML. If it matches the current checkout, use its `workspace` and `project_id` rather than searching every project. Scope CLI issue lists with `--project-id` (and `--workspace` when needed), for example `trama issue list --project-id prj_1 --q "login timeout"`. If `.trama` is missing or incomplete, ask the user for the workspace, project ID, and confirmation of the repository remote before creating it; include an optional Goal only when one applies. After they reply, create `.trama` using this format:
+
+```toml
+schema_version = 1
+workspace = "workspace-slug"
+repository = "github.com/owner/repository"
+project_id = "prj_project-id"
+project_name = "Project name"
+goal_id = ""
+goal_name = ""
+```
+
+Use the `trama-project-context` skill when available. Never save credentials in `.trama`, and do not silently replace a stale mapping.
+
+Find matching issues within the saved project scope and read their context before creating or updating anything. When the user names multiple issues, read each one and update the ones affected. Resolve an optional Goal only when the repository mapping or user makes it clear; ask when there are multiple plausible choices.
 
 Use the CLI's current search, issue context, and Goal context operations as exposed by `trama commands`. Do not assume that a command exists just because an older skill or client named it.
 

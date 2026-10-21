@@ -7,12 +7,15 @@ object is for, which tools to call, and the rules that keep the workspace trustw
 | Skill | Use it when |
 |---|---|
 | [`trama`](trama/SKILL.md) | Always first: concepts, ground rules, tool map, and the issues of this checkout |
+| [`trama-project-context`](trama-project-context/SKILL.md) | First use in a repository: create or refresh `.trama` and scope future issue lookups |
 | [`trama-workflow`](trama-workflow/SKILL.md) | Issue-first work across one or more issues |
 | [`trama-start-work`](trama-start-work/SKILL.md) | Reading context and starting implementation |
 | [`trama-report-progress`](trama-report-progress/SKILL.md) | Recording factual progress and artifacts on issues |
 | [`trama-ask-and-decide`](trama-ask-and-decide/SKILL.md) | Using an Issue's Human input feature in Question or Decision mode |
 | [`trama-triage-issues`](trama-triage-issues/SKILL.md) | Filing, finding, and triaging issues |
 | [`trama-cli`](trama-cli/SKILL.md) | The same work through the `trama` shell command, when MCP is unavailable (`trama skill install` installs it) |
+
+For repository-specific scope, `trama-project-context` reads or creates a root `.trama` file containing the workspace, repository, and project mapping. Its format is shown in [`.trama.example`](../.trama.example); it contains no credentials and can be committed to share the mapping with teammates.
 
 ## Install
 
