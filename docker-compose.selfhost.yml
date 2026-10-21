@@ -104,10 +104,12 @@ services:
   mcp:
     <<: *hardened
     image: ${TRAMA_REGISTRY:-ghcr.io/alessandrobrunoh}/trama-mcp:${TRAMA_VERSION:-latest}
-    read_only: true
     environment:
       TRAMA_API_URL: http://api:3000/api
+      # Safe only because api and mcp communicate on the private Compose network.
+      TRAMA_MCP_ALLOW_INTERNAL_HTTP: "true"
       MCP_BIND: 0.0.0.0:8080
+    read_only: true
     depends_on:
       api:
         condition: service_healthy

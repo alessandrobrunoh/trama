@@ -3,15 +3,26 @@
   "index": "/index.html",
   "assetGroups": [
     {
-      "name": "app",
+      "name": "shell",
       "installMode": "prefetch",
       "resources": {
         "files": [
           "/favicon.ico",
-          "/index.csr.html",
           "/index.html",
           "/manifest.webmanifest",
           "/*.css",
+          "/main*.js",
+          "/polyfills*.js",
+          "/runtime*.js"
+        ]
+      }
+    },
+    {
+      "name": "lazy-chunks",
+      "installMode": "lazy",
+      "updateMode": "lazy",
+      "resources": {
+        "files": [
           "/*.js"
         ]
       }

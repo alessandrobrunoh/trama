@@ -109,6 +109,20 @@ describe('query DTOs', () => {
       'comments',
     ]);
   });
+
+  it('bounds the legacy list query to the maximum page size', async () => {
+    const qb: Record<string, unknown> = {};
+    for (const method of ['where', 'orderBy', 'andWhere', 'take'])
+      qb[method] = vi.fn(() => qb);
+    qb.getMany = vi.fn(async () => []);
+    const svc = new CommentsService(
+      {} as never,
+      {} as never,
+      { createQueryBuilder: () => qb } as never,
+    );
+    await svc.list('ws_1');
+    expect(qb.take).toHaveBeenCalledWith(COMMENT_PAGE_SIZE.max);
+  });
 });
 
 /** A real query builder over the real entity metadata (no connection needed) to inspect the generated SQL. */

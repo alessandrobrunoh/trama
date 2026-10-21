@@ -34,6 +34,8 @@ export interface ProjectContextRows {
   artifacts: readonly ArtifactEntity[];
   decisions: readonly DecisionEntity[];
   inputRequests: readonly InputRequestEntity[];
+  /** Markdown fetches records against all project issue ids, while issue details are capped. */
+  includeUnmatchedAssociations?: boolean;
 }
 
 const byNumber = <T extends { number: number }>(a: T, b: T) =>
@@ -68,7 +70,10 @@ export function assembleProjectContext(
     if (seen.has(artifact.id)) continue;
     let path: SubjectRef[] | undefined;
     if (artifact.projectId === project.id) path = [projectRef];
-    else if (artifact.issueId && issueById.has(artifact.issueId))
+    else if (
+      artifact.issueId &&
+      (rows.includeUnmatchedAssociations || issueById.has(artifact.issueId))
+    )
       path = [projectRef, ref('issue', artifact.issueId)];
     if (!path) continue;
     seen.add(artifact.id);
@@ -78,13 +83,18 @@ export function assembleProjectContext(
   const decisions = rows.decisions
     .filter(
       (d) =>
+        (rows.includeUnmatchedAssociations &&
+          (!!d.originIssueId || (d.relatedIssueIds ?? []).length > 0)) ||
         (!!d.originIssueId && issueById.has(d.originIssueId)) ||
         (d.relatedIssueIds ?? []).some((id) => issueById.has(id)),
     )
     .sort(byNumber);
   const inputRequests = rows.inputRequests
     .filter(
-      (r) => r.state === 'open' && !!r.issueId && issueById.has(r.issueId),
+      (r) =>
+        r.state === 'open' &&
+        !!r.issueId &&
+        (rows.includeUnmatchedAssociations || issueById.has(r.issueId)),
     )
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
@@ -129,6 +139,12 @@ const CLOSED_ISSUE = new Set(['done', 'canceled']);
 export interface ProjectContextNames {
   /** actor/user id → display name */
   names?: ReadonlyMap<string, string>;
+  counts?: Partial<
+    Record<
+      'issues' | 'openIssues' | 'artifacts' | 'decisions' | 'inputRequests',
+      number
+    >
+  >;
 }
 
 /** Markdown briefing of the project's directly-owned issues and records. */
@@ -200,11 +216,19 @@ export function projectContextMarkdown(
     }),
   );
   const open = ctx.issues.filter((i) => !CLOSED_ISSUE.has(i.status));
-  const closed = ctx.issues.length - open.length;
+  const issueTotal = opts.counts?.issues ?? ctx.issues.length;
+  const openTotal = opts.counts?.openIssues ?? open.length;
+  const closed =
+    opts.counts?.openIssues === undefined
+      ? issueTotal - open.length
+      : issueTotal - opts.counts.openIssues;
   section('Open issues', [
-    ...capped(open, CONTEXT_CAPS.issues, (i) => {
+    ...open.slice(0, CONTEXT_CAPS.issues).map((i) => {
       return `- ${i.key} ${i.title} (${i.kind}, ${words(i.status)}${i.priority !== 'none' ? `, ${i.priority}` : ''})`;
     }),
+    ...(openTotal > Math.min(open.length, CONTEXT_CAPS.issues)
+      ? [`- … ${openTotal - Math.min(open.length, CONTEXT_CAPS.issues)} more`]
+      : []),
     ...(closed ? [`_${closed} more issues are done or canceled._`] : []),
   ]);
 
@@ -235,8 +259,9 @@ export function projectContextMarkdown(
     }
     artifactLines.push('');
   }
-  if (ctx.artifacts.length > shown)
-    artifactLines.push(`- … ${ctx.artifacts.length - shown} more`);
+  const artifactTotal = opts.counts?.artifacts ?? ctx.artifacts.length;
+  if (artifactTotal > shown)
+    artifactLines.push(`- … ${artifactTotal - shown} more`);
   section(
     'Artifacts',
     artifactLines.length && artifactLines[artifactLines.length - 1] === ''
@@ -247,9 +272,8 @@ export function projectContextMarkdown(
   const liveDecisions = ctx.decisions.filter(
     (d) => d.status !== 'rejected' && d.status !== 'draft',
   );
-  section(
-    'Decisions',
-    capped(liveDecisions, CONTEXT_CAPS.decisions, (d) => {
+  section('Decisions', [
+    ...liveDecisions.slice(0, CONTEXT_CAPS.decisions).map((d) => {
       const origin = d.originIssueId
         ? issueById.get(d.originIssueId)?.key
         : undefined;
@@ -261,13 +285,24 @@ export function projectContextMarkdown(
             : ` — ${d.status}, not yet accepted`;
       return `- ${d.key} ${d.title}: ${oneLine(d.statement, CONTEXT_CAPS.text)}${origin ? ` (from ${origin})` : ''}${state}`;
     }),
-  );
-  section(
-    'Open input requests',
-    capped(ctx.inputRequests, CONTEXT_CAPS.inputRequests, (r) => {
+    ...((opts.counts?.decisions ?? liveDecisions.length) >
+    Math.min(liveDecisions.length, CONTEXT_CAPS.decisions)
+      ? [
+          `- … ${(opts.counts?.decisions ?? liveDecisions.length) - Math.min(liveDecisions.length, CONTEXT_CAPS.decisions)} more`,
+        ]
+      : []),
+  ]);
+  section('Open input requests', [
+    ...ctx.inputRequests.slice(0, CONTEXT_CAPS.inputRequests).map((r) => {
       const origin = r.issueId ? issueById.get(r.issueId)?.key : undefined;
       return `- ${origin ? `${origin}: ` : ''}${oneLine(r.question, 300)}${r.options?.length ? ` [options: ${r.options.join(' / ')}]` : ''}`;
     }),
-  );
+    ...((opts.counts?.inputRequests ?? ctx.inputRequests.length) >
+    Math.min(ctx.inputRequests.length, CONTEXT_CAPS.inputRequests)
+      ? [
+          `- … ${(opts.counts?.inputRequests ?? ctx.inputRequests.length) - Math.min(ctx.inputRequests.length, CONTEXT_CAPS.inputRequests)} more`,
+        ]
+      : []),
+  ]);
   return `${out.join('\n').trimEnd()}\n`;
 }

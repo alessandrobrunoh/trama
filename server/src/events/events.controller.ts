@@ -9,10 +9,11 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
-import { Observable, filter, interval, map, merge } from 'rxjs';
+import { Observable, filter, interval, map, merge, mergeMap } from 'rxjs';
 import type { Repository } from 'typeorm';
 import { Auth, Ctx, type AuthInfo, type WorkspaceContext } from '../auth/request-context.js';
 import { DomainEventEntity } from '../database/entities/index.js';
+import { EventVisibilityService } from './event-visibility.service.js';
 import { EventsService } from './events.service.js';
 import { StreamAuthService, closeWhenInvalid, streamRecheckMs } from './stream-auth.js';
 
@@ -32,13 +33,14 @@ class ListEventsQuery {
 export class EventsController {
   constructor(
     private readonly events: EventsService,
+    private readonly visibility: EventVisibilityService,
     private readonly streamAuth: StreamAuthService,
     @InjectRepository(DomainEventEntity)
     private readonly repo: Repository<DomainEventEntity>,
   ) {}
 
   @Get()
-  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListEventsQuery) {
+  async list(@Ctx() ctx: WorkspaceContext, @Query() q: ListEventsQuery) {
     const qb = this.repo
       .createQueryBuilder('e')
       .where('e.workspaceId = :ws', { ws: ctx.workspace.id })
@@ -58,25 +60,35 @@ export class EventsController {
       if (Number.isNaN(before.getTime())) throw new BadRequestException('before must be an ISO date');
       qb.andWhere('e.at < :before', { before });
     }
-    return qb.getMany();
+    const rows = await qb.getMany();
+    return this.visibility.filterEvents(ctx.workspace.id, rows, ctx.access);
   }
 
   /**
-   * Server-Sent Events: one LiveEvent JSON per message, a ping comment every 25s. The stream ends
-   * (every 30s check, `TRAMA_SSE_RECHECK_MS`) once the session or token is revoked or expired, or
-   * the caller is no longer a member of the workspace; reconnecting then fails with 401/404.
+   * Server-Sent Events: one visible LiveEvent JSON per message, a ping comment every 25s. The
+   * stream ends when credentials, role, or project access change.
    */
   @Sse('stream')
   stream(@Ctx() ctx: WorkspaceContext, @Auth() auth: AuthInfo): Observable<MessageEvent> {
     const live$ = this.events.stream$.pipe(
       filter((e) => e.workspaceId === ctx.workspace.id && (!e.userId || e.userId === ctx.userId)),
-      map((e): MessageEvent => ({ data: e.event })),
+      mergeMap(async (published) => ({
+        published,
+        visible: await this.visibility.isLiveVisible(
+          ctx.workspace.id,
+          published.event,
+          ctx.access,
+          published.subject,
+        ),
+      }), 8),
+      filter(({ visible }) => visible),
+      map(({ published }): MessageEvent => ({ data: published.event })),
     );
     const ping$ = interval(25_000).pipe(
       map((): MessageEvent => ({ type: 'ping', data: { at: new Date().toISOString() } })),
     );
     return merge(live$, ping$).pipe(
-      closeWhenInvalid(() => this.streamAuth.isStillValid(auth, ctx.workspace.id), streamRecheckMs()),
+      closeWhenInvalid(() => this.streamAuth.isStillValid(auth, ctx), streamRecheckMs()),
     );
   }
 }

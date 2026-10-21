@@ -1045,7 +1045,11 @@ export class IssuesService {
       actor,
       type: 'issue.deleted',
       subject: { type: 'issue', id: removed.id },
-      data: { key: removed.key, title: removed.title },
+      data: {
+        key: removed.key,
+        title: removed.title,
+        projectId: removed.projectId,
+      },
     });
     for (const issue of detached)
       await this.events.record({
@@ -1078,7 +1082,7 @@ export class IssuesService {
         actor,
         type: 'issue.deleted',
         subject: { type: 'issue', id: row.id },
-        data: { key: row.key, title: row.title },
+        data: { key: row.key, title: row.title, projectId: row.projectId },
       });
     for (const issue of detached)
       await this.events.record({

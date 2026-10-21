@@ -161,6 +161,45 @@ describe('assembleProjectContext', () => {
     expect(md).toContain('BUG-12: Question 1? [options: a / b]');
     expect(md).not.toContain('Workstream');
   });
+
+  it('renders database totals for associations beyond the capped issue window', () => {
+    const issues = Array.from({ length: 45 }, (_, i) =>
+      issue(i + 1, { status: i < 40 ? 'done' : 'todo' }),
+    );
+    const decisions = Array.from({ length: 22 }, (_, i) =>
+      decision(i + 1, { originIssueId: `in_${i + 41}` }),
+    );
+    const inputRequests = Array.from({ length: 22 }, (_, i) =>
+      input(i + 1, { issueId: `in_${i + 41}` }),
+    );
+    const ctx = assembleProjectContext(
+      rows({
+        issues: issues.slice(0, 40),
+        decisions,
+        inputRequests,
+        includeUnmatchedAssociations: true,
+      }),
+    );
+    const md = projectContextMarkdown(ctx, {
+      counts: { issues: 45, openIssues: 5, decisions: 22, inputRequests: 22 },
+    });
+
+    expect(ctx.issues).toHaveLength(40);
+    expect(ctx.decisions).toHaveLength(22);
+    expect(ctx.inputRequests).toHaveLength(22);
+    expect(md).toContain('_40 more issues are done or canceled._');
+    expect(md).toContain('- … 2 more');
+  });
+
+  it('caps rendered markdown sections but preserves the full JSON context', () => {
+    const allIssues = Array.from({ length: 45 }, (_, i) => issue(i + 1));
+    const ctx = assembleProjectContext(rows({ issues: allIssues }));
+    const md = projectContextMarkdown(ctx);
+
+    expect(ctx.issues).toHaveLength(45);
+    expect(md.match(/^- BUG-/gm)).toHaveLength(40);
+    expect(md).toContain('- … 5 more');
+  });
 });
 
 describe('ProjectContextService', () => {
@@ -229,6 +268,26 @@ describe('ProjectContextService', () => {
     } as unknown as DataSource;
     await expect(
       new ProjectContextService(ds).build(WS, 'pj_nope'),
+    ).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('does not fetch markdown rows for a project hidden by authorization', async () => {
+    const ds = {
+      getRepository: (entity: unknown) => ({
+        findOneBy: async () => (entity === ProjectEntity ? project() : null),
+        find: async () => [],
+      }),
+    } as unknown as DataSource;
+    const access = {
+      projects: { all: false, projectIds: [] },
+      includeUnassigned: false,
+      grants: [],
+    };
+
+    await expect(
+      memberAccessStore.run(access, () =>
+        new ProjectContextService(ds).markdown(WS, 'pj_1'),
+      ),
     ).rejects.toBeInstanceOf(NotFoundException);
   });
 });

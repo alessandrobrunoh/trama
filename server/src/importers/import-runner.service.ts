@@ -19,6 +19,7 @@ const SWEEP_EVERY_MS = 30_000;
 /** Waits up to this long inside the process; longer rate-limit windows hand the job back to the queue. */
 const MAX_INLINE_WAIT_MS = 10 * 60_000;
 const WAIT_SLICE_MS = 5_000;
+const MAX_CONCURRENT_IMPORTS = 4;
 
 /** The rows of an `UPDATE ... RETURNING` result whatever shape the driver gave it (`rows` or `[rows, count]`). */
 export function claimedRows(result: unknown): unknown[] {
@@ -36,6 +37,7 @@ const sleep =(ms: number) => new Promise<void>((resolve) => setTimeout(resolve, 
 export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger(ImportRunnerService.name);
   private readonly active = new Set<string>();
+  private readonly pending = new Set<string>();
   private timer: ReturnType<typeof setInterval> | null = null;
   private stopping = false;
 
@@ -64,16 +66,23 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
-  /** Starts every queued or abandoned job this process is not already running. */
+  /** Fills the bounded worker pool with queued or abandoned jobs. */
   async sweep(): Promise<void> {
     if (this.stopping) return;
     const rows = await this.jobs.find({ where: [{ status: 'queued' }, { status: 'running' }], select: { id: true } }).catch(() => []);
-    for (const { id } of rows) if (!this.active.has(id)) void this.kick(id);
+    for (const { id } of rows) {
+      if (this.active.size + this.pending.size >= MAX_CONCURRENT_IMPORTS) break;
+      if (!this.active.has(id) && !this.pending.has(id)) {
+        this.pending.add(id);
+        void this.kick(id).finally(() => this.pending.delete(id));
+      }
+    }
   }
 
   /** Claims the job (atomically, so two instances never run it) and runs it in the background. */
   async kick(id: string): Promise<boolean> {
-    if (this.active.has(id) || this.stopping) return false;
+    if (this.active.has(id) || this.pending.has(id) || this.stopping || this.active.size + this.pending.size >= MAX_CONCURRENT_IMPORTS) return false;
+    this.pending.add(id);
     // An UPDATE ... RETURNING comes back from TypeORM as `[rows, affectedCount]`, not as the rows.
     const result = await this.ds.query<unknown>(
       `UPDATE "import_jobs" SET "status" = 'running', "heartbeatAt" = now(), "startedAt" = COALESCE("startedAt", now())
@@ -83,11 +92,17 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
        ) RETURNING "id"`,
       [id, STALE_AFTER_SECONDS],
     );
-    if (!claimedRows(result).length) return false;
+    if (!claimedRows(result).length) {
+      this.pending.delete(id);
+      return false;
+    }
     this.active.add(id);
     void this.execute(id)
       .catch((e: unknown) => this.log.error(`Import ${id} crashed: ${redactSecrets(e instanceof Error ? e.message : String(e))}`))
-      .finally(() => this.active.delete(id));
+      .finally(() => {
+        this.active.delete(id);
+        this.pending.delete(id);
+      });
     return true;
   }
 

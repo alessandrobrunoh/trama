@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Patch, Post, Query } from '@nestjs/common';
+import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -80,6 +81,8 @@ class ListCustomerRequestsQuery {
   @IsOptional() @IsString() issueId?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsIn(['true', 'false']) important?: 'true' | 'false';
+  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) limit?: number;
+  @IsOptional() @IsString() @MaxLength(200) cursor?: string;
 }
 
 @Controller('w/:slug/customers')
@@ -177,6 +180,8 @@ export class CustomerRequestsController {
       ...(q.issueId ? { issueId: q.issueId } : {}),
       ...(q.projectId ? { projectId: q.projectId } : {}),
       ...(q.important ? { important: q.important === 'true' } : {}),
+      ...(q.limit ? { limit: q.limit } : {}),
+      ...(q.cursor ? { cursor: q.cursor } : {}),
     });
   }
 }

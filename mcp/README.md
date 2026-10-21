@@ -21,7 +21,8 @@ cd mcp && TRAMA_API_URL=http://localhost:3000/api cargo run   # local, listens o
 
 | Env | Default | |
 |---|---|---|
-| `TRAMA_API_URL` | `http://localhost:3000/api` | API base URL as seen from the server |
+| `TRAMA_API_URL` | `http://localhost:3000/api` | API base URL as seen from the server. HTTPS is required except for loopback; URLs with userinfo, query, or fragment are rejected. |
+| `TRAMA_MCP_ALLOW_INTERNAL_HTTP` | unset | Set to `true` only for an API on a trusted private network, such as the isolated self-host Compose network. Bearer keys are unencrypted over HTTP. |
 | `MCP_BIND` | `127.0.0.1:8787` | listen address (the Docker image sets `0.0.0.0:8080`) |
 | `MCP_ALLOWED_ORIGINS` | none | comma-separated browser origins allowed (requests with any other `Origin` get 403) |
 | `MCP_MAX_OUTPUT_BYTES` | `200000` | tool output beyond this is truncated |
@@ -38,6 +39,8 @@ claude mcp add --transport http trama https://trama.alessandrobrunoh.it/mcp \
 Streamable HTTP, stateless (`POST /mcp` only, JSON replies, no sessions). `--stdio` runs the same server over
 stdin/stdout for local clients, with the key in `TRAMA_API_KEY`. The [`trama` CLI](../cli/README.md) embeds this protocol layer too:
 `trama mcp` serves it over stdio using the CLI's saved login (`claude mcp add trama -- trama mcp`). `GET /healthz` is unauthenticated.
+
+The HTTP listener does not provide TLS. For any network-accessible deployment, terminate TLS at a trusted reverse proxy and forward to MCP over a private network. Do not publish the MCP container port directly to an untrusted network. The self-host Compose stack publishes only Caddy proxy ports; its MCP service has no `ports:` mapping and is reached internally.
 
 ### Several workspaces
 

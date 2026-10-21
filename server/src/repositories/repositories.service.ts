@@ -122,10 +122,14 @@ export class RepositoriesService {
 
   async remove(workspaceId: string, actor: ActorRef, id: string) {
     const row = await this.get(workspaceId, id);
+    let projectIds: string[] = [];
     await this.ds.transaction(async (m) => {
       const projects = await m
         .getRepository(ProjectEntity)
         .findBy({ workspaceId });
+      projectIds = projects
+        .filter((project) => project.repositoryIds.includes(id))
+        .map((project) => project.id);
       for (const p of projects)
         if (p.repositoryIds.includes(id))
           await m.update(
@@ -140,7 +144,7 @@ export class RepositoriesService {
       actor,
       type: 'repository.deleted',
       subject: { type: 'repository', id },
-      data: { fullName: row.fullName },
+      data: { fullName: row.fullName, projectIds },
     });
   }
 }

@@ -36,6 +36,25 @@ function fakeRepo<T extends Row>(rows: T[], make?: (x: Partial<T>) => T) {
     },
     find: async ({ where }: { where: Where }) =>
       rows.filter((r) => matches(r, where)).sort((a, b) => (b as unknown as { createdAt: Date }).createdAt.getTime() - (a as unknown as { createdAt: Date }).createdAt.getTime()),
+    createQueryBuilder: () => {
+      let filters: ((r: T) => boolean)[] = [];
+      let max = rows.length;
+      const qb = {
+        leftJoin: () => qb,
+        where: (_sql: string, params: Record<string, unknown>) => { filters.push((r) => matches(r, params)); return qb; },
+        andWhere: (sql: string, params: Record<string, unknown>) => {
+          if (sql.includes('customerId')) filters.push((r) => (r as Record<string, unknown>)['customerId'] === params['customerId']);
+          if (sql.includes('issueId')) filters.push((r) => (r as Record<string, unknown>)['issueId'] === params['issueId']);
+          if (sql.includes('important')) filters.push((r) => (r as Record<string, unknown>)['important'] === params['important']);
+          return qb;
+        },
+        orderBy: () => qb,
+        addOrderBy: () => qb,
+        take: (n: number) => { max = n; return qb; },
+        getMany: async () => rows.filter((r) => filters.every((f) => f(r))).slice(0, max),
+      };
+      return qb;
+    },
     delete: async (where: Where) => {
       for (const r of rows.filter((x) => matches(x, where))) rows.splice(rows.indexOf(r), 1);
     },
@@ -233,7 +252,7 @@ describe('customers: requests', () => {
     await service.createRequest('ws_1', ACTOR, customer.id, { issueId: 'iss_1', body: 'one' });
     await service.createRequest('ws_1', ACTOR, customer.id, { issueId: 'iss_1', body: 'two' });
     expect(requestRows).toHaveLength(2);
-    expect(await service.listRequests('ws_1', { issueId: 'iss_1' })).toHaveLength(2);
+    expect((await service.listRequests('ws_1', { issueId: 'iss_1' })).items).toHaveLength(2);
   });
 
   it('edits the body, toggles important, clears the source, and records one event per real change', async () => {
@@ -273,7 +292,7 @@ describe('customers: requests', () => {
     await service.createRequest('ws_1', ACTOR, customer.id, { issueId: 'iss_1', important: true });
     await service.createRequest('ws_1', ACTOR, customer.id, { projectId: 'pj_1' });
     expect(await service.requestsFor('ws_1', customer.id)).toHaveLength(2);
-    expect(await service.listRequests('ws_1', { important: true })).toHaveLength(1);
+    expect((await service.listRequests('ws_1', { important: true })).items).toHaveLength(1);
     await expect(service.requestsFor('ws_2', customer.id)).rejects.toBeInstanceOf(NotFoundException);
   });
 });

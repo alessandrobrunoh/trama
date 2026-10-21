@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  UnprocessableEntityException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
 import {
@@ -29,6 +33,7 @@ import {
 } from '../database/entities/index.js';
 import {
   applyFilters,
+  fieldValues,
   groupItems,
   sortItems,
   VIEW_FIELDS,
@@ -40,6 +45,8 @@ import { hashPublicToken, isPublicToken } from './view-token.js';
 
 /** Rows returned for one public view; the rest is cut (and flagged as `truncated`). */
 export const PUBLIC_VIEW_LIMIT = 500;
+/** Maximum workspace rows evaluated for one unauthenticated public-view request. */
+export const PUBLIC_VIEW_SCAN_LIMIT = 20_000;
 
 type Row = Record<string, unknown>;
 type Names = Record<RefKind, Map<string, string>>;
@@ -105,7 +112,7 @@ export class PublicViewsService {
     const groupBy = view.groupBy ?? (view.layout === 'board' ? 'status' : null);
     const groups = groupItems(entity, kept, groupBy, ctx);
 
-    const names = await this.namesFor(workspaceId, entity, groupBy);
+    const names = await this.namesFor(workspaceId, entity, groupBy, kept, ctx);
     const workspace = await this.ds
       .getRepository(WorkspaceEntity)
       .findOneBy({ id: workspaceId });
@@ -141,15 +148,60 @@ export class PublicViewsService {
     entity: 'issue' | 'project',
     rows: readonly Row[],
   ): Promise<Map<string, Demand>> {
-    const requests = await this.ds
-      .getRepository(CustomerRequestEntity)
-      .find({ where: { workspaceId } });
+    const targetIds = [...new Set(rows.map((row) => String(row['id'])))];
+    if (!targetIds.length) return new Map();
+
+    const requestsRepo = this.ds.getRepository(CustomerRequestEntity);
+    const requestProjection = {
+      customerId: true,
+      important: true,
+      issueId: true,
+      projectId: true,
+    } as const;
+    let issues: Pick<IssueEntity, 'id' | 'projectId'>[] = [];
+    let requests: CustomerRequestEntity[];
+    if (entity === 'issue') {
+      requests = await this.boundedRows(
+        requestsRepo.find({
+          where: { workspaceId, issueId: In(targetIds) },
+          select: requestProjection,
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      );
+    } else {
+      issues = await this.boundedRows(
+        this.ds.getRepository(IssueEntity).find({
+          where: { workspaceId, projectId: In(targetIds) },
+          select: { id: true, projectId: true },
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      );
+      const issueIds = issues.map((issue) => issue.id);
+      const requestTargets = [
+        { workspaceId, projectId: In(targetIds) },
+        ...(issueIds.length ? [{ workspaceId, issueId: In(issueIds) }] : []),
+      ];
+      requests = await this.boundedRows(
+        requestsRepo.find({
+          where: requestTargets as never,
+          select: requestProjection,
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      );
+    }
     if (!requests.length) return new Map();
+    const customerIds = [
+      ...new Set(requests.map((request) => request.customerId)),
+    ];
     const customers = new Map(
       (
-        await this.ds
-          .getRepository(CustomerEntity)
-          .find({ where: { workspaceId } })
+        await this.boundedRows(
+          this.ds.getRepository(CustomerEntity).find({
+            where: { workspaceId, id: In(customerIds) },
+            select: { id: true, tierId: true, revenue: true, size: true },
+            take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+          }),
+        )
       ).map((c) => [
         c.id,
         {
@@ -163,7 +215,8 @@ export class PublicViewsService {
       requests.map(
         (r) =>
           ({
-            ...r,
+            customerId: r.customerId,
+            important: r.important,
             issueId: r.issueId ?? undefined,
             projectId: r.projectId ?? undefined,
           }) as unknown as CustomerRequest,
@@ -172,16 +225,14 @@ export class PublicViewsService {
     );
     if (entity === 'issue') return own;
     // A project also counts the requests on its directly assigned issues.
-    const issues = await this.ds
-      .getRepository(IssueEntity)
-      .find({ where: { workspaceId }, select: { id: true, projectId: true } });
     const byProject = new Map<string, Demand[]>();
     for (const issue of issues) {
       const demand = own.get(issue.id);
       if (!demand) continue;
-      const targets = new Set<string>(issue.projectId ? [issue.projectId] : []);
-      for (const p of targets)
-        byProject.set(p, [...(byProject.get(p) ?? []), demand]);
+      if (!issue.projectId) continue;
+      const bucket = byProject.get(issue.projectId);
+      if (bucket) bucket.push(demand);
+      else byProject.set(issue.projectId, [demand]);
     }
     const out = new Map<string, Demand>();
     for (const row of rows) {
@@ -198,23 +249,34 @@ export class PublicViewsService {
     entity: ViewEntity,
     workspaceId: string,
   ): Promise<Row[]> {
-    const where = { workspaceId } as never;
+    const where = { workspaceId };
+    const take = PUBLIC_VIEW_SCAN_LIMIT + 1;
     switch (entity) {
       case 'issue':
-        return (await this.ds
-          .getRepository(IssueEntity)
-          .find({ where })) as unknown as Row[];
+        return (await this.boundedRows(
+          this.ds.getRepository(IssueEntity).find({ where, take }),
+        )) as unknown as Row[];
       case 'decision':
-        return (await this.ds
-          .getRepository(DecisionEntity)
-          .find({ where })) as unknown as Row[];
+        return (await this.boundedRows(
+          this.ds.getRepository(DecisionEntity).find({ where, take }),
+        )) as unknown as Row[];
       case 'project':
-        return (await this.ds
-          .getRepository(ProjectEntity)
-          .find({ where })) as unknown as Row[];
+        return (await this.boundedRows(
+          this.ds.getRepository(ProjectEntity).find({ where, take }),
+        )) as unknown as Row[];
       default:
         return [];
     }
+  }
+
+  private async boundedRows<T>(query: Promise<T[]>): Promise<T[]> {
+    const rows = await query;
+    if (rows.length > PUBLIC_VIEW_SCAN_LIMIT) {
+      throw new UnprocessableEntityException(
+        `This shared view exceeds the ${PUBLIC_VIEW_SCAN_LIMIT.toLocaleString('en-US')}-row evaluation limit. Ask the owner to narrow it.`,
+      );
+    }
+    return rows;
   }
 
   /** Display names for the teams, people, projects and releases the returned rows point at. */
@@ -222,6 +284,8 @@ export class PublicViewsService {
     workspaceId: string,
     entity: ViewEntity,
     groupBy: string | null,
+    rows: readonly Row[],
+    ctx: QueryContext,
   ): Promise<Names> {
     const names: Names = {
       team: new Map(),
@@ -229,40 +293,81 @@ export class PublicViewsService {
       project: new Map(),
       release: new Map(),
     };
-    const need = new Set<RefKind>();
-    for (const field of [
-      'teamId',
-      'assigneeId',
-      'leadId',
-      'projectId',
-      groupBy,
-    ]) {
-      const spec = field ? VIEW_FIELDS[entity]?.[field] : undefined;
-      if (spec?.refersTo) need.add(spec.refersTo);
+    const fields = new Set<string>(
+      entity === 'issue'
+        ? ['teamId', 'assigneeId', 'projectId']
+        : entity === 'project'
+          ? ['leadId']
+          : [],
+    );
+    if (groupBy) fields.add(groupBy);
+    const ids: Record<RefKind, Set<string>> = {
+      team: new Set(),
+      user: new Set(),
+      project: new Set(),
+      release: new Set(),
+    };
+    let referenceCount = 0;
+    for (const field of fields) {
+      const spec = VIEW_FIELDS[entity]?.[field];
+      if (!spec?.refersTo) continue;
+      for (const row of rows) {
+        for (const id of fieldValues(entity, row, field, ctx)) {
+          const values = ids[spec.refersTo];
+          if (values.has(id)) continue;
+          values.add(id);
+          referenceCount += 1;
+          if (referenceCount > PUBLIC_VIEW_SCAN_LIMIT) {
+            throw new UnprocessableEntityException(
+              `This shared view exceeds the ${PUBLIC_VIEW_SCAN_LIMIT.toLocaleString('en-US')}-row evaluation limit. Ask the owner to narrow it.`,
+            );
+          }
+        }
+      }
     }
-    if (need.has('team'))
-      for (const t of await this.ds
-        .getRepository(TeamEntity)
-        .find({ where: { workspaceId } }))
+    if (ids.team.size)
+      for (const t of await this.boundedRows(
+        this.ds.getRepository(TeamEntity).find({
+          where: { workspaceId, id: In([...ids.team]) },
+          select: { id: true, name: true },
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      ))
         names.team.set(t.id, t.name);
-    if (need.has('project'))
-      for (const p of await this.ds
-        .getRepository(ProjectEntity)
-        .find({ where: { workspaceId } }))
+    if (ids.project.size)
+      for (const p of await this.boundedRows(
+        this.ds.getRepository(ProjectEntity).find({
+          where: { workspaceId, id: In([...ids.project]) },
+          select: { id: true, name: true },
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      ))
         names.project.set(p.id, p.name);
-    if (need.has('release'))
-      for (const r of await this.ds
-        .getRepository(ReleaseEntity)
-        .find({ where: { workspaceId } }))
+    if (ids.release.size)
+      for (const r of await this.boundedRows(
+        this.ds.getRepository(ReleaseEntity).find({
+          where: { workspaceId, id: In([...ids.release]) },
+          select: { id: true, name: true },
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      ))
         names.release.set(r.id, r.name);
-    if (need.has('user')) {
-      const members = await this.ds
-        .getRepository(MembershipEntity)
-        .findBy({ workspaceId });
+    if (ids.user.size) {
+      const members = await this.boundedRows(
+        this.ds.getRepository(MembershipEntity).find({
+          where: { workspaceId, userId: In([...ids.user]) },
+          select: { userId: true },
+          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+        }),
+      );
       const users = members.length
-        ? await this.ds
-            .getRepository(UserEntity)
-            .findBy({ id: In(members.map((m) => m.userId)) })
+        ? await this.boundedRows(
+            this.ds.getRepository(UserEntity).find({
+              where: { id: In(members.map((m) => m.userId)) },
+              select: { id: true, name: true },
+              take: PUBLIC_VIEW_SCAN_LIMIT + 1,
+            }),
+          )
         : [];
       for (const u of users) names.user.set(u.id, u.name);
     }

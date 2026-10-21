@@ -134,8 +134,9 @@ export class ImportsService {
     } else mapping = parseMapping(req.mapping);
     await this.assertMapping(workspaceId, mapping);
 
-    const job = await this.jobs.save(
-      this.jobs.create({
+    let job: ImportJobEntity;
+    try {
+      job = await this.jobs.save(this.jobs.create({
         id: uid('imp'),
         workspaceId,
         provider: req.provider,
@@ -155,8 +156,14 @@ export class ImportsService {
         createdBy: actor,
         startedAt: null,
         finishedAt: null,
-      }),
-    );
+      }));
+    } catch (error) {
+      // The partial unique index is the cross-request/process authority.
+      if ((error as { code?: string })?.code === '23505') {
+        throw new ConflictException('Another import is still running in this workspace');
+      }
+      throw error;
+    }
     await this.events.record({
       workspaceId,
       actor,

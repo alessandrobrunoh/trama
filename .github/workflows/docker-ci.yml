@@ -1,13 +1,35 @@
 name: Docker
 
-# The compose files and Caddy config must stay valid, and the self-host stack must refuse to start without
-# its secrets (there are no default passwords).
+# Compose/Caddy config and all application images must stay valid, and the self-host stack must
+# refuse to start without its secrets (there are no default passwords).
 on:
   pull_request:
     paths:
       - 'docker-compose.selfhost.yml'
       - 'docker/**'
       - 'server/docker-compose*.yml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'server/Dockerfile'
+      - 'server/Dockerfile.dockerignore'
+      - 'mcp/Dockerfile'
+      - 'mcp/Dockerfile.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'angular.json'
+      - 'tsconfig*.json'
+      - 'ngsw-config.json'
+      - '.postcssrc.json'
+      - 'public/**'
+      - 'src/**'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - 'server/nest-cli.json'
+      - 'server/tsconfig*.json'
+      - 'server/src/**'
+      - 'mcp/Cargo.toml'
+      - 'mcp/Cargo.lock'
+      - 'mcp/src/**'
       - '.github/workflows/docker-ci.yml'
       - '.github/workflows/release-images.yml'
   push:
@@ -16,6 +38,28 @@ on:
       - 'docker-compose.selfhost.yml'
       - 'docker/**'
       - 'server/docker-compose*.yml'
+      - 'Dockerfile'
+      - '.dockerignore'
+      - 'server/Dockerfile'
+      - 'server/Dockerfile.dockerignore'
+      - 'mcp/Dockerfile'
+      - 'mcp/Dockerfile.dockerignore'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'angular.json'
+      - 'tsconfig*.json'
+      - 'ngsw-config.json'
+      - '.postcssrc.json'
+      - 'public/**'
+      - 'src/**'
+      - 'server/package.json'
+      - 'server/package-lock.json'
+      - 'server/nest-cli.json'
+      - 'server/tsconfig*.json'
+      - 'server/src/**'
+      - 'mcp/Cargo.toml'
+      - 'mcp/Cargo.lock'
+      - 'mcp/src/**'
       - '.github/workflows/docker-ci.yml'
       - '.github/workflows/release-images.yml'
 
@@ -53,3 +97,28 @@ jobs:
             caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile
       - name: Author's deployment file is still valid
         run: docker compose -f server/docker-compose.yml config --quiet
+
+  images:
+    name: Build ${{ matrix.image }} image
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: frontend
+            dockerfile: Dockerfile
+          - image: server
+            dockerfile: server/Dockerfile
+          - image: mcp
+            dockerfile: mcp/Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}

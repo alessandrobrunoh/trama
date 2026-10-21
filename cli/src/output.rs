@@ -117,7 +117,7 @@ fn cell(value: &Value) -> String {
         Value::Array(items) if items.iter().all(|i| !i.is_object() && !i.is_array()) => items.iter().map(cell).collect::<Vec<_>>().join(", "),
         other => other.to_string(),
     };
-    let text = text.replace(['\n', '\r', '\t'], " ");
+    let text = escape_terminal_controls(&text).replace(['\n', '\r', '\t'], " ");
     if text.chars().count() > MAX_CELL {
         let mut short: String = text.chars().take(MAX_CELL - 1).collect();
         short.push('…');
@@ -125,6 +125,21 @@ fn cell(value: &Value) -> String {
     } else {
         text
     }
+}
+
+/// Makes terminal control characters visible without changing printable text.
+pub(crate) fn escape_terminal_controls(text: &str) -> String {
+    text.chars()
+        .map(|ch| {
+            if ch == '\n' {
+                ch.to_string()
+            } else if ch.is_control() {
+                format!("\\u{{{:04X}}}", ch as u32)
+            } else {
+                ch.to_string()
+            }
+        })
+        .collect()
 }
 
 fn is_scalar(v: &Value) -> bool {
@@ -256,10 +271,14 @@ pub fn print(value: &Value, fmt: &Format) {
     }
 }
 
-/// Prints an API reply. Non-JSON replies (the markdown briefing) are passed through untouched.
+/// Prints an API reply. Raw mode is exact; human-readable Markdown is escaped for terminal safety.
 pub fn print_reply(reply: &Reply, fmt: &Format) -> Result<()> {
-    if fmt.mode == Mode::Raw || (!reply.is_json() && !reply.body.trim().is_empty()) {
+    if fmt.mode == Mode::Raw {
         emit(&reply.body);
+        return Ok(());
+    }
+    if !reply.is_json() && !reply.body.trim().is_empty() {
+        emit(&escape_terminal_controls(&reply.body));
         return Ok(());
     }
     if reply.body.trim().is_empty() {
@@ -348,6 +367,29 @@ mod tests {
         let t = render(&v, &fmt(Mode::Table, true, &["id", "owner.name"]));
         assert_eq!(t.lines().next().unwrap(), "ID  OWNER.NAME");
         assert_eq!(t.lines().nth(1).unwrap(), "1   Ann");
+    }
+
+    #[test]
+    fn table_cells_escape_terminal_controls() {
+        let value = json!([{ "id": "x\u{1b}]0;spoof\u{7}\u{80}\u{9b}" }]);
+        let rendered = table(&value, &[]);
+        assert!(rendered.contains(r"\u{001B}]0;spoof\u{0007}\u{0080}\u{009B}"));
+        assert!(!rendered.chars().any(|ch| ch.is_control() && ch != '\n'));
+    }
+
+    #[test]
+    fn markdown_replies_escape_controls() {
+        let body = "text \u{1b}]0;spoof\u{7}\u{80}\u{9b}\u{01}\nsecond line";
+        let escaped = "text \\u{001B}]0;spoof\\u{0007}\\u{0080}\\u{009B}\\u{0001}\nsecond line";
+        assert_eq!(escape_terminal_controls(body), escaped);
+        let reply = Reply {
+            status: 200,
+            content_type: "text/markdown".into(),
+            headers: Default::default(),
+            body: body.into(),
+        };
+        assert!(!reply.is_json());
+        assert_eq!(escape_terminal_controls(&reply.body), escaped);
     }
 
     #[test]

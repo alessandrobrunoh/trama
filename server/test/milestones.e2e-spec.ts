@@ -195,6 +195,11 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const issue = await mkIssue('bug', 'Artifacts');
     for (const kind of ['commit', 'branch'])
       await c.post(`${base()}/artifacts`, { issueId: issue.id, kind, title: 'x' }).expect(400);
-    await c.post(`${base()}/artifacts`, { issueId: issue.id, kind: 'pull_request', title: 'PR' }).expect(201);
+    const artifact = await c.post(`${base()}/artifacts`, {
+      issueId: issue.id,
+      kind: 'pull_request',
+      title: 'PR',
+    });
+    expect(artifact.status, JSON.stringify(artifact.body)).toBe(201);
   });
 });

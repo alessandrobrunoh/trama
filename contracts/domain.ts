@@ -1214,13 +1214,17 @@ export function demandOf(
   customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
 ): Demand {
   const customerIds: ID[] = [];
+  const seenCustomerIds = new Set<ID>();
   let requestCount = 0;
   let importantCount = 0;
   for (const r of requests) {
     if (!customers.has(r.customerId)) continue;
     requestCount += 1;
     if (r.important) importantCount += 1;
-    if (!customerIds.includes(r.customerId)) customerIds.push(r.customerId);
+    if (!seenCustomerIds.has(r.customerId)) {
+      seenCustomerIds.add(r.customerId);
+      customerIds.push(r.customerId);
+    }
   }
   return finishDemand(customerIds, requestCount, importantCount, customers);
 }
@@ -1233,12 +1237,16 @@ function finishDemand(
 ): Demand {
   if (!customerIds.length) return NO_DEMAND;
   const tierIds: ID[] = [];
+  const seenTierIds = new Set<ID>();
   let revenue = 0;
   let size = 0;
   for (const id of customerIds) {
     const c = customers.get(id);
     if (!c) continue;
-    if (c.tierId && !tierIds.includes(c.tierId)) tierIds.push(c.tierId);
+    if (c.tierId && !seenTierIds.has(c.tierId)) {
+      seenTierIds.add(c.tierId);
+      tierIds.push(c.tierId);
+    }
     revenue += c.revenue ?? 0;
     size = Math.max(size, c.size ?? 0);
   }
@@ -1280,12 +1288,17 @@ export function mergeDemand(
   customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
 ): Demand {
   const customerIds: ID[] = [];
+  const seenCustomerIds = new Set<ID>();
   let requestCount = 0;
   let importantCount = 0;
   for (const part of parts) {
     requestCount += part.requestCount;
     importantCount += part.importantCount;
-    for (const id of part.customerIds) if (!customerIds.includes(id)) customerIds.push(id);
+    for (const id of part.customerIds) {
+      if (seenCustomerIds.has(id)) continue;
+      seenCustomerIds.add(id);
+      customerIds.push(id);
+    }
   }
   return finishDemand(customerIds, requestCount, importantCount, customers);
 }
@@ -3181,8 +3194,8 @@ export function webhookEventMatches(patterns: readonly string[], type: string): 
 // ───────────────────────────── Snapshot ─────────────────────────────
 
 /**
- * `?comments=` on GET /snapshot. `full` (default, kept for MCP/CLI consumers) inlines every comment;
- * `index` returns `comments: []` plus `commentIndex`, and the client loads threads via GET /comments/page.
+ * `?comments=` on GET /snapshot. `index` (default) returns `comments: []` plus `commentIndex`;
+ * `full` explicitly inlines every comment for MCP/CLI consumers that require complete history.
  */
 export type SnapshotCommentsMode = 'full' | 'index';
 export const SNAPSHOT_COMMENTS_MODES: readonly SnapshotCommentsMode[] = ['full', 'index'];
