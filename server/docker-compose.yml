@@ -85,6 +85,8 @@ services:
     read_only: true
     environment:
       TRAMA_API_URL: http://trama-api:3000/api
+      # MCP and API communicate over the trusted Compose network; HTTP is unencrypted.
+      TRAMA_MCP_ALLOW_INTERNAL_HTTP: "true"
       MCP_BIND: 0.0.0.0:8080
     networks:
       - default

@@ -98,7 +98,11 @@ jobs:
       - name: Author's deployment file is still valid
         env:
           POSTGRES_PASSWORD: ci-password
-        run: docker compose -f server/docker-compose.yml config --quiet
+        run: |
+          docker compose -f server/docker-compose.yml config --quiet
+          docker compose -f server/docker-compose.yml config --format json | jq -e \
+            '.services.mcp.environment.TRAMA_API_URL == "http://trama-api:3000/api" and
+             .services.mcp.environment.TRAMA_MCP_ALLOW_INTERNAL_HTTP == "true"' > /dev/null
 
   images:
     name: Build ${{ matrix.image }} image
