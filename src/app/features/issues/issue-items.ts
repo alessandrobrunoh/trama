@@ -367,8 +367,8 @@ export class IssueRow extends IssueItemBase {
             role="checkbox"
             [attr.aria-checked]="selected()"
             [attr.aria-label]="'Select ' + i.key"
-            class="border-border-strong relative size-3.5 items-center justify-center rounded-[4px] border"
-            [class]="selected() ? 'bg-primary border-primary text-primary-foreground flex' : selecting() ? 'bg-background flex' : 'bg-background hidden group-hover/card:flex'"
+            class="border-border-strong relative flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border focus-visible:opacity-100"
+            [class]="selected() ? 'bg-primary border-primary text-primary-foreground opacity-100' : selecting() ? 'bg-background opacity-100' : 'bg-background opacity-0 group-hover/card:opacity-100'"
             (click)="onCheck($event)"
           >
             @if (selected()) {

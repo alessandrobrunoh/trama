@@ -29,6 +29,24 @@ export class KanbanLabelDirective {
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [NgTemplateOutlet, CdkDropListGroup, CdkDropList, CdkDrag, LucideDynamicIcon],
   host: { class: 'flex min-h-0 flex-1 flex-col' },
+  styles: `
+    .board-column {
+      contain: layout style;
+    }
+
+    .board-item {
+      content-visibility: auto;
+      contain-intrinsic-block-size: auto 120px;
+    }
+
+    /* CDK measures every card when dragging. Use real geometry, not offscreen
+       estimates, and keep the preview fully rendered outside the scrollport. */
+    .cdk-drop-list-dragging .board-item,
+    .board-item.cdk-drag-preview,
+    .board-item:focus-within {
+      content-visibility: visible;
+    }
+  `,
   template: `
     @if (layout() === 'list') {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list" cdkDropListGroup>
@@ -82,7 +100,7 @@ export class KanbanLabelDirective {
       <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden max-md:snap-x max-md:snap-mandatory max-md:scroll-px-4">
         <div class="flex h-full min-w-max gap-3 px-4 py-3 sm:px-6" cdkDropListGroup>
           @for (g of columns(); track g.key) {
-            <section class="group/col bg-muted/30 flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
+            <section class="board-column group/col bg-muted/30 flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
               <header class="flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
                 <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.items.length }}</span>
@@ -108,7 +126,7 @@ export class KanbanLabelDirective {
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay" [class.cursor-grab]="!disabled()">
+                  <div class="board-item shrink-0" cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay" [class.cursor-grab]="!disabled()">
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 } @empty {
