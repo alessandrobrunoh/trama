@@ -13,6 +13,7 @@ import {
   LucidePlug,
   LucideRocket,
   LucideScale,
+  LucideTimer,
   LucideUserRoundCheck,
   LucideUsers,
   type LucideIcon,
@@ -72,6 +73,13 @@ export const PRIMARY_NAV: NavItem[] = [
 
 /** Everything else, tucked under "More" in the sidebar. All of it stays one keystroke away (G chords, ⌘K). */
 export const MORE_NAV: NavItem[] = [
+  {
+    segment: 'timer',
+    label: 'Timer',
+    icon: LucideTimer,
+    keys: 'g h',
+    hint: 'Start, stop, or add your own time. It stays in Trama.',
+  },
   {
     segment: 'overview',
     label: 'Overview',
@@ -185,6 +193,7 @@ export function orderNav(items: readonly NavItem[], order: readonly string[]): N
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
   overview: 'Overview',
+  timer: 'Timer',
   stats: 'Statistics',
   inbox: 'Inbox',
   'my-work': 'My work',

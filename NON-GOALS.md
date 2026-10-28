@@ -11,7 +11,7 @@ Trama reduces the work required to manage development. Issues stay granular; opt
 3. **Be a Git host, Git client, code-review UI or CI system.** It reads PR, CI and review state from the providers and links to them.
 4. **Be a CRM.** Customer feedback may be linked to issues as a source of demand. Accounts, pipelines, contacts and revenue belong elsewhere.
 5. **Be a BI or analytics suite.** No configurable dashboards, agent performance scoring, token-usage leaderboards or velocity analytics. A few factual counts on a project or Issue are fine.
-6. **Track time.** No timers, timesheets or billing.
+6. **Bill time.** No timesheets, rates, invoices, or time reports. A person may start, stop, and manually add their own timer entries against a project or issue. Those hours stay in Trama and are not sent to LunaGest or anywhere else.
 7. **Be a chat or messaging tool.** Comments on work are enough; no channels or DMs.
 8. **Be a general wiki or document store.** Only documents that are artifacts or decisions of a piece of work.
 9. **Plan sprints.** No cycles, burndown or velocity.
@@ -35,7 +35,8 @@ Rule from now on: **core** surfaces may evolve; **frozen** surfaces get bug fixe
 | Agent surface: MCP, CLI, skills, scoped tokens | Core | How agents actually reach Trama. Keep the tool set small and task-oriented. |
 | Search and command palette | Core | Navigation for a dense tool. |
 | Auth, roles, token permissions, SSE live updates | Core | Needed for safe multi-actor use; the permission matrix itself is frozen. |
-| Projects, milestones, project updates | Keep, frozen | Optional planning context for Issues; must not grow into a PM suite. |
+| Projects, milestones, project updates | Keep, frozen | Optional planning context for Issues; must not grow into a PM suite. A project may bind one LunaGest project. |
+| Timer | Core | One running timer per person. No billing and no sync to LunaGest. |
 | Teams | Keep, frozen | Ownership context only. |
 | Repositories | Keep, frozen | Context for projects and Issues; could become a settings or project tab. |
 | My Work | Keep, frozen | Personal entry point; could fold into one inbox with Attention. |

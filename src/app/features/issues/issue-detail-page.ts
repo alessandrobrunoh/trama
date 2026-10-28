@@ -66,6 +66,7 @@ import { AiIssueSection } from '../ai-actions/ai-issue-cards';
 import { issueWorkState } from '../customers/customer-model';
 import { CustomerRequests } from '../customers/customer-requests';
 import { DemandSummary } from '../customers/demand-summary';
+import { IssueLunagest } from './issue-lunagest';
 import { IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 import { LabelPicker } from '../../shared/label-picker';
@@ -103,6 +104,7 @@ import { LabelPicker } from '../../shared/label-picker';
     CustomerRequests,
     DemandSummary,
     IssueTimeCard,
+    IssueLunagest,
     AiIssueSection,
   ],
   host: { class: 'flex min-h-full flex-col' },
@@ -506,6 +508,8 @@ import { LabelPicker } from '../../shared/label-picker';
           </section>
 
           <app-issue-time-card [issue]="i" />
+
+          <app-issue-lunagest [issueId]="i.id" />
 
           <section class="bg-card border-border rounded-lg border">
             <h3 class="text-muted-foreground px-3 pt-2.5 pb-1 text-xs font-medium">Details</h3>

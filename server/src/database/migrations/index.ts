@@ -36,6 +36,10 @@ import { Releases1793770000000 } from './1793770000000-Releases.js';
 import { ProjectIssueKeys1793780000000 } from './1793780000000-ProjectIssueKeys.js';
 import { CustomerRequestPageIndex1793781000000 } from './1793781000000-CustomerRequestPageIndex.js';
 import { UniqueActiveImport1793790000000 } from './1793790000000-UniqueActiveImport.js';
+import { LunaGest1793800000000 } from './1793800000000-LunaGest.js';
+import { LunaGestIssueLinks1793810000000 } from './1793810000000-LunaGestIssueLinks.js';
+import { LunaGestSyncBaseline1793820000000 } from './1793820000000-LunaGestSyncBaseline.js';
+import { TimeEntries1793830000000 } from './1793830000000-TimeEntries.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -77,4 +81,8 @@ export const MIGRATIONS = [
   ProjectIssueKeys1793780000000,
   CustomerRequestPageIndex1793781000000,
   UniqueActiveImport1793790000000,
+  LunaGest1793800000000,
+  LunaGestIssueLinks1793810000000,
+  LunaGestSyncBaseline1793820000000,
+  TimeEntries1793830000000,
 ];

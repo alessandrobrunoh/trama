@@ -201,6 +201,11 @@ export const routes: Routes = [
           import('./features/decisions/decision-detail-page').then((m) => m.DecisionDetailPage),
       },
       {
+        path: 'timer',
+        title: 'Timer · Trama',
+        loadComponent: () => import('./features/timer/timer-page').then((m) => m.TimerPage),
+      },
+      {
         path: 'projects',
         title: 'Projects · Trama',
         loadComponent: () =>

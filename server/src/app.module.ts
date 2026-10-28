@@ -16,6 +16,7 @@ import { FavoritesModule } from './favorites/favorites.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PublicConfigController } from './public-config.controller.js';
 import { ImportersModule } from './importers/importers.module.js';
+import { LunagestModule } from './lunagest/lunagest.module.js';
 import { InputRequestsModule } from './input-requests/input-requests.module.js';
 import { InsightsModule } from './insights/insights.module.js';
 import { InvitesModule } from './invites/invites.module.js';
@@ -31,6 +32,7 @@ import { RepositoriesModule } from './repositories/repositories.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
 import { TeamsModule } from './teams/teams.module.js';
+import { TimeEntriesModule } from './time-entries/time-entries.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
 import { ViewsModule } from './views/views.module.js';
 import { OutgoingWebhooksModule } from './outgoing-webhooks/outgoing-webhooks.module.js';
@@ -49,6 +51,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     FavoritesModule,
     NotificationsModule,
     TeamsModule,
+    TimeEntriesModule,
     RepositoriesModule,
     ProjectsModule,
     ProjectUpdatesModule,
@@ -71,6 +74,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     SnapshotModule,
     IntegrationsModule,
     ImportersModule,
+    LunagestModule,
     WebhooksModule,
     OutgoingWebhooksModule,
   ],

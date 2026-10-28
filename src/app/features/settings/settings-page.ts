@@ -9,6 +9,7 @@ import {
   LucideBell,
   LucideDownload,
   LucideKeyboard,
+  LucideMoon,
   LucideShieldCheck,
   LucidePlug,
   LucideSlidersHorizontal,
@@ -29,6 +30,7 @@ import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { CustomerRequestsSection } from './sections/customer-requests-section';
 import { ImportSection } from './sections/import-section';
+import { LunagestSection } from './sections/lunagest-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { LabelsSection } from './sections/labels-section';
 import { StatusesSection } from './sections/statuses-section';
@@ -77,6 +79,7 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
       { id: 'customer-requests', label: 'Customer requests', icon: LucideInbox },
       { id: 'import', label: 'Import', icon: LucideDownload },
+      { id: 'lunagest', label: 'LunaGest', icon: LucideMoon },
     ],
   },
 ];
@@ -113,6 +116,7 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     StatusesSection,
     CustomerRequestsSection,
     ImportSection,
+    LunagestSection,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -191,6 +195,9 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             }
             @case ('import') {
               <app-import-section />
+            }
+            @case ('lunagest') {
+              <app-lunagest-section />
             }
             @default {
               <app-empty-state [icon]="warn" title="Unknown settings section" description="Pick a section from the list on the left." />

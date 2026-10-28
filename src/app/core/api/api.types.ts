@@ -735,3 +735,102 @@ export interface CreateImportCredentialInput {
   /** GitHub Enterprise only. */
   baseUrl?: string;
 }
+
+// ───── LunaGest ─────
+export interface LunaGestConnectionConfigured {
+  configured: true;
+  id: ID;
+  baseUrl: string;
+  account: string;
+  updatedAt: ISODate;
+}
+export interface LunaGestConnectionUnconfigured {
+  configured: false;
+}
+export type LunaGestConnection = LunaGestConnectionConfigured | LunaGestConnectionUnconfigured;
+export interface SaveLunaGestConnectionInput {
+  username: string;
+  password: string;
+  apiKey: string;
+  /** Omit to keep the server default (https://panel.lunagest.com). */
+  baseUrl?: string;
+}
+export interface LunaGestRemoteProject {
+  id: ID;
+  name: string;
+}
+/** `GET /lunagest/remote-projects`. A bare array is also accepted. */
+export interface LunaGestRemoteProjects {
+  projects: LunaGestRemoteProject[];
+}
+export interface LunaGestProjectUnlinked {
+  state: 'unlinked';
+}
+export interface LunaGestProjectLinked {
+  state: 'linked';
+  remoteProjectId: ID;
+  remoteProjectName: string;
+  updatedAt: ISODate;
+}
+export type LunaGestProjectLink = LunaGestProjectUnlinked | LunaGestProjectLinked;
+export interface LinkLunaGestProjectInput {
+  remoteProjectId: string;
+}
+export interface LunaGestIssueNotApplicable {
+  applicable: false;
+}
+export interface LunaGestIssueApplicable {
+  applicable: true;
+  state: 'linked' | 'local_only' | 'push_failed';
+  remoteTaskId: ID | null;
+  lastError: string | null;
+  updatedAt: ISODate | null;
+}
+export type LunaGestIssueLink = LunaGestIssueNotApplicable | LunaGestIssueApplicable;
+export interface LunaGestRemoteTask {
+  id: ID;
+  title: string;
+}
+export interface LinkLunaGestTaskInput {
+  remoteTaskId: string;
+}
+export interface LunaGestRealignChoice {
+  issueId: ID;
+  field: 'title' | 'description';
+  take: 'local' | 'remote';
+}
+export interface LunaGestRealignConflict {
+  issueId: ID;
+  issueKey: string;
+  field: 'title' | 'description';
+  local: string;
+  remote: string;
+}
+export interface LunaGestRealignResult {
+  pulled: { issueId: ID; field: 'title' | 'description' }[];
+  pushed: { issueId: ID; field: 'title' | 'description' }[];
+  conflicts: LunaGestRealignConflict[];
+  skipped: { issueId?: ID; remoteTaskId?: string; reason: string }[];
+}
+
+export interface TimeEntry {
+  id: ID;
+  workspaceId: ID;
+  userId: ID;
+  projectId: ID | null;
+  issueId: ID | null;
+  description: string;
+  startedAt: ISODate;
+  endedAt: ISODate | null;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+export interface TimeEntryTarget {
+  description?: string;
+  projectId?: ID | null;
+  issueId?: ID | null;
+}
+export interface ManualTimeEntryInput extends TimeEntryTarget {
+  startedAt: ISODate;
+  endedAt: ISODate;
+}

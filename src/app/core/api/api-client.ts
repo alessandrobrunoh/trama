@@ -151,6 +151,22 @@ import type {
   RoleInput,
   UpdateRoleInput,
   WebhookWithSecret,
+  LinkLunaGestProjectInput,
+  LinkLunaGestTaskInput,
+  LunaGestConnection,
+  LunaGestIssueLink,
+  LunaGestRemoteTask,
+  LunaGestConnectionConfigured,
+  LunaGestProjectLink,
+  LunaGestProjectLinked,
+  LunaGestRealignChoice,
+  LunaGestRealignResult,
+  LunaGestRemoteProject,
+  LunaGestRemoteProjects,
+  SaveLunaGestConnectionInput,
+  ManualTimeEntryInput,
+  TimeEntry,
+  TimeEntryTarget,
 } from './api.types';
 
 export interface RequestOptions {
@@ -238,6 +254,8 @@ export class ApiClient {
   };
   private patch = <T>(path: string, body: unknown, o?: RequestOptions) =>
     this.request<T>('PATCH', path, { body, quiet: o?.quiet });
+  private put = <T>(path: string, body?: unknown, o?: RequestOptions) =>
+    this.request<T>('PUT', path, { body: body ?? {}, quiet: o?.quiet });
   private del = <T = void>(path: string, o?: RequestOptions & { body?: unknown }) =>
     this.request<T>('DELETE', path, { quiet: o?.quiet, body: o?.body });
 
@@ -859,6 +877,70 @@ export class ApiClient {
     cancel: (slug: string, id: ID) => this.post<ImportJob>(`${this.w(slug)}/imports/${id}/cancel`),
     retry: (slug: string, id: ID) => this.post<ImportJob>(`${this.w(slug)}/imports/${id}/retry`),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/imports/${id}`),
+  };
+
+  /** Workspace LunaGest connection and per-project links. Secrets are write-only. */
+  readonly lunagest = {
+    connection: (slug: string, o?: RequestOptions) =>
+      this.get<LunaGestConnection>(`${this.w(slug)}/lunagest/connection`, undefined, o),
+    saveConnection: (slug: string, input: SaveLunaGestConnectionInput, o?: RequestOptions) =>
+      this.put<LunaGestConnectionConfigured>(`${this.w(slug)}/lunagest/connection`, input, o),
+    removeConnection: (slug: string, o?: RequestOptions) =>
+      this.del(`${this.w(slug)}/lunagest/connection`, o),
+    /** Accepts `{ projects }` or a bare array. */
+    remoteProjects: async (slug: string, o?: RequestOptions): Promise<LunaGestRemoteProject[]> => {
+      const res = await this.get<LunaGestRemoteProjects | LunaGestRemoteProject[]>(
+        `${this.w(slug)}/lunagest/remote-projects`,
+        undefined,
+        o,
+      );
+      return Array.isArray(res) ? res : (res.projects ?? []);
+    },
+    project: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.get<LunaGestProjectLink>(`${this.w(slug)}/projects/${projectId}/lunagest`, undefined, o),
+    linkProject: (
+      slug: string,
+      projectId: ID,
+      input: LinkLunaGestProjectInput,
+      o?: RequestOptions,
+    ) =>
+      this.put<LunaGestProjectLinked>(`${this.w(slug)}/projects/${projectId}/lunagest`, input, o),
+    unlinkProject: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.del(`${this.w(slug)}/projects/${projectId}/lunagest`, o),
+    realign: (slug: string, projectId: ID, choices: LunaGestRealignChoice[] = [], o?: RequestOptions) =>
+      this.post<LunaGestRealignResult>(
+        `${this.w(slug)}/projects/${projectId}/lunagest/realign`,
+        { choices },
+        o,
+      ),
+    issue: (slug: string, idOrKey: string, o?: RequestOptions) =>
+      this.get<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest`, undefined, o),
+    remoteTasks: async (slug: string, idOrKey: string, o?: RequestOptions) => {
+      const res = await this.get<{ tasks: LunaGestRemoteTask[] }>(
+        `${this.w(slug)}/issues/${idOrKey}/lunagest/remote-tasks`,
+        undefined,
+        o,
+      );
+      return res.tasks ?? [];
+    },
+    pushIssue: (slug: string, idOrKey: string, o?: RequestOptions) =>
+      this.post<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest/push`, {}, o),
+    linkIssue: (slug: string, idOrKey: string, input: LinkLunaGestTaskInput, o?: RequestOptions) =>
+      this.put<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest`, input, o),
+  };
+
+  /** The signed-in person's timer. Not sent to LunaGest. */
+  readonly timeEntries = {
+    list: (slug: string, o?: RequestOptions) =>
+      this.get<TimeEntry[]>(`${this.w(slug)}/time-entries`, undefined, o),
+    start: (slug: string, input: TimeEntryTarget = {}, o?: RequestOptions) =>
+      this.post<TimeEntry>(`${this.w(slug)}/time-entries/start`, input, o),
+    stop: (slug: string, o?: RequestOptions) =>
+      this.post<TimeEntry>(`${this.w(slug)}/time-entries/stop`, {}, o),
+    add: (slug: string, input: ManualTimeEntryInput, o?: RequestOptions) =>
+      this.post<TimeEntry>(`${this.w(slug)}/time-entries`, input, o),
+    remove: (slug: string, id: ID, o?: RequestOptions) =>
+      this.del(`${this.w(slug)}/time-entries/${id}`, o),
   };
 
   /** URL of the workspace SSE stream (for EventSource). */

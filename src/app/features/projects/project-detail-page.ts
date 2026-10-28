@@ -61,6 +61,7 @@ import { DemandSummary } from '../customers/demand-summary';
 import { ProjectDocumentsTab } from '../documents/project-documents-tab';
 import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
+import { ProjectLunagest } from './project-lunagest';
 import { ProjectHealthBadge } from './project-health';
 import { canPostUpdate, isOverdue, isUpdateOverdue, projectStatusOptions } from './project-model';
 import { ProjectStatsTab } from './project-stats-tab';
@@ -116,6 +117,7 @@ const ACTIVITY_CAP = 20;
     ProjectContextTab,
     ProjectDocumentsTab,
     ProjectGlyphPicker,
+    ProjectLunagest,
     ProjectHealthBadge,
     ProjectStatsTab,
     ProjectUpdatesTab,
@@ -361,6 +363,8 @@ const ACTIVITY_CAP = 20;
                   (save)="update({ description: $event.trim() || null })"
                 />
               </section>
+
+              <app-project-lunagest [projectId]="p.id" [canManage]="canManage()" />
 
               @if (canManage()) {
                 <app-project-risks-card [project]="p" />
