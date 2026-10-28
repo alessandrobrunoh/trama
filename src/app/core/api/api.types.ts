@@ -751,7 +751,8 @@ export type LunaGestConnection = LunaGestConnectionConfigured | LunaGestConnecti
 export interface SaveLunaGestConnectionInput {
   username: string;
   password: string;
-  apiKey: string;
+  /** Omit to use the panel's public anon key. */
+  apiKey?: string;
   /** Omit to keep the server default (https://panel.lunagest.com). */
   baseUrl?: string;
 }

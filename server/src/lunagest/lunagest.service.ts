@@ -21,6 +21,7 @@ import {
   type SyncTake,
 } from './lunagest-realign.js';
 import {
+  LUNAGEST_ANON_KEY,
   LunaGestClient,
   normalizeLunaGestBaseUrl,
   type LunaGestCredentials,
@@ -127,18 +128,16 @@ export class LunagestService {
     input: {
       username: string;
       password: string;
-      apiKey: string;
+      apiKey?: string;
       baseUrl?: string;
     },
   ): Promise<LunaGestConnectionView> {
     const baseUrl = await normalizeLunaGestBaseUrl(input.baseUrl);
     const username = input.username.trim();
     const password = input.password;
-    const apiKey = input.apiKey.trim();
-    if (!username || !password || !apiKey) {
-      throw new BadRequestException(
-        'username, password, and apiKey are required',
-      );
+    const apiKey = input.apiKey?.trim() || LUNAGEST_ANON_KEY;
+    if (!username || !password) {
+      throw new BadRequestException('username and password are required');
     }
     const creds: LunaGestCredentials = { username, password, apiKey };
     await this.client.login(baseUrl, creds);
