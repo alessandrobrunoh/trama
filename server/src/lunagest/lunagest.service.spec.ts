@@ -223,10 +223,17 @@ describe('LunaGest connection', () => {
     expect(s.connections[0].secret).not.toContain(PASSWORD);
     expect(s.connections[0].secret).not.toContain(API_KEY);
     expect(JSON.stringify(await s.service.getConnection('ws_1'))).toBe(json);
-    expect(http.calls[0].body).toEqual({ email: USER, password: PASSWORD });
+    expect(http.calls[0].body).toEqual({
+      email: USER,
+      password: PASSWORD,
+      gotrue_meta_security: {},
+    });
     expect(http.calls[0].headers).toMatchObject({
       apikey: API_KEY,
+      Authorization: `Bearer ${API_KEY}`,
       'content-type': 'application/json',
+      'x-client-info': 'supabase-js-web/2.103.3',
+      'x-supabase-api-version': '2024-01-01',
     });
     expect(http.calls[0].url).not.toContain(PASSWORD);
     expect(http.calls[0].url).not.toContain(API_KEY);

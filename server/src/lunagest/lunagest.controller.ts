@@ -30,7 +30,7 @@ import { LunagestService } from './lunagest.service.js';
 class SaveLunaGestConnectionDto {
   @IsString() @MinLength(1) @MaxLength(320) username: string;
   @IsString() @MinLength(1) @MaxLength(2000) password: string;
-  @IsString() @MinLength(1) @MaxLength(2000) apiKey: string;
+  @IsOptional() @IsString() @MaxLength(2000) apiKey?: string;
   @IsOptional() @IsString() @MaxLength(500) baseUrl?: string;
 }
 

@@ -3,6 +3,20 @@ import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { HttpClient, type HttpResponse } from '../integrations/http-client.js';
 
 export const LUNAGEST_DEFAULT_BASE_URL = 'https://panel.lunagest.com';
+/** Public Supabase anon key. Sent as `apikey` and as the Bearer token on login. Not a user password. */
+export const LUNAGEST_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzc2OTUyMzE3LCJleHAiOjE5MzQ2MzIzMTd9.2W7ryk4ynSYN0QpifBP0pfAKxlfS1144-xq2U9yuVnY';
+
+function panelHeaders(apiKey: string, bearer = apiKey): Record<string, string> {
+  return {
+    apikey: apiKey,
+    Authorization: `Bearer ${bearer}`,
+    'content-type': 'application/json',
+    'x-client-info': 'supabase-js-web/2.103.3',
+    'x-supabase-api-version': '2024-01-01',
+  };
+}
+
 const BAD_BASE_URL = 'baseUrl must be an https origin';
 const LOGIN_REJECTED = 'LunaGest rejected the login';
 const PROJECTS_UNAVAILABLE = 'LunaGest did not return projects';
@@ -137,8 +151,12 @@ export class LunaGestClient {
       res = await this.http.request({
         method: 'POST',
         url: `${baseUrl}/auth/v1/token?grant_type=password`,
-        headers: { apikey: creds.apiKey, 'content-type': 'application/json' },
-        body: { email: creds.username, password: creds.password },
+        headers: panelHeaders(creds.apiKey),
+        body: {
+          email: creds.username,
+          password: creds.password,
+          gotrue_meta_security: {},
+        },
       });
     } catch {
       throw new BadRequestException(LOGIN_REJECTED);
@@ -174,7 +192,7 @@ export class LunaGestClient {
       return await this.http.request({
         method: 'GET',
         url: `${baseUrl}/functions/v1/pm?resource=projects`,
-        headers: { apikey: apiKey, Authorization: `Bearer ${token}` },
+        headers: panelHeaders(apiKey, token),
       });
     } catch {
       throw new BadRequestException(PROJECTS_UNAVAILABLE);
@@ -191,7 +209,7 @@ export class LunaGestClient {
       this.http.request({
         method: 'GET',
         url: `${baseUrl}/functions/v1/pm?resource=tasks&project_id=${encodeURIComponent(remoteProjectId)}`,
-        headers: { apikey: creds.apiKey, Authorization: `Bearer ${token}` },
+        headers: panelHeaders(creds.apiKey, token),
       }),
     );
     if (!res || res.status < 200 || res.status >= 300)
@@ -246,7 +264,7 @@ export class LunaGestClient {
         this.http.request({
           method: req.method,
           url: req.url,
-          headers: { apikey: creds.apiKey, Authorization: `Bearer ${token}` },
+          headers: panelHeaders(creds.apiKey, token),
           body: req.body,
         }),
       );

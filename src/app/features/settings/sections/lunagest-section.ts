@@ -19,8 +19,8 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { SECTION_KIT } from './section-kit';
 
 /**
- * Settings → LunaGest: one workspace connection (base URL, username, password, API key).
- * Projects opt in separately. The password and API key are write-only and cleared after a successful save.
+ * Settings → LunaGest: one workspace connection (base URL, username, password).
+ * Projects opt in separately. The password is write-only and cleared after a successful save.
  */
 @Component({
   selector: 'app-lunagest-section',
@@ -62,7 +62,7 @@ import { SECTION_KIT } from './section-kit';
         <form (submit)="save($event)">
           <app-settings-group
             title="Credentials"
-            description="Stored on the server. The password and API key are not shown again."
+            description="Stored on the server. The password is not shown again."
           >
             <app-settings-row label="Base URL" description="Leave empty to use the default." wide>
               <input
@@ -96,18 +96,6 @@ import { SECTION_KIT } from './section-kit';
                 aria-label="Password"
                 [value]="password()"
                 (input)="password.set($any($event.target).value)"
-              />
-            </app-settings-row>
-            <app-settings-row label="API key" wide>
-              <input
-                hlmInput
-                class="h-8 w-full font-mono text-xs"
-                type="password"
-                autocomplete="off"
-                spellcheck="false"
-                aria-label="API key"
-                [value]="apiKey()"
-                (input)="apiKey.set($any($event.target).value)"
               />
             </app-settings-row>
             <div class="flex items-center justify-end gap-2 px-4 py-3">
@@ -144,13 +132,8 @@ export class LunagestSection {
   protected readonly baseUrl = signal('');
   protected readonly username = signal('');
   protected readonly password = signal('');
-  protected readonly apiKey = signal('');
   protected readonly canSave = computed(
-    () =>
-      !this.busy() &&
-      this.username().trim().length > 0 &&
-      this.password().trim().length > 0 &&
-      this.apiKey().trim().length > 0,
+    () => !this.busy() && this.username().trim().length > 0 && this.password().trim().length > 0,
   );
 
   constructor() {
@@ -187,7 +170,6 @@ export class LunagestSection {
     const input: SaveLunaGestConnectionInput = {
       username: this.username().trim(),
       password: this.password(),
-      apiKey: this.apiKey(),
     };
     const baseUrl = this.baseUrl().trim();
     if (baseUrl) input.baseUrl = baseUrl;
@@ -198,7 +180,6 @@ export class LunagestSection {
       this.connection.set(saved);
       this.baseUrl.set(saved.baseUrl);
       this.password.set('');
-      this.apiKey.set('');
     } catch (e) {
       this.error.set(ApiError.from(e).message);
     } finally {
@@ -216,7 +197,6 @@ export class LunagestSection {
       this.connection.set(null);
       this.username.set('');
       this.password.set('');
-      this.apiKey.set('');
       this.baseUrl.set('');
     } catch (e) {
       this.error.set(ApiError.from(e).message);
