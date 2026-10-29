@@ -3,6 +3,8 @@ import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { describe, expect, it, vi } from 'vitest';
+import { memberAccessStore } from '../auth/member-access.js';
+import type { MemberAccess } from '../contracts/domain.js';
 import type { IssueEntity } from '../database/entities/index.js';
 import {
   BULK_ISSUES_MAX,
@@ -93,16 +95,57 @@ function makeService(opts: { failSave?: boolean } = {}) {
     projects: vi.fn(async () => undefined),
   };
   const labels = { assign: vi.fn(async (_w: string, ids?: string[]) => ids) };
-  const repo = { findOneBy: vi.fn(async ({ id }: { id: string }) => byId.get(id) ?? null) };
+  const qb = {
+    where: vi.fn(() => qb),
+    andWhere: vi.fn((_sql: string, extra?: Record<string, unknown>) => {
+      Object.assign(qb.params, extra);
+      return qb;
+    }),
+    getMany: vi.fn(async () => {
+      const ids = (qb.params.ids as string[] | undefined) ?? [];
+      const keys = (qb.params.keys as string[] | undefined) ?? [];
+      return [...byId.values()].filter(
+        (row) =>
+          ids.includes(row.id) ||
+          keys.includes(row.key) ||
+          keys.some((key) => row.aliases.includes(key)),
+      );
+    }),
+    params: {} as Record<string, unknown>,
+  };
+  const repo = {
+    findOneBy: vi.fn(async ({ id }: { id: string }) => byId.get(id) ?? null),
+    createQueryBuilder: vi.fn(() => {
+      qb.params = {};
+      return qb;
+    }),
+  };
+  const workspaceFind = vi.fn(async () => null);
   const service = new IssuesService(
-    { transaction } as never,
+    {
+      transaction,
+      getRepository: () => ({ findOneBy: workspaceFind, findBy: vi.fn(async () => []) }),
+    } as never,
     refs as never,
     {} as never,
     { record } as never,
     labels as never,
     repo as never,
   );
-  return { service, byId, save, query, update, del, transaction, record, refs, labels };
+  return {
+    service,
+    byId,
+    save,
+    query,
+    update,
+    del,
+    transaction,
+    record,
+    refs,
+    labels,
+    repo,
+    workspaceFind,
+  };
 }
 
 const eventTypes = (record: ReturnType<typeof vi.fn>) =>
@@ -124,6 +167,31 @@ describe('IssuesService.getMany', () => {
     expect(err).toBeInstanceOf(NotFoundException);
     expect((err as Error).message).toContain('in_x, in_y');
   });
+
+  it('resolves ids, keys, and aliases in one query and hides projects', async () => {
+    const { service, byId, repo } = makeService();
+    byId.set('in_a', issue('in_a', { key: 'AUTH-1', aliases: ['OLD-1'], projectId: 'pj_ok' }));
+    byId.set('in_b', issue('in_b', { key: 'AUTH-2', projectId: 'pj_ok' }));
+    byId.set('in_h', issue('in_h', { key: 'AUTH-3', projectId: 'pj_hidden' }));
+    const access: MemberAccess = {
+      projects: { all: false, projectIds: ['pj_ok'] },
+      includeUnassigned: true,
+      grants: [],
+    };
+    const rows = await memberAccessStore.run(access, () =>
+      service.getMany('ws_1', ['auth-2', 'OLD-1', 'in_a', 'AUTH-3', 'auth-2']),
+    ).catch((e: unknown) => e);
+    expect(rows).toBeInstanceOf(NotFoundException);
+    expect((rows as Error).message).toContain('AUTH-3');
+    expect(repo.createQueryBuilder).toHaveBeenCalledTimes(1);
+    expect(repo.findOneBy).not.toHaveBeenCalled();
+
+    const ok = await memberAccessStore.run(access, () =>
+      service.getMany('ws_1', ['auth-2', 'OLD-1', 'in_a', 'auth-2']),
+    );
+    expect(ok.map((r) => r.id)).toEqual(['in_b', 'in_a']);
+    expect(repo.createQueryBuilder).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe('IssuesService.updateMany', () => {
@@ -136,7 +204,7 @@ describe('IssuesService.updateMany', () => {
   });
 
   it('applies status and priority to every issue in a single transaction', async () => {
-    const { service, transaction, save, record } = makeService();
+    const { service, transaction, save, record, workspaceFind } = makeService();
     const rows = [issue('in_a'), issue('in_b')];
     const out = await service.updateMany('ws_1', actor, rows, {
       status: 'in_review',
@@ -152,6 +220,7 @@ describe('IssuesService.updateMany', () => {
     // events follow the commit, one set per issue
     expect(eventTypes(record).filter((t) => t === 'issue.status_changed')).toHaveLength(2);
     expect(eventTypes(record).filter((t) => t === 'issue.updated')).toHaveLength(2);
+    expect(workspaceFind).toHaveBeenCalledTimes(1);
   });
 
   it('validates references once per batch, not once per issue', async () => {

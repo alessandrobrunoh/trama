@@ -4,7 +4,7 @@ import {
   Injectable,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, type Repository } from 'typeorm';
+import { DataSource, In, type EntityManager, type Repository } from 'typeorm';
 import { currentAccess, projectHidden } from '../auth/member-access.js';
 import { currentUploadCaller } from '../auth/upload-caller.js';
 import type { ActorRef } from '../contracts/domain.js';
@@ -31,6 +31,47 @@ import {
 } from './upload-rules.js';
 
 const ISSUE_KEY = /^[A-Za-z]+-\d+$/;
+const UPLOAD_TOKEN = `'/uploads/(upl_[a-z0-9]{10,24})'`;
+
+/** Text scans used only by `reconcileUploadReferences`, never by GET. */
+const SCAN_INSERTS = [
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT DISTINCT m.match[1], 'issue', i."id", i."projectId"
+   FROM "issues" i
+   CROSS JOIN LATERAL regexp_matches(coalesce(i."body", ''), ${UPLOAD_TOKEN}, 'g') AS m(match)
+   WHERE i."workspaceId" = $1
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT DISTINCT m.match[1], 'project', p."id", p."id"
+   FROM "projects" p
+   CROSS JOIN LATERAL regexp_matches(coalesce(p."description", ''), ${UPLOAD_TOKEN}, 'g') AS m(match)
+   WHERE p."workspaceId" = $1
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT DISTINCT m.match[1], 'document', d."id", NULL
+   FROM "documents" d
+   CROSS JOIN LATERAL regexp_matches(d."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
+   WHERE d."workspaceId" = $1
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT DISTINCT m.match[1], 'document_revision', r."id", NULL
+   FROM "document_revisions" r
+   CROSS JOIN LATERAL regexp_matches(r."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
+   WHERE r."workspaceId" = $1
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT DISTINCT m.match[1], 'comment', c."id", NULL
+   FROM "comments" c
+   CROSS JOIN LATERAL regexp_matches(c."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
+   WHERE c."workspaceId" = $1
+   ON CONFLICT DO NOTHING`,
+  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
+   SELECT a."uploadId", 'artifact', a."id", COALESCE(a."projectId", i."projectId")
+   FROM "artifacts" a
+   LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
+   WHERE a."workspaceId" = $1 AND a."uploadId" IS NOT NULL
+   ON CONFLICT DO NOTHING`,
+];
 
 export interface IncomingUpload {
   buffer: Buffer;
@@ -47,6 +88,28 @@ export interface StagedUpload {
   kind: 'image' | 'file';
   url: string;
   markdown: string;
+}
+
+export type UploadSubjectType =
+  | 'issue'
+  | 'project'
+  | 'document'
+  | 'document_revision'
+  | 'comment'
+  | 'artifact';
+
+/** A record whose text or upload column keeps a file alive. */
+export interface UploadSubject {
+  type: UploadSubjectType;
+  id: string;
+  projectId?: string | null;
+}
+
+interface StoredMention {
+  uploadId: string;
+  subjectType: string;
+  subjectId: string;
+  projectId: string | null;
 }
 
 /**
@@ -141,6 +204,7 @@ export class UploadsService {
         }),
       );
     });
+    await this.linkArtifact(workspaceId, artifact.id, id, resolved.projectId);
     await this.events.record({
       workspaceId,
       actor: caller.actor,
@@ -212,27 +276,108 @@ export class UploadsService {
     workspaceId: string,
     text: string | null | undefined,
   ): Promise<void> {
+    const ids = [...new Set(uploadIdsIn(text))];
+    if (!ids.length) return;
     const caller = currentUploadCaller();
-    for (const id of uploadIdsIn(text)) {
-      if (!(await this.readable(workspaceId, caller, id))) {
+    const rows = await this.uploads.find({
+      where: { workspaceId, id: In(ids) },
+      select: { id: true, createdBy: true, referenced: true },
+    });
+    const byId = new Map(rows.map((row) => [row.id, row]));
+    const refs = await this.referencesFor(workspaceId, ids);
+    for (const id of ids) {
+      const row = byId.get(id);
+      const list = refs.get(id) ?? [];
+      const ok =
+        !!row &&
+        !!caller &&
+        (list.some((ref) =>
+          uploadVisible(ref, currentAccess(), caller.permissions),
+        ) ||
+          (list.length === 0 &&
+            !row.referenced &&
+            sameActor(row.createdBy, caller.actor)));
+      if (!ok)
         throw new BadRequestException(
           'That file is not available to attach here',
         );
-      }
     }
   }
 
-  /** After the text is saved: keep the files it still mentions and delete the ones it dropped. */
+  /**
+   * After the text is saved: keep the files it still mentions and delete the ones it dropped.
+   * `subject` is the record that owns this text. Without it, only the `referenced` flag moves.
+   */
   async retained(
     workspaceId: string,
     before: string | null | undefined,
     after: string | null | undefined,
+    subject?: UploadSubject,
   ): Promise<void> {
     const next = new Set(uploadIdsIn(after));
-    for (const id of next)
-      await this.uploads.update({ workspaceId, id }, { referenced: true });
-    const dropped = uploadIdsIn(before).filter((id) => !next.has(id));
+    if (!subject) {
+      if (next.size)
+        await this.uploads.update(
+          { workspaceId, id: In([...next]) },
+          { referenced: true },
+        );
+      const dropped = uploadIdsIn(before).filter((id) => !next.has(id));
+      await this.releaseIds(workspaceId, dropped);
+      return;
+    }
+    const existing = await this.subjectUploadIds(workspaceId, subject);
+    await this.replaceSubject(workspaceId, subject, [...next]);
+    if (next.size)
+      await this.uploads.update(
+        { workspaceId, id: In([...next]) },
+        { referenced: true },
+      );
+    const dropped = existing.filter((id) => !next.has(id));
     await this.releaseIds(workspaceId, dropped);
+  }
+
+  /** Record that an artifact row is what keeps this file alive. */
+  async linkArtifact(
+    workspaceId: string,
+    artifactId: string,
+    uploadId: string,
+    projectId: string | null,
+    manager?: EntityManager,
+  ): Promise<void> {
+    const query = manager?.query.bind(manager) ?? this.ds.query.bind(this.ds);
+    await query(
+      `INSERT INTO "upload_references"
+         ("workspaceId", "uploadId", "subjectType", "subjectId", "projectId")
+       VALUES ($1, $2, 'artifact', $3, $4)
+       ON CONFLICT ("workspaceId", "uploadId", "subjectType", "subjectId")
+       DO UPDATE SET "projectId" = EXCLUDED."projectId"`,
+      [workspaceId, uploadId, artifactId, projectId],
+    );
+    await this.uploads.update(
+      { workspaceId, id: uploadId },
+      { referenced: true },
+    );
+  }
+
+  /** Drop mention rows for records that were just deleted, then release files nothing else names. */
+  async forgetSubjects(
+    workspaceId: string,
+    subjects: readonly UploadSubject[],
+  ): Promise<void> {
+    if (!subjects.length) return;
+    const removed = await this.ds.query<{ uploadId: string }[]>(
+      `DELETE FROM "upload_references"
+       WHERE "workspaceId" = $1
+         AND ("subjectType", "subjectId") IN (
+           SELECT * FROM unnest($2::varchar[], $3::varchar[])
+         )
+       RETURNING "uploadId"`,
+      [workspaceId, subjects.map((s) => s.type), subjects.map((s) => s.id)],
+    );
+    await this.releaseIds(
+      workspaceId,
+      removed.map((row) => row.uploadId),
+    );
   }
 
   /**
@@ -295,35 +440,73 @@ export class UploadsService {
   }
 
   async releaseIds(workspaceId: string, ids: readonly string[]): Promise<void> {
-    for (const id of new Set(ids)) {
-      if (!isUploadId(id)) continue;
-      if ((await this.references(workspaceId, id)).length === 0)
-        await this.uploads.delete({ workspaceId, id });
-    }
+    const unique = [...new Set(ids)].filter((id) => isUploadId(id));
+    if (!unique.length) return;
+    const refs = await this.referencesFor(workspaceId, unique);
+    const gone = unique.filter((id) => (refs.get(id) ?? []).length === 0);
+    if (gone.length) await this.uploads.delete({ workspaceId, id: In(gone) });
   }
 
-  private async readable(
-    workspaceId: string,
-    caller: UploadCaller | null,
-    id: string,
-  ): Promise<boolean> {
-    if (!caller || !isUploadId(id)) return false;
-    const row = await this.uploads.findOne({
-      where: { workspaceId, id },
-      select: { id: true, createdBy: true, referenced: true },
+  /**
+   * Rebuild mention rows for one workspace from the text and artifact columns the read path used to scan.
+   * Not called from GET. Inserts mentions a write missed and drops rows whose text is gone, then releases
+   * blobs that no longer have a mention. Staged drafts (never referenced) are left alone.
+   */
+  async reconcileUploadReferences(workspaceId: string): Promise<void> {
+    const removed = await this.ds.transaction(async (m) => {
+      await m.query(
+        `CREATE TEMP TABLE "upload_reference_scan" (
+           "uploadId" character varying NOT NULL,
+           "subjectType" character varying NOT NULL,
+           "subjectId" character varying NOT NULL,
+           "projectId" character varying,
+           PRIMARY KEY ("uploadId", "subjectType", "subjectId")
+         ) ON COMMIT DROP`,
+      );
+      for (const sql of SCAN_INSERTS) await m.query(sql, [workspaceId]);
+      await m.query(
+        `DELETE FROM "upload_reference_scan" s
+         WHERE NOT EXISTS (
+           SELECT 1 FROM "uploads" u
+           WHERE u."id" = s."uploadId" AND u."workspaceId" = $1
+         )`,
+        [workspaceId],
+      );
+      const dropped = await m.query<{ uploadId: string }[]>(
+        `DELETE FROM "upload_references" r
+         WHERE r."workspaceId" = $1
+           AND NOT EXISTS (
+             SELECT 1 FROM "upload_reference_scan" s
+             WHERE s."uploadId" = r."uploadId"
+               AND s."subjectType" = r."subjectType"
+               AND s."subjectId" = r."subjectId"
+           )
+         RETURNING r."uploadId"`,
+        [workspaceId],
+      );
+      await m.query(
+        `INSERT INTO "upload_references"
+           ("workspaceId", "uploadId", "subjectType", "subjectId", "projectId")
+         SELECT $1, s."uploadId", s."subjectType", s."subjectId", s."projectId"
+         FROM "upload_reference_scan" s
+         ON CONFLICT ("workspaceId", "uploadId", "subjectType", "subjectId")
+         DO UPDATE SET "projectId" = EXCLUDED."projectId"`,
+        [workspaceId],
+      );
+      await m.query(
+        `UPDATE "uploads" u SET "referenced" = true
+         WHERE u."workspaceId" = $1 AND u."referenced" = false
+           AND EXISTS (
+             SELECT 1 FROM "upload_references" r
+             WHERE r."workspaceId" = u."workspaceId" AND r."uploadId" = u."id"
+           )`,
+        [workspaceId],
+      );
+      return dropped ?? [];
     });
-    if (!row) return false;
-    const refs = await this.references(workspaceId, id);
-    if (
-      refs.some((ref) =>
-        uploadVisible(ref, currentAccess(), caller.permissions),
-      )
-    )
-      return true;
-    return (
-      refs.length === 0 &&
-      !row.referenced &&
-      sameActor(row.createdBy, caller.actor)
+    await this.releaseIds(
+      workspaceId,
+      removed.map((row) => row.uploadId),
     );
   }
 
@@ -408,119 +591,225 @@ export class UploadsService {
     };
   }
 
-  /** Every current mention of this file in the workspace. An empty list means the blob is unreferenced. */
+  /** Every current mention of this file. An empty list means the blob is unreferenced. */
   private async references(
     workspaceId: string,
     id: string,
   ): Promise<UploadRef[]> {
-    const token = `/uploads/${id}`;
-    const out: UploadRef[] = [];
-    const artifacts = await this.ds.query<{ projectId: string | null }[]>(
-      `SELECT COALESCE(a."projectId", i."projectId") AS "projectId"
-       FROM "artifacts" a
-       LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
-       WHERE a."workspaceId" = $1 AND a."uploadId" = $2`,
-      [workspaceId, id],
-    );
-    for (const row of artifacts)
-      out.push({
-        resource: 'artifacts',
-        projectScoped: true,
-        projectId: row.projectId,
-      });
+    const map = await this.referencesFor(workspaceId, [id]);
+    return map.get(id) ?? [];
+  }
 
-    const issues = await this.ds.query<{ projectId: string | null }[]>(
-      `SELECT "projectId" FROM "issues" WHERE "workspaceId" = $1 AND strpos(coalesce("body", ''), $2) > 0`,
-      [workspaceId, token],
+  /** Live visibility for many uploads. Dead subjects are ignored, matching a scan of rows that still exist. */
+  private async referencesFor(
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, UploadRef[]>> {
+    const out = new Map<string, UploadRef[]>();
+    if (!ids.length) return out;
+    const rows = await this.ds.query<StoredMention[]>(
+      `SELECT "uploadId", "subjectType", "subjectId", "projectId"
+       FROM "upload_references"
+       WHERE "workspaceId" = $1 AND "uploadId" = ANY($2::varchar[])`,
+      [workspaceId, [...ids]],
     );
-    for (const row of issues)
-      out.push({
-        resource: 'issues',
-        projectScoped: true,
-        projectId: row.projectId,
-      });
-
-    const projects = await this.ds.query<{ id: string }[]>(
-      `SELECT "id" FROM "projects" WHERE "workspaceId" = $1 AND strpos(coalesce("description", ''), $2) > 0`,
-      [workspaceId, token],
-    );
-    for (const row of projects)
-      out.push({
-        resource: 'projects',
-        projectScoped: true,
-        projectId: row.id,
-      });
-
-    // A file in a document stays readable while the current body or any kept revision mentions it.
-    const docs = await this.ds.query<{ hit: boolean }[]>(
-      `SELECT EXISTS (
-         SELECT 1 FROM "documents" WHERE "workspaceId" = $1 AND strpos("body", $2) > 0
-       ) OR EXISTS (
-         SELECT 1 FROM "document_revisions" WHERE "workspaceId" = $1 AND strpos("body", $2) > 0
-       ) AS "hit"`,
-      [workspaceId, token],
-    );
-    if (docs[0]?.hit)
-      out.push({
-        resource: 'documents',
-        projectScoped: false,
-        projectId: null,
-      });
-
-    const comments = await this.ds.query<{ type: string; id: string }[]>(
-      `SELECT "subject"->>'type' AS "type", "subject"->>'id' AS "id"
-       FROM "comments" WHERE "workspaceId" = $1 AND strpos("body", $2) > 0`,
-      [workspaceId, token],
-    );
-    if (comments.length) await this.pushCommentRefs(workspaceId, comments, out);
+    if (!rows.length) return out;
+    const idsOf = (type: string) => [
+      ...new Set(
+        rows
+          .filter((row) => row.subjectType === type)
+          .map((row) => row.subjectId),
+      ),
+    ];
+    const [issues, projects, documents, revisions, comments, artifacts] =
+      await Promise.all([
+        this.projectById('issues', workspaceId, idsOf('issue')),
+        this.existingIds('projects', workspaceId, idsOf('project')),
+        this.existingIds('documents', workspaceId, idsOf('document')),
+        this.existingIds(
+          'document_revisions',
+          workspaceId,
+          idsOf('document_revision'),
+        ),
+        this.commentSubjects(workspaceId, idsOf('comment')),
+        this.artifactProjects(workspaceId, idsOf('artifact')),
+      ]);
+    const push = (uploadId: string, ref: UploadRef) => {
+      const list = out.get(uploadId) ?? [];
+      list.push(ref);
+      out.set(uploadId, list);
+    };
+    for (const row of rows) {
+      if (row.subjectType === 'issue') {
+        if (!issues.has(row.subjectId)) continue;
+        push(row.uploadId, {
+          resource: 'issues',
+          projectScoped: true,
+          projectId: issues.get(row.subjectId) ?? null,
+        });
+      } else if (row.subjectType === 'project') {
+        if (!projects.has(row.subjectId)) continue;
+        push(row.uploadId, {
+          resource: 'projects',
+          projectScoped: true,
+          projectId: row.subjectId,
+        });
+      } else if (
+        row.subjectType === 'document' ||
+        row.subjectType === 'document_revision'
+      ) {
+        const live = row.subjectType === 'document' ? documents : revisions;
+        if (!live.has(row.subjectId)) continue;
+        push(row.uploadId, {
+          resource: 'documents',
+          projectScoped: false,
+          projectId: null,
+        });
+      } else if (row.subjectType === 'comment') {
+        const comment = comments.get(row.subjectId);
+        if (!comment) continue;
+        push(row.uploadId, comment);
+      } else if (row.subjectType === 'artifact') {
+        if (!artifacts.has(row.subjectId)) continue;
+        push(row.uploadId, {
+          resource: 'artifacts',
+          projectScoped: true,
+          projectId: artifacts.get(row.subjectId) ?? null,
+        });
+      }
+    }
     return out;
   }
 
-  private async pushCommentRefs(
+  private async subjectUploadIds(
     workspaceId: string,
-    comments: { type: string; id: string }[],
-    out: UploadRef[],
-  ) {
-    const ids = (type: string) =>
-      comments.filter((c) => c.type === type).map((c) => c.id);
-    const tables = { issues: 'issues', milestones: 'milestones' } as const;
-    const projectOf = async (table: keyof typeof tables, wanted: string[]) => {
-      if (!wanted.length) return new Map<string, string | null>();
-      const rows = await this.ds.query<
-        { id: string; projectId: string | null }[]
-      >(
-        `SELECT "id", "projectId" FROM "${tables[table]}" WHERE "workspaceId" = $1 AND "id" = ANY($2)`,
-        [workspaceId, wanted],
-      );
-      return new Map(rows.map((row) => [row.id, row.projectId]));
-    };
-    const issues = await projectOf('issues', ids('issue'));
-    const milestones = await projectOf('milestones', ids('milestone'));
+    subject: UploadSubject,
+  ): Promise<string[]> {
+    const rows = await this.ds.query<{ uploadId: string }[]>(
+      `SELECT "uploadId" FROM "upload_references"
+       WHERE "workspaceId" = $1 AND "subjectType" = $2 AND "subjectId" = $3`,
+      [workspaceId, subject.type, subject.id],
+    );
+    return rows.map((row) => row.uploadId);
+  }
+
+  private async replaceSubject(
+    workspaceId: string,
+    subject: UploadSubject,
+    uploadIds: readonly string[],
+  ): Promise<void> {
+    await this.ds.query(
+      `DELETE FROM "upload_references"
+       WHERE "workspaceId" = $1 AND "subjectType" = $2 AND "subjectId" = $3`,
+      [workspaceId, subject.type, subject.id],
+    );
+    if (!uploadIds.length) return;
+    await this.ds.query(
+      `INSERT INTO "upload_references"
+         ("workspaceId", "uploadId", "subjectType", "subjectId", "projectId")
+       SELECT $1, u, $3, $4, $5 FROM unnest($2::varchar[]) AS u
+       ON CONFLICT ("workspaceId", "uploadId", "subjectType", "subjectId")
+       DO UPDATE SET "projectId" = EXCLUDED."projectId"`,
+      [
+        workspaceId,
+        [...uploadIds],
+        subject.type,
+        subject.id,
+        subject.projectId ?? null,
+      ],
+    );
+  }
+
+  private async existingIds(
+    table: 'projects' | 'documents' | 'document_revisions',
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Set<string>> {
+    if (!ids.length) return new Set();
+    const rows = await this.ds.query<{ id: string }[]>(
+      `SELECT "id" FROM "${table}" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])`,
+      [workspaceId, [...ids]],
+    );
+    return new Set(rows.map((row) => row.id));
+  }
+
+  private async projectById(
+    table: 'issues' | 'milestones',
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, string | null>> {
+    if (!ids.length) return new Map();
+    const rows = await this.ds.query<
+      { id: string; projectId: string | null }[]
+    >(
+      `SELECT "id", "projectId" FROM "${table}" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])`,
+      [workspaceId, [...ids]],
+    );
+    return new Map(rows.map((row) => [row.id, row.projectId]));
+  }
+
+  private async artifactProjects(
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, string | null>> {
+    if (!ids.length) return new Map();
+    const rows = await this.ds.query<
+      { id: string; projectId: string | null }[]
+    >(
+      `SELECT a."id", COALESCE(a."projectId", i."projectId") AS "projectId"
+       FROM "artifacts" a
+       LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
+       WHERE a."workspaceId" = $1 AND a."id" = ANY($2::varchar[])`,
+      [workspaceId, [...ids]],
+    );
+    return new Map(rows.map((row) => [row.id, row.projectId]));
+  }
+
+  private async commentSubjects(
+    workspaceId: string,
+    ids: readonly string[],
+  ): Promise<Map<string, UploadRef>> {
+    if (!ids.length) return new Map();
+    const comments = await this.ds.query<
+      { id: string; type: string; subjectId: string }[]
+    >(
+      `SELECT "id", "subject"->>'type' AS "type", "subject"->>'id' AS "subjectId"
+       FROM "comments" WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])`,
+      [workspaceId, [...ids]],
+    );
+    const wanted = (type: string) =>
+      comments.filter((row) => row.type === type).map((row) => row.subjectId);
+    const [issues, milestones] = await Promise.all([
+      this.projectById('issues', workspaceId, wanted('issue')),
+      this.projectById('milestones', workspaceId, wanted('milestone')),
+    ]);
+    const out = new Map<string, UploadRef>();
     for (const comment of comments) {
       if (comment.type === 'issue')
-        out.push({
+        out.set(comment.id, {
           resource: 'comments',
           projectScoped: true,
-          projectId: issues.get(comment.id) ?? null,
+          projectId: issues.get(comment.subjectId) ?? null,
         });
       else if (comment.type === 'milestone')
-        out.push({
+        out.set(comment.id, {
           resource: 'comments',
           projectScoped: true,
-          projectId: milestones.get(comment.id) ?? null,
+          projectId: milestones.get(comment.subjectId) ?? null,
         });
       else if (comment.type === 'project')
-        out.push({
+        out.set(comment.id, {
           resource: 'comments',
           projectScoped: true,
-          projectId: comment.id,
+          projectId: comment.subjectId,
         });
       else
-        out.push({
+        out.set(comment.id, {
           resource: 'comments',
           projectScoped: false,
           projectId: null,
         });
     }
+    return out;
   }
 }

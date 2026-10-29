@@ -887,12 +887,18 @@ export class TramaStore {
 
   /**
    * Run a server write through the serial queue. On error: roll back the optimistic tx,
-   * toast, resolve `{ ok: false }`. On settle: schedule a snapshot refetch.
+   * toast, resolve `{ ok: false }`. On settle: schedule a snapshot refetch unless the
+   * caller already upserted the response (`refetch: false`).
    */
   private async attempt<T>(
     label: string,
     run: (slug: string) => Promise<T>,
-    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+    options: {
+      tx?: { rollback: () => void };
+      onResult?: (result: T) => void;
+      /** Issue field patches upsert the response. Attention is not derived from those fields. */
+      refetch?: boolean;
+    } = {},
   ): Promise<{ ok: true; value: T } | { ok: false }> {
     this.pending++;
     this.epoch++;
@@ -916,7 +922,7 @@ export class TramaStore {
       this.pending--;
       this.epoch++;
       this.sync.pendingWrites.set(this.pending);
-      this.scheduleRefetch();
+      if (options.refetch !== false) this.scheduleRefetch();
       this.invalidateProjectContexts();
     }
   }
@@ -925,7 +931,11 @@ export class TramaStore {
   private async write<T>(
     label: string,
     run: (slug: string) => Promise<T>,
-    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+    options: {
+      tx?: { rollback: () => void };
+      onResult?: (result: T) => void;
+      refetch?: boolean;
+    } = {},
   ): Promise<T | undefined> {
     const r = await this.attempt(label, run, options);
     return r.ok ? r.value : undefined;
@@ -935,7 +945,11 @@ export class TramaStore {
   private async writeOk<T>(
     label: string,
     run: (slug: string) => Promise<T>,
-    options: { tx?: { rollback: () => void }; onResult?: (result: T) => void } = {},
+    options: {
+      tx?: { rollback: () => void };
+      onResult?: (result: T) => void;
+      refetch?: boolean;
+    } = {},
   ): Promise<boolean> {
     return (await this.attempt(label, run, options)).ok;
   }
@@ -1043,6 +1057,7 @@ export class TramaStore {
     tx.patch(this._issues, id, this.issueOptimistic(current, patch));
     return this.write('update issue', (s) => this.api.issues.update(s, id, patch), {
       tx,
+      refetch: false,
       onResult: (i) => this.upsert(this._issues, i),
     });
   }
@@ -1084,7 +1099,11 @@ export class TramaStore {
     return this.writeOk(
       'update issues',
       (s) => this.api.issues.bulkUpdate(s, targets.map((t) => t.id), patch),
-      { tx, onResult: (rows) => rows.forEach((i) => this.upsert(this._issues, i)) },
+      {
+        tx,
+        refetch: false,
+        onResult: (rows) => rows.forEach((i) => this.upsert(this._issues, i)),
+      },
     );
   }
 

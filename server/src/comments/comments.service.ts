@@ -196,7 +196,10 @@ export class CommentsService {
       },
       { type: 'created', entity: 'comment', id: row.id },
     );
-    await this.uploads?.retained(ctx.workspace.id, null, row.body);
+    await this.uploads?.retained(ctx.workspace.id, null, row.body, {
+      type: 'comment',
+      id: row.id,
+    });
     return row;
   }
 
@@ -209,7 +212,10 @@ export class CommentsService {
     row.body = body.trim();
     row.updatedAt = new Date();
     await this.repo.save(row);
-    await this.uploads?.retained(ctx.workspace.id, previous, row.body);
+    await this.uploads?.retained(ctx.workspace.id, previous, row.body, {
+      type: 'comment',
+      id: row.id,
+    });
     this.events.publish(ctx.workspace.id, {
       type: 'updated',
       entity: 'comment',
@@ -228,7 +234,10 @@ export class CommentsService {
       );
     const previous = row.body;
     await this.repo.delete({ id });
-    await this.uploads?.retained(ctx.workspace.id, previous, null);
+    await this.uploads?.retained(ctx.workspace.id, previous, null, {
+      type: 'comment',
+      id: row.id,
+    });
     this.events.publish(ctx.workspace.id, {
       type: 'deleted',
       entity: 'comment',

@@ -658,6 +658,28 @@ export class UploadEntity extends Wire {
   }
 }
 
+/** One row per live mention of an upload. The read path uses this instead of scanning record text. */
+@Entity('upload_references')
+@Index('IDX_upload_references_upload', ['workspaceId', 'uploadId'])
+@Index('IDX_upload_references_subject', [
+  'workspaceId',
+  'subjectType',
+  'subjectId',
+])
+@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
+  onDelete: 'CASCADE',
+})
+@ForeignKey(() => UploadEntity, ['uploadId'], ['id'], { onDelete: 'CASCADE' })
+export class UploadReferenceEntity extends Wire {
+  @PrimaryColumn({ type: 'varchar' }) workspaceId: string;
+  @PrimaryColumn({ type: 'varchar' }) uploadId: string;
+  /** issue, project, document, document_revision, comment, or artifact. */
+  @PrimaryColumn({ type: 'varchar' }) subjectType: string;
+  @PrimaryColumn({ type: 'varchar' }) subjectId: string;
+  /** Denormalized. Visibility uses the live owner when the two can drift. */
+  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
+}
+
 @Entity('decisions')
 @Index('UQ_decisions_workspace_key', ['workspaceId', 'key'], { unique: true })
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
@@ -1018,6 +1040,7 @@ export const ENTITIES = [
   CustomerSubscriptionEntity,
   ArtifactEntity,
   UploadEntity,
+  UploadReferenceEntity,
   DecisionEntity,
   DependencyEntity,
   CommentEntity,

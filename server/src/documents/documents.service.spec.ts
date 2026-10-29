@@ -601,9 +601,18 @@ describe('uploads', () => {
 
   it('checks the files a create mentions and marks them referenced', async () => {
     const { service, uploads } = setup();
-    await service.create(ctx(), { title: 'Spec', body: MARKDOWN });
+    const doc = await service.create(ctx(), { title: 'Spec', body: MARKDOWN });
     expect(uploads.assertAttachable).toHaveBeenCalledWith(WS, MARKDOWN);
-    expect(uploads.retained).toHaveBeenCalledWith(WS, null, MARKDOWN);
+    expect(uploads.retained).toHaveBeenCalledWith(WS, null, MARKDOWN, {
+      type: 'document',
+      id: doc.id,
+    });
+    expect(uploads.retained).toHaveBeenCalledWith(
+      WS,
+      null,
+      MARKDOWN,
+      expect.objectContaining({ type: 'document_revision' }),
+    );
   });
 
   it('re-checks on a body change and keeps what the next body still mentions', async () => {
@@ -615,7 +624,16 @@ describe('uploads', () => {
       body: MARKDOWN,
     });
     expect(uploads.assertAttachable).toHaveBeenCalledWith(WS, MARKDOWN);
-    expect(uploads.retained).toHaveBeenCalledWith(WS, 'plain', MARKDOWN);
+    expect(uploads.retained).toHaveBeenCalledWith(WS, 'plain', MARKDOWN, {
+      type: 'document',
+      id: doc.id,
+    });
+    expect(uploads.retained).toHaveBeenCalledWith(
+      WS,
+      'plain',
+      MARKDOWN,
+      expect.objectContaining({ type: 'document_revision' }),
+    );
   });
 
   it('releases the files of the body and the history when deleted', async () => {

@@ -36,6 +36,18 @@ export const isClosedIssue = (i: Pick<Issue, 'status'>, entries?: readonly Statu
   const type = statusTypeOf(entries ?? defaultStatusCatalog().issue, i.status);
   return type === 'done' || type === 'canceled';
 };
+
+/**
+ * Status id for the row Done / Reopen control. Uses the first catalog entry of that type so a
+ * renamed workspace status is written, and falls back to the legacy enum when the catalog has none.
+ */
+export function quietToggleStatus(
+  entries: readonly StatusEntry<IssueStatus>[] | null | undefined,
+  quiet: boolean,
+): string {
+  const type: IssueStatus = quiet ? 'todo' : 'done';
+  return entries?.find((entry) => entry.type === type)?.id ?? type;
+}
 // ───────────────────────── picker options ─────────────────────────
 
 export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>
