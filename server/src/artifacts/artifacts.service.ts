@@ -433,7 +433,12 @@ export class ArtifactsService {
         changes,
       },
     });
-    if (released) await this.uploads?.releaseIds(workspaceId, [released]);
+    if (released) {
+      await this.uploads?.forgetSubjects(workspaceId, [
+        { type: 'artifact', id },
+      ]);
+      await this.uploads?.releaseIds(workspaceId, [released]);
+    }
     if (changes.review && row.review === 'requested')
       await this.reviewRequested(row, actor);
     return row;
@@ -447,7 +452,12 @@ export class ArtifactsService {
       [workspaceId, id],
     );
     await this.repo.delete({ id });
-    if (uploadId) await this.uploads?.releaseIds(workspaceId, [uploadId]);
+    if (uploadId) {
+      await this.uploads?.forgetSubjects(workspaceId, [
+        { type: 'artifact', id },
+      ]);
+      await this.uploads?.releaseIds(workspaceId, [uploadId]);
+    }
     await this.events.record({
       workspaceId,
       actor,

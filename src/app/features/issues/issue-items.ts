@@ -31,7 +31,7 @@ import { PriorityIcon } from '../../shared/priority-icon';
 import { SwipeRow } from '../../shared/swipe-row';
 import { LabelChips } from '../../shared/label-chip';
 import type { IssueProp as IssuePropName } from './issue-model';
-import { isClosedIssue } from './issue-model';
+import { isClosedIssue, quietToggleStatus } from './issue-model';
 import { describeDemand } from '../customers/customer-model';
 import { IssueActions } from './issue-actions';
 import { IssueProp } from './issue-prop';
@@ -281,7 +281,10 @@ export class IssueRow extends IssueItemBase {
   }
 
   protected toggleDone(): void {
-    this.actions.setStatus([this.issue().id], this.quiet() ? 'todo' : 'done');
+    this.actions.setStatus(
+      [this.issue().id],
+      quietToggleStatus(this.store.settings().statuses.issue, this.quiet()),
+    );
   }
 
   // Long press selects the row (touch has no hover checkbox).

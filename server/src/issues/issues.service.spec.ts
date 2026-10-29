@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { IssueEntity } from '../database/entities/index.js';
 import { IssuesService, claimAssignee } from './issues.service.js';
 
@@ -116,5 +116,41 @@ describe('IssuesService.update parent authorization', () => {
     ]);
     expect(authorizedRows.map((row) => row.id)).not.toContain('in_stale_parent');
     expect(save).not.toHaveBeenCalled();
+  });
+});
+
+describe('IssuesService.list limit', () => {
+  function serviceCapturingTake() {
+    const take = vi.fn().mockReturnThis();
+    const qb = {
+      where: vi.fn().mockReturnThis(),
+      orderBy: vi.fn().mockReturnThis(),
+      andWhere: vi.fn().mockReturnThis(),
+      take,
+      getMany: vi.fn(async () => []),
+    };
+    const service = new IssuesService(
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      { createQueryBuilder: () => qb } as never,
+    );
+    return { service, take };
+  }
+
+  it('caps an omitted limit at 500 and still honors a smaller one', async () => {
+    const open = serviceCapturingTake();
+    await open.service.list('ws_1', { kind: 'bug' });
+    expect(open.take).toHaveBeenCalledWith(500);
+
+    const paged = serviceCapturingTake();
+    await paged.service.list('ws_1', { limit: 25 });
+    expect(paged.take).toHaveBeenCalledWith(25);
+
+    const over = serviceCapturingTake();
+    await over.service.list('ws_1', { limit: 900 });
+    expect(over.take).toHaveBeenCalledWith(500);
   });
 });

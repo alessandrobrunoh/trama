@@ -184,6 +184,12 @@ export class ProjectsService {
       subject: { type: 'project', id: row.id },
       data: { name: row.name, key: row.key },
     });
+    if (row.description)
+      await this.uploads?.retained(workspaceId, null, row.description, {
+        type: 'project',
+        id: row.id,
+        projectId: row.id,
+      });
     return row;
   }
 
@@ -298,6 +304,7 @@ export class ProjectsService {
         workspaceId,
         previousDescription,
         row.description,
+        { type: 'project', id: row.id, projectId: row.id },
       );
     if (row.status !== before)
       await this.events.record({

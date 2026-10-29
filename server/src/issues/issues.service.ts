@@ -21,6 +21,7 @@ import {
   type IssueSource,
   type IssueStatus,
   type Priority,
+  type StatusEntry,
 } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
@@ -169,16 +170,15 @@ export class IssuesService {
     private readonly lunagest?: LunagestService,
   ) {}
 
-  private async resolveIssueStatus(workspaceId: string, stored: string) {
-    const catalog = (await loadStatusCatalog(this.ds, workspaceId)).issue;
-    return requireStatus(catalog, stored, 'status');
+  private async issueCatalog(workspaceId: string) {
+    return (await loadStatusCatalog(this.ds, workspaceId)).issue;
   }
 
-  private async issueStatusType(
-    workspaceId: string,
+  private resolveStoredStatus(
+    catalog: readonly StatusEntry<IssueStatus>[],
     stored: string,
-  ): Promise<IssueStatus> {
-    return (await this.resolveIssueStatus(workspaceId, stored)).type;
+  ) {
+    return requireStatus(catalog, stored, 'status');
   }
 
   async list(
@@ -241,7 +241,8 @@ export class IssuesService {
         '(i.title ILIKE :q OR i.key ILIKE :q OR i.aliases::text ILIKE :q)',
         { q: `%${f.q}%` },
       );
-    if (f.limit) qb.take(f.limit);
+    // ListIssueQuery caps an explicit limit at 500; omitting it used to return the whole table.
+    qb.take(Math.min(f.limit ?? 500, 500));
     return qb.getMany();
   }
 
@@ -484,8 +485,8 @@ export class IssuesService {
       workspaceId,
       input.releaseId ?? null,
     );
-    const resolved = await this.resolveIssueStatus(
-      workspaceId,
+    const resolved = this.resolveStoredStatus(
+      await this.issueCatalog(workspaceId),
       input.status ?? 'backlog',
     );
     const status = resolved.id as IssueStatus;
@@ -557,7 +558,11 @@ export class IssuesService {
         }),
       );
     });
-    await this.uploads?.retained(workspaceId, null, row.body);
+    await this.uploads?.retained(workspaceId, null, row.body, {
+      type: 'issue',
+      id: row.id,
+      projectId: row.projectId,
+    });
     await this.noteLunaGest(workspaceId, row, {
       created: true,
       titleChanged: true,
@@ -601,7 +606,15 @@ export class IssuesService {
       };
     }
     const previousBody = row.body;
-    const prepared = await this.prepareUpdate(workspaceId, actor, row, patch);
+    const catalog = await this.issueCatalog(workspaceId);
+    const prepared = await this.prepareUpdate(
+      workspaceId,
+      actor,
+      row,
+      patch,
+      false,
+      catalog,
+    );
     if (patch.body !== undefined)
       await this.uploads?.assertAttachable(workspaceId, row.body);
     await this.ds.transaction(async (m) => {
@@ -686,7 +699,11 @@ export class IssuesService {
       await m.save(row);
     });
     if (patch.body !== undefined)
-      await this.uploads?.retained(workspaceId, previousBody, row.body);
+      await this.uploads?.retained(workspaceId, previousBody, row.body, {
+        type: 'issue',
+        id: row.id,
+        projectId: row.projectId,
+      });
     await this.noteLunaGest(workspaceId, row, {
       created: false,
       titleChanged: row.title !== before.title,
@@ -742,20 +759,48 @@ export class IssuesService {
     refs: readonly string[],
   ): Promise<IssueEntity[]> {
     const wanted = unique(refs);
+    if (!wanted.length) return [];
+    const keys = wanted.filter((ref) => KEY_RE.test(ref)).map((ref) => ref.toUpperCase());
+    const ids = wanted.filter((ref) => !KEY_RE.test(ref));
+    const clauses: string[] = [];
+    const params: Record<string, unknown> = { workspaceId };
+    if (ids.length) {
+      clauses.push('i.id IN (:...ids)');
+      params.ids = ids;
+    }
+    if (keys.length) {
+      clauses.push('i.key IN (:...keys)');
+      clauses.push(
+        'EXISTS (SELECT 1 FROM jsonb_array_elements_text(i.aliases) alias WHERE alias IN (:...keys))',
+      );
+      params.keys = keys;
+    }
+    const found = await this.repo
+      .createQueryBuilder('i')
+      .where('i.workspaceId = :workspaceId', { workspaceId })
+      .andWhere(`(${clauses.join(' OR ')})`, params)
+      .getMany();
     const rows: IssueEntity[] = [];
     const missing: string[] = [];
     for (const ref of wanted) {
-      try {
-        rows.push(await this.get(workspaceId, ref));
-      } catch (err) {
-        if (!(err instanceof NotFoundException)) throw err;
-        missing.push(ref);
-      }
+      const row = KEY_RE.test(ref)
+        ? this.matchKey(found, ref.toUpperCase())
+        : found.find((candidate) => candidate.id === ref);
+      if (!row || projectHidden(currentAccess(), row.projectId)) missing.push(ref);
+      else rows.push(row);
     }
     if (missing.length)
       throw new NotFoundException(`Issue not found: ${missing.join(', ')}`);
-    return unique(rows.map((r) => r.id)).map((id) =>
-      rows.find((r) => r.id === id)!,
+    return unique(rows.map((r) => r.id)).map(
+      (id) => rows.find((r) => r.id === id)!,
+    );
+  }
+
+  /** A key hit wins over an alias, matching `get()`. */
+  private matchKey(found: readonly IssueEntity[], key: string): IssueEntity | undefined {
+    return (
+      found.find((row) => row.key === key) ??
+      found.find((row) => row.aliases.includes(key))
     );
   }
 
@@ -795,6 +840,7 @@ export class IssuesService {
       removeLabels,
     );
 
+    const catalog = await this.issueCatalog(workspaceId);
     const prepared: PreparedUpdate[] = [];
     for (const row of rows) {
       const next: IssueInput = {};
@@ -809,7 +855,7 @@ export class IssuesService {
           (l) => !removeLabels.includes(l),
         );
       prepared.push(
-        await this.prepareUpdate(workspaceId, actor, row, next, true),
+        await this.prepareUpdate(workspaceId, actor, row, next, true, catalog),
       );
     }
     await this.ds.transaction(async (m) => {
@@ -856,7 +902,9 @@ export class IssuesService {
     row: IssueEntity,
     patch: IssueInput,
     refsChecked = false,
+    catalog?: readonly StatusEntry<IssueStatus>[],
   ): Promise<PreparedUpdate> {
+    const statuses = catalog ?? (await this.issueCatalog(workspaceId));
     const previousAssigneeId = row.assigneeId;
     if (!refsChecked) {
       await this.refs.teams(
@@ -880,7 +928,7 @@ export class IssuesService {
       } else {
         if (
           patch.status !== undefined &&
-          (await this.resolveIssueStatus(workspaceId, patch.status)).type !==
+          this.resolveStoredStatus(statuses, patch.status).type !==
             'canceled'
         )
           throw new BadRequestException(
@@ -946,10 +994,10 @@ export class IssuesService {
           'issue',
           row.labels,
         )) ?? [];
-    const fromType = await this.issueStatusType(workspaceId, from);
+    const fromType = this.resolveStoredStatus(statuses, from).type;
     let toType = fromType;
     if (patch.status !== undefined) {
-      const resolved = await this.resolveIssueStatus(workspaceId, patch.status);
+      const resolved = this.resolveStoredStatus(statuses, patch.status);
       row.status = resolved.id as IssueStatus;
       toType = resolved.type;
       if (resolved.id !== from) applyStatusFacts(row, resolved.type);

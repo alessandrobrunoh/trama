@@ -49,6 +49,25 @@ export class RejectUnsafeInputPipe implements PipeTransform {
   }
 }
 
+/**
+ * Baseline headers on every response. Registered before routes so a handler can still
+ * override one (file downloads set a stricter Content-Security-Policy).
+ * HSTS is production-only: local HTTP would otherwise be stuck behind the policy.
+ */
+export function securityHeaders(
+  _req: unknown,
+  res: { setHeader(name: string, value: string): void },
+  next: () => void,
+): void {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('X-Frame-Options', 'DENY');
+  if (process.env.NODE_ENV === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
+  next();
+}
+
 /** Shared by main.ts and the e2e tests. */
 export function configureApp(app: INestApplication): void {
   app.setGlobalPrefix('api');
@@ -90,6 +109,9 @@ export function configureApp(app: INestApplication): void {
     ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   });
+  // before routes (and the rate limiter) so every response, including 429s, carries them
+  // and a route can still replace a header
+  app.use(securityHeaders);
   // after CORS, so a 429 still carries the CORS headers the browser needs to read it
   app.use(rateLimitMiddleware());
   app.enableShutdownHooks();

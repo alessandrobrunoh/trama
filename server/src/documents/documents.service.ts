@@ -256,7 +256,7 @@ export class DocumentsService {
     await this.uploads.assertAttachable(workspaceId, input.body);
     const owners = await this.resolveOwners(workspaceId, input);
     const now = new Date();
-    const row = await this.ds.transaction(async (m) => {
+    const { saved: row, revisionId } = await this.ds.transaction(async (m) => {
       const saved = await m.getRepository(DocumentEntity).save(
         m.getRepository(DocumentEntity).create({
           id: uid('doc'),
@@ -272,7 +272,7 @@ export class DocumentsService {
           updatedAt: now,
         }),
       );
-      await m.getRepository(DocumentRevisionEntity).save(
+      const revision = await m.getRepository(DocumentRevisionEntity).save(
         m.getRepository(DocumentRevisionEntity).create({
           id: uid('rev'),
           workspaceId,
@@ -284,11 +284,18 @@ export class DocumentsService {
           createdAt: now,
         }),
       );
-      return saved;
+      return { saved, revisionId: revision.id };
     });
     for (const [key, value] of Object.entries(owners))
       await this.attachTo(workspaceId, ctx.actor, row.id, { [key]: value });
-    await this.uploads.retained(workspaceId, null, row.body);
+    await this.uploads.retained(workspaceId, null, row.body, {
+      type: 'document',
+      id: row.id,
+    });
+    await this.uploads.retained(workspaceId, null, row.body, {
+      type: 'document_revision',
+      id: revisionId,
+    });
     await this.events.record({
       workspaceId,
       actor: ctx.actor,
@@ -358,7 +365,7 @@ export class DocumentsService {
       title: patch.title ?? row.title,
       body: patch.body ?? row.body,
     };
-    const checkpoint = await this.ds.transaction(async (m) => {
+    const written = await this.ds.transaction(async (m) => {
       const res = await m.getRepository(DocumentEntity).update(
         { id: row.id, workspaceId, version: baseVersion },
         {
@@ -381,9 +388,13 @@ export class DocumentsService {
           { id: head.id },
           { version: baseVersion + 1, ...next },
         );
-        return false;
+        return {
+          created: false,
+          revisionId: head.id,
+          removedRevisionIds: [] as string[],
+        };
       }
-      await revisions.save(
+      const created = await revisions.save(
         revisions.create({
           id: uid('rev'),
           workspaceId,
@@ -394,17 +405,39 @@ export class DocumentsService {
           createdAt: now,
         }),
       );
-      await m.query(
-        `DELETE FROM "document_revisions" WHERE "documentId" = $1 AND "id" IN (SELECT "id" FROM "document_revisions" WHERE "documentId" = $1 ORDER BY "version" DESC OFFSET $2)`,
+      const removed = await m.query(
+        `DELETE FROM "document_revisions" WHERE "documentId" = $1 AND "id" IN (SELECT "id" FROM "document_revisions" WHERE "documentId" = $1 ORDER BY "version" DESC OFFSET $2) RETURNING "id"`,
         [row.id, DOCUMENT_LIMITS.revisionsKept],
       );
-      return true;
+      const removedRevisionIds = (Array.isArray(removed) ? removed : []).map(
+        (item: { id: string }) => item.id,
+      );
+      return { created: true, revisionId: created.id, removedRevisionIds };
     });
-    if (checkpoint === null)
+    if (written === null)
       throw this.conflict(await this.load(workspaceId, row.id));
+    const checkpoint = written.created;
     // Files dropped from the body stay while a kept revision still mentions them; `releaseIds` re-checks.
-    if (patch.body !== undefined)
-      await this.uploads.retained(workspaceId, previousBody, next.body);
+    if (patch.body !== undefined) {
+      await this.uploads.retained(workspaceId, previousBody, next.body, {
+        type: 'document',
+        id: row.id,
+      });
+      await this.uploads.retained(
+        workspaceId,
+        written.created ? null : previousBody,
+        next.body,
+        { type: 'document_revision', id: written.revisionId },
+      );
+      if (written.removedRevisionIds.length)
+        await this.uploads.forgetSubjects(
+          workspaceId,
+          written.removedRevisionIds.map((id) => ({
+            type: 'document_revision' as const,
+            id,
+          })),
+        );
+    }
     if (patch.title !== undefined)
       await this.ds
         .getRepository(ArtifactEntity)
