@@ -7,6 +7,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -14,10 +15,8 @@ import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import type { TimeEntry } from '../../core/api/api.types';
 import { TramaStore } from '../../core/stores/trama.store';
+import { AppSelect, type Option } from '../../shared/app-select';
 import { PageHeader } from '../../shared/page-header';
-
-const SELECT =
-  'border-border bg-background h-8 min-w-0 rounded-md border px-2 text-[13px]';
 
 function formatSpan(startedAt: string, endedAt: string | null, now: number): string {
   const end = endedAt ? new Date(endedAt).getTime() : now;
@@ -25,71 +24,76 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
   const hours = Math.floor(total / 3600);
   const minutes = Math.floor((total % 3600) / 60);
   const seconds = total % 60;
-  if (hours > 0) return `${hours}h ${String(minutes).padStart(2, '0')}m`;
-  return `${minutes}m ${String(seconds).padStart(2, '0')}s`;
+  return [hours, minutes, seconds].map((unit) => String(unit).padStart(2, '0')).join(':');
 }
 
 /** Start, stop, or add your own time. Hours are not sent to LunaGest. */
 @Component({
   selector: 'app-timer-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, PageHeader],
+  imports: [DatePipe, RouterLink, HlmButtonImports, HlmInputImports, PageHeader, AppSelect],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <app-page-header
       title="Timer"
       description="Your time stays in Trama. It is not sent to LunaGest."
     />
-    <div class="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 py-4 sm:px-6">
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-5 sm:px-6 sm:py-8">
+      <div class="mx-auto grid max-w-5xl gap-5">
       @if (error(); as message) {
-        <p class="text-destructive text-[13px]" role="alert">{{ message }}</p>
+        <p class="border-destructive/25 bg-destructive/5 text-destructive rounded-lg border px-4 py-3 text-sm" role="alert">{{ message }}</p>
       }
-      <div class="flex flex-wrap items-center gap-2">
+      <section class="bg-card overflow-hidden rounded-xl border" aria-labelledby="live-timer">
+        <div class="from-primary/10 via-muted/40 to-card grid gap-5 bg-linear-to-br px-5 py-6 sm:grid-cols-[1fr_auto] sm:items-center sm:px-7">
+          <div class="min-w-0">
+            <h2 id="live-timer" class="text-muted-foreground text-xs font-semibold tracking-wider uppercase">Live timer</h2>
+            <p class="mt-2 font-mono text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl" role="timer">
+              {{ running() ? span(running()!) : '00:00:00' }}
+            </p>
+            <p class="text-muted-foreground mt-2 break-words text-sm">
+              {{ running() ? (running()?.description || 'Tracking time') : 'Ready to track your next session.' }}
+            </p>
+          </div>
+          @if (running()) {
+            <button hlmBtn type="button" [disabled]="busy()" (click)="stop()">Stop timer</button>
+          } @else {
+            <button hlmBtn type="button" [disabled]="busy() || loading()" (click)="start()">Start timer</button>
+          }
+        </div>
+        <div class="grid gap-4 border-t p-5 sm:grid-cols-2 sm:p-7">
+          <label class="grid gap-1.5 text-sm font-medium sm:col-span-2">
+            Description
         <input
           hlmInput
-          class="h-8 min-w-48 flex-1 text-[13px]"
+          class="w-full"
           placeholder="What are you working on?"
-          aria-label="Description"
           [value]="description()"
           (input)="description.set($any($event.target).value)"
         />
-        <select
-          [class]="select"
-          aria-label="Project"
-          [value]="projectId()"
-          (change)="projectId.set($any($event.target).value)"
-        >
-          <option value="">No project</option>
-          @for (project of store.projects(); track project.id) {
-            <option [value]="project.id">{{ project.name }}</option>
-          }
-        </select>
-        <select
-          [class]="select"
-          aria-label="Issue"
-          [value]="issueId()"
-          (change)="issueId.set($any($event.target).value)"
-        >
-          <option value="">No issue</option>
-          @for (issue of issueChoices(); track issue.id) {
-            <option [value]="issue.id">{{ issue.key }} {{ issue.title }}</option>
-          }
-        </select>
-        @if (running(); as current) {
-          <span class="text-[13px] tabular-nums">{{ span(current) }}</span>
-          <button hlmBtn type="button" size="sm" [disabled]="busy()" (click)="stop()">Stop</button>
-        } @else {
-          <button hlmBtn type="button" size="sm" [disabled]="busy()" (click)="start()">Start</button>
-        }
-      </div>
+          </label>
+          <div class="grid min-w-0 gap-1.5">
+            <label for="timer-project" class="text-sm font-medium">Project</label>
+            <app-select controlId="timer-project" [options]="projectChoices()"
+              [value]="projectId()" (valueChange)="selectProject($event)" />
+          </div>
+          <div class="grid min-w-0 gap-1.5">
+            <label for="timer-issue" class="text-sm font-medium">Issue</label>
+            <app-select controlId="timer-issue" [options]="issueChoices()" [(value)]="issueId" />
+          </div>
+        </div>
+      </section>
 
-      <form class="flex flex-wrap items-end gap-2" (submit)="addManual($event)">
+      <section class="bg-card rounded-xl border p-5 sm:p-7" aria-labelledby="manual-entry">
+        <h2 id="manual-entry" class="font-semibold">Log time manually</h2>
+        <p class="text-muted-foreground mt-1 text-sm">Add a past session using the description, project, and issue above.</p>
+      <form class="mt-4 grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" (submit)="addManual($event)">
         <label class="flex flex-col gap-1 text-[13px]">
           Start
           <input
             hlmInput
-            class="h-8 text-[13px]"
+            class="min-w-0 w-full"
             type="datetime-local"
+            required
             [value]="manualStart()"
             (input)="manualStart.set($any($event.target).value)"
           />
@@ -98,25 +102,37 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
           End
           <input
             hlmInput
-            class="h-8 text-[13px]"
+            class="min-w-0 w-full"
             type="datetime-local"
+            required
             [value]="manualEnd()"
             (input)="manualEnd.set($any($event.target).value)"
           />
         </label>
-        <button hlmBtn type="submit" size="sm" variant="outline" [disabled]="busy()">Add</button>
+        <button hlmBtn type="submit" variant="outline" [disabled]="busy()">Add entry</button>
       </form>
+      </section>
 
+      <section class="bg-card rounded-xl border" aria-labelledby="time-history">
+      <div class="flex items-center justify-between gap-3 border-b px-5 py-4 sm:px-7">
+        <h2 id="time-history" class="font-semibold">Time history</h2>
+        <span class="bg-muted text-muted-foreground rounded-full px-2.5 py-1 text-xs">{{ entries().length }} entries</span>
+      </div>
       @if (loading()) {
-        <p class="text-muted-foreground text-[13px]">Loading…</p>
+        <p class="text-muted-foreground p-6 text-sm" role="status">Loading time entries…</p>
       } @else if (!entries().length) {
-        <p class="text-muted-foreground text-[13px]">No time yet.</p>
+        <div class="px-5 py-10 text-center">
+          <p class="font-medium">No time logged yet</p>
+          <p class="text-muted-foreground mt-1 text-sm">Start the timer or add a past session to build your history.</p>
+        </div>
       } @else {
         <ul class="flex flex-col divide-y">
           @for (entry of entries(); track entry.id) {
-            <li class="flex flex-wrap items-center gap-2 py-2 text-[13px]">
-              <span class="min-w-24 tabular-nums">{{ span(entry) }}</span>
-              <span class="min-w-0 flex-1 truncate">{{ entry.description || 'No description' }}</span>
+            <li class="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3 text-sm sm:px-7">
+              <div class="min-w-0 flex-1 basis-40">
+                <p class="truncate font-medium">{{ entry.description || 'Untitled session' }}</p>
+                <p class="text-muted-foreground mt-0.5 text-xs">{{ entry.startedAt | date:'medium' }}</p>
+              </div>
               @if (entry.issueId) {
                 <a
                   class="text-primary hover:underline"
@@ -124,6 +140,10 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
                   >{{ issueKey(entry.issueId) }}</a
                 >
               }
+              @if (!entry.endedAt) {
+                <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 text-xs">Running</span>
+              }
+              <span class="font-mono text-xs tabular-nums">{{ span(entry) }}</span>
               <button
                 hlmBtn
                 type="button"
@@ -138,6 +158,8 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
           }
         </ul>
       }
+      </section>
+      </div>
     </div>
   `,
 })
@@ -145,7 +167,6 @@ export class TimerPage {
   private readonly api = inject(ApiClient);
   protected readonly store = inject(TramaStore);
 
-  protected readonly select = SELECT;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -158,10 +179,18 @@ export class TimerPage {
   protected readonly manualEnd = signal('');
   protected readonly now = signal(Date.now());
   protected readonly running = computed(() => this.entries().find((entry) => !entry.endedAt) ?? null);
-  protected readonly issueChoices = computed(() => {
+  protected readonly projectChoices = computed<Option[]>(() => [
+    { value: '', label: 'No project' },
+    ...this.store.projects().map((project) => ({ value: project.id, label: project.name })),
+  ]);
+  protected readonly issueChoices = computed<Option[]>(() => {
     const projectId = this.projectId();
-    const issues = this.store.issues();
-    return projectId ? issues.filter((issue) => issue.projectId === projectId) : issues;
+    return [
+      { value: '', label: 'No issue' },
+      ...this.store.issues()
+        .filter((issue) => !projectId || issue.projectId === projectId)
+        .map((issue) => ({ value: issue.id, label: issue.title, hint: issue.key })),
+    ];
   });
 
   constructor() {
@@ -176,6 +205,13 @@ export class TimerPage {
 
   protected span(entry: TimeEntry): string {
     return formatSpan(entry.startedAt, entry.endedAt, this.now());
+  }
+
+  protected selectProject(id: string): void {
+    this.projectId.set(id);
+    if (!this.issueChoices().some((issue) => issue.value === this.issueId())) {
+      this.issueId.set('');
+    }
   }
 
   protected issueKey(id: string): string {
@@ -238,6 +274,10 @@ export class TimerPage {
     const startedAt = this.manualStart();
     const endedAt = this.manualEnd();
     if (!slug || !startedAt || !endedAt || this.busy()) return;
+    if (new Date(endedAt) <= new Date(startedAt)) {
+      this.error.set('End time must be after start time.');
+      return;
+    }
     this.busy.set(true);
     this.error.set('');
     try {
