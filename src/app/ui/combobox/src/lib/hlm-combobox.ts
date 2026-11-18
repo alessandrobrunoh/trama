@@ -26,6 +26,7 @@ import { classes } from '@spartan-ng/helm/utils';
         'filter',
         'search',
         'value',
+        'isSingleValuePresent',
         'itemToString',
         'filterOptions',
         'isItemEqualToValue',
