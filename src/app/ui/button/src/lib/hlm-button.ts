@@ -11,9 +11,9 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(0_0_0/0.15)]',
+          'bg-primary text-primary-foreground hover:bg-primary/90',
         outline:
-          'border-border-strong bg-background hover:bg-accent hover:text-foreground dark:bg-secondary dark:hover:bg-accent shadow-xs aria-expanded:bg-accent aria-expanded:text-foreground',
+          'bg-secondary text-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-foreground',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground',
         ghost:

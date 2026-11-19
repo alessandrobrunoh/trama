@@ -13,8 +13,7 @@
   display: flex;
   align-items: stretch;
   padding: 0 0.25rem env(safe-area-inset-bottom);
-  border-top: 1px solid var(--border);
-  background: color-mix(in oklab, var(--background) 90%, transparent);
+  background: color-mix(in oklab, var(--sidebar) 92%, transparent);
   -webkit-backdrop-filter: saturate(1.6) blur(20px);
   backdrop-filter: saturate(1.6) blur(20px);
 }
@@ -164,7 +163,6 @@ html[data-keyboard='open'] .mobile-tabbar {
   justify-content: space-between;
   gap: 0.75rem;
   padding-inline: 1rem;
-  border-bottom: 1px solid var(--border);
 }
 
 .mobile-menu__identity {
@@ -217,7 +215,7 @@ html[data-keyboard='open'] .mobile-tabbar {
 }
 
 .mobile-menu__group + .mobile-menu__group {
-  border-top: 1px solid var(--border);
+  margin-block-start: 0.375rem;
 }
 
 .mobile-menu__label {
@@ -636,13 +634,7 @@ html[data-keyboard='open'] .mobile-fab {
 }
 
 /* ───────────────────────── Fonts (self-hosted) ───────────────────────── */
-@font-face {
-  font-family: 'Inter';
-  src: url('/fonts/InterVariable.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
-  font-display: swap;
-}
+/* UI text uses the system font (SF Pro on macOS); Geist Mono is only a fallback behind ui-monospace. */
 @font-face {
   font-family: 'Geist Mono';
   src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
@@ -653,42 +645,49 @@ html[data-keyboard='open'] .mobile-fab {
 
 /* ───────────────────────── Tokens ─────────────────────────
    Light is :root, dark is :root.dark (class set by ThemeService).
-   Linear-like: the app chrome (sidebar) is the darkest/most recessed surface and the page
-   sits on an inset panel. Neutral greys + ONE terracotta accent. Status tones are muted and keep
-   the same meaning in both modes. Use the semantic Tailwind colors (bg-background,
-   text-muted-foreground, text-status-working, …) — never raw hex / palette colors in feature code.
+   Native desktop-app feel: system font, compact density, plain content area, a slightly tinted
+   sidebar with no divider line, rows without dividers (hover / selected tints), hairlines only
+   where a control needs an edge (inputs, focus). Neutrals are a faint cool grey + ONE terracotta
+   accent. Status tones are muted and keep the same meaning in both modes. Use the semantic
+   Tailwind colors (bg-background, text-muted-foreground, text-status-working, …) — never raw
+   hex / palette colors in feature code.
+
+   Lines are translucent (black/white at low alpha) so they stay faint on any surface tint.
+   --border: separators that survive (menus, tables headers); --border-strong: control edges;
+   --input: form-control edge (kept visible for contrast).
 
    Entity accents: tasks are demand (circle glyphs). */
 :root {
   color-scheme: light;
   --radius: 0.375rem; /* 6px: controls, menus, popovers */
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, 'Geist Mono', Menlo, Consolas, monospace;
 
   --background: #ffffff;
-  --foreground: #1b1c1f;
-  --card: #ffffff;
-  --card-foreground: #1b1c1f;
+  --foreground: #1d1d1f;
+  --card: #f7f7f9; /* flat cards read as a tint on the white content area, not as a bordered box */
+  --card-foreground: #1d1d1f;
   --popover: #ffffff;
-  --popover-foreground: #1b1c1f;
+  --popover-foreground: #1d1d1f;
   --primary: #ad5235; /* white text on it: 5.2:1 */
   --primary-text: #ad5235;
   --primary-foreground: #ffffff;
-  --secondary: #f3f3f5;
-  --secondary-foreground: #26272b;
+  --secondary: #f2f2f4;
+  --secondary-foreground: #2a2a2d;
   --muted: #f5f5f7;
-  --muted-foreground: #62646b; /* 5.4:1 on the sidebar, 5.2:1 on accent: AA for small text everywhere */
-  --accent: #efeff2;
-  --accent-foreground: #1b1c1f;
+  --muted-foreground: #66666b; /* >= 4.8:1 on white, sidebar and accent: AA for small text everywhere */
+  --accent: #ebebef;
+  --accent-foreground: #1d1d1f;
   --destructive: #c93535;
-  --border: #e8e8ec;
-  --border-strong: #d6d6dc;
-  --input: #cfcfd6;
+  --border: rgb(0 0 0 / 0.07);
+  --border-strong: rgb(0 0 0 / 0.12);
+  --input: rgb(0 0 0 / 0.16);
   --ring: #ad5235;
-  /* Faint row hover / selected fills */
-  --hover: rgb(18 19 24 / 0.035);
-  --selected: color-mix(in oklab, var(--primary) 8%, transparent);
+  /* Row hover / selected fills */
+  --hover: rgb(0 0 0 / 0.04);
+  --selected: color-mix(in oklab, var(--primary) 10%, transparent);
 
   --chart-1: #ad5235;
   --chart-2: #2d9d8f;
@@ -696,13 +695,13 @@ html[data-keyboard='open'] .mobile-fab {
   --chart-4: #8a63d2;
   --chart-5: #5e6ad2;
 
-  --sidebar: #f4f4f6;
-  --sidebar-foreground: #3a3b40;
+  --sidebar: #f3f3f5;
+  --sidebar-foreground: #3a3a3e;
   --sidebar-primary: #ad5235;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e8e8ec;
-  --sidebar-accent-foreground: #1b1c1f;
-  --sidebar-border: #e3e3e8;
+  --sidebar-accent: #e6e6ea;
+  --sidebar-accent-foreground: #1d1d1f;
+  --sidebar-border: transparent; /* no divider line: the tint separates the sidebar */
   --sidebar-ring: #ad5235;
 
   --entity-decision: #b7791f;
@@ -719,36 +718,37 @@ html[data-keyboard='open'] .mobile-fab {
   --tone-teal: #0f7a6f;
   --tone-green: #28793f;
 
-  --shadow-menu: 0 0 0 1px rgb(0 0 0 / 0.06), 0 8px 24px -4px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
-  --shadow-panel: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-menu: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 8px 24px -4px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-panel: none;
 }
 
 :root.dark {
   color-scheme: dark;
 
-  /* Near-black, slightly cool. Sidebar #08090a < panel #0e0f11 < raised #141518 < popover #18191c. */
-  --background: #0e0f11;
-  --foreground: #e9eaee;
-  --card: #131417;
-  --card-foreground: #e9eaee;
-  --popover: #17181b;
-  --popover-foreground: #e9eaee;
+  /* Graphite, like a native dark window: content #1e1e20, sidebar a step lighter (#262628),
+     raised #252528, popover #2a2a2d. */
+  --background: #1e1e20;
+  --foreground: #ececef;
+  --card: #252528;
+  --card-foreground: #ececef;
+  --popover: #2a2a2d;
+  --popover-foreground: #ececef;
   --primary: #b95a3a; /* fill: white text 4.6:1 */
   --primary-text: #e0845e; /* same hue as text and icons on dark surfaces: 6.4:1 */
   --primary-foreground: #ffffff;
-  --secondary: #18191c;
-  --secondary-foreground: #e9eaee;
-  --muted: #141518;
-  --muted-foreground: #8a8f98;
-  --accent: #1c1d21;
-  --accent-foreground: #f4f5f7;
+  --secondary: #2a2a2d;
+  --secondary-foreground: #ececef;
+  --muted: #232326;
+  --muted-foreground: #9d9da3; /* >= 5:1 on every dark surface above */
+  --accent: #303034;
+  --accent-foreground: #f5f5f7;
   --destructive: #eb5757;
-  --border: #222327;
-  --border-strong: #2f3035;
-  --input: #34363c;
+  --border: rgb(255 255 255 / 0.08);
+  --border-strong: rgb(255 255 255 / 0.13);
+  --input: rgb(255 255 255 / 0.18);
   --ring: #d9714a;
-  --hover: rgb(255 255 255 / 0.03);
-  --selected: color-mix(in oklab, var(--primary) 12%, transparent);
+  --hover: rgb(255 255 255 / 0.05);
+  --selected: color-mix(in oklab, var(--primary) 18%, transparent);
 
   --chart-1: #d9714a;
   --chart-2: #46b8a8;
@@ -756,13 +756,13 @@ html[data-keyboard='open'] .mobile-fab {
   --chart-4: #a389e6;
   --chart-5: #6e79d6;
 
-  --sidebar: #08090a;
-  --sidebar-foreground: #c9cbd1;
+  --sidebar: #262628;
+  --sidebar-foreground: #d2d2d7;
   --sidebar-primary: #b95a3a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #17181b;
-  --sidebar-accent-foreground: #f4f5f7;
-  --sidebar-border: #1a1b1f;
+  --sidebar-accent: #38383c;
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: transparent;
   --sidebar-ring: #d9714a;
 
   --entity-decision: #e0b04a;
@@ -778,8 +778,8 @@ html[data-keyboard='open'] .mobile-fab {
   --tone-teal: #4cc0b0;
   --tone-green: #4cb782;
 
-  --shadow-menu: 0 0 0 1px rgb(255 255 255 / 0.06), 0 12px 32px -6px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4);
-  --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.04), 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-menu: 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 12px 32px -6px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-panel: none;
 }
 
 /* Status → tone. Semantics are shared across entities:
@@ -915,8 +915,6 @@ html[data-keyboard='open'] .mobile-fab {
   }
   body {
     @apply bg-background text-foreground font-sans text-sm antialiased;
-    font-feature-settings: 'cv01', 'cv02', 'cv11', 'ss03', 'calt';
-    letter-spacing: -0.006em;
     margin: 0;
     overflow-x: hidden;
   }
@@ -1053,7 +1051,6 @@ html[data-keyboard='open'] .mobile-fab {
     max-height: min(92dvh, 100%);
     border-radius: 1.25rem 1.25rem 0 0;
     border: 0;
-    border-top: 1px solid var(--border);
     box-shadow: 0 -12px 48px rgb(0 0 0 / 0.35);
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
     grid-template-columns: minmax(0, 1fr);

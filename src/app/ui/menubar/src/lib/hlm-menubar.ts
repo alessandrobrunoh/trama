@@ -11,6 +11,6 @@ import { classes } from '@spartan-ng/helm/utils';
 })
 export class HlmMenubar {
   constructor() {
-    classes(() => 'bg-background h-8 gap-0.5 rounded-lg border p-[3px] flex items-center');
+    classes(() => 'bg-secondary h-8 gap-0.5 rounded-lg p-[3px] flex items-center');
   }
 }
