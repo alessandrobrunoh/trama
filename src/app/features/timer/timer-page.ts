@@ -17,6 +17,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import type { TimeEntry } from '../../core/api/api.types';
 import { TramaStore } from '../../core/stores/trama.store';
+import { UiStore } from '../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../shared/app-select';
 import { DatePicker } from '../../shared/date-picker';
 import { PageHeader } from '../../shared/page-header';
@@ -180,7 +181,7 @@ function at(date: Date, time: string): Date {
                     hlmTooltip="Delete entry"
                     aria-label="Delete entry"
                     [disabled]="busy()"
-                    (click)="remove(entry.id)"
+                    (click)="confirmRemove(entry)"
                   >
                     <svg [lucideIcon]="trashIcon" [size]="14"></svg>
                   </button>
@@ -196,6 +197,7 @@ function at(date: Date, time: string): Date {
 export class TimerPage {
   private readonly api = inject(ApiClient);
   protected readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
 
   protected readonly playIcon = LucidePlay;
   protected readonly stopIcon = LucideSquare;
@@ -334,6 +336,14 @@ export class TimerPage {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected confirmRemove(entry: TimeEntry): void {
+    this.ui.setConfirmDelete({
+      title: 'Delete this time entry?',
+      description: `${this.span(entry)} of tracked time is removed. This cannot be undone.`,
+      onConfirm: () => this.remove(entry.id),
+    });
   }
 
   protected async remove(id: string): Promise<void> {

@@ -30,6 +30,7 @@ import {
 import { ISSUE_KIND_META, ISSUE_KINDS, ISSUE_STATUS_META, ISSUE_STATUSES } from '../../../core/meta';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
@@ -176,7 +177,7 @@ const POLL_MS = 2000;
                   · added {{ c.createdAt | relativeTime }}@if (c.lastUsedAt) { · used {{ c.lastUsedAt | relativeTime }} }
                 </span>
               </div>
-              <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Delete the credential of ' + c.account" (click)="removeCredential(c)">
+              <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Delete the credential of ' + c.account" (click)="confirmRemoveCredential(c)">
                 <svg [lucideIcon]="trash" [size]="14"></svg>
               </button>
             </div>
@@ -361,7 +362,7 @@ const POLL_MS = 2000;
                   <button hlmBtn size="sm" variant="outline" class="h-7" (click)="retry(j)"><svg [lucideIcon]="retryIcon" [size]="12"></svg> Resume</button>
                 }
                 @if (!isActive(j)) {
-                  <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Remove ' + j.sourceLabel + ' from history'" (click)="remove(j)"><svg [lucideIcon]="close" [size]="14"></svg></button>
+                  <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Remove ' + j.sourceLabel + ' from history'" (click)="confirmRemove(j)"><svg [lucideIcon]="close" [size]="14"></svg></button>
                 }
               }
             </div>
@@ -391,6 +392,7 @@ const POLL_MS = 2000;
 })
 export class ImportSection {
   private readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
   private readonly api = inject(ApiClient);
   private readonly notify = inject(Notifier);
   private readonly destroyRef = inject(DestroyRef);
@@ -581,6 +583,23 @@ export class ImportSection {
     } finally {
       this.busy.set(false);
     }
+  }
+
+  protected confirmRemoveCredential(c: ImportCredential): void {
+    this.ui.setConfirmDelete({
+      title: `Delete the credential of ${c.account}?`,
+      description: 'Imports that use it can no longer reach the source. You can add it again later.',
+      onConfirm: () => this.removeCredential(c),
+    });
+  }
+
+  protected confirmRemove(job: ImportJob): void {
+    this.ui.setConfirmDelete({
+      title: `Remove ${job.sourceLabel} from history?`,
+      description: 'Only the history entry is removed. The tasks it already imported stay.',
+      confirmLabel: 'Remove',
+      onConfirm: () => this.remove(job),
+    });
   }
 
   protected async removeCredential(c: ImportCredential): Promise<void> {

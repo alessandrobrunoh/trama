@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, effect, inject, viewChild } from '@
 import { LucideDynamicIcon, LucideSquarePen, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../core/ai/assistant.store';
+import { UiStore } from '../../core/stores/ui.store';
 import { AssistantChat } from './assistant-chat';
 
 /** Full-page assistant: the same chats as the floating popup, with room for long conversations. */
@@ -24,7 +25,7 @@ import { AssistantChat } from './assistant-chat';
           variant="ghost"
           size="sm"
           class="text-muted-foreground"
-          (click)="ai.deleteChat(chat.id)"
+          (click)="deleteChat(chat.id, chat.title)"
         >
           <svg [lucideIcon]="deleteIcon" [size]="14"></svg> Delete
         </button>
@@ -38,9 +39,18 @@ import { AssistantChat } from './assistant-chat';
 })
 export class AssistantPage {
   protected readonly ai = inject(AssistantStore);
+  private readonly ui = inject(UiStore);
   private readonly chat = viewChild(AssistantChat);
   protected readonly newIcon = LucideSquarePen;
   protected readonly deleteIcon = LucideTrash2;
+
+  protected deleteChat(id: string, title: string): void {
+    this.ui.setConfirmDelete({
+      title: `Delete “${title}”?`,
+      description: 'The conversation is removed from this device. This cannot be undone.',
+      onConfirm: () => this.ai.deleteChat(id),
+    });
+  }
 
   constructor() {
     // The page opens on a fresh chat (with the history underneath) unless the popup handed one over

@@ -141,7 +141,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               size="icon-sm"
               class="text-muted-foreground"
               [attr.aria-label]="'Revoke invitation for ' + i.email"
-              (click)="revoke(i)"
+              (click)="confirmRevoke(i)"
             >
               <svg [lucideIcon]="xIcon" [size]="14"></svg>
             </button>
@@ -443,6 +443,15 @@ export class MembersSection {
     const link = await this.invites.resend(i.id);
     this.busy.set(false);
     if (link) this.sent.set({ link });
+  }
+
+  protected confirmRevoke(i: WorkspaceInvite): void {
+    this.ui.setConfirmDelete({
+      title: `Revoke the invitation for ${i.email}?`,
+      description: 'The invitation link stops working. You can invite them again later.',
+      confirmLabel: 'Revoke',
+      onConfirm: () => this.revoke(i),
+    });
   }
 
   protected async revoke(i: WorkspaceInvite): Promise<void> {

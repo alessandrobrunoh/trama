@@ -23,14 +23,14 @@ import {
   type StatusSubject,
 } from '../../../core/contracts/domain';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { isLucideName, STATUS_LUCIDE } from '../../../shared/lucide-names';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
   | { kind: 'edit'; entry: StatusEntry }
-  | { kind: 'add' }
-  | { kind: 'delete'; entry: StatusEntry };
+  | { kind: 'add' };
 
 /** Workspace status catalogs: name, icon and color, plus extra statuses that share a semantic type. */
 @Component({
@@ -136,16 +136,6 @@ type Dialog =
               </hlm-dialog-footer>
             </form>
           }
-          @case ('delete') {
-            <hlm-dialog-header>
-              <h2 hlmDialogTitle>Remove {{ deleting()?.name }}?</h2>
-              <p hlmDialogDescription>Nothing is using it. This does not change the type other statuses still have.</p>
-            </hlm-dialog-header>
-            <hlm-dialog-footer>
-              <button hlmBtn type="button" variant="outline" (click)="dlg.set(null)">Cancel</button>
-              <button hlmBtn type="button" variant="destructive" [disabled]="busy()" (click)="confirmDelete()">Remove</button>
-            </hlm-dialog-footer>
-          }
         }
       </hlm-dialog-content>
     </hlm-dialog>
@@ -192,6 +182,7 @@ type Dialog =
 })
 export class StatusesSection {
   private readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
 
   /** Project health went away with project updates: only task and project statuses are configurable. */
   protected readonly subjects = STATUS_SUBJECTS.filter((s) => s === 'issue' || s === 'project');
@@ -220,11 +211,6 @@ export class StatusesSection {
     const dialog = this.dlg();
     return dialog?.kind === 'edit' ? dialog.entry : null;
   });
-  protected readonly deleting = computed(() => {
-    const dialog = this.dlg();
-    return dialog?.kind === 'delete' ? dialog.entry : null;
-  });
-
   protected typeLabel(type: string): string {
     return statusTypeLabel(this.current(), type);
   }
@@ -303,7 +289,14 @@ export class StatusesSection {
 
   protected openDelete(entry: StatusEntry): void {
     if (!this.canRemove(entry)) return;
-    this.dlg.set({ kind: 'delete', entry });
+    this.ui.setConfirmDelete({
+      title: `Remove ${entry.name}?`,
+      description: 'Nothing is using it. This does not change the type other statuses still have.',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        await this.store.deleteStatus(this.current(), entry.id);
+      },
+    });
   }
 
   protected setType(type: string): void {
@@ -326,12 +319,4 @@ export class StatusesSection {
     if (ok) this.dlg.set(null);
   }
 
-  protected async confirmDelete(): Promise<void> {
-    const entry = this.deleting();
-    if (!entry || this.busy()) return;
-    this.busy.set(true);
-    const ok = await this.store.deleteStatus(this.current(), entry.id);
-    this.busy.set(false);
-    if (ok) this.dlg.set(null);
-  }
 }

@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { AssistantStore } from '../../../core/ai/assistant.store';
+import { UiStore } from '../../../core/stores/ui.store';
 import { SECTION_KIT } from './section-kit';
 
 @Component({
@@ -111,7 +112,7 @@ import { SECTION_KIT } from './section-kit';
         }
         <div class="flex gap-2">
           @if (ai.status()?.supergrok?.connected) {
-            <button hlmBtn variant="outline" size="sm" (click)="ai.disconnectSuperGrok()">
+            <button hlmBtn variant="outline" size="sm" (click)="disconnectSuperGrok()">
               Disconnect SuperGrok
             </button>
           } @else {
@@ -173,4 +174,14 @@ import { SECTION_KIT } from './section-kit';
 })
 export class AiSection {
   protected readonly ai = inject(AssistantStore);
+  private readonly ui = inject(UiStore);
+
+  protected disconnectSuperGrok(): void {
+    this.ui.setConfirmDelete({
+      title: 'Disconnect SuperGrok?',
+      description: 'The assistant stops using your SuperGrok account until you connect it again.',
+      confirmLabel: 'Disconnect',
+      onConfirm: () => this.ai.disconnectSuperGrok(),
+    });
+  }
 }
