@@ -5,7 +5,6 @@ import {
   inject,
   input,
   model,
-  output,
   signal,
 } from '@angular/core';
 import {
@@ -28,12 +27,10 @@ import {
   type ProjectAiRisk,
   type ProjectAiRisks,
   type ProjectAiSummary,
-  type ProjectHealth,
 } from '../../core';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { EntityChip } from '../../shared/entity-chip';
 import { Markdown } from '../../shared/markdown';
-import { ProjectHealthBadge } from './project-health';
 
 const NOT_CONFIGURED =
   'AI is not configured for this workspace. Ask an administrator to connect a model in Settings › AI & assistant.';
@@ -47,63 +44,6 @@ function injectAiAvailability() {
   const assistant = inject(AssistantStore);
   const notConfigured = computed(() => assistant.status() !== null && !assistant.ready());
   return { notConfigured, failure: () => (notConfigured() ? NOT_CONFIGURED : FAILED) };
-}
-
-/** "Draft with AI": asks for a status update draft (health + markdown) and emits it. Nothing is posted. */
-@Component({
-  selector: 'app-project-ai-draft-button',
-  changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmSpinner, LucideDynamicIcon],
-  host: { class: 'inline-flex flex-col items-start gap-1' },
-  template: `
-    <button
-      hlmBtn
-      type="button"
-      variant="outline"
-      size="sm"
-      class="gap-1.5"
-      [disabled]="busy()"
-      [attr.aria-busy]="busy()"
-      (click)="run()"
-    >
-      @if (busy()) {
-        <hlm-spinner class="size-3.5" aria-label="Drafting" />
-        <span>Drafting…</span>
-      } @else {
-        <svg [lucideIcon]="sparkles" [size]="14"></svg>
-        <span>Draft with AI</span>
-      }
-    </button>
-    @if (error(); as e) {
-      <p class="text-destructive max-w-xs text-xs" role="alert">{{ e }}</p>
-    }
-  `,
-})
-export class ProjectAiDraftButton {
-  private readonly store = inject(TramaStore);
-  private readonly ai = injectAiAvailability();
-
-  readonly project = input.required<Project>();
-  readonly draft = output<{ health: ProjectHealth; body: string }>();
-
-  protected readonly sparkles = LucideSparkles;
-  protected readonly busy = signal(false);
-  protected readonly error = signal('');
-
-  protected async run(): Promise<void> {
-    if (this.busy()) return;
-    const id = this.project().id;
-    this.busy.set(true);
-    this.error.set('');
-    try {
-      const result = await this.store.aiProject(id, 'update_draft');
-      if (this.project().id !== id) return;
-      if (!result) this.error.set(this.ai.failure());
-      else this.draft.emit({ health: result.health, body: result.body });
-    } finally {
-      this.busy.set(false);
-    }
-  }
 }
 
 /** "Summarize with AI": previews a proposed summary + description; nothing changes until "Apply". */
@@ -151,7 +91,7 @@ export class ProjectAiDraftButton {
           <div class="flex flex-col gap-4 text-[13px]">
             <section class="grid gap-1.5" aria-labelledby="ai-sum-summary">
               <h3 id="ai-sum-summary" class="text-muted-foreground text-xs font-medium">Summary</h3>
-              <p class="rounded-md border px-3 py-2">{{ p.summary }}</p>
+              <p class="bg-muted rounded-md px-3 py-2">{{ p.summary }}</p>
               @if (project().summary) {
                 <p class="text-meta line-clamp-2">Current: {{ project().summary }}</p>
               }
@@ -160,7 +100,7 @@ export class ProjectAiDraftButton {
               <h3 id="ai-sum-description" class="text-muted-foreground text-xs font-medium">
                 Description
               </h3>
-              <div class="rounded-md border px-3 py-2">
+              <div class="bg-muted rounded-md px-3 py-2">
                 <app-markdown [source]="p.description" />
               </div>
               @if (project().description) {
@@ -243,7 +183,7 @@ export class ProjectAiSummaryButton {
   selector: 'app-project-ai-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmSpinner, LucideDynamicIcon],
-  host: { class: 'bg-card block rounded-lg border' },
+  host: { class: 'bg-card block rounded-lg' },
   template: `
     <div class="flex items-center gap-1 pe-2">
       <button
@@ -268,7 +208,7 @@ export class ProjectAiSummaryButton {
       <ng-content select="[cardActions]" />
     </div>
     @if (open()) {
-      <div [id]="bodyId" class="border-t px-3 py-3" [attr.aria-busy]="busy()">
+      <div [id]="bodyId" class="px-3 pt-1 pb-3" [attr.aria-busy]="busy()">
         <ng-content />
       </div>
     }
@@ -293,8 +233,8 @@ export class ProjectAiCard {
   host: { class: 'block' },
   template: `
     <app-project-ai-card
-      title="Suggested issues"
-      busyLabel="Finding issues"
+      title="Suggested tasks"
+      busyLabel="Finding tasks"
       [busy]="busy()"
       [open]="open()"
       (openChange)="toggle($event)"
@@ -321,10 +261,10 @@ export class ProjectAiCard {
           </button>
         </div>
       } @else if (busy() && !loaded()) {
-        <p class="text-meta">Looking through open issues that are not in this project…</p>
+        <p class="text-meta">Looking through open tasks that are not in this project…</p>
       } @else if (loaded()) {
         @if (rows().length) {
-          <ul class="flex flex-col divide-y" aria-label="Suggested issues">
+          <ul class="flex flex-col gap-1" aria-label="Suggested tasks">
             @for (r of rows(); track r.issueId) {
               <li class="flex flex-wrap items-start gap-x-3 gap-y-1.5 py-2 first:pt-0 last:pb-0">
                 <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
@@ -365,11 +305,11 @@ export class ProjectAiCard {
             }
           </ul>
         } @else {
-          <p class="text-meta">No more suggestions. Issues in this project are already counted.</p>
+          <p class="text-meta">No more suggestions. Tasks in this project are already counted.</p>
         }
       } @else {
         <p class="text-meta">
-          Open this card to ask the assistant which existing issues belong here.
+          Open this card to ask the assistant which existing tasks belong here.
         </p>
       }
     </app-project-ai-card>
@@ -419,7 +359,7 @@ export class ProjectIssueSuggestions {
     try {
       const result = await this.store.aiProject(id, 'issues');
       if (this.project().id !== id) return;
-      if (result) {
+      if (result?.kind === 'issues') {
         this.result.set({ projectId: id, items: result.suggestions });
         this.dismissed.set(new Set());
         this.added.set(new Set());
@@ -451,24 +391,24 @@ const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, 
 const SEVERITY_STYLE: Record<AttentionSeverity, { label: string; classes: string }> = {
   high: {
     label: 'High',
-    classes: 'text-status-blocked bg-status-blocked/10 border-status-blocked/25',
+    classes: 'text-status-blocked bg-status-blocked/10',
   },
   medium: {
     label: 'Medium',
-    classes: 'text-status-needs-input bg-status-needs-input/10 border-status-needs-input/25',
+    classes: 'text-status-needs-input bg-status-needs-input/10',
   },
-  low: { label: 'Low', classes: 'text-muted-foreground bg-muted border-border' },
+  low: { label: 'Low', classes: 'text-muted-foreground bg-muted' },
 };
 
-/** "Risks & health": proposed health and the risks found for the project (read-only; health is set by posting an update). */
+/** "Risks": the risks found for the project (read-only). */
 @Component({
   selector: 'app-project-risks-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ProjectAiCard, ProjectHealthBadge, EntityChip, HlmButtonImports, LucideDynamicIcon],
+  imports: [ProjectAiCard, EntityChip, HlmButtonImports, LucideDynamicIcon],
   host: { class: 'block' },
   template: `
     <app-project-ai-card
-      title="Risks & health"
+      title="Risks"
       busyLabel="Checking risks"
       [busy]="busy()"
       [open]="open()"
@@ -497,27 +437,14 @@ const SEVERITY_STYLE: Record<AttentionSeverity, { label: string; classes: string
         </div>
       } @else if (busy() && !data()) {
         <p class="text-meta">Checking dates, blockers and open questions…</p>
-      } @else if (data(); as d) {
-        <div class="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span class="text-muted-foreground text-xs">Proposed health</span>
-          <app-project-health [health]="d.health" [compact]="true" />
-          @if (d.health !== project().health) {
-            <span class="text-meta text-xs">
-              {{
-                project().health
-                  ? 'Current is different. Post an update to change it.'
-                  : 'No update posted yet.'
-              }}
-            </span>
-          }
-        </div>
+      } @else if (data()) {
         @if (risks().length) {
-          <ul class="flex flex-col divide-y" aria-label="Risks">
+          <ul class="flex flex-col gap-1" aria-label="Risks">
             @for (r of risks(); track $index) {
               <li class="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
                 <div class="flex items-center gap-2">
                   <span
-                    class="inline-flex h-5 shrink-0 items-center rounded-full border px-2 text-[11px] font-medium"
+                    class="inline-flex h-5 shrink-0 items-center rounded-full px-2 text-[11px] font-medium"
                     [class]="severity[r.severity].classes"
                   >
                     {{ severity[r.severity].label }}<span class="sr-only"> severity</span>

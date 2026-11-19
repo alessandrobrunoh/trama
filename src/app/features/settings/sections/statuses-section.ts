@@ -23,19 +23,20 @@ import {
   type StatusSubject,
 } from '../../../core/contracts/domain';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { UiStore } from '../../../core/stores/ui.store';
+import { AppSelect, type Option } from '../../../shared/app-select';
 import { isLucideName, STATUS_LUCIDE } from '../../../shared/lucide-names';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
   | { kind: 'edit'; entry: StatusEntry }
-  | { kind: 'add' }
-  | { kind: 'delete'; entry: StatusEntry };
+  | { kind: 'add' };
 
 /** Workspace status catalogs: name, icon and color, plus extra statuses that share a semantic type. */
 @Component({
   selector: 'app-statuses-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, HlmButtonImports, HlmDialogImports, HlmInputImports, LucideDynamicIcon, ...SECTION_KIT],
+  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, HlmInputImports, LucideDynamicIcon, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-6' },
   template: `
     <app-section-header
@@ -74,7 +75,7 @@ type Dialog =
     <app-settings-group [title]="labels[current()] + ' · ' + entries().length">
       @for (entry of entries(); track entry.id) {
         <div class="flex min-h-14 items-center gap-3 px-4 py-2">
-          <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-md border" [style.color]="entry.color">
+          <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary" [style.color]="entry.color">
             @if (emoji(entry.icon); as mark) {
               <span class="text-sm leading-none">{{ mark }}</span>
             } @else {
@@ -135,16 +136,6 @@ type Dialog =
               </hlm-dialog-footer>
             </form>
           }
-          @case ('delete') {
-            <hlm-dialog-header>
-              <h2 hlmDialogTitle>Remove {{ deleting()?.name }}?</h2>
-              <p hlmDialogDescription>Nothing is using it. This does not change the type other statuses still have.</p>
-            </hlm-dialog-header>
-            <hlm-dialog-footer>
-              <button hlmBtn type="button" variant="outline" (click)="dlg.set(null)">Cancel</button>
-              <button hlmBtn type="button" variant="destructive" [disabled]="busy()" (click)="confirmDelete()">Remove</button>
-            </hlm-dialog-footer>
-          }
         }
       </hlm-dialog-content>
     </hlm-dialog>
@@ -158,11 +149,7 @@ type Dialog =
         @if (showType) {
           <div class="grid gap-1.5">
             <label class="text-muted-foreground text-xs font-medium" for="status-type">Type</label>
-            <select id="status-type" class="border-input bg-background h-9 rounded-md border px-2 text-[13px]" [value]="formType()" (change)="setType($any($event.target).value)">
-              @for (type of types(); track type) {
-                <option [value]="type">{{ typeLabel(type) }}</option>
-              }
-            </select>
+            <app-select controlId="status-type" [options]="typeOptions()" [value]="formType()" (valueChange)="setType($event)" />
           </div>
         }
         <div class="grid gap-1.5">
@@ -195,8 +182,10 @@ type Dialog =
 })
 export class StatusesSection {
   private readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
 
-  protected readonly subjects = STATUS_SUBJECTS;
+  /** Project health went away with project updates: only task and project statuses are configurable. */
+  protected readonly subjects = STATUS_SUBJECTS.filter((s) => s === 'issue' || s === 'project');
   protected readonly labels = STATUS_SUBJECT_LABEL;
   protected readonly nameMax = STATUS_NAME_MAX;
   protected readonly iconChoices = [...STATUS_LUCIDE.keys()];
@@ -215,15 +204,13 @@ export class StatusesSection {
   protected readonly canManage = computed(() => this.store.can('admin'));
   protected readonly entries = computed(() => this.store.settings().statuses[STATUS_CATALOG_KEY[this.current()]]);
   protected readonly types = computed(() => statusTypes(this.current()));
+  protected readonly typeOptions = computed<Option[]>(() =>
+    this.types().map((type) => ({ value: type, label: this.typeLabel(type) })),
+  );
   protected readonly editing = computed(() => {
     const dialog = this.dlg();
     return dialog?.kind === 'edit' ? dialog.entry : null;
   });
-  protected readonly deleting = computed(() => {
-    const dialog = this.dlg();
-    return dialog?.kind === 'delete' ? dialog.entry : null;
-  });
-
   protected typeLabel(type: string): string {
     return statusTypeLabel(this.current(), type);
   }
@@ -245,10 +232,6 @@ export class StatusesSection {
         return store.issues().filter((issue) => has(issue.status)).length;
       case 'project':
         return store.projects().filter((project) => has(project.status)).length;
-      case 'decision':
-        return store.decisions().filter((decision) => has(decision.status)).length;
-      case 'project_health':
-        return store.projects().filter((project) => has(project.health)).length;
       default:
         return 0;
     }
@@ -306,7 +289,14 @@ export class StatusesSection {
 
   protected openDelete(entry: StatusEntry): void {
     if (!this.canRemove(entry)) return;
-    this.dlg.set({ kind: 'delete', entry });
+    this.ui.setConfirmDelete({
+      title: `Remove ${entry.name}?`,
+      description: 'Nothing is using it. This does not change the type other statuses still have.',
+      confirmLabel: 'Remove',
+      onConfirm: async () => {
+        await this.store.deleteStatus(this.current(), entry.id);
+      },
+    });
   }
 
   protected setType(type: string): void {
@@ -329,12 +319,4 @@ export class StatusesSection {
     if (ok) this.dlg.set(null);
   }
 
-  protected async confirmDelete(): Promise<void> {
-    const entry = this.deleting();
-    if (!entry || this.busy()) return;
-    this.busy.set(true);
-    const ok = await this.store.deleteStatus(this.current(), entry.id);
-    this.busy.set(false);
-    if (ok) this.dlg.set(null);
-  }
 }

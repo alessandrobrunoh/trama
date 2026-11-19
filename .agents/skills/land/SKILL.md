@@ -38,7 +38,7 @@ Land only the change the user asked to land. If the worktree also contains unrel
 
 If the change is already committed on a non-`main` branch, keep that branch. Otherwise create a short descriptive branch from the current `HEAD` (for example `docs/landing-skill` or `fix/workspace-isolation`) and commit there. Do not commit on `main`.
 
-Commit messages are short and imperative. There is no conventional-commits requirement. Examples: `Add workstream repository relation`, `Fix workspace scoping in execution query`.
+Commit messages are short and imperative. There is no conventional-commits requirement. Examples: `Add task sub-task filter`, `Fix workspace scoping in task query`.
 
 ```bash
 git switch -c <branch>

@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import { BadRequestException } from '@nestjs/common';
 import type { DataSource, Repository } from 'typeorm';
 import { describe, expect, it, vi } from 'vitest';
 import type { RefsService } from '../common/refs.service.js';
@@ -62,10 +62,17 @@ describe('isHttpUrl', () => {
 });
 
 describe('ArtifactsService owners', () => {
-  it('requires at least one owner', async () => {
+  it('requires a task owner', async () => {
     const { service } = setup();
     await expect(
       service.create('ws_1', ACTOR, { kind: 'document', title: 'x' }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      service.create('ws_1', ACTOR, {
+        kind: 'document',
+        title: 'x',
+        projectId: 'pj_1',
+      } as never),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
@@ -75,14 +82,14 @@ describe('ArtifactsService owners', () => {
       service.create('ws_1', ACTOR, {
         kind: 'link',
         title: 'x',
-        projectId: 'pj_1',
+        issueId: 'in_1',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
       service.create('ws_1', ACTOR, {
         kind: 'link',
         title: 'x',
-        projectId: 'pj_1',
+        issueId: 'in_1',
         url: 'ftp://x',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
@@ -90,7 +97,7 @@ describe('ArtifactsService owners', () => {
       service.create('ws_1', ACTOR, {
         kind: 'link',
         title: 'x',
-        projectId: 'pj_1',
+        issueId: 'in_1',
         url: 'https://x.test',
       }),
     ).resolves.toMatchObject({ kind: 'link', state: 'published' });
@@ -98,169 +105,54 @@ describe('ArtifactsService owners', () => {
       service.create('ws_1', ACTOR, {
         kind: 'file',
         title: 'x',
-        projectId: 'pj_1',
+        issueId: 'in_1',
         url: '/api/w/acme/uploads/upl_abcdefghijkl',
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('lets a document carry only a description, and reports the owners in the event', async () => {
+  it('lets a document carry only a description, and reports the owner in the event', async () => {
     const { service, record } = setup();
     const row = await service.create('ws_1', ACTOR, {
       kind: 'document',
       title: 'Notes',
       description: ' why ',
       issueId: 'in_1',
-      projectId: 'pj_1',
     });
-    expect(row).toMatchObject({
-      description: 'why',
-      issueId: 'in_1',
-      projectId: 'pj_1',
-    });
+    expect(row).toMatchObject({ description: 'why', issueId: 'in_1' });
     expect(record).toHaveBeenCalledWith(
       expect.objectContaining({
         type: 'artifact.attached',
-        data: expect.objectContaining({ issueId: 'in_1', projectId: 'pj_1' }),
+        data: expect.objectContaining({ issueId: 'in_1' }),
       }),
     );
   });
 
-  it('refuses to detach the last owner and keeps the others when detaching one', async () => {
-    const { service, record } = setup({
-      projectId: 'pj_1',
-      issueId: null,
-    });
+  it('refuses to detach the task owner', async () => {
+    const { service, record } = setup({ issueId: 'in_1' });
     await expect(
-      service.update('ws_1', ACTOR, 'ar_1', { projectId: null }),
+      service.update('ws_1', ACTOR, 'ar_1', { issueId: null }),
     ).rejects.toBeInstanceOf(BadRequestException);
-    const { service: s2, record: r2 } = setup({
-      projectId: 'pj_1',
-      issueId: 'in_1',
-    });
-    await expect(
-      s2.update('ws_1', ACTOR, 'ar_1', { issueId: null }),
-    ).resolves.toMatchObject({ projectId: 'pj_1', issueId: null });
-    expect(r2).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: 'artifact.updated',
-        data: expect.objectContaining({ projectId: 'pj_1' }),
-      }),
-    );
     expect(record).not.toHaveBeenCalled();
   });
-});
 
-describe('ArtifactsService document artifacts', () => {
-  function withDocument(
-    docs: { id: string; title: string; workspaceId: string }[],
-    attached: Partial<ArtifactEntity>[] = [],
-  ) {
-    const record = vi.fn(async () => ({}));
-    const repo = {
-      create: (x: Partial<ArtifactEntity>) => x as ArtifactEntity,
-      save: async (x: ArtifactEntity) => x,
-      findOneBy: async () => null,
-      existsBy: async (w: Partial<ArtifactEntity>) =>
-        attached.some((a) =>
-          Object.entries(w).every(
-            ([k, v]) => (a as Record<string, unknown>)[k] === v,
-          ),
-        ),
-    } as unknown as Repository<ArtifactEntity>;
-    const others = {
-      existsBy: async () => true,
-      findOne: async ({
-        where,
-      }: {
-        where: { id: string; workspaceId: string };
-      }) =>
-        docs.find(
-          (d) => d.id === where.id && d.workspaceId === where.workspaceId,
-        ) ??
-        (where.id.startsWith('in_') ? { id: where.id, projectId: null } : null),
-    };
-    const ds = {
-      getRepository: () => others,
-      query: async () => [],
-    } as unknown as DataSource;
-    const refs = {
-      repositories: async () => undefined,
-    } as unknown as RefsService;
-    return {
-      service: new ArtifactsService(
-        ds,
-        refs,
-        { record } as unknown as EventsService,
-        repo,
-      ),
-    };
-  }
-
-  it('takes title and provider from the document and needs no url', async () => {
-    const { service } = withDocument([
-      { id: 'doc_1', title: 'Spec', workspaceId: 'ws_1' },
-    ]);
+  it('moves an artifact to another task', async () => {
+    const { service, record } = setup({ issueId: 'in_1' });
     await expect(
-      service.create('ws_1', ACTOR, {
-        kind: 'document',
-        documentId: 'doc_1',
-        projectId: 'pj_1',
-        title: 'ignored',
-        url: 'https://x.test',
+      service.update('ws_1', ACTOR, 'ar_1', { issueId: 'in_2' }),
+    ).resolves.toMatchObject({ issueId: 'in_2' });
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'artifact.updated',
+        data: expect.objectContaining({ issueId: 'in_2' }),
       }),
-    ).resolves.toMatchObject({
-      title: 'Spec',
-      documentId: 'doc_1',
-      provider: 'docs',
-      url: null,
-      state: 'published',
-    });
-  });
-
-  it('refuses a document of another workspace, a wrong kind, and a second attach to the same owner', async () => {
-    const { service } = withDocument([
-      { id: 'doc_1', title: 'Spec', workspaceId: 'ws_2' },
-    ]);
-    await expect(
-      service.create('ws_1', ACTOR, {
-        kind: 'document',
-        documentId: 'doc_1',
-        projectId: 'pj_1',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    const mine = withDocument(
-      [{ id: 'doc_1', title: 'Spec', workspaceId: 'ws_1' }],
-      [{ documentId: 'doc_1', projectId: 'pj_1', workspaceId: 'ws_1' }],
     );
-    await expect(
-      mine.service.create('ws_1', ACTOR, {
-        kind: 'link',
-        documentId: 'doc_1',
-        projectId: 'pj_1',
-        url: 'https://x.test',
-      }),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(
-      mine.service.create('ws_1', ACTOR, {
-        kind: 'document',
-        documentId: 'doc_1',
-        projectId: 'pj_1',
-      }),
-    ).rejects.toBeInstanceOf(ConflictException);
-    await expect(
-      mine.service.create('ws_1', ACTOR, {
-        kind: 'document',
-        documentId: 'doc_1',
-        issueId: 'in_1',
-      }),
-    ).resolves.toMatchObject({ issueId: 'in_1' });
   });
 
-  it('still needs a title without a document', async () => {
-    const { service } = withDocument([]);
+  it('needs a title', async () => {
+    const { service } = setup();
     await expect(
-      service.create('ws_1', ACTOR, { kind: 'document', projectId: 'pj_1' }),
+      service.create('ws_1', ACTOR, { kind: 'document', issueId: 'in_1' }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 });
@@ -272,8 +164,9 @@ describe('ArtifactsService issue artifact counts', () => {
       andWhere: vi.fn().mockReturnThis(),
       getCount: vi.fn(async () => count),
     };
+    const createQueryBuilder = vi.fn(() => query);
     const repo = {
-      createQueryBuilder: vi.fn(() => query),
+      createQueryBuilder,
     } as unknown as Repository<ArtifactEntity>;
     const service = new ArtifactsService(
       {} as DataSource,
@@ -281,17 +174,17 @@ describe('ArtifactsService issue artifact counts', () => {
       {} as EventsService,
       repo,
     );
-    return { service, query, repo };
+    return { service, query, createQueryBuilder };
   }
 
   it.each([0, 3])(
     'returns %i for an issue without loading its artifacts',
     async (count) => {
-      const { service, query, repo } = withCount(count);
+      const { service, query, createQueryBuilder } = withCount(count);
 
       await expect(service.countForIssue('ws_1', 'in_1')).resolves.toBe(count);
 
-      expect(repo.createQueryBuilder.mock.calls).toEqual([['a']]);
+      expect(createQueryBuilder.mock.calls).toEqual([['a']]);
       expect(query.where).toHaveBeenCalledWith('a.workspaceId = :workspaceId', {
         workspaceId: 'ws_1',
       });
@@ -310,7 +203,6 @@ describe('ArtifactsService issue-owner visibility', () => {
       const artifact = {
         id: 'ar_hidden',
         workspaceId: 'ws_1',
-        projectId: null,
         issueId: 'in_hidden',
       } as ArtifactEntity;
       const repo = {
@@ -343,7 +235,6 @@ describe('ArtifactsService issue-owner visibility', () => {
     const artifact = {
       id: 'ar_unassigned',
       workspaceId: 'ws_1',
-      projectId: null,
       issueId: null,
     } as ArtifactEntity;
     const service = new ArtifactsService(
@@ -431,28 +322,32 @@ describe('ArtifactsService issue-owner visibility', () => {
   );
 
   it.each([true, false])(
-    'rejects creating or moving an artifact onto a hidden project (includeUnassigned=%s)',
+    'rejects moving an artifact onto a hidden issue (includeUnassigned=%s)',
     async (includeUnassigned) => {
       const access = {
         projects: { all: false, projectIds: ['pj_visible'] },
         includeUnassigned,
         grants: [],
       };
-      const { service } = setup();
-      const update = setup({ projectId: 'pj_visible', issueId: null });
+      const issueRepo = {
+        findOne: async ({ where }: { where: { id: string } }) => ({
+          id: where.id,
+          projectId: where.id === 'in_hidden' ? 'pj_hidden' : 'pj_visible',
+        }),
+      };
+      const row = { id: 'ar_1', workspaceId: 'ws_1', issueId: 'in_visible' };
+      const service = new ArtifactsService(
+        { getRepository: () => issueRepo } as unknown as DataSource,
+        {} as RefsService,
+        {} as EventsService,
+        {
+          findOneBy: async () => row,
+        } as unknown as Repository<ArtifactEntity>,
+      );
 
       await memberAccessStore.run(access, async () => {
         await expect(
-          service.create('ws_1', ACTOR, {
-            kind: 'document',
-            title: 'Hidden project artifact',
-            projectId: 'pj_hidden',
-          }),
-        ).rejects.toMatchObject({ status: 400 });
-        await expect(
-          update.service.update('ws_1', ACTOR, 'ar_1', {
-            projectId: 'pj_hidden',
-          }),
+          service.update('ws_1', ACTOR, 'ar_1', { issueId: 'in_hidden' }),
         ).rejects.toMatchObject({ status: 400 });
       });
     },
@@ -464,7 +359,6 @@ describe('ArtifactsService issue-owner visibility', () => {
       const artifact = {
         id: 'ar_hidden',
         workspaceId: 'ws_1',
-        projectId: null,
         issueId: 'in_hidden',
         kind: 'document',
         title: 'Hidden',

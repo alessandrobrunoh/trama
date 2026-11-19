@@ -2,20 +2,14 @@ import {
   LucideActivity,
   LucideInbox,
   LucideBox,
-  LucideBuilding2,
   LucideChartColumn,
+  LucideChartGantt,
   LucideCircleDot,
-  LucideFileText,
-  LucideFolderGit2,
+  LucideGauge,
   LucideLayers,
-  LucideLayoutDashboard,
   LucideMessageSquare,
   LucidePlug,
-  LucideRocket,
-  LucideScale,
   LucideTimer,
-  LucideUserRoundCheck,
-  LucideUsers,
   type LucideIcon,
 } from '@lucide/angular';
 
@@ -34,8 +28,8 @@ export interface NavItem {
 }
 
 /**
- * The five places people live in, always visible at the top of the sidebar.
- * Inbox merges what used to be My Attention and Notifications.
+ * The places people live in, always visible at the top of the sidebar.
+ * Inbox merges what used to be My Attention, Notifications and My Work.
  */
 export const PRIMARY_NAV: NavItem[] = [
   {
@@ -44,23 +38,25 @@ export const PRIMARY_NAV: NavItem[] = [
     icon: LucideInbox,
     keys: 'g a',
     badge: 'inbox',
-    hint: 'Everything waiting on you: questions, reviews, blockers, mentions and updates',
-    keywords: 'attention notifications needs you updates unread',
+    hint: 'What needs you, your tasks and what changed: reviews, blockers, mentions and updates',
+    keywords: 'attention notifications needs you updates unread my work my tasks assigned',
   },
   {
-    segment: 'my-work',
-    label: 'My work',
-    icon: LucideUserRoundCheck,
-    keys: 'g m',
-    hint: 'Issues assigned to you or reported by you',
+    segment: 'overview',
+    label: 'Overview',
+    icon: LucideGauge,
+    keys: 'g o',
+    hint: 'The workspace as a briefing: what moves, what is stuck, who is on what and which projects are late',
+    keywords: 'dashboard pulse briefing summary status health progress week',
   },
   {
-    segment: 'issues',
-    label: 'Issues',
+    segment: 'tasks',
+    label: 'Tasks',
     icon: LucideCircleDot,
     keys: 'g i',
     badge: 'issues',
-    hint: 'Demand: bugs, requests, incidents. What problems exist',
+    hint: 'Bugs, requests, and incidents',
+    keywords: 'issues',
   },
   {
     segment: 'projects',
@@ -68,6 +64,14 @@ export const PRIMARY_NAV: NavItem[] = [
     icon: LucideBox,
     keys: 'g p',
     hint: 'Planned outcomes: what we want to achieve, by when, and where',
+  },
+  {
+    segment: 'timeline',
+    label: 'Timeline',
+    icon: LucideChartGantt,
+    keys: 'g t',
+    hint: 'All projects on one time axis: milestones, progress and where each is heading',
+    keywords: 'roadmap gantt schedule milestones forecast calendar dates',
   },
 ];
 
@@ -81,68 +85,12 @@ export const MORE_NAV: NavItem[] = [
     hint: 'Start, stop, or add your own time. It stays in Trama.',
   },
   {
-    segment: 'overview',
-    label: 'Overview',
-    icon: LucideLayoutDashboard,
-    keys: 'g o',
-    hint: 'What is in flight across the workspace',
-  },
-  {
-    segment: 'input-requests',
-    label: 'Input requests',
-    icon: LucideMessageSquare,
-    keys: '',
-    hint: 'Questions waiting for or preserving a human answer',
-  },
-  {
-    segment: 'decisions',
-    label: 'Decisions',
-    icon: LucideScale,
-    keys: 'g d',
-    hint: 'What was decided and why',
-  },
-  {
-    segment: 'documents',
-    label: 'Documents',
-    icon: LucideFileText,
-    keys: 'g u',
-    hint: 'Specs, plans and notes that do not live in a repository',
-  },
-  {
-    segment: 'releases',
-    label: 'Releases',
-    icon: LucideRocket,
-    keys: 'g l',
-    hint: 'Release pipelines, versions and changelog',
-    keywords: 'versions shipped changelog',
-  },
-  {
-    segment: 'customers',
-    label: 'Customers',
-    icon: LucideBuilding2,
-    keys: 'g c',
-    hint: 'Companies whose feedback is linked to issues',
-  },
-  {
-    segment: 'repositories',
-    label: 'Repositories',
-    icon: LucideFolderGit2,
-    keys: 'g r',
-    hint: 'Repositories and the work touching them',
-  },
-  {
-    segment: 'teams',
-    label: 'Teams',
-    icon: LucideUsers,
-    keys: 'g t',
-    hint: 'Who works on what, team by team',
-  },
-  {
     segment: 'views',
     label: 'Views',
     icon: LucideLayers,
     keys: 'g v',
-    hint: 'Saved filters for issues, projects and decisions, as lists, boards or timelines',
+    hint: 'Saved filters for tasks and projects, as lists, boards or timelines',
+    keywords: 'issues',
   },
   {
     segment: 'activity',
@@ -156,7 +104,7 @@ export const MORE_NAV: NavItem[] = [
     label: 'Statistics',
     icon: LucideChartColumn,
     keys: 'g y',
-    hint: 'Throughput, health and trends',
+    hint: 'Finished work, work in progress and estimates',
   },
   {
     segment: 'assistant',
@@ -192,22 +140,15 @@ export function orderNav(items: readonly NavItem[], order: readonly string[]): N
 
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
-  overview: 'Overview',
   timer: 'Timer',
   stats: 'Statistics',
   inbox: 'Inbox',
-  'my-work': 'My work',
   assistant: 'Assistant',
   connect: 'Connect your agent',
-  issues: 'Issues',
-  'input-requests': 'Input requests',
-  customers: 'Customers',
-  decisions: 'Decisions',
+  tasks: 'Tasks',
+  issues: 'Tasks',
   projects: 'Projects',
-  documents: 'Documents',
-  releases: 'Releases',
-  repositories: 'Repositories',
-  teams: 'Teams',
+  timeline: 'Timeline',
   views: 'Views',
   activity: 'Activity',
   settings: 'Settings',
@@ -215,14 +156,9 @@ export const SECTION_LABELS: Record<string, string> = {
 
 /** Sections that have a list page to link back to. */
 export const SECTIONS_WITH_LIST = new Set([
+  'tasks',
   'issues',
-  'customers',
-  'decisions',
   'projects',
-  'documents',
-  'releases',
-  'repositories',
-  'teams',
   'views',
   'settings',
 ]);

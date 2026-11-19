@@ -14,7 +14,7 @@ export interface PickOption {
   label: string;
   /** Secondary text (searchable in the picker). */
   hint?: string;
-  /** Leading colour dot (a CSS colour, e.g. a team colour). */
+  /** Leading colour dot (a CSS colour, e.g. a project colour). */
   color?: string;
   status?: AnyStatus;
   /** Glyph family for the status option. */
@@ -48,7 +48,7 @@ export class OptionLeading {
  * Filter-chip style dropdown: a small outline button "Label: summary" opening a radio (single) or
  * checkbox (multi) menu. Value is an array of selected option values (empty = no filter).
  *
- *   <app-option-menu label="Team" [options]="teamOptions()" [(selected)]="teams" multi />
+ *   <app-option-menu label="Project" [options]="projectOptions()" [(selected)]="projects" multi />
  */
 @Component({
   selector: 'app-option-menu',
@@ -167,7 +167,7 @@ export class OptionMenu {
 
 /**
  * "Add …" picker: a trigger button (projected content) opening a searchable list. Emits the value
- * of the chosen option; the parent decides what that means (add a team, supersede by…).
+ * of the chosen option; the parent decides what that means (add a task, mark a duplicate of…).
  *
  *   <app-entity-picker [options]="free()" placeholder="Find an item…" (picked)="add($event)">
  *     <svg lucidePlus [size]="13"></svg> Add

@@ -1,12 +1,10 @@
-// Generic filter / sort / group for issues, decisions and projects,
+// Generic filter / sort / group for tasks and projects,
 // driven by the contract's ViewFilter / SavedView. Pure functions: use inside `computed()`.
 import type { SavedView, ViewEntity, ViewFilter } from '../contracts/domain';
 import {
-  DECISION_STATUS_META,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
-  PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
   PROVIDER_META,
 } from '../meta';
@@ -34,10 +32,8 @@ export interface Group<T> {
 /** Display order of an enum value for (entity, field); `Infinity` when unordered. */
 export function enumOrder(entity: ViewEntity, field: string, value: string): number {
   const table = (): Record<string, { order: number }> | null => {
-    if (field === 'status' && entity === 'decision') return DECISION_STATUS_META;
     if (field === 'status' && entity === 'issue') return ISSUE_STATUS_META;
     if (field === 'status' && entity === 'project') return PROJECT_STATUS_META;
-    if (field === 'health' && entity === 'project') return PROJECT_HEALTH_META;
     if (field === 'kind' && entity === 'issue') return ISSUE_KIND_META;
     if (field === 'priority') return PRIORITY_META;
     if (field === 'provider') return PROVIDER_META;

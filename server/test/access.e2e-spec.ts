@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Client, TokenClient, createTestApp } from './app.js';
 
-describe('permission policies, team roles and token scopes', () => {
+describe('permission policies and token scopes', () => {
   let app: INestApplication;
   let server: ReturnType<INestApplication['getHttpServer']>;
   beforeAll(async () => {
@@ -36,46 +36,40 @@ describe('permission policies, team roles and token scopes', () => {
       const { owner, admin, member, w } = await setup();
       const ws = (await owner.get(w).expect(200)).body;
       const caps = (id: string) => ws.settings.roles.find((role: { id: string }) => role.id === id).capabilities as string[];
-      expect(caps('admin')).toContain('createTeams');
-      expect(caps('member')).not.toContain('createTeams');
+      expect(caps('admin')).toContain('manageAgents');
+      expect(caps('member')).not.toContain('manageAgents');
       expect(caps('member')).toContain('createIssues');
       expect(caps('member')).toContain('manageTokens');
       expect(caps('member')).not.toContain('manageIntegrations');
       expect(ws.settings).toMatchObject({ estimateScale: 'fibonacci', weekStart: 'monday', timeZone: 'auto' });
 
-      await admin.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'createTeams'] }).expect(403);
+      await admin.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'manageAgents'] }).expect(403);
       await member.patch(`${w}/settings`, { estimateScale: 'linear' }).expect(403);
       await owner.patch(`${w}/roles/member`, { capabilities: ['not-a-capability'] }).expect(400);
-      const res = (await owner.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'createTeams'] }).expect(200)).body;
-      expect(res.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createTeams');
+      const res = (await owner.patch(`${w}/roles/member`, { capabilities: [...caps('member'), 'manageAgents'] }).expect(200)).body;
+      expect(res.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('manageAgents');
       expect(res.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createIssues');
       const snap = (await owner.get(`${w}/snapshot`).expect(200)).body;
-      expect(snap.workspace.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('createTeams');
+      expect(snap.workspace.settings.roles.find((role: { id: string }) => role.id === 'member').capabilities).toContain('manageAgents');
     });
 
-    it('capabilities are enforced on the routes (members can create teams once allowed; viewers never)', async () => {
+    it('capabilities are enforced on the routes (members manage projects until it is taken away; viewers never)', async () => {
       const { owner, member, viewer, w } = await setup();
-      await member.post(`${w}/teams`, { name: 'Nope', key: 'NOPE' }).expect(403);
-      await setCaps(owner, w, 'member', [...(await roleCaps(owner, w, 'member')), 'createTeams']);
-      await member.post(`${w}/teams`, { name: 'Yes', key: 'YES' }).expect(201);
-      await viewer.post(`${w}/teams`, { name: 'No', key: 'NO' }).expect(403);
-      const t = (await owner.post(`${w}/teams`, { name: 'Core', key: 'CORE' }).expect(201)).body;
-      await member.patch(`${w}/teams/CORE`, { name: 'Renamed' }).expect(403);
-      await member.delete(`${w}/teams/${t.id}`).expect(403);
+      await member.post(`${w}/projects`, { name: 'Allowed' }).expect(201);
+      await viewer.post(`${w}/projects`, { name: 'No' }).expect(403);
+      await setCaps(owner, w, 'member', (await roleCaps(owner, w, 'member')).filter((cap) => cap !== 'manageProjects'));
+      await member.post(`${w}/projects`, { name: 'Nope' }).expect(403);
     });
 
-    it('can lock down issue deletion and decision acceptance', async () => {
+    it('can lock down issue deletion and creation', async () => {
       const { owner, admin, member, w } = await setup();
-      const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Crash' }).expect(201)).body;
-      const decision = (await member.post(`${w}/decisions`, { title: 'Use X', statement: 'We use X', originIssueId: issue.id }).expect(201)).body;
+      const issue = (await member.post(`${w}/tasks`, { kind: 'bug', title: 'Crash' }).expect(201)).body;
 
-      const drop = new Set(['deleteIssues', 'acceptDecisions', 'createIssues']);
+      const drop = new Set(['deleteIssues', 'createIssues']);
       await setCaps(owner, w, 'member', (await roleCaps(owner, w, 'member')).filter((cap) => !drop.has(cap)));
-      await member.delete(`${w}/issues/${issue.key}`).expect(403);
-      await member.post(`${w}/decisions/${decision.key}/accept`).expect(403);
-      await member.post(`${w}/issues`, { kind: 'bug', title: 'Another' }).expect(403);
-      await admin.post(`${w}/decisions/${decision.key}/accept`).expect(200);
-      await admin.delete(`${w}/issues/${issue.key}`).expect(204);
+      await member.delete(`${w}/tasks/${issue.key}`).expect(403);
+      await member.post(`${w}/tasks`, { kind: 'bug', title: 'Another' }).expect(403);
+      await admin.delete(`${w}/tasks/${issue.key}`).expect(204);
     });
 
     it('only roles with inviteMembers can invite, and not into a stronger role; shared views follow manageSharedViews', async () => {
@@ -96,178 +90,23 @@ describe('permission policies, team roles and token scopes', () => {
       await admin.post(`${w}/views`, { name: 'Shared', entity: 'issue', shared: true }).expect(201);
     });
 
-    it('stores workspace customization (default team, estimate scale, week start, time zone, icon)', async () => {
-      const { owner, admin, member, w } = await setup();
-      const team = (await owner.post(`${w}/teams`, { name: 'Core', key: 'CORE' }).expect(201)).body;
+    it('stores workspace customization (estimate scale, week start, time zone, icon)', async () => {
+      const { admin, member, w } = await setup();
       const res = (
         await admin
-          .patch(`${w}/settings`, { defaultTeamId: team.id, estimateScale: 'tshirt', weekStart: 'sunday', timeZone: 'Europe/Rome', iconColor: '#7C3AED', iconInitial: 'pc' })
+          .patch(`${w}/settings`, { estimateScale: 'tshirt', weekStart: 'sunday', timeZone: 'Europe/Rome', iconColor: '#7C3AED', iconInitial: 'pc' })
           .expect(200)
       ).body;
-      expect(res.settings).toMatchObject({ defaultTeamId: team.id, estimateScale: 'tshirt', weekStart: 'sunday', timeZone: 'Europe/Rome', iconColor: '#7c3aed', iconInitial: 'PC' });
+      expect(res.settings).toMatchObject({ estimateScale: 'tshirt', weekStart: 'sunday', timeZone: 'Europe/Rome', iconColor: '#7c3aed', iconInitial: 'PC' });
+      expect(res.settings).not.toHaveProperty('defaultTeamId');
       await admin.patch(`${w}/settings`, { timeZone: 'Mars/Olympus' }).expect(400);
-      await admin.patch(`${w}/settings`, { defaultTeamId: 'tm_missing' }).expect(400);
       await admin.patch(`${w}/settings`, { estimateScale: 'bananas' }).expect(400);
       expect((await admin.patch(`${w}/settings`, { estimateScale: 'exponential' }).expect(200)).body.settings.estimateScale).toBe('exponential');
       await admin.patch(`${w}/settings`, { estimateScale: 'tshirt' }).expect(200);
       expect((await member.get(w).expect(200)).body.settings.estimateScale).toBe('tshirt');
-      const cleared = (await admin.patch(`${w}/settings`, { defaultTeamId: null, iconColor: null, iconInitial: '' }).expect(200)).body;
-      expect(cleared.settings.defaultTeamId).toBeUndefined();
+      const cleared = (await admin.patch(`${w}/settings`, { iconColor: null, iconInitial: '' }).expect(200)).body;
       expect(cleared.settings.iconColor).toBeUndefined();
       expect(cleared.settings.estimateScale).toBe('tshirt');
-    });
-  });
-
-  describe('team roles and edit policy', () => {
-    async function teamSetup() {
-      const ctx = await setup();
-      const { owner, member, w } = ctx;
-      const team = (
-        await owner.post(`${w}/teams`, { name: 'Secure', key: 'SEC', memberIds: [member.id], leadIds: [member.id], editPolicy: 'members' }).expect(201)
-      ).body;
-      const open = (await owner.post(`${w}/teams`, { name: 'Open', key: 'OPEN' }).expect(201)).body;
-      return { ...ctx, team, open };
-    }
-
-    it('validates leads (subset of members), drops leads who leave the team', async () => {
-      const { owner, member, member2, w, team } = await teamSetup();
-      expect(team).toMatchObject({ leadIds: [member.id], editPolicy: 'members' });
-      await owner.post(`${w}/teams`, { name: 'Bad', key: 'BAD', leadIds: [member.id] }).expect(400);
-      await owner.patch(`${w}/teams/SEC`, { leadIds: [member2.id] }).expect(400);
-      const t = (await owner.patch(`${w}/teams/SEC`, { memberIds: [member2.id] }).expect(200)).body;
-      expect(t.leadIds).toEqual([]);
-      expect(t.memberIds).toEqual([member2.id]);
-    });
-
-    it('editPolicy "members": only team members, leads and admins edit its issues', async () => {
-      const { owner, admin, member, member2, w, team } = await teamSetup();
-      const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Locked', teamId: team.id }).expect(201)).body;
-      await member2.patch(`${w}/issues/${issue.key}`, { title: 'Hacked' }).expect(403);
-      await member2.delete(`${w}/issues/${issue.key}`).expect(403);
-      await member2.get(`${w}/issues/${issue.key}`).expect(200);
-      await member.patch(`${w}/issues/${issue.key}`, { title: 'Fine' }).expect(200);
-      await admin.patch(`${w}/issues/${issue.key}`, { title: 'Admin edit' }).expect(200);
-
-      await owner.patch(`${w}/teams/SEC`, { editPolicy: 'workspace' }).expect(200);
-      await member2.patch(`${w}/issues/${issue.key}`, { title: 'Now open' }).expect(200);
-    });
-
-    it('editPolicy "members" also protects the team\'s issues; issues without a team stay open', async () => {
-      const { member, member2, w, team } = await teamSetup();
-      const issue = (await member.post(`${w}/issues`, { kind: 'bug', title: 'Team bug', teamId: team.id }).expect(201)).body;
-      await member2.post(`${w}/issues`, { kind: 'bug', title: 'Sneaky', teamId: team.id }).expect(403);
-      await member2.patch(`${w}/issues/${issue.key}`, { title: 'Hacked' }).expect(403);
-      await member2.delete(`${w}/issues/${issue.key}`).expect(403);
-      await member.patch(`${w}/issues/${issue.key}`, { priority: 'high' }).expect(200);
-      const free = (await member2.post(`${w}/issues`, { kind: 'bug', title: 'No team' }).expect(201)).body;
-      await member2.patch(`${w}/issues/${free.key}`, { teamId: team.id }).expect(403);
-      await member2.patch(`${w}/issues/${free.key}`, { title: 'Still ok' }).expect(200);
-    });
-
-    it('checks the parent team edit policy when creating or reparenting an issue', async () => {
-      const { member, member2, w, team } = await teamSetup();
-      const parent = (
-        await member.post(`${w}/issues`, {
-          kind: 'feature',
-          title: 'Restricted parent',
-          teamId: team.id,
-        }).expect(201)
-      ).body;
-
-      await member2
-        .post(`${w}/issues`, {
-          kind: 'bug',
-          title: 'Unauthorized child',
-          parentId: parent.id,
-        })
-        .expect(403);
-      const child = (
-        await member2
-          .post(`${w}/issues`, { kind: 'bug', title: 'Unlinked issue' })
-          .expect(201)
-      ).body;
-      await member2.patch(`${w}/issues/${child.id}`, { parentId: parent.id }).expect(403);
-
-      const authorizedChild = (
-        await member.post(`${w}/issues`, {
-          kind: 'bug',
-          title: 'Authorized child',
-          parentId: parent.id,
-        }).expect(201)
-      ).body;
-      expect(authorizedChild.parentId).toBe(parent.id);
-
-      await member.patch(`${w}/teams/${team.id}`, { memberIds: [] }).expect(200);
-      await member.patch(`${w}/issues/${authorizedChild.id}`, { parentId: null }).expect(403);
-    });
-
-    it('checks both sides of a hierarchy before deletes detach parent links', async () => {
-      const { owner, member, member2, w, team } = await teamSetup();
-      const otherTeam = (
-        await owner.post(`${w}/teams`, {
-          name: 'Other secure',
-          key: 'OTHER',
-          memberIds: [member2.id],
-          leadIds: [member2.id],
-          editPolicy: 'members',
-        }).expect(201)
-      ).body;
-      const parent = (
-        await member.post(`${w}/issues`, {
-          kind: 'feature',
-          title: 'Secure parent',
-          teamId: team.id,
-        }).expect(201)
-      ).body;
-      const child = (
-        await owner.post(`${w}/issues`, {
-          kind: 'bug',
-          title: 'Other team child',
-          teamId: otherTeam.id,
-          parentId: parent.id,
-        }).expect(201)
-      ).body;
-
-      await member.delete(`${w}/issues/${parent.id}`).expect(403);
-      expect((await owner.get(`${w}/issues/${child.id}`).expect(200)).body.parentId).toBe(
-        parent.id,
-      );
-
-      const secondParent = (
-        await member.post(`${w}/issues`, {
-          kind: 'feature',
-          title: 'Secure parent for child delete',
-          teamId: team.id,
-        }).expect(201)
-      ).body;
-      const secondChild = (
-        await owner.post(`${w}/issues`, {
-          kind: 'bug',
-          title: 'Unassigned child',
-          parentId: secondParent.id,
-        }).expect(201)
-      ).body;
-      await member2
-        .post(`${w}/issues/bulk-delete`, { ids: [secondChild.id] })
-        .expect(403);
-      expect((await owner.get(`${w}/issues/${secondChild.id}`).expect(200)).body.parentId).toBe(
-        secondParent.id,
-      );
-    });
-
-    it('agents count through their owner; a lead may edit their own team but not delete it', async () => {
-      const { owner, member, member2, w, team } = await teamSetup();
-      const mine = (await owner.post(`${w}/agents`, { name: 'Mine', provider: 'claude_code', ownerUserId: member.id }).expect(201)).body;
-      const theirs = (await owner.post(`${w}/agents`, { name: 'Theirs', provider: 'codex', ownerUserId: member2.id }).expect(201)).body;
-      const mineTok = new TokenClient(server, (await owner.post(`${w}/tokens`, { name: 'a', agentId: mine.id }).expect(201)).body.secret);
-      const theirsTok = new TokenClient(server, (await owner.post(`${w}/tokens`, { name: 'b', agentId: theirs.id }).expect(201)).body.secret);
-      const body = { kind: 'bug', title: 'Agent work', teamId: team.id };
-      await theirsTok.post(`${w}/issues`, body).expect(403);
-      await mineTok.post(`${w}/issues`, body).expect(201);
-
-      await member.patch(`${w}/teams/SEC`, { description: 'Led by member' }).expect(200);
-      await member2.patch(`${w}/teams/SEC`, { description: 'Not a lead' }).expect(403);
-      await member.delete(`${w}/teams/${team.id}`).expect(403);
     });
   });
 
@@ -288,20 +127,20 @@ describe('permission policies, team roles and token scopes', () => {
       // read: GET only
       await read.client.get(`${w}/snapshot`).expect(200);
       expect((await read.client.get(`${w}/snapshot`)).body.myRole).toBe('owner');
-      const denied = await read.client.post(`${w}/issues`, { kind: 'bug', title: 'x' }).expect(403);
+      const denied = await read.client.post(`${w}/tasks`, { kind: 'bug', title: 'x' }).expect(403);
       expect(denied.body.message).toMatch(/read/);
       await read.client.get(`${w}/integrations`).expect(403);
 
       // write: everyday work yes, admin routes no (even though the user is an owner)
-      await write.client.post(`${w}/issues`, { kind: 'bug', title: 'from token' }).expect(201);
+      await write.client.post(`${w}/tasks`, { kind: 'bug', title: 'from token' }).expect(201);
       expect((await write.client.get(`${w}/snapshot`)).body.myRole).toBe('owner');
-      const noTeam = await write.client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(403);
-      expect(noTeam.body.message).toMatch(/write/);
+      const noAgent = await write.client.post(`${w}/agents`, { name: 'Bot', provider: 'codex' }).expect(403);
+      expect(noAgent.body.message).toMatch(/write/);
       await write.client.patch(w, { name: 'Renamed' }).expect(403);
-      await dflt.client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(403);
+      await dflt.client.post(`${w}/agents`, { name: 'Bot', provider: 'codex' }).expect(403);
 
       // admin: full role of the user
-      await admin.client.post(`${w}/teams`, { name: 'T', key: 'TT' }).expect(201);
+      await admin.client.post(`${w}/agents`, { name: 'Bot', provider: 'codex' }).expect(201);
       expect((await admin.client.get(`${w}/snapshot`)).body.myRole).toBe('owner');
       expect(slug).toBeTruthy();
     });
@@ -319,8 +158,8 @@ describe('permission policies, team roles and token scopes', () => {
       await owner.post(`${w}/tokens`, { name: 'bot', agentId: agent.id, scope: 'admin' }).expect(400);
       const bot = (await owner.post(`${w}/tokens`, { name: 'bot', agentId: agent.id, scope: 'read' }).expect(201)).body;
       const readBot = new TokenClient(server, bot.secret);
-      await readBot.get(`${w}/issues`).expect(200);
-      await readBot.post(`${w}/issues`, { kind: 'bug', title: 'x' }).expect(403);
+      await readBot.get(`${w}/tasks`).expect(200);
+      await readBot.post(`${w}/tasks`, { kind: 'bug', title: 'x' }).expect(403);
 
       const listed = (await owner.get(`${w}/tokens`).expect(200)).body as { scope: string }[];
       expect(listed.map((t) => t.scope).sort()).toEqual(['read', 'read', 'read', 'write']);

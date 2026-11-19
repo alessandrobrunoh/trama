@@ -1,5 +1,5 @@
 // Label picker: search, tick several, and create a label from what you typed. Used on the detail
-// pages of issues, projects and repositories, and as the label filter on lists.
+// pages of tasks and projects, and as the label filter on lists.
 import { ChangeDetectionStrategy, Component, ElementRef, computed, inject, input, output, signal, viewChild } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTag } from '@lucide/angular';
@@ -57,6 +57,7 @@ import { LabelChip, LabelChips } from './label-chip';
             type="button"
             variant="ghost"
             class="h-auto min-h-8 w-full min-w-0 justify-start gap-1.5 px-1.5 py-1 text-left font-normal"
+            [class]="triggerClass()"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
@@ -121,7 +122,7 @@ import { LabelChip, LabelChips } from './label-chip';
             @if (otherScope(); as o) {
               “{{ o.name }}” is a {{ o.scope }} label.
             } @else if (!scope()) {
-              Labels apply to issues and projects.
+              Labels apply to tasks and projects.
             } @else if (inScope().length === 0) {
               No {{ scope() }} labels yet.
             } @else {
@@ -129,10 +130,10 @@ import { LabelChip, LabelChips } from './label-chip';
             }
           </div>
           @if (atMax()) {
-            <div class="text-muted-foreground border-t px-3 py-1.5 text-[11px]">At most {{ catalog.maxPerRecord }} labels per item.</div>
+            <div class="text-muted-foreground px-3 py-1.5 text-[11px]">At most {{ catalog.maxPerRecord }} labels per item.</div>
           }
           @if (catalog.canManage() && manageLink()) {
-            <div class="border-t p-1">
+            <div class="p-1">
               <a
                 hlmBtn
                 variant="ghost"
@@ -158,6 +159,8 @@ export class LabelPicker {
   /** Selected label ids. */
   readonly value = input<readonly string[]>([]);
   readonly variant = input<'field' | 'chip'>('field');
+  /** Extra classes for the field trigger (e.g. a shorter row in the task inspector). */
+  readonly triggerClass = input('');
   readonly label = input('Labels');
   readonly placeholder = input('Add labels');
   readonly disabled = input(false);
@@ -166,7 +169,7 @@ export class LabelPicker {
   readonly creatable = input(true);
   /**
    * Record this picker labels. Only that scope is offered; labels already selected stay so they can be removed.
-   * `null` (repositories) has no scope: nothing new can be added.
+   * `null` has no scope: nothing new can be added.
    */
   readonly scope = input<LabelScope | null>(null);
   /** Show the "Manage labels" link for admins. */

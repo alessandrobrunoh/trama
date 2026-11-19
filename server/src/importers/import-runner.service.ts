@@ -6,7 +6,6 @@ import { EventsService } from '../events/events.service.js';
 import { HttpClient } from '../integrations/http-client.js';
 import { MilestonesService } from '../milestones/milestones.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
-import { TeamsService } from '../teams/teams.service.js';
 import { CredentialsService, createAdapter } from './credentials.service.js';
 import { ImportJobEntity } from './entities.js';
 import { ImportEngine, ImportFatalError, MAX_STORED_ERRORS, emptyProgress, type EngineHooks, type EngineState } from './import-engine.js';
@@ -47,7 +46,6 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
     private readonly credentials: CredentialsService,
     private readonly events: EventsService,
     private readonly counters: CountersService,
-    private readonly teams: TeamsService,
     private readonly projects: ProjectsService,
     private readonly milestones: MilestonesService,
     @InjectRepository(ImportJobEntity) private readonly jobs: Repository<ImportJobEntity>,
@@ -129,7 +127,7 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
       token = cred.token;
       const adapter = createAdapter(this.http, job.provider, cred, job.source);
       const sink = new TypeormImportSink(
-        { ds: this.ds, counters: this.counters, teams: this.teams, projects: this.projects, milestones: this.milestones },
+        { ds: this.ds, counters: this.counters, projects: this.projects, milestones: this.milestones },
         job.workspaceId,
         job.createdBy,
         job.id,

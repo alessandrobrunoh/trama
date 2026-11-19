@@ -83,15 +83,15 @@ describe('workspace roles', () => {
     const { service, ws } = setup();
     await service.createRole(ctx(ws), {
       name: 'Support',
-      capabilities: ['manageCustomers'],
-      grants: ['customers:view'],
+      capabilities: ['manageProjects'],
+      grants: ['issues:view'],
     });
     const support = ws.resolved().roles.find((role) => role.name === 'Support');
     expect(support).toMatchObject({
       owner: false,
-      capabilities: ['manageCustomers'],
+      capabilities: ['manageProjects'],
     });
-    expect(support?.grants).toEqual(['customers:view']);
+    expect(support?.grants).toEqual(['issues:view']);
     expect(ws.resolved().roles.map((role) => role.id)).toContain('owner');
   });
 
@@ -99,7 +99,7 @@ describe('workspace roles', () => {
     const { service, ws } = setup();
     await service.createRole(ctx(ws), {
       name: 'Support',
-      capabilities: ['manageCustomers'],
+      capabilities: ['manageProjects'],
     });
     const support = ws
       .resolved()
@@ -107,14 +107,14 @@ describe('workspace roles', () => {
     expect(
       roleAllows(
         support,
-        { capability: 'manageCustomers', min: 'member', neededGrant: null },
+        { capability: 'manageProjects', min: 'member', neededGrant: null },
         null,
       ),
     ).toBe(true);
     expect(
       roleAllows(
         support,
-        { capability: 'deleteCustomers', min: 'member', neededGrant: null },
+        { capability: 'manageIntegrations', min: 'member', neededGrant: null },
         null,
       ),
     ).toBe(false);

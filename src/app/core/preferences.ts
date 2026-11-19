@@ -10,14 +10,12 @@ import { oneOf, readJson, writeJson } from './stores/storage';
 export const PREFERENCES_STORAGE_KEY = 'trama.preferences.v1';
 
 /** Page opened after signing in and from "/". */
-export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'issues'] as const;
+export const HOME_VIEWS = ['inbox', 'tasks'] as const;
 export type HomeView = (typeof HOME_VIEWS)[number];
 
 export const HOME_VIEW_LABELS: Record<HomeView, string> = {
-  overview: 'Overview',
   inbox: 'Inbox',
-  'my-work': 'My work',
-  issues: 'Issues',
+  tasks: 'Tasks',
 };
 
 /** Key that posts a comment. With `mod-enter`, plain Enter adds a new line. */
@@ -55,10 +53,10 @@ export class Preferences {
   private readonly saved = readJson<Persisted>(PREFERENCES_STORAGE_KEY);
 
   readonly homeView = signal<HomeView>(oneOf(
-      // "My Attention" became the Inbox.
-      (this.saved?.homeView as string | undefined) === 'attention' ? 'inbox' : this.saved?.homeView,
+      // "My Attention", Overview and My work all became the Inbox; anything unknown opens the Inbox too.
+      (this.saved?.homeView as string | undefined) === 'issues' ? 'tasks' : this.saved?.homeView,
       HOME_VIEWS,
-      'overview',
+      'inbox',
     ));
   readonly sendKey = signal<SendKey>(oneOf(this.saved?.sendKey, SEND_KEYS, 'mod-enter'));
   readonly fontSize = signal<FontSize>(oneOf(this.saved?.fontSize, FONT_SIZES, 'default'));
@@ -101,7 +99,7 @@ export class Preferences {
 
   /** Back to the defaults. */
   reset(): void {
-    this.homeView.set('overview');
+    this.homeView.set('inbox');
     this.sendKey.set('mod-enter');
     this.fontSize.set('default');
     this.pointerCursors.set(true);

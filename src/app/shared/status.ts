@@ -11,7 +11,6 @@ import {
   LucideCircleAlert,
   LucideCircleCheck,
   LucideCircleDashed,
-  LucideCircleMinus,
   LucideCircleX,
   LucideGitMerge,
   LucideRocket,
@@ -23,7 +22,6 @@ import {
   resolveStatusEntry,
   type ArtifactState,
   type CiState,
-  type DecisionStatus,
   type IssueStatus,
   type StatusEntry,
   type StatusSubject,
@@ -32,7 +30,7 @@ import { TramaStore } from '../core/stores/trama.store';
 import { LucideNames, isLucideName } from './lucide-names';
 
 /** Every enum value that has a status visual. */
-export type AnyStatus = IssueStatus | DecisionStatus | ArtifactState | CiState;
+export type AnyStatus = IssueStatus | ArtifactState | CiState;
 
 type Glyph =
   | { kind: 'icon'; icon: LucideIcon }
@@ -86,11 +84,6 @@ export const STATUS_VISUALS: Record<AnyStatus, StatusVisual> = {
   in_review: v('In review', 'review', { kind: 'pie', fraction: 0.75 }),
   done: v('Done', 'done', icon(LucideCircleCheck)),
   canceled: v('Canceled', 'neutral', icon(LucideCircleX)),
-  // DecisionStatus
-  accepted: v('Accepted', 'done', icon(LucideCircleCheck)),
-  proposed: v('Proposed', 'input', { kind: 'dashed' }),
-  superseded: v('Superseded', 'neutral', icon(LucideCircleMinus)),
-  rejected: v('Rejected', 'danger', icon(LucideCircleX)),
   // ArtifactState / CI
   open: v('Open', 'active', icon(LucideCircle)),
   merged: v('Merged', 'review', icon(LucideGitMerge)),
@@ -111,7 +104,7 @@ export function statusLabel(status: AnyStatus): string {
 }
 
 /** Which glyph family to draw. Issues use circles; other resources use their catalog icon. */
-export type StatusEntity = 'auto' | 'issue' | 'other';
+export type StatusEntity = 'auto' | 'issue' | 'project' | 'other';
 
 const ISSUE_ONLY = new Set<string>(['backlog', 'todo', 'in_progress', 'done']);
 
@@ -239,7 +232,7 @@ export class StatusIcon {
     const s = this.status();
     const e = this.entity();
     if (e === 'issue' && CIRCLE[s]) return 'circle';
-    if (e === 'other') return 'icon';
+    if (e === 'other' || e === 'project') return 'icon';
     if (ISSUE_ONLY.has(s) || (e === 'auto' && CIRCLE[s] && s !== 'canceled')) return 'circle';
     return 'icon';
   });
@@ -253,8 +246,9 @@ export class StatusIcon {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status);
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status);
-    if (entity === 'other') return resolveStatusEntry(catalog.decision, status);
-    const lists = [catalog.issue, catalog.decision];
+    if (entity === 'project') return resolveStatusEntry(catalog.project, status);
+    if (entity === 'other') return undefined;
+    const lists = [catalog.issue, catalog.project];
     const hits = lists.filter((entries) => entries.some((entry) => entry.id === status || entry.type === status));
     if (hits.length !== 1) return undefined;
     return resolveStatusEntry(hits[0], status);
@@ -282,7 +276,7 @@ export class StatusIcon {
   imports: [StatusIcon],
   host: {
     class:
-      'border-border-strong text-foreground/85 inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-1.5 text-xs font-medium',
+      'bg-foreground/[0.06] text-foreground/85 inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-xs font-medium',
   },
   template: `
     <app-status-icon [status]="status()" [entity]="entity()" [subject]="subject()" [size]="12" />
@@ -310,7 +304,7 @@ export class StatusBadge {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status)?.name;
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status)?.name;
-    if (entity === 'other') return resolveStatusEntry(catalog.decision, status)?.name;
+    if (entity === 'project') return resolveStatusEntry(catalog.project, status)?.name;
     return undefined;
   }
 }
@@ -341,7 +335,9 @@ export class StatusLabel {
       ? catalog[STATUS_CATALOG_KEY[subject]]
       : this.entity() === 'issue'
         ? catalog.issue
-        : null;
+        : this.entity() === 'project'
+          ? catalog.project
+          : null;
     return (entries ? resolveStatusEntry(entries, this.status())?.name : undefined) ?? this.visual().label;
   });
 }

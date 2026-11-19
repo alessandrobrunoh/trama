@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to Trama.
 
-Trama is an early-stage source-available project exploring a different model for coordinating software work across humans, coding agents, teams, repositories, and delivery systems.
+Trama is an early-stage source-available project exploring a different model for coordinating software work across humans, coding agents, and delivery systems.
 
 Because the architecture is still evolving, **design alignment matters as much as implementation quality**.
 
@@ -14,10 +14,8 @@ For larger changes, please open a GitHub Issue or Discussion first.
 
 This is especially important for changes involving:
 
-- the Issue domain model;
-- Input requests;
+- the Task domain model;
 - Artifacts;
-- Decisions;
 - Attention;
 - authentication;
 - workspace permissions;
@@ -35,7 +33,7 @@ The goal is to avoid contributors spending significant time implementing competi
 
 Contributions should generally reinforce these principles:
 
-1. **Reduce project-management tax.** Issues stay granular; avoid adding another required unit of work or a duplicate status.
+1. **Reduce project-management tax.** Tasks stay granular; avoid adding another required unit of work or a duplicate status.
 
 2. **Humans and agents are both actors**  
    Agent activity should be explicit and auditable.
@@ -43,12 +41,12 @@ Contributions should generally reinforce these principles:
 3. **Human attention is scarce**  
    Trama should surface where human judgment is needed.
 
-4. **Keep one source of work status.** Questions and Decisions surface in Attention; they do not create a parallel execution status.
+4. **Keep one source of work status.** Attention is derived from the work; it does not create a parallel execution status.
 
-5. **Context should transfer.** Goals, Plans, meaningful Decisions, answers, and artifacts should remain useful to future humans and agents.
+5. **Context should transfer.** Descriptions, comments, and artifacts should remain useful to future humans and agents.
 
-6. **Multi-team is the default**  
-   Avoid assumptions that every unit of work belongs to exactly one team.
+6. **Keep structure optional**  
+   A simple Task needs only its problem; extra structure should appear only when it helps.
 
 7. **Self-hosting matters**  
    Avoid architecture that unnecessarily requires a large infrastructure stack.
@@ -125,8 +123,8 @@ There is no strict conventional-commit requirement yet, but commit messages shou
 Good examples:
 
 ```text
-Add issue-scoped human input
-Fix workspace scoping in execution query
+Add task sub-task filter
+Fix workspace scoping in task query
 Refactor GitHub webhook verification
 Document agent identity model
 ```
@@ -147,7 +145,7 @@ Use short descriptive branch names when possible.
 Examples:
 
 ```text
-feat/issue-human-input
+feat/task-subtask-filter
 feat/github-webhooks
 fix/workspace-isolation
 docs/security-policy
@@ -180,7 +178,7 @@ Before introducing a field such as:
 assigneeId
 status
 provider
-teamId
+projectId
 ```
 
 consider whether the relationship is actually:
@@ -259,7 +257,7 @@ Agent actions should eventually be attributable to:
 
 ```text
 workspace
-issue
+task
 provider
 actor
 ```
@@ -303,7 +301,7 @@ Feature requests should explain the underlying problem before proposing a specif
 
 Prefer:
 
-> When an agent cannot continue without a product choice, the answer should stay with the Issue for the next session.
+> When an agent finishes a change, the reviewer should see what it produced without opening the chat that made it.
 
 over:
 

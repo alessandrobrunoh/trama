@@ -7,10 +7,10 @@
   </picture>
 </a>
 
-### Issues describe problems and goals. Agents work directly from Issues.
+### Tasks describe problems. Agents work directly from Tasks.
 
 **Trama is the source-available coordination layer for software teams that work with coding agents.**<br>
-Issues stay granular. Plans, durable Decisions, and human input preserve the context needed to continue the work; artifacts show what it produced.
+Tasks stay granular. Projects group them, comments keep the context, and artifacts show what the work produced.
 
 [![License: PolyForm Shield](https://img.shields.io/badge/license-PolyForm%20Shield%201.0.0-1348dc?style=flat-square)](LICENSE)
 [![Angular](https://img.shields.io/badge/Angular-22-dd0031?style=flat-square&logo=angular&logoColor=white)](https://angular.dev)
@@ -33,64 +33,61 @@ Issues stay granular. Plans, durable Decisions, and human input preserve the con
 
 ## Why Trama
 
-Trama keeps one problem per Issue without forcing a session that spans several Issues into a second project-management object. Work with coding agents needs:
+Trama keeps one problem per Task without forcing a session that spans several Tasks into a second project-management object. Work with coding agents needs:
 
-- granular Issues that can be worked on together without duplicating their status;
+- granular Tasks that can be worked on together without duplicating their status;
 - a **coding agent** does a large part of the work, and delegates to subagents;
-- the change spans **several repositories** and teams;
+- the change is tied to a Git repository and a project, and the reviewer needs to see what was produced;
 - the *why* behind a choice lives in a chat thread nobody can find in a month.
 
-> **An Issue is the unit of work. A session can work across Issues without a second status to maintain.**
+> **A Task is the unit of work. A session can work across Tasks without a second status to maintain.**
 
-Trama keeps Issues first-class and does not copy what execution tools already hold (transcripts, prompts, file edits): it links to that context. Optional Plans, Decisions, and human input preserve only what helps someone understand and continue the work.
+Trama keeps Tasks first-class and does not copy what execution tools already hold (transcripts, prompts, file edits): it links to that context. Comments and artifacts preserve only what helps someone understand and continue the work.
 
 ```text
-  Issue           "What is the problem, context and desired goal?"
+  Task            "What is the problem and its context?"
      │
-     ├── optional Plan          "How will we approach it?"
-     ├── Human input            "Question or Decision?"
+     ├── Comments               "What was found, decided or asked?"
      └── Artifacts              "What did the work produce?"
      │
-     └── PRs, builds, documents, deployments
+     └── PRs, builds, deployments
 ```
 
-The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the thesis in [VISION.md](VISION.md) (two pages) and what Trama deliberately does not do in [NON-GOALS.md](NON-GOALS.md). The original long-form write-up is kept as background in [docs/vision-detailed.md](docs/vision-detailed.md).
+The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the thesis in [VISION.md](VISION.md) (two pages) and what Trama deliberately does not do in [NON-GOALS.md](NON-GOALS.md). The original long-form write-up is kept as historical background in [docs/vision-detailed.md](docs/vision-detailed.md); it predates the current model.
 
-> **Status:** early-stage and not yet considered production-ready (see [SECURITY.md](SECURITY.md)). The approved product direction is Issue-first; [NON-GOALS.md](NON-GOALS.md) records current scope boundaries.
+> **Status:** early-stage and not yet considered production-ready (see [SECURITY.md](SECURITY.md)). The product direction is Task-first; [NON-GOALS.md](NON-GOALS.md) records current scope boundaries.
 
 ## Core ideas
 
 | Concept | What it is |
 |---|---|
-| **Issue** | A problem, request or task: bug, feature, incident, tech debt, feedback, idea, security finding. Its optional Goal describes what should be true when resolved. |
-| **Plan** | An optional implementation approach, created close to the work and linked to the Issue. |
-| **Human input** | One Issue-level feature with two modes: a **Question** an agent needs answered, or a **Decision** whose reasoning should survive the session. |
-| **Artifact** | Proof of delivery: pull/merge requests, builds, test reports, designs, deployments, releases, with live CI and review state. |
-| **Attention** | A queue of what needs *human* judgment right now: reviews, decisions, failing CI, conflicts, triage. Human attention is the scarce resource. |
-| **Project** | Optional planning context for Issues, milestones and updates, separate from repositories. Supporting, not core. |
+| **Task** | A problem, request or piece of work: bug, feature, incident, tech debt, feedback, idea, security finding. Tasks can have sub-tasks. |
+| **Artifact** | Proof of delivery: pull/merge requests, builds, test reports, designs, deployments, with live CI and review state. |
+| **Attention** | A queue of what needs *human* judgment right now: reviews, failing CI, conflicts, triage. Human attention is the scarce resource. |
+| **Project** | Planning context for Tasks: milestones. It has one optional `repository` (`owner/name` or a URL), which is how a checkout finds its project. Supporting, not core. |
 
-**One status, one source of truth.** The Issue status tracks the work. Questions and proposed Decisions surface in Attention; they do not create a second execution status.
+**One status, one source of truth.** The Task status tracks the work. Nothing else creates a second execution status.
 
 ## Features
 
 **Core**
 
-- **Issue-first work.** Goal, Plans, Decisions, Questions, and artifacts are available from the Issue when needed.
+- **Task-first work.** Sub-tasks, comments and artifacts are available from the Task when needed.
 - **Humans and agents as actors.** Agents are first-class members with scoped tokens, usage caps and an auditable activity trail. Accountability stays with a human.
-- **Human input.** Agents can ask a Question or propose a Decision; people respond from the Issue or Attention inbox.
-- **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Import repositories, link PRs, receive webhooks.
-- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->20 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
-- **Agent skills** that teach a coding agent how to pick up work, report progress, ask for input and triage.
+- **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Link PRs and receive webhooks.
+- **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->19 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
+- **Agent skills** that teach a coding agent how to pick up work, report progress and triage.
 - **Live updates** over SSE, a command palette, keyboard shortcuts, search, roles and API tokens with narrow scopes.
 - **Self-hosting first**: one PostgreSQL, three small images, no large infrastructure stack.
 
 **Supporting (scope under review, see [NON-GOALS.md](NON-GOALS.md))**
 
-- Projects with milestones and updates, teams, repositories, saved views, customers and customer feedback linked to issues, outgoing webhooks, notifications (in-app and email), an installable PWA.
+- Projects with milestones, saved views, outgoing webhooks, notifications (in-app and email), an installable PWA.
+- Importing tasks from GitHub Issues or Linear, and linking a Task to an external issue.
 - An optional built-in assistant and "suggest improvements" for any OpenAI-compatible model. Off by default; keys stay on the server.
 - Statistics, a timeline, a roadmap page and marketing pages exist in the app today and are proposed for removal or merging.
 
-**Not built yet:** importing or linking issues from an existing tracker (GitHub Issues, Linear, Jira), and guided onboarding.
+**Not built yet:** importing from Jira, and guided onboarding.
 
 ## How it fits together
 
@@ -224,7 +221,7 @@ npm run lint && npm run build
 |---|---|
 | [VISION.md](VISION.md) | The thesis and the core model (authoritative, two pages) |
 | [NON-GOALS.md](NON-GOALS.md) | What Trama will not do, and the proposed scope freeze |
-| [docs/vision-detailed.md](docs/vision-detailed.md) | The original long-form vision, kept as background |
+| [docs/vision-detailed.md](docs/vision-detailed.md) | The original long-form vision, kept as historical background (predates the Task-first model) |
 | [server/API.md](server/API.md) | Every route, auth modes, conventions |
 | [server/ARCHITECTURE.md](server/ARCHITECTURE.md) | Request pipeline, modules, extension points |
 | [server/AI.md](server/AI.md) | Configuring the assistant and AI suggestions |
@@ -237,7 +234,7 @@ npm run lint && npm run build
 
 ## Contributing
 
-Trama is early-stage and the architecture is still evolving, so design alignment matters as much as code quality. Small fixes, docs, tests and accessibility improvements can go straight to a pull request. For larger changes touching the Issue model, permissions, integrations, MCP or the database schema, please open an issue or discussion first.
+Trama is early-stage and the architecture is still evolving, so design alignment matters as much as code quality. Small fixes, docs, tests and accessibility improvements can go straight to a pull request. For larger changes touching the Task model, permissions, integrations, MCP or the database schema, please open an issue or discussion first.
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md), sign the [CLA](CLA.md) on your first pull request, and follow the [Code of Conduct](CODE_OF_CONDUCT.md). If you find a vulnerability, follow [SECURITY.md](SECURITY.md) rather than opening a public issue.
 

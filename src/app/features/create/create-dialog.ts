@@ -16,11 +16,10 @@ import {
   LucideCircleUser,
   LucideDynamicIcon,
   LucideBox,
-  LucideFolderGit2,
+  LucideGauge,
   LucideLayers,
-  LucideScale,
+  LucideMessageSquare,
   LucideTag,
-  LucideUsers,
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
@@ -31,14 +30,11 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import {
-  GIT_PROVIDERS,
-  GIT_PROVIDER_META,
   isProjectKey,
   isReservedProjectKey,
   PROJECT_KEY_MAX,
   uniqueProjectKey,
   UNASSIGNED_ISSUE_KEY_PREFIX,
-  type GitProvider,
   type IssueKind,
   type IssueStatus,
   type Priority,
@@ -55,23 +51,21 @@ import {
   PRIORITY_META,
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
-import { formatBytes } from '../../core/format';
 import { DraftStore } from '../../core/stores/draft.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
+import { Kbd } from '../../shared/kbd';
+import { LabelCatalog } from '../../shared/label-catalog';
 import { StatusIcon } from '../../shared/status';
-import { UploadFile } from '../../shared/upload-file';
 import { issueEstimateOptions } from '../issues/issue-model';
+import { isValidThreadUrl, toThreadUrl } from '../issues/issue-thread-link';
 import { Picker, type PickOption } from '../../shared/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
 import { DraftSuggestions } from '../ai/draft-suggestions';
 import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 import { EntityChip } from '../../shared/entity-chip';
 
-type ComposerKind = 'issue' | 'decision';
-
-/** Kinds whose records can own file/image artifacts, so the dialog accepts attachments for them. */
-const ATTACHABLE = new Set<CreateKind>(['issue', 'project']);
+type ComposerKind = 'issue';
 
 interface KindDef {
   kind: ComposerKind;
@@ -81,30 +75,22 @@ interface KindDef {
   example: string;
 }
 
-/** The composer kinds, most common first. Other kinds (team, view, …) open in single-form mode. */
+/** Composer kinds. Project and view open in single-form mode. */
 const SWITCHER: KindDef[] = [
   {
     kind: 'issue',
-    label: 'Issue',
+    label: 'Task',
     blurb: "A problem or request: what's wrong or needed.",
     example: 'CORA-142',
   },
-  {
-    kind: 'decision',
-    label: 'Decision',
-    blurb: 'Durable knowledge: what was decided and why.',
-    example: 'ADR-7',
-  },
 ];
 const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = {
-  team: { label: 'Team', icon: LucideUsers },
-  repository: { label: 'Repository', icon: LucideFolderGit2 },
   project: { label: 'Project', icon: LucideBox },
   view: { label: 'View', icon: LucideLayers },
 };
 
 const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'timeline'];
-const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'decision', 'project'];
+const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'project'];
 
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] =>
@@ -116,13 +102,11 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 
 /**
  * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues
- * and decisions (title · description · property chips), plus compact forms for
- * team / repository / view.
+ * (title · description · property chips), plus compact forms for project and view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
- *   issue:      status, priority, teamId, kind, assigneeId, projectId, parentId, title, body,
- *               and optional goal
- *   decision:   title, statement, rationale, required primary issue, tags (string[] or "a, b")
+ *   issue:      status, priority, kind, assigneeId, projectId, parentId, title, body
+ *   project:    name, key, summary, optional repository string (URL or owner/name)
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
  *
  * After create we close and toast with an "Open" action instead of navigating away (Linear
@@ -146,8 +130,8 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     AppSelect,
     FormRow,
     DraftSuggestions,
-    UploadFile,
     EntityChip,
+    Kbd,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -164,51 +148,15 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           <p hlmDialogDescription class="sr-only">
             Create a new {{ kindLabel().toLowerCase() }} in this workspace.
           </p>
-          <div class="flex items-center gap-2 max-sm:flex-wrap">
+          <div class="flex items-center gap-2">
             @if (composer(); as c) {
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 max-sm:contents">
-                @if (kind() !== 'decision') {
-                  <app-picker
-                    class="max-sm:order-2"
-                    variant="pill"
-                    label="Team"
-                    [icon]="teamIcon"
-                    [options]="teamOptions()"
-                    [value]="opt(headerTeamId())"
-                    [clearable]="kind() === 'issue'"
-                    clearLabel="No team"
-                    (valueChange)="setHeaderTeam($event[0] ?? '')"
-                  />
+              <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
+                <app-status-icon entity="issue" status="todo" [size]="13" />
+                <span>New {{ c.label.toLowerCase() }}</span>
+                @if (projectName(); as pn) {
+                  <span aria-hidden="true">›</span>
+                  <span class="text-foreground truncate">{{ pn }}</span>
                 }
-                <div
-                  role="tablist"
-                  aria-label="What to create"
-                  class="bg-muted inline-flex rounded-md p-0.5 max-sm:order-1 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-[calc(100%-3.5rem)]"
-                >
-                  @for (k of switcher; track k.kind) {
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="kind() === k.kind"
-                      [title]="k.blurb"
-                      class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:px-1.5"
-                      [class.bg-background]="kind() === k.kind"
-                      [class.text-foreground]="kind() === k.kind"
-                      [class.shadow-panel]="kind() === k.kind"
-                      (click)="onSwitch(k.kind)"
-                    >
-                      @switch (k.kind) {
-                        @case ('issue') {
-                          <app-status-icon entity="issue" status="todo" [size]="13" />
-                        }
-                        @default {
-                          <svg [lucideIcon]="scale" [size]="13" class="text-entity-decision"></svg>
-                        }
-                      }
-                      {{ k.label }}
-                    </button>
-                  }
-                </div>
               </div>
             } @else {
               <div class="flex flex-1 items-center gap-2 py-1 text-sm font-medium">
@@ -216,25 +164,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 New {{ kindLabel().toLowerCase() }}
               </div>
             }
-            @if (composer()) {
-              <button
-                hlmBtn
-                type="button"
-                variant="outline"
-                size="sm"
-                class="h-7 px-2.5 text-xs max-sm:order-3 max-sm:ml-auto max-sm:h-9"
-                [disabled]="busy()"
-                (click)="saveDraft($event)"
-              >
-                Save as draft
-              </button>
-            }
             <button
               hlmBtn
               type="button"
               variant="ghost"
               size="icon-sm"
-              class="max-sm:order-1 max-sm:size-9"
+              class="text-muted-foreground"
               hlmDialogClose
               aria-label="Close"
             >
@@ -280,67 +215,32 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 <p
                   class="bg-muted/50 text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 rounded-md px-3 py-2 text-xs"
                 >
-                  This issue will be a sub-issue of
+                  This task will be a subtask of
                   <app-entity-chip class="max-w-full" type="issue" [ref]="parentId()" />.
                 </p>
               }
               @if (kind() === 'issue') {
-                <div class="border-border-strong mt-2 border-t pt-2">
-                  <label for="cr-goal" class="text-muted-foreground text-xs font-medium">Goal <span class="font-normal">(optional)</span></label>
-                  <textarea
-                    id="cr-goal"
-                    class="placeholder:text-muted-foreground/60 field-sizing-content max-h-32 min-h-12 w-full resize-none bg-transparent py-1 text-sm leading-relaxed outline-none"
-                    rows="2"
-                    placeholder="The desired result, not a technical plan."
-                    [(ngModel)]="goal"
-                    name="goal"
-                    aria-label="Goal"
-                  ></textarea>
-                </div>
-              }
-              @if (err('statement'); as e) {
-                <p class="text-destructive text-xs" role="alert">{{ e }}</p>
-              }
-              @if (kind() === 'decision') {
-                <textarea
-                  class="placeholder:text-muted-foreground/60 field-sizing-content max-h-48 min-h-12 w-full resize-none border-t bg-transparent py-2 text-sm leading-relaxed outline-none"
-                  rows="2"
-                  placeholder="Rationale: why this, and not the alternative? (optional)"
-                  [(ngModel)]="text2"
-                  name="rationale"
-                  aria-label="Rationale"
-                ></textarea>
-              }
-              @if (canAttach()) {
-                <div
-                  class="mt-2 flex flex-wrap items-center gap-1.5"
-                  data-testid="create-attachments"
-                >
-                  <app-upload-file
-                    label="Attach files"
-                    variant="ghost"
-                    size="xs"
-                    [multiple]="true"
-                    [busy]="busy()"
-                    (file)="addAttachment($event)"
+                <div class="mt-1 flex items-center gap-2">
+                  <svg
+                    [lucideIcon]="threadIcon"
+                    [size]="14"
+                    class="text-muted-foreground shrink-0"
+                    aria-hidden="true"
+                  ></svg>
+                  <input
+                    class="placeholder:text-muted-foreground/60 w-full bg-transparent py-1 text-sm outline-none"
+                    placeholder="Thread link (optional), e.g. https://delta.dev/…"
+                    [(ngModel)]="threadUrl"
+                    name="threadUrl"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Thread link"
+                    [attr.aria-invalid]="!!err('thread')"
                   />
-                  @for (f of attachments(); track $index) {
-                    <span
-                      class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
-                    >
-                      <span class="truncate">{{ f.name }}</span>
-                      <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
-                      <button
-                        type="button"
-                        class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
-                        [attr.aria-label]="'Remove ' + f.name"
-                        (click)="removeAttachment($index)"
-                      >
-                        <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                      </button>
-                    </span>
-                  }
                 </div>
+                @if (err('thread'); as e) {
+                  <p class="text-destructive pl-6 text-xs" role="alert">{{ e }}</p>
+                }
               }
             </div>
 
@@ -361,7 +261,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             </div>
 
             <!-- property chips -->
-            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-3" role="group" aria-label="Task properties">
               @switch (kind()) {
                 @case ('issue') {
                   <app-picker
@@ -382,26 +282,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   />
                   <app-picker
                     variant="pill"
-                    label="Type"
-                    [searchable]="false"
-                    [options]="issueKindOptions"
-                    [value]="[issueKind()]"
-                    (valueChange)="setOne(issueKind, $event)"
-                  />
-                  @if (showEstimate()) {
-                    <app-picker
-                      variant="pill"
-                      label="Estimate"
-                      [searchable]="false"
-                      [options]="issueEstimateChoices()"
-                      [value]="opt(issueEstimate())"
-                      [clearable]="true"
-                      clearLabel="No estimate"
-                      (valueChange)="issueEstimate.set($event[0] ?? '')"
-                    />
-                  }
-                  <app-picker
-                    variant="pill"
                     label="Assignee"
                     [icon]="userIcon"
                     [options]="userOptions()"
@@ -414,6 +294,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     <app-picker
                       variant="pill"
                       label="Project"
+                      [icon]="projectIcon"
                       [options]="projectOptions()"
                       [value]="opt(projectId())"
                       [clearable]="true"
@@ -421,124 +302,44 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       (valueChange)="projectId.set($event[0] ?? '')"
                     />
                   }
-                }
-                @case ('decision') {
-                  <app-picker
-                    variant="pill"
-                    label="Status"
-                    [searchable]="false"
-                    [options]="decisionStatusOptions"
-                    [value]="[decisionStatus()]"
-                    (valueChange)="setOne(decisionStatus, $event)"
-                  />
-                  <app-picker
-                    variant="pill"
-                    label="Primary issue (required)"
-                    [options]="issueOptions()"
-                    [value]="opt(originIssueId())"
-                    (valueChange)="originIssueId.set($event[0] ?? '')"
-                  />
-                  <label
-                    class="border-border-strong focus-within:border-ring/60 flex h-7 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs"
-                  >
-                    <svg
-                      [lucideIcon]="tagIcon"
-                      [size]="13"
-                      class="text-muted-foreground shrink-0"
-                    ></svg>
-                    <input
-                      class="placeholder:text-muted-foreground w-36 bg-transparent outline-none"
-                      placeholder="Tags, comma separated"
-                      [(ngModel)]="tags"
-                      name="tags"
-                      autocomplete="off"
-                      aria-label="Tags"
+                  @if (showEstimate()) {
+                    <app-picker
+                      variant="pill"
+                      label="Estimate"
+                      [icon]="estimateIcon"
+                      [searchable]="false"
+                      [options]="issueEstimateChoices()"
+                      [value]="opt(issueEstimate())"
+                      [clearable]="true"
+                      clearLabel="No estimate"
+                      (valueChange)="issueEstimate.set($event[0] ?? '')"
                     />
-                  </label>
+                  }
+                  @if (labelOptions().length) {
+                    <app-picker
+                      variant="pill"
+                      label="Labels"
+                      [icon]="labelIcon"
+                      [multiple]="true"
+                      [options]="labelOptions()"
+                      [value]="labelIds()"
+                      (valueChange)="setLabels($event)"
+                    />
+                  }
+                  <app-picker
+                    variant="pill"
+                    label="Type"
+                    [searchable]="false"
+                    [options]="issueKindOptions"
+                    [value]="[issueKind()]"
+                    (valueChange)="setOne(issueKind, $event)"
+                  />
                 }
               }
             </div>
-            @if (err('issue'); as e) {
-              <p class="text-destructive px-5 pb-2 text-xs" role="alert">{{ e }}</p>
-            }
           } @else {
             <div class="flex flex-col gap-3 px-4 pt-2 pb-4">
               @switch (kind()) {
-                @case ('team') {
-                  <div class="grid gap-3 sm:grid-cols-[1fr_8rem]">
-                    <app-form-row label="Name" [error]="err('title')">
-                      <input
-                        hlmInput
-                        placeholder="Platform"
-                        [ngModel]="title()"
-                        (ngModelChange)="onTeamName($event)"
-                        name="name"
-                        autocomplete="off"
-                        autofocus
-                        aria-label="Team name"
-                      />
-                    </app-form-row>
-                    <app-form-row label="Key" [error]="err('key')">
-                      <input
-                        hlmInput
-                        class="font-mono uppercase"
-                        placeholder="PLAT"
-                        [ngModel]="teamKey()"
-                        (ngModelChange)="onTeamKey($event)"
-                        name="key"
-                        maxlength="8"
-                        autocomplete="off"
-                        aria-label="Team key"
-                      />
-                    </app-form-row>
-                  </div>
-                  <app-form-row label="Description" [optional]="true">
-                    <textarea
-                      hlmTextarea
-                      rows="2"
-                      [(ngModel)]="text"
-                      name="description"
-                      placeholder="What does this team own?"
-                    ></textarea>
-                  </app-form-row>
-                  <p class="text-muted-foreground text-xs">
-                    The key prefixes issue ids (PLAT-12) and cannot be changed later.
-                  </p>
-                }
-                @case ('repository') {
-                  <div class="grid gap-3 sm:grid-cols-[9rem_1fr]">
-                    <app-form-row label="Provider">
-                      <app-select
-                        [options]="gitProviderOptions"
-                        [(value)]="gitProvider"
-                        label="Provider"
-                      />
-                    </app-form-row>
-                    <app-form-row label="Repository" [error]="err('title')">
-                      <input
-                        hlmInput
-                        class="font-mono"
-                        placeholder="acme/api"
-                        [(ngModel)]="title"
-                        name="fullName"
-                        autocomplete="off"
-                        autofocus
-                        aria-label="Repository name"
-                      />
-                    </app-form-row>
-                  </div>
-                  <app-form-row label="Default branch" [optional]="true">
-                    <input
-                      hlmInput
-                      class="font-mono"
-                      placeholder="main"
-                      [(ngModel)]="text"
-                      name="branch"
-                      autocomplete="off"
-                      aria-label="Default branch"
-                    />
-                  </app-form-row>
-                }
                 @case ('project') {
                   <app-form-row label="Name" [error]="err('title')">
                     <input
@@ -568,7 +369,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     />
                   </app-form-row>
                   <p class="text-muted-foreground -mt-1 text-xs">
-                    Prefixes issue keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
+                    Prefixes task keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
                   </p>
                   <app-form-row label="Summary" [optional]="true">
                     <input
@@ -580,45 +381,17 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Project summary"
                     />
                   </app-form-row>
-                  @if (repoOptions().length) {
-                    <app-form-row label="Repositories" [optional]="true">
-                      <app-picker
-                        variant="field"
-                        label="Repositories"
-                        placeholder="None"
-                        [multiple]="true"
-                        [options]="repoOptions()"
-                        [value]="repositoryIds()"
-                        (valueChange)="repositoryIds.set($event)"
-                      />
-                    </app-form-row>
-                  }
-                  <div class="flex flex-wrap items-center gap-1.5" data-testid="create-attachments">
-                    <app-upload-file
-                      label="Attach files"
-                      variant="ghost"
-                      size="xs"
-                      [multiple]="true"
-                      [busy]="busy()"
-                      (file)="addAttachment($event)"
+                  <app-form-row label="Repository" [optional]="true">
+                    <input
+                      hlmInput
+                      class="font-mono"
+                      placeholder="owner/name or https://github.com/owner/name"
+                      [(ngModel)]="repositoryText"
+                      name="repository"
+                      autocomplete="off"
+                      aria-label="Repository"
                     />
-                    @for (f of attachments(); track $index) {
-                      <span
-                        class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
-                      >
-                        <span class="truncate">{{ f.name }}</span>
-                        <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
-                        <button
-                          type="button"
-                          class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
-                          [attr.aria-label]="'Remove ' + f.name"
-                          (click)="removeAttachment($index)"
-                        >
-                          <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                        </button>
-                      </span>
-                    }
-                  </div>
+                  </app-form-row>
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -672,7 +445,18 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             class="mx-0 mb-0 flex-row items-center justify-end gap-3 rounded-b-xl px-4 py-3"
           >
             @if (composer()) {
-              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs max-sm:mr-auto">
+              <button
+                hlmBtn
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground mr-auto h-8 px-2 text-xs max-sm:h-10"
+                [disabled]="busy()"
+                (click)="saveDraft($event)"
+              >
+                Save as draft
+              </button>
+              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
                 <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
                 Create more
               </label>
@@ -680,11 +464,14 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             @if (!composer()) {
               <button hlmBtn type="button" variant="ghost" size="sm" class="max-sm:h-10" hlmDialogClose>Cancel</button>
             }
-            <button hlmBtn type="submit" size="sm" class="max-sm:h-10 max-sm:flex-1" [disabled]="busy()">
+            <button hlmBtn type="submit" size="sm" class="max-sm:h-10" [disabled]="busy()">
               @if (busy()) {
                 <hlm-spinner />
               }
               Create {{ kindLabel().toLowerCase() }}
+              @if (composer()) {
+                <app-kbd keys="mod+enter" class="opacity-70 max-sm:hidden" />
+              }
             </button>
           </hlm-dialog-footer>
         </form>
@@ -695,11 +482,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 export class CreateDialog {
   protected readonly ui = inject(UiStore);
   private readonly store = inject(TramaStore);
-  /** Workspace default team (Settings → General), if it still exists. */
-  private defaultTeam(): string {
-    const id = this.store.settings().defaultTeamId;
-    return id && this.store.teamById().has(id) ? id : '';
-  }
   protected readonly canShare = computed(() => this.store.allowed('manageSharedViews'));
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
@@ -707,11 +489,13 @@ export class CreateDialog {
 
   private readonly titleEl = viewChild<ElementRef<HTMLInputElement>>('titleEl');
 
-  protected readonly switcher = SWITCHER;
-  protected readonly scale = LucideScale;
-  protected readonly tagIcon = LucideTag;
+  private readonly labelCatalog = inject(LabelCatalog);
+
   protected readonly userIcon = LucideCircleUser;
-  protected readonly teamIcon = LucideUsers;
+  protected readonly projectIcon = LucideBox;
+  protected readonly estimateIcon = LucideGauge;
+  protected readonly labelIcon = LucideTag;
+  protected readonly threadIcon = LucideMessageSquare;
   protected readonly closeIcon = LucideX;
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
@@ -725,7 +509,6 @@ export class CreateDialog {
   // ── form state (shared across kinds; reset on open, carried over on switch) ──
   protected readonly title = signal('');
   protected readonly text = signal('');
-  protected readonly goal = signal('');
   protected readonly text2 = signal('');
   protected readonly tags = signal('');
   protected readonly priority = signal<string>('none');
@@ -740,24 +523,27 @@ export class CreateDialog {
     issueEstimateOptions(undefined, this.store.estimateScale()),
   );
   protected readonly assigneeId = signal('');
-  protected readonly teamId = signal('');
-  protected readonly repositoryIds = signal<string[]>([]);
+  /** Workspace label ids. */
+  protected readonly labelIds = signal<string[]>([]);
+  protected readonly labelOptions = computed<PickOption[]>(() => {
+    const { suggested, rest } = this.labelCatalog.arrange(new Set(this.labelIds()), false, 'issue');
+    return [...suggested, ...rest].map((l) => ({
+      value: l.id,
+      label: l.name,
+      kind: 'label' as const,
+      color: l.color,
+    }));
+  });
+  /** Optional git repository: a URL or `owner/name`, not a registry id. */
+  protected readonly repositoryText = signal('');
   protected readonly projectId = signal('');
   protected readonly projectKey = signal('');
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
   /** Parent issue supplied by the opening context; not persisted in the generic issue draft. */
   protected readonly parentId = signal('');
-  /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
-  protected readonly attachments = signal<File[]>([]);
-  protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
-  // decision
-  protected readonly originIssueId = signal('');
-  protected readonly decisionStatus = signal<string>('proposed');
-  // team / repository / view
-  protected readonly teamKey = signal('');
-  private teamKeyTouched = false;
+  /** Optional link to the Delta thread working on the task. */
+  protected readonly threadUrl = signal('');
   private projectKeyTouched = false;
-  protected readonly gitProvider = signal<string>('github');
   protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
   protected readonly shared = signal(true);
@@ -793,14 +579,8 @@ export class CreateDialog {
     value: k,
     label: ISSUE_KIND_META[k].label,
   }));
-  protected readonly decisionStatusOptions: PickOption[] = [
-    { value: 'proposed', label: 'Proposed', kind: 'status' },
-    { value: 'accepted', label: 'Accepted', kind: 'status' },
-  ];
-  protected readonly gitProviderOptions: Option[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label }));
   protected readonly viewEntityOptions: Option[] = [
-    { value: 'issue', label: 'Issues' },
-    { value: 'decision', label: 'Decisions' },
+    { value: 'issue', label: 'Tasks' },
     { value: 'project', label: 'Projects' },
   ];
   /** Timeline views use project dates. */
@@ -816,57 +596,25 @@ export class CreateDialog {
     this.viewLayoutOptions().some((o) => o.value === this.viewLayout()) ? this.viewLayout() : 'list',
   );
 
-  protected readonly teamOptions = computed<PickOption[]>(() =>
-    this.store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team', hint: t.key })),
-  );
   protected readonly userOptions = computed<PickOption[]>(() =>
     this.store
       .users()
       .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
   );
-  /** The repositories offered: the chosen project's own, or all of them. */
-  protected readonly repoOptions = computed<PickOption[]>(() => {
-    const project = this.store.getProject(this.projectId());
-    return this.store
-      .repositories()
-      .filter((r) => !project || project.repositoryIds.includes(r.id))
-      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
-  });
   protected readonly projectOptions = computed<PickOption[]>(() =>
     this.store
       .projects()
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
       .map((p) => ({ value: p.id, label: p.name, hint: p.key, kind: 'plain' })),
   );
-  /** Issues offered as decision origins; closed issues remain selectable. */
-  protected readonly issueOptions = computed<PickOption[]>(() => {
-    return this.store.issues().map((i) => ({
-        value: i.id,
-        label: i.title,
-        hint: i.key,
-        search: `${i.key} ${i.title}`,
-        kind: 'status' as const,
-        status: i.status,
-        statusEntity: 'issue' as const,
-      }));
-  });
-
-  protected readonly titlePlaceholder = computed(() => {
-    switch (this.kind()) {
-      case 'decision':
-        return 'Decision, e.g. Use opaque session tokens';
-      default:
-        return 'Issue title';
-    }
-  });
-  protected readonly bodyPlaceholder = computed(() => {
-    switch (this.kind()) {
-      case 'decision':
-        return 'What was decided?';
-      default:
-        return 'Add a description, steps to reproduce, links… Markdown supported.';
-    }
-  });
+  /** Name of the chosen project, shown next to "New task" in the header. */
+  protected readonly projectName = computed(
+    () => this.store.getProject(this.projectId())?.name ?? '',
+  );
+  protected readonly titlePlaceholder = computed(() => 'Task title');
+  protected readonly bodyPlaceholder = computed(
+    () => 'Add a description, steps to reproduce, links… Markdown supported.',
+  );
 
   /** True while the form shows text restored from an unsent draft. */
   protected readonly restored = signal(false);
@@ -880,6 +628,8 @@ export class CreateDialog {
       untracked(() => {
         this.reset(kind, defaults);
         this.restoreDraft(kind, defaults);
+        // The dialog portal focuses its first control (the close button): start in the title.
+        this.focusTitle(80);
       });
     });
     // Keep what is typed, so closing the dialog or navigating away does not lose it.
@@ -888,19 +638,18 @@ export class CreateDialog {
       const draft = {
         title: this.title(),
         text: this.text(),
-        goal: this.goal(),
         text2: this.text2(),
         priority: this.priority(),
         issueKind: this.issueKind(),
-        teamId: this.teamId(),
         assigneeId: this.assigneeId(),
         projectId: this.projectId(),
         tags: this.tags(),
+        threadUrl: this.threadUrl(),
       };
       const kind = this.kind();
       untracked(() => {
         // Nothing to keep until there is a title or a description.
-        const hasText = !!(draft.title.trim() || draft.text.trim() || draft.goal.trim());
+        const hasText = !!(draft.title.trim() || draft.text.trim());
         this.drafts.set(this.draftKey(kind), hasText ? draft : null);
       });
     });
@@ -914,19 +663,18 @@ export class CreateDialog {
   private restoreDraft(kind: CreateKind, d: Record<string, unknown>): void {
     this.restored.set(false);
     if (!SWITCHER.some((k) => k.kind === kind)) return;
-    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement']) || asStr(d['goal'])) return;
+    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement'])) return;
     const draft = this.drafts.get<Record<string, unknown>>(this.draftKey(kind));
-    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim() || asStr(draft['goal']).trim())) return;
+    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim())) return;
     this.title.set(asStr(draft['title']));
     this.text.set(asStr(draft['text']));
-    this.goal.set(asStr(draft['goal']));
     this.text2.set(asStr(draft['text2']));
     this.priority.set(oneOf(PRIORITIES, draft['priority']) ?? this.priority());
     this.issueKind.set(oneOf(ISSUE_KINDS, draft['issueKind']) ?? this.issueKind());
-    if (this.store.teamById().has(asStr(draft['teamId']))) this.teamId.set(asStr(draft['teamId']));
     if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
     if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
     this.tags.set(asStr(draft['tags']));
+    this.threadUrl.set(asStr(draft['threadUrl']));
     this.restored.set(true);
   }
 
@@ -942,7 +690,6 @@ export class CreateDialog {
     this.kind.set(kind);
     this.title.set(asStr(d['title']) || asStr(d['name']));
     this.text.set(asStr(d['body']) || asStr(d['description']) || asStr(d['statement']));
-    this.goal.set(asStr(d['goal']));
     this.text2.set(asStr(d['rationale']));
     this.tags.set(asTags(d['tags']).join(', '));
     this.priority.set(oneOf(PRIORITIES, d['priority']) ?? 'none');
@@ -955,19 +702,15 @@ export class CreateDialog {
     this.assigneeId.set(
       this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '',
     );
-    this.teamId.set(asStr(d['teamId']) || this.defaultTeam());
     this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
+    this.labelIds.set(
+      asArr(d['labels'])
+        .filter((id) => this.labelCatalog.byId().has(id))
+        .slice(0, this.labelCatalog.maxPerRecord),
+    );
     this.parentId.set(asStr(d['parentId']));
-    this.repositoryIds.set(
-      asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
-    );
-    this.originIssueId.set(this.store.getIssue(asStr(d['originIssueId']))?.id ?? '');
-    this.decisionStatus.set(
-      d['status'] === 'accepted' && kind === 'decision' ? 'accepted' : 'proposed',
-    );
+    this.repositoryText.set(asStr(d['repository']));
 
-    this.teamKey.set('');
-    this.teamKeyTouched = false;
     this.projectKeyTouched = false;
     this.projectKey.set(
       kind === 'project'
@@ -977,8 +720,7 @@ export class CreateDialog {
           )
         : '',
     );
-    this.gitProvider.set('github');
-    this.attachments.set([]);
+    this.threadUrl.set(asStr(d['threadUrl']));
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'issue');
     this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
@@ -1016,15 +758,11 @@ export class CreateDialog {
     return bits.join(' · ');
   }
 
-  /** The team preselected for a new issue. */
-  protected readonly headerTeamId = computed(() => this.teamId());
-
   /** What the draft already has, so quick suggestions skip no-ops. */
   protected readonly suggestionCurrent = computed(() => ({
     priority: this.priority(),
     kind: this.issueKind(),
     estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
-    teamId: this.teamId(),
     assigneeId: this.assigneeId(),
   }));
 
@@ -1032,82 +770,20 @@ export class CreateDialog {
     this.text.update((t) => `${t.trimEnd()}${t.trim() ? '\n\n' : ''}${question}\n`);
   }
 
-  protected setHeaderTeam(id: string): void {
-    // Keep both in step so switching kind carries the team over.
-    if (id || this.kind() === 'issue') this.teamId.set(id);
-  }
-
   protected opt(v: string): string[] {
     return v ? [v] : [];
+  }
+
+  protected setLabels(ids: string[]): void {
+    this.labelIds.set(ids.slice(0, this.labelCatalog.maxPerRecord));
   }
 
   protected setOne(sig: { set: (v: string) => void }, values: string[]): void {
     if (values[0]) sig.set(values[0]);
   }
 
-  protected addAttachment(file: File): void {
-    this.attachments.update((list) => [...list, file]);
-  }
-
-  protected removeAttachment(at: number): void {
-    this.attachments.update((list) => list.filter((_, i) => i !== at));
-  }
-
-  protected bytes(size: number): string {
-    return formatBytes(size);
-  }
-
-  /** Upload the picked files onto the new record. The store toasts each failure itself. */
-  private async uploadAttachments(
-    target: { type: 'issue' | 'project'; id: string },
-  ): Promise<void> {
-    for (const file of this.attachments())
-      await this.store.uploadArtifactFile(target, file);
-  }
-
-  protected onSwitch(next: ComposerKind): void {
-    if (next === this.kind()) return;
-    // Title / description / priority carry over; kind-specific properties keep their own state.
-    // The text moves to the new kind's draft, so the old one is not left behind.
-    this.drafts.set(this.draftKey(this.kind()), null);
-    this.restored.set(false);
-    this.attachments.set([]);
-    this.kind.set(next);
-    this.submitted.set(false);
-    this.ui.createKind.set(next);
-    this.focusTitle();
-  }
-
   protected onClosed(): void {
     if (this.ui.modal() === 'create') this.ui.closeModal();
-  }
-
-  /** Picking a project narrows the repositories to its own (all of them when none were chosen yet). */
-  protected onProject(id: string | undefined): void {
-    this.projectId.set(id ?? '');
-    const project = this.store.getProject(id);
-    if (!project) return;
-    const own = this.repositoryIds().filter((r) => project.repositoryIds.includes(r));
-    this.repositoryIds.set(own.length ? own : [...project.repositoryIds]);
-  }
-
-  protected onTeamName(v: string): void {
-    this.title.set(v);
-    if (!this.teamKeyTouched) {
-      const words = v.trim().split(/\s+/);
-      const initials = words.map((w) => w[0] ?? '').join('');
-      this.teamKey.set(
-        (words.length > 1 ? initials : v.trim().slice(0, 4))
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 8),
-      );
-    }
-  }
-
-  protected onTeamKey(v: string): void {
-    this.teamKeyTouched = true;
-    this.teamKey.set(v);
   }
 
   protected onProjectName(v: string): void {
@@ -1126,35 +802,26 @@ export class CreateDialog {
     this.projectKey.set(v.toUpperCase());
   }
 
-  protected err(field: 'title' | 'statement' | 'key' | 'issue'): string | null {
+  protected err(field: 'title' | 'key' | 'thread'): string | null {
     if (!this.submitted()) return null;
-    if (this.draftAttempt() && field === 'statement') return null;
     const k = this.kind();
     switch (field) {
-      case 'title':
-        return this.title().trim()
+      case 'thread': {
+        const raw = this.threadUrl().trim();
+        return k !== 'issue' || !raw || isValidThreadUrl(toThreadUrl(raw))
           ? null
-          : k === 'issue' || k === 'decision'
-            ? 'Give it a title.'
-            : 'Required.';
-      case 'statement':
-        if (k !== 'decision') return null;
-        return this.text().trim() ? null : 'Say what was decided.';
-      case 'issue':
-        if (k !== 'decision') return null;
-        return this.originIssueId() ? null : 'Choose the primary issue for this decision.';
+          : 'Use a full http(s) link, for example https://delta.dev/…';
+      }
+      case 'title':
+        return this.title().trim() ? null : k === 'issue' ? 'Give it a title.' : 'Required.';
       case 'key':
-        if (k === 'team')
-          return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
-            ? null
-            : '2 to 8 letters or digits, starting with a letter.';
         if (k === 'project') {
           const key = this.projectKey().trim().toUpperCase();
           if (!isProjectKey(key)) return 'Use 1 to 4 letters or digits, starting with a letter.';
           if (isReservedProjectKey(key))
             return key === UNASSIGNED_ISSUE_KEY_PREFIX
-              ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for issues without a project.`
-              : `${key} is reserved for decision identifiers.`;
+              ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for tasks without a project.`
+              : `${key} is reserved.`;
           if (this.store.projects().some((project) => project.key === key))
             return `The tag ${key} is already used.`;
         }
@@ -1163,13 +830,11 @@ export class CreateDialog {
   }
 
   private valid(): boolean {
-    return (['title', 'statement', 'key', 'issue'] as const).every(
-      (f) => !this.err(f),
-    );
+    return (['title', 'key', 'thread'] as const).every((f) => !this.err(f));
   }
 
-  private focusTitle(): void {
-    setTimeout(() => this.titleEl()?.nativeElement.focus());
+  private focusTitle(delay = 0): void {
+    setTimeout(() => this.titleEl()?.nativeElement.focus(), delay);
   }
 
   protected applyIssueSuggestion(suggestion: AiIssueDraftSuggestion): void {
@@ -1182,9 +847,6 @@ export class CreateDialog {
         break;
       case 'estimate':
         this.issueEstimate.set(String(suggestion.value));
-        break;
-      case 'teamId':
-        this.teamId.set(suggestion.value);
         break;
       case 'assigneeId':
         this.assigneeId.set(suggestion.value);
@@ -1202,7 +864,7 @@ export class CreateDialog {
     ev.stopPropagation();
     if (this.busy()) return;
     if (asDraft) {
-      if (!this.title().trim() || (this.kind() === 'decision' && !this.originIssueId())) {
+      if (!this.title().trim() || this.err('thread')) {
         this.submitted.set(true);
         return;
       }
@@ -1224,53 +886,18 @@ export class CreateDialog {
             kind: this.issueKind() as IssueKind,
             title,
             body: this.text().trim() || undefined,
-            goal: this.goal().trim() || undefined,
             priority: this.priority() as Priority,
             status,
-            teamId: this.teamId() || undefined,
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
+            labels: this.labelIds().length ? this.labelIds() : undefined,
             parentId: this.parentId() || undefined,
+            threadUrl: this.threadUrl().trim() ? toThreadUrl(this.threadUrl()) : undefined,
           });
           if (i) {
-            await this.uploadAttachments({ type: 'issue', id: i.id });
-            done = { label: `${i.key} created`, path: ['issues', i.key] };
+            done ={ label: `${i.key} created`, path: ['tasks', i.key] };
           }
-          break;
-        }
-        case 'decision': {
-          const d = await this.store.proposeDecision({
-            title,
-            statement: this.text().trim(),
-            rationale: this.text2().trim() || undefined,
-            status: asDraft ? 'draft' : (this.decisionStatus() as 'proposed' | 'accepted'),
-            originIssueId: this.originIssueId(),
-            tags: asTags(this.tags()),
-          });
-          if (d)
-            done = {
-              label: asDraft ? `${d.key} saved as draft` : `${d.key} created`,
-              path: ['decisions', d.key],
-            };
-          break;
-        }
-        case 'team': {
-          const t = await this.store.createTeam({
-            name: title,
-            key: this.teamKey().toUpperCase(),
-            description: this.text().trim() || undefined,
-          });
-          if (t) done = { label: `Team ${t.name} created`, path: ['teams', t.key] };
-          break;
-        }
-        case 'repository': {
-          const r = await this.store.createRepository({
-            provider: this.gitProvider() as GitProvider,
-            fullName: title,
-            defaultBranch: this.text().trim() || undefined,
-          });
-          if (r) done = { label: `${r.fullName} added`, path: ['repositories', r.id] };
           break;
         }
         case 'project': {
@@ -1278,10 +905,9 @@ export class CreateDialog {
             name: title,
             key: this.projectKey().trim().toUpperCase(),
             summary: this.text().trim() || undefined,
-            repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
+            repository: this.repositoryText().trim() || undefined,
           });
           if (p) {
-            await this.uploadAttachments({ type: 'project', id: p.id });
             done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
           }
           break;
@@ -1304,9 +930,8 @@ export class CreateDialog {
       if (asDraft && this.kind() === 'issue') done.label = `${done.path[1]} saved as draft`;
       const commands = ['/', slug, ...done.path];
       // Linear behaviour: stay where you are, offer "Open" in the toast.
-      // Views and teams are destinations of their own, so those still navigate.
-      const navigate =
-        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository' || this.kind() === 'project';
+      // Views and projects are destinations of their own, so those still navigate.
+      const navigate = this.kind() === 'view' || this.kind() === 'project';
       this.notifier.success(done.label, {
         description: navigate ? undefined : title,
         action: navigate
@@ -1318,7 +943,7 @@ export class CreateDialog {
         this.title.set('');
         this.text.set('');
         this.text2.set('');
-        this.attachments.set([]);
+        this.threadUrl.set('');
         this.submitted.set(false);
         this.draftAttempt.set(false);
         this.focusTitle();

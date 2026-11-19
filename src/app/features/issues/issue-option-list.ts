@@ -1,4 +1,4 @@
-// Searchable option list (status / priority / assignee / team / duplicate) for one or more
+// Searchable option list (status / priority / assignee / project / duplicate) for one or more
 // issues. Used inside the row/card popovers and the keyboard command dialog. Digits 1–9 pick directly.
 import { ChangeDetectionStrategy, Component, computed, inject, input, output, signal } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
@@ -32,9 +32,7 @@ const CREATE = '__create:';
               @if (current().has(o.value)) {
                 <svg [lucideIcon]="check" [size]="14" class="text-foreground shrink-0"></svg>
               }
-              @if (o.hint && field() === 'team') {
-                <span class="text-muted-foreground font-mono text-[11px]">{{ o.hint }}</span>
-              } @else if (n < 9 && digits()) {
+              @if (n < 9 && digits()) {
                 <span class="text-muted-foreground w-3 shrink-0 text-right font-mono text-[11px]">{{ n + 1 }}</span>
               }
             </button>

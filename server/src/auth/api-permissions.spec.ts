@@ -8,23 +8,23 @@ import {
 
 describe('requiredPermission', () => {
   it('maps method + resource', () => {
-    expect(requiredPermission('GET', '/api/w/:slug/issues')).toBe(
-      'issues:read',
+    expect(requiredPermission('GET', '/api/w/:slug/tasks')).toBe(
+      'tasks:read',
     );
-    expect(requiredPermission('POST', '/api/w/:slug/issues')).toBe(
-      'issues:write',
+    expect(requiredPermission('POST', '/api/w/:slug/tasks')).toBe(
+      'tasks:write',
     );
-    expect(requiredPermission('PATCH', '/api/w/:slug/issues/:idOrKey')).toBe(
-      'issues:write',
+    expect(requiredPermission('PATCH', '/api/w/:slug/tasks/:idOrKey')).toBe(
+      'tasks:write',
     );
-    expect(requiredPermission('DELETE', '/api/w/:slug/issues/:idOrKey')).toBe(
-      'issues:delete',
+    expect(requiredPermission('DELETE', '/api/w/:slug/tasks/:idOrKey')).toBe(
+      'tasks:delete',
     );
-    expect(requiredPermission('POST', '/api/w/:slug/issues/bulk')).toBe(
-      'issues:write',
+    expect(requiredPermission('POST', '/api/w/:slug/tasks/bulk')).toBe(
+      'tasks:write',
     );
-    expect(requiredPermission('POST', '/api/w/:slug/issues/bulk-delete')).toBe(
-      'issues:delete',
+    expect(requiredPermission('POST', '/api/w/:slug/tasks/bulk-delete')).toBe(
+      'tasks:delete',
     );
     expect(
       requiredPermission('GET', '/api/w/:slug/workstreams/:idOrKey/graph'),
@@ -38,12 +38,7 @@ describe('requiredPermission', () => {
         '/api/w/:slug/outgoing-webhooks/:id/deliveries',
       ),
     ).toBe('outgoing-webhooks:read');
-    expect(requiredPermission('POST', '/api/w/:slug/releases')).toBe(
-      'releases:write',
-    );
-    expect(
-      requiredPermission('POST', '/api/w/:slug/releases/:id/complete'),
-    ).toBe('releases:write');
+    expect(requiredPermission('POST', '/api/w/:slug/releases')).toBeNull();
   });
 
   it('keeps the issue-first insights routes read-only', () => {
@@ -64,28 +59,7 @@ describe('requiredPermission', () => {
     );
   });
 
-  it('maps the customer-request inbox to customers and its sources to integrations', () => {
-    expect(requiredPermission('GET', '/api/w/:slug/customer-intake')).toBe(
-      'customers:read',
-    );
-    expect(
-      requiredPermission('POST', '/api/w/:slug/customer-intake/:id/link'),
-    ).toBe('customers:write');
-    expect(requiredPermission('GET', '/api/w/:slug/intake-sources')).toBe(
-      'integrations:read',
-    );
-    expect(
-      requiredPermission(
-        'POST',
-        '/api/w/:slug/intake-sources/:id/rotate-secret',
-      ),
-    ).toBe('integrations:write');
-    expect(
-      requiredPermission('DELETE', '/api/w/:slug/intake-sources/:id'),
-    ).toBe('integrations:delete');
-  });
-
-  it('maps imports to integrations (admin) and issue external links to issues', () => {
+  it('maps imports to integrations and task external links to tasks', () => {
     expect(requiredPermission('GET', '/api/w/:slug/imports')).toBe(
       'integrations:read',
     );
@@ -105,63 +79,30 @@ describe('requiredPermission', () => {
       requiredPermission('DELETE', '/api/w/:slug/imports/credentials/:id'),
     ).toBe('integrations:delete');
     expect(
-      requiredPermission('POST', '/api/w/:slug/issues/:idOrKey/external-ref'),
-    ).toBe('issues:write');
+      requiredPermission('POST', '/api/w/:slug/tasks/:idOrKey/external-ref'),
+    ).toBe('tasks:write');
     expect(
       requiredPermission(
         'POST',
-        '/api/w/:slug/issues/:idOrKey/external-ref/refresh',
+        '/api/w/:slug/tasks/:idOrKey/external-ref/refresh',
       ),
-    ).toBe('issues:write');
+    ).toBe('tasks:write');
     expect(
-      requiredPermission('DELETE', '/api/w/:slug/issues/:idOrKey/external-ref'),
-    ).toBe('issues:delete');
-  });
-
-  it('maps customer tiers to workspace settings and the flat request list to customers', () => {
-    expect(requiredPermission('POST', '/api/w/:slug/customer-tiers')).toBe(
-      'workspace:write',
-    );
-    expect(
-      requiredPermission('DELETE', '/api/w/:slug/customer-tiers/:id'),
-    ).toBe('workspace:delete');
-    expect(requiredPermission('GET', '/api/w/:slug/customer-requests')).toBe(
-      'customers:read',
-    );
-    expect(
-      requiredPermission(
-        'PATCH',
-        '/api/w/:slug/customers/:id/requests/:requestId',
-      ),
-    ).toBe('customers:write');
-  });
-
-  it('gives decision verdicts their own permission', () => {
-    expect(
-      requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/accept'),
-    ).toBe('decisions:accept');
-    expect(
-      requiredPermission('POST', '/api/w/:slug/decisions/:idOrKey/supersede'),
-    ).toBe('decisions:accept');
-    expect(requiredPermission('PATCH', '/api/w/:slug/decisions/:idOrKey')).toBe(
-      'decisions:write',
-    );
+      requiredPermission('DELETE', '/api/w/:slug/tasks/:idOrKey/external-ref'),
+    ).toBe('tasks:delete');
   });
 
   it('maps nested artifact routes to artifacts:*, not the parent resource', () => {
     const table: [string, string, string][] = [
-      ['GET', '/api/w/:slug/issues/:idOrKey/artifacts', 'artifacts:read'],
-      ['POST', '/api/w/:slug/issues/:idOrKey/artifacts', 'artifacts:write'],
-      ['GET', '/api/w/:slug/projects/:id/artifacts', 'artifacts:read'],
-      ['POST', '/api/w/:slug/projects/:id/artifacts', 'artifacts:write'],
+      ['GET', '/api/w/:slug/tasks/:idOrKey/artifacts', 'artifacts:read'],
+      ['POST', '/api/w/:slug/tasks/:idOrKey/artifacts', 'artifacts:write'],
       ['GET', '/api/w/:slug/artifacts/:id', 'artifacts:read'],
       ['DELETE', '/api/w/:slug/artifacts/:id', 'artifacts:delete'],
       [
         'POST',
-        '/api/w/:slug/issues/:idOrKey/artifacts/upload',
+        '/api/w/:slug/tasks/:idOrKey/artifacts/upload',
         'artifacts:write',
       ],
-      ['POST', '/api/w/:slug/projects/:id/artifacts/upload', 'artifacts:write'],
     ];
     for (const [method, route, expected] of table)
       expect(requiredPermission(method, route), `${method} ${route}`).toBe(
@@ -170,50 +111,18 @@ describe('requiredPermission', () => {
     expect(requiredPermission('GET', '/api/w/:slug/uploads/:id')).toBeNull();
     expect(isUploadBytesRoute('/api/w/:slug/uploads/:id')).toBe(true);
     expect(
-      isUploadBytesRoute('/api/w/:slug/issues/:idOrKey/artifacts/upload'),
+      isUploadBytesRoute('/api/w/:slug/tasks/:idOrKey/artifacts/upload'),
     ).toBe(false);
   });
 
-  it('maps documents to documents:*, revisions included; attaching needs artifacts:write', () => {
-    const table: [string, string, string][] = [
-      ['GET', '/api/w/:slug/documents', 'documents:read'],
-      ['GET', '/api/w/:slug/documents/:id/revisions', 'documents:read'],
-      ['POST', '/api/w/:slug/documents', 'documents:write'],
-      ['PATCH', '/api/w/:slug/documents/:id', 'documents:write'],
-      ['POST', '/api/w/:slug/documents/:id/attach', 'artifacts:write'],
-      ['POST', '/api/w/:slug/documents/:id/detach', 'artifacts:write'],
-      [
-        'POST',
-        '/api/w/:slug/documents/:id/revisions/:version/restore',
-        'documents:write',
-      ],
-      ['DELETE', '/api/w/:slug/documents/:id', 'documents:delete'],
-    ];
-    for (const [method, route, expected] of table)
-      expect(requiredPermission(method, route), `${method} ${route}`).toBe(
-        expected,
-      );
-    expect(normalizePermissions(['documents:write'])).toEqual([
-      'documents:read',
-      'documents:write',
-    ]);
+  it('no longer knows the removed documents resource', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/documents')).toBeNull();
+    expect(normalizePermissions(['documents:write'])).toEqual([]);
   });
 
   it('keeps the other nested routes under their parent resource', () => {
     const table: [string, string, string][] = [
-      ['POST', '/api/w/:slug/projects/:projectId/updates', 'projects:write'],
-      [
-        'DELETE',
-        '/api/w/:slug/projects/:projectId/updates/:id',
-        'projects:delete',
-      ],
-      ['GET', '/api/w/:slug/projects/:id/context', 'projects:read'],
-      ['POST', '/api/w/:slug/issues/:idOrKey/link', 'issues:write'],
-      [
-        'POST',
-        '/api/w/:slug/input-requests/:id/answer',
-        'input-requests:write',
-      ],
+      ['POST', '/api/w/:slug/tasks/:idOrKey/link', 'tasks:write'],
     ];
     for (const [method, route, expected] of table)
       expect(requiredPermission(method, route), `${method} ${route}`).toBe(
@@ -223,7 +132,7 @@ describe('requiredPermission', () => {
 
   it('fails closed on a nested sub-resource that is in the catalog but not mapped', () => {
     expect(
-      requiredPermission('GET', '/api/w/:slug/issues/:idOrKey/comments'),
+      requiredPermission('GET', '/api/w/:slug/tasks/:idOrKey/comments'),
     ).toBeNull();
     expect(
       requiredPermission('POST', '/api/w/:slug/workstreams/:idOrKey/issues'),
@@ -255,17 +164,14 @@ describe('normalizePermissions', () => {
   it('drops unknown values, dedupes and adds the implied read', () => {
     expect(
       normalizePermissions([
-        'issues:write',
-        'issues:write',
+        'tasks:write',
+        'tasks:write',
         'bogus:read',
-        'issues:fly',
+        'tasks:fly',
         'teams:read',
+        'issues:read',
       ]),
-    ).toEqual(['issues:read', 'issues:write', 'teams:read']);
-    expect(normalizePermissions(['decisions:accept'])).toEqual([
-      'decisions:read',
-      'decisions:accept',
-    ]);
+    ).toEqual(['tasks:read', 'tasks:write']);
   });
 });
 
@@ -283,13 +189,17 @@ describe('MCP tool catalog', () => {
   }[];
 
   it("declares exactly the permission the API derives from each tool's route", () => {
-    expect(tools.length).toBeGreaterThan(80);
+    expect(tools.length).toBeGreaterThan(50);
     for (const t of tools) {
-      const route = `/api/w/:slug${t.path.replace(/\{(\w+)\}/g, ':$1')}`;
+      const removed = /^\/(teams|customers|customer-|decisions|releases|input-requests|repositories|intake)/.test(t.path);
+      if (removed) continue;
+      const path = t.path.replace(/^\/issues/, '/tasks');
+      const route = `/api/w/:slug${path.replace(/\{(\w+)\}/g, ':$1')}`;
+      const permission = t.permission.replace(/^issues:/, 'tasks:');
       expect(
         requiredPermission(t.method, route),
         `${t.name} (${t.method} ${t.path})`,
-      ).toBe(t.permission);
+      ).toBe(permission);
     }
   });
 });

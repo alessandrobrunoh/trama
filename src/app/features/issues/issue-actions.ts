@@ -21,7 +21,7 @@ import {
 } from '../../core';
 
 /** What the keyboard / bulk command dialog edits. */
-export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'team' | 'project' | 'label' | 'duplicate';
+export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'project' | 'label' | 'duplicate' | 'estimate';
 
 export interface IssuePrompt {
   field: IssuePromptField;
@@ -60,7 +60,7 @@ export class IssueActions {
   /** "CORA-142" or "3 issues". */
   subject(ids: readonly string[]): string {
     const list = this.issues(ids);
-    return list.length === 1 ? list[0].key : `${list.length} issues`;
+    return list.length === 1 ? list[0].key : `${list.length} tasks`;
   }
 
   // ───────────────────────── properties ─────────────────────────
@@ -89,11 +89,6 @@ export class IssueActions {
     if (!me) return;
     const mine = this.issues(ids).every((i) => i.assigneeId === me);
     this.setAssignee(ids, mine ? null : me);
-  }
-
-  setTeam(ids: readonly string[], teamId: string | null): void {
-    const name = teamId ? (this.store.getTeam(teamId)?.name ?? 'team') : null;
-    this.patchMany(ids, (i) => ((i.teamId ?? null) === teamId ? null : { teamId }), name ? `Moved to ${name}` : 'Team cleared');
   }
 
   setProject(ids: readonly string[], projectId: string | null): void {
@@ -164,7 +159,7 @@ export class IssueActions {
   }
 
   open(issue: Issue): void {
-    void this.router.navigate(['/', this.store.slug() ?? '', 'issues', issue.key]);
+    void this.router.navigate(['/', this.store.slug() ?? '', 'tasks', issue.key]);
   }
 
   /** Confirm a classification change; issue keys are tied to projects, not issue kinds. */
@@ -173,7 +168,7 @@ export class IssueActions {
     const meta = ISSUE_KIND_META[kind];
     this.ui.setConfirmDelete({
       title: `Change type to ${meta.label}?`,
-      description: `${issue.key} will stay the same; only the issue type will change.`,
+      description: `${issue.key} will stay the same; only the task type will change.`,
       confirmLabel: 'Change type',
       destructive: false,
       onConfirm: async () => {
@@ -191,10 +186,25 @@ export class IssueActions {
   }
 
   /**
-   * Delete right away from the UI and on the server after a short grace period, with an Undo toast
-   * (one atomic request for the whole selection). `after` runs once the issues are gone from the UI.
+   * Ask for confirmation in the global dialog, then delete: gone from the UI right away and on the server
+   * after a short grace period, with an Undo toast (one atomic request for the whole selection).
+   * `after` runs once the issues are gone from the UI.
    */
   remove(ids: readonly string[], after?: () => void): void {
+    const list = this.issues(ids);
+    if (!list.length || !this.store.allowed('deleteIssues')) return;
+    const one = list.length === 1 ? list[0] : null;
+    this.ui.setConfirmDelete({
+      title: one ? `Delete ${one.key}?` : `Delete ${list.length} tasks?`,
+      description: one
+        ? `“${one.title}” and its comments will be deleted. Canceling it instead keeps the history.`
+        : `These ${list.length} tasks and their comments will be deleted. Canceling them instead keeps the history.`,
+      confirmLabel: one ? 'Delete task' : `Delete ${list.length} tasks`,
+      onConfirm: () => this.stageRemove(list.map((i) => i.id), after),
+    });
+  }
+
+  private stageRemove(ids: readonly string[], after?: () => void): void {
     const list = this.issues(ids);
     if (!list.length || !this.store.allowed('deleteIssues')) return;
     const staged = this.store.stageIssueDelete(list.map((i) => i.id));
@@ -202,7 +212,7 @@ export class IssueActions {
     const gone = new Set(list.map((i) => i.id));
     this.ui.setSelected(this.ui.selectedRowIds().filter((id) => !gone.has(id)));
     after?.();
-    const label = list.length === 1 ? `${list[0].key} deleted` : `${list.length} issues deleted`;
+    const label = list.length === 1 ? `${list[0].key} deleted` : `${list.length} tasks deleted`;
     this.notifier.success(label, {
       description: list.length === 1 ? list[0].title : undefined,
       duration: 6000,
@@ -249,7 +259,7 @@ export class IssueActions {
 
   /** Inverse of `patch` for the issues as they were `before`: scalar fields grouped by their old value. */
   private async undo(before: readonly Issue[], patch: BulkIssuePatch): Promise<void> {
-    const scalars = ['status', 'priority', 'assigneeId', 'teamId', 'projectId'] as const;
+    const scalars = ['status', 'priority', 'assigneeId', 'projectId'] as const;
     for (const field of scalars) {
       if (patch[field] === undefined) continue;
       const groups = new Map<string, string[]>();

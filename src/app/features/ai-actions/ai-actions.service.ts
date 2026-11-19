@@ -368,7 +368,7 @@ export class AiActions {
   // ───────────────────────────── applying (always by a person, with Undo) ─────────────────────────────
 
   canEditIssue(issue: Issue): boolean {
-    return this.store.canEditTeamWork(issue.teamId);
+    return this.store.can('member');
   }
 
   /** Apply the chosen triage suggestions. Returns how many changed. */

@@ -55,21 +55,9 @@ export class RecentItems {
         const i = this.store.getIssue(ref);
         return i ? { type, id: i.id, key: i.key, title: i.title } : null;
       }
-      case 'decision': {
-        const d = this.store.getDecision(ref);
-        return d ? { type, id: d.id, key: d.key, title: d.title } : null;
-      }
       case 'project': {
         const p = this.store.getProject(ref);
         return p ? { type, id: p.id, title: p.name } : null;
-      }
-      case 'repository': {
-        const r = this.store.getRepository(ref);
-        return r ? { type, id: r.id, title: r.fullName } : null;
-      }
-      case 'team': {
-        const t = this.store.getTeam(ref);
-        return t ? { type, id: t.id, key: t.key, title: t.name } : null;
       }
       default:
         return null;
@@ -80,19 +68,15 @@ export class RecentItems {
   list(): RecentItem[] {
     const slug = this.store.slug();
     if (!slug) return [];
+    // Items stored by older versions can have types that no longer exist; only known ones survive.
     const exists = (r: RecentItem): boolean => {
-      if ((r.type as string) === 'workstream') return false;
       switch (r.type) {
-        case 'decision': return this.store.decisionById().has(r.id);
         case 'issue': return this.store.issueById().has(r.id);
-        case 'repository': return this.store.repositoryById().has(r.id);
-        case 'team': return this.store.teamById().has(r.id);
-        default: return true;
+        case 'project': return this.store.projectById().has(r.id);
+        default: return false;
       }
     };
-    return (this.all()[slug] ?? [])
-      .map((r) => ((r.type as string) === 'intake' ? { ...r, type: 'issue' as const } : r))
-      .filter(exists);
+    return (this.all()[slug] ?? []).filter(exists);
   }
 
   push(h: SearchHit): void {

@@ -13,7 +13,7 @@ describe('ImportRunnerService worker cap', () => {
       }),
     };
     const runner = new ImportRunnerService(
-      ds as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never,
+      ds as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never, {} as never,
     );
     const execute = vi.fn(async () => gate);
     (runner as unknown as { execute: typeof execute }).execute = execute;

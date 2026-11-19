@@ -41,7 +41,7 @@ describe('planNotifications', () => {
       expect.objectContaining({
         userId: 'usr_dev',
         kind: 'assigned',
-        link: 'issues/BUG-142',
+        link: 'tasks/BUG-142',
         title: 'Maya assigned you BUG-142: Session expires',
       }),
     ]);
@@ -68,24 +68,6 @@ describe('planNotifications', () => {
     );
     expect(drafts.map((d) => [d.userId, d.kind])).toEqual([
       ['usr_dev', 'assigned'],
-    ]);
-  });
-
-  it('sends an Issue input request to its assignee', () => {
-    const drafts = planNotifications(
-      ctx({
-        type: 'input.requested',
-        issue,
-        data: { question: 'Drop Safari 16?', assigneeUserId: 'usr_ask' },
-      }),
-    );
-    expect(drafts).toEqual([
-      expect.objectContaining({
-        userId: 'usr_ask',
-        kind: 'input_requested',
-        body: 'Drop Safari 16?',
-        link: 'issues/BUG-142',
-      }),
     ]);
   });
 
@@ -127,7 +109,7 @@ describe('planNotifications', () => {
         userId: 'usr_dev',
         kind: 'review_requested',
         title: 'Review requested: PR #318',
-        link: 'issues/BUG-142',
+        link: 'tasks/BUG-142',
       }),
     ]);
     const failing = planNotifications({
@@ -154,170 +136,35 @@ describe('planNotifications', () => {
     expect(passing).toEqual([]);
   });
 
-  it('tells the Issue assignee about a proposed decision', () => {
-    const drafts = planNotifications({
-      event: {
-        type: 'decision.proposed',
-        actor: { type: 'agent', id: 'ag_1' },
-        subject: { type: 'decision', id: 'dc_1' },
-        data: {},
-      },
-      actorName: 'claude-code',
-      decision: { id: 'dc_1', key: 'ADR-23', title: 'Hash refresh tokens' },
-      issue,
-    });
-    expect(drafts).toEqual([
-      expect.objectContaining({
-        userId: 'usr_dev',
-        kind: 'decision_proposed',
-        link: 'decisions/ADR-23',
-      }),
-    ]);
-  });
-
   it('says nothing when an Issue has no assignee', () => {
     const none = planNotifications(
       ctx({
-        type: 'input.requested',
+        type: 'review.requested',
         issue: { ...issue, assigneeId: null },
-        data: { question: 'Who?' },
+        data: { title: 'PR #318' },
       }),
     );
     expect(none).toEqual([]);
   });
-  describe('customers', () => {
-    const acme = {
-      id: 'cus_1',
-      name: 'Acme',
-      subscriberIds: ['usr_a', 'usr_b', 'usr_actor'],
-    };
-    const event = (
-      type: string,
-      data: Record<string, unknown>,
-    ): RuleContext['event'] => ({
-      type,
-      actor: { type: 'user', id: 'usr_actor' },
-      subject: { type: 'customer_request', id: 'crq_1' },
-      data: { customerId: 'cus_1', issueKey: 'BUG-142', ...data },
-    });
-    const request = (
-      type: string,
-      data: Record<string, unknown>,
-    ): RuleContext => ({
-      event: event(type, data),
-      actorName: 'Maya',
-      customer: acme,
-    });
 
-    it('tells followers about a new request, never the author', () => {
-      const drafts = planNotifications(
-        request('customer_request.linked', {
-          important: false,
-          excerpt: 'We need SSO',
-        }),
-      );
-      expect(drafts.map((d) => [d.userId, d.kind])).toEqual([
-        ['usr_a', 'customer_request'],
-        ['usr_b', 'customer_request'],
-      ]);
-      expect(drafts[0]).toMatchObject({
-        link: 'customers/cus_1',
-        body: 'We need SSO',
-        subject: { type: 'customer', id: 'cus_1' },
-      });
-      expect(drafts[0].title).toBe('Maya added a request from Acme: BUG-142');
-    });
-
-    it('uses the stronger kind when a request is added already important', () => {
-      const drafts = planNotifications(
-        request('customer_request.linked', { important: true }),
-      );
-      expect(drafts.map((d) => d.kind)).toEqual([
-        'customer_important',
-        'customer_important',
-      ]);
-    });
-
-    it('notifies when a request is flagged important, and only then', () => {
-      const flagged = planNotifications(
-        request('customer_request.updated', {
-          fields: ['important'],
-          important: true,
-        }),
-      );
-      expect(flagged.map((d) => d.kind)).toEqual([
-        'customer_important',
-        'customer_important',
-      ]);
+  it('ignores retired customer, decision, and input events', () => {
+    for (const type of [
+      'input.requested',
+      'decision.proposed',
+      'customer_request.linked',
+      'customer_request.updated',
+      'issue.status_changed',
+      'project.status_changed',
+    ]) {
       expect(
         planNotifications(
-          request('customer_request.updated', {
-            fields: ['important'],
-            important: false,
+          ctx({
+            type,
+            issue,
+            data: { to: 'done', important: true, assigneeUserId: 'usr_ask' },
           }),
         ),
       ).toEqual([]);
-      expect(
-        planNotifications(
-          request('customer_request.updated', {
-            fields: ['body'],
-            important: true,
-          }),
-        ),
-      ).toEqual([]);
-    });
-
-    it('closes the loop: followers and whoever recorded the requests hear about the delivery once', () => {
-      const drafts = planNotifications({
-        event: {
-          type: 'issue.status_changed',
-          actor: { type: 'user', id: 'usr_actor' },
-          subject: { type: 'issue', id: 'iss_1' },
-          data: { to: 'done' },
-        },
-        actorName: 'Maya',
-        delivery: {
-          target: {
-            type: 'issue',
-            id: 'iss_1',
-            label: 'BUG-142: Session expires',
-            link: 'issues/BUG-142',
-          },
-          customers: [
-            { id: 'cus_1', name: 'Acme', subscriberIds: ['usr_a'] },
-            { id: 'cus_2', name: 'Beta', subscriberIds: ['usr_a', 'usr_c'] },
-            { id: 'cus_3', name: 'Gamma', subscriberIds: [] },
-          ],
-          requesterIds: ['usr_c', 'usr_d', 'usr_actor'],
-        },
-      });
-      expect(drafts.map((d) => d.userId).sort()).toEqual([
-        'usr_a',
-        'usr_c',
-        'usr_d',
-      ]);
-      expect(
-        drafts.every(
-          (d) => d.kind === 'customer_delivered' && d.link === 'issues/BUG-142',
-        ),
-      ).toBe(true);
-      expect(drafts[0].title).toBe(
-        'BUG-142: Session expires was delivered: Acme, Beta and 1 more asked for it',
-      );
-      expect(drafts[0].subject).toEqual({ type: 'issue', id: 'iss_1' });
-    });
-
-    it('says nothing without a customer behind the work', () => {
-      const none = planNotifications({
-        event: {
-          type: 'project.status_changed',
-          actor: { type: 'user', id: 'usr_actor' },
-          subject: { type: 'project', id: 'pj_1' },
-          data: { to: 'completed' },
-        },
-        actorName: 'Maya',
-      });
-      expect(none).toEqual([]);
-    });
+    }
   });
 });

@@ -118,7 +118,7 @@ export class UploadsController {
     );
   }
 
-  @Post('issues/:idOrKey/artifacts/upload')
+  @Post('tasks/:idOrKey/artifacts/upload')
   @Multipart()
   @UseInterceptors(uploadFile)
   uploadOnIssue(
@@ -133,26 +133,6 @@ export class UploadsController {
       callerOf(ctx, auth),
       asFile(file),
       { issueId },
-    );
-  }
-
-  @Post('projects/:id/artifacts/upload')
-  @Multipart()
-  @UseInterceptors(uploadFile)
-  uploadOnProject(
-    @Ctx() ctx: WorkspaceContext,
-    @Auth() auth: AuthInfo,
-    @Param('id') projectId: string,
-    @UploadedFile() file: IncomingUpload,
-  ) {
-    return this.uploads.attachArtifact(
-      ctx.workspace.id,
-      ctx.workspace.slug,
-      callerOf(ctx, auth),
-      asFile(file),
-      {
-        projectId,
-      },
     );
   }
 

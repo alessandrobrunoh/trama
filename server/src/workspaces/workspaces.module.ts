@@ -8,18 +8,14 @@ import {
   ApiTokenEntity,
   IssueEntity,
   MembershipEntity,
-  TeamEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
 import { AccessGuard } from './access.guard.js';
-import { CustomerTiersController } from './customer-tiers.controller.js';
-import { CustomerTiersService } from './customer-tiers.service.js';
 import { LabelsController } from './labels.controller.js';
 import { LabelsService } from './labels.service.js';
 import { StatusesController } from './statuses.controller.js';
 import { StatusesService } from './statuses.service.js';
-import { PermissionsService } from './permissions.service.js';
 import {
   AgentsController,
   MembersController,
@@ -39,7 +35,6 @@ import { WorkspacesService } from './workspaces.service.js';
       UserEntity,
       AgentEntity,
       ApiTokenEntity,
-      TeamEntity,
       IssueEntity,
     ]),
   ],
@@ -51,14 +46,11 @@ import { WorkspacesService } from './workspaces.service.js';
     TokensController,
     LabelsController,
     StatusesController,
-    CustomerTiersController,
   ],
   providers: [
     WorkspacesService,
     LabelsService,
     StatusesService,
-    CustomerTiersService,
-    PermissionsService,
     { provide: APP_GUARD, useClass: AccessGuard },
     { provide: APP_INTERCEPTOR, useClass: MemberAccessInterceptor },
   ],
@@ -66,7 +58,6 @@ import { WorkspacesService } from './workspaces.service.js';
     WorkspacesService,
     LabelsService,
     StatusesService,
-    PermissionsService,
   ],
 })
 export class WorkspacesModule {}

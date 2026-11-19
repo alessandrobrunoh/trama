@@ -108,17 +108,17 @@ export class SessionStore {
     await this.router.navigate(['/login']);
   }
 
-  /** Navigate to another workspace (its overview). */
+  /** Navigate to another workspace (its inbox). */
   async switchWorkspace(slug: string): Promise<void> {
     if (slug === this._workspace()?.slug) return;
-    await this.router.navigate(['/', slug, 'overview']);
+    await this.router.navigate(['/', slug, 'inbox']);
   }
 
   /** Create a workspace, add it to `workspaces()` and open it. Rejects with `ApiError`. */
   async createWorkspace(name: string, slug: string): Promise<Workspace> {
     const ws = await this.api.workspaces.create({ name, slug });
     this._workspaces.update((list) => [...list.filter((w) => w.id !== ws.id), ws]);
-    await this.router.navigate(['/', ws.slug, 'overview']);
+    await this.router.navigate(['/', ws.slug, 'inbox']);
     return ws;
   }
 

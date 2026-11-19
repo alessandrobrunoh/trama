@@ -98,9 +98,14 @@ describe('visitedRef', () => {
       type: 'project',
       ref: 'pj_1',
     });
-    expect(visitedRef('/acme/decisions/ADR-7')?.type).toBe('decision');
-    expect(visitedRef('/acme/repositories/rp_1')?.type).toBe('repository');
-    expect(visitedRef('/acme/teams/AUTH')?.type).toBe('team');
+    expect(visitedRef('/acme/tasks/BUG-12')).toEqual({
+      slug: 'acme',
+      type: 'issue',
+      ref: 'BUG-12',
+    });
+    for (const removed of ['decisions/ADR-7', 'repositories/rp_1', 'teams/AUTH', 'customers/cu_1']) {
+      expect(visitedRef(`/acme/${removed}`)).toBeNull();
+    }
   });
 
   it('ignores lists, other areas and settings', () => {

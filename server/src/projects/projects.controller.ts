@@ -3,14 +3,13 @@ import { Transform, Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsBoolean, IsIn, IsInt, Max, Min, IsISO8601, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
 import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import {
-  CUSTOMER_REVENUE_MAX,
   PROJECT_KEY_MAX,
+  PROJECT_REPOSITORY_MAX,
   type ActorRef,
   type Priority,
 } from '../contracts/domain.js';
 import { Clearable, OptionalNotNull } from '../common/validation.js';
 import { PROJECT_ICON_MAX, PROJECT_ICON_PATTERN } from './project-icon.js';
-import { CustomersService } from '../customers/customers.service.js';
 import { ProjectsService } from './projects.service.js';
 
 const PRIORITIES: Priority[] = ['none', 'urgent', 'high', 'medium', 'low'];
@@ -25,10 +24,11 @@ class CreateProjectDto {
   @IsOptional() @Matches(COLOR) color?: string;
   @IsOptional() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string;
   @IsOptional() @IsString() @MaxLength(80) status?: string;
+  /** Project health: a health catalog id or one of on_track, at_risk, off_track. */
+  @IsOptional() @IsString() @MaxLength(80) health?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsString() leadId?: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
-  @IsOptional() @IsArray() @IsString({ each: true }) repositoryIds?: string[];
+  @Clearable() @IsString() @MaxLength(PROJECT_REPOSITORY_MAX) repository?: string | null;
   /** Workspace label ids. */
   @IsOptional() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @IsOptional() @IsISO8601() startDate?: string;
@@ -43,10 +43,11 @@ class UpdateProjectDto {
   @OptionalNotNull() @Matches(COLOR) color?: string;
   @Clearable() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string | null;
   @OptionalNotNull() @IsString() @MaxLength(80) status?: string;
+  /** Project health. `null` clears it. */
+  @Clearable() @IsString() @MaxLength(80) health?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() leadId?: string | null;
-  @OptionalNotNull() @IsArray() @IsString({ each: true }) teamIds?: string[];
-  @OptionalNotNull() @IsArray() @IsString({ each: true }) repositoryIds?: string[];
+  @Clearable() @IsString() @MaxLength(PROJECT_REPOSITORY_MAX) repository?: string | null;
   /** Workspace label ids. Replaces the whole list. */
   @OptionalNotNull() @IsArray() @ArrayMaxSize(20) @IsString({ each: true }) labels?: string[];
   @Clearable() @IsISO8601() startDate?: string | null;
@@ -55,44 +56,23 @@ class UpdateProjectDto {
 
 class ListProjectsQuery {
   @IsOptional() @IsString() @MaxLength(80) status?: string;
-  @IsOptional() @IsString() teamId?: string;
+  @IsOptional() @IsString() @MaxLength(80) health?: string;
   @IsOptional() @IsString() leadId?: string;
-  @IsOptional() @IsString() repositoryId?: string;
   @IsOptional() @IsString() q?: string;
-  /** Only projects this customer asked for. */
-  @IsOptional() @IsString() @MaxLength(100) customerId?: string;
-  /** Only projects a customer of this tier asked for. */
-  @IsOptional() @IsString() @MaxLength(100) tierId?: string;
-  /** At least this many distinct requesting customers. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(1000) minCustomers?: number;
-  /** At least this many customer requests. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) minRequests?: number;
-  /** The requesting customers' revenue adds up to at least this. */
-  @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(CUSTOMER_REVENUE_MAX) minRevenue?: number;
-  /** `true`: only projects with at least one request flagged important. */
-  @IsOptional()
-  @Transform(({ value }: { value: unknown }) => (value === 'true' ? true : value === 'false' ? false : value))
-  @IsBoolean()
-  important?: boolean;
 }
 
 @Controller('w/:slug/projects')
 export class ProjectsController {
-  constructor(
-    private readonly service: ProjectsService,
-    private readonly customers: CustomersService,
-  ) {}
+  constructor(private readonly service: ProjectsService) {}
 
   @Get()
-  async list(@Ctx() ctx: WorkspaceContext, @Query() q: ListProjectsQuery) {
-    return this.customers.attachProjectCounts(ctx.workspace.id, await this.service.list(ctx.workspace.id, q));
+  list(@Ctx() ctx: WorkspaceContext, @Query() q: ListProjectsQuery) {
+    return this.service.list(ctx.workspace.id, q);
   }
 
   @Get(':id')
-  async get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
-    const row = await this.service.get(ctx.workspace.id, id);
-    await this.customers.attachProjectCounts(ctx.workspace.id, [row]);
-    return row;
+  get(@Ctx() ctx: WorkspaceContext, @Param('id') id: string) {
+    return this.service.get(ctx.workspace.id, id);
   }
 
   @Post()

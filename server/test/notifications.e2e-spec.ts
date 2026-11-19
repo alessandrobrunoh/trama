@@ -36,31 +36,31 @@ describe('notifications', () => {
   afterAll(() => app.close());
 
   it('tells someone an issue was assigned to them, and only them', async () => {
-    const issue = (await owner.post(`${base()}/issues`, { title: 'Session expires', kind: 'bug', assigneeId: devId }).expect(201)).body;
+    const issue = (await owner.post(`${base()}/tasks`, { title: 'Session expires', kind: 'bug', assigneeId: devId }).expect(201)).body;
     const { items, unread } = await eventually(() => inbox(dev), (v) => v.items.length > 0, 'the assignment');
     expect(unread).toBe(1);
-    expect(items[0]).toMatchObject({ kind: 'assigned', link: `issues/${issue.key}`, title: `Olivia Owner assigned you ${issue.key}: Session expires` });
+    expect(items[0]).toMatchObject({ kind: 'assigned', link: `tasks/${issue.key}`, title: `Olivia Owner assigned you ${issue.key}: Session expires` });
     expect(items[0].readAt).toBeUndefined();
     expect((await inbox(owner)).items).toEqual([]); // the person who acted is not told
   });
 
   it('notifies a new assignee on update, but not when nothing changed', async () => {
-    const issue = (await owner.post(`${base()}/issues`, { title: 'Reassign me', kind: 'feature' }).expect(201)).body;
-    await owner.patch(`${base()}/issues/${issue.key}`, { title: 'Reassign me please' }).expect(200);
-    await owner.patch(`${base()}/issues/${issue.key}`, { assigneeId: devId }).expect(200);
+    const issue = (await owner.post(`${base()}/tasks`, { title: 'Reassign me', kind: 'feature' }).expect(201)).body;
+    await owner.patch(`${base()}/tasks/${issue.key}`, { title: 'Reassign me please' }).expect(200);
+    await owner.patch(`${base()}/tasks/${issue.key}`, { assigneeId: devId }).expect(200);
     await eventually(() => inbox(dev), (v) => v.items.some((n) => n.title.includes('Reassign me please')), 'the reassignment');
-    await owner.patch(`${base()}/issues/${issue.key}`, { assigneeId: devId }).expect(200); // same assignee again
+    await owner.patch(`${base()}/tasks/${issue.key}`, { assigneeId: devId }).expect(200); // same assignee again
     await new Promise((r) => setTimeout(r, 300));
     const mine = (await inbox(dev)).items.filter((n) => n.kind === 'assigned' && n.title.includes('Reassign me'));
     expect(mine).toHaveLength(1);
   });
 
   it('comments notify the assignee; marking read lowers the unread count', async () => {
-    const issue = (await owner.post(`${base()}/issues`, { title: 'Needs eyes', kind: 'bug', assigneeId: devId }).expect(201)).body;
+    const issue = (await owner.post(`${base()}/tasks`, { title: 'Needs eyes', kind: 'bug', assigneeId: devId }).expect(201)).body;
     await owner.post(`${base()}/comments`, { subject: { type: 'issue', id: issue.id }, body: 'Looks like a race condition in the refresh path.' }).expect(201);
     const after = await eventually(() => inbox(dev), (v) => v.items.some((n) => n.kind === 'comment'), 'the comment');
     const comment = after.items.find((n) => n.kind === 'comment')!;
-    expect(comment).toMatchObject({ link: `issues/${issue.key}`, body: 'Looks like a race condition in the refresh path.' });
+    expect(comment).toMatchObject({ link: `tasks/${issue.key}`, body: 'Looks like a race condition in the refresh path.' });
 
     const unreadBefore = after.unread;
     const res = (await dev.post(`${base()}/notifications/read`, { ids: [comment.id] }).expect(200)).body;
@@ -71,9 +71,8 @@ describe('notifications', () => {
     expect((await dev.post(`${base()}/notifications/read`, {}).expect(200)).body.unread).toBe(0); // no ids: everything
   });
 
-  it('routes questions, review requests and failing CI to the right person', async () => {
-    const issue = (await owner.post(`${base()}/issues`, { title: 'Harden auth', kind: 'bug', assigneeId: devId }).expect(201)).body;
-    await owner.post(`${base()}/input-requests`, { issueId: issue.id, question: 'Keep the polyfill?' }).expect(201);
+  it('routes review requests and failing CI to the right person', async () => {
+    const issue = (await owner.post(`${base()}/tasks`, { title: 'Harden auth', kind: 'bug', assigneeId: devId }).expect(201)).body;
     const pr = (
       await owner.post(`${base()}/artifacts`, { issueId: issue.id, kind: 'pull_request', title: 'PR #7', state: 'open', ci: 'pending', review: 'none' }).expect(201)
     ).body;
@@ -82,11 +81,11 @@ describe('notifications', () => {
 
     const { items } = await eventually(
       () => inbox(dev),
-      (v) => ['input_requested', 'review_requested', 'ci_failed'].every((k) => v.items.some((n) => n.kind === k)),
-      'the three issue notifications',
+      (v) => ['review_requested', 'ci_failed'].every((k) => v.items.some((n) => n.kind === k)),
+      'the issue notifications',
     );
     const by = (kind: string) => items.find((n) => n.kind === kind)!;
-    expect(by('input_requested')).toMatchObject({ body: 'Keep the polyfill?', link: `issues/${issue.key}` });
+    expect(by('review_requested')).toMatchObject({ link: `tasks/${issue.key}` });
     expect(by('review_requested').title).toBe('Review requested: PR #7');
     expect(by('ci_failed').title).toBe('Checks are failing: PR #7');
   });
@@ -101,7 +100,7 @@ describe('notifications', () => {
     expect(updated.settings.comment).toEqual({ inApp: true, email: false, push: true }); // untouched
 
     const count = (await inbox(dev)).items.length;
-    await owner.post(`${base()}/issues`, { title: 'Muted assignment', kind: 'bug', assigneeId: devId }).expect(201);
+    await owner.post(`${base()}/tasks`, { title: 'Muted assignment', kind: 'bug', assigneeId: devId }).expect(201);
     await new Promise((r) => setTimeout(r, 400));
     expect((await inbox(dev)).items).toHaveLength(count);
 

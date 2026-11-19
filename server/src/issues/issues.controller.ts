@@ -37,29 +37,19 @@ import {
   Auth,
   Can,
   Ctx,
-  EditsTeamWork,
   type AuthInfo,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import { projectHidden } from '../auth/member-access.js';
-import {
-  CUSTOMER_REVENUE_MAX,
-  isPlanArtifact,
-  isPlanDecision,
-  resolveIssuePlans,
-} from '../contracts/domain.js';
+import { isPlanArtifact } from '../contracts/domain.js';
 import type {
   ActorRef,
   IssueKind,
   IssueSource,
   Priority,
 } from '../contracts/domain.js';
-import { Clearable, OptionalNotNull } from '../common/validation.js';
+import { Clearable, IsThreadUrl, OptionalNotNull } from '../common/validation.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
-import { DecisionsService } from '../decisions/decisions.service.js';
-import { CustomersService } from '../customers/customers.service.js';
-import { InputRequestsService } from '../input-requests/input-requests.service.js';
-import { PermissionsService } from '../workspaces/permissions.service.js';
 import { renderIssueBriefing } from './issue-briefing.js';
 import { IssuesService } from './issues.service.js';
 
@@ -101,16 +91,15 @@ class CreateIssueDto {
   @IsOptional() @IsString() @MaxLength(20000) body?: string;
   @IsOptional() @IsIn(SOURCES) source?: IssueSource;
   @IsOptional() @IsString() @MaxLength(200) reporterName?: string;
-  @IsOptional() @IsString() @MaxLength(2000) goal?: string;
   @IsOptional() @IsString() assigneeId?: string;
-  @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
-  @IsOptional() @IsString() releaseId?: string;
   /** Id or key of the parent issue. */
   @IsOptional() @IsString() parentId?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
+  /** Link to the Delta thread worked on for this task (http/https, at most 2048 characters). */
+  @IsOptional() @IsString() @IsThreadUrl() threadUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
   /** Workspace label ids. */
   @IsOptional()
@@ -128,18 +117,16 @@ class UpdateIssueDto {
   @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
-  @Clearable() @IsString() @MaxLength(2000) goal?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;
-  @Clearable() @IsString() teamId?: string | null;
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
-  /** Draft release in this workspace. `null` clears it. */
-  @Clearable() @IsString() releaseId?: string | null;
   /** Id or key of the parent issue. `null` makes this issue a root issue. */
   @Clearable() @IsString() parentId?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
+  /** Link to the Delta thread worked on for this task. `null` clears it. */
+  @Clearable() @IsString() @IsThreadUrl() threadUrl?: string | null;
   /** At most one milestone per project, from the issue's project. */
   @OptionalNotNull()
   @IsArray()
@@ -174,10 +161,8 @@ export class BulkIssuePatchDto {
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() assigneeId?: string | null;
-  @Clearable() @IsString() teamId?: string | null;
   /** `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;
-  @Clearable() @IsString() releaseId?: string | null;
   @OptionalNotNull()
   @IsArray()
   @ArrayMaxSize(20)
@@ -206,42 +191,9 @@ class ContextQuery {
 class ListIssueQuery {
   @IsOptional() @IsIn(KINDS) kind?: IssueKind;
   @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
-  @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() milestoneId?: string;
-  @IsOptional() @IsString() releaseId?: string;
-  @IsOptional() @IsString() customerId?: string;
-  /** At least this many distinct linked customers. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(1000)
-  minCustomers?: number;
-  /** At least this many customer requests. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100000)
-  minRequests?: number;
-  /** Only issues a customer of this tier asked for. */
-  @IsOptional() @IsString() @MaxLength(100) tierId?: string;
-  /** The requesting customers' revenue adds up to at least this. */
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(CUSTOMER_REVENUE_MAX)
-  minRevenue?: number;
-  /** `true`: only issues with at least one request flagged important. */
-  @IsOptional()
-  @Transform(({ value }: { value: unknown }) =>
-    value === 'true' ? true : value === 'false' ? false : value,
-  )
-  @IsBoolean()
-  important?: boolean;
   @IsOptional() @IsString() q?: string;
   /** Comma-separated priorities, e.g. `high,urgent`. */
   @IsOptional()
@@ -267,16 +219,11 @@ class ListIssueQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
 }
 
-@Controller('w/:slug/issues')
-@EditsTeamWork('issue')
+@Controller('w/:slug/tasks')
 export class IssuesController {
   constructor(
     private readonly service: IssuesService,
-    private readonly customers: CustomersService,
-    private readonly permissions: PermissionsService,
     private readonly artifacts: ArtifactsService,
-    private readonly decisions: DecisionsService,
-    private readonly inputRequests: InputRequestsService,
   ) {}
 
   @Get()
@@ -296,7 +243,7 @@ export class IssuesController {
     @Body() dto: BulkUpdateIssuesDto,
   ) {
     const rows = await this.service.getMany(ctx.workspace.id, dto.ids);
-    await this.assertTeams(ctx, rows, dto.patch.teamId);
+    await this.assertTeams(ctx, rows);
     const updated = await this.service.updateMany(
       ctx.workspace.id,
       actor,
@@ -357,57 +304,29 @@ export class IssuesController {
   ) {
     const issue = await this.service.get(ctx.workspace.id, idOrKey);
     await this.hideInvisibleParents(ctx, issue);
-    const [artifacts, decisions, requests] = await Promise.all([
-      canReadArtifacts(auth)
-        ? this.artifacts.list(ctx.workspace.id, { issueId: issue.id })
-        : Promise.resolve([]),
-      this.decisions.list(ctx.workspace.id, { issueId: issue.id }),
-      this.inputRequests.list(ctx.workspace.id, { issueId: issue.id }),
-    ]);
-    const inputRequests = requests.filter((r) => r.state === 'open');
+    const artifacts = canReadArtifacts(auth)
+      ? await this.artifacts.list(ctx.workspace.id, { issueId: issue.id })
+      : [];
     const wantsMarkdown =
       q.format === 'markdown' ||
       (!q.format &&
         req?.accepts(['application/json', 'text/markdown']) === 'text/markdown');
     if (wantsMarkdown) {
       res?.type('text/markdown; charset=utf-8');
-      const documentIds = artifacts.flatMap((a) =>
-        a.documentId ? [a.documentId] : [],
-      );
-      const plans = resolveIssuePlans({
-        issueId: issue.id,
-        artifacts,
-        decisions,
-        documentVersions: await this.service.documentVersions(
-          ctx.workspace.id,
-          documentIds,
-        ),
-      });
-      return renderIssueBriefing({
-        issue,
-        plans,
-        decisions,
-        inputRequests: requests,
-        artifacts,
-      });
+      return renderIssueBriefing({ issue, artifacts });
     }
     const plans = artifacts.filter(isPlanArtifact);
-    const planDecisions = decisions.filter(isPlanDecision);
     const latestArtifact = [...plans].sort(
       (a, b) => b.updatedAt.getTime() - a.updatedAt.getTime(),
     )[0];
     return {
       issue,
-      planSummary:
-        plans.length || planDecisions.length
-          ? {
-              artifactCount: plans.length,
-              latestArtifact,
-              decisions: planDecisions,
-            }
-          : undefined,
-      decisions,
-      inputRequests,
+      planSummary: plans.length
+        ? {
+            artifactCount: plans.length,
+            latestArtifact,
+          }
+        : undefined,
       artifacts,
     };
   }
@@ -425,7 +344,7 @@ export class IssuesController {
         ctx.workspace.id,
         actor,
         dto,
-        (parents) => this.assertTeams(ctx, parents, dto.teamId),
+        (parents) => this.assertTeams(ctx, parents),
       ),
     );
   }
@@ -444,7 +363,7 @@ export class IssuesController {
         actor,
         idOrKey,
         dto,
-        (affected) => this.assertTeams(ctx, affected, dto.teamId),
+        (affected) => this.assertTeams(ctx, affected),
       ),
     );
   }
@@ -465,25 +384,12 @@ export class IssuesController {
     );
   }
 
-  /** The team edit policy of every team the request touches (current teams of the issues and the one they move to). */
+  /** Team policies are gone. Hidden projects still conceal the parent issue. */
   private async assertTeams(
     ctx: WorkspaceContext,
-    rows: readonly {
-      teamId?: string | null;
-      projectId?: string | null;
-    }[],
-    moveTo?: string | null,
+    rows: readonly { projectId?: string | null }[],
   ) {
-    const teams = new Map<string, boolean>();
-    const add = (teamId: string | null | undefined, conceal: boolean): void => {
-      if (teamId)
-        teams.set(teamId, (teams.get(teamId) ?? false) || conceal);
-    };
-    for (const row of rows)
-      add(row.teamId, projectHidden(ctx.access, row.projectId));
-    if (moveTo) add(moveTo, false);
-    for (const [id, conceal] of teams)
-      await this.permissions.assertTeamEdit(ctx, id, { conceal });
+    if (rows.some((row) => projectHidden(ctx.access, row.projectId))) return;
   }
 
   private async withCounts<T extends { id: string; parentId?: string | null }>(
@@ -499,7 +405,6 @@ export class IssuesController {
     rows: T | T[],
   ) {
     const list = Array.isArray(rows) ? rows : [rows];
-    await this.customers.attachCounts(ctx.workspace.id, list);
     await this.hideInvisibleParents(ctx, list);
     return rows;
   }

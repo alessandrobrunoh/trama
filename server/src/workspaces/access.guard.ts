@@ -21,7 +21,6 @@ import {
   IS_PUBLIC_KEY,
   MULTIPART_KEY,
   REQUIRE_USER_KEY,
-  TEAM_SCOPE_KEY,
   ROLES_KEY,
   SESSION_ONLY_KEY,
   type AppRequest,
@@ -48,7 +47,6 @@ import type {
   TokenScope,
   WorkspaceRole,
 } from '../contracts/domain.js';
-import { PermissionsService } from './permissions.service.js';
 import {
   AgentEntity,
   MembershipEntity,
@@ -149,7 +147,6 @@ export class AccessGuard implements CanActivate {
     private readonly users: Repository<UserEntity>,
     @InjectRepository(AgentEntity)
     private readonly agents: Repository<AgentEntity>,
-    private readonly permissions: PermissionsService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -278,12 +275,6 @@ export class AccessGuard implements CanActivate {
         owner: effective.owner,
         capabilities: effective.capabilities,
       };
-      const teamScope = this.reflector.getAllAndOverride<'issue' | undefined>(
-        TEAM_SCOPE_KEY,
-        targets,
-      );
-      if (teamScope)
-        await this.permissions.enforceTeamScope(teamScope, req, req.ctx);
     }
     return true;
   }

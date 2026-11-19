@@ -64,7 +64,7 @@ const EXPIRY: Option[] = [
             <app-settings-row label="Name" description="Something that tells you where it is used, like “CI” or “Claude on my laptop”." wide>
               <input hlmInput class="h-8 w-full text-[13px]" placeholder="CI" autofocus [value]="name()" (input)="name.set($any($event.target).value)" aria-label="Token name" />
             </app-settings-row>
-            <app-settings-row label="Acts as" [description]="canAgents() ? 'You, or an agent. An agent token acts with the member role and cannot accept decisions.' : 'The token acts as you. Only people allowed to manage agents can mint tokens for agents.'" wide>
+            <app-settings-row label="Acts as" [description]="canAgents() ? 'You, or an agent. An agent token acts with the member role.' : 'The token acts as you. Only people allowed to manage agents can mint tokens for agents.'" wide>
               <app-select size="sm" [options]="actorOptions()" [(value)]="actsAs" [disabled]="!canAgents()" label="Acts as" />
             </app-settings-row>
             <div class="px-4 py-3">
@@ -75,8 +75,8 @@ const EXPIRY: Option[] = [
                   <button
                     type="button"
                     role="radio"
-                    class="hover:bg-accent rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                    [class.border-primary]="scope() === sc.id"
+                    class="hover:bg-hover rounded-md px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    [class.bg-secondary]="scope() !== sc.id"
                     [class.bg-selected]="scope() === sc.id"
                     [attr.aria-checked]="scope() === sc.id"
                     [disabled]="!scopeAllowed(sc.id)"

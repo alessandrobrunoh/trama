@@ -3,8 +3,6 @@ import type { WorkspaceContext } from '../auth/request-context.js';
 import type { Role } from '../contracts/domain.js';
 import {
   IntegrationConnectionEntity,
-  ReleaseEntity,
-  ReleasePipelineEntity,
   type UserEntity,
 } from '../database/entities/index.js';
 import { SnapshotService } from './snapshot.service.js';
@@ -38,14 +36,6 @@ function build(role: Role, manageIntegrations: Role = 'admin') {
   const service = new SnapshotService(
     ds as never,
     { list: vi.fn().mockResolvedValue([]) } as never,
-    {
-      attachProjectCounts: vi
-        .fn()
-        .mockImplementation((_ws: string, rows: unknown[]) => rows),
-      attachCounts: vi
-        .fn()
-        .mockImplementation((_ws: string, rows: unknown[]) => rows),
-    } as never,
     {
       listAll: vi.fn().mockResolvedValue([]),
       index: vi.fn().mockResolvedValue([]),
@@ -103,13 +93,20 @@ describe('SnapshotService attention', () => {
   });
 });
 
-describe('SnapshotService releases', () => {
-  it('includes release pipelines and releases', async () => {
-    const { run, queried } = build('member');
-    const snap = await run();
-    expect(snap.releasePipelines).toEqual([]);
-    expect(snap.releases).toEqual([]);
-    expect(queried).toContain(ReleasePipelineEntity);
-    expect(queried).toContain(ReleaseEntity);
+describe('SnapshotService retired collections', () => {
+  it('omits teams, repositories, customers, decisions, input requests, and releases', async () => {
+    const snap = await build('member').run();
+    for (const key of [
+      'teams',
+      'repositories',
+      'customers',
+      'customerRequests',
+      'decisions',
+      'inputRequests',
+      'releasePipelines',
+      'releases',
+    ]) {
+      expect(snap).not.toHaveProperty(key);
+    }
   });
 });

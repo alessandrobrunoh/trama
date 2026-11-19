@@ -1,45 +1,26 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import {
-  PROJECT_HEALTH_META,
-  TramaStore,
-  UiStore,
-  applyFilters,
-  sortItems,
-  type Project,
-  type ViewFilter,
-} from '../../core';
+import { TramaStore, UiStore, statusTypeOf } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { TopBarActions } from '../../layout/page-chrome';
+import { StatusBar } from '../../layout/status-bar';
+import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { PriorityIcon } from '../../shared/priority-icon';
-import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
-import { compactNumber, describeDemand } from '../customers/customer-model';
-import { DemandFilters } from '../customers/demand-filters';
+import { FullDatePipe } from '../../shared/pipes';
+import { PreviewLink, useKeyboardPreview } from '../issues/list-preview';
+import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
-import { teamOptions } from '../../shared/picker-options';
 import { ProjectGlyph } from './project-glyph';
-import { ProjectHealthBadge } from './project-health';
-import {
-  HEALTH_ORDER,
-  PROJECT_STATUS_META,
-  isClosed,
-  isOverdue,
-  isUpdateOverdue,
-  projectStatusOptions,
-  projectStatusView,
-} from './project-model';
+import { isClosed, isOverdue, projectStatusOptions } from './project-model';
+import { PriorityIcon } from '../../shared/priority-icon';
+import { StatusIcon } from '../../shared/status';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
-
-const NO_UPDATES = 'none';
-
-type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount';
 
 @Component({
   selector: 'app-project-list-page',
@@ -48,20 +29,20 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
     SearchInput,
     LabelPicker,
     LabelChips,
-    RouterLink,
+    PreviewLink,
     HlmButtonImports,
     LucideDynamicIcon,
     PageHeader,
     Picker,
-    DemandFilters,
     Kbd,
     EmptyState,
     TopBarActions,
-    PriorityIcon,
+    ActorAvatar,
+    StatusBar,
     FullDatePipe,
-    RelativeTimePipe,
     ProjectGlyph,
-    ProjectHealthBadge,
+    PriorityIcon,
+    StatusIcon,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -77,7 +58,24 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
 
     <app-page-header title="Projects" [description]="description()" />
 
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
+    <app-status-bar>
+      <span class="tabular-nums">{{ total() }} {{ total() === 1 ? 'project' : 'projects' }} · {{ inProgress() }} in progress</span>
+      @if (hasFilters()) {
+        <span class="truncate">{{ rows().length }} shown</span>
+      }
+      @if (hasFilters()) {
+        <button
+          end
+          type="button"
+          class="hover:text-foreground underline-offset-2 hover:underline"
+          (click)="clearFilters()"
+        >
+          Clear filters
+        </button>
+      }
+    </app-status-bar>
+
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-5">
       <app-search-input noun="projects" [(value)]="search" />
       <div
         class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
@@ -91,23 +89,6 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
           [value]="statusFilter()"
           (valueChange)="statusFilter.set($event)"
         />
-        <app-picker
-          variant="chip"
-          label="Health"
-          [multiple]="true"
-          [searchable]="false"
-          [options]="healths"
-          [value]="healthFilter()"
-          (valueChange)="healthFilter.set($event)"
-        />
-        <app-picker
-          variant="chip"
-          label="Team"
-          [multiple]="true"
-          [options]="teams()"
-          [value]="teamFilter()"
-          (valueChange)="teamFilter.set($event)"
-        />
         <app-label-picker
           variant="chip"
           label="Label"
@@ -116,10 +97,6 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
           [manageLink]="false"
           [value]="labelFilter()"
           (valueChange)="labelFilter.set($event)"
-        />
-        <app-demand-filters
-          [filters]="demandFilters()"
-          (filtersChange)="demandFilters.set($event)"
         />
         @if (hasFilters()) {
           <button
@@ -133,28 +110,13 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
           </button>
         }
       </div>
-      @if (store.customerRequests().length) {
-        <label class="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs">
-          Sort
-          <select
-            class="border-input bg-background text-foreground h-7 rounded-md border px-1.5 text-xs"
-            aria-label="Sort projects"
-            [value]="sort()"
-            (change)="sort.set($any($event.target).value)"
-          >
-            @for (o of sorts; track o.value) {
-              <option [value]="o.value">{{ o.label }}</option>
-            }
-          </select>
-        </label>
-      }
     </div>
 
     @if (total() === 0) {
       <app-empty-state
         [icon]="boxIcon"
         title="No projects yet"
-        description="A project groups planned issues, milestones, repositories and project context."
+        description="A project groups planned tasks and milestones."
       >
         @if (canManage()) {
           <button hlmBtn size="sm" (click)="create()">
@@ -166,108 +128,90 @@ type ProjectSort = 'name' | 'customerCount' | 'customerRevenue' | 'requestCount'
       <app-empty-state
         [icon]="searchIcon"
         title="No projects match"
-        description="Try another name, status or team."
+        description="Try another name, status or repository."
       >
         <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
       </app-empty-state>
     } @else {
-      <div class="min-h-0 flex-1 overflow-y-auto" role="list">
+      <div class="min-h-0 flex-1 overflow-y-auto pb-4" role="list">
         <div
-          class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex"
+          class="text-muted-foreground flex items-center gap-3 px-4 pt-1 text-xs max-md:hidden sm:px-5"
+          aria-hidden="true"
         >
-          <span class="flex-1">Name</span>
-          <span class="w-24">Priority</span>
-          <span class="w-28">Status</span>
-          <span class="w-24">Health</span>
-          <span class="w-24">Updated</span>
+          <span class="min-w-0 flex-1"></span>
+          <span class="w-5"></span>
+          <span class="w-28">Progress</span>
           <span class="w-32">Lead</span>
-          <span class="w-28">Target</span>
-          @if (showCustomers()) {
-            <span class="w-24 text-right">Customers</span>
-          }
-          <span class="w-20 text-right">Repos</span>
+          <span class="w-24">Target date</span>
         </div>
-        @for (row of rows(); track row.project.id) {
-          @let p = row.project;
-          <a
-            [routerLink]="['/', slug(), 'projects', p.id]"
-            [attr.data-row-id]="p.id"
-            role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
-            [class.bg-muted]="ui.focusedRowId() === p.id"
-          >
-            <span class="flex min-w-0 flex-1 items-center gap-2.5">
-              <app-project-glyph [project]="p" [size]="16" />
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-medium">
-                  <span class="text-muted-foreground mr-1.5 font-mono text-xs">{{ p.key }}</span>
-                  {{ p.name }}
-                </span>
-                @if (p.summary) {
-                  <span class="text-muted-foreground block truncate text-xs">{{ p.summary }}</span>
-                }
-                @if (p.labels.length) {
-                  <app-label-chips class="mt-1" [ids]="p.labels" />
-                }
-              </span>
-            </span>
-            <span
-              class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[22px] max-md:text-[13px] md:contents"
-            >
-              <span class="flex w-24 items-center max-md:w-auto"
-                ><app-priority-icon [priority]="p.priority" [showLabel]="true"
-              /></span>
-              <span
-                class="flex w-28 items-center gap-1.5 max-md:w-auto"
-                [style.color]="row.status.color"
+        @for (g of groups(); track g.id) {
+          <section [attr.aria-label]="g.label">
+            <h2 class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] font-normal sm:px-5">
+              <app-status-icon [status]="g.id" entity="project" [size]="14" />
+              <span class="text-foreground">{{ g.label }}</span>
+              <span class="tabular-nums">{{ g.rows.length }}</span>
+            </h2>
+            @for (row of g.rows; track row.project.id) {
+              @let p = row.project;
+              <a
+                [appPreviewLink]="['/', slug(), 'projects', p.id]"
+                (preview)="showProject(p.id)"
+                [attr.data-row-id]="p.id"
+                [attr.aria-current]="isPreviewed(p.id) ? 'true' : null"
+                role="listitem"
+                class="focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset sm:px-5 md:min-h-9 md:flex-nowrap md:py-1.5"
+                [class]="
+                  isPreviewed(p.id) || ui.focusedRowId() === p.id
+                    ? 'bg-selected'
+                    : 'hover:bg-hover'
+                "
               >
-                <span
-                  class="size-2 shrink-0 rounded-full"
-                  [style.background]="row.status.color"
-                ></span>
-                {{ row.status.label }}
-              </span>
-              <span class="flex w-24 items-center max-md:w-auto">
-                @if (p.health) {
-                  <app-project-health [health]="p.health" [compact]="true" />
-                } @else {
-                  <span aria-label="No update yet">—</span>
-                }
-              </span>
-              <span
-                class="w-24 whitespace-nowrap max-md:w-auto"
-                [class.text-status-needs-input]="row.updateOverdue"
-              >
-                {{ p.lastUpdateAt ? (p.lastUpdateAt | relativeTime) : '—' }}
-              </span>
-              <span class="w-32 truncate max-md:w-auto max-md:max-w-32">{{ row.lead ?? '—' }}</span>
-              <span
-                class="w-28 whitespace-nowrap max-md:w-auto"
-                [class.text-status-blocked]="row.overdue"
-              >
-                {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
-              </span>
-              @if (showCustomers()) {
-                <span
-                  class="w-24 text-right whitespace-nowrap tabular-nums max-md:w-auto"
-                  [title]="row.demandText"
-                >
-                  @if (row.demand; as d) {
-                    {{ d.customerCount
-                    }}<span class="text-muted-foreground"> · {{ compact(d.revenue) }}</span>
-                  } @else {
-                    <span class="text-muted-foreground">—</span>
+                <span class="flex min-w-0 flex-1 items-center gap-2.5">
+                  <app-project-glyph [project]="p" [size]="16" />
+                  <span class="max-w-[14rem] min-w-0 shrink-0 truncate">{{ p.name }}</span>
+                  @if (p.summary) {
+                    <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs max-lg:hidden">{{ p.summary }}</span>
+                  }
+                  @if (p.labels.length) {
+                    <app-label-chips class="shrink-0 max-xl:hidden" [ids]="p.labels" [max]="2" />
                   }
                 </span>
-              }
-              <span class="w-20 text-right whitespace-nowrap tabular-nums max-md:w-auto">
-                {{ p.repositoryIds.length
-                }}<span class="md:hidden">
-                  {{ p.repositoryIds.length === 1 ? 'repo' : 'repos' }}</span
+                <span
+                  class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] max-md:text-[13px] md:contents"
                 >
-              </span>
-            </span>
-          </a>
+                  <span class="flex w-5 items-center justify-center max-md:w-auto">
+                    <app-priority-icon [priority]="p.priority" />
+                  </span>
+                  <span
+                    class="flex w-28 items-center gap-2 max-md:w-auto"
+                    [attr.aria-label]="row.percent + '% complete'"
+                  >
+                    <span class="bg-foreground/10 h-1 w-14 overflow-hidden rounded-full" aria-hidden="true">
+                      <span
+                        class="bg-status-done block h-full rounded-full"
+                        [style.width.%]="row.percent"
+                      ></span>
+                    </span>
+                    <span class="tabular-nums">{{ row.percent }}%</span>
+                  </span>
+                  <span class="flex w-32 items-center gap-1.5 max-md:w-auto max-md:max-w-36">
+                    @if (p.leadId) {
+                      <app-actor-avatar [actor]="{ type: 'user', id: p.leadId }" [size]="18" />
+                      <span class="truncate">{{ row.lead }}</span>
+                    } @else {
+                      <span>—</span>
+                    }
+                  </span>
+                  <span
+                    class="w-24 whitespace-nowrap max-md:hidden"
+                    [class.text-status-blocked]="row.overdue"
+                  >
+                    {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
+                  </span>
+                </span>
+              </a>
+            }
+          </section>
         }
       </div>
     }
@@ -288,88 +232,89 @@ export class ProjectListPage {
   protected get statuses() {
     return projectStatusOptions(this.store.settings().statuses.project);
   }
-  protected readonly healths = [
-    ...HEALTH_ORDER.map((h) => ({ value: h as string, label: PROJECT_HEALTH_META[h].label })),
-    { value: NO_UPDATES, label: 'No updates' },
-  ];
 
   // Filters survive navigation inside the app (see ListStateStore).
   protected readonly search = this.listState.remember('projects.search', '');
   protected readonly statusFilter = this.listState.remember<string[]>('projects.status', []);
-  protected readonly healthFilter = this.listState.remember<string[]>('projects.health', []);
-  protected readonly teamFilter = this.listState.remember<string[]>('projects.team', []);
   protected readonly labelFilter = this.listState.remember<string[]>('projects.labels', []);
-  protected readonly demandFilters = this.listState.remember<ViewFilter[]>('projects.demand', []);
-  protected readonly sort = this.listState.remember<ProjectSort>('projects.sort', 'name');
-  protected readonly sorts: { value: ProjectSort; label: string }[] = [
-    { value: 'name', label: 'Name' },
-    { value: 'customerCount', label: 'Most customers' },
-    { value: 'customerRevenue', label: 'Most revenue' },
-    { value: 'requestCount', label: 'Most requests' },
-  ];
-  protected readonly compact = compactNumber;
-  /** The customers column appears once any customer has asked for something. */
-  protected readonly showCustomers = computed(() => this.store.demand().size > 0);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
-  protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly total = computed(() => this.store.projects().length);
   protected readonly hasFilters = computed(
     () =>
       !!this.search().trim() ||
       this.statusFilter().length > 0 ||
-      this.healthFilter().length > 0 ||
-      this.teamFilter().length > 0 ||
-      this.labelFilter().length > 0 ||
-      this.demandFilters().length > 0,
+      this.labelFilter().length > 0,
   );
 
   protected readonly rows = computed(() => {
     const q = this.search().trim().toLowerCase();
     const statuses = new Set(this.statusFilter());
-    const teams = new Set(this.teamFilter());
-    const healths = new Set(this.healthFilter());
     const labels = this.labelFilter();
     const users = this.store.userById();
-    const demand = this.store.demand();
-    const ctx = { demand };
-    const sort = this.sort();
-    const matching = applyFilters('project', this.store.projects(), this.demandFilters(), ctx);
-    // "Most customers / revenue / requests" first; the others stay as before (open first, then by name).
-    const ordered: readonly Project[] =
-      sort === 'name'
-        ? matching
-        : sortItems('project', matching, { field: sort, direction: 'desc' }, ctx);
-    return (
-      ordered
-        .filter((p) => {
-          if (statuses.size && !statuses.has(p.status)) return false;
-          if (healths.size && !healths.has(p.health ?? NO_UPDATES)) return false;
-          if (teams.size && !p.teamIds.some((id) => teams.has(id))) return false;
-          if (labels.length && !labels.some((id) => p.labels.includes(id))) return false;
-          return !q || `${p.name} ${p.summary ?? ''}`.toLowerCase().includes(q);
-        })
-        .slice()
-        // Open projects first, then by name (or by demand when asked).
-        .sort((a, b) => {
-          const entries = this.store.settings().statuses.project;
-          return sort === 'name'
-            ? Number(isClosed(a, entries)) - Number(isClosed(b, entries)) ||
-                a.name.localeCompare(b.name)
-            : 0;
-        })
-        .map((project) => ({
+    return this.store
+      .projects()
+      .filter((p) => {
+        if (statuses.size && !statuses.has(p.status)) return false;
+        if (labels.length && !labels.some((id) => p.labels.includes(id))) return false;
+        return !q || `${p.name} ${p.summary ?? ''} ${p.repository ?? ''}`.toLowerCase().includes(q);
+      })
+      .slice()
+      .sort((a, b) => {
+        const entries = this.store.settings().statuses.project;
+        return (
+          Number(isClosed(a, entries)) - Number(isClosed(b, entries)) || a.name.localeCompare(b.name)
+        );
+      })
+      .map((project) => {
+        const issues = this.store.issuesByProject().get(project.id) ?? [];
+        return {
           project,
-          status: projectStatusView(project.status, this.store.settings().statuses.project),
           lead: project.leadId ? users.get(project.leadId)?.name : undefined,
           overdue: isOverdue(project),
-          updateOverdue: isUpdateOverdue(project),
-          demand: demand.get(project.id),
-          demandText: demand.has(project.id) ? describeDemand(demand.get(project.id)!) : '',
-        }))
-    );
+          percent: milestoneStats(issues, usesPoints(issues, this.store.estimateScale())).percent,
+        };
+      });
   });
+
+  /** Rows under a muted header per project status, in the workspace's status order. */
+  protected readonly groups = computed(() => {
+    const rows = this.rows();
+    return this.store
+      .settings()
+      .statuses.project.map((entry) => ({
+        id: entry.id,
+        label: entry.name,
+        color: entry.color,
+        rows: rows.filter((r) => r.project.status === entry.id),
+      }))
+      .filter((g) => g.rows.length > 0);
+  });
+
+  protected readonly inProgress = computed(
+    () =>
+      this.store
+        .projects()
+        .filter((p) => statusTypeOf(this.store.settings().statuses.project, p.status) === 'in_progress')
+        .length,
+  );
+
+  private readonly pane = inject(RightPaneStore);
+
+  /** Arrow keys and j/k show the focused project in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => this.pane.show({ kind: 'project', id }));
+
+  protected isPreviewed(id: string): boolean {
+    const c = this.pane.content();
+    return c?.kind === 'project' && c.id === id;
+  }
+
+  /** A single click previews the project; Enter, a double click and phones open it. */
+  protected showProject(id: string): void {
+    this.ui.setFocusedRow(id);
+    this.pane.show({ kind: 'project', id });
+  }
 
   protected readonly description = computed(() => {
     const n = this.total();
@@ -384,9 +329,6 @@ export class ProjectListPage {
   protected clearFilters(): void {
     this.search.set('');
     this.statusFilter.set([]);
-    this.healthFilter.set([]);
-    this.teamFilter.set([]);
     this.labelFilter.set([]);
-    this.demandFilters.set([]);
   }
 }

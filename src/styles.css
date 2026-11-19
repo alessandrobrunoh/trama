@@ -13,8 +13,7 @@
   display: flex;
   align-items: stretch;
   padding: 0 0.25rem env(safe-area-inset-bottom);
-  border-top: 1px solid var(--border);
-  background: color-mix(in oklab, var(--background) 90%, transparent);
+  background: color-mix(in oklab, var(--sidebar) 92%, transparent);
   -webkit-backdrop-filter: saturate(1.6) blur(20px);
   backdrop-filter: saturate(1.6) blur(20px);
 }
@@ -164,7 +163,6 @@ html[data-keyboard='open'] .mobile-tabbar {
   justify-content: space-between;
   gap: 0.75rem;
   padding-inline: 1rem;
-  border-bottom: 1px solid var(--border);
 }
 
 .mobile-menu__identity {
@@ -217,7 +215,7 @@ html[data-keyboard='open'] .mobile-tabbar {
 }
 
 .mobile-menu__group + .mobile-menu__group {
-  border-top: 1px solid var(--border);
+  margin-block-start: 0.375rem;
 }
 
 .mobile-menu__label {
@@ -636,74 +634,130 @@ html[data-keyboard='open'] .mobile-fab {
 }
 
 /* ───────────────────────── Fonts (self-hosted) ───────────────────────── */
+/* IBM Plex Sans (variable weight, 100-700) for UI text and IBM Plex Mono for keys, ids and code.
+   Files live in public/fonts (from @fontsource, SIL OFL); never loaded from a CDN. */
 @font-face {
-  font-family: 'Inter';
-  src: url('/fonts/InterVariable.woff2') format('woff2');
-  font-weight: 100 900;
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/ibm-plex-sans-latin-wght-normal.woff2') format('woff2');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329,
+    U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/ibm-plex-sans-latin-ext-wght-normal.woff2') format('woff2');
+  font-weight: 100 700;
+  font-style: normal;
+  font-display: swap;
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329,
+    U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  src: url('/fonts/ibm-plex-sans-latin-wght-italic.woff2') format('woff2');
+  font-weight: 100 700;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
-  font-weight: 100 900;
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+  font-weight: 500 700;
   font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  src: url('/fonts/ibm-plex-mono-latin-400-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
   font-display: swap;
 }
 
 /* ───────────────────────── Tokens ─────────────────────────
    Light is :root, dark is :root.dark (class set by ThemeService).
-   Linear-like: the app chrome (sidebar) is the darkest/most recessed surface and the page
-   sits on an inset panel. Neutral greys + ONE terracotta accent. Status tones are muted and keep
-   the same meaning in both modes. Use the semantic Tailwind colors (bg-background,
-   text-muted-foreground, text-status-working, …) — never raw hex / palette colors in feature code.
+   Workspace look: three panes (sidebar | main | right pane). Side panes sit on a light gray
+   (--sidebar, also exposed as --pane), the center is white, panes are split by a single hairline
+   (--border), rows carry no dividers (flat gray hover / selected fills), embedded blocks are cards
+   with a hairline and a 7px radius. Text is IBM Plex Sans in regular weight: hierarchy comes from
+   near-black vs muted gray, not from bold. ONE quiet blue accent (--primary: links, focus, unread
+   dots, primary buttons). The terracotta is the brand color only (--brand: logo mark).
+   Status tones are muted and keep the same meaning in both modes. Use the semantic Tailwind colors
+   (bg-background, text-muted-foreground, text-status-working, …) — never raw hex / palette
+   colors in feature code.
 
-   Entity accents: issues are demand (circle glyphs), decisions are knowledge (--entity-decision). */
+   Lines are translucent (black/white at low alpha) so they stay faint on any surface tint.
+   --border: pane dividers and card edges; --border-strong: control edges;
+   --input: form-control edge (kept visible for contrast).
+
+   Entity accents: tasks are demand (circle glyphs). */
 :root {
   color-scheme: light;
-  --radius: 0.375rem; /* 6px: controls, menus, popovers */
+  --radius: 0.4375rem; /* 7px: embedded cards (rounded-lg); controls and menus are 5-6px (rounded-md) */
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto,
+    'Helvetica Neue', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
 
   --background: #ffffff;
-  --foreground: #1b1c1f;
-  --card: #ffffff;
-  --card-foreground: #1b1c1f;
+  --foreground: #1f1f22;
+  --card: #fafafb; /* embedded blocks: a faint tint plus a hairline (see Card) */
+  --card-foreground: #1f1f22;
   --popover: #ffffff;
-  --popover-foreground: #1b1c1f;
-  --primary: #ad5235; /* white text on it: 5.2:1 */
-  --primary-text: #ad5235;
+  --popover-foreground: #1f1f22;
+  --primary: #4560e0; /* quiet blue; white text on it: 5.2:1 */
+  --primary-text: #4560e0;
   --primary-foreground: #ffffff;
-  --secondary: #f3f3f5;
-  --secondary-foreground: #26272b;
-  --muted: #f5f5f7;
-  --muted-foreground: #62646b; /* 5.4:1 on the sidebar, 5.2:1 on accent: AA for small text everywhere */
-  --accent: #efeff2;
-  --accent-foreground: #1b1c1f;
-  --destructive: #c93535;
-  --border: #e8e8ec;
-  --border-strong: #d6d6dc;
-  --input: #cfcfd6;
-  --ring: #ad5235;
-  /* Faint row hover / selected fills */
-  --hover: rgb(18 19 24 / 0.035);
-  --selected: color-mix(in oklab, var(--primary) 8%, transparent);
+  --brand: #ad5235;
+  --secondary: #f0f0f2;
+  --secondary-foreground: #2a2a2d;
+  --muted: #f5f5f6;
+  --muted-foreground: #6b6b72; /* >= 4.8:1 on white, sidebar and selected rows: AA for small text everywhere */
+  --accent: #ececee;
+  --accent-foreground: #1f1f22;
+  --destructive: #c2453d;
+  --border: rgb(0 0 0 / 0.08);
+  --border-strong: rgb(0 0 0 / 0.13);
+  --input: rgb(0 0 0 / 0.16);
+  --ring: #4f6bed;
+  /* Row hover / selected fills: flat translucent grays, equally right on white and on the side panes */
+  --hover: rgb(0 0 0 / 0.04);
+  --selected: rgb(0 0 0 / 0.065);
 
-  --chart-1: #ad5235;
+  /* Diff-style rows ("+6 −4") and quoted-comment bars */
+  --diff-add: #2f8a3e;
+  --diff-add-bg: #e3f3e5;
+  --diff-del: #c2453d;
+  --diff-del-bg: #f8e1e1;
+  --comment-bar: #9b7fd1;
+
+  --chart-1: #4560e0;
   --chart-2: #2d9d8f;
   --chart-3: #d19a2a;
   --chart-4: #8a63d2;
   --chart-5: #5e6ad2;
 
-  --sidebar: #f4f4f6;
-  --sidebar-foreground: #3a3b40;
-  --sidebar-primary: #ad5235;
+  --sidebar: #f5f5f6;
+  --pane: var(--sidebar);
+  --sidebar-foreground: #2c2c30;
+  --sidebar-primary: #4560e0;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e8e8ec;
-  --sidebar-accent-foreground: #1b1c1f;
-  --sidebar-border: #e3e3e8;
-  --sidebar-ring: #ad5235;
+  --sidebar-accent: rgb(0 0 0 / 0.065); /* the flat gray selected row */
+  --sidebar-accent-foreground: #1f1f22;
+  --sidebar-border: var(--border); /* the hairline between panes */
+  --sidebar-ring: #4f6bed;
 
   --entity-decision: #b7791f;
   --entity-issue: #62646b;
@@ -719,51 +773,59 @@ html[data-keyboard='open'] .mobile-fab {
   --tone-teal: #0f7a6f;
   --tone-green: #28793f;
 
-  --shadow-menu: 0 0 0 1px rgb(0 0 0 / 0.06), 0 8px 24px -4px rgb(0 0 0 / 0.12), 0 2px 6px rgb(0 0 0 / 0.05);
-  --shadow-panel: 0 0 0 1px rgb(0 0 0 / 0.04), 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-menu: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 8px 24px -4px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-panel: none;
 }
 
 :root.dark {
   color-scheme: dark;
 
-  /* Near-black, slightly cool. Sidebar #08090a < panel #0e0f11 < raised #141518 < popover #18191c. */
-  --background: #0e0f11;
-  --foreground: #e9eaee;
-  --card: #131417;
-  --card-foreground: #e9eaee;
-  --popover: #17181b;
-  --popover-foreground: #e9eaee;
-  --primary: #b95a3a; /* fill: white text 4.6:1 */
-  --primary-text: #e0845e; /* same hue as text and icons on dark surfaces: 6.4:1 */
+  /* Graphite, same structure as light: the side panes are a step darker than the content
+     (sidebar #171719, content #1e1e21), embedded cards a step lighter (#242427). */
+  --background: #1e1e21;
+  --foreground: #ececef;
+  --card: #242427;
+  --card-foreground: #ececef;
+  --popover: #2a2a2e;
+  --popover-foreground: #ececef;
+  --primary: #4f68e8; /* fill: white text 4.7:1 */
+  --primary-text: #8da0ff; /* same hue as text and icons on dark surfaces: 6.6:1 */
   --primary-foreground: #ffffff;
-  --secondary: #18191c;
-  --secondary-foreground: #e9eaee;
-  --muted: #141518;
-  --muted-foreground: #8a8f98;
-  --accent: #1c1d21;
-  --accent-foreground: #f4f5f7;
-  --destructive: #eb5757;
-  --border: #222327;
-  --border-strong: #2f3035;
-  --input: #34363c;
-  --ring: #d9714a;
-  --hover: rgb(255 255 255 / 0.03);
-  --selected: color-mix(in oklab, var(--primary) 12%, transparent);
+  --brand: #d9714a;
+  --secondary: #2a2a2e;
+  --secondary-foreground: #ececef;
+  --muted: #232326;
+  --muted-foreground: #9b9ba3; /* >= 5:1 on every dark surface above */
+  --accent: #2e2e32;
+  --accent-foreground: #f5f5f7;
+  --destructive: #eb6a62;
+  --border: rgb(255 255 255 / 0.09);
+  --border-strong: rgb(255 255 255 / 0.14);
+  --input: rgb(255 255 255 / 0.18);
+  --ring: #7d92ff;
+  --hover: rgb(255 255 255 / 0.05);
+  --selected: rgb(255 255 255 / 0.09);
 
-  --chart-1: #d9714a;
+  --diff-add: #5fbf71;
+  --diff-add-bg: rgb(63 160 82 / 0.16);
+  --diff-del: #ee7770;
+  --diff-del-bg: rgb(220 80 72 / 0.16);
+  --comment-bar: #a994de;
+
+  --chart-1: #6f86ff;
   --chart-2: #46b8a8;
   --chart-3: #e0b04a;
   --chart-4: #a389e6;
   --chart-5: #6e79d6;
 
-  --sidebar: #08090a;
-  --sidebar-foreground: #c9cbd1;
-  --sidebar-primary: #b95a3a;
+  --sidebar: #171719;
+  --sidebar-foreground: #d6d6db;
+  --sidebar-primary: #4f68e8;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #17181b;
-  --sidebar-accent-foreground: #f4f5f7;
-  --sidebar-border: #1a1b1f;
-  --sidebar-ring: #d9714a;
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-border: var(--border);
+  --sidebar-ring: #7d92ff;
 
   --entity-decision: #e0b04a;
   --entity-issue: #8a8f98;
@@ -778,8 +840,8 @@ html[data-keyboard='open'] .mobile-fab {
   --tone-teal: #4cc0b0;
   --tone-green: #4cb782;
 
-  --shadow-menu: 0 0 0 1px rgb(255 255 255 / 0.06), 0 12px 32px -6px rgb(0 0 0 / 0.7), 0 2px 6px rgb(0 0 0 / 0.4);
-  --shadow-panel: 0 0 0 1px rgb(255 255 255 / 0.04), 0 2px 8px rgb(0 0 0 / 0.35);
+  --shadow-menu: 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 12px 32px -6px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-panel: none;
 }
 
 /* Status → tone. Semantics are shared across entities:
@@ -795,7 +857,7 @@ html[data-keyboard='open'] .mobile-fab {
   --status-ready-to-land: var(--tone-teal);
   --status-shipped: var(--tone-green);
   --status-canceled: var(--tone-neutral);
-  /* Extra execution / intake / decision / artifact / CI states reuse the same tones */
+  /* Extra execution / artifact / CI states reuse the same tones */
   --status-queued: var(--tone-neutral);
   --status-running: var(--tone-blue);
   --status-failed: var(--tone-red);
@@ -840,11 +902,25 @@ html[data-keyboard='open'] .mobile-fab {
   --shadow-panel: var(--shadow-panel);
 
   /* Motion: every `transition-*` utility shares one short, decelerating curve (Linear / Raycast feel). */
+  /* Regular weight almost everywhere: hierarchy is near-black vs muted gray, not bold. The
+     `font-medium`/`font-semibold`/`font-bold` utilities all land one notch lighter than usual
+     (Plex Sans is variable 100-700). */
+  --font-weight-medium: 400;
+  --font-weight-semibold: 500;
+  --font-weight-bold: 600;
+
   --default-transition-duration: 140ms;
   --default-transition-timing-function: cubic-bezier(0.2, 0, 0, 1);
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
+  --color-brand: var(--brand);
+  --color-pane: var(--pane);
+  --color-diff-add: var(--diff-add);
+  --color-diff-add-bg: var(--diff-add-bg);
+  --color-diff-del: var(--diff-del);
+  --color-diff-del-bg: var(--diff-del-bg);
+  --color-comment-bar: var(--comment-bar);
   --color-border-strong: var(--border-strong);
   --color-hover: var(--hover);
   --color-selected: var(--selected);
@@ -915,8 +991,6 @@ html[data-keyboard='open'] .mobile-fab {
   }
   body {
     @apply bg-background text-foreground font-sans text-sm antialiased;
-    font-feature-settings: 'cv01', 'cv02', 'cv11', 'ss03', 'calt';
-    letter-spacing: -0.006em;
     margin: 0;
     overflow-x: hidden;
   }
@@ -981,6 +1055,21 @@ html[data-keyboard='open'] .mobile-fab {
   &::-webkit-scrollbar {
     display: none;
   }
+}
+/* Single-line text that fades out at the end instead of an ellipsis (sidebar rows, tree rows). The
+   mask sits on the whole box, so a short title in a wide box is untouched. */
+@utility truncate-fade {
+  overflow: hidden;
+  white-space: nowrap;
+  mask-image: linear-gradient(to right, #000 calc(100% - 1.5rem), transparent);
+}
+/* A slim pane header row (sidebar, main, right pane share the height so the hairline lines up). */
+@utility pane-header {
+  display: flex;
+  height: 2.75rem;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 0.125rem;
 }
 /* Horizontal scrollers without a scrollbar: fade the trailing edge so a clipped chip reads as "more to scroll",
    and pad the end so the last item clears the fade once scrolled all the way. */
@@ -1053,7 +1142,6 @@ html[data-keyboard='open'] .mobile-fab {
     max-height: min(92dvh, 100%);
     border-radius: 1.25rem 1.25rem 0 0;
     border: 0;
-    border-top: 1px solid var(--border);
     box-shadow: 0 -12px 48px rgb(0 0 0 / 0.35);
     padding-bottom: max(1rem, env(safe-area-inset-bottom));
     grid-template-columns: minmax(0, 1fr);
@@ -1552,6 +1640,21 @@ html[data-pointer-cursors='false']
 html[data-underline-links='true'] :is(app-markdown, p, li) a:not([hlmBtn], [data-slot='button']) {
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+
+/* ───────────────────────── Header actions: plain text + icon ─────────────────────────
+   In the main header every action reads as plain text with an icon (no button chrome); only the
+   primary (filled) button keeps its fill. Unlayered so it wins over the button's utilities. */
+@media (min-width: 48rem) {
+  .top-bar__actions [data-slot='button']:is([data-variant='outline'], [data-variant='secondary']) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--foreground);
+  }
+  .top-bar__actions
+    [data-slot='button']:is([data-variant='outline'], [data-variant='secondary']):is(:hover, [aria-expanded='true']) {
+    background: var(--hover);
+  }
 }
 
 /* Reduce motion: always, or when the operating system asks for it (unless set to "full"). */

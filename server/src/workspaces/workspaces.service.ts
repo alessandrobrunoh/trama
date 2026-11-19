@@ -29,7 +29,6 @@ import {
   ApiTokenEntity,
   InviteEntity,
   MembershipEntity,
-  TeamEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
@@ -131,7 +130,6 @@ export class WorkspacesService {
   async updateSettings(
     ctx: WorkspaceContext,
     patch: {
-      defaultTeamId?: string | null;
       estimateScale?: WorkspaceSettings['estimateScale'];
       weekStart?: WorkspaceSettings['weekStart'];
       timeZone?: string;
@@ -141,14 +139,6 @@ export class WorkspacesService {
   ) {
     const ws = ctx.workspace;
     const next: Partial<WorkspaceSettings> = { ...ws.settings };
-    if (patch.defaultTeamId !== undefined) {
-      if (patch.defaultTeamId === null) delete next.defaultTeamId;
-      else {
-        if (!(await this.ds.getRepository(TeamEntity).existsBy({ id: patch.defaultTeamId, workspaceId: ws.id })))
-          throw new BadRequestException('defaultTeamId must be a team of this workspace');
-        next.defaultTeamId = patch.defaultTeamId;
-      }
-    }
     if (patch.estimateScale !== undefined) next.estimateScale = patch.estimateScale;
     if (patch.weekStart !== undefined) next.weekStart = patch.weekStart;
     if (patch.timeZone !== undefined) {
@@ -325,14 +315,6 @@ export class WorkspacesService {
     assertCanRemoveMember(await this.ruleContext(ws), caller, m);
     await this.ds.transaction(async (tx) => {
       await tx.delete(MembershipEntity, { id });
-      const teams = await tx.findBy(TeamEntity, { workspaceId });
-      for (const t of teams)
-        if (t.memberIds.includes(m.userId))
-          await tx.update(
-            TeamEntity,
-            { id: t.id },
-            { memberIds: t.memberIds.filter((u) => u !== m.userId), leadIds: t.leadIds.filter((u) => u !== m.userId) },
-          );
     });
     this.events.publish(workspaceId, { type: 'deleted', entity: 'membership', id });
   }

@@ -3,13 +3,7 @@
 import type {
   ActorRef,
   Artifact,
-  ArtifactKind,
-  ArtifactProvider,
-  ArtifactState,
   ApiToken,
-  CiState,
-  CustomerStatus,
-  Decision,
   EstimateScale,
   ExternalProvider,
   ImportCredentialRef,
@@ -19,7 +13,6 @@ import type {
   MemberAccess,
   MemberGrant,
   PermissionMap,
-  TeamEditPolicy,
   TokenScope,
   ApiPermission,
   TokenLimits,
@@ -34,14 +27,11 @@ import type {
   Issue,
   IssueKind,
   IssueSource,
-  IntakeProvider,
-  IntakeSource,
   IntegrationConnection,
   IssueStatus,
   Priority,
   ProjectHealth,
   ProjectStatus,
-  ReviewState,
   Role,
   ShareGrant,
   ShareLevel,
@@ -182,93 +172,6 @@ export interface CreatedToken {
   secret: string;
 }
 
-// ───── teams / repositories ─────
-export interface CreateTeamInput {
-  name: string;
-  key: string;
-  color?: string;
-  description?: string;
-  memberIds?: ID[];
-  /** Subset of `memberIds`. */
-  leadIds?: ID[];
-  editPolicy?: TeamEditPolicy;
-}
-/** The team key is immutable. */
-export interface UpdateTeamInput {
-  name?: string;
-  color?: string;
-  description?: string | null;
-  memberIds?: ID[];
-  leadIds?: ID[];
-  editPolicy?: TeamEditPolicy;
-}
-export interface CreateRepositoryInput {
-  provider: GitProvider;
-  fullName: string;
-  url?: string;
-  defaultBranch?: string;
-  teamIds?: ID[];
-  /** Workspace label ids. */
-  labels?: ID[];
-}
-export interface UpdateRepositoryInput {
-  url?: string;
-  defaultBranch?: string;
-  teamIds?: ID[];
-  /** Workspace label ids. Replaces the whole list. */
-  labels?: ID[];
-}
-
-// ───── customers ─────
-export interface CreateCustomerInput {
-  name: string;
-  /** Raw domains, primary first. The server stores them normalized. */
-  domains: string[];
-  logoUrl?: string;
-  /** Whole number >= 0. */
-  revenue?: number;
-  /** Whole number >= 0. */
-  size?: number;
-  tierId?: ID;
-  status?: CustomerStatus;
-}
-export interface UpdateCustomerInput {
-  name?: string;
-  /** Replaces the whole list; the first one is the primary. */
-  domains?: string[];
-  /** `null` clears. */
-  logoUrl?: string | null;
-  revenue?: number | null;
-  size?: number | null;
-  tierId?: ID | null;
-  status?: CustomerStatus;
-  /** `true` archives, `false` restores. Requests stay. */
-  archived?: boolean;
-}
-/** Exactly one of `issueId` / `projectId`. */
-export interface CreateCustomerRequestInput {
-  issueId?: ID;
-  projectId?: ID;
-  /** Markdown. */
-  body?: string;
-  important?: boolean;
-  sourceUrl?: string;
-}
-export interface UpdateCustomerRequestInput {
-  /** `null` clears. */
-  body?: string | null;
-  important?: boolean;
-  sourceUrl?: string | null;
-}
-export interface CreateCustomerTierInput {
-  name: string;
-  color?: string;
-}
-export interface UpdateCustomerTierInput {
-  name?: string;
-  color?: string;
-}
-
 // ───── projects ─────
 export interface CreateProjectInput {
   name: string;
@@ -280,10 +183,12 @@ export interface CreateProjectInput {
   /** Lucide icon name (kebab-case) or a single emoji. */
   icon?: string;
   status?: ProjectStatus;
+  /** Health, set by hand. */
+  health?: ProjectHealth;
   priority?: Priority;
   leadId?: ID;
-  teamIds?: ID[];
-  repositoryIds?: ID[];
+  /** Optional git repository name or URL. Not a repository registry id. */
+  repository?: string | null;
   /** Workspace label ids. */
   labels?: ID[];
   startDate?: ISODate;
@@ -299,44 +204,16 @@ export interface UpdateProjectInput {
   /** Lucide icon name (kebab-case) or a single emoji. `null` resets to the default glyph. */
   icon?: string | null;
   status?: ProjectStatus;
+  /** Health, set by hand. `null` clears it. */
+  health?: ProjectHealth | null;
   priority?: Priority;
   leadId?: ID | null;
-  teamIds?: ID[];
-  repositoryIds?: ID[];
+  /** Optional git repository name or URL. `null` clears it. */
+  repository?: string | null;
   /** Workspace label ids. Replaces the whole list. */
   labels?: ID[];
   startDate?: ISODate | null;
   targetDate?: ISODate | null;
-}
-
-// ───── project updates ─────
-/** `POST /projects/:projectId/updates`. The newest update drives `Project.health` / `lastUpdateAt`. */
-export interface CreateProjectUpdateInput {
-  health: ProjectHealth;
-  /** Markdown. */
-  body: string;
-  /** True when the body came from `aiProject(id, 'update_draft')`. */
-  aiDrafted?: boolean;
-}
-/** `PATCH /projects/:projectId/updates/:id`. Sets `editedAt` on the update. */
-export interface UpdateProjectUpdateInput {
-  health?: ProjectHealth;
-  body?: string;
-}
-
-// ───── input requests ─────
-export interface CreateInputRequestInput {
-  /** Omit only for legacy, unlinked human requests. */
-  issueId?: ID;
-  question: string;
-  options?: string[];
-  assigneeUserId?: ID;
-}
-/** PATCH /input-requests/:id (open requests only). `null` clears. */
-export interface UpdateInputRequestInput {
-  question?: string;
-  options?: string[] | null;
-  assigneeUserId?: ID | null;
 }
 
 // ───── issues ─────
@@ -344,19 +221,18 @@ export interface CreateIssueInput {
   kind: IssueKind;
   title: string;
   body?: string;
-  /** Desired result, not a technical plan. */
-  goal?: string;
   /** Parent issue id when creating a sub-issue. */
   parentId?: ID;
   source?: IssueSource;
   reporterName?: string;
   assigneeId?: ID;
-  teamId?: ID;
   /** Project the issue is planned under. */
   projectId?: ID;
   priority?: Priority;
   status?: string;
   externalUrl?: string;
+  /** Link to the Delta thread (delta.dev) working on this task. */
+  threadUrl?: string;
   estimate?: number;
   /** Workspace label ids. */
   labels?: ID[];
@@ -368,19 +244,17 @@ export interface UpdateIssueInput {
   /** Story points (non-negative). `null` clears. */
   estimate?: number | null;
   body?: string | null;
-  goal?: string | null;
   assigneeId?: ID | null;
-  teamId?: ID | null;
   /** `null` clears it and drops that project's milestone. */
   projectId?: ID | null;
   priority?: Priority;
   status?: string;
   reporterName?: string | null;
   externalUrl?: string | null;
+  /** Link to the Delta thread (delta.dev) working on this task. `null` clears it. */
+  threadUrl?: string | null;
   /** At most one per project; milestones must belong to the issue's project. */
   milestoneIds?: ID[];
-  /** Upcoming (or completed) release this issue ships in. `null` clears. */
-  releaseId?: ID | null;
   /** Id or key. `null` clears the duplicate relation. */
   duplicateOfId?: ID | null;
   /** Workspace label ids. Replaces the whole list. */
@@ -391,7 +265,6 @@ export interface BulkIssuePatch {
   status?: string;
   priority?: Priority;
   assigneeId?: ID | null;
-  teamId?: ID | null;
   projectId?: ID | null;
   addLabels?: ID[];
   removeLabels?: ID[];
@@ -413,91 +286,6 @@ export interface UpdateMilestoneInput {
   sortOrder?: number;
 }
 
-// ───── releases ─────
-export interface CreateReleasePipelineInput {
-  name: string;
-  type?: 'continuous' | 'scheduled';
-  teamId?: ID;
-  moveOpenIssuesToNext?: boolean;
-}
-export interface UpdateReleasePipelineInput {
-  name?: string;
-  type?: 'continuous' | 'scheduled';
-  teamId?: ID | null;
-  moveOpenIssuesToNext?: boolean;
-}
-export interface CreateReleaseInput {
-  pipelineId: ID;
-  name: string;
-  notes?: string;
-  targetAt?: ISODate;
-}
-export interface UpdateReleaseInput {
-  name?: string;
-  notes?: string | null;
-  targetAt?: ISODate | null;
-  status?: 'draft' | 'canceled';
-}
-export interface CompleteReleaseInput {
-  moveOpenIssuesToDone?: boolean;
-  targetStatusId?: string;
-  moveOpenIssuesToNext?: boolean;
-}
-
-// ───── artifacts ─────
-/** Fields shared by project- and issue-owned artifact creation routes; owner comes from the path. */
-export interface CreateArtifactFields {
-  repositoryId?: ID;
-  kind: ArtifactKind;
-  provider?: ArtifactProvider;
-  title: string;
-  url?: string;
-  externalId?: string;
-  /** Short note on what it is / why it is attached (markdown allowed). */
-  description?: string;
-  state?: ArtifactState;
-  ci?: CiState;
-  review?: ReviewState;
-  hasConflicts?: boolean;
-  environment?: string;
-}
-/** `POST /projects/:id/artifacts` and `POST /issues/:idOrKey/artifacts`: the owner is in the path. */
-export type CreateOwnedArtifactInput = CreateArtifactFields;
-export interface UpdateArtifactInput {
-  repositoryId?: ID | null;
-  title?: string;
-  /** Markdown note; null clears it. */
-  description?: string | null;
-  url?: string | null;
-  externalId?: string | null;
-  state?: ArtifactState;
-  ci?: CiState | null;
-  review?: ReviewState | null;
-  hasConflicts?: boolean | null;
-  environment?: string | null;
-}
-
-// ───── decisions ─────
-export interface CreateDecisionInput {
-  title: string;
-  statement?: string;
-  rationale?: string;
-  /** Default `proposed`; people can also record it directly as accepted / rejected. */
-  status?: 'draft' | 'proposed' | 'accepted' | 'rejected';
-  originIssueId: ID;
-  relatedIssueIds?: ID[];
-  tags?: string[];
-}
-export interface UpdateDecisionInput {
-  title?: string;
-  statement?: string;
-  status?: 'proposed';
-  rationale?: string | null;
-  originIssueId?: ID | null;
-  relatedIssueIds?: ID[];
-  tags?: string[];
-}
-
 // ───── comments ─────
 export interface CreateCommentInput {
   subject: SubjectRef;
@@ -508,20 +296,10 @@ export interface CreateCommentInput {
 export interface EventsQuery {
   /** `type:id`, e.g. `execution:ex_1`. */
   subject?: string;
-  /** Event type prefix, e.g. `issue.` or `decision.accepted`. */
+  /** Event type prefix, e.g. `issue.` or `issue.status_changed`. */
   type?: string;
   /** ISO date cursor: events strictly older than this. */
   before?: ISODate;
-  limit?: number;
-}
-export interface InsightsQuery {
-  /** 7, 30 or 90 (default 30). */
-  days?: number;
-  teamId?: ID;
-  projectId?: ID;
-  /** Days without activity before in-flight work is stale (default 7). */
-  staleDays?: number;
-  /** Items kept per signal (counts always cover everything). */
   limit?: number;
 }
 export interface AttentionQuery {
@@ -562,7 +340,6 @@ export interface UpdateViewInput {
 // ───── search ─────
 export interface SearchResults {
   issues: Issue[];
-  decisions: Decision[];
   artifacts: Artifact[];
 }
 
@@ -583,7 +360,6 @@ export interface UpdateIntegrationInput {
 /** What `GET /integrations` returns: the contract entity plus webhook / link details. */
 export type IntegrationDetail = IntegrationConnection & {
   webhookUrl?: string;
-  repositoryIds: ID[];
   lastWebhookAt?: ISODate;
 };
 /** One-time webhook setup (the secret is only returned on create and rotate). */
@@ -596,25 +372,6 @@ export interface WebhookSetup {
 export interface IntegrationWithWebhook {
   connection: IntegrationDetail;
   webhook?: WebhookSetup;
-}
-export interface RemoteRepository {
-  fullName: string;
-  url: string;
-  defaultBranch: string;
-  private?: boolean;
-  description?: string;
-  linked: boolean;
-  repositoryId?: ID;
-}
-export interface RemoteRepositoryPage {
-  items: RemoteRepository[];
-  page: number;
-  perPage: number;
-  hasMore: boolean;
-}
-export interface LinkRepositoryInput {
-  fullName: string;
-  teamIds?: ID[];
 }
 
 // ───── outgoing webhooks (custom integrations) ─────
@@ -635,88 +392,6 @@ export interface UpdateWebhookInput {
 export interface WebhookWithSecret {
   webhook: OutgoingWebhook;
   secret: string;
-}
-
-// ───── documents ─────
-export interface CreateDocumentInput {
-  title: string;
-  body?: string;
-  icon?: string | null;
-  /** Attach on creation (project id or issue id/key). */
-  projectId?: ID;
-  issueId?: ID;
-}
-export interface UpdateDocumentInput {
-  /** The `version` this change is based on; a stale one is refused with 409. */
-  baseVersion: number;
-  title?: string;
-  body?: string;
-  icon?: string | null;
-}
-export interface DocumentsQuery {
-  q?: string;
-  projectId?: ID;
-  issueId?: ID;
-  attached?: boolean;
-  archived?: 'false' | 'only' | 'all';
-  authorId?: string;
-  sort?: 'updated' | 'created' | 'title';
-  order?: 'asc' | 'desc';
-  limit?: number;
-  offset?: number;
-}
-export interface DocumentOwnerInput {
-  projectId?: ID;
-  issueId?: ID;
-}
-
-// ───── customer intake (inbound customer requests) ─────
-export interface CreateIntakeSourceInput {
-  provider: IntakeProvider;
-  name: string;
-  enabled?: boolean;
-  autoCreateCustomers?: boolean;
-  targetProjectId?: ID;
-  /** Zendesk only: the part before `.zendesk.com`, to build ticket links. */
-  subdomain?: string;
-  /** The provider's own signing secret (Intercom, Zendesk, Front, Slack). Can be added later. */
-  secret?: string;
-}
-export interface UpdateIntakeSourceInput {
-  name?: string;
-  enabled?: boolean;
-  autoCreateCustomers?: boolean;
-  /** `null` clears. */
-  targetProjectId?: ID | null;
-  subdomain?: string | null;
-  secret?: string;
-}
-/** `secret` is only present when Trama generated it (email, signed webhook) and is shown once. */
-export interface IntakeSourceWithSecret {
-  source: IntakeSource;
-  secret?: string;
-}
-/** Dry run of a sample delivery. */
-export interface IntakeTestResult {
-  ok: boolean;
-  dryRun: true;
-  status?: string;
-  /** What the sample was reduced to. */
-  request?: { externalId: string; requesterEmail?: string; subject?: string; body: string };
-  customer?: { id: ID; name: string; created: boolean };
-  wouldCreate?: { name: string; domain: string };
-  target?: { issueId?: ID; issueKey?: string; projectId?: ID };
-  /** True when the request would wait in the triage inbox. */
-  inbox?: boolean;
-}
-export interface LinkIntakeItemInput {
-  /** Exactly one of issueId / projectId. */
-  issueId?: ID;
-  projectId?: ID;
-  customerId?: ID;
-  createCustomer?: boolean;
-  customerName?: string;
-  important?: boolean;
 }
 
 // ───── imports from GitHub Issues / Linear ─────
@@ -812,6 +487,42 @@ export interface LunaGestRealignResult {
   pushed: { issueId: ID; field: 'title' | 'description' }[];
   conflicts: LunaGestRealignConflict[];
   skipped: { issueId?: ID; remoteTaskId?: string; reason: string }[];
+}
+/** One LunaGest project the workspace could import (`GET /lunagest/import/projects`). */
+export interface LunaGestImportableProject {
+  id: string;
+  name: string;
+  description: string | null;
+  /** Tasks LunaGest returned for the project; `null` when that call failed. */
+  taskCount: number | null;
+  /** The Trama project it is already bound to, when the caller may see it. */
+  projectId: ID | null;
+  projectName: string | null;
+  /** Already bound to a Trama project (visible to the caller or not). */
+  imported: boolean;
+  /** Tasks of that Trama project already tied to a LunaGest task. */
+  linkedTaskCount: number;
+}
+export interface LunaGestProjectImportResult {
+  remoteProjectId: string;
+  remoteProjectName: string;
+  /** `created`: new Trama project. `linked`: an existing project with the same name was bound. `existing`: already bound. */
+  project: 'created' | 'linked' | 'existing' | 'failed';
+  projectId: ID | null;
+  projectKey: string | null;
+  tasks: {
+    /** New Trama tasks. */
+    created: number;
+    /** Existing Trama tasks (same title) now tied to a LunaGest task. */
+    linked: number;
+    /** Remote tasks that were already tied to a Trama task; left untouched. */
+    existing: number;
+  };
+  /** Set when this project could not be imported; the others still ran. */
+  error?: string;
+}
+export interface LunaGestImportResult {
+  projects: LunaGestProjectImportResult[];
 }
 
 export interface TimeEntry {

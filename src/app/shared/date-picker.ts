@@ -44,14 +44,14 @@ function daysFromNow(days: number): Date {
         <ng-content />
       </button>
       <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-fit gap-0 p-0">
-        <div class="grid grid-cols-2 gap-0.5 border-b p-1">
+        <div class="grid grid-cols-2 gap-0.5 p-1">
           @for (p of presets; track p.label) {
             <button hlmBtn variant="ghost" size="xs" class="justify-start font-normal" (click)="pick(p.at())">{{ p.label }}</button>
           }
         </div>
         <hlm-calendar class="border-0" [date]="date()" [weekStartsOn]="store.weekStartsOn()" (dateChange)="pick($event)" />
         @if (value()) {
-          <div class="border-t p-1">
+          <div class="p-1">
             <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground w-full" (click)="pick(null)">Clear date</button>
           </div>
         }

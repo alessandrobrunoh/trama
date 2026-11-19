@@ -14,8 +14,9 @@ describe('SearchService', () => {
     await service.search('ws_1', 'login');
 
     expect(queries.length).toBeGreaterThan(0);
-    expect(queries.join('\n')).not.toMatch(/workstreams|workstreamId|originWorkstreamId/i);
-    expect(queries.join('\n')).toContain('x."originIssueId"');
+    expect(queries.join('\n')).not.toMatch(
+      /workstreams|workstreamId|originWorkstreamId|customers|decisions|repositories|teams|originIssueId/i,
+    );
     expect(queries.join('\n')).toContain('x."issueId"');
   });
 

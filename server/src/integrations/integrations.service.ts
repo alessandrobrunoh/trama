@@ -5,9 +5,8 @@ import type { Repository } from 'typeorm';
 import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
 import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { notFound, uid } from '../common/util.js';
-import { IntegrationConnectionEntity, RepositoryEntity } from '../database/entities/index.js';
+import { IntegrationConnectionEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import { RepositoriesService } from '../repositories/repositories.service.js';
 import { HttpClient, ProviderHttpError } from './http-client.js';
 import { createGitClient, normalizeBaseUrl, type GitProviderClient } from './providers.js';
 import { SecretsService } from './secrets.service.js';
@@ -39,9 +38,7 @@ export class IntegrationsService {
     private readonly http: HttpClient,
     private readonly secrets: SecretsService,
     private readonly events: EventsService,
-    private readonly repositories: RepositoriesService,
     @InjectRepository(IntegrationConnectionEntity) private readonly repo: Repository<IntegrationConnectionEntity>,
-    @InjectRepository(RepositoryEntity) private readonly repos: Repository<RepositoryEntity>,
   ) {}
 
   /** Public base URL for webhook URLs: `PUBLIC_URL`, else derived from the request. */
@@ -58,11 +55,10 @@ export class IntegrationsService {
 
   /** Contract IntegrationConnection plus webhookUrl, linked repository ids and the last webhook delivery time. Never secrets. */
   present(conn: IntegrationConnectionEntity, origin: string) {
-    const config = conn.config as { repositoryIds?: string[]; lastWebhookAt?: string };
+    const config = conn.config as { lastWebhookAt?: string };
     return {
       ...conn.toJSON(),
       webhookUrl: this.webhookUrl(conn, origin),
-      repositoryIds: config.repositoryIds ?? [],
       lastWebhookAt: config.lastWebhookAt,
     };
   }
@@ -151,7 +147,7 @@ export class IntegrationsService {
         secret: this.secrets.encrypt(input.token, SECRET(id)),
         webhookSecret: webhookSecret ? this.secrets.encrypt(webhookSecret, WEBHOOK(id)) : null,
         status: 'connected',
-        config: { repositoryIds: [] },
+        config: {},
       }),
     );
     this.events.publish(workspaceId, { type: 'created', entity: 'integration', id });
@@ -218,52 +214,6 @@ export class IntegrationsService {
 
   async remoteRepositories(workspaceId: string, id: string, page: number, perPage: number) {
     const row = await this.getRow(workspaceId, id);
-    const result = await this.guard(label(row.provider), () => this.client(row).listRepositories(page, perPage));
-    const local = await this.repos.findBy({ workspaceId, provider: row.provider as GitProvider });
-    const byName = new Map(local.map((r) => [r.fullName.toLowerCase(), r.id]));
-    return {
-      ...result,
-      items: result.items.map((r) => ({ ...r, repositoryId: byName.get(r.fullName.toLowerCase()), linked: byName.has(r.fullName.toLowerCase()) })),
-    };
-  }
-
-  /** Verifies the repository is visible to the token, creates (or adopts) the Repository row and attaches it to this connection. */
-  async linkRepository(workspaceId: string, actor: ActorRef, id: string, input: { fullName: string; teamIds?: string[] }) {
-    const row = await this.getRow(workspaceId, id);
-    if (row.provider === 'delta') throw new BadRequestException('Delta connections cannot link repositories');
-    const provider = row.provider;
-    const remote = await this.guard(label(provider), () => this.client(row).getRepository(input.fullName));
-    const existing = await this.repos
-      .createQueryBuilder('r')
-      .where('r.workspaceId = :workspaceId AND r.provider = :provider AND lower(r.fullName) = lower(:n)', { workspaceId, provider, n: remote.fullName })
-      .getOne();
-    let created = false;
-    let repository: RepositoryEntity;
-    if (existing) repository = existing;
-    else {
-      repository = await this.repositories.create(workspaceId, actor, {
-        provider,
-        fullName: remote.fullName,
-        url: remote.url,
-        defaultBranch: remote.defaultBranch,
-        teamIds: input.teamIds,
-      });
-      created = true;
-    }
-    const config = row.config as { repositoryIds?: string[] };
-    const ids = new Set(config.repositoryIds ?? []);
-    ids.add(repository.id);
-    row.config = { ...row.config, repositoryIds: [...ids] };
-    await this.repo.save(row);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'integration', id });
-    return { repository, created };
-  }
-
-  async unlinkRepository(workspaceId: string, id: string, repositoryId: string) {
-    const row = await this.getRow(workspaceId, id);
-    const config = row.config as { repositoryIds?: string[] };
-    row.config = { ...row.config, repositoryIds: (config.repositoryIds ?? []).filter((r) => r !== repositoryId) };
-    await this.repo.save(row);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'integration', id });
+    return this.guard(label(row.provider), () => this.client(row).listRepositories(page, perPage));
   }
 }

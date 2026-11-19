@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input, model } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import {
   MEMBER_ACTION_META,
   MEMBER_RESOURCE_ORDER,
@@ -23,7 +24,7 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
 @Component({
   selector: 'app-member-access-editor',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports],
+  imports: [HlmButtonImports, HlmCheckbox],
   host: { class: 'flex flex-col gap-3' },
   template: `
     <div class="flex flex-wrap items-center gap-1.5">
@@ -36,15 +37,14 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
     </div>
 
     @if (showProjects()) {
-    <div class="bg-card overflow-hidden rounded-lg border">
+    <div class="bg-card overflow-hidden rounded-lg">
       <div class="flex items-start gap-3 px-3 py-2.5">
-        <input
-          type="checkbox"
-          class="accent-primary mt-0.5 size-4 cursor-pointer"
+        <hlm-checkbox
+          class="mt-0.5"
           [checked]="value().projects.all"
           [disabled]="disabled()"
           aria-label="All projects, including ones created later"
-          (change)="setAllProjects($any($event.target).checked)"
+          (checkedChange)="setAllProjects($event)"
         />
         <span class="min-w-0">
           <span class="block text-[13px] font-medium">All projects</span>
@@ -52,18 +52,16 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
         </span>
       </div>
       @if (!value().projects.all) {
-        <div class="border-t px-3 py-2">
+        <div class="px-3 pt-1 pb-2.5">
           @if (projects().length) {
             <div class="flex max-h-40 flex-col gap-1 overflow-y-auto">
               @for (p of projects(); track p.id) {
                 <label class="flex items-center gap-2 py-0.5 text-[13px]">
-                  <input
-                    type="checkbox"
-                    class="accent-primary size-4 cursor-pointer"
+                  <hlm-checkbox
                     [checked]="value().projects.projectIds.includes(p.id)"
                     [disabled]="disabled()"
-                    [attr.aria-label]="'Can see ' + p.name"
-                    (change)="toggleProject(p.id, $any($event.target).checked)"
+                    [aria-label]="'Can see ' + p.name"
+                    (checkedChange)="toggleProject(p.id, $event)"
                   />
                   <span class="truncate">{{ p.name }}</span>
                 </label>
@@ -72,13 +70,11 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
           } @else {
             <p class="text-muted-foreground text-xs">This workspace has no projects yet.</p>
           }
-          <label class="mt-2 flex items-center gap-2 border-t pt-2 text-[13px]">
-            <input
-              type="checkbox"
-              class="accent-primary size-4 cursor-pointer"
+          <label class="mt-3 flex items-center gap-2 text-[13px]">
+            <hlm-checkbox
               [checked]="value().includeUnassigned"
               [disabled]="disabled()"
-              (change)="setUnassigned($any($event.target).checked)"
+              (checkedChange)="setUnassigned($event)"
             />
             Also see work that is not in a project
           </label>
@@ -87,8 +83,8 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
     </div>
     }
 
-    <div class="bg-card overflow-hidden rounded-lg border" role="group" aria-label="What they can do">
-      <div class="bg-muted/40 text-muted-foreground flex items-center gap-3 border-b px-3 py-1.5 text-[11px] font-medium uppercase">
+    <div class="bg-card overflow-hidden rounded-lg" role="group" aria-label="What they can do">
+      <div class="text-muted-foreground flex items-center gap-3 px-3 py-1.5 text-[11px] font-medium uppercase">
         <span class="flex-1">Action</span>
         @for (c of columns; track c.id) {
           <span class="w-14 text-center">
@@ -99,22 +95,20 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
         }
       </div>
       @for (g of groups(); track g.name) {
-        <div class="text-muted-foreground bg-muted/20 border-b px-3 py-1 text-[11px] font-medium tracking-wide uppercase">{{ g.name }}</div>
+        <div class="text-muted-foreground bg-muted px-3 py-1 text-[11px] font-medium tracking-wide uppercase">{{ g.name }}</div>
         @for (r of g.items; track r.id) {
-          <div class="flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
+          <div class="flex items-center gap-3 px-3 py-1.5">
             <span class="min-w-0 flex-1">
               <span class="block text-[13px]">{{ r.label }}</span>
               <span class="text-muted-foreground block text-xs leading-snug">{{ r.description }}</span>
             </span>
             @for (c of columns; track c.id) {
               <span class="flex w-14 justify-center">
-                <input
-                  type="checkbox"
-                  class="accent-primary size-4 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                <hlm-checkbox
                   [checked]="has(r.id, c.id)"
                   [disabled]="disabled() || lockedIn(r.id, c.id)"
-                  [attr.aria-label]="(lockedIn(r.id, c.id) ? 'From the role: ' : '') + c.label + ' ' + r.label"
-                  (change)="toggle(r.id, c.id, $any($event.target).checked)"
+                  [aria-label]="(lockedIn(r.id, c.id) ? 'From the role: ' : '') + c.label + ' ' + r.label"
+                  (checkedChange)="toggle(r.id, c.id, $event)"
                 />
               </span>
             }

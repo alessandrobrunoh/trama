@@ -98,7 +98,7 @@ const secretAad = (id: string) => `${id}:lunagest`;
 /** Workspace LunaGest connection and the single project binding that uses it. */
 @Injectable()
 export class LunagestService {
-  private readonly client: LunaGestClient;
+  readonly client: LunaGestClient;
 
   constructor(
     http: HttpClient,
@@ -114,6 +114,18 @@ export class LunagestService {
     private readonly projects: ProjectsService,
   ) {
     this.client = new LunaGestClient(http);
+  }
+
+  /** Origin and decrypted login of the workspace connection, for server-side callers (the import). Never serialized. */
+  async session(
+    workspaceId: string,
+  ): Promise<{ connectionId: string; baseUrl: string; creds: LunaGestCredentials }> {
+    const connection = await this.requireConnection(workspaceId);
+    return {
+      connectionId: connection.id,
+      baseUrl: connection.baseUrl,
+      creds: this.credentials(connection),
+    };
   }
 
   async getConnection(workspaceId: string): Promise<LunaGestConnectionView> {
@@ -403,7 +415,7 @@ export class LunagestService {
   /**
    * One project, one pass. A field both sides changed is left alone unless `choices`
    * names it. Unlinked issues are not created on LunaGest, and unknown remote tasks
-   * are not turned into issues. Project name is pulled only; there is no project-update call.
+   * are not turned into issues. Project name is pulled only.
    */
   async realign(
     workspaceId: string,

@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import type { MemberResource } from '../contracts/domain.js';
 import { canView, currentAccess, projectHidden } from '../auth/member-access.js';
 
-export const SEARCH_TYPES = ['project', 'issue', 'customer', 'decision', 'artifact', 'document', 'repository', 'team'] as const;
+export const SEARCH_TYPES = ['project', 'issue', 'artifact'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -43,46 +43,11 @@ const SPECS: Spec[] = [
     rank: 3,
   },
   {
-    type: 'customer',
-    from: `"customers" x`,
-    select: `x."id", NULL AS key, x."name" AS title, x."domain" AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
-    fields: [['x."name"', 'title'], ['x."domain"', 'title']],
-    rank: 3,
-  },
-  {
-    type: 'decision',
-    from: `"decisions" x LEFT JOIN "issues" i ON i."id" = x."originIssueId"`,
-    select: `x."id", x."key", x."title", x."status" AS subtitle, NULL AS "legacyWorkstreamKey", x."statement" AS body, i."projectId" AS "projectId"`,
-    fields: [['x."key"', 'key'], ['x."title"', 'title'], ['x."statement"', 'body']],
-    rank: 2,
-  },
-  {
     type: 'artifact',
     from: `"artifacts" x LEFT JOIN "issues" i ON i."id" = x."issueId"`,
-    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, x."legacyWorkstreamKey" AS "legacyWorkstreamKey", COALESCE(x."url", x."description") AS body, COALESCE(x."projectId", i."projectId") AS "projectId"`,
+    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, x."legacyWorkstreamKey" AS "legacyWorkstreamKey", COALESCE(x."url", x."description") AS body, i."projectId" AS "projectId"`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
     rank: 4,
-  },
-  {
-    type: 'document',
-    from: `"documents" x`,
-    select: `x."id", NULL AS key, x."title", CASE WHEN x."archivedAt" IS NULL THEN 'document' ELSE 'document · archived' END AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
-    fields: [['x."title"', 'title']],
-    rank: 4,
-  },
-  {
-    type: 'repository',
-    from: `"repositories" x`,
-    select: `x."id", NULL AS key, x."fullName" AS title, x."provider" AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
-    fields: [['x."fullName"', 'title']],
-    rank: 5,
-  },
-  {
-    type: 'team',
-    from: `"teams" x`,
-    select: `x."id", x."key", x."name" AS title, 'Team' AS subtitle, NULL AS "legacyWorkstreamKey", x."description" AS body`,
-    fields: [['x."key"', 'key'], ['x."name"', 'title'], ['x."description"', 'body']],
-    rank: 6,
   },
 ];
 
@@ -101,12 +66,9 @@ interface Row {
 const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
   project: 'projects',
   issue: 'issues',
-  customer: 'customers',
-  decision: 'decisions',
   artifact: 'artifacts',
-  document: 'documents',
 };
-const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'decision', 'artifact']);
+const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'artifact']);
 
 /** Scores a row: exact key 100, key prefix 80, key contains 60, title exact 70, prefix 55, contains 40, body 20. */
 export function scoreRow(q: string, row: Pick<Row, 'key' | 'title' | 'body'>): number {

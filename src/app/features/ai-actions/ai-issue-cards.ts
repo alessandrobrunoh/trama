@@ -1,4 +1,4 @@
-// AI cards of the issue page sidebar: summary, suggested properties and a clearer description.
+// AI cards of the task page (shown in its stream): summary, suggested properties and a clearer description.
 // Each card starts its request when it appears (the person just pressed its button), cancels it
 // when closed, and only ever proposes: nothing changes until "Apply" / "Accept".
 import {
@@ -95,10 +95,10 @@ interface TriageRow {
   template: `
     <app-ai-result title="Suggested properties" [state]="job.state()" [error]="job.error()" (cancel)="job.cancel()" (retry)="run()" (regenerate)="run()" (closed)="closed.emit()">
       @if (rows().length) {
-        <p class="text-muted-foreground mb-1 text-[11px] leading-snug">A starting point based on this text and similar finished issues, not a verdict.</p>
+        <p class="text-muted-foreground mb-1 text-[11px] leading-snug">A starting point based on this text and similar finished tasks, not a verdict.</p>
         <ul class="flex flex-col">
           @for (r of rows(); track r.id) {
-            <li class="border-border flex flex-col gap-0.5 border-t py-1.5 first:border-t-0">
+            <li class="flex flex-col gap-0.5 py-1.5">
               <div class="flex items-center gap-1.5">
                 <span class="text-muted-foreground w-[3.75rem] shrink-0 text-[11px]">{{ r.label }}</span>
                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5 text-[13px]">
@@ -123,7 +123,7 @@ interface TriageRow {
                 @if (applied().has(r.id)) {
                   <span class="text-status-shipped inline-flex items-center gap-1 text-[11px]"><svg [lucideIcon]="check" [size]="12"></svg>Applied</span>
                 } @else {
-                  <button hlmBtn variant="outline" size="xs" type="button" [disabled]="!canEdit() || busy()" [hlmTooltip]="canEdit() ? 'Apply this suggestion' : 'You cannot edit this issue'" (click)="apply([r])">Apply</button>
+                  <button hlmBtn variant="outline" size="xs" type="button" [disabled]="!canEdit() || busy()" [hlmTooltip]="canEdit() ? 'Apply this suggestion' : 'You cannot edit this task'" (click)="apply([r])">Apply</button>
                 }
               </div>
               @if (r.wsTitle) {
@@ -142,7 +142,7 @@ interface TriageRow {
           <p class="text-muted-foreground mt-2 text-[11px] leading-snug">
             Compared with
             @for (x of s; track x.key; let last = $last) {
-              <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="['/', slug(), 'issues', x.key]">{{ x.key }}</a>
+              <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="['/', slug(), 'tasks', x.key]">{{ x.key }}</a>
               <span>{{ x.note }}{{ last ? '' : ', ' }}</span>
             }
           </p>
@@ -357,17 +357,19 @@ export class AiImproveCard implements OnInit, OnDestroy {
 type CardKind = 'summarize' | 'triage' | 'improve';
 
 /**
- * "AI" block at the top of the issue sidebar: three quiet buttons and their result cards.
+ * "AI" block of a task: optional quiet buttons and the result cards (the task page shows only the cards, in its stream).
  * Other places (header menu, command palette) ask for an action with `AiActions.request(...)`.
  */
 @Component({
   selector: 'app-ai-issue-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AiButton, AiSummaryCard, AiTriageCard, AiImproveCard, HlmTooltip, LucideDynamicIcon, RouterLink],
-  host: { class: 'block' },
+  // Without open cards (and no action row) there is nothing to show, so the host takes no space in the stream.
+  host: { class: 'block min-w-0 [&:not(:has(section>*))]:hidden' },
   template: `
     @if (ai.available()) {
       <section aria-label="AI" class="flex flex-col gap-2">
+        @if (showActions()) {
         <div class="flex items-center gap-1.5 px-0.5">
           <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-primary"></svg>
           <h3 class="text-muted-foreground text-xs font-medium">AI</h3>
@@ -389,7 +391,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
             size="xs"
             tooltip="Priority, estimate and type"
             [disabled]="!canEdit()"
-            disabledReason="You cannot edit this issue"
+            disabledReason="You cannot edit this task"
             (pressed)="show('triage')"
           />
           <app-ai-button
@@ -398,12 +400,13 @@ type CardKind = 'summarize' | 'triage' | 'improve';
             size="xs"
             tooltip="A clearer title and description"
             [disabled]="!canEdit()"
-            disabledReason="You cannot edit this issue"
+            disabledReason="You cannot edit this task"
             (pressed)="show('improve')"
           />
         </div>
         @if (!ai.noted()) {
           <p class="text-muted-foreground px-0.5 text-[11px] leading-snug">Sends this item's text to your configured AI provider.</p>
+        }
         }
         @if (open().summarize) {
           <app-ai-summary-card [issue]="issue()" (closed)="hide('summarize')" />
@@ -415,11 +418,11 @@ type CardKind = 'summarize' | 'triage' | 'improve';
           <app-ai-improve-card [issue]="issue()" (closed)="hide('improve')" />
         }
       </section>
-    } @else if (ai.checked()) {
+    } @else if (ai.checked() && showActions()) {
       <p class="text-muted-foreground flex items-center gap-1.5 px-0.5 text-xs">
         <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="opacity-60"></svg>
         <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="ai.settingsLink()">Enable AI</a>
-        <span>to summarize and triage issues.</span>
+        <span>to summarize and triage tasks.</span>
       </p>
     }
   `,
@@ -427,6 +430,8 @@ type CardKind = 'summarize' | 'triage' | 'improve';
 export class AiIssueSection {
   protected readonly ai = inject(AiActions);
   readonly issue = input.required<Issue>();
+  /** False: only the result cards; the actions live in the page's "more" menu and the command palette. */
+  readonly showActions = input(true);
   protected readonly sparkles = LucideSparkles;
   protected readonly info = LucideInfo;
   protected readonly canEdit = computed(() => this.ai.canEditIssue(this.issue()));

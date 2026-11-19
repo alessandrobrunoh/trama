@@ -13,7 +13,7 @@ import {
 } from '../contracts/domain.js';
 import { projectHidden } from '../auth/member-access.js';
 
-type Query = { days?: number; teamId?: string; projectId?: string; staleDays?: number; limit?: number };
+type Query = { days?: number; projectId?: string; staleDays?: number; limit?: number };
 type Row = Record<string, any>;
 const DAY = 86_400_000;
 const OPEN = ['backlog', 'todo', 'in_progress', 'in_review'];
@@ -62,13 +62,6 @@ export class InsightsService {
     const now = new Date();
     const from = new Date(now.getTime() - days * DAY);
     const lookback = new Date(now.getTime() - Math.max(days * 2, 90) * DAY);
-    if (query.teamId) {
-      const [team] = await this.db.query<Row[]>(
-        'SELECT id FROM teams WHERE id = $1 AND "workspaceId" = $2',
-        [query.teamId, workspaceId],
-      );
-      if (!team) throw new NotFoundException('Team not found');
-    }
     if (query.projectId) {
       const [project] = await this.db.query<Row[]>(
         'SELECT id FROM projects WHERE id = $1 AND "workspaceId" = $2',
@@ -83,11 +76,10 @@ export class InsightsService {
       params.push(value);
       return `$${params.length}`;
     };
-    if (query.teamId) conditions.push(`i."teamId" = ${bind(query.teamId)}`);
     if (query.projectId) conditions.push(`i."projectId" = ${bind(query.projectId)}`);
     // Keep this as a correlated scope: all report data derives from visible Issues.
     const issues: Row[] = await this.db.query(
-      `SELECT i.id, i.key, i.title, i.status, i."teamId", i."projectId", i."assigneeId",
+      `SELECT i.id, i.key, i.title, i.status, i."projectId", i."assigneeId",
               i."createdAt", i."updatedAt", i."startedAt", i."completedAt", i."milestoneIds"
          FROM issues i WHERE ${conditions.join(' AND ')}
            AND (i.status IN ('backlog','todo','in_progress','in_review') OR i."completedAt" >= $${params.push(lookback)})`,
@@ -96,25 +88,6 @@ export class InsightsService {
     const visibleIssues = issues.filter((issue) => !projectHidden(ctx.access, issue.projectId));
     const issueIds = visibleIssues.map((issue) => issue.id);
     const scoped = issueIds.length > 0;
-    const requests: Row[] = scoped
-      ? await this.db.query(
-          `SELECT r.question, r."assigneeUserId", r."createdAt", r."issueId",
-                  i.id, i.key, i.title
-             FROM input_requests r JOIN issues i ON i.id = r."issueId" AND i."workspaceId" = r."workspaceId"
-            WHERE r."workspaceId" = $1 AND r.state = 'open'
-               AND r."issueId" = ANY($2::text[])`,
-          [workspaceId, issueIds],
-        )
-      : [];
-    const decisions: Row[] = scoped
-      ? await this.db.query(
-          `SELECT DISTINCT d.id, d.key, d.title, d."createdAt", d."proposedBy"
-             FROM decisions d JOIN issues i ON i."workspaceId" = d."workspaceId"
-               AND (i.id = d."originIssueId" OR d."relatedIssueIds" ? i.id)
-            WHERE d."workspaceId" = $1 AND d.status = 'proposed' AND i.id = ANY($2::text[])`,
-          [workspaceId, issueIds],
-        )
-      : [];
     const artifacts: Row[] = scoped
       ? await this.db.query(
           `SELECT a.id, a.title, a.kind, a.state, a.ci, a.review, a."updatedAt", a."issueId",
@@ -179,16 +152,6 @@ export class InsightsService {
       detail,
     });
     const signalItems: Record<InsightSignalId, InsightItem[]> = {
-      needs_input: [
-        ...requests.map((r) => item(
-          'issue',
-          r,
-          r.createdAt,
-          'Issue question is waiting for an answer.',
-          r.assigneeUserId ? { type: 'user', id: r.assigneeUserId, name: r.assigneeUserId } : { type: 'unassigned', name: 'Unassigned' },
-        )),
-        ...decisions.map((d) => item('decision', d, d.createdAt, 'Proposed Decision is waiting for a response.')),
-      ],
       stale_issues: visibleIssues
         .filter((i) => ACTIVE.includes(i.status) && age(new Date(i.updatedAt), now) >= staleDays)
         .map((i) => item('issue', i, new Date(i.updatedAt), 'In-flight Issue has not been updated recently.')),
@@ -201,8 +164,6 @@ export class InsightsService {
       ci_failing: artifacts
         .filter((a) => a.ci === 'failing' || a.ci?.state === 'failing' || a.ci?.status === 'failing')
         .map((a) => item('artifact', a, new Date(a.updatedAt), 'Latest pull request CI result is failing.')),
-      undecided_decisions: decisions.map((d) => item('decision', d, d.createdAt, 'Proposed Decision is waiting for a response.')),
-      customer_demand_waiting: [],
     };
     const signals = (Object.keys(INSIGHT_SIGNALS) as InsightSignalId[]).map((id) => {
       const all = signalItems[id].sort((a, b) => (b.ageDays ?? 0) - (a.ageDays ?? 0));
@@ -233,8 +194,6 @@ export class InsightsService {
         issuesDone: 0,
         comments: 0,
         pullRequests: 0,
-        decisionsProposed: 0,
-        inputRequestsRaised: 0,
         lastActiveAt: new Date(event.lastAt).toISOString(),
       };
       actor.events += Number(event.events);
@@ -269,26 +228,23 @@ export class InsightsService {
       items: assigned.map((issue) => item('issue', issue, new Date(issue.updatedAt), 'Assigned in-flight Issue.')),
     })).sort((a, b) => b.issues - a.issues);
     const bottleneckMap = new Map<string, InsightBottleneck>();
-    for (const waiting of signalItems.needs_input) {
+    for (const waiting of signalItems.prs_stuck_in_review) {
       const actor = waiting.waitingOn ?? { type: 'unassigned' as const, name: 'Unassigned' };
       const key = actor.id ?? 'unassigned';
       const row = bottleneckMap.get(key) ?? {
         actor,
-        inputRequests: 0,
-        decisions: 0,
         reviews: 0,
         oldestDays: 0,
         totalWaitDays: 0,
       };
-      if (waiting.type === 'decision') row.decisions++;
-      else row.inputRequests++;
+      row.reviews++;
       row.oldestDays = Math.max(row.oldestDays, waiting.ageDays ?? 0);
       row.totalWaitDays += waiting.ageDays ?? 0;
       bottleneckMap.set(key, row);
     }
     const report: InsightsReport = {
       generatedAt: now.toISOString(), range: { days, from: from.toISOString(), to: now.toISOString() },
-      scope: { ...(query.teamId ? { teamId: query.teamId } : {}), ...(query.projectId ? { projectId: query.projectId } : {}) },
+      scope: { ...(query.projectId ? { projectId: query.projectId } : {}) },
       staleDays, signals,
       bottlenecks: [...bottleneckMap.values()].sort((a, b) => b.totalWaitDays - a.totalWaitDays),
       flow: {

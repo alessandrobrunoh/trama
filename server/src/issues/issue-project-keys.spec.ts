@@ -15,7 +15,6 @@ function setup() {
     status: 'todo',
     priority: 'none',
     assigneeId: null,
-    teamId: null,
     projectId: 'pj_cora',
     parentId: null,
     duplicateOfId: null,
@@ -25,10 +24,9 @@ function setup() {
     startedAt: null,
     completedAt: null,
     updatedAt: new Date(0),
-  } as IssueEntity;
+  } as unknown as IssueEntity;
   let relation = {
     id: row.id,
-    teamId: row.teamId,
     projectId: row.projectId,
     parentId: row.parentId,
     key: row.key,
@@ -44,7 +42,6 @@ function setup() {
   const save = vi.fn(async (issue: IssueEntity) => {
     relation = {
       id: issue.id,
-      teamId: issue.teamId,
       projectId: issue.projectId,
       parentId: issue.parentId,
       key: issue.key,

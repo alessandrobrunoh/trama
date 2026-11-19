@@ -40,7 +40,7 @@ let seq = 0;
           @if (eta(); as e) {
             <span class="text-muted-foreground tabular-nums">{{ e }}</span>
           }
-          <span class="inline-flex h-5 items-center gap-1 rounded-full border border-border-strong px-1.5 font-medium" [style.color]="health().color">
+          <span class="inline-flex h-5 items-center gap-1 rounded-full bg-secondary px-1.5 font-medium" [style.color]="health().color">
             <span class="size-1.5 rounded-full" [style.background]="health().color"></span>{{ health().label }}
           </span>
         </span>
@@ -48,8 +48,8 @@ let seq = 0;
     }
 
     @if (m.totals.scope === 0) {
-      <div class="text-muted-foreground border-border-strong flex items-center justify-center rounded-md border border-dashed px-4 text-center text-xs" [style.height.px]="height()">
-        {{ milestone() ? 'No issues in this milestone yet.' : 'Link issues to see progress over time.' }}
+      <div class="text-muted-foreground bg-muted flex items-center justify-center rounded-md px-4 text-center text-xs" [style.height.px]="height()">
+        {{ milestone() ? 'No tasks in this milestone yet.' : 'Link tasks to see progress over time.' }}
       </div>
     } @else {
       <div class="relative outline-none" tabindex="0" [attr.aria-label]="summary()" (keydown)="onKey($event)" (blur)="hover.set(null)">
@@ -138,7 +138,7 @@ let seq = 0;
         }
       </div>
       @if (!compactMode() && m.totals.defaulted > 0) {
-        <p class="text-muted-foreground mt-1.5 text-[11px]">{{ m.totals.defaulted }} {{ m.totals.defaulted === 1 ? 'issue has' : 'issues have' }} no estimate and {{ m.totals.defaulted === 1 ? 'counts' : 'count' }} as 1 point.</p>
+        <p class="text-muted-foreground mt-1.5 text-[11px]">{{ m.totals.defaulted }} {{ m.totals.defaulted === 1 ? 'task has' : 'tasks have' }} no estimate and {{ m.totals.defaulted === 1 ? 'counts' : 'count' }} as 1 point.</p>
       }
     }
   `,

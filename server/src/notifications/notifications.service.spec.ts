@@ -1,15 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NotificationsService } from './notifications.service.js';
 import {
-  CustomerEntity,
-  CustomerRequestEntity,
-  CustomerSubscriptionEntity,
-  IssueEntity,
   MembershipEntity,
   NotificationEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
+import * as rules from './notification-rules.js';
 
 function serviceWith(ds: object): NotificationsService {
   return new NotificationsService(
@@ -87,20 +84,23 @@ describe('notification fanout batching', () => {
                 }
               : {},
     });
+    const drafts = Array.from({ length: 10 }, (_, i) => ({
+      userId: `u${i}`,
+      kind: 'assigned' as const,
+      title: `Assigned ${i}`,
+      link: 'issues/ABC-1',
+      subject: { type: 'issue' as const, id: 'i1' },
+    }));
+    const planned = vi.spyOn(rules, 'planNotifications').mockReturnValue(drafts);
     const context = {
       event: {
-        type: 'customer_request.linked',
+        type: 'issue.updated',
         actor: { type: 'user', id: 'actor' },
-        subject: { type: 'customer_request', id: 'r1' },
+        subject: { type: 'issue', id: 'i1' },
         data: {},
         workspaceId: 'w1',
       },
       actorName: 'Actor',
-      customer: {
-        id: 'c1',
-        name: 'Customer',
-        subscriberIds: Array.from({ length: 10 }, (_, i) => `u${i}`),
-      },
     };
     (service as unknown as { context: () => Promise<unknown> }).context = vi
       .fn()
@@ -122,57 +122,7 @@ describe('notification fanout batching', () => {
       actor: context.event.actor,
     });
     expect(maximum).toBe(8);
-  });
-
-  it('groups subscriptions by customer in one pass', async () => {
-    const service = serviceWith({
-      getRepository: (entity: unknown) => {
-        if (entity === CustomerSubscriptionEntity)
-          return {
-            find: vi.fn().mockResolvedValue([
-              { customerId: 'c1', userId: 'u1' },
-              { customerId: 'c2', userId: 'u2' },
-              { customerId: 'c1', userId: 'u3' },
-            ]),
-          };
-        if (entity === CustomerRequestEntity)
-          return {
-            find: vi.fn().mockResolvedValue([
-              { customerId: 'c1', createdBy: { type: 'agent' } },
-              { customerId: 'c2', createdBy: { type: 'agent' } },
-            ]),
-          };
-        if (entity === IssueEntity)
-          return {
-            findOneBy: vi
-              .fn()
-              .mockResolvedValue({ key: 'ABC-1', title: 'Issue' }),
-          };
-        if (entity === CustomerEntity)
-          return {
-            find: vi.fn().mockResolvedValue([
-              { id: 'c1', name: 'One' },
-              { id: 'c2', name: 'Two' },
-            ]),
-          };
-        throw new Error('Unexpected repository');
-      },
-    });
-    const result = await (
-      service as unknown as {
-        delivery: (
-          workspaceId: string,
-          type: 'issue',
-          id: string,
-        ) => Promise<{
-          customers: { id: string; subscriberIds: string[] }[];
-        }>;
-      }
-    ).delivery('w1', 'issue', 'i1');
-    expect(result?.customers).toEqual([
-      { id: 'c1', name: 'One', subscriberIds: ['u1', 'u3'] },
-      { id: 'c2', name: 'Two', subscriberIds: ['u2'] },
-    ]);
+    planned.mockRestore();
   });
 
   it('uses a transaction-scoped lock and preserves the dedupe key and time window', async () => {

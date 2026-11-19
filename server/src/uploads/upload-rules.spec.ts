@@ -205,7 +205,7 @@ describe('who can see a file', () => {
       canStageUpload({ ...member, permissions: ['issues:read'] }, null),
     ).toBe(false);
     expect(
-      canStageUpload({ ...member, permissions: ['issues:write'] }, null),
+      canStageUpload({ ...member, permissions: ['tasks:write'] }, null),
     ).toBe(true);
     expect(canAttachArtifact({ ...member, role: 'viewer' }, null)).toBe(false);
     expect(canAttachArtifact(member, null)).toBe(true);

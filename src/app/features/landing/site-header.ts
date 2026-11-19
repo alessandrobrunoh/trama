@@ -28,7 +28,7 @@ import { BrandAssets, type LogoKind } from '../brand/brand-assets';
     LucideDynamicIcon,
   ],
   host: {
-    class: 'border-border/60 bg-background/75 sticky top-0 z-20 block border-b backdrop-blur-xl',
+    class: 'bg-background/75 sticky top-0 z-20 block backdrop-blur-xl',
   },
   template: `
     <div class="mx-auto flex h-14 max-w-6xl items-center gap-6 px-4 sm:px-6">

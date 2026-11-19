@@ -24,12 +24,10 @@ describe('assistant token scope', () => {
     for (const p of [
       'workspace:read',
       'agents:read',
-      'issues:write',
+      'tasks:write',
       'projects:write',
       'artifacts:write',
       'comments:write',
-      'decisions:write',
-      'input-requests:write',
       'search:read',
     ] as const) {
       expect(ASSISTANT_PERMISSIONS, p).toContain(p);
@@ -41,7 +39,6 @@ describe('assistant token scope', () => {
       ['PATCH', '/api/w/:slug/settings'],
       ['PATCH', '/api/w/:slug'],
       ['POST', '/api/w/:slug/labels'],
-      ['POST', '/api/w/:slug/customer-tiers'],
       ['POST', '/api/w/:slug/agents'],
       ['PATCH', '/api/w/:slug/agents/:id'],
     ] as const) {

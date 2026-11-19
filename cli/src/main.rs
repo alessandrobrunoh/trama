@@ -23,6 +23,9 @@ mod protocol;
 #[path = "../../mcp/src/upstream.rs"]
 #[allow(dead_code)]
 mod upstream;
+#[path = "../../mcp/src/work.rs"]
+#[allow(dead_code)]
+mod work;
 
 mod auth;
 mod builtin;
@@ -37,6 +40,7 @@ mod output;
 mod skill;
 mod update;
 mod util;
+mod workcmd;
 
 use std::process::ExitCode;
 use std::time::Duration;
@@ -103,13 +107,13 @@ impl Ctx {
 fn build_cli(reg: &Registry) -> Command {
     let mut root = Command::new("trama")
         .version(VERSION)
-        .about("Agent-first command line for Trama: issues, decisions and more")
+        .about("Agent-first command line for Trama: tasks, projects and more")
         .long_about(
             "Agent-first command line for Trama.\n\n\
              Every Trama API route is a command: `trama <resource> <verb>`. Output is JSON when piped, a table in a terminal.\n\
              Errors go to stderr as JSON with a stable exit code (see `trama --help` footer).\n\n\
              Connect:   trama login            trama account add    (or export TRAMA_API_KEY and TRAMA_API_URL)\n\
-             Discover:  trama commands         trama schema issue create\n\
+             Discover:  trama commands         trama schema task create\n\
              Agents:    trama skill install    trama mcp config",
         )
         .after_help(
@@ -131,11 +135,15 @@ fn build_cli(reg: &Registry) -> Command {
     for c in builtin::definitions() {
         root = root.subcommand(c);
     }
+    root = root
+        .subcommand(workcmd::timer_command())
+        .subcommand(workcmd::lunagest_command());
     for c in reg.commands() {
-        let c = if c.get_name() == "event" {
-            c.subcommand(events::command())
-        } else {
-            c
+        let c = match c.get_name() {
+            "event" => c.subcommand(events::command()),
+            "task" => workcmd::extend_task(c),
+            "project" => workcmd::extend_project(c),
+            _ => c,
         };
         root = root.subcommand(c);
     }
@@ -152,6 +160,9 @@ async fn run_tool(
         Some((verb, sub)) => (Some(verb), sub),
         None => (None, group_matches),
     };
+    if let Some(done) = workcmd::intercept(reg, group, verb, m, ctx).await {
+        return done;
+    }
     let entry = reg
         .find(group, verb)
         .ok_or_else(|| CliError::internal(format!("no handler for '{group}'")))?;
@@ -171,8 +182,7 @@ async fn run_tool(
     }
     // Context briefings are markdown unless JSON was requested.
     let accept = match entry.tool.name.as_str() {
-        "get_issue_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
-        "get_project_context" => http::ACCEPT_MARKDOWN,
+        "get_task_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
         _ => http::ACCEPT_JSON,
     };
     exec::run(&label, &call, accept, ctx).await
@@ -255,6 +265,8 @@ async fn run() -> Result<()> {
         },
         "skill" => skill::run(sub, &ctx),
         "update" => update::run(sub, &ctx).await,
+        "timer" => workcmd::timer(sub, &ctx).await,
+        "lunagest" => workcmd::lunagest(sub, &ctx).await,
         "version" => {
             builtin::version(&ctx);
             Ok(())

@@ -11,22 +11,6 @@ function service() {
     title: 'Broken thing',
     projectId: null,
   };
-  const request = {
-    id: 'request-1',
-    issueId: issue.id,
-    question: 'Which behavior is expected?',
-    assigneeUserId: null,
-    state: 'open',
-    createdAt: at,
-  };
-  const decision = {
-    id: 'decision-1',
-    originIssueId: issue.id,
-    title: 'Choose a direction',
-    statement: 'Use option A',
-    status: 'proposed',
-    createdAt: at,
-  };
   const artifact = {
     id: 'artifact-1',
     issueId: issue.id,
@@ -37,8 +21,6 @@ function service() {
   };
   const repositories = {
     issues: { findBy: vi.fn().mockResolvedValue([issue]) },
-    requests: { find: vi.fn().mockResolvedValue([request]) },
-    decisions: { find: vi.fn().mockResolvedValue([decision]) },
     artifacts: { find: vi.fn().mockResolvedValue([artifact]) },
     states: {
       findBy: vi.fn().mockResolvedValue([]),
@@ -48,8 +30,6 @@ function service() {
   };
   const instance = new AttentionService(
     repositories.issues as never,
-    repositories.requests as never,
-    repositories.decisions as never,
     repositories.artifacts as never,
     repositories.states as never,
   );
@@ -57,22 +37,15 @@ function service() {
 }
 
 describe('AttentionService', () => {
-  it('derives issue questions, proposed decisions, and issue artifact review/CI items', async () => {
+  it('derives issue artifact review and CI items', async () => {
     const { instance } = service();
 
     const items = await instance.list('workspace-1', 'user-1');
 
     expect(items.map(({ kind, issueId }) => [kind, issueId])).toEqual([
       ['ci_failed', 'issue-1'],
-      ['input_requested', 'issue-1'],
-      ['needs_decision', 'issue-1'],
       ['review_requested', 'issue-1'],
     ]);
-    expect(items.find((item) => item.kind === 'input_requested')).toMatchObject({
-      id: 'input_requested:request-1',
-      inputRequestId: 'request-1',
-      title: 'Which behavior is expected?',
-    });
   });
 
   it('persists per-user dismissals and snoozes against the current item timestamp', async () => {
@@ -80,7 +53,7 @@ describe('AttentionService', () => {
     await instance.dismiss(
       'workspace-1',
       'user-1',
-      'needs_decision:decision-1',
+      'review_requested:artifact-1',
     );
     await instance.snooze(
       'workspace-1',
@@ -94,7 +67,7 @@ describe('AttentionService', () => {
       expect.objectContaining({
         workspaceId: 'workspace-1',
         userId: 'user-1',
-        itemId: 'needs_decision:decision-1',
+        itemId: 'review_requested:artifact-1',
         state: 'dismissed',
         since: at,
       }),
@@ -124,14 +97,4 @@ describe('AttentionService', () => {
     });
   });
 
-  it('does not show a question assigned to another person', async () => {
-    const { instance, repositories } = service();
-    repositories.requests.find.mockResolvedValue([
-      { issueId: 'issue-1', state: 'open', assigneeUserId: 'someone-else' },
-    ]);
-
-    const items = await instance.list('workspace-1', 'user-1');
-
-    expect(items.some((item) => item.kind === 'input_requested')).toBe(false);
-  });
 });

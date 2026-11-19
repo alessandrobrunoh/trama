@@ -5,12 +5,10 @@ import type {
   ArtifactKind,
   AttentionKind,
   AttentionSeverity,
-  DecisionStatus,
   ExecutionProvider,
   IssueKind,
   IssueStatus,
   Priority,
-  ProjectHealth,
   ProjectStatus,
   LegacyRole,
   ViewLayout,
@@ -39,13 +37,6 @@ export const PROJECT_STATUS_META: Record<ProjectStatus, Meta> = {
   paused: { label: 'Paused', tone: 'warning', order: 3 },
   completed: { label: 'Completed', tone: 'success', order: 4 },
   canceled: { label: 'Canceled', tone: 'muted', order: 5 },
-};
-
-/** Project health (set by whoever posts a project update). */
-export const PROJECT_HEALTH_META: Record<ProjectHealth, Meta> = {
-  on_track: { label: 'On track', tone: 'success', order: 0 },
-  at_risk: { label: 'At risk', tone: 'warning', order: 1 },
-  off_track: { label: 'Off track', tone: 'danger', order: 2 },
 };
 
 /** Layouts a saved view can use, in picker order. */
@@ -112,45 +103,24 @@ export const ARTIFACT_KIND_META: Record<ArtifactKind, { label: string; order: nu
 };
 export const ARTIFACT_KINDS = sortedKeys(ARTIFACT_KIND_META);
 
-export const DECISION_STATUS_META: Record<DecisionStatus, Meta> = {
-  draft: { label: 'Draft', tone: 'muted', order: -1 },
-  proposed: { label: 'Proposed', tone: 'warning', order: 0 },
-  accepted: { label: 'Accepted', tone: 'success', order: 1 },
-  superseded: { label: 'Superseded', tone: 'muted', order: 2 },
-  rejected: { label: 'Rejected', tone: 'danger', order: 3 },
-};
-export const DECISION_STATUSES = sortedKeys(DECISION_STATUS_META);
-
 export const ATTENTION_KIND_META: Record<
   AttentionKind,
   { label: string; groupTitle: string; defaultSeverity: AttentionSeverity; order: number }
 > = {
-  input_requested: {
-    label: 'Input requested',
-    groupTitle: 'Needs your input',
-    defaultSeverity: 'high',
-    order: 0,
-  },
-  needs_decision: {
-    label: 'Needs decision',
-    groupTitle: 'Needs decision',
-    defaultSeverity: 'high',
-    order: 1,
-  },
-  ci_failed: { label: 'CI failed', groupTitle: 'CI failed', defaultSeverity: 'high', order: 2 },
   review_requested: {
     label: 'Review requested',
     groupTitle: 'Review requested',
     defaultSeverity: 'medium',
-    order: 3,
+    order: 0,
   },
+  ci_failed: { label: 'CI failed', groupTitle: 'CI failed', defaultSeverity: 'high', order: 1 },
   conflict: {
     label: 'Conflict',
     groupTitle: 'Merge conflicts',
     defaultSeverity: 'medium',
-    order: 4,
+    order: 2,
   },
-  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 5 },
+  triage: { label: 'Triage', groupTitle: 'Needs triage', defaultSeverity: 'low', order: 3 },
 };
 export const ATTENTION_KINDS = sortedKeys(ATTENTION_KIND_META);
 export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medium: 1, low: 2 };
@@ -158,7 +128,7 @@ export const SEVERITY_ORDER: Record<AttentionSeverity, number> = { high: 0, medi
 export const ROLE_META: Record<LegacyRole, { label: string; rank: number; description: string }> = {
   viewer: { label: 'Viewer', rank: 0, description: 'Read only' },
   member: { label: 'Member', rank: 1, description: 'Create and update work' },
-  admin: { label: 'Admin', rank: 2, description: 'Manage teams, repositories, agents and members' },
+  admin: { label: 'Admin', rank: 2, description: 'Manage agents, integrations and members' },
   owner: { label: 'Owner', rank: 3, description: 'Everything, including deleting the workspace' },
 };
 export const ROLES: LegacyRole[] = ['owner', 'admin', 'member', 'viewer'];
@@ -168,9 +138,9 @@ export const ROLE_DETAILS: Record<LegacyRole, string> = {
   owner:
     'Full control. Sets the roles & permissions matrix, grants the owner role and can delete the workspace. A workspace always keeps at least one owner.',
   admin:
-    'Manages people and structure: members, teams, repositories, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
+    'Manages people and structure: members, agents, integrations. Can do everything a member can, whatever the permission matrix says about work.',
   member:
-    'Does the everyday work: creates and edits issues, decisions and comments. What else a member may do is set in Roles & permissions.',
+    'Does the everyday work: creates and edits tasks and comments. What else a member may do is set in Roles & permissions.',
   viewer: 'Read-only. Can browse everything in the workspace but cannot change anything.',
 };
 

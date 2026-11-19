@@ -23,14 +23,14 @@ reports configuration presence, not a successful upstream connection.
 
 ## User experience
 
-- The issue/workstream/decision composer offers “Suggest improvements”. It sends
+- The task composer offers “Suggest improvements”. It sends
   the current title and description and previews both replacements plus questions
   about missing details. Each replacement requires explicit acceptance. Editing
   the draft invalidates the preview and cancels any pending request.
 - The Assistant button opens a nonmodal panel on every authenticated workspace
   page, including settings. It can be closed or expanded without navigating away.
 - Chat sends recent conversation messages and optionally the current item's
-  details. Issue, workstream, decision and project records are resolved on the
+  details. Task (issue) and project records are resolved on the
   server within the authenticated workspace. Other pages share only their name,
   not the whole workspace or the visible table. The UI describes this boundary.
 - Responses are plain text; generated HTML and remote image URLs are never rendered.

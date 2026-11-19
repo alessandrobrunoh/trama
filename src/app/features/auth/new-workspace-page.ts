@@ -31,15 +31,15 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
       title="Create a workspace"
       [subtitle]="
         hasWorkspaces()
-          ? 'A workspace holds your team, issues, plans and agents.'
-          : 'Welcome' + (firstName() ? ', ' + firstName() : '') + '. A workspace holds your team, issues, plans and agents.'
+          ? 'A workspace holds your team, tasks, plans and agents.'
+          : 'Welcome' + (firstName() ? ', ' + firstName() : '') + '. A workspace holds your team, tasks, plans and agents.'
       "
     >
       <form (submit)="submit($event)" novalidate class="flex flex-col gap-4">
         @if (error(); as e) {
           <div
             role="alert"
-            class="border-destructive/30 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border px-2.5 py-2 text-sm"
+            class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
           >
             <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
             <span>{{ e }}</span>

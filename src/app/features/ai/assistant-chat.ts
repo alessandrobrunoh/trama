@@ -67,7 +67,7 @@ export function timeAgo(time: number): string {
                   @for (prompt of prompts; track prompt) {
                     <button
                       type="button"
-                      class="hover:bg-accent rounded-md border px-3 py-2 text-left text-xs"
+                      class="bg-secondary hover:bg-hover rounded-md px-3 py-2 text-left text-xs"
                       (click)="ai.draft.set(prompt); focusComposer()"
                     >
                       {{ prompt }}
@@ -252,7 +252,7 @@ export function timeAgo(time: number): string {
             ? ai.context().kind === 'page'
               ? ai.status()?.assistantTools?.enabled
                 ? 'Shares the page name. The assistant can look up and change records in this workspace for you, within your permissions and usage caps.'
-                : 'Shares the page name and your open issues (titles only).'
+                : 'Shares the page name and your open tasks (titles only).'
               : 'Shares this item’s details with the AI provider.'
             : 'No current page data will be added.'
         }}

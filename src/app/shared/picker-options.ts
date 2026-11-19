@@ -34,28 +34,12 @@ export const providerOptions = (): PickOption[] =>
     kind: 'provider',
   }));
 
-export const teamOptions = (store: TramaStore): PickOption[] =>
-  store.teams().map((team) => ({
-    value: team.id,
-    label: team.name,
-    kind: 'team',
-    hint: team.key,
-  }));
-
 export const userOptions = (store: TramaStore): PickOption[] =>
   store.users().map((user) => ({
     value: user.id,
     label: user.name,
     kind: 'user',
     search: `${user.name} ${user.email}`,
-  }));
-
-export const repoOptions = (store: TramaStore): PickOption[] =>
-  store.repositories().map((repository) => ({
-    value: repository.id,
-    label: repository.fullName,
-    kind: 'repo',
-    provider: repository.provider,
   }));
 
 /** Open projects (plus `currentId` even when closed), for the Project picker. */

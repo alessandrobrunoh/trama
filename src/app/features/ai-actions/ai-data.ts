@@ -144,10 +144,6 @@ export function digestData(store: TramaStore, info: MilestoneInfo): PromptDigest
     .sort((a, b) => (a.updatedAt < b.updatedAt ? -1 : 1))
     .slice(0, 5)
     .map((i) => `${i.key} ${oneLine(i.title, 80)}: ${ISSUE_STATUS_META[i.status].label.toLowerCase()}, untouched ${ageDays(i.updatedAt)}d`);
-  for (const q of store.openInputRequests().slice().sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1)).slice(0, 3)) {
-    const issue = q.issueId ? store.getIssue(q.issueId) : undefined;
-    waiting.push(`Question${issue ? ` on ${issue.key}` : ''}: "${oneLine(q.question, 100)}" open ${ageDays(q.createdAt)}d`);
-  }
 
   const cap = (xs: string[], n: number) => xs.slice(0, n).map((x) => clip(x, 220));
   return {

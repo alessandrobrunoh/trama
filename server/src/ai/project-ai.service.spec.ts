@@ -9,7 +9,6 @@ import type {
   ProjectAiIssues,
   ProjectAiRisks,
   ProjectAiSummary,
-  ProjectAiUpdateDraft,
 } from '../contracts/domain.js';
 import type { AiConfig } from './ai.config.js';
 import type { AiService } from './ai.service.js';
@@ -49,18 +48,13 @@ function makeFacts(extra: Partial<ProjectFacts> = {}): ProjectFacts {
       description: null,
       status: 'in_progress',
       priority: 'high',
-      health: null,
       lead: 'Ada',
       startDate: ago(40),
       targetDate: ahead(60),
       createdAt: ago(40),
-      lastUpdateAt: ago(2),
     },
     milestones: [],
     issues: [issue(1), issue(2, { status: 'done' })],
-    updates: [],
-    decisions: [],
-    inputRequests: [],
     events: [],
     candidates: [],
     ...extra,
@@ -118,39 +112,6 @@ function setup(
     service.suggest('usr_1', ctx, 'pj_1', kind, new AbortController().signal);
   return { run, complete, gather };
 }
-
-describe('project AI: update_draft', () => {
-  it('returns the validated draft', async () => {
-    const { run } = setup({
-      reply:
-        '```json\n{"health":"at_risk","body":"## Progress\\nShipped invoices."}\n```',
-    });
-    const result = (await run('update_draft')) as ProjectAiUpdateDraft;
-    expect(result).toEqual({
-      kind: 'update_draft',
-      health: 'at_risk',
-      body: '## Progress\nShipped invoices.',
-    });
-  });
-
-  it('falls back to the computed health when the model health is unknown', async () => {
-    const { run } = setup({ reply: '{"health":"great","body":"All good."}' });
-    expect((await run('update_draft')) as ProjectAiUpdateDraft).toMatchObject({
-      health: 'on_track',
-    });
-  });
-
-  it('rejects malformed output', async () => {
-    const { run } = setup({ reply: 'sorry, I cannot do that' });
-    await expect(run('update_draft')).rejects.toBeInstanceOf(
-      BadGatewayException,
-    );
-    const empty = setup({ reply: '{"health":"on_track","body":"  "}' });
-    await expect(empty.run('update_draft')).rejects.toBeInstanceOf(
-      BadGatewayException,
-    );
-  });
-});
 
 describe('project AI: summary', () => {
   it('returns a single-line summary and the description', async () => {
@@ -290,7 +251,7 @@ describe('project AI: risks', () => {
     expect(b).toEqual(a);
   });
 
-  it('flags late milestones, stale issues and missing updates', async () => {
+  it('flags late milestones, stale issues and unowned urgent issues', async () => {
     const facts = makeFacts({
       milestones: [{ id: 'ms_1', name: 'Beta', targetDate: ago(20) }],
       issues: [
@@ -298,7 +259,6 @@ describe('project AI: risks', () => {
         issue(2, { status: 'in_progress', updatedAt: ago(40) }),
         issue(3, { priority: 'urgent', assigneeId: null, assignee: null }),
       ],
-      project: { ...makeFacts().project, lastUpdateAt: ago(35) },
     });
     const { run } = setup({ facts, configured: false });
     const { risks } = (await run('risks')) as ProjectAiRisks;
@@ -306,7 +266,6 @@ describe('project AI: risks', () => {
     expect(titles).toContain('Milestone "Beta" is late');
     expect(titles).toContain('ENG-2 looks stalled');
     expect(titles).toContain('ENG-3 has no assignee');
-    expect(titles).toContain('No recent project update');
     expect(risks.find((r) => r.title === 'ENG-2 looks stalled')?.issueId).toBe(
       'iss_2',
     );

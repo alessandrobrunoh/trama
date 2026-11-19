@@ -1,7 +1,7 @@
-// Activation checklist of a workspace: six first steps from "nothing here yet" to "an agent is working".
+// Activation checklist of a workspace: first steps from "nothing here yet" to "an agent is working".
 //
-// Progress is derived from real data wherever there is some (a team exists, an issue exists,
-// criteria, a token was used…). Only what has no trace in the workspace is remembered: dismissal and "tried
+// Progress is derived from real data wherever there is some (an issue exists, a git connection,
+// a token was used…). Only what has no trace in the workspace is remembered: dismissal and "tried
 // the command bar". There is no per-user settings endpoint, so those live in this browser, per user and workspace.
 import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import type { Capability } from '../contracts/domain';
@@ -12,11 +12,11 @@ import { UiStore } from './ui.store';
 
 export const ONBOARDING_STORAGE_KEY = 'trama.onboarding.v1';
 
-export type OnboardingStepId = 'team' | 'invite' | 'repository' | 'issue' | 'agent' | 'command-bar';
+export type OnboardingStepId = 'invite' | 'repository' | 'issue' | 'agent' | 'command-bar';
 
 /** What clicking the step's button does: open a dialog, or go to a page under the workspace. */
 export type OnboardingAction =
-  | { kind: 'create'; what: 'team' | 'repository' | 'issue' }
+  | { kind: 'create'; what: 'issue' }
   | { kind: 'link'; path: string[] }
   | { kind: 'command-bar' };
 
@@ -37,9 +37,8 @@ type Persisted = Record<string, Remembered>;
 
 /** Steps that need a capability the person may not have; they are left out unless already done. */
 const NEEDS: Partial<Record<OnboardingStepId, Capability>> = {
-  team: 'createTeams',
   invite: 'inviteMembers',
-  repository: 'manageRepositories',
+  repository: 'manageIntegrations',
   agent: 'manageTokens',
 };
 
@@ -71,14 +70,6 @@ export class OnboardingStore {
       s.agents().length > 0 || s.tokens().some((t) => !!t.lastUsedAt && t.actor.id === s.me()?.id);
     const defs: OnboardingStep[] = [
       {
-        id: 'team',
-        title: 'Create a team',
-        description: 'A team organizes issue triage and gives issues a key like WEB-12.',
-        cta: 'Create team',
-        action: { kind: 'create', what: 'team' },
-        done: s.teams().length > 0,
-      },
-      {
         id: 'invite',
         title: 'Invite a teammate',
         description: 'Work is easier with someone to hand a question to.',
@@ -88,17 +79,17 @@ export class OnboardingStore {
       },
       {
         id: 'repository',
-        title: 'Connect a repository',
-        description: 'Pull requests and checks on connected repositories appear alongside issues.',
-        cta: 'Add repository',
-        action: { kind: 'create', what: 'repository' },
-        done: s.repositories().length > 0,
+        title: 'Connect git',
+        description: 'Pull requests and checks from a connected GitHub, GitLab or Bitbucket account appear alongside tasks.',
+        cta: 'Connect',
+        action: { kind: 'link', path: ['settings', 'integrations'] },
+        done: s.integrations().length > 0,
       },
       {
         id: 'issue',
-        title: 'Create your first issue',
-        description: 'Record a problem or request, with an optional goal describing the desired result.',
-        cta: 'New issue',
+        title: 'Create your first task',
+        description: 'Record a problem or request.',
+        cta: 'New task',
         action: { kind: 'create', what: 'issue' },
         done: s.issues().length > 0,
       },

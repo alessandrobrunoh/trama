@@ -334,8 +334,8 @@ mod tests {
 
     #[test]
     fn looks_through_single_array_envelopes() {
-        let v = json!({ "results": [{ "id": "1", "title": "A", "type": "issue", "score": 3 }, { "id": "2", "title": "B", "type": "team", "score": 1 }] });
-        assert_eq!(render(&v, &fmt(Mode::Json, false, &["id", "type"])), r#"{"results":[{"id":"1","type":"issue"},{"id":"2","type":"team"}]}"#);
+        let v = json!({ "results": [{ "id": "1", "title": "A", "type": "issue", "score": 3 }, { "id": "2", "title": "B", "type": "project", "score": 1 }] });
+        assert_eq!(render(&v, &fmt(Mode::Json, false, &["id", "type"])), r#"{"results":[{"id":"1","type":"issue"},{"id":"2","type":"project"}]}"#);
         let t = render(&v, &fmt(Mode::Table, true, &["id", "type"]));
         assert_eq!(t.lines().next().unwrap(), "ID  TYPE");
         assert_eq!(render(&v, &fmt(Mode::Jsonl, false, &["id"])), "{\"id\":\"1\"}\n{\"id\":\"2\"}");

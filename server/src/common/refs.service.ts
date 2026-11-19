@@ -3,20 +3,10 @@ import { DataSource, In } from 'typeorm';
 import type { SubjectRef } from '../contracts/domain.js';
 import {
   ArtifactEntity,
-  CustomerEntity,
-  CustomerRequestEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
-  ReleaseEntity,
-  ReleasePipelineEntity,
-  DocumentEntity,
-  ProjectUpdateEntity,
-  RepositoryEntity,
-  TeamEntity,
 } from '../database/entities/index.js';
 
 /** Validates cross-entity references inside one workspace (400 on unknown ids). */
@@ -39,14 +29,6 @@ export class RefsService {
       throw new BadRequestException(
         `Unknown ${label} in: ${unique.join(', ')}`,
       );
-  }
-
-  teams(workspaceId: string, ids?: readonly string[] | null) {
-    return this.assertAll(TeamEntity, workspaceId, ids, 'team');
-  }
-
-  repositories(workspaceId: string, ids?: readonly string[] | null) {
-    return this.assertAll(RepositoryEntity, workspaceId, ids, 'repository');
   }
 
   projects(workspaceId: string, ids?: readonly string[] | null) {
@@ -86,52 +68,16 @@ export class RefsService {
           exists: await db.getRepository(ArtifactEntity).existsBy(where),
         };
       }
-      case 'input_request': {
-        return {
-          exists: await db.getRepository(InputRequestEntity).existsBy(where),
-        };
-      }
-      case 'decision': {
-        return {
-          exists: await db.getRepository(DecisionEntity).existsBy(where),
-        };
-      }
       case 'milestone': {
         return {
           exists: await db.getRepository(MilestoneEntity).existsBy(where),
         };
       }
-      case 'release':
-        return {
-          exists: await db.getRepository(ReleaseEntity).existsBy(where),
-        };
-      case 'release_pipeline':
-        return {
-          exists: await db.getRepository(ReleasePipelineEntity).existsBy(where),
-        };
       case 'issue':
         return { exists: await db.getRepository(IssueEntity).existsBy(where) };
-      case 'customer':
-        return {
-          exists: await db.getRepository(CustomerEntity).existsBy(where),
-        };
-      case 'customer_request':
-        return {
-          exists: await db.getRepository(CustomerRequestEntity).existsBy(where),
-        };
-      case 'repository':
-        return {
-          exists: await db.getRepository(RepositoryEntity).existsBy(where),
-        };
-      case 'team':
-        return { exists: await db.getRepository(TeamEntity).existsBy(where) };
       case 'project':
         return {
           exists: await db.getRepository(ProjectEntity).existsBy(where),
-        };
-      case 'project_update':
-        return {
-          exists: await db.getRepository(ProjectUpdateEntity).existsBy(where),
         };
       case 'import':
         return {
@@ -142,10 +88,6 @@ export class RefsService {
                 [subject.id, workspaceId],
               )
             ).length > 0,
-        };
-      case 'document':
-        return {
-          exists: await db.getRepository(DocumentEntity).existsBy(where),
         };
       default:
         return { exists: false };

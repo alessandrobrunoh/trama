@@ -109,7 +109,8 @@ export const routes: Routes = [
     component: AppShell,
     canActivate: [authGuard, workspaceGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'overview' },
+      { path: '', pathMatch: 'full', redirectTo: 'inbox' },
+      // The Inbox is home; the Overview is the briefing about the whole workspace.
       {
         path: 'overview',
         title: 'Overview · Trama',
@@ -126,9 +127,10 @@ export const routes: Routes = [
         title: 'Inbox · Trama',
         loadComponent: () => import('./features/inbox/inbox-page').then((m) => m.InboxPage),
       },
-      // My Attention and Notifications became tabs of the Inbox; old links keep working.
+      // My Attention, Notifications and My Work became tabs of the Inbox; old links keep working.
       redirectInbox('attention', 'needs-you'),
       redirectInbox('notifications', 'updates'),
+      redirectInbox('my-work', 'tasks'),
       {
         path: 'connect',
         title: 'Connect your agent · Trama',
@@ -141,64 +143,31 @@ export const routes: Routes = [
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
       },
       {
-        path: 'my-work',
-        title: 'My Work · Trama',
-        loadComponent: () => import('./features/my-work/my-work-page').then((m) => m.MyWorkPage),
-      },
-      {
         path: 'activity',
         title: 'Activity · Trama',
         loadComponent: () =>
           import('./features/activity/activity-page').then((m) => m.ActivityPage),
       },
       {
-        path: 'issues',
-        title: 'Issues · Trama',
+        path: 'tasks',
+        title: 'Tasks · Trama',
         loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
       },
       {
-        path: 'issues/:key',
-        title: 'Issue · Trama',
+        path: 'tasks/:key',
+        title: 'Task · Trama',
         loadComponent: () =>
           import('./features/issues/issue-detail-page').then((m) => m.IssueDetailPage),
       },
+      // Old shared links: /issues and /issues/:key keep working.
+      { path: 'issues', pathMatch: 'full', redirectTo: 'tasks' },
+      { path: 'issues/:key', redirectTo: 'tasks/:key' },
+      { path: 'roadmap', pathMatch: 'full', redirectTo: 'timeline' },
       {
-        path: 'input-requests',
-        title: 'Input requests · Trama',
+        path: 'timeline',
+        title: 'Timeline · Trama',
         loadComponent: () =>
-          import('./features/issues/input-requests-page').then((m) => m.InputRequestsPage),
-      },
-      {
-        path: 'customers',
-        title: 'Customers · Trama',
-        loadComponent: () =>
-          import('./features/customers/customer-list-page').then((m) => m.CustomerListPage),
-      },
-      {
-        path: 'customers/inbox',
-        title: 'Customer request inbox · Trama',
-        loadComponent: () =>
-          import('./features/customers/customer-inbox-page').then((m) => m.CustomerInboxPage),
-      },
-      {
-        path: 'customers/:id',
-        title: 'Customer · Trama',
-        loadComponent: () =>
-          import('./features/customers/customer-detail-page').then((m) => m.CustomerDetailPage),
-      },
-      // The timeline is a layout of saved views now (views/:id with layout "timeline"); keep old links working.
-      { path: 'timeline', pathMatch: 'full', redirectTo: 'views' },
-      {
-        path: 'decisions',
-        title: 'Decisions · Trama',
-        loadComponent: () =>
-          import('./features/decisions/decision-list-page').then((m) => m.DecisionListPage),
-      },
-      {
-        path: 'decisions/:key',
-        title: 'Decision · Trama',
-        loadComponent: () =>
-          import('./features/decisions/decision-detail-page').then((m) => m.DecisionDetailPage),
+          import('./features/timeline/timeline-page').then((m) => m.TimelinePage),
       },
       {
         path: 'timer',
@@ -214,77 +183,8 @@ export const routes: Routes = [
       {
         path: 'projects/:id',
         title: 'Project · Trama',
-        // Repositories used to live under /projects: send old links (`rp_…` ids) to /repositories.
-        canActivate: [
-          (route: ActivatedRouteSnapshot) => {
-            const id = route.paramMap.get('id') ?? '';
-            return id.startsWith('rp_')
-              ? inject(Router).createUrlTree([
-                  '/',
-                  route.paramMap.get('workspaceSlug') ?? '',
-                  'repositories',
-                  id,
-                ])
-              : true;
-          },
-        ],
         loadComponent: () =>
           import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
-      },
-      {
-        path: 'documents',
-        title: 'Documents · Trama',
-        loadComponent: () =>
-          import('./features/documents/document-list-page').then((m) => m.DocumentListPage),
-      },
-      {
-        path: 'releases',
-        title: 'Releases · Trama',
-        loadComponent: () =>
-          import('./features/releases/release-list-page').then((m) => m.ReleaseListPage),
-      },
-      {
-        path: 'releases/:pipelineId',
-        title: 'Releases · Trama',
-        loadComponent: () =>
-          import('./features/releases/release-list-page').then((m) => m.ReleaseListPage),
-      },
-      {
-        path: 'releases/:pipelineId/:releaseId',
-        title: 'Release · Trama',
-        loadComponent: () =>
-          import('./features/releases/release-detail-page').then((m) => m.ReleaseDetailPage),
-      },
-      {
-        path: 'documents/:id',
-        title: 'Document · Trama',
-        loadComponent: () =>
-          import('./features/documents/document-page').then((m) => m.DocumentPage),
-      },
-      {
-        path: 'repositories',
-        title: 'Repositories · Trama',
-        loadComponent: () =>
-          import('./features/repositories/repository-list-page').then((m) => m.RepositoryListPage),
-      },
-      {
-        path: 'repositories/:id',
-        title: 'Repository · Trama',
-        loadComponent: () =>
-          import('./features/repositories/repository-detail-page').then(
-            (m) => m.RepositoryDetailPage,
-          ),
-      },
-      {
-        path: 'teams',
-        title: 'Teams · Trama',
-        loadComponent: () => import('./features/teams/team-list-page').then((m) => m.TeamListPage),
-      },
-      {
-        path: 'teams/:key',
-        title: 'Team · Trama',
-        loadComponent: () =>
-          import('./features/teams/team-detail-page').then((m) => m.TeamDetailPage),
       },
       {
         path: 'views',

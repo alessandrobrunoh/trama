@@ -10,11 +10,12 @@ import {
   inject,
   input,
   signal,
+  untracked,
+  type WritableSignal,
 } from '@angular/core';
 import {
-  LucideArrowDownWideNarrow,
-  LucideArrowUpNarrowWide,
   LucideCheck,
+  LucideChevronsUpDown,
   LucideBox,
   LucideTag,
   LucideCircleUserRound,
@@ -32,13 +33,13 @@ import {
   LucideSearch,
   LucideSlidersHorizontal,
   LucideTrash2,
-  LucideUsers,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
+import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
@@ -49,6 +50,7 @@ import {
   filterValues,
   isTypingTarget,
   queryGroups,
+  queryItems,
   setFilter,
   usePageShortcuts,
   type Issue,
@@ -60,24 +62,17 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { IssueKindLabel } from '../../shared/issue';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
-import { PeekPanel } from '../../shared/peek-panel';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
+import { StatusBar } from '../../layout/status-bar';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { Picker, type PickOption } from '../../shared/picker';
-import {
-  priorityOptions,
-  projectFilterOptions,
-  teamOptions,
-  userOptions,
-} from '../../shared/picker-options';
-import { DemandFilters } from '../customers/demand-filters';
+import { FilterBar } from '../../shared/filter-bar/filter-bar';
 import { IssueActions } from './issue-actions';
 import { IssueCard, IssueRow } from './issue-items';
 import {
   DEFAULT_DISPLAY,
-  GROUPS,
   GROUP_LABEL,
   PROPS,
   PROP_LABEL,
@@ -85,17 +80,18 @@ import {
   SORT_LABEL,
   groupLabel,
   groupUniverse,
-  issueKindOptions,
-  issueStatusOptions,
-  milestoneFilterOptions,
+  issueFlow,
   readDisplay,
   writeDisplay,
   type IssueDisplay,
   type IssueGroup,
+  type IssueLayout,
   type IssueProp,
+  type IssueSort,
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
-import { LabelPicker } from '../../shared/label-picker';
+import { buildIssueTree, flatIssueRows, type IssueTreeRow } from './issue-tree';
+import { useKeyboardPreview } from './list-preview';
 import { SearchInput } from '../../shared/search-input';
 
 interface Column {
@@ -103,22 +99,50 @@ interface Column {
   items: Issue[];
 }
 
-const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assigneeId']);
+/** A group as the list renders it: tree rows (context rows included), and the count of real matches. */
+interface RowColumn {
+  key: string;
+  items: IssueTreeRow[];
+  count: number;
+  parentIds: string[];
+}
+
+const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
+
+const FILTER_LABEL: Record<string, string> = {
+  status: 'Status',
+  kind: 'Type',
+  priority: 'Priority',
+  assigneeId: 'Assignee',
+  labels: 'Label',
+  projectId: 'Project',
+  milestoneIds: 'Milestone',
+};
+
+/** `ListStateStore.remember` under a key that can change with an input (one board per context). */
+function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): WritableSignal<T> {
+  const cell = computed(() => list.remember<T>(key(), initial));
+  const read = computed(() => cell()());
+  return Object.assign(read, {
+    set: (value: T) => untracked(cell).set(value),
+    update: (fn: (value: T) => T) => untracked(cell).update(fn),
+    asReadonly: () => read,
+  }) as unknown as WritableSignal<T>;
+}
 
 @Component({
   selector: 'app-issue-board',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     SearchInput,
-    LabelPicker,
+    FilterBar,
     HlmButtonImports,
     HlmPopoverImports,
+    HlmSwitchImports,
     HlmContextMenuImports,
     HlmDropdownMenuImports,
     HlmTooltip,
     LucideDynamicIcon,
-    Picker,
-    DemandFilters,
     EmptyState,
     StatusIcon,
     PriorityIcon,
@@ -132,112 +156,50 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     KanbanItemDirective,
     KanbanLabelDirective,
     Kbd,
-    PeekPanel,
+    StatusBar,
   ],
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
     <!-- Filter + display toolbar -->
+    @if (toolbar()) {
     <div
-      class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6 max-md:contents"
+      class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-6 max-md:contents"
     >
-      <div class="contents max-md:block max-md:w-full max-md:border-b max-md:px-4 max-md:py-2">
+      <div class="contents max-md:block max-md:w-full max-md:px-4 max-md:py-2">
         <app-search-input noun="issues" [(value)]="search" />
       </div>
       <!-- Phones: this row sticks under the header while the list scrolls (see styles.css, [data-mobile-sticky]). -->
       <div
-        class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:border-b max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2"
+        class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2"
         data-mobile-sticky
       >
-        <div
-          class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overflow-y-hidden overscroll-x-contain"
+        <app-filter-bar
+          class="min-w-0 flex-1"
+          entity="issue"
+          [filters]="filters()"
+          (filtersChange)="filters.set($event)"
+          [sort]="sortSpec()"
+          [defaultSort]="false"
+          (sortChange)="setSort($event)"
+          [groupBy]="groupField()"
+          [columns]="d().layout === 'board'"
+          (groupByChange)="setGroup($event)"
         >
-          <app-picker
-            variant="chip"
-            label="Status"
-            [multiple]="true"
-            [searchable]="false"
-            [options]="statuses"
-            [value]="fv('status')"
-            (valueChange)="setF('status', $event)"
-          />
-          <app-picker
-            variant="chip"
-            label="Type"
-            [multiple]="true"
-            [searchable]="false"
-            [options]="kinds"
-            [value]="fv('kind')"
-            (valueChange)="setF('kind', $event)"
-          />
-          <app-picker
-            variant="chip"
-            label="Priority"
-            [multiple]="true"
-            [searchable]="false"
-            [options]="priorities"
-            [value]="fv('priority')"
-            (valueChange)="setF('priority', $event)"
-          />
-          <app-picker
-            variant="chip"
-            label="Assignee"
-            [multiple]="true"
-            [options]="assigneeFilter()"
-            [value]="fv('assigneeId')"
-            (valueChange)="setF('assigneeId', $event)"
-          />
-          <app-picker
-            variant="chip"
-            label="Team"
-            [multiple]="true"
-            [options]="teams()"
-            [value]="fv('teamId')"
-            (valueChange)="setF('teamId', $event)"
-          />
-          <app-label-picker
-            variant="chip"
-            label="Label"
-            scope="issue"
-            [creatable]="false"
-            [manageLink]="false"
-            [value]="fv('labels')"
-            (valueChange)="setF('labels', $event)"
-          />
-          @if (projectFilter().length > 1) {
-            <app-picker
-              variant="chip"
-              label="Project"
-              [multiple]="true"
-              [icon]="projectIcon"
-              [options]="projectFilter()"
-              [value]="fv('projectId')"
-              (valueChange)="setF('projectId', $event)"
-            />
-          }
-          @if (milestoneFilter().length) {
-            <app-picker
-              variant="chip"
-              label="Milestone"
-              [multiple]="true"
-              [options]="milestoneFilter()"
-              [value]="fv('milestoneIds')"
-              (valueChange)="setF('milestoneIds', $event)"
-            />
-          }
-          <app-demand-filters [filters]="filters()" (filtersChange)="filters.set($event)" />
-          @if (hasFilters()) {
+        <div trailing class="flex shrink-0 items-center gap-1">
+          @if (hasTree()) {
             <button
               hlmBtn
               variant="ghost"
-              size="sm"
-              class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs"
-              (click)="clearFilters()"
+              size="icon-sm"
+              class="text-muted-foreground size-7"
+              [attr.aria-label]="anyExpanded() ? 'Collapse all sub-tasks' : 'Expand all sub-tasks'"
+              [hlmTooltip]="anyExpanded() ? 'Collapse all sub-tasks' : 'Expand all sub-tasks'"
+              (click)="toggleAll()"
             >
-              <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
+              <svg [lucideIcon]="expandAllIcon" [size]="14"></svg>
             </button>
           }
-        </div>
-        <div class="ml-auto flex shrink-0 items-center gap-1">
+          @if (!forceLayout()) {
           <div
             class="bg-muted/60 flex items-center rounded-md p-0.5"
             role="group"
@@ -252,6 +214,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                   : 'text-muted-foreground hover:text-foreground'
               "
               [attr.aria-pressed]="d().layout === 'list'"
+              aria-label="List"
               hlmTooltip="List"
               (click)="patch({ layout: 'list' })"
             >
@@ -266,12 +229,14 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                   : 'text-muted-foreground hover:text-foreground'
               "
               [attr.aria-pressed]="d().layout === 'board'"
+              aria-label="Board"
               hlmTooltip="Board"
               (click)="patch({ layout: 'board' })"
             >
               <svg [lucideIcon]="boardIcon" [size]="14"></svg>
             </button>
           </div>
+          }
 
           <hlm-popover align="end" sideOffset="4">
             <button
@@ -287,56 +252,25 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             </button>
             <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72 p-0 text-[13px]">
               <div class="flex flex-col gap-2.5 p-3">
-                <label class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">Grouping</span>
-                  <select
-                    class="border-input bg-background h-7 w-36 rounded-md border px-1.5 text-xs"
-                    [value]="d().groupBy"
-                    (change)="patch({ groupBy: $any($event.target).value })"
-                  >
-                    @for (g of groups; track g) {
-                      <option [value]="g">{{ groupLabels[g] }}</option>
-                    }
-                  </select>
-                </label>
-                <div class="flex items-center justify-between gap-3">
-                  <span class="text-muted-foreground">Ordering</span>
-                  <span class="flex items-center gap-1">
-                    <select
-                      class="border-input bg-background h-7 w-[7.25rem] rounded-md border px-1.5 text-xs"
-                      [value]="d().sortField"
-                      (change)="patch({ sortField: $any($event.target).value })"
-                    >
-                      @for (s of sorts; track s) {
-                        <option [value]="s">{{ sortLabels[s] }}</option>
-                      }
-                    </select>
-                    <button
-                      hlmBtn
-                      variant="outline"
-                      size="icon-sm"
-                      class="size-7"
-                      [attr.aria-label]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'"
-                      [hlmTooltip]="d().sortDir === 'asc' ? 'Ascending' : 'Descending'"
-                      (click)="patch({ sortDir: d().sortDir === 'asc' ? 'desc' : 'asc' })"
-                    >
-                      <svg
-                        [lucideIcon]="d().sortDir === 'asc' ? ascIcon : descIcon"
-                        [size]="13"
-                      ></svg>
-                    </button>
-                  </span>
-                </div>
                 <label class="flex cursor-pointer items-center justify-between gap-3">
                   <span class="text-muted-foreground">Show empty groups</span>
-                  <input
-                    type="checkbox"
-                    class="accent-primary size-3.5"
+                  <hlm-switch
+                    size="sm"
+                    aria-label="Show empty groups"
                     [checked]="d().showEmptyGroups"
-                    (change)="patch({ showEmptyGroups: $any($event.target).checked })"
+                    (checkedChange)="patch({ showEmptyGroups: $event })"
                   />
                 </label>
                 @if (d().layout === 'list') {
+                  <label class="flex cursor-pointer items-center justify-between gap-3">
+                    <span class="text-muted-foreground">Nest sub-tasks</span>
+                    <hlm-switch
+                      size="sm"
+                      aria-label="Nest sub-tasks under their parent"
+                      [checked]="d().nested"
+                      (checkedChange)="patch({ nested: $event })"
+                    />
+                  </label>
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-muted-foreground">Density</span>
                     <span class="bg-muted/60 flex rounded-md p-0.5">
@@ -356,17 +290,17 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                   </div>
                 }
               </div>
-              <div class="border-t p-3">
+              <div class="p-3 pt-1">
                 <p class="text-muted-foreground mb-2 text-xs">Display properties</p>
                 <div class="flex flex-wrap gap-1.5">
                   @for (p of props; track p) {
                     <button
                       type="button"
-                      class="h-6 rounded-md border px-2 text-xs transition-colors"
+                      class="h-6 rounded-md px-2 text-xs transition-colors"
                       [class]="
                         isShown(p)
-                          ? 'border-border-strong bg-accent text-foreground'
-                          : 'border-border text-muted-foreground hover:text-foreground'
+                          ? 'bg-selected text-foreground'
+                          : 'bg-secondary text-muted-foreground hover:text-foreground'
                       "
                       [attr.aria-pressed]="isShown(p)"
                       (click)="toggleProp(p)"
@@ -376,7 +310,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                   }
                 </div>
               </div>
-              <div class="flex justify-end border-t px-3 py-2">
+              <div class="flex justify-end px-3 pb-2">
                 <button
                   hlmBtn
                   variant="ghost"
@@ -390,14 +324,16 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             </hlm-popover-content>
           </hlm-popover>
         </div>
+        </app-filter-bar>
       </div>
     </div>
+    }
 
     @if (scoped().length === 0) {
       <app-empty-state [icon]="inbox" [title]="emptyTitle()" [description]="emptyDescription()">
         @if (canEdit() && showCreate()) {
           <button hlmBtn size="sm" (click)="create()">
-            <svg [lucideIcon]="plus" [size]="14"></svg>New issue
+            <svg [lucideIcon]="plus" [size]="14"></svg>New task
             <app-kbd keys="c" class="opacity-70" />
           </button>
         }
@@ -405,24 +341,30 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
     } @else if (shown() === 0) {
       <app-empty-state
         [icon]="filterIcon"
-        title="No issues match"
+        title="No tasks match"
         description="Nothing in this view matches the filters. Remove a filter or change the search."
       >
         <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
+        @if (canEdit() && showCreate()) {
+          <button hlmBtn size="sm" (click)="create()">
+            <svg [lucideIcon]="plus" [size]="14"></svg>New task
+          </button>
+        }
       </app-empty-state>
     } @else {
       <app-kanban
-        [columns]="columns()"
+        [columns]="rowColumns()"
         [layout]="d().layout"
         [disabled]="!draggable()"
         [prefix]="dropPrefix()"
         [addable]="canEdit() && showCreate()"
-        addLabel="New issue in this group"
-        emptyText="No issues"
+        addLabel="New task in this group"
+        emptyText="No tasks"
         (add)="createIn($event)"
-        (moved)="move($event.item, $event.to)"
+        (moved)="move($event.item.issue, $event.to)"
       >
-        <ng-template kanbanItem let-i>
+        <ng-template kanbanItem let-r>
+          @let i = r.issue;
           <div
             [hlmContextMenuTrigger]="issueMenu"
             [hlmContextMenuTriggerData]="{ $implicit: i }"
@@ -432,11 +374,17 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               <app-issue-row
                 [issue]="i"
                 [selected]="selectedSet().has(i.id)"
-                [selectable]="canEdit()"
+                [selectable]="canEdit() && !r.ghost"
                 [selecting]="selection().length > 0"
-                [hidden]="d().hidden"
+                [hidden]="hiddenProps()"
                 [compact]="d().density === 'compact'"
                 [dateField]="dateField()"
+                [tree]="nested()"
+                [depth]="r.depth"
+                [childCount]="r.childCount"
+                [expanded]="r.expanded"
+                [ghost]="r.ghost"
+                (toggleExpand)="toggleRow(r.id)"
                 (toggleSelect)="onSelect(i, $event)"
               />
             } @else {
@@ -446,7 +394,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
                 [selected]="selectedSet().has(i.id)"
                 [selectable]="canEdit()"
                 [selecting]="selection().length > 0"
-                [hidden]="d().hidden"
+                [hidden]="hiddenProps()"
                 [dateField]="dateField()"
                 [showStatus]="effectiveGroup() !== 'status'"
                 (toggleSelect)="onSelect(i, $event)"
@@ -464,11 +412,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             }
             @case ('priority') {
               <app-priority-icon [priority]="$any(key)" />
-            }
-            @case ('teamId') {
-              @if (key) {
-                <app-actor-avatar [actor]="{ type: 'team', id: key }" [size]="16" />
-              }
             }
             @case ('assigneeId') {
               @if (key) {
@@ -490,7 +433,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               }
             }
           }
-          <span class="truncate font-medium">{{ label(key) }}</span>
+          <span class="truncate">{{ label(key) }}</span>
         </ng-template>
       </app-kanban>
     }
@@ -500,7 +443,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
       @let ids = targetsFor(i);
       <hlm-dropdown-menu class="w-60">
         <hlm-dropdown-menu-label class="truncate">{{
-          ids.length > 1 ? ids.length + ' issues' : i.key + ' · ' + i.title
+          ids.length > 1 ? ids.length + ' tasks' : i.key + ' · ' + i.title
         }}</hlm-dropdown-menu-label>
         <hlm-dropdown-menu-group>
           <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="statusSub">
@@ -515,10 +458,6 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             <svg [lucideIcon]="noUser" [size]="14"></svg> Assignee
             <hlm-dropdown-menu-item-sub-indicator />
           </button>
-          <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="teamSub">
-            <svg [lucideIcon]="teamIcon" [size]="14"></svg> Team
-            <hlm-dropdown-menu-item-sub-indicator />
-          </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
         <hlm-dropdown-menu-group>
@@ -531,7 +470,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           <button hlmDropdownMenuItem (triggered)="actions.copyKeys(ids)">
             <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy
             {{ ids.length > 1 ? 'keys' : 'key' }}
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+." /></hlm-dropdown-menu-shortcut>
+            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+k" /></hlm-dropdown-menu-shortcut>
           </button>
           <button hlmDropdownMenuItem (triggered)="actions.copyLinks(ids)">
             <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy
@@ -566,7 +505,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           <hlm-dropdown-menu-separator />
           <button hlmDropdownMenuItem variant="destructive" (triggered)="actions.remove(ids)">
             <svg [lucideIcon]="trash" [size]="14"></svg> Delete{{
-              ids.length > 1 ? ' ' + ids.length + ' issues' : ''
+              ids.length > 1 ? ' ' + ids.length + ' tasks' : ''
             }}…
             <hlm-dropdown-menu-shortcut
               ><app-kbd keys="mod+backspace"
@@ -620,21 +559,35 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           }
         </hlm-dropdown-menu-sub>
       </ng-template>
-      <ng-template #teamSub>
-        <hlm-dropdown-menu-sub class="max-h-80 w-52 overflow-y-auto">
-          @for (o of teamOpts(); track o.value) {
-            <button hlmDropdownMenuItem (triggered)="actions.setTeam(ids, o.value || null)">
-              <app-issue-option-glyph [option]="o" /> <span class="truncate">{{ o.label }}</span>
-              @if (allHave(ids, 'teamId', o.value)) {
-                <svg [lucideIcon]="checkIcon" [size]="13" class="ml-auto shrink-0"></svg>
-              }
-            </button>
-          }
-        </hlm-dropdown-menu-sub>
-      </ng-template>
     </ng-template>
 
-    <app-peek-panel />
+    <!-- Status bar: what is open, this week's delta and the active filters. -->
+    @if (statusBar()) {
+    <app-status-bar>
+      <span class="tabular-nums">{{ flow().open }} open · {{ flow().inProgress }} in progress</span>
+      <span
+        class="flex items-center gap-1.5 tabular-nums"
+        [attr.aria-label]="flow().opened + ' opened and ' + flow().closed + ' closed this week'"
+      >
+        <span class="text-diff-add">+{{ flow().opened }}</span>
+        <span class="text-diff-del">−{{ flow().closed }}</span>
+        <span>this week</span>
+      </span>
+      @if (hasFilters()) {
+        <span class="truncate">{{ shown() }} shown · {{ filterSummary() }}</span>
+      }
+      @if (hasFilters()) {
+        <button
+          end
+          type="button"
+          class="hover:text-foreground underline-offset-2 hover:underline"
+          (click)="clearFilters()"
+        >
+          Clear filters
+        </button>
+      }
+    </app-status-bar>
+    }
 
     <!-- Bulk action bar -->
     @if (selection().length) {
@@ -647,7 +600,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
           aria-label="Bulk actions"
         >
           <span
-            class="flex items-center gap-1 rounded-md border border-dashed px-2 py-0.5 text-xs whitespace-nowrap"
+            class="flex items-center gap-1 bg-muted rounded-md px-2 py-0.5 text-xs whitespace-nowrap"
           >
             <span class="tabular-nums">{{ selection().length }}</span> selected
             <button
@@ -660,7 +613,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               <svg [lucideIcon]="xIcon" [size]="12"></svg>
             </button>
           </span>
-          @if (selection().length < shown()) {
+          @if (selection().length < ordered().length) {
             <button
               hlmBtn
               variant="ghost"
@@ -672,7 +625,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
               Select all
             </button>
           }
-          <span class="bg-border mx-1 h-4 w-px shrink-0"></span>
+          <span class="mx-1 h-4 shrink-0"></span>
           <button
             hlmBtn
             variant="ghost"
@@ -729,7 +682,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'teamId', 'assignee
             size="icon-sm"
             class="size-7"
             aria-label="Copy keys"
-            hlmTooltip="Copy keys · ⌘."
+            hlmTooltip="Copy keys · ⇧⌘K"
             (click)="actions.copyKeys(selection())"
           >
             <svg [lucideIcon]="copyIcon" [size]="14"></svg>
@@ -756,6 +709,7 @@ export class IssueBoard {
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
   protected readonly favorites = inject(FavoritesStore);
+  private readonly pane = inject(RightPaneStore);
   private readonly document = inject(DOCUMENT);
 
   /** Issues this board shows. */
@@ -766,43 +720,60 @@ export class IssueBoard {
   readonly dropPrefix = input('issue-col');
   /** Query `?status=` applied once when the board opens. */
   readonly status = input<string>();
-  /** Query `?team=`. */
-  readonly team = input<string>();
   /** Query `?project=<projectId>` (links from a project). */
   readonly project = input<string>();
-  readonly emptyTitle = input('No issues yet');
+  readonly emptyTitle = input('No tasks yet');
   readonly emptyDescription = input(
-    'Issues track bugs, requests and incidents from triage through completion.',
+    'Tasks track bugs, requests and incidents from triage through completion.',
   );
   readonly showCreate = input(true);
   /** localStorage key for display options. */
   readonly storageKey = input('trama.issues.display.v1');
+  /** Remembered filters and search live under this key (a board embedded elsewhere gets its own). */
+  readonly stateKey = input('issues');
+  /** Prefilled into the create dialog (new task buttons), e.g. the project of an embedded board. */
+  readonly createDefaults = input<Record<string, unknown>>({});
 
-  // display options (persisted)
-  protected readonly d = signal<IssueDisplay>(readDisplay('trama.issues.display.v1'));
+  // ── embedding (project tab, saved views): what the table is told instead of what the user picks ──
+  /** Filters that always apply and are not shown or editable (a project, a saved view's query). */
+  readonly baseFilters = input<readonly ViewFilter[]>([]);
+  /** Show the search and filter / sort / group bar. A host that owns them (a saved view) turns it off. */
+  readonly toolbar = input(true);
+  /** Show the counts and active filters under the list. */
+  readonly statusBar = input(true);
+  /** Columns to leave out of the rows whatever the user chose in Display. */
+  readonly hideProps = input<readonly IssueProp[]>([]);
+  /** Fixed layout; hides the list / board switch. */
+  readonly forceLayout = input<IssueLayout | null>(null);
+  /** Fixed grouping field (`'none'` = no grouping). */
+  readonly forceGroup = input<IssueGroup | null>(null);
+  /** Fixed ordering. */
+  readonly forceSort = input<{ field: IssueSort; direction: 'asc' | 'desc' } | null>(null);
+
+  // display options (persisted); `d` is what the table uses: the user's options with the fixed ones on top
+  private readonly state = signal<IssueDisplay>(readDisplay('trama.issues.display.v1'));
+  protected readonly d = computed<IssueDisplay>(() => {
+    const s = this.state();
+    const layout = this.forceLayout();
+    const group = this.forceGroup();
+    const sort = this.forceSort();
+    return {
+      ...s,
+      ...(layout ? { layout } : {}),
+      ...(group ? { groupBy: group } : {}),
+      ...(sort ? { sortField: sort.field, sortDir: sort.direction } : {}),
+    };
+  });
   // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
-  protected readonly filters = this.listState.remember<ViewFilter[]>('issues.filters', []);
-  protected readonly search = this.listState.remember('issues.search', '');
+  protected readonly filters = rememberKeyed<ViewFilter[]>(this.listState, () => `${this.stateKey()}.filters`, []);
+  protected readonly search = rememberKeyed(this.listState, () => `${this.stateKey()}.search`, '');
+  /** Sub-tasks the user collapsed (ids), remembered while the app is open. */
+  private readonly collapsed = rememberKeyed<string[]>(this.listState, () => `${this.stateKey()}.collapsed`, []);
   private anchor: string | null = null;
 
-  protected get statuses() {
-    return issueStatusOptions(this.store.settings().statuses.issue);
-  }
-  protected readonly kinds = issueKindOptions();
-  protected readonly priorities = priorityOptions();
-  protected readonly teams = computed(() => teamOptions(this.store));
-  protected readonly assigneeFilter = computed<PickOption[]>(() => [
-    { value: '', label: 'Unassigned' },
-    ...userOptions(this.store),
-  ]);
-  protected readonly projectFilter = computed(() => projectFilterOptions(this.store));
-  protected readonly milestoneFilter = computed(() => milestoneFilterOptions(this.store));
-  private readonly queryCtx = computed(() => ({
-    demand: this.store.demand(),
-  }));
-  protected readonly groups = GROUPS;
-  protected readonly sorts = SORTS;
+  private readonly queryCtx = computed(() => ({}));
   protected readonly props = PROPS;
+  protected readonly expandAllIcon = LucideChevronsUpDown;
   protected readonly groupLabels = GROUP_LABEL;
   protected readonly sortLabels = SORT_LABEL;
   protected readonly propLabels = PROP_LABEL;
@@ -812,13 +783,10 @@ export class IssueBoard {
   protected readonly statusOpts = promptOptions(this.store, 'status', []);
   protected readonly priorityOpts = promptOptions(this.store, 'priority', []);
   protected readonly assigneeOpts = computed(() => promptOptions(this.store, 'assignee', []));
-  protected readonly teamOpts = computed(() => promptOptions(this.store, 'team', []));
 
   protected readonly plus = LucidePlus;
   protected readonly searchIcon = LucideSearch;
   protected readonly xIcon = LucideX;
-  protected readonly ascIcon = LucideArrowUpNarrowWide;
-  protected readonly descIcon = LucideArrowDownWideNarrow;
   protected readonly inbox = LucideInbox;
   protected readonly filterIcon = LucideListFilter;
   protected readonly listIcon = LucideList;
@@ -826,7 +794,6 @@ export class IssueBoard {
   protected readonly displayIcon = LucideSlidersHorizontal;
   protected readonly noUser = LucideCircleUserRound;
   protected readonly projectIcon = LucideBox;
-  protected readonly teamIcon = LucideUsers;
   protected readonly copyIcon = LucideCopy;
   protected readonly branchIcon = LucideGitBranch;
   protected readonly starIcon = LucideStar;
@@ -837,16 +804,20 @@ export class IssueBoard {
   protected readonly checkIcon = LucideCheck;
 
   protected readonly canEdit = computed(() => this.store.can('member'));
-  /** Filters beyond the ones the URL pins (`?team=`). */
   protected readonly hasFilters = computed(
-    () =>
-      this.filters().some((f) => !(f.field === 'teamId' && this.team())) ||
-      this.search().trim().length > 0,
+    () => this.filters().length > 0 || this.search().trim().length > 0,
   );
   protected readonly effectiveGroup = computed<IssueGroup>(() => {
     const g = this.d().groupBy;
     return this.d().layout === 'board' && g === 'none' ? 'status' : g;
   });
+  /** What the filter bar shows as the grouping (`null` = no grouping). */
+  protected readonly groupField = computed<string | null>(() => {
+    const g = this.effectiveGroup();
+    return g === 'none' ? null : g;
+  });
+  protected readonly sortSpec = computed(() => ({ field: this.d().sortField, direction: this.d().sortDir }));
+  protected readonly hiddenProps = computed<IssueProp[]>(() => [...new Set([...this.d().hidden, ...this.hideProps()])]);
   protected readonly draggable = computed(
     () => this.canEdit() && DRAGGABLE.has(this.effectiveGroup()),
   );
@@ -854,12 +825,32 @@ export class IssueBoard {
     this.d().sortField === 'createdAt' ? 'createdAt' : 'updatedAt',
   );
 
+  protected readonly flow = computed(() =>
+    issueFlow(this.issues(), this.store.settings().statuses.issue),
+  );
+  protected readonly filterSummary = computed(() => {
+    const parts = this.filters().map((f) => {
+      const n = Array.isArray(f.value) ? f.value.length : 1;
+      return `${FILTER_LABEL[f.field] ?? f.field}${n > 1 ? ` (${n})` : ''}`;
+    });
+    const q = this.search().trim();
+    if (q) parts.push(`“${q}”`);
+    return parts.join(', ');
+  });
+
+  /** Arrow keys and j/k show the focused task in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => {
+    const issue = this.issues().find((i) => i.id === id);
+    if (issue) this.pane.show({ kind: 'task', idOrKey: issue.key });
+  });
+
   /** Issues inside the current view tab. */
   protected readonly scoped = computed(() => {
     const s = this.scope();
-    if (!s) return this.issues();
-    const set = new Set<string>(s);
-    return this.issues().filter((i) => set.has(i.status));
+    const set = s ? new Set<string>(s) : null;
+    const inScope = set ? this.issues().filter((i) => set.has(i.status)) : this.issues();
+    const base = this.baseFilters();
+    return base.length ? queryItems('issue', inScope, { filters: base }, this.queryCtx()) : inScope;
   });
 
   protected readonly columns = computed<Column[]>(() => {
@@ -882,7 +873,7 @@ export class IssueBoard {
       'issue',
       this.scoped() as Issue[],
       {
-        filters: this.filters(),
+        filters: [...this.baseFilters(), ...this.filters()],
         search: this.search(),
         sort: { field: d.sortField, direction: d.sortDir },
         groupBy: group === 'none' ? null : group,
@@ -892,11 +883,44 @@ export class IssueBoard {
     );
   });
 
-  /** Visible issue ids in display order. */
-  private readonly ordered = computed(() => [
-    ...new Set(this.columns().flatMap((c) => c.items.map((i) => i.id))),
+  /** Ids of every task that passed the filters, in any group. */
+  private readonly matching = computed(
+    () => new Set(this.columns().flatMap((c) => c.items.map((i) => i.id))),
+  );
+  protected readonly shown = computed(() => this.matching().size);
+
+  /** Sub-tasks nest under their parent (list layout only). */
+  protected readonly nested = computed(() => this.d().layout === 'list' && this.d().nested);
+  /** The rows each group shows: the matching tasks, as a tree when nested. */
+  protected readonly rowColumns = computed<RowColumn[]>(() => {
+    if (!this.nested()) {
+      return this.columns().map((c) => ({ key: c.key, items: flatIssueRows(c.items), count: c.items.length, parentIds: [] }));
+    }
+    const byId = this.store.issueById();
+    const matching = this.matching();
+    const collapsed = new Set(this.collapsed());
+    return this.columns().map((c) => {
+      const tree = buildIssueTree(c.items, byId, matching, collapsed);
+      return { key: c.key, items: tree.rows, count: c.items.length, parentIds: tree.parentIds };
+    });
+  });
+  private readonly parentIds = computed(() => [...new Set(this.rowColumns().flatMap((c) => c.parentIds))]);
+  protected readonly hasTree = computed(() => this.nested() && this.parentIds().length > 0);
+  protected readonly anyExpanded = computed(() => {
+    const collapsed = new Set(this.collapsed());
+    return this.parentIds().some((id) => !collapsed.has(id));
+  });
+  /** The rows by task id, to follow ← / → from the focused row. */
+  private readonly rowById = computed(() => {
+    const map = new Map<string, IssueTreeRow>();
+    for (const c of this.rowColumns()) for (const r of c.items) if (!r.ghost && !map.has(r.id)) map.set(r.id, r);
+    return map;
+  });
+
+  /** Visible task ids in display order (context rows and collapsed sub-tasks are not part of it). */
+  protected readonly ordered = computed(() => [
+    ...new Set(this.rowColumns().flatMap((c) => c.items.filter((r) => !r.ghost).map((r) => r.id))),
   ]);
-  protected readonly shown = computed(() => this.ordered().length);
   private readonly visibleSet = computed(() => new Set(this.ordered()));
   /** Selected issues that are visible on this board. */
   protected readonly selection = computed(() =>
@@ -915,70 +939,91 @@ export class IssueBoard {
     {
       keys: 's',
       label: 'Change status',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('status', this.targets()),
     },
     {
       keys: 'p',
       label: 'Set priority',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('priority', this.targets()),
     },
     {
       keys: 'a',
       label: 'Assign to…',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('assignee', this.targets()),
     },
     {
       keys: 'i',
       label: 'Assign to me',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.toggleAssignMe(this.targets()),
     },
     {
       keys: 'l',
       label: 'Toggle labels…',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('label', this.targets()),
     },
     {
       keys: 'shift+p',
       label: 'Move to project…',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.canAct(),
       run: () => this.actions.openPrompt('project', this.targets()),
     },
     {
-      keys: 'mod+.',
-      label: 'Copy issue key',
-      group: 'Issues',
+      keys: 'left',
+      label: 'Collapse sub-tasks / go to parent',
+      group: 'Tasks',
+      when: () => this.treeKey('left', false),
+      run: () => this.treeKey('left', true),
+    },
+    {
+      keys: 'right',
+      label: 'Expand sub-tasks / go to first sub-task',
+      group: 'Tasks',
+      when: () => this.treeKey('right', false),
+      run: () => this.treeKey('right', true),
+    },
+    {
+      keys: 'e',
+      label: 'Set estimate…',
+      group: 'Tasks',
+      when: () => this.canAct() && this.store.estimateScale() !== 'none',
+      run: () => this.actions.openPrompt('estimate', this.targets()),
+    },
+    {
+      keys: 'mod+shift+k',
+      label: 'Copy task key',
+      group: 'Tasks',
       when: () => this.targets().length > 0 && !this.typing(),
       run: () => this.actions.copyKeys(this.targets()),
     },
     {
       keys: 'mod+shift+l',
-      label: 'Copy issue link',
-      group: 'Issues',
+      label: 'Copy task link',
+      group: 'Tasks',
       when: () => this.targets().length > 0 && !this.typing(),
       run: () => this.actions.copyLinks(this.targets()),
     },
     {
       keys: 'mod+shift+g',
       label: 'Copy git branch name',
-      group: 'Issues',
+      group: 'Tasks',
       when: () => this.targets().length === 1 && !this.typing(),
       run: () => this.actions.copyBranch(this.targets()[0]),
     },
     {
       keys: 'mod+shift+.',
       label: 'Copy git branch name',
-      group: 'Issues',
+      group: 'Tasks',
       hidden: true,
       when: () => this.targets().length === 1 && !this.typing(),
       run: () => this.actions.copyBranch(this.targets()[0]),
@@ -986,26 +1031,26 @@ export class IssueBoard {
     {
       keys: 'mod+shift+>',
       label: 'Copy git branch name',
-      group: 'Issues',
+      group: 'Tasks',
       hidden: true,
       when: () => this.targets().length === 1 && !this.typing(),
       run: () => this.actions.copyBranch(this.targets()[0]),
     },
     {
       keys: 'mod+backspace',
-      label: 'Delete issue',
-      group: 'Issues',
+      label: 'Delete task',
+      group: 'Tasks',
       when: () => this.canAct() && !this.typing(),
       run: () => this.actions.remove(this.targets()),
     },
     {
       keys: 'mod+a',
-      label: 'Select all issues',
-      group: 'Issues',
+      label: 'Select all tasks',
+      group: 'Tasks',
       when: () => this.canEdit() && this.shown() > 0 && !this.typing(),
       run: () => this.selectAll(),
     },
-    { keys: 'f', label: 'Filter issues', group: 'Issues', run: () => this.focusSearch() },
+    { keys: 'f', label: 'Filter tasks', group: 'Tasks', run: () => this.focusSearch() },
   ]);
 
   constructor() {
@@ -1013,29 +1058,27 @@ export class IssueBoard {
     let loadedKey = '';
     effect(() => {
       const key = this.storageKey();
-      const d = this.d();
+      const d = this.state();
       if (key !== loadedKey) {
         loadedKey = key;
-        this.d.set(readDisplay(key));
+        this.state.set(readDisplay(key));
         return;
       }
       writeDisplay(key, d);
     });
-    // `?status=` / `?team=` from links (sidebar team links, attention, saved links).
+    // `?status=` / `?project=` from links (attention, project pages, saved links).
     // On open, a link's params override the remembered filters; with no params the remembered ones stay.
-    let opening = true;
     effect(() => {
       const status = this.status();
-      const team = this.team();
       const project = this.project();
-      const initial = opening;
-      opening = false;
-      this.filters.update((f) => {
-        let next = team || !initial ? setFilter(f, 'teamId', 'in', team ? [team] : []) : f;
-        if (project) next = setFilter(next, 'projectId', 'in', [project]);
-        const known = this.store.settings().statuses.issue.some((entry) => entry.id === status || entry.type === status);
-        if (status && known) next = setFilter(next, 'status', 'in', [status]);
-        return next;
+      untracked(() => {
+        this.filters.update((f) => {
+          let next = f;
+          if (project) next = setFilter(next, 'projectId', 'in', [project]);
+          const known = this.store.settings().statuses.issue.some((entry) => entry.id === status || entry.type === status);
+          if (status && known) next = setFilter(next, 'status', 'in', [status]);
+          return next;
+        });
       });
     });
     // Prev / next on the detail page follow this order.
@@ -1049,11 +1092,67 @@ export class IssueBoard {
   // ───────────────────────── display ─────────────────────────
 
   protected patch(p: Partial<IssueDisplay>): void {
-    this.d.update((d) => ({ ...d, ...p }));
+    this.state.update((d) => ({ ...d, ...p }));
   }
 
   protected resetDisplay(): void {
-    this.d.set({ ...DEFAULT_DISPLAY, hidden: [] });
+    this.state.set({ ...DEFAULT_DISPLAY, hidden: [] });
+  }
+
+  protected setGroup(field: string | null): void {
+    this.patch({ groupBy: (field ?? 'none') as IssueGroup });
+  }
+
+  protected setSort(sort: { field: string; direction: 'asc' | 'desc' } | null): void {
+    if (sort && (SORTS as readonly string[]).includes(sort.field)) {
+      this.patch({ sortField: sort.field as IssueSort, sortDir: sort.direction });
+    }
+  }
+
+  // ───────────────────────── sub-task tree ─────────────────────────
+
+  protected toggleRow(id: string): void {
+    this.collapsed.update((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]));
+  }
+
+  protected toggleAll(): void {
+    this.collapsed.set(this.anyExpanded() ? [...this.parentIds()] : []);
+  }
+
+  /** ← collapses the focused row, or moves to its parent; → expands it, or moves to its first sub-task. */
+  private treeKey(dir: 'left' | 'right', run: boolean): boolean {
+    if (!this.nested()) return false;
+    const id = this.ui.focusedRowId();
+    const row = id ? this.rowById().get(id) : undefined;
+    if (!row) return false;
+    if (dir === 'left') {
+      if (row.expanded) {
+        if (run) this.toggleRow(row.id);
+        return true;
+      }
+      const parent = row.parentId ? this.rowById().get(row.parentId) : undefined;
+      if (!parent) return false;
+      if (run) this.focusRow(parent.id);
+      return true;
+    }
+    if (row.childCount === 0) return false;
+    if (!row.expanded) {
+      if (run) this.toggleRow(row.id);
+      return true;
+    }
+    const child = this.rowColumns()
+      .flatMap((c) => c.items)
+      .find((r) => r.parentId === row.id);
+    if (!child) return false;
+    if (run) this.focusRow(child.id);
+    return true;
+  }
+
+  private focusRow(id: string): void {
+    this.ui.setFocusedRow(id);
+    this.document
+      .querySelector<HTMLElement>(`[data-row-id="${CSS.escape(id)}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
   }
 
   protected isShown(p: IssueProp): boolean {
@@ -1072,34 +1171,24 @@ export class IssueBoard {
 
   // ───────────────────────── filters ─────────────────────────
 
-  protected fv(field: string): string[] {
-    return filterValues(this.filters(), field);
-  }
-
-  protected setF(field: string, values: string[]): void {
-    this.filters.update((f) => setFilter(f, field, 'in', values));
-  }
-
   protected clearFilters(): void {
-    const team = this.team();
-    this.filters.set(team ? setFilter([], 'teamId', 'in', [team]) : []);
+    this.filters.set([]);
     this.search.set('');
   }
 
   private focusSearch(): void {
-    this.document.querySelector<HTMLInputElement>('input[aria-label="Filter issues"]')?.focus();
+    this.document.querySelector<HTMLInputElement>('input[aria-label="Filter tasks"]')?.focus();
   }
 
   // ───────────────────────── create / move ─────────────────────────
 
   protected create(): void {
-    this.ui.openCreate('issue', this.team() ? { teamId: this.team() } : {});
+    this.ui.openCreate('issue', { ...this.createDefaults() });
   }
 
   /** "+" in a group header: prefill what the group means. */
   protected createIn(key: string): void {
-    const defaults: Record<string, unknown> = {};
-    if (this.team()) defaults['teamId'] = this.team();
+    const defaults: Record<string, unknown> = { ...this.createDefaults() };
     switch (this.effectiveGroup()) {
       case 'status':
         defaults['status'] = key;
@@ -1109,9 +1198,6 @@ export class IssueBoard {
         break;
       case 'kind':
         defaults['kind'] = key;
-        break;
-      case 'teamId':
-        if (key) defaults['teamId'] = key;
         break;
       case 'assigneeId':
         if (key) defaults['assigneeId'] = key;
@@ -1132,10 +1218,6 @@ export class IssueBoard {
       case 'priority':
         if (issue.priority !== value)
           void this.store.updateIssue(issue.id, { priority: value as Priority });
-        break;
-      case 'teamId':
-        if ((issue.teamId ?? '') !== value)
-          void this.store.updateIssue(issue.id, { teamId: value || null });
         break;
       case 'assigneeId':
         if ((issue.assigneeId ?? '') !== value)
@@ -1172,7 +1254,7 @@ export class IssueBoard {
 
   protected allHave(
     ids: readonly string[],
-    field: 'status' | 'priority' | 'assigneeId' | 'teamId',
+    field: 'status' | 'priority' | 'assigneeId',
     value: string,
   ): boolean {
     const list = this.actions.issues(ids);

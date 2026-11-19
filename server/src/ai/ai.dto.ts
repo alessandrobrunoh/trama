@@ -42,11 +42,6 @@ class IssueDraftOptionsDto {
   @IsNumber({}, { each: true })
   estimates: number[];
   @IsArray()
-  @ArrayMaxSize(50)
-  @ValidateNested({ each: true })
-  @Type(() => DraftOptionDto)
-  teams: DraftOptionDto[];
-  @IsArray()
   @ArrayMaxSize(100)
   @ValidateNested({ each: true })
   @Type(() => DraftOptionDto)
@@ -59,7 +54,7 @@ class IssueDraftOptionsDto {
 }
 
 export class SuggestionDto {
-  @IsIn(['issue', 'decision']) kind: 'issue' | 'decision';
+  @IsIn(['issue']) kind: 'issue';
   @IsString() @MaxLength(300) title: string;
   @IsString() @MaxLength(12000) description: string;
   @IsOptional()
@@ -74,8 +69,7 @@ class MessageDto {
 }
 
 export class ChatContextDto {
-  @IsIn(['page', 'issue', 'project', 'decision']) kind:
-    'page' | 'issue' | 'project' | 'decision';
+  @IsIn(['page', 'issue', 'project']) kind: 'page' | 'issue' | 'project';
   @IsString() @MaxLength(160) label: string;
   @IsOptional() @IsString() @MaxLength(160) id?: string;
 }

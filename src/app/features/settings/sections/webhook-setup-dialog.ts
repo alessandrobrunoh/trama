@@ -14,7 +14,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Set Content type to application/json.',
       'Paste the secret.',
       'Choose “Let me select individual events” and tick the events listed below.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
   gitlab: {
@@ -23,7 +23,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Paste the URL below.',
       'Paste the secret into “Secret token”.',
       'Tick the triggers listed below and keep SSL verification on.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
   bitbucket: {
@@ -32,7 +32,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Give it a title and paste the URL below.',
       'Tick “Use a secret” and paste the secret.',
       'Under Triggers choose “Choose from a full list of triggers” and tick the ones listed below: Pull request created, updated, approved, approval removed, merged and declined; and Repository → Build status created and updated.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
 };
@@ -52,12 +52,12 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
           <hlm-dialog-header>
             <h2 hlmDialogTitle>{{ rotated() ? 'New webhook secret' : 'Set up the webhook' }}</h2>
             <p hlmDialogDescription>
-              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on issues and projects.' }}
+              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on tasks and projects.' }}
             </p>
           </hlm-dialog-header>
 
           <div class="flex flex-col gap-4 text-[13px]">
-            <div class="border-status-needs-input/30 bg-status-needs-input/10 text-status-needs-input flex items-start gap-2 rounded-md border px-3 py-2 text-xs">
+            <div class="bg-status-needs-input/10 text-status-needs-input flex items-start gap-2 rounded-md px-3 py-2 text-xs">
               <svg [lucideIcon]="warn" [size]="14" class="mt-px shrink-0"></svg>
               <span>Copy the secret now. It is shown only once; rotate it later if you lose it.</span>
             </div>
@@ -86,7 +86,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
             </div>
 
             @if (guide(); as g) {
-              <div class="bg-muted/40 rounded-md border px-3 py-2.5">
+              <div class="bg-muted rounded-md px-3 py-2.5">
                 <p class="text-xs font-medium">{{ g.where }}</p>
                 <ol class="text-muted-foreground mt-1.5 list-decimal space-y-0.5 pl-4 text-xs">
                   @for (step of g.steps; track step) {

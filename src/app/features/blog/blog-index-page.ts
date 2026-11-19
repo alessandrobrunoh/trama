@@ -31,9 +31,9 @@ import { BLOG_POSTS } from './blog-posts';
         comparisons with the tools you already use.
       </p>
 
-      <ul class="border-border mt-12 flex flex-col border-t">
+      <ul class="mt-12 flex flex-col">
         @for (post of posts; track post.slug) {
-          <li class="border-border border-b">
+          <li>
             <a [routerLink]="['/blog', post.slug]" class="group flex flex-col gap-2 py-7">
               <span class="text-muted-foreground flex items-center gap-2 text-xs">
                 <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{{

@@ -12,7 +12,6 @@ import { notFound, uid } from '../common/util.js';
 import {
   ArtifactEntity,
   IssueEntity,
-  ProjectEntity,
   UploadEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
@@ -48,25 +47,13 @@ const SCAN_INSERTS = [
    WHERE p."workspaceId" = $1
    ON CONFLICT DO NOTHING`,
   `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
-   SELECT DISTINCT m.match[1], 'document', d."id", NULL
-   FROM "documents" d
-   CROSS JOIN LATERAL regexp_matches(d."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
-   WHERE d."workspaceId" = $1
-   ON CONFLICT DO NOTHING`,
-  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
-   SELECT DISTINCT m.match[1], 'document_revision', r."id", NULL
-   FROM "document_revisions" r
-   CROSS JOIN LATERAL regexp_matches(r."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
-   WHERE r."workspaceId" = $1
-   ON CONFLICT DO NOTHING`,
-  `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
    SELECT DISTINCT m.match[1], 'comment', c."id", NULL
    FROM "comments" c
    CROSS JOIN LATERAL regexp_matches(c."body", ${UPLOAD_TOKEN}, 'g') AS m(match)
    WHERE c."workspaceId" = $1
    ON CONFLICT DO NOTHING`,
   `INSERT INTO "upload_reference_scan" ("uploadId", "subjectType", "subjectId", "projectId")
-   SELECT a."uploadId", 'artifact', a."id", COALESCE(a."projectId", i."projectId")
+   SELECT a."uploadId", 'artifact', a."id", i."projectId"
    FROM "artifacts" a
    LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
    WHERE a."workspaceId" = $1 AND a."uploadId" IS NOT NULL
@@ -93,8 +80,6 @@ export interface StagedUpload {
 export type UploadSubjectType =
   | 'issue'
   | 'project'
-  | 'document'
-  | 'document_revision'
   | 'comment'
   | 'artifact';
 
@@ -113,9 +98,8 @@ interface StoredMention {
 }
 
 /**
- * Files live in Postgres, next to documents, because a document is versioned markdown with a
- * full-text index and cannot hold a blob. Bytes are returned only when a live reference on a
- * record the caller can read still points at them.
+ * Files live in Postgres. Bytes are returned only when a live reference on a record the caller
+ * can read still points at them.
  */
 @Injectable()
 export class UploadsService {
@@ -159,7 +143,7 @@ export class UploadsService {
     slug: string,
     caller: UploadCaller,
     file: IncomingUpload,
-    owner: { issueId?: string; projectId?: string },
+    owner: { issueId: string },
   ): Promise<ArtifactEntity> {
     if (!canAttachArtifact(caller, currentAccess()))
       throw new ForbiddenException('You cannot attach files here');
@@ -184,14 +168,12 @@ export class UploadsService {
         m.create(ArtifactEntity, {
           id: uid('ar'),
           workspaceId,
-          projectId: resolved.projectId,
           issueId: resolved.issueId,
-          repositoryId: null,
+          repository: null,
           description: null,
           kind: accepted.kind,
           provider: 'other',
           title: accepted.filename,
-          documentId: null,
           url,
           uploadId: id,
           externalId: null,
@@ -214,7 +196,6 @@ export class UploadsService {
         kind: artifact.kind,
         title: artifact.title,
         state: artifact.state,
-        ...(artifact.projectId ? { projectId: artifact.projectId } : {}),
         ...(artifact.issueId ? { issueId: artifact.issueId } : {}),
       },
     });
@@ -383,14 +364,12 @@ export class UploadsService {
   /**
    * Ids that will have no row left after `owner` is deleted: files named in `texts` or in comments on that
    * record, and uploads whose only artifact owner is that record. Call before the delete, then `releaseIds`.
-   * A document owner also loses the files named in its revisions and in its linked artifacts.
    */
   async idsLostWith(
     workspaceId: string,
     owner: {
       issueId?: string;
       projectId?: string;
-      documentId?: string;
     },
     texts: readonly (string | null | undefined)[],
   ): Promise<string[]> {
@@ -398,36 +377,17 @@ export class UploadsService {
     for (const text of texts) for (const id of uploadIdsIn(text)) ids.add(id);
     const issueId = owner.issueId ?? null;
     const projectId = owner.projectId ?? null;
-    const documentId = owner.documentId ?? null;
-    const artifacts = await this.ds.query<
-      { id: string; uploadId: string | null }[]
-    >(
-      documentId
-        ? `SELECT "id", "uploadId" FROM "artifacts"
-           WHERE "workspaceId" = $1 AND "documentId" = $2`
-        : `SELECT "id", "uploadId" FROM "artifacts"
-           WHERE "workspaceId" = $1
-             AND "issueId" IS NOT DISTINCT FROM $2
-             AND "projectId" IS NOT DISTINCT FROM $3`,
-      documentId
-        ? [workspaceId, documentId]
-        : [workspaceId, issueId, projectId],
+    const artifacts = issueId
+      ? await this.ds.query<{ id: string; uploadId: string | null }[]>(
+          `SELECT "id", "uploadId" FROM "artifacts"
+           WHERE "workspaceId" = $1 AND "issueId" = $2`,
+          [workspaceId, issueId],
+        )
+      : [];
+    const subjects = [issueId, projectId, ...artifacts.map((row) => row.id)].filter(
+      (id): id is string => !!id,
     );
-    const subjects = [
-      issueId,
-      projectId,
-      documentId,
-      ...artifacts.map((row) => row.id),
-    ].filter((id): id is string => !!id);
     for (const row of artifacts) if (row.uploadId) ids.add(row.uploadId);
-    if (documentId) {
-      const revisions = await this.ds.query<{ body: string }[]>(
-        `SELECT "body" FROM "document_revisions" WHERE "workspaceId" = $1 AND "documentId" = $2`,
-        [workspaceId, documentId],
-      );
-      for (const rev of revisions)
-        for (const id of uploadIdsIn(rev.body)) ids.add(id);
-    }
     if (subjects.length) {
       const comments = await this.ds.query<{ body: string }[]>(
         `SELECT "body" FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
@@ -542,24 +502,9 @@ export class UploadsService {
 
   private async resolveOwner(
     workspaceId: string,
-    owner: { issueId?: string; projectId?: string },
+    owner: { issueId: string },
   ) {
-    const chosen = [owner.issueId, owner.projectId].filter(Boolean);
-    if (chosen.length !== 1)
-      throw new BadRequestException('Attach the file to one issue or project');
-    if (owner.projectId) {
-      const row = await this.ds.getRepository(ProjectEntity).findOne({
-        where: { workspaceId, id: owner.projectId },
-        select: { id: true },
-      });
-      if (!row || projectHidden(currentAccess(), row.id))
-        throw notFound('Project', owner.projectId);
-      return {
-        issueId: null,
-        projectId: row.id,
-      };
-    }
-    const issueId = owner.issueId!;
+    const issueId = owner.issueId;
     const repo = this.ds.getRepository(IssueEntity);
     let row: IssueEntity | null = null;
     if (ISSUE_KEY.test(issueId)) {
@@ -585,10 +530,7 @@ export class UploadsService {
     }
     if (!row || projectHidden(currentAccess(), row.projectId))
       throw notFound('Issue', issueId);
-    return {
-      issueId: row.id,
-      projectId: null,
-    };
+    return { issueId: row.id, projectId: row.projectId };
   }
 
   /** Every current mention of this file. An empty list means the blob is unreferenced. */
@@ -621,19 +563,12 @@ export class UploadsService {
           .map((row) => row.subjectId),
       ),
     ];
-    const [issues, projects, documents, revisions, comments, artifacts] =
-      await Promise.all([
-        this.projectById('issues', workspaceId, idsOf('issue')),
-        this.existingIds('projects', workspaceId, idsOf('project')),
-        this.existingIds('documents', workspaceId, idsOf('document')),
-        this.existingIds(
-          'document_revisions',
-          workspaceId,
-          idsOf('document_revision'),
-        ),
-        this.commentSubjects(workspaceId, idsOf('comment')),
-        this.artifactProjects(workspaceId, idsOf('artifact')),
-      ]);
+    const [issues, projects, comments, artifacts] = await Promise.all([
+      this.projectById('issues', workspaceId, idsOf('issue')),
+      this.existingIds('projects', workspaceId, idsOf('project')),
+      this.commentSubjects(workspaceId, idsOf('comment')),
+      this.artifactProjects(workspaceId, idsOf('artifact')),
+    ]);
     const push = (uploadId: string, ref: UploadRef) => {
       const list = out.get(uploadId) ?? [];
       list.push(ref);
@@ -653,17 +588,6 @@ export class UploadsService {
           resource: 'projects',
           projectScoped: true,
           projectId: row.subjectId,
-        });
-      } else if (
-        row.subjectType === 'document' ||
-        row.subjectType === 'document_revision'
-      ) {
-        const live = row.subjectType === 'document' ? documents : revisions;
-        if (!live.has(row.subjectId)) continue;
-        push(row.uploadId, {
-          resource: 'documents',
-          projectScoped: false,
-          projectId: null,
         });
       } else if (row.subjectType === 'comment') {
         const comment = comments.get(row.subjectId);
@@ -721,7 +645,7 @@ export class UploadsService {
   }
 
   private async existingIds(
-    table: 'projects' | 'documents' | 'document_revisions',
+    table: 'projects',
     workspaceId: string,
     ids: readonly string[],
   ): Promise<Set<string>> {
@@ -756,7 +680,7 @@ export class UploadsService {
     const rows = await this.ds.query<
       { id: string; projectId: string | null }[]
     >(
-      `SELECT a."id", COALESCE(a."projectId", i."projectId") AS "projectId"
+      `SELECT a."id", i."projectId" AS "projectId"
        FROM "artifacts" a
        LEFT JOIN "issues" i ON i."id" = a."issueId" AND i."workspaceId" = a."workspaceId"
        WHERE a."workspaceId" = $1 AND a."id" = ANY($2::varchar[])`,

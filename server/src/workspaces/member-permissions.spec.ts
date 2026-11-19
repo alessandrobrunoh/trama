@@ -1,65 +1,59 @@
+import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import {
-  LAST_OWNER,
-  NEEDS_TRANSFER,
-  ONLY_OWNERS,
-  ONLY_PRIMARY_OWNER,
-  OWNER_PROTECTED,
-  memberRules,
-  type MemberUiContext,
-} from '../../../src/app/features/settings/sections/member-permissions.ts';
+  assertCanChangeRole,
+  assertCanRemoveMember,
+  assertCanTransferOwnership,
+  type MemberRuleContext,
+} from './member-rules.js';
 
-/** The Members UI must disable exactly what `member-rules.ts` refuses. */
-const ctx = (over: Partial<MemberUiContext> = {}): MemberUiContext => ({
-  meId: 'u_primary',
-  myRole: 'owner',
+/** Server rules behind the members screen. Do not import the frontend module (it sits outside the server rootDir). */
+const ctx = (over: Partial<MemberRuleContext> = {}): MemberRuleContext => ({
   primaryOwnerId: 'u_primary',
   ownerCount: 2,
   ...over,
 });
 
-describe('member row rules in the UI', () => {
+describe('member rules', () => {
   it('the primary owner can manage everyone else and transfer ownership', () => {
-    expect(memberRules(ctx(), { userId: 'u_owner2', role: 'owner' })).toEqual({ roleLocked: null, removeLocked: null, canTransfer: true });
-    expect(memberRules(ctx(), { userId: 'u_member', role: 'member' }).canTransfer).toBe(true);
+    expect(() => assertCanChangeRole(ctx(), { userId: 'u_primary', role: 'owner' }, { userId: 'u_owner2', role: 'owner' }, 'member')).not.toThrow();
+    expect(() => assertCanRemoveMember(ctx(), { userId: 'u_primary', role: 'owner' }, { userId: 'u_member', role: 'member' })).not.toThrow();
+    expect(() => assertCanTransferOwnership({ primaryOwnerId: 'u_primary' }, { userId: 'u_primary', role: 'owner' }, 'u_member')).not.toThrow();
   });
 
   it('the primary owner cannot step down or leave until they transfer ownership', () => {
-    const r = memberRules(ctx(), { userId: 'u_primary', role: 'owner' });
-    expect(r.roleLocked).toBe(NEEDS_TRANSFER);
-    expect(r.removeLocked).toBe(NEEDS_TRANSFER);
-    expect(r.canTransfer).toBe(false);
+    expect(() => assertCanChangeRole(ctx(), { userId: 'u_primary', role: 'owner' }, { userId: 'u_primary', role: 'owner' }, 'member')).toThrow(ConflictException);
+    expect(() => assertCanRemoveMember(ctx(), { userId: 'u_primary', role: 'owner' }, { userId: 'u_primary', role: 'owner' })).toThrow(ConflictException);
+    expect(() => assertCanTransferOwnership({ primaryOwnerId: 'u_primary' }, { userId: 'u_primary', role: 'owner' }, 'u_primary')).toThrow();
   });
 
   it('nobody else can change the primary owner', () => {
-    const other = ctx({ meId: 'u_owner2' });
-    expect(memberRules(other, { userId: 'u_primary', role: 'owner' }).removeLocked).toBe(OWNER_PROTECTED);
-    const admin = ctx({ meId: 'u_admin', myRole: 'admin' });
-    expect(memberRules(admin, { userId: 'u_primary', role: 'owner' }).roleLocked).toBe(OWNER_PROTECTED);
+    expect(() => assertCanRemoveMember(ctx(), { userId: 'u_owner2', role: 'owner' }, { userId: 'u_primary', role: 'owner' })).toThrow(ForbiddenException);
+    expect(() => assertCanChangeRole(ctx(), { userId: 'u_admin', role: 'admin' }, { userId: 'u_primary', role: 'owner' }, 'member')).toThrow(ForbiddenException);
   });
 
   it('another owner cannot touch a peer owner, an admin cannot touch any owner', () => {
-    const other = ctx({ meId: 'u_owner2', ownerCount: 3 });
-    expect(memberRules(other, { userId: 'u_owner3', role: 'owner' }).roleLocked).toBe(ONLY_PRIMARY_OWNER);
-    expect(memberRules(other, { userId: 'u_owner3', role: 'owner' }).canTransfer).toBe(false);
-    const admin = ctx({ meId: 'u_admin', myRole: 'admin' });
-    expect(memberRules(admin, { userId: 'u_owner2', role: 'owner' }).removeLocked).toBe(ONLY_OWNERS);
-    expect(memberRules(admin, { userId: 'u_member', role: 'member' }).removeLocked).toBeNull();
+    const other = ctx({ ownerCount: 3 });
+    expect(() => assertCanChangeRole(other, { userId: 'u_owner2', role: 'owner' }, { userId: 'u_owner3', role: 'owner' }, 'member')).toThrow(ForbiddenException);
+    expect(() => assertCanTransferOwnership({ primaryOwnerId: 'u_primary' }, { userId: 'u_owner2', role: 'owner' }, 'u_owner3')).toThrow(ForbiddenException);
+    expect(() => assertCanRemoveMember(ctx(), { userId: 'u_admin', role: 'admin' }, { userId: 'u_owner2', role: 'owner' })).toThrow(ForbiddenException);
+    expect(() => assertCanRemoveMember(ctx(), { userId: 'u_admin', role: 'admin' }, { userId: 'u_member', role: 'member' })).not.toThrow();
   });
 
   it('a non-primary owner can step down or leave', () => {
-    const other = ctx({ meId: 'u_owner2' });
-    expect(memberRules(other, { userId: 'u_owner2', role: 'owner' })).toEqual({ roleLocked: null, removeLocked: null, canTransfer: false });
+    const other = ctx();
+    expect(() => assertCanChangeRole(other, { userId: 'u_owner2', role: 'owner' }, { userId: 'u_owner2', role: 'owner' }, 'member')).not.toThrow();
+    expect(() => assertCanRemoveMember(other, { userId: 'u_owner2', role: 'owner' }, { userId: 'u_owner2', role: 'owner' })).not.toThrow();
   });
 
   it('the last owner is locked', () => {
-    const solo = ctx({ meId: 'u_owner2', primaryOwnerId: undefined, ownerCount: 1 });
-    expect(memberRules(solo, { userId: 'u_owner2', role: 'owner' }).removeLocked).toBe(LAST_OWNER);
+    const solo = ctx({ primaryOwnerId: undefined, ownerCount: 1 });
+    expect(() => assertCanRemoveMember(solo, { userId: 'u_owner2', role: 'owner' }, { userId: 'u_owner2', role: 'owner' })).toThrow(ConflictException);
   });
 
-  it('legacy workspaces without a primary owner: owners act on owners, anyone can be handed the workspace', () => {
-    const legacy = ctx({ primaryOwnerId: undefined, meId: 'u_owner2' });
-    expect(memberRules(legacy, { userId: 'u_primary', role: 'owner' }).removeLocked).toBeNull();
-    expect(memberRules(legacy, { userId: 'u_member', role: 'member' }).canTransfer).toBe(true);
+  it('legacy workspaces without a primary owner: owners act on owners', () => {
+    const legacy = ctx({ primaryOwnerId: undefined });
+    expect(() => assertCanRemoveMember(legacy, { userId: 'u_owner2', role: 'owner' }, { userId: 'u_primary', role: 'owner' })).not.toThrow();
+    expect(() => assertCanTransferOwnership({ primaryOwnerId: null }, { userId: 'u_owner2', role: 'owner' }, 'u_member')).not.toThrow();
   });
 });

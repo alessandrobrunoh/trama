@@ -30,7 +30,6 @@ describe('IssuesService.update parent authorization', () => {
         status: 'todo',
         priority: 'none',
         assigneeId: null,
-        teamId: null,
         projectId: 'pj_visible',
         parentId: null,
         duplicateOfId: null,
@@ -44,9 +43,9 @@ describe('IssuesService.update parent authorization', () => {
       }) as IssueEntity;
     const initialChild = issue('in_child', { parentId: 'in_stale_parent' });
     const lockedChild = issue('in_child', { parentId: 'in_current_parent' });
-    const staleParent = issue('in_stale_parent', { teamId: 'tm_allowed' });
-    const currentParent = issue('in_current_parent', { teamId: 'tm_locked' });
-    const nextParent = issue('in_next_parent', { teamId: 'tm_allowed' });
+    const staleParent = issue('in_stale_parent', { projectId: 'pj_allowed' });
+    const currentParent = issue('in_current_parent', { projectId: 'pj_locked' });
+    const nextParent = issue('in_next_parent', { projectId: 'pj_allowed' });
     const persisted = new Map([
       [initialChild.id, initialChild],
       [staleParent.id, staleParent],
@@ -93,9 +92,9 @@ describe('IssuesService.update parent authorization', () => {
         findOneBy: async ({ id }: { id: string }) => persisted.get(id) ?? null,
       } as never,
     );
-    const authorize = vi.fn(async (affected: readonly IssueEntity[]) => {
-      if (affected.some((candidate) => candidate.teamId === 'tm_locked'))
-        throw new Error('Current parent team is restricted');
+    const authorize = vi.fn(async (affected: readonly { id: string; projectId?: string | null }[]) => {
+      if (affected.some((candidate) => candidate.projectId === 'pj_locked'))
+        throw new Error('Current parent project is restricted');
     });
 
     await expect(
@@ -106,7 +105,7 @@ describe('IssuesService.update parent authorization', () => {
         { parentId: 'in_next_parent' },
         authorize,
       ),
-    ).rejects.toThrow('Current parent team is restricted');
+    ).rejects.toThrow('Current parent project is restricted');
 
     const authorizedRows = authorize.mock.calls[0][0];
     expect(authorizedRows.map((row) => row.id).sort()).toEqual([

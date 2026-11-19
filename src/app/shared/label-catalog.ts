@@ -7,11 +7,10 @@ import { readJson, writeJson } from '../core/stores/storage';
 export interface LabelUsage {
   issues: number;
   projects: number;
-  repositories: number;
   total: number;
 }
 
-export const NO_USAGE: LabelUsage = { issues: 0, projects: 0, repositories: 0, total: 0 };
+export const NO_USAGE: LabelUsage = { issues: 0, projects: 0, total: 0 };
 
 const RECENT_MAX = 4;
 /** Labels offered as suggestions when nothing is typed. */
@@ -26,9 +25,8 @@ export function describeUsage(u: LabelUsage, empty = 'Not used'): string {
   const add = (n: number, one: string, many: string) => {
     if (n) parts.push(`${n} ${n === 1 ? one : many}`);
   };
-  add(u.issues, 'issue', 'issues');
+  add(u.issues, 'task', 'tasks');
   add(u.projects, 'project', 'projects');
-  add(u.repositories, 'repository', 'repositories');
   return parts.length ? parts.join(' · ') : empty;
 }
 
@@ -45,10 +43,10 @@ export class LabelCatalog {
   readonly canCreate = computed(() => this.store.can('member'));
   readonly canManage = computed(() => this.store.can('admin'));
 
-  /** Per label id, how many issues, projects and repositories carry it. */
+  /** Per label id, how many tasks and projects carry it. */
   readonly usage = computed(() => {
     const map = new Map<string, LabelUsage>();
-    const bump = (ids: readonly string[] | undefined, key: 'issues' | 'projects' | 'repositories') => {
+    const bump = (ids: readonly string[] | undefined, key: 'issues' | 'projects') => {
       for (const id of ids ?? []) {
         const u = map.get(id) ?? { ...NO_USAGE };
         u[key] += 1;
@@ -58,7 +56,6 @@ export class LabelCatalog {
     };
     for (const i of this.store.issues()) bump(i.labels, 'issues');
     for (const p of this.store.projects()) bump(p.labels, 'projects');
-    for (const r of this.store.repositories()) bump(r.labels, 'repositories');
     return map;
   });
 
@@ -98,7 +95,7 @@ export class LabelCatalog {
    */
   /**
    * `scope` limits the list to that record type. Already-selected ids stay so a mismatched label can be removed.
-   * `null` (repositories, which have no label scope) offers only what is already selected.
+   * `null` (no scope) offers only what is already selected.
    */
   arrange(keep: ReadonlySet<string> = new Set(), withSuggested = true, scope?: LabelScope | null): { suggested: WorkspaceLabel[]; rest: WorkspaceLabel[] } {
     const offered = this.all()

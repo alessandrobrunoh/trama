@@ -28,8 +28,8 @@ import { SiteHeader } from '../landing/site-header';
             Where Trama is going
           </h1>
           <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-            We're building an issue-first workspace where plans, decisions and human input stay
-            attached to the work they concern. Dates are deliberately absent: we would rather ship
+            We're building a task-first workspace where plans and context stay attached to the
+            work they concern. Dates are deliberately absent: we would rather ship
             when it's right than hit a number we made up.
           </p>
           <a
@@ -47,7 +47,7 @@ import { SiteHeader } from '../landing/site-header';
       </div>
 
       <div class="mx-auto max-w-6xl px-4 sm:px-6">
-        <section class="border-border mt-16 rounded-2xl border border-dashed p-6 sm:p-8">
+        <section class="bg-muted mt-16 rounded-2xl p-6 sm:p-8">
           <div class="flex items-center gap-2">
             <svg [lucideIcon]="banIcon" [size]="16" class="text-muted-foreground"></svg>
             <h2 class="font-semibold">Deliberately not on the roadmap</h2>

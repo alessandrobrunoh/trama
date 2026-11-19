@@ -38,10 +38,10 @@ import { AssistantChat, timeAgo } from './assistant-chat';
         role="dialog"
         aria-modal="false"
         aria-labelledby="assistant-title"
-        class="assistant-panel bg-popover text-popover-foreground fixed z-40 flex flex-col overflow-hidden rounded-lg border shadow-lg"
+        class="assistant-panel bg-popover text-popover-foreground fixed z-40 flex flex-col ring-foreground/10 overflow-hidden rounded-lg shadow-lg ring-1"
         (keydown.escape)="minimize($event)"
       >
-        <header class="flex h-12 shrink-0 items-center gap-1 border-b px-3">
+        <header class="flex h-12 shrink-0 items-center gap-1 px-3">
           <h2 id="assistant-title" class="min-w-0 flex-1 truncate text-sm font-medium">
             {{ ai.active()?.title ?? 'New chat' }}
           </h2>
@@ -85,7 +85,7 @@ import { AssistantChat, timeAgo } from './assistant-chat';
 
     @if (!ai.onAssistantPage()) {
       <div
-        class="bg-popover text-muted-foreground fixed right-4 bottom-4 z-30 flex h-8 items-center gap-0.5 rounded-md border px-1 text-xs shadow-md max-md:hidden"
+        class="bg-popover text-muted-foreground fixed right-4 bottom-4 z-30 flex h-8 items-center ring-foreground/10 gap-0.5 rounded-md px-1 text-xs shadow-md ring-1 max-md:hidden"
       >
         @for (chat of dockChats(); track chat.id) {
           <button
@@ -136,7 +136,7 @@ import { AssistantChat, timeAgo } from './assistant-chat';
         <div
           role="menu"
           aria-label="Chat history"
-          class="bg-popover text-popover-foreground fixed right-4 bottom-16 z-50 w-96 max-w-[calc(100vw-2rem)] rounded-lg border p-1 shadow-md"
+          class="bg-popover text-popover-foreground fixed right-4 bottom-16 z-50 w-96 max-w-[calc(100vw-2rem)] ring-foreground/10 rounded-lg p-1 shadow-md ring-1"
           (keydown.escape)="historyOpen.set(false)"
         >
           <div class="text-muted-foreground px-3 py-2 text-xs">Chat history</div>
@@ -162,7 +162,7 @@ import { AssistantChat, timeAgo } from './assistant-chat';
           }
           <a
             [routerLink]="['/', ai.slug(), 'assistant']"
-            class="text-muted-foreground hover:bg-accent hover:text-foreground mt-1 block rounded-md border-t px-3 py-2 text-xs"
+            class="text-muted-foreground hover:bg-accent hover:text-foreground mt-1 block rounded-md px-3 py-2 text-xs"
             (click)="historyOpen.set(false); ai.open.set(false)"
             >Open full page</a
           >

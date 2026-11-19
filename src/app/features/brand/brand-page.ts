@@ -58,7 +58,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
               </div>
               <div class="mt-3 grid gap-3 md:grid-cols-2">
                 @for (variant of variants; track variant) {
-                  <figure class="border-border overflow-hidden rounded-xl border">
+                  <figure class="overflow-hidden rounded-xl">
                     <div
                       class="flex h-56 items-center justify-center p-10"
                       [class]="variant === 'black' ? 'bg-white' : 'bg-[#0e0f11]'"
@@ -73,7 +73,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
                       />
                     </div>
                     <figcaption
-                      class="border-border bg-card flex items-center gap-1 border-t px-3 py-2 text-[12px]"
+                      class="bg-card flex items-center gap-1 px-3 py-2 text-[12px]"
                     >
                       <span class="text-muted-foreground mr-auto capitalize">{{ variant }}</span>
                       <button
@@ -119,7 +119,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
             that, the strands blur together.
           </p>
         </div>
-        <div class="border-border bg-card flex items-center justify-center rounded-xl border p-8">
+        <div class="bg-card flex items-center justify-center rounded-xl p-8">
           <div class="relative p-8 outline-1 outline-offset-0 outline-primary/40 outline-dashed">
             <div class="outline-primary/30 bg-primary/5 outline-1 outline-dashed">
               <img src="/icons/trama-horizontal-black.svg" alt="" class="h-12 w-auto dark:hidden" />
@@ -149,10 +149,10 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
           @for (c of colors; track c.name) {
             <button
               type="button"
-              class="group border-border bg-card hover:border-border-strong overflow-hidden rounded-xl border text-left transition-colors"
+              class="group bg-card hover:bg-secondary overflow-hidden rounded-xl text-left transition-colors"
               (click)="assets.copyText(c.hex, c.name + ' copied')"
             >
-              <span class="block h-24 border-b border-black/5" [style.background]="c.hex"></span>
+              <span class="block h-24" [style.background]="c.hex"></span>
               <span class="flex items-center justify-between px-3.5 pt-3 text-[13px] font-medium">
                 {{ c.name }}
                 <svg
@@ -176,7 +176,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
       <section class="mt-20" aria-labelledby="type">
         <h2 id="type" class="text-2xl font-semibold tracking-[-0.02em]">Typography</h2>
         <div class="mt-8 grid gap-3 md:grid-cols-2">
-          <div class="border-border bg-card rounded-xl border p-6">
+          <div class="bg-card rounded-xl p-6">
             <p class="text-muted-foreground text-[12px]">Interface and headings</p>
             <p class="mt-3 text-5xl font-semibold tracking-[-0.035em]">Inter</p>
             <p class="text-muted-foreground mt-4 text-[14px] leading-relaxed">
@@ -184,11 +184,11 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
               rsms.me/inter.
             </p>
           </div>
-          <div class="border-border bg-card rounded-xl border p-6">
+          <div class="bg-card rounded-xl p-6">
             <p class="text-muted-foreground text-[12px]">Keys, code and identifiers</p>
             <p class="mt-3 font-mono text-5xl tracking-tight">Geist Mono</p>
             <p class="text-muted-foreground mt-4 text-[14px] leading-relaxed">
-              For issue keys like <span class="text-foreground font-mono">AUTH-12</span>, shortcuts
+              For task keys like <span class="text-foreground font-mono">AUTH-12</span>, shortcuts
               and code samples.
             </p>
           </div>
@@ -205,11 +205,11 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
         <div class="mt-6 flex flex-wrap gap-2 text-[14px]">
           @for (n of names; track n.text) {
             <span
-              class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1"
+              class="inline-flex items-center gap-1.5 rounded-full px-3 py-1"
               [class]="
                 n.ok
-                  ? 'border-tone-green/30 bg-tone-green/8 text-foreground'
-                  : 'border-destructive/25 bg-destructive/5 text-muted-foreground line-through'
+                  ? 'bg-tone-green/10 text-foreground'
+                  : 'bg-destructive/10 text-muted-foreground line-through'
               "
             >
               <svg
@@ -228,7 +228,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
         <h2 id="usage" class="text-2xl font-semibold tracking-[-0.02em]">Please don't</h2>
         <div class="mt-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
           @for (d of donts; track d.label) {
-            <figure class="border-border bg-card overflow-hidden rounded-xl border">
+            <figure class="bg-card overflow-hidden rounded-xl">
               <div class="flex h-36 items-center justify-center overflow-hidden p-6">
                 <img
                   src="/icons/trama-horizontal-black.svg"
@@ -244,7 +244,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
                 />
               </div>
               <figcaption
-                class="border-border flex items-center gap-1.5 border-t px-3.5 py-2.5 text-[13px]"
+                class="flex items-center gap-1.5 px-3.5 py-2.5 text-[13px]"
               >
                 <svg [lucideIcon]="xIcon" [size]="13" class="text-destructive shrink-0"></svg>
                 {{ d.label }}
@@ -278,7 +278,6 @@ export class BrandPage {
     { name: 'Graphite', hex: '#1B1C1F', role: 'Body text on light' },
     { name: 'Mist', hex: '#F4F4F6', role: 'Light surfaces and sidebar' },
     { name: 'Violet', hex: '#7C5CC4', role: 'Secondary accent' },
-    { name: 'Decision Amber', hex: '#B7791F', role: 'Decisions' },
   ];
 
   protected readonly names = [

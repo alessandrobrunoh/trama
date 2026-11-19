@@ -27,7 +27,7 @@ const GLYPHS: Record<string, string> = {
 };
 
 /**
- * Keyboard shortcut chip(s) in Geist Mono. "mod" renders ⌘ on macOS and Ctrl elsewhere.
+ * Keyboard shortcut chip(s) in IBM Plex Mono. "mod" renders ⌘ on macOS and Ctrl elsewhere.
  *   <app-kbd keys="mod+k" />     → [⌘][K]
  *   <app-kbd keys="g i" />       → [G][I]
  *   <app-kbd keys="mod+shift+p" />

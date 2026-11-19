@@ -13,6 +13,7 @@ function makeService(options: { clash?: boolean; hiddenParent?: boolean } = {}) 
     id: 'iss_1',
     key: 'BUG-1',
     projectId: 'pj_visible',
+    parentId: null as string | null,
     externalRef: null as ExternalRef | null,
     externalUrl: null as string | null,
     updatedAt: new Date(0),

@@ -11,6 +11,7 @@ import {
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { ApiClient } from '../../../core/api/api-client';
@@ -29,6 +30,8 @@ import {
 import { ISSUE_KIND_META, ISSUE_KINDS, ISSUE_STATUS_META, ISSUE_STATUSES } from '../../../core/meta';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
+import { UiStore } from '../../../core/stores/ui.store';
+import { AppSelect, type Option } from '../../../shared/app-select';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import {
@@ -43,7 +46,6 @@ import {
 } from './import-model';
 import { SECTION_KIT } from './section-kit';
 
-const SELECT = 'border-border bg-background h-8 w-full rounded-md border px-2 text-[13px]';
 const POLL_MS = 2000;
 
 /**
@@ -54,7 +56,7 @@ const POLL_MS = 2000;
 @Component({
   selector: 'app-import-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, RelativeTimePipe, ProviderIcon, ...SECTION_KIT],
+  imports: [AppSelect, HlmButtonImports, HlmCheckbox, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, RelativeTimePipe, ProviderIcon, ...SECTION_KIT],
   template: `
     <app-section-header
       title="Import"
@@ -122,19 +124,14 @@ const POLL_MS = 2000;
             wide
           >
             <div class="flex items-center gap-2">
-              <select [class]="select" aria-label="Credential" [value]="credential()" (change)="credential.set($any($event.target).value); resetPreview()">
-                @if (provider() === 'github') {
-                  <option value="" [selected]="credential() === ''">Public repository (no token)</option>
-                }
-                @for (c of credentialsOf(provider()); track c.id) {
-                  <option [value]="'c:' + c.id" [selected]="credential() === ('c:' + c.id)">{{ c.account }}{{ c.baseUrl ? ' · ' + c.baseUrl : '' }}</option>
-                }
-                @if (provider() === 'github') {
-                  @for (c of githubConnections(); track c.id) {
-                    <option [value]="'n:' + c.id" [selected]="credential() === ('n:' + c.id)">GitHub integration · {{ c.account }}</option>
-                  }
-                }
-              </select>
+              <app-select
+                class="min-w-0 flex-1"
+                size="sm"
+                label="Credential"
+                [options]="credentialOptions()"
+                [value]="credential()"
+                (valueChange)="setCredential($event)"
+              />
               <button hlmBtn size="icon-sm" variant="outline" aria-label="Add a credential" (click)="addingCredential.set(!addingCredential())">
                 <svg [lucideIcon]="plus" [size]="14"></svg>
               </button>
@@ -180,7 +177,7 @@ const POLL_MS = 2000;
                   · added {{ c.createdAt | relativeTime }}@if (c.lastUsedAt) { · used {{ c.lastUsedAt | relativeTime }} }
                 </span>
               </div>
-              <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Delete the credential of ' + c.account" (click)="removeCredential(c)">
+              <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Delete the credential of ' + c.account" (click)="confirmRemoveCredential(c)">
                 <svg [lucideIcon]="trash" [size]="14"></svg>
               </button>
             </div>
@@ -235,39 +232,16 @@ const POLL_MS = 2000;
           </app-settings-group>
 
           @if (p.provider === 'linear') {
-            <app-settings-group title="Teams" description="Choose the teams to read, then map each to a Trama team.">
+            <app-settings-group title="Teams" description="Choose which Linear teams to read. Issues are imported as tasks and are not assigned to a team.">
               @for (t of p.teams; track t.id) {
                 <app-settings-row [label]="t.name + (t.key ? ' (' + t.key + ')' : '')" [description]="t.count !== undefined ? t.count + ' issues' : ''" wide>
-                  <div class="flex items-center gap-2">
-                    <input type="checkbox" class="size-4" [checked]="!excludedTeams().has(t.id)" [attr.aria-label]="'Include ' + t.name" (change)="toggleTeam(t.id, $any($event.target).checked)" />
-                    <select [class]="select" [attr.aria-label]="'Trama team for ' + t.name" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                      <option value="create" [selected]="draft().teams[t.id] === 'create'">Create team “{{ t.key ?? t.name }}”</option>
-                      <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
-                      @for (x of teams(); track x.id) {
-                        <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
-                      }
-                    </select>
-                  </div>
+                  <hlm-checkbox [checked]="!excludedTeams().has(t.id)" [aria-label]="'Include ' + t.name" (checkedChange)="toggleTeam(t.id, $event)" />
                 </app-settings-row>
               }
               @if (teamsChanged()) {
                 <div class="bg-muted/30 flex justify-end px-4 py-2">
                   <button hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="runPreview(true)">Refresh preview with these teams</button>
                 </div>
-              }
-            </app-settings-group>
-          } @else {
-            <app-settings-group title="Team" description="The tracker has no teams: choose where its issues belong in Trama.">
-              @for (t of p.teams; track t.id) {
-                <app-settings-row [label]="t.name" wide>
-                  <select [class]="select" aria-label="Trama team" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                    <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
-                    <option value="create" [selected]="draft().teams[t.id] === 'create'">Create a team</option>
-                    @for (x of teams(); track x.id) {
-                      <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
-                    }
-                  </select>
-                </app-settings-row>
               }
             </app-settings-group>
           }
@@ -278,13 +252,13 @@ const POLL_MS = 2000;
           >
             @for (x of p.projects; track x.id) {
               <app-settings-row [label]="x.name" wide>
-                <select [class]="select" [attr.aria-label]="'Trama project for ' + x.name" [value]="draft().projects[x.id]" (change)="setTarget('projects', x.id, $any($event.target).value)">
-                  <option value="create" [selected]="draft().projects[x.id] === 'create'">Create project</option>
-                  <option value="skip" [selected]="draft().projects[x.id] === 'skip'">No project</option>
-                  @for (pr of projects(); track pr.id) {
-                    <option [value]="'map:' + pr.id" [selected]="draft().projects[x.id] === ('map:' + pr.id)">{{ pr.name }}</option>
-                  }
-                </select>
+                <app-select
+                  size="sm"
+                  [label]="'Trama project for ' + x.name"
+                  [options]="projectOptions()"
+                  [value]="draft().projects[x.id] ?? ''"
+                  (valueChange)="setTarget('projects', x.id, $event)"
+                />
               </app-settings-row>
             } @empty {
               <p class="text-muted-foreground px-4 py-3 text-xs">No projects in the source.</p>
@@ -294,11 +268,13 @@ const POLL_MS = 2000;
           <app-settings-group title="Statuses" description="Each state of the tracker becomes one of Trama’s statuses.">
             @for (s of p.statuses; track s.id) {
               <app-settings-row [label]="s.name" [description]="s.type + (s.count !== undefined ? ' · ' + s.count + ' issues' : '')" wide>
-                <select [class]="select" [attr.aria-label]="'Trama status for ' + s.name" [value]="draft().statuses[s.id]" (change)="setStatus(s.id, $any($event.target).value)">
-                  @for (st of statuses; track st) {
-                    <option [value]="st" [selected]="draft().statuses[s.id] === (st)">{{ statusLabel(st) }}</option>
-                  }
-                </select>
+                <app-select
+                  size="sm"
+                  [label]="'Trama status for ' + s.name"
+                  [options]="statusOptions"
+                  [value]="draft().statuses[s.id] ?? ''"
+                  (valueChange)="setStatus(s.id, $any($event))"
+                />
               </app-settings-row>
             }
           </app-settings-group>
@@ -309,13 +285,13 @@ const POLL_MS = 2000;
               <app-settings-group description="A tracker label can reuse a Trama label, become a new one or be dropped. Labels named bug, security, incident, chore or idea also pick the issue kind.">
                 @for (l of p.labels; track l.id) {
                   <app-settings-row [label]="l.name" wide>
-                    <select [class]="select" [attr.aria-label]="'Trama label for ' + l.name" [value]="draft().labels[l.id]" (change)="setTarget('labels', l.id, $any($event.target).value)">
-                      <option value="create" [selected]="draft().labels[l.id] === 'create'">Create label</option>
-                      <option value="skip" [selected]="draft().labels[l.id] === 'skip'">Drop it</option>
-                      @for (x of labels(); track x.id) {
-                        <option [value]="'map:' + x.id" [selected]="draft().labels[l.id] === ('map:' + x.id)">{{ x.name }}</option>
-                      }
-                    </select>
+                    <app-select
+                      size="sm"
+                      [label]="'Trama label for ' + l.name"
+                      [options]="labelOptions()"
+                      [value]="draft().labels[l.id] ?? ''"
+                      (valueChange)="setTarget('labels', l.id, $event)"
+                    />
                   </app-settings-row>
                 } @empty {
                   <p class="text-muted-foreground px-4 py-3 text-xs">No labels in the source.</p>
@@ -330,12 +306,13 @@ const POLL_MS = 2000;
               <app-settings-group description="Matched by email, then by login or name. An assignee left unmatched leaves the issue unassigned.">
                 @for (u of p.users; track u.id) {
                   <app-settings-row [label]="u.name || u.login || u.id" [description]="u.email || (u.login ? '@' + u.login : '')" wide>
-                    <select [class]="select" [attr.aria-label]="'Trama member for ' + (u.name || u.login || u.id)" [value]="draft().users[u.id]" (change)="setUser(u.id, $any($event.target).value)">
-                      <option value="" [selected]="draft().users[u.id] === ''">Unassigned</option>
-                      @for (m of members(); track m.id) {
-                        <option [value]="m.id" [selected]="draft().users[u.id] === (m.id)">{{ m.name }}</option>
-                      }
-                    </select>
+                    <app-select
+                      size="sm"
+                      [label]="'Trama member for ' + (u.name || u.login || u.id)"
+                      [options]="memberOptions()"
+                      [value]="draft().users[u.id] ?? ''"
+                      (valueChange)="setUser(u.id, $event)"
+                    />
                   </app-settings-row>
                 } @empty {
                   <p class="text-muted-foreground px-4 py-3 text-xs">No people to map.</p>
@@ -352,11 +329,13 @@ const POLL_MS = 2000;
               <hlm-switch [checked]="options().includeClosed" (checkedChange)="setOption({ includeClosed: $event })" aria-label="Import closed issues" />
             </app-settings-row>
             <app-settings-row label="Default kind" description="For issues with no label that says bug, feature, incident…" wide>
-              <select [class]="select" aria-label="Default kind" [value]="options().defaultKind" (change)="setOption({ defaultKind: $any($event.target).value })">
-                @for (k of kinds; track k) {
-                  <option [value]="k" [selected]="options().defaultKind === (k)">{{ kindLabel(k) }}</option>
-                }
-              </select>
+              <app-select
+                size="sm"
+                label="Default kind"
+                [options]="kindOptions"
+                [value]="options().defaultKind"
+                (valueChange)="setOption({ defaultKind: $any($event) })"
+              />
             </app-settings-row>
             <div class="bg-muted/30 flex items-center justify-between gap-3 px-4 py-2">
               <span class="text-muted-foreground text-xs">
@@ -383,7 +362,7 @@ const POLL_MS = 2000;
                   <button hlmBtn size="sm" variant="outline" class="h-7" (click)="retry(j)"><svg [lucideIcon]="retryIcon" [size]="12"></svg> Resume</button>
                 }
                 @if (!isActive(j)) {
-                  <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Remove ' + j.sourceLabel + ' from history'" (click)="remove(j)"><svg [lucideIcon]="close" [size]="14"></svg></button>
+                  <button hlmBtn size="icon-sm" variant="ghost" class="text-muted-foreground" [attr.aria-label]="'Remove ' + j.sourceLabel + ' from history'" (click)="confirmRemove(j)"><svg [lucideIcon]="close" [size]="14"></svg></button>
                 }
               }
             </div>
@@ -396,7 +375,7 @@ const POLL_MS = 2000;
             @if (j.errors.length) {
               <details class="text-xs">
                 <summary class="text-muted-foreground hover:text-foreground cursor-pointer select-none">{{ j.progress.failed }} issues could not be imported</summary>
-                <ul class="bg-muted/40 mt-1.5 max-h-40 space-y-0.5 overflow-y-auto rounded-md border px-3 py-2">
+                <ul class="bg-muted mt-1.5 max-h-40 space-y-0.5 overflow-y-auto rounded-md px-3 py-2">
                   @for (e of j.errors; track $index) {
                     <li><span class="font-mono">{{ e.ref }}</span> {{ e.message }}</li>
                   }
@@ -413,14 +392,14 @@ const POLL_MS = 2000;
 })
 export class ImportSection {
   private readonly store = inject(TramaStore);
+  private readonly ui = inject(UiStore);
   private readonly api = inject(ApiClient);
   private readonly notify = inject(Notifier);
   private readonly destroyRef = inject(DestroyRef);
 
-  protected readonly select = SELECT;
   protected readonly providers = EXTERNAL_PROVIDERS;
-  protected readonly statuses = ISSUE_STATUSES;
-  protected readonly kinds = ISSUE_KINDS;
+  protected readonly statusOptions: Option[] = ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label }));
+  protected readonly kindOptions: Option[] = ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label }));
   protected readonly statusText = STATUS_TEXT;
   protected readonly plus = LucidePlus;
   protected readonly trash = LucideTrash2;
@@ -431,11 +410,33 @@ export class ImportSection {
   protected readonly retryIcon = LucideRotateCw;
 
   protected readonly canManage = computed(() => this.store.allowed('manageIntegrations'));
-  protected readonly teams = computed(() => this.store.teams());
   protected readonly projects = computed(() => this.store.projects().slice().sort((a, b) => a.name.localeCompare(b.name)));
   protected readonly labels = computed(() => this.store.settings().labels.filter((l) => l.scope === 'issue' && !l.archived));
   protected readonly members = computed(() => this.store.members().map((m) => ({ id: m.user.id, name: m.user.name })));
   protected readonly githubConnections = computed(() => this.store.integrations().filter((c) => c.provider === 'github'));
+
+  protected readonly credentialOptions = computed<Option[]>(() => {
+    const github = this.provider() === 'github';
+    return [
+      ...(github ? [{ value: '', label: 'Public repository (no token)' }] : []),
+      ...this.credentialsOf(this.provider()).map((c) => ({ value: `c:${c.id}`, label: `${c.account}${c.baseUrl ? ' · ' + c.baseUrl : ''}` })),
+      ...(github ? this.githubConnections().map((c) => ({ value: `n:${c.id}`, label: `GitHub integration · ${c.account}` })) : []),
+    ];
+  });
+  protected readonly projectOptions = computed<Option[]>(() => [
+    { value: 'create', label: 'Create project' },
+    { value: 'skip', label: 'No project' },
+    ...this.projects().map((p) => ({ value: `map:${p.id}`, label: p.name })),
+  ]);
+  protected readonly labelOptions = computed<Option[]>(() => [
+    { value: 'create', label: 'Create label' },
+    { value: 'skip', label: 'Drop it' },
+    ...this.labels().map((l) => ({ value: `map:${l.id}`, label: l.name })),
+  ]);
+  protected readonly memberOptions = computed<Option[]>(() => [
+    { value: '', label: 'Unassigned' },
+    ...this.members().map((m) => ({ value: m.id, label: m.name })),
+  ]);
 
   protected readonly provider = signal<ExternalProvider>('github');
   protected readonly credentials = signal<readonly ImportCredential[]>([]);
@@ -584,6 +585,23 @@ export class ImportSection {
     }
   }
 
+  protected confirmRemoveCredential(c: ImportCredential): void {
+    this.ui.setConfirmDelete({
+      title: `Delete the credential of ${c.account}?`,
+      description: 'Imports that use it can no longer reach the source. You can add it again later.',
+      onConfirm: () => this.removeCredential(c),
+    });
+  }
+
+  protected confirmRemove(job: ImportJob): void {
+    this.ui.setConfirmDelete({
+      title: `Remove ${job.sourceLabel} from history?`,
+      description: 'Only the history entry is removed. The tasks it already imported stay.',
+      confirmLabel: 'Remove',
+      onConfirm: () => this.remove(job),
+    });
+  }
+
   protected async removeCredential(c: ImportCredential): Promise<void> {
     const slug = this.store.slug();
     if (!slug) return;
@@ -598,6 +616,11 @@ export class ImportSection {
   }
 
   // ───── preview
+  protected setCredential(value: string): void {
+    this.credential.set(value);
+    this.resetPreview();
+  }
+
   protected resetPreview(): void {
     this.preview.set(null);
     this.excludedTeams.set(new Set());

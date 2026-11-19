@@ -30,13 +30,13 @@ const DOT: Record<ExternalStateType, string> = {
   imports: [HlmButtonImports, HlmInputImports, HlmTooltip, LucideDynamicIcon, PropertyRow, ProviderIcon],
   host: { class: 'block' },
   template: `
-    <app-property-row label="Tracker" [icon]="trackerIcon">
+    <app-property-row label="Tracker" [icon]="trackerIcon" compact>
       @if (ref(); as r) {
         <a
           [href]="r.url"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:bg-hover focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-[13px] outline-none focus-visible:ring-2"
+          class="hover:bg-hover focus-visible:ring-ring flex min-w-0 items-center gap-1.5 rounded-md px-1.5 py-0.5 text-[13px] outline-none focus-visible:ring-2"
           [hlmTooltip]="tooltip(r)"
         >
           @if (r.provider === 'github') { <app-provider-icon provider="github" /> }
@@ -55,18 +55,18 @@ const DOT: Record<ExternalStateType, string> = {
           <button type="button" class="text-muted-foreground hover:text-foreground shrink-0 disabled:opacity-50" aria-label="Refresh the external status" hlmTooltip="Refresh status" [disabled]="busy()" (click)="refresh()">
             <svg [lucideIcon]="refreshIcon" [size]="13" [class.animate-spin]="busy()"></svg>
           </button>
-          <button type="button" class="text-muted-foreground hover:text-foreground shrink-0" aria-label="Unlink the external issue" hlmTooltip="Unlink" [disabled]="busy()" (click)="unlink()">
+          <button type="button" class="text-muted-foreground hover:text-foreground shrink-0" aria-label="Unlink the external task" hlmTooltip="Unlink" [disabled]="busy()" (click)="unlink()">
             <svg [lucideIcon]="unlinkIcon" [size]="13"></svg>
           </button>
         }
       } @else if (canEdit()) {
         @if (linking()) {
-          <form class="flex min-w-0 flex-1 items-center gap-1.5" (submit)="link($event)">
+          <form class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5" (submit)="link($event)">
             <input
               hlmInput
-              class="h-7 min-w-0 flex-1 text-[13px]"
+              class="h-7 min-w-0 flex-1 basis-full text-[13px]"
               placeholder="https://github.com/owner/repo/issues/12"
-              aria-label="URL of the GitHub or Linear issue"
+              aria-label="URL of the GitHub or Linear task"
               [value]="url()"
               (input)="url.set($any($event.target).value)"
               (keydown.escape)="linking.set(false)"
@@ -75,7 +75,7 @@ const DOT: Record<ExternalStateType, string> = {
           </form>
         } @else {
           <button type="button" class="text-muted-foreground hover:bg-hover hover:text-foreground h-7 min-w-0 truncate rounded-md px-1.5 text-left text-[13px] whitespace-nowrap" (click)="linking.set(true)">
-            Link GitHub or Linear issue…
+            Link issue…
           </button>
         }
       } @else {
@@ -110,14 +110,14 @@ export class IssueExternalRef {
   }
   protected tooltip(r: ExternalRef): string {
     const when = r.syncedAt ? `Status read ${relativeTime(r.syncedAt)}` : 'Status not read yet';
-    return `${r.origin === 'import' ? 'Imported from' : 'Linked to'} ${this.providerLabel(r)}. ${when}. Read-only: it does not change this issue’s status.`;
+    return `${r.origin === 'import' ? 'Imported from' : 'Linked to'} ${this.providerLabel(r)}. ${when}. Read-only: it does not change this task’s status.`;
   }
 
   protected async link(event: Event): Promise<void> {
     event.preventDefault();
     const url = this.url().trim();
     if (!url) return;
-    await this.run(() => this.api.issues.externalRef.link(this.slug(), this.issue().key, url), 'Linked to the external issue', 'Could not link the issue', () => {
+    await this.run(() => this.api.issues.externalRef.link(this.slug(), this.issue().key, url), 'Linked to the external task', 'Could not link the task', () => {
       this.linking.set(false);
       this.url.set('');
     });
@@ -126,7 +126,7 @@ export class IssueExternalRef {
     return this.run(() => this.api.issues.externalRef.refresh(this.slug(), this.issue().key), 'Status refreshed', 'Could not refresh the status');
   }
   protected unlink(): Promise<void> {
-    return this.run(() => this.api.issues.externalRef.unlink(this.slug(), this.issue().key), 'Unlinked', 'Could not unlink the issue');
+    return this.run(() => this.api.issues.externalRef.unlink(this.slug(), this.issue().key), 'Unlinked', 'Could not unlink the task');
   }
 
   private async run(call: () => Promise<Issue>, ok: string, failure: string, after?: () => void): Promise<void> {

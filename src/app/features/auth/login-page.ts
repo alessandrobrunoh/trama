@@ -43,7 +43,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         @if (demo()) {
           <aside
             aria-labelledby="demo-login-title"
-            class="border-primary/20 bg-primary/5 mb-1 rounded-xl border p-3.5"
+            class="bg-primary/10 mb-1 rounded-xl p-3.5"
           >
             <div class="flex items-start gap-3">
               <span
@@ -85,7 +85,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         @if (error(); as e) {
           <div
             role="alert"
-            class="border-destructive/30 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border px-2.5 py-2 text-sm"
+            class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
           >
             <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
             <span>{{ e }}</span>

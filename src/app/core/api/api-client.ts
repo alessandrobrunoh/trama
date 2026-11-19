@@ -19,50 +19,29 @@ import type {
   Comment,
   CommentPage,
   SnapshotCommentsMode,
-  Decision,
-  Document,
-  DocumentRevision,
-  DocumentSummary,
   DomainEvent,
   Favorite,
-  CustomerSubscription,
   ImportCredential,
   ImportJob,
   ImportPreview,
   FavoriteType,
   ID,
-  InputRequest,
   NotificationKind,
   NotificationChannels,
   NotificationList,
   NotificationSettings,
   InviteLink,
   InvitePreview,
-  Customer,
-  CustomerRequest,
-  InsightSignal,
-  InsightSignalId,
-  InsightsReport,
-  IntakeItem,
-  IntakeItemStatus,
-  IntakeSource,
   Issue,
-  IssueContext,
   Membership,
   Milestone,
   OutgoingWebhook,
-  Release,
-  ReleasePipeline,
   Project,
   ProjectAiKind,
   ProjectAiResult,
-  ProjectContext,
-  ProjectUpdate,
-  Repository,
   Role,
   PublicView,
   SavedView,
-  Team,
   User,
   WebhookDeliveryLog,
   Workspace,
@@ -79,65 +58,30 @@ import type {
   AttentionQuery,
   CreateAgentInput,
   CreateCommentInput,
-  CreateDecisionInput,
-  CreateDocumentInput,
-  DocumentOwnerInput,
-  DocumentsQuery,
-  UpdateDocumentInput,
-  CreateInputRequestInput,
   CreateInviteInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
-  CompleteReleaseInput,
-  CreateReleaseInput,
-  CreateReleasePipelineInput,
-  UpdateReleaseInput,
-  UpdateReleasePipelineInput,
-  UpdateInputRequestInput,
-  CreateCustomerInput,
   BulkIssuePatch,
   CreateIssueInput,
-  CreateCustomerRequestInput,
-  CreateCustomerTierInput,
-  UpdateCustomerRequestInput,
-  UpdateCustomerTierInput,
-  CreateIntakeSourceInput,
   CreateIntegrationInput,
-  IntakeSourceWithSecret,
-  IntakeTestResult,
-  LinkIntakeItemInput,
-  UpdateIntakeSourceInput,
   IntegrationDetail,
   IntegrationWithWebhook,
-  LinkRepositoryInput,
-  RemoteRepositoryPage,
   UpdateIntegrationInput,
-  CreateOwnedArtifactInput,
   CreateProjectInput,
-  CreateProjectUpdateInput,
-  CreateRepositoryInput,
-  CreateTeamInput,
   CreateTokenInput,
   CreatedToken,
   CreateViewInput,
   InviteViewInput,
   CreateWorkspaceInput,
   EventsQuery,
-  InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
   SignupInput,
   UpdateAgentInput,
-  UpdateArtifactInput,
-  UpdateDecisionInput,
-  UpdateCustomerInput,
   UpdateIssueInput,
   UpdateMemberInput,
   UpdateProjectInput,
-  UpdateProjectUpdateInput,
-  UpdateRepositoryInput,
-  UpdateTeamInput,
   UpdateViewInput,
   UpdateWorkspaceInput,
   CreateLabelInput,
@@ -154,6 +98,8 @@ import type {
   LinkLunaGestProjectInput,
   LinkLunaGestTaskInput,
   LunaGestConnection,
+  LunaGestImportResult,
+  LunaGestImportableProject,
   LunaGestIssueLink,
   LunaGestRemoteTask,
   LunaGestConnectionConfigured,
@@ -318,12 +264,6 @@ export class ApiClient {
       this.patch<Workspace>(`${this.w(slug)}/statuses/${subject}/${id}`, input),
     deleteStatus: (slug: string, subject: string, id: ID) =>
       this.del<Workspace>(`${this.w(slug)}/statuses/${subject}/${id}`),
-    createCustomerTier: (slug: string, input: CreateCustomerTierInput) =>
-      this.post<Workspace>(`${this.w(slug)}/customer-tiers`, input),
-    updateCustomerTier: (slug: string, id: ID, input: UpdateCustomerTierInput) =>
-      this.patch<Workspace>(`${this.w(slug)}/customer-tiers/${id}`, input),
-    deleteCustomerTier: (slug: string, id: ID) =>
-      this.del<Workspace>(`${this.w(slug)}/customer-tiers/${id}`),
     /** Owner only. `confirm` must be the workspace's exact slug or name. */
     remove: (slug: string, confirm: string) => this.del(this.w(slug), { body: { confirm } }),
     /** `comments: 'index'` leaves the comments out (threads load on demand via `comments.page`). */
@@ -437,82 +377,6 @@ export class ApiClient {
 
   // ───────────────────────── domain ─────────────────────────
 
-  readonly teams = {
-    list: (slug: string) => this.get<Team[]>(`${this.w(slug)}/teams`),
-    get: (slug: string, id: ID) => this.get<Team>(`${this.w(slug)}/teams/${id}`),
-    create: (slug: string, input: CreateTeamInput) =>
-      this.post<Team>(`${this.w(slug)}/teams`, input),
-    update: (slug: string, id: ID, input: UpdateTeamInput) =>
-      this.patch<Team>(`${this.w(slug)}/teams/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/teams/${id}`),
-  };
-
-  readonly customers = {
-    list: (slug: string) => this.get<Customer[]>(`${this.w(slug)}/customers`, { archived: 'all' }),
-    get: (slug: string, id: ID) => this.get<Customer>(`${this.w(slug)}/customers/${id}`),
-    create: (slug: string, input: CreateCustomerInput) =>
-      this.post<Customer>(`${this.w(slug)}/customers`, input),
-    update: (slug: string, id: ID, input: UpdateCustomerInput) =>
-      this.patch<Customer>(`${this.w(slug)}/customers/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/customers/${id}`),
-    requests: (slug: string, id: ID) =>
-      this.get<CustomerRequest[]>(`${this.w(slug)}/customers/${id}/requests`),
-    createRequest: (slug: string, id: ID, input: CreateCustomerRequestInput) =>
-      this.post<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests`, input),
-    updateRequest: (slug: string, id: ID, requestId: ID, input: UpdateCustomerRequestInput) =>
-      this.patch<CustomerRequest>(`${this.w(slug)}/customers/${id}/requests/${requestId}`, input),
-    removeRequest: (slug: string, id: ID, requestId: ID) =>
-      this.post<void>(`${this.w(slug)}/customers/${id}/requests/${requestId}/unlink`),
-  };
-
-  /** The signed-in user's customer subscriptions in a workspace (private to them). `remove` is idempotent. */
-  readonly customerSubscriptions = {
-    list: (slug: string) =>
-      this.get<CustomerSubscription[]>(`${this.w(slug)}/customer-subscriptions`, undefined, {
-        quiet: true,
-      }),
-    add: (slug: string, customerId: ID) =>
-      this.post<CustomerSubscription>(`${this.w(slug)}/customer-subscriptions`, { customerId }),
-    remove: (slug: string, customerId: ID) =>
-      this.del(`${this.w(slug)}/customer-subscriptions/${encodeURIComponent(customerId)}`),
-  };
-
-  /** Markdown documents of the workspace, with revisions; attached to work through `document` artifacts. */
-  readonly documents = {
-    list: (slug: string, query: DocumentsQuery = {}) =>
-      this.get<DocumentSummary[]>(`${this.w(slug)}/documents`, { ...query }),
-    get: (slug: string, id: ID) =>
-      this.get<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
-    create: (slug: string, input: CreateDocumentInput) =>
-      this.post<Document>(`${this.w(slug)}/documents`, input),
-    /** 409 (`ApiError.body.current`) when `baseVersion` is stale. */
-    update: (slug: string, id: ID, input: UpdateDocumentInput, o?: RequestOptions) =>
-      this.patch<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`, input, o),
-    remove: (slug: string, id: ID) =>
-      this.del(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
-    archive: (slug: string, id: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/archive`),
-    restore: (slug: string, id: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/restore`),
-    revisions: (slug: string, id: ID) =>
-      this.get<DocumentRevision[]>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions`),
-    revision: (slug: string, id: ID, version: number) =>
-      this.get<DocumentRevision>(
-        `${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}`,
-      ),
-    restoreRevision: (slug: string, id: ID, version: number, baseVersion: number) =>
-      this.post<Document>(
-        `${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}/restore`,
-        { baseVersion },
-      ),
-    attach: (slug: string, id: ID, owner: DocumentOwnerInput) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/attach`, owner),
-    detach: (slug: string, id: ID, artifactId: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/detach`, {
-        artifactId,
-      }),
-  };
-
   readonly projects = {
     list: (slug: string) => this.get<Project[]>(`${this.w(slug)}/projects`),
     get: (slug: string, id: ID) => this.get<Project>(`${this.w(slug)}/projects/${id}`),
@@ -521,102 +385,37 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateProjectInput) =>
       this.patch<Project>(`${this.w(slug)}/projects/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/projects/${id}`),
-    /** Status posts, newest first. */
-    updates: {
-      list: (slug: string, projectId: ID) =>
-        this.get<ProjectUpdate[]>(`${this.w(slug)}/projects/${projectId}/updates`),
-      get: (slug: string, projectId: ID, id: ID) =>
-        this.get<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
-      create: (slug: string, projectId: ID, input: CreateProjectUpdateInput) =>
-        this.post<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates`, input),
-      update: (slug: string, projectId: ID, id: ID, input: UpdateProjectUpdateInput) =>
-        this.patch<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`, input),
-      remove: (slug: string, projectId: ID, id: ID) =>
-        this.del(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
-    },
-    /** The project, its issues, artifacts and updates. */
-    context: (slug: string, projectId: ID) =>
-      this.get<ProjectContext>(`${this.w(slug)}/projects/${projectId}/context`),
-    /** The same context rendered as markdown (for agents / copy). */
-    contextMarkdown: (slug: string, projectId: ID) =>
-      this.request<string>('GET', `${this.w(slug)}/projects/${projectId}/context.md`, {
-        text: true,
-        accept: 'text/markdown',
-      }),
     /** AI suggestion; the `kind` of the result matches the requested one. */
     ai: (slug: string, projectId: ID, kind: ProjectAiKind) =>
       this.post<ProjectAiResult>(`${this.w(slug)}/projects/${projectId}/ai/${kind}`),
-    /** Artifacts attached to the project itself (use `context` for the whole tree). */
-    artifacts: {
-      list: (slug: string, projectId: ID) =>
-        this.get<Artifact[]>(`${this.w(slug)}/projects/${projectId}/artifacts`),
-      create: (slug: string, projectId: ID, input: CreateOwnedArtifactInput) =>
-        this.post<Artifact>(`${this.w(slug)}/projects/${projectId}/artifacts`, input),
-    },
-  };
-
-  readonly repositories = {
-    list: (slug: string) => this.get<Repository[]>(`${this.w(slug)}/repositories`),
-    get: (slug: string, id: ID) => this.get<Repository>(`${this.w(slug)}/repositories/${id}`),
-    create: (slug: string, input: CreateRepositoryInput) =>
-      this.post<Repository>(`${this.w(slug)}/repositories`, input),
-    update: (slug: string, id: ID, input: UpdateRepositoryInput) =>
-      this.patch<Repository>(`${this.w(slug)}/repositories/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/repositories/${id}`),
-  };
-
-  readonly inputRequests = {
-    list: (slug: string, issueId?: ID) =>
-      this.get<InputRequest[]>(`${this.w(slug)}/input-requests`, { issueId }),
-    create: (slug: string, input: CreateInputRequestInput) =>
-      this.post<InputRequest>(`${this.w(slug)}/input-requests`, input),
-    answer: (slug: string, id: ID, answer: string) =>
-      this.post<InputRequest>(`${this.w(slug)}/input-requests/${id}/answer`, { answer }),
-    dismiss: (slug: string, id: ID) =>
-      this.post<InputRequest>(`${this.w(slug)}/input-requests/${id}/dismiss`),
-    /** Open requests only (`409` otherwise). */
-    update: (slug: string, id: ID, input: UpdateInputRequestInput) =>
-      this.patch<InputRequest>(`${this.w(slug)}/input-requests/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/input-requests/${id}`),
   };
 
   readonly issues = {
-    list: (slug: string) => this.get<Issue[]>(`${this.w(slug)}/issues`),
+    list: (slug: string) => this.get<Issue[]>(`${this.w(slug)}/tasks`),
     get: (slug: string, idOrKey: string) =>
-      this.get<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}`),
-    context: (slug: string, idOrKey: string) =>
-      this.get<IssueContext>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/context`),
+      this.get<Issue>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}`),
     create: (slug: string, input: CreateIssueInput) =>
-      this.post<Issue>(`${this.w(slug)}/issues`, input),
+      this.post<Issue>(`${this.w(slug)}/tasks`, input),
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
-      this.patch<Issue>(`${this.w(slug)}/issues/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/issues/${id}`),
+      this.patch<Issue>(`${this.w(slug)}/tasks/${id}`, input),
+    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/tasks/${id}`),
     /** One patch for many issues, all or nothing. */
     bulkUpdate: (slug: string, ids: ID[], patch: BulkIssuePatch) =>
-      this.post<Issue[]>(`${this.w(slug)}/issues/bulk`, { ids, patch }),
+      this.post<Issue[]>(`${this.w(slug)}/tasks/bulk`, { ids, patch }),
     bulkRemove: (slug: string, ids: ID[]) =>
-      this.post<{ deleted: ID[] }>(`${this.w(slug)}/issues/bulk-delete`, { ids }),
+      this.post<{ deleted: ID[] }>(`${this.w(slug)}/tasks/bulk-delete`, { ids }),
     /** Link to a GitHub / Linear issue by URL; the external status is a read-only mirror. */
     externalRef: {
       link: (slug: string, idOrKey: string, url: string) =>
-        this.post<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref`, {
+        this.post<Issue>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/external-ref`, {
           url,
         }),
       refresh: (slug: string, idOrKey: string) =>
         this.post<Issue>(
-          `${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref/refresh`,
+          `${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/external-ref/refresh`,
         ),
       unlink: (slug: string, idOrKey: string) =>
-        this.del<Issue>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/external-ref`),
-    },
-    artifacts: {
-      list: (slug: string, idOrKey: string) =>
-        this.get<Artifact[]>(`${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/artifacts`),
-      create: (slug: string, idOrKey: string, input: CreateOwnedArtifactInput) =>
-        this.post<Artifact>(
-          `${this.w(slug)}/issues/${encodeURIComponent(idOrKey)}/artifacts`,
-          input,
-        ),
+        this.del<Issue>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/external-ref`),
     },
   };
 
@@ -633,33 +432,8 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/milestones/${id}`),
   };
 
-  readonly releasePipelines = {
-    list: (slug: string) => this.get<ReleasePipeline[]>(`${this.w(slug)}/releases/pipelines`),
-    create: (slug: string, input: CreateReleasePipelineInput) =>
-      this.post<ReleasePipeline>(`${this.w(slug)}/releases/pipelines`, input),
-    update: (slug: string, id: ID, input: UpdateReleasePipelineInput) =>
-      this.patch<ReleasePipeline>(`${this.w(slug)}/releases/pipelines/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/releases/pipelines/${id}`),
-  };
-
-  readonly releases = {
-    list: (slug: string, pipelineId?: ID) =>
-      this.get<Release[]>(`${this.w(slug)}/releases`, { pipelineId }),
-    get: (slug: string, id: ID) => this.get<Release>(`${this.w(slug)}/releases/${id}`),
-    create: (slug: string, input: CreateReleaseInput) =>
-      this.post<Release>(`${this.w(slug)}/releases`, input),
-    update: (slug: string, id: ID, input: UpdateReleaseInput) =>
-      this.patch<Release>(`${this.w(slug)}/releases/${id}`, input),
-    complete: (slug: string, id: ID, input: CompleteReleaseInput = {}) =>
-      this.post<Release>(`${this.w(slug)}/releases/${id}/complete`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/releases/${id}`),
-  };
-
   readonly artifacts = {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
-    update: (slug: string, id: ID, input: UpdateArtifactInput) =>
-      this.patch<Artifact>(`${this.w(slug)}/artifacts/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/artifacts/${id}`),
   };
 
   readonly uploads = {
@@ -675,31 +449,13 @@ export class ApiClient {
         markdown: string;
       }>(`${this.w(slug)}/uploads`, file),
     /** Attach the file as an image or file artifact. The URL form is unchanged. */
-    attach: (slug: string, target: { type: 'issue' | 'project'; id: string }, file: File) => {
-      const id = encodeURIComponent(target.id);
-      const path =
-        target.type === 'issue'
-          ? `${this.w(slug)}/issues/${id}/artifacts/upload`
-          : `${this.w(slug)}/projects/${id}/artifacts/upload`;
-      return this.postForm<Artifact>(path, file);
-    },
+    attach: (slug: string, target: { type: 'issue'; id: string }, file: File) =>
+      this.postForm<Artifact>(
+        `${this.w(slug)}/tasks/${encodeURIComponent(target.id)}/artifacts/upload`,
+        file,
+      ),
     discard: (slug: string, id: string, o?: RequestOptions) =>
       this.del(`${this.w(slug)}/uploads/${encodeURIComponent(id)}`, o),
-  };
-
-  readonly decisions = {
-    list: (slug: string) => this.get<Decision[]>(`${this.w(slug)}/decisions`),
-    get: (slug: string, idOrKey: string) =>
-      this.get<Decision>(`${this.w(slug)}/decisions/${encodeURIComponent(idOrKey)}`),
-    create: (slug: string, input: CreateDecisionInput) =>
-      this.post<Decision>(`${this.w(slug)}/decisions`, input),
-    update: (slug: string, id: ID, input: UpdateDecisionInput) =>
-      this.patch<Decision>(`${this.w(slug)}/decisions/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/decisions/${id}`),
-    accept: (slug: string, id: ID) => this.post<Decision>(`${this.w(slug)}/decisions/${id}/accept`),
-    reject: (slug: string, id: ID) => this.post<Decision>(`${this.w(slug)}/decisions/${id}/reject`),
-    supersede: (slug: string, id: ID, byId: ID) =>
-      this.post<Decision>(`${this.w(slug)}/decisions/${id}/supersede`, { byId }),
   };
 
   readonly comments = {
@@ -732,19 +488,10 @@ export class ApiClient {
       this.get<DomainEvent[]>(`${this.w(slug)}/events`, { ...query }),
   };
 
-  readonly insights = {
-    /** Health signals, flow metrics and agent failure signals (GET /insights). */
-    report: (slug: string, query: InsightsQuery = {}) =>
-      this.get<InsightsReport>(`${this.w(slug)}/insights`, { ...query }),
-    /** One signal with up to `limit` items: what a health tile drills into. */
-    signal: (slug: string, id: InsightSignalId, query: InsightsQuery = {}) =>
-      this.get<InsightSignal>(`${this.w(slug)}/insights/signals/${id}`, { ...query }),
-  };
-
   readonly attention = {
     list: (slug: string, query: AttentionQuery = {}) =>
       this.get<AttentionItem[]>(`${this.w(slug)}/attention`, { ...query }),
-    /** `id` is the attention item id, e.g. `input_requested:ir_1` (URL-encoded here). */
+    /** `id` is the attention item id, e.g. `review_requested:art_1` (URL-encoded here). */
     dismiss: (slug: string, id: string) =>
       this.post<void>(`${this.w(slug)}/attention/${encodeURIComponent(id)}/dismiss`),
     snooze: (slug: string, id: string, until: string) =>
@@ -780,7 +527,7 @@ export class ApiClient {
   search = (slug: string, q: string) => this.get<SearchResults>(`${this.w(slug)}/search`, { q });
 
   readonly integrations = {
-    /** Admin only. Includes webhookUrl, linked repository ids and lastWebhookAt. */
+    /** Admin only. Includes webhookUrl and lastWebhookAt. */
     list: (slug: string, o?: RequestOptions) =>
       this.get<IntegrationDetail[]>(`${this.w(slug)}/integrations`, undefined, o),
     /** Returns the connection and, for GitHub/GitLab, the one-time webhook setup (secret shown once). */
@@ -792,16 +539,6 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/integrations/${id}`),
     rotateWebhookSecret: (slug: string, id: ID) =>
       this.post<IntegrationWithWebhook>(`${this.w(slug)}/integrations/${id}/rotate-webhook-secret`),
-    remoteRepositories: (slug: string, id: ID, page = 1, perPage = 30) =>
-      this.get<RemoteRepositoryPage>(`${this.w(slug)}/integrations/${id}/remote-repositories`, {
-        page,
-        perPage,
-      }),
-    /** Creates (201) or adopts (200) the Repository and attaches it to the connection. */
-    linkRepository: (slug: string, id: ID, input: LinkRepositoryInput) =>
-      this.post<Repository>(`${this.w(slug)}/integrations/${id}/link-repository`, input),
-    unlinkRepository: (slug: string, id: ID, repositoryId: ID) =>
-      this.del(`${this.w(slug)}/integrations/${id}/repositories/${repositoryId}`),
   };
 
   /** Custom integrations: signed JSON POSTs to your URL for domain events. Needs the manageIntegrations capability. */
@@ -823,37 +560,6 @@ export class ApiClient {
       this.get<WebhookDeliveryLog[]>(`${this.w(slug)}/outgoing-webhooks/${id}/deliveries`, {
         limit,
       }),
-  };
-
-  /** Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook). Needs manageIntegrations. */
-  readonly intakeSources = {
-    list: (slug: string, o?: RequestOptions) =>
-      this.get<IntakeSource[]>(`${this.w(slug)}/intake-sources`, undefined, o),
-    /** Trama-signed sources (email, generic) return their secret once. */
-    create: (slug: string, input: CreateIntakeSourceInput) =>
-      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources`, input),
-    update: (slug: string, id: ID, input: UpdateIntakeSourceInput) =>
-      this.patch<IntakeSource>(`${this.w(slug)}/intake-sources/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/intake-sources/${id}`),
-    rotateSecret: (slug: string, id: ID) =>
-      this.post<IntakeSourceWithSecret>(`${this.w(slug)}/intake-sources/${id}/rotate-secret`),
-    /** Dry run of a sample delivery: nothing is saved. */
-    test: (slug: string, id: ID) =>
-      this.post<IntakeTestResult>(`${this.w(slug)}/intake-sources/${id}/test`),
-  };
-
-  /** The triage inbox: inbound customer requests waiting to be linked to an issue or project. */
-  readonly customerIntake = {
-    list: (slug: string, status: IntakeItemStatus | 'all' = 'pending', o?: RequestOptions) =>
-      this.get<IntakeItem[]>(`${this.w(slug)}/customer-intake`, { status }, o),
-    count: (slug: string, o?: RequestOptions) =>
-      this.get<{ pending: number }>(`${this.w(slug)}/customer-intake/count`, undefined, o),
-    link: (slug: string, id: ID, input: LinkIntakeItemInput) =>
-      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/link`, input),
-    dismiss: (slug: string, id: ID) =>
-      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/dismiss`),
-    restore: (slug: string, id: ID) =>
-      this.post<IntakeItem>(`${this.w(slug)}/customer-intake/${id}/restore`),
   };
 
   /** Import from GitHub Issues and Linear. Needs the manageIntegrations capability; tokens never come back. */
@@ -896,6 +602,18 @@ export class ApiClient {
       );
       return Array.isArray(res) ? res : (res.projects ?? []);
     },
+    /** Remote projects with their task count and whether each is already bound to a Trama project. */
+    importable: async (slug: string, o?: RequestOptions): Promise<LunaGestImportableProject[]> => {
+      const res = await this.get<{ projects: LunaGestImportableProject[] }>(
+        `${this.w(slug)}/lunagest/import/projects`,
+        undefined,
+        o,
+      );
+      return res.projects ?? [];
+    },
+    /** Idempotent: projects and tasks that are already bound are reused. At most 25 projects per call. */
+    importProjects: (slug: string, remoteProjectIds: string[], o?: RequestOptions) =>
+      this.post<LunaGestImportResult>(`${this.w(slug)}/lunagest/import`, { remoteProjectIds }, o),
     project: (slug: string, projectId: ID, o?: RequestOptions) =>
       this.get<LunaGestProjectLink>(`${this.w(slug)}/projects/${projectId}/lunagest`, undefined, o),
     linkProject: (
@@ -914,19 +632,19 @@ export class ApiClient {
         o,
       ),
     issue: (slug: string, idOrKey: string, o?: RequestOptions) =>
-      this.get<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest`, undefined, o),
+      this.get<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest`, undefined, o),
     remoteTasks: async (slug: string, idOrKey: string, o?: RequestOptions) => {
       const res = await this.get<{ tasks: LunaGestRemoteTask[] }>(
-        `${this.w(slug)}/issues/${idOrKey}/lunagest/remote-tasks`,
+        `${this.w(slug)}/tasks/${idOrKey}/lunagest/remote-tasks`,
         undefined,
         o,
       );
       return res.tasks ?? [];
     },
     pushIssue: (slug: string, idOrKey: string, o?: RequestOptions) =>
-      this.post<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest/push`, {}, o),
+      this.post<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest/push`, {}, o),
     linkIssue: (slug: string, idOrKey: string, input: LinkLunaGestTaskInput, o?: RequestOptions) =>
-      this.put<LunaGestIssueLink>(`${this.w(slug)}/issues/${idOrKey}/lunagest`, input, o),
+      this.put<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest`, input, o),
   };
 
   /** The signed-in person's timer. Not sent to LunaGest. */

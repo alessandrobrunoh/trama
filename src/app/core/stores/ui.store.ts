@@ -10,7 +10,6 @@ export type ModalKind =
   | 'shortcuts'
   | 'customize-sidebar'
   | 'create'
-  | 'customer'
   | 'confirm-delete'
   | null;
 
@@ -24,22 +23,9 @@ const SIDEBAR_BADGE_STYLES = ['count', 'dot'] as const;
 const SIDEBAR_SECTIONS = ['personal', 'workspace'] as const;
 
 /** What the global "create" dialog creates. */
-export type CreateKind =
-  | 'issue'
-  | 'decision'
-  | 'artifact'
-  | 'view'
-  | 'team'
-  | 'repository'
-  | 'project'
-  | 'input-request';
+export type CreateKind = 'issue' | 'artifact' | 'view' | 'project';
 
-/** What the customer dialog does: add a customer, or record a request (optionally prefilled with who and where). */
-export type CustomerDialogState =
-  | { kind: 'customer' }
-  | { kind: 'request'; customerId?: string; issueId?: string; projectId?: string };
-
-/** Prefill for the create dialog, e.g. `{ teamId }`, `{ projectId }`, `{ kind: 'bug' }`. */
+/** Prefill for the create dialog, e.g. `{ projectId }`, `{ kind: 'bug' }`. */
 export type CreateDefaults = Record<string, unknown>;
 
 export interface ConfirmDeleteState {
@@ -59,7 +45,7 @@ export interface ConfirmDeleteState {
 
 interface PersistedUi {
   sidebarCollapsed: boolean;
-  /** Sidebar section / team ids the user folded away. */
+  /** Sidebar sections the user folded away. */
   foldedSections: string[];
   sidebarBadgeStyle: SidebarBadgeStyle;
   /** Per sidebar entry (path segment); missing means "always". */
@@ -96,7 +82,7 @@ export class UiStore {
   readonly sidebarCollapsed = signal<boolean>(
     typeof this.persisted?.sidebarCollapsed === 'boolean' ? this.persisted.sidebarCollapsed : false,
   );
-  /** Folded sidebar groups ("teams", "views", "team:<id>"). Persisted. */
+  /** Folded sidebar groups (e.g. "views"). Persisted. */
   readonly foldedSections = signal<string[]>(
     Array.isArray(this.persisted?.foldedSections) ? this.persisted.foldedSections.filter((x) => typeof x === 'string') : [],
   );
@@ -114,7 +100,6 @@ export class UiStore {
   readonly checklistRequests = signal(0);
   readonly mobileSidebarOpen = signal(false);
   readonly modal = signal<ModalKind>(null);
-  readonly customerDialog = signal<CustomerDialogState>({ kind: 'customer' });
   readonly createKind = signal<CreateKind>('issue');
   readonly createDefaults = signal<CreateDefaults>({});
   readonly confirmDelete = signal<ConfirmDeleteState | null>(null);
@@ -200,11 +185,6 @@ export class UiStore {
     this.createKind.set(kind);
     this.createDefaults.set(defaults);
     this.openModal('create');
-  }
-  /** Open the dialog that adds a customer or records a customer request. */
-  openCustomerDialog(state: CustomerDialogState): void {
-    this.customerDialog.set(state);
-    this.openModal('customer');
   }
   /** Opens the confirm dialog (or closes it when `state` is null). */
   setConfirmDelete(state: ConfirmDeleteState | null): void {

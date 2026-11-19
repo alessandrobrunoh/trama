@@ -1,6 +1,5 @@
 import {
   BadRequestException,
-  ConflictException,
   Inject,
   Injectable,
   Optional,
@@ -17,28 +16,16 @@ import type {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import {
-  applyProjectScope,
-  currentAccess,
-  projectHidden,
-} from '../auth/member-access.js';
-import {
-  ArtifactEntity,
-  DocumentEntity,
-  IssueEntity,
-  ProjectEntity,
-} from '../database/entities/index.js';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
+import { ArtifactEntity, IssueEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { isWorkspaceUploadUrl } from '../uploads/upload-rules.js';
 import { UploadsService } from '../uploads/uploads.service.js';
 
-/** `null` detaches an owner (PATCH); `undefined` leaves it alone. */
+/** `undefined` leaves a field alone; `null` clears it (an artifact must keep a task owner). */
 export interface ArtifactInput {
-  projectId?: string | null;
   issueId?: string | null;
-  repositoryId?: string | null;
-  /** Create only: points the artifact at a Trama document (kind `document`); the title and provider follow it. */
-  documentId?: string | null;
+  repository?: string | null;
   description?: string | null;
   kind?: ArtifactKind;
   provider?: ArtifactProvider;
@@ -53,9 +40,8 @@ export interface ArtifactInput {
 }
 
 export interface ArtifactFilter {
-  projectId?: string;
   issueId?: string;
-  repositoryId?: string;
+  repository?: string;
   kind?: ArtifactKind;
   state?: ArtifactState;
 }
@@ -89,13 +75,8 @@ export function isHttpUrl(value: string | null | undefined): boolean {
 }
 
 /** The owner ids of an artifact row (only the ones that are set). */
-export function artifactOwners(
-  row: Pick<ArtifactEntity, 'projectId' | 'issueId'>,
-) {
-  return {
-    ...(row.projectId ? { projectId: row.projectId } : {}),
-    ...(row.issueId ? { issueId: row.issueId } : {}),
-  };
+export function artifactOwners(row: Pick<ArtifactEntity, 'issueId'>) {
+  return row.issueId ? { issueId: row.issueId } : {};
 }
 
 @Injectable()
@@ -116,33 +97,31 @@ export class ArtifactsService {
       .createQueryBuilder('a')
       .where('a.workspaceId = :workspaceId', { workspaceId })
       .orderBy('a.createdAt', 'DESC');
-    if (f.projectId) qb.andWhere('a.projectId = :p', { p: f.projectId });
     if (f.issueId) qb.andWhere('a.issueId = :i', { i: f.issueId });
-    if (f.repositoryId)
-      qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
+    if (f.repository)
+      qb.andWhere('a.repository = :r', { r: f.repository });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
     const access = currentAccess();
     if (access && !access.projects.all) {
       const ids = access.projects.projectIds;
       const scope = ids.length
-        ? `(a."projectId" IN (:...memberProjectIds) OR EXISTS (SELECT 1 FROM issues i WHERE i.id = a."issueId" AND i."projectId" IN (:...memberProjectIds))${access.includeUnassigned ? ' OR (a."projectId" IS NULL AND a."issueId" IS NULL)' : ''})`
+        ? `(EXISTS (SELECT 1 FROM issues i WHERE i.id = a."issueId" AND (i."projectId" IN (:...memberProjectIds)${access.includeUnassigned ? ' OR i."projectId" IS NULL' : ''}))${access.includeUnassigned ? ' OR a."issueId" IS NULL' : ''})`
         : access.includeUnassigned
-          ? '(a."projectId" IS NULL AND a."issueId" IS NULL)'
+          ? '(a."issueId" IS NULL OR EXISTS (SELECT 1 FROM issues i WHERE i.id = a."issueId" AND i."projectId" IS NULL))'
           : '1 = 0';
       qb.andWhere(scope, ids.length ? { memberProjectIds: ids } : undefined);
     }
     return qb.getMany();
   }
 
-  /** Counts issue artifacts visible to the caller without loading artifact rows. */
+  /** Counts the artifacts of an issue the caller can already see, without loading artifact rows. */
   countForIssue(workspaceId: string, issueId: string): Promise<number> {
-    const qb = this.repo
+    return this.repo
       .createQueryBuilder('a')
       .where('a.workspaceId = :workspaceId', { workspaceId })
-      .andWhere('a.issueId = :issueId', { issueId });
-    applyProjectScope(qb, 'a', 'projectId');
-    return qb.getCount();
+      .andWhere('a.issueId = :issueId', { issueId })
+      .getCount();
   }
 
   async get(workspaceId: string, id: string) {
@@ -152,7 +131,6 @@ export class ArtifactsService {
   }
 
   private async isHidden(row: ArtifactEntity): Promise<boolean> {
-    if (row.projectId) return projectHidden(currentAccess(), row.projectId);
     if (row.issueId) {
       const issue = await this.ds.getRepository(IssueEntity).findOne({
         where: { id: row.issueId, workspaceId: row.workspaceId },
@@ -161,17 +139,6 @@ export class ArtifactsService {
       return projectHidden(currentAccess(), issue?.projectId);
     }
     return projectHidden(currentAccess(), null);
-  }
-
-  /** 404 when the project is absent or outside the caller's project scope. */
-  async assertProject(workspaceId: string, projectId: string): Promise<void> {
-    if (
-      projectHidden(currentAccess(), projectId) ||
-      !(await this.ds
-        .getRepository(ProjectEntity)
-        .existsBy({ id: projectId, workspaceId }))
-    )
-      throw notFound('Project', projectId);
   }
 
   /** Resolves an issue by id, project key (`CORA-12`) or alias; 404 when unknown. */
@@ -201,23 +168,11 @@ export class ArtifactsService {
     return row.id;
   }
 
-  /** Every referenced owner must exist in the workspace. */
+  /** The referenced task must exist in the workspace and be visible to the caller. */
   private async validateOwners(
     workspaceId: string,
-    o: {
-      projectId?: string | null;
-      issueId?: string | null;
-    },
+    o: { issueId?: string | null },
   ) {
-    if (o.projectId) {
-      if (
-        projectHidden(currentAccess(), o.projectId) ||
-        !(await this.ds
-          .getRepository(ProjectEntity)
-          .existsBy({ id: o.projectId, workspaceId }))
-      )
-        throw new BadRequestException(`Unknown project "${o.projectId}"`);
-    }
     if (o.issueId) {
       const issue = await this.ds.getRepository(IssueEntity).findOne({
         where: { id: o.issueId, workspaceId },
@@ -230,8 +185,6 @@ export class ArtifactsService {
   }
 
   private async validate(workspaceId: string, input: ArtifactInput) {
-    if (input.repositoryId)
-      await this.refs.repositories(workspaceId, [input.repositoryId]);
     await this.validateOwners(workspaceId, input);
   }
 
@@ -260,47 +213,16 @@ export class ArtifactsService {
     );
   }
 
-  /** The document a `document` artifact points to: it must exist in the workspace and not already be attached to the same owner. */
-  private async resolveDocument(
-    workspaceId: string,
-    input: ArtifactInput & { kind: ArtifactKind },
-  ) {
-    if (!input.documentId) return null;
-    if (input.kind !== 'document')
-      throw new BadRequestException('documentId needs kind "document"');
-    const doc = await this.ds.getRepository(DocumentEntity).findOne({
-      where: { workspaceId, id: input.documentId },
-      select: { id: true, title: true },
-    });
-    if (!doc)
-      throw new BadRequestException(`Unknown document "${input.documentId}"`);
-    for (const owner of ['projectId', 'issueId'] as const) {
-      if (
-        input[owner] &&
-        (await this.repo.existsBy({
-          workspaceId,
-          documentId: doc.id,
-          [owner]: input[owner],
-        }))
-      )
-        throw new ConflictException('This document is already attached there');
-    }
-    return doc;
-  }
-
   async create(
     workspaceId: string,
     actor: ActorRef,
     input: ArtifactInput & { kind: ArtifactKind },
   ) {
-    if (!input.projectId && !input.issueId)
-      throw new BadRequestException(
-        'An artifact needs at least one owner: projectId or issueId',
-      );
+    if (!input.issueId)
+      throw new BadRequestException('An artifact needs a task: issueId');
     this.assertLinkUrl(input.kind, input.url);
     await this.validate(workspaceId, input);
-    const doc = await this.resolveDocument(workspaceId, input);
-    const title = doc?.title ?? input.title?.trim();
+    const title = input.title?.trim();
     if (!title) throw new BadRequestException('An artifact needs a title');
     const isPr =
       input.kind === 'pull_request' || input.kind === 'merge_request';
@@ -308,22 +230,19 @@ export class ArtifactsService {
       this.repo.create({
         id: uid('ar'),
         workspaceId,
-        projectId: input.projectId ?? null,
-        issueId: input.issueId ?? null,
-        repositoryId: input.repositoryId ?? null,
+        issueId: input.issueId,
+        repository: input.repository ?? null,
         description: input.description?.trim() || null,
         kind: input.kind,
-        provider: doc
-          ? 'docs'
-          : (input.provider ??
-            (input.kind === 'merge_request'
-              ? 'gitlab'
-              : input.kind === 'pull_request'
-                ? 'github'
-                : 'other')),
+        provider:
+          input.provider ??
+          (input.kind === 'merge_request'
+            ? 'gitlab'
+            : input.kind === 'pull_request'
+              ? 'github'
+              : 'other'),
         title,
-        documentId: doc?.id ?? null,
-        url: doc ? null : (input.url ?? null),
+        url: input.url ?? null,
         externalId: input.externalId ?? null,
         state: input.state ?? DEFAULT_STATE[input.kind],
         ci: input.ci ?? (isPr ? 'pending' : null),
@@ -384,19 +303,12 @@ export class ArtifactsService {
         fields.push(k);
       }
     };
-    if (patch.title !== undefined) {
-      if (row.documentId)
-        throw new BadRequestException(
-          'The title of a document artifact follows the document; rename the document instead',
-        );
-      set('title', patch.title.trim());
-    }
+    if (patch.title !== undefined) set('title', patch.title.trim());
     if (patch.description !== undefined)
       set('description', patch.description?.trim() || null);
     for (const k of [
-      'projectId',
       'issueId',
-      'repositoryId',
+      'repository',
       'provider',
       'url',
       'externalId',
@@ -414,10 +326,8 @@ export class ArtifactsService {
       fields.push('uploadId');
     }
     if (!fields.length) return row;
-    if (!row.projectId && !row.issueId)
-      throw new BadRequestException(
-        'An artifact needs at least one owner: projectId or issueId',
-      );
+    if (!row.issueId)
+      throw new BadRequestException('An artifact needs a task: issueId');
     this.assertLinkUrl(row.kind, row.url, row.uploadId);
     row.updatedAt = new Date();
     await this.repo.save(row);

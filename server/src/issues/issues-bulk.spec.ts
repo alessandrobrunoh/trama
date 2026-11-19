@@ -26,7 +26,6 @@ function issue(id: string, over: Partial<IssueEntity> = {}): IssueEntity {
     status: 'todo',
     priority: 'none',
     assigneeId: null,
-    teamId: null,
     projectId: null,
     parentId: null,
     duplicateOfId: null,
@@ -47,13 +46,13 @@ function makeService(opts: { failSave?: boolean } = {}) {
     return r;
   });
   const query = vi.fn(async (sql: string, params?: unknown[]) => {
-    if (sql.startsWith('SELECT "id", "teamId"')) {
+    if (sql.includes('FROM "projects"')) return [{ key: 'BUG' }];
+    if (sql.startsWith('SELECT "id", "projectId"')) {
       const ids = params?.[1] as string[];
       return ids.map((id) => {
         const row = byId.get(id) ?? issue(id);
         return {
           id,
-          teamId: row.teamId,
           projectId: row.projectId,
           parentId: row.parentId,
           key: row.key,
@@ -82,15 +81,14 @@ function makeService(opts: { failSave?: boolean } = {}) {
       }
       return [...byId.values()].filter((row) => ids.includes(row.id));
     }
-    return undefined;
+    return [];
   });
   const del = vi.fn(async () => undefined);
   const update = vi.fn(async () => undefined);
   const manager = { save, query, update, delete: del };
   const transaction = vi.fn(async (fn: (m: unknown) => Promise<void>) => fn(manager));
-  const record = vi.fn(async () => undefined);
+  const record = vi.fn(async (_event: { type: string }) => undefined);
   const refs = {
-    teams: vi.fn(async () => undefined),
     users: vi.fn(async () => undefined),
     projects: vi.fn(async () => undefined),
   };
@@ -127,7 +125,7 @@ function makeService(opts: { failSave?: boolean } = {}) {
       getRepository: () => ({ findOneBy: workspaceFind, findBy: vi.fn(async () => []) }),
     } as never,
     refs as never,
-    {} as never,
+    { next: vi.fn(async () => 1), nextAbove: vi.fn(async () => 1) } as never,
     { record } as never,
     labels as never,
     repo as never,
@@ -227,10 +225,10 @@ describe('IssuesService.updateMany', () => {
     const { service, refs } = makeService();
     await service.updateMany('ws_1', actor, [issue('in_a'), issue('in_b'), issue('in_c')], {
       assigneeId: 'usr_x',
-      teamId: 'tm_x',
+      projectId: 'pj_x',
     });
-    expect(refs.teams).toHaveBeenCalledTimes(1);
-    expect(refs.teams).toHaveBeenCalledWith('ws_1', ['tm_x']);
+    expect(refs.projects).toHaveBeenCalledTimes(1);
+    expect(refs.projects).toHaveBeenCalledWith('ws_1', ['pj_x']);
     expect(refs.users).toHaveBeenCalledWith('ws_1', ['usr_x']);
   });
 
@@ -321,15 +319,15 @@ describe('IssuesService.removeMany', () => {
     expect(eventTypes(record)).toEqual(['issue.deleted', 'issue.deleted']);
   });
 
-  it('leaves issues untouched when related-team authorization rejects a hierarchy delete', async () => {
+  it('leaves issues untouched when authorization rejects a hierarchy delete', async () => {
     const { service, byId, del, record } = makeService();
-    const parent = issue('in_parent', { teamId: 'tm_locked' });
+    const parent = issue('in_parent');
     const child = issue('in_child', { parentId: parent.id });
     byId.set(parent.id, parent);
     byId.set(child.id, child);
-    const authorize = vi.fn(async (affected: readonly IssueEntity[]) => {
+    const authorize = vi.fn(async (affected: readonly { id: string }[]) => {
       expect(affected.map((row) => row.id).sort()).toEqual(['in_child', 'in_parent']);
-      throw new ForbiddenException('team policy');
+      throw new ForbiddenException('project hidden');
     });
 
     await expect(
@@ -378,78 +376,27 @@ describe('IssuesController bulk', () => {
     const service = {
       getMany: vi.fn(async () => rows),
       updateMany: vi.fn(async (_w: string, _a: unknown, r: IssueEntity[]) => r),
-      removeMany: vi.fn(
-        async (
-          _w: string,
-          _a: unknown,
-          affected: IssueEntity[],
-          authorize: (rows: readonly IssueEntity[]) => Promise<void>,
-        ) => authorize(affected),
-      ),
+      removeMany: vi.fn(async () => undefined),
       visibleParentIds: vi.fn(async () => new Set<string>()),
     };
-    const permissions = {
-      assertTeamEdit: vi.fn(async (_c: unknown, team: string) => {
-        if (team === 'tm_locked') throw new ForbiddenException('Team LCK only lets its members edit');
-      }),
-    };
-    const customers = { attachCounts: vi.fn(async () => undefined) };
-    const artifacts = { countForIssue: vi.fn(async () => 0) };
-    const controller = new IssuesController(
-      service as never,
-      customers as never,
-      permissions as never,
-      artifacts as never,
-      {} as never,
-      {} as never,
-    );
-    return { controller, service, permissions };
+    const controller = new IssuesController(service as never, {} as never);
+    return { controller, service };
   }
 
-  it('checks the edit policy of every team involved, including the one issues move to', async () => {
-    const { controller, permissions, service } = makeController([
-      issue('in_a', { teamId: 'tm_a' }),
-      issue('in_b', { teamId: 'tm_a' }),
-      issue('in_c'),
-    ]);
+  it('updates the batch without a team policy', async () => {
+    const { controller, service } = makeController([issue('in_a'), issue('in_b')]);
     await controller.bulkUpdate(ctx, actor, {
-      ids: ['in_a', 'in_b', 'in_c'],
-      patch: { teamId: 'tm_b' },
+      ids: ['in_a', 'in_b'],
+      patch: { priority: 'low' },
     });
-    expect(permissions.assertTeamEdit.mock.calls.map((c) => c[1]).sort()).toEqual(['tm_a', 'tm_b']);
     expect(service.updateMany).toHaveBeenCalledTimes(1);
   });
 
-  it('403s without writing when one issue belongs to a team the caller cannot edit', async () => {
-    const { controller, service } = makeController([
-      issue('in_a'),
-      issue('in_b', { teamId: 'tm_locked' }),
-    ]);
-    await expect(
-      controller.bulkUpdate(ctx, actor, { ids: ['in_a', 'in_b'], patch: { priority: 'low' } }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
-    expect(service.updateMany).not.toHaveBeenCalled();
-  });
-
-  it('403s a bulk delete the same way and returns the deleted ids otherwise', async () => {
-    const locked = makeController([issue('in_a', { teamId: 'tm_locked' })]);
-    await expect(locked.controller.bulkDelete(ctx, actor, { ids: ['in_a'] })).rejects.toBeInstanceOf(
-      ForbiddenException,
-    );
-    expect(locked.service.removeMany).not.toHaveBeenCalled();
-
+  it('returns the deleted ids', async () => {
     const ok = makeController([issue('in_a'), issue('in_b')]);
     expect(await ok.controller.bulkDelete(ctx, actor, { ids: ['in_a', 'in_b'] })).toEqual({
       deleted: ['in_a', 'in_b'],
     });
-
-    const relatedLocked = makeController([issue('in_parent')]);
-    relatedLocked.service.removeMany.mockImplementation(async (_w, _a, _rows, authorize) =>
-      authorize([issue('in_parent'), issue('in_child', { teamId: 'tm_locked' })]),
-    );
-    await expect(
-      relatedLocked.controller.bulkDelete(ctx, actor, { ids: ['in_parent'] }),
-    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

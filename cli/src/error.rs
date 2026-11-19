@@ -228,9 +228,9 @@ mod tests {
 
     #[test]
     fn error_json_is_stable() {
-        let v = CliError::from_http(404, r#"{"message":"Issue not found"}"#).to_json();
+        let v = CliError::from_http(404, r#"{"message":"Task not found"}"#).to_json();
         assert_eq!(v["error"]["code"], "not_found");
         assert_eq!(v["error"]["status"], 404);
-        assert_eq!(v["error"]["message"], "Issue not found");
+        assert_eq!(v["error"]["message"], "Task not found");
     }
 }

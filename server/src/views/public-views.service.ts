@@ -5,13 +5,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
-import {
-  buildDemandIndex,
-  mergeDemand,
-  resolveLabelCatalog,
-  type CustomerRequest,
-  type Demand,
-} from '../contracts/domain.js';
+import { resolveLabelCatalog } from '../contracts/domain.js';
 import type {
   PublicView,
   PublicViewGroup,
@@ -19,15 +13,10 @@ import type {
   ViewEntity,
 } from '../contracts/domain.js';
 import {
-  CustomerEntity,
-  CustomerRequestEntity,
-  DecisionEntity,
   IssueEntity,
   MembershipEntity,
   ProjectEntity,
-  ReleaseEntity,
   SavedViewEntity,
-  TeamEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
@@ -92,9 +81,6 @@ export class PublicViewsService {
     const { workspaceId, entity } = view;
     const rows = await this.rowsOf(entity, workspaceId);
     const ctx: QueryContext = {};
-    if (entity === 'issue' || entity === 'project') {
-      ctx.demand = await this.demandFor(workspaceId, entity, rows);
-    }
 
     const sort =
       view.sort ??
@@ -142,109 +128,6 @@ export class PublicViewsService {
     };
   }
 
-  /** Customer demand per issue or project of the workspace (a project counts the requests on its issues too). */
-  private async demandFor(
-    workspaceId: string,
-    entity: 'issue' | 'project',
-    rows: readonly Row[],
-  ): Promise<Map<string, Demand>> {
-    const targetIds = [...new Set(rows.map((row) => String(row['id'])))];
-    if (!targetIds.length) return new Map();
-
-    const requestsRepo = this.ds.getRepository(CustomerRequestEntity);
-    const requestProjection = {
-      customerId: true,
-      important: true,
-      issueId: true,
-      projectId: true,
-    } as const;
-    let issues: Pick<IssueEntity, 'id' | 'projectId'>[] = [];
-    let requests: CustomerRequestEntity[];
-    if (entity === 'issue') {
-      requests = await this.boundedRows(
-        requestsRepo.find({
-          where: { workspaceId, issueId: In(targetIds) },
-          select: requestProjection,
-          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-        }),
-      );
-    } else {
-      issues = await this.boundedRows(
-        this.ds.getRepository(IssueEntity).find({
-          where: { workspaceId, projectId: In(targetIds) },
-          select: { id: true, projectId: true },
-          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-        }),
-      );
-      const issueIds = issues.map((issue) => issue.id);
-      const requestTargets = [
-        { workspaceId, projectId: In(targetIds) },
-        ...(issueIds.length ? [{ workspaceId, issueId: In(issueIds) }] : []),
-      ];
-      requests = await this.boundedRows(
-        requestsRepo.find({
-          where: requestTargets as never,
-          select: requestProjection,
-          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-        }),
-      );
-    }
-    if (!requests.length) return new Map();
-    const customerIds = [
-      ...new Set(requests.map((request) => request.customerId)),
-    ];
-    const customers = new Map(
-      (
-        await this.boundedRows(
-          this.ds.getRepository(CustomerEntity).find({
-            where: { workspaceId, id: In(customerIds) },
-            select: { id: true, tierId: true, revenue: true, size: true },
-            take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-          }),
-        )
-      ).map((c) => [
-        c.id,
-        {
-          tierId: c.tierId ?? undefined,
-          revenue: c.revenue ?? undefined,
-          size: c.size ?? undefined,
-        },
-      ]),
-    );
-    const own = buildDemandIndex(
-      requests.map(
-        (r) =>
-          ({
-            customerId: r.customerId,
-            important: r.important,
-            issueId: r.issueId ?? undefined,
-            projectId: r.projectId ?? undefined,
-          }) as unknown as CustomerRequest,
-      ),
-      customers,
-    );
-    if (entity === 'issue') return own;
-    // A project also counts the requests on its directly assigned issues.
-    const byProject = new Map<string, Demand[]>();
-    for (const issue of issues) {
-      const demand = own.get(issue.id);
-      if (!demand) continue;
-      if (!issue.projectId) continue;
-      const bucket = byProject.get(issue.projectId);
-      if (bucket) bucket.push(demand);
-      else byProject.set(issue.projectId, [demand]);
-    }
-    const out = new Map<string, Demand>();
-    for (const row of rows) {
-      const id = String(row['id']);
-      const parts = [own.get(id), ...(byProject.get(id) ?? [])].filter(
-        (d): d is Demand => !!d,
-      );
-      if (parts.length) out.set(id, mergeDemand(parts, customers));
-    }
-    return out;
-  }
-
   private async rowsOf(
     entity: ViewEntity,
     workspaceId: string,
@@ -255,10 +138,6 @@ export class PublicViewsService {
       case 'issue':
         return (await this.boundedRows(
           this.ds.getRepository(IssueEntity).find({ where, take }),
-        )) as unknown as Row[];
-      case 'decision':
-        return (await this.boundedRows(
-          this.ds.getRepository(DecisionEntity).find({ where, take }),
         )) as unknown as Row[];
       case 'project':
         return (await this.boundedRows(
@@ -279,7 +158,7 @@ export class PublicViewsService {
     return rows;
   }
 
-  /** Display names for the teams, people, projects and releases the returned rows point at. */
+  /** Display names for the people and projects the returned rows point at. */
   private async namesFor(
     workspaceId: string,
     entity: ViewEntity,
@@ -288,24 +167,20 @@ export class PublicViewsService {
     ctx: QueryContext,
   ): Promise<Names> {
     const names: Names = {
-      team: new Map(),
       user: new Map(),
       project: new Map(),
-      release: new Map(),
     };
     const fields = new Set<string>(
       entity === 'issue'
-        ? ['teamId', 'assigneeId', 'projectId']
+        ? ['assigneeId', 'projectId']
         : entity === 'project'
           ? ['leadId']
           : [],
     );
     if (groupBy) fields.add(groupBy);
     const ids: Record<RefKind, Set<string>> = {
-      team: new Set(),
       user: new Set(),
       project: new Set(),
-      release: new Set(),
     };
     let referenceCount = 0;
     for (const field of fields) {
@@ -325,15 +200,6 @@ export class PublicViewsService {
         }
       }
     }
-    if (ids.team.size)
-      for (const t of await this.boundedRows(
-        this.ds.getRepository(TeamEntity).find({
-          where: { workspaceId, id: In([...ids.team]) },
-          select: { id: true, name: true },
-          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-        }),
-      ))
-        names.team.set(t.id, t.name);
     if (ids.project.size)
       for (const p of await this.boundedRows(
         this.ds.getRepository(ProjectEntity).find({
@@ -343,15 +209,6 @@ export class PublicViewsService {
         }),
       ))
         names.project.set(p.id, p.name);
-    if (ids.release.size)
-      for (const r of await this.boundedRows(
-        this.ds.getRepository(ReleaseEntity).find({
-          where: { workspaceId, id: In([...ids.release]) },
-          select: { id: true, name: true },
-          take: PUBLIC_VIEW_SCAN_LIMIT + 1,
-        }),
-      ))
-        names.release.set(r.id, r.name);
     if (ids.user.size) {
       const members = await this.boundedRows(
         this.ds.getRepository(MembershipEntity).find({
@@ -418,18 +275,9 @@ export class PublicViewsService {
           kind: str(r['kind']),
           status: str(r['status']),
           priority: str(r['priority']) as PublicViewItem['priority'],
-          team: name('team', r['teamId']),
           assignee: name('user', r['assigneeId']),
           project: name('project', r['projectId']),
           labels: labels(r['labels']),
-        });
-      case 'decision':
-        return compact({
-          ...base,
-          key: str(r['key']),
-          title: str(r['title']) ?? '',
-          status: str(r['status']),
-          labels: strs(r['tags']),
         });
       case 'project':
         return compact({

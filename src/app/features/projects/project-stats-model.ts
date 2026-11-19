@@ -1,7 +1,7 @@
 // Insights of one project, computed from its issues and milestones.
 // Pure functions: the tab passes the records and `now`, nothing here reads the store.
 import { addDays, differenceInCalendarDays, format, startOfDay, startOfWeek } from 'date-fns';
-import type { Issue, IssueStatus, Milestone, Priority, Project } from '../../core/contracts/domain';
+import type { Issue, Milestone, Project } from '../../core/contracts/domain';
 
 const DAY = 86_400_000;
 
@@ -86,8 +86,6 @@ export interface ProjectStats {
   burnUp: BurnUp | null;
   velocity: VelocityWeek[];
   forecast: Forecast;
-  statusCounts: { status: IssueStatus; count: number }[];
-  priorityCounts: { priority: Priority; count: number }[];
   assignees: CountRow[];
   milestones: MilestoneProgress[];
   /** Cumulative completed count, one entry per burn-up point (for the KPI sparkline). */
@@ -130,20 +128,9 @@ export function projectStats(input: ProjectStatsInput): ProjectStats {
     completedTrend: burn?.series.completed ?? [],
     velocity: velocity(issues, now, input.weekStartsOn),
     forecast: forecast(issues, kpis, target, now),
-    statusCounts: countBy(issues, (i) => i.status).map(([status, count]) => ({ status, count })),
-    priorityCounts: countBy(scoped, (i) => i.priority).map(([priority, count]) => ({
-      priority,
-      count,
-    })),
     assignees: assigneeRows(scoped, input.userName),
     milestones: milestoneRows(input.milestones, issues, now),
   };
-}
-
-function countBy<K extends string>(items: readonly Issue[], key: (i: Issue) => K): [K, number][] {
-  const map = new Map<K, number>();
-  for (const i of items) map.set(key(i), (map.get(key(i)) ?? 0) + 1);
-  return [...map.entries()];
 }
 
 /** Scope vs started vs completed over time, from `createdAt`, `startedAt` and `completedAt`. */

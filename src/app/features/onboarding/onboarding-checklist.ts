@@ -8,7 +8,7 @@ import { UiStore } from '../../core/stores/ui.store';
 import { Viewport } from '../../core/viewport';
 
 /**
- * "Get started" card for workspaces that are still being set up: six steps from the first team to a connected
+ * "Get started" card for workspaces that are still being set up: five steps from the first invite to a connected
  * agent. Done steps come from real data (see OnboardingStore). Dismissible; the help menu brings it back.
  */
 @Component({
@@ -18,7 +18,7 @@ import { Viewport } from '../../core/viewport';
   host: { class: 'block' },
   template: `
     @if (onboarding.visible() && compact() && !expanded()) {
-      <section class="bg-card flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg border px-4 py-2" aria-label="Setup checklist">
+      <section class="bg-card flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-4 py-2" aria-label="Setup checklist">
         <div
           class="bg-muted h-1 w-16 shrink-0 overflow-hidden rounded-full max-sm:hidden"
           role="progressbar"
@@ -48,7 +48,7 @@ import { Viewport } from '../../core/viewport';
         </button>
       </section>
     } @else if (onboarding.visible()) {
-      <section class="bg-card rounded-lg border" aria-labelledby="onboarding-title">
+      <section class="bg-card rounded-lg" aria-labelledby="onboarding-title">
         <header class="flex items-start gap-3 px-4 pt-4 pb-3 sm:px-5">
           <div class="min-w-0 flex-1">
             <h2 id="onboarding-title" class="text-[15px] font-semibold tracking-tight">
@@ -89,7 +89,7 @@ import { Viewport } from '../../core/viewport';
 
         <ol class="mt-2 pb-2">
           @for (step of onboarding.steps(); track step.id) {
-            <li class="flex items-start gap-3 px-4 py-2 sm:px-5" [class.bg-muted/40]="onboarding.next()?.id === step.id">
+            <li class="flex items-start gap-3 px-4 py-2 sm:px-5" [class.bg-muted]="onboarding.next()?.id === step.id">
               <span
                 class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border"
                 [class.bg-primary]="step.done"

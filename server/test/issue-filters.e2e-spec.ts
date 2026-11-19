@@ -13,7 +13,7 @@ describe('issue list filters: priority and open', () => {
   it('filters by one or several priorities and by open status', async () => {
     const owner = await Client.signup(server, 'Olivia');
     const slug = (await owner.client.post('/api/workspaces', { name: 'Filters Co' }).expect(201)).body.slug as string;
-    const w = `/api/w/${slug}/issues`;
+    const w = `/api/w/${slug}/tasks`;
     const make = (title: string, priority: string, status: string) =>
       owner.client.post(w, { kind: 'bug', title, priority, status }).expect(201);
     await make('urgent open', 'urgent', 'todo');

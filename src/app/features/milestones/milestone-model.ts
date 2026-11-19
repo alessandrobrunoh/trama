@@ -95,15 +95,15 @@ export function milestoneState(ms: Pick<Milestone, 'targetDate'>, s: MilestoneSt
 
 /** "61% of ◬ 7" / "61% of 7 issues". */
 export function progressLabel(s: MilestoneStats): string {
-  if (s.issues === 0) return 'No issues';
-  return s.points ? `${s.percent}% of ◬ ${fmtNum(s.scope)}` : `${s.percent}% of ${s.issues} ${s.issues === 1 ? 'issue' : 'issues'}`;
+  if (s.issues === 0) return 'No tasks';
+  return s.points ? `${s.percent}% of ◬ ${fmtNum(s.scope)}` : `${s.percent}% of ${s.issues} ${s.issues === 1 ? 'task' : 'tasks'}`;
 }
 
 export const fmtNum = (n: number): string => (Number.isInteger(n) ? String(n) : String(Math.round(n * 10) / 10));
 
 /** "◬ 7" or "7 issues". */
 export function unitLabel(n: number, points: boolean): string {
-  return points ? `◬ ${fmtNum(n)}` : `${fmtNum(n)} ${n === 1 ? 'issue' : 'issues'}`;
+  return points ? `◬ ${fmtNum(n)}` : `${fmtNum(n)} ${n === 1 ? 'task' : 'tasks'}`;
 }
 
 // ───────────────────────── burn-up ─────────────────────────

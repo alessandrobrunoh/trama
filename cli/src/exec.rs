@@ -41,7 +41,7 @@ fn dry_run(call: &Call, ctx: &Ctx) -> Result<()> {
     Ok(())
 }
 
-/// `label` names the command for the confirmation prompt (e.g. `issue delete CORA-1`).
+/// `label` names the command for the confirmation prompt (e.g. `task delete CORA-1`).
 pub async fn run(label: &str, call: &Call, accept: &str, ctx: &Ctx) -> Result<()> {
     if ctx.dry_run {
         return dry_run(call, ctx);
@@ -77,6 +77,32 @@ pub async fn run(label: &str, call: &Call, accept: &str, ctx: &Ctx) -> Result<()
         return output::print_reply(&reply, &ctx.fmt);
     }
     run_across(&targets, call, accept, ctx).await
+}
+
+/// Sends one request to the single workspace the flags select and returns the JSON reply (`null` when
+/// it has no body), for commands that read or combine several routes. A request that matched more than
+/// one profile is refused: such a command works on one workspace at a time.
+pub async fn fetch(call: &Call, ctx: &Ctx) -> Result<Value> {
+    let mut targets = config::resolve_many(&ctx.ov)?;
+    if targets.len() > 1 {
+        let where_: Vec<String> = targets
+            .iter()
+            .map(|c| c.workspace.clone().unwrap_or_else(|| "?".into()))
+            .collect();
+        return Err(CliError::usage(format!("this command works on one workspace at a time (it matched {})", where_.join(", ")))
+            .hint("Add `--profile <name>` or `--workspace <slug>`."));
+    }
+    let creds = targets.pop().ok_or_else(CliError::not_logged_in)?;
+    let api = Api::new(&creds.url, ctx.timeout)?;
+    let slug = auth::workspace_slug(&api, &creds).await?;
+    let reply = api
+        .workspace(&creds.token, &slug, call, crate::http::ACCEPT_JSON)
+        .await?
+        .into_result()?;
+    if reply.body.trim().is_empty() {
+        return Ok(Value::Null);
+    }
+    reply.json().map_err(|e| e.hint("Use `-o raw` on a plain command to see the reply."))
 }
 
 /// One read, sent to every matching profile. Each row carries the workspace it came from, so keys

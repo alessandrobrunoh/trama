@@ -1,10 +1,6 @@
 import type { ViewEntity, ViewLayout } from '../contracts/domain.js';
 
-export const VIEW_ENTITIES: readonly ViewEntity[] = [
-  'issue',
-  'decision',
-  'project',
-];
+export const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'project'];
 export const VIEW_LAYOUTS: readonly ViewLayout[] = [
   'list',
   'board',

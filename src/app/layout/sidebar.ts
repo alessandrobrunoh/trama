@@ -9,12 +9,10 @@ import {
   LucideCheck,
   LucideCircleDot,
   LucideEllipsis,
+  LucideInbox,
   LucideBox,
-  LucideFolderGit2,
   LucideLayers,
   LucideLock,
-  LucideScale,
-  LucideUsers,
   LucideBookOpen,
   LucideCircleHelp,
   LucideExternalLink,
@@ -51,13 +49,15 @@ import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
-import { CustomerAvatar } from '../features/customers/customer-avatar';
 import { ProjectGlyph } from '../features/projects/project-glyph';
 import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
+import { SidebarTree } from './sidebar-tree';
 
 /**
- * Sidebar content (workspace switcher, search, navigation, teams, views, user menu).
- * Rendered inside <hlm-sidebar> by AppShell — which also turns it into a sheet on mobile.
+ * Sidebar content: icon row (toggle, search, inbox, create), workspace switcher, Inbox / Tasks,
+ * Pinned, the Projects tree, Views, a "More" group and the user menu. Light-gray pane, no row
+ * dividers, flat gray selected row, sentence-case muted section labels.
+ * Rendered inside <hlm-sidebar> by AppShell. On phones the shell shows <app-mobile-nav> instead.
  */
 @Component({
   selector: 'app-sidebar',
@@ -75,73 +75,79 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     ActorAvatar,
     StatusIcon,
     ProjectGlyph,
-    CustomerAvatar,
+    SidebarTree,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <div class="border-sidebar-border flex items-center gap-2 border-b px-5 py-4 md:hidden">
-      <button
-        type="button"
-        class="hover:bg-sidebar-accent flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-start"
-        [hlmDropdownMenuTrigger]="userMenu"
-        align="start"
-        aria-label="Account menu"
-      >
-        <app-actor-avatar [actor]="meRef()" [size]="36" />
-        <span class="min-w-0 flex-1 truncate text-base font-medium">{{
-          session.user()?.name ?? 'Account'
-        }}</span>
-        <svg [lucideIcon]="chevrons" [size]="17" class="text-muted-foreground shrink-0"></svg>
-      </button>
-      <button
-        type="button"
-        class="hover:bg-sidebar-accent flex size-10 shrink-0 items-center justify-center rounded-full"
-        aria-label="Settings"
-        (click)="go(['/', slug(), 'settings', 'profile'])"
-      >
-        <svg [lucideIcon]="settings" [size]="19"></svg>
-      </button>
-    </div>
-
-    <div hlmSidebarHeader class="gap-1 px-2 pt-2.5 pb-1 max-md:hidden">
-      <div class="flex items-center gap-0.5">
-        <!-- workspace switcher -->
+    <div hlmSidebarHeader class="gap-0 p-0">
+      <!-- window-ish icon row: toggle + search on the left, inbox + create on the right -->
+      <div class="pane-header border-sidebar-border border-b px-2">
         <button
-          type="button"
-          class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          [hlmDropdownMenuTrigger]="workspaceMenu"
-          align="start"
-          aria-label="Switch workspace"
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
+          hlmTooltip="Hide sidebar  ⌘B"
+          position="bottom"
+          aria-label="Hide sidebar (⌘B)"
+          (click)="sidebar.toggleSidebar()"
         >
-          <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 shrink-0 dark:hidden" />
-          <img
-            src="/icons/trama-symbol-white.svg"
-            alt=""
-            class="hidden size-5 shrink-0 dark:block"
-          />
-          <span class="min-w-0 truncate text-[13px] font-semibold" [title]="wsName()">{{ wsName() }}</span>
-          <svg [lucideIcon]="chevronDown" [size]="13" class="text-muted-foreground shrink-0"></svg>
+          <svg [lucideIcon]="sidebarIcon" [size]="16"></svg>
         </button>
         <button
-          type="button"
-          class="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground flex size-8 shrink-0 items-center justify-center rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
           hlmTooltip="Search  ⌘K"
           position="bottom"
           aria-label="Search (⌘K)"
           (click)="ui.openCommandPalette()"
         >
-          <svg [lucideIcon]="search" [size]="15"></svg>
+          <svg [lucideIcon]="search" [size]="16"></svg>
         </button>
+        <span class="flex-1"></span>
+        <a
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground relative"
+          [routerLink]="['/', slug(), 'inbox']"
+          hlmTooltip="Inbox  G then A"
+          position="bottom"
+          [attr.aria-label]="inboxCount() ? 'Inbox, ' + inboxCount() + ' need you' : 'Inbox'"
+        >
+          <svg [lucideIcon]="inboxIcon" [size]="16"></svg>
+          @if (inboxCount() > 0) {
+            <span class="bg-primary ring-sidebar absolute top-1 right-1 size-1.5 rounded-full ring-2" aria-hidden="true"></span>
+          }
+        </a>
         <button
-          type="button"
-          class="bg-background border-sidebar-border text-foreground hover:bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-md border shadow-xs outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground"
           [hlmDropdownMenuTrigger]="createMenu"
           align="end"
           hlmTooltip="Create  C"
           position="bottom"
           aria-label="Create"
         >
-          <svg [lucideIcon]="newIcon" [size]="15"></svg>
+          <svg [lucideIcon]="newIcon" [size]="16"></svg>
+        </button>
+      </div>
+
+      <!-- workspace switcher -->
+      <div class="px-2 pt-2 pb-1">
+        <button
+          type="button"
+          class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-start outline-hidden focus-visible:ring-2"
+          [hlmDropdownMenuTrigger]="workspaceMenu"
+          align="start"
+          aria-label="Switch workspace"
+        >
+          <span class="text-muted-foreground min-w-0 flex-1 truncate text-[13px]">{{ wsName() }}</span>
+          <svg [lucideIcon]="chevrons" [size]="14" class="text-muted-foreground shrink-0"></svg>
         </button>
       </div>
     </div>
@@ -153,53 +159,10 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         }
       </ul>
 
-      <!-- More: everything that is not one of the five places above. Folded by default, open on its own pages. -->
-      @if (moreItems().length) {
-        <div class="mt-1">
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex h-7 w-full items-center gap-2 rounded-md px-2 text-[13px] outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring max-md:h-11 max-md:text-[15px]"
-            (click)="ui.toggleFolded('open:more')"
-            [attr.aria-expanded]="moreOpen()"
-            aria-controls="sidebar-more"
-          >
-            <svg [lucideIcon]="more" [size]="15"></svg>
-            <span class="flex-1 text-start">More</span>
-            <span
-              class="inline-flex shrink-0 transition-transform"
-              [class.-rotate-90]="!moreOpen()"
-              aria-hidden="true"
-              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
-            ></span>
-          </button>
-          @if (moreOpen()) {
-            <ul hlmSidebarMenu id="sidebar-more" class="gap-px">
-              @for (item of moreItems(); track item.segment) {
-                <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
-              }
-            </ul>
-          }
-        </div>
-      }
-
-      <!-- Favorites: only once something is pinned -->
+      <!-- Pinned: only once something is pinned -->
       @if (favorites.entries().length) {
-        <div class="mt-4 max-md:mt-2">
-          <button
-            type="button"
-            class="group/sec text-muted-foreground hover:text-foreground flex h-6 w-full items-center gap-1 rounded-md px-2 text-xs font-medium"
-            (click)="ui.toggleFolded('favorites')"
-            [attr.aria-expanded]="!ui.isFolded('favorites')"
-          >
-            Favorites
-            <span
-              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
-              [class.-rotate-90]="ui.isFolded('favorites')"
-              [class.opacity-0]="!ui.isFolded('favorites')"
-              aria-hidden="true"
-              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
-            ></span>
-          </button>
+        <div class="mt-4">
+          <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'favorites', label: 'Pinned' }" />
           @if (!ui.isFolded('favorites')) {
             <ul hlmSidebarMenu class="gap-px">
               @for (e of favorites.entries(); track e.favorite.id) {
@@ -217,21 +180,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                       @case ('issue') {
                         <app-status-icon entity="issue" [status]="$any(e.status)" />
                       }
-                      @case ('decision') {
-                        <svg
-                          [lucideIcon]="decisionIcon"
-                          [size]="14"
-                          class="text-entity-decision shrink-0"
-                        ></svg>
-                      }
-                      @case ('team') {
-                        <span
-                          class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white"
-                          [style.background]="e.color"
-                          aria-hidden="true"
-                          >{{ e.label.slice(0, 1) }}</span
-                        >
-                      }
                       @case ('project') {
                         @if (store.getProject(e.subjectId); as pj) {
                           <app-project-glyph [project]="pj" [size]="14" />
@@ -243,13 +191,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                           ></svg>
                         }
                       }
-                      @case ('repository') {
-                        <svg
-                          [lucideIcon]="repoIcon"
-                          [size]="14"
-                          class="text-muted-foreground shrink-0"
-                        ></svg>
-                      }
                       @case ('view') {
                         <svg
                           [lucideIcon]="layers"
@@ -257,19 +198,14 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                           class="text-muted-foreground shrink-0"
                         ></svg>
                       }
-                      @case ('customer') {
-                        @if (store.getCustomer(e.subjectId); as cu) {
-                          <app-customer-avatar [customer]="cu" [size]="14" />
-                        }
-                      }
                     }
-                    <span class="flex-1 truncate">{{ e.label }}</span>
+                    <span class="truncate-fade flex-1">{{ e.label }}</span>
                   </a>
                   <button
                     type="button"
-                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
-                    aria-label="Remove from favorites"
-                    hlmTooltip="Remove from favorites"
+                    class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/fav:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                    aria-label="Remove from pinned"
+                    hlmTooltip="Unpin"
                     (click)="favorites.toggle(e.type, e.subjectId)"
                   >
                     <svg [lucideIcon]="closeIcon" [size]="12"></svg>
@@ -281,143 +217,27 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         </div>
       }
 
-      <!-- Teams -->
-      <div class="mt-4 max-md:mt-3">
-        <div class="group/sec flex items-center">
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium"
-            (click)="ui.toggleFolded('teams')"
-            [attr.aria-expanded]="!ui.isFolded('teams')"
-          >
-            Your teams
-            <span
-              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
-              [class.-rotate-90]="ui.isFolded('teams')"
-              [class.opacity-0]="!ui.isFolded('teams')"
-              aria-hidden="true"
-              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
-            ></span>
-          </button>
-          <a
-            [routerLink]="['/', slug(), 'teams']"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-            hlmTooltip="All teams"
-            aria-label="All teams"
-            closeMobileSidebarOnClick
-            ><svg [lucideIcon]="more" [size]="13"></svg
-          ></a>
-          @if (canAdmin()) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-              aria-label="Create team"
-              hlmTooltip="Create team"
-              (click)="ui.openCreate('team')"
-            >
-              <svg [lucideIcon]="plus" [size]="13"></svg>
-            </button>
-          }
-        </div>
-        @if (!ui.isFolded('teams')) {
-          <ul hlmSidebarMenu class="gap-px">
-            @for (t of sidebarTeams(); track t.id) {
-              @let open = ui.isFolded('open:team:' + t.id);
-              <li hlmSidebarMenuItem>
-                <button
-                  type="button"
-                  hlmSidebarMenuButton
-                  (click)="ui.toggleFolded('open:team:' + t.id)"
-                  [attr.aria-expanded]="open"
-                >
-                  <span
-                    class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white"
-                    [style.background]="t.color"
-                    aria-hidden="true"
-                    >{{ t.key.slice(0, 1) }}</span
-                  >
-                  <span class="truncate">{{ t.name }}</span>
-                  <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!open"
-                    ><svg
-                      [lucideIcon]="chevronDown"
-                      [size]="12"
-                      class="text-muted-foreground shrink-0"
-                    ></svg
-                  ></span>
-                </button>
-                @if (open) {
-                  <ul class="mt-px flex flex-col gap-px pl-[18px]">
-                    @for (sub of teamLinks; track sub.label) {
-                      <li>
-                        <a
-                          hlmSidebarMenuButton
-                          [routerLink]="
-                            sub.segment ? ['/', slug(), sub.segment] : ['/', slug(), 'teams', t.key]
-                          "
-                          [queryParams]="sub.segment ? { team: t.id } : null"
-                          [isActive]="isTeamLinkActive(t.id, t.key, sub.segment)"
-                          closeMobileSidebarOnClick
-                        >
-                          <svg
-                            [lucideIcon]="sub.icon"
-                            [size]="14"
-                            class="text-muted-foreground"
-                          ></svg>
-                          <span class="flex-1 truncate">{{ sub.label }}</span>
-                          @if (sub.segment === 'issues' && openIssuesByTeam().get(t.id); as n) {
-                            <span class="text-muted-foreground text-[11px] tabular-nums">{{
-                              n
-                            }}</span>
-                          }
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                }
-              </li>
-            } @empty {
-              <li class="text-muted-foreground px-2 py-1 text-xs">No teams yet</li>
-            }
-          </ul>
+      <!-- Projects: a tree (project > open tasks > subtasks) -->
+      <div class="mt-4">
+        <ng-container
+          *ngTemplateOutlet="
+            sectionLabel;
+            context: { $implicit: 'projects', label: 'Projects', all: 'projects', allLabel: 'All projects', create: 'project', createLabel: 'New project' }
+          "
+        />
+        @if (!ui.isFolded('projects')) {
+          <app-sidebar-tree />
         }
       </div>
 
       <!-- Views -->
-      <div class="mt-4 max-md:mt-3">
-        <div class="group/sec flex items-center">
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium"
-            (click)="ui.toggleFolded('views')"
-            [attr.aria-expanded]="!ui.isFolded('views')"
-          >
-            Views
-            <span
-              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
-              [class.-rotate-90]="ui.isFolded('views')"
-              [class.opacity-0]="!ui.isFolded('views')"
-              aria-hidden="true"
-              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
-            ></span>
-          </button>
-          <a
-            [routerLink]="['/', slug(), 'views']"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-            hlmTooltip="All views"
-            aria-label="All views"
-            closeMobileSidebarOnClick
-            ><svg [lucideIcon]="more" [size]="13"></svg
-          ></a>
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-            aria-label="Create view"
-            hlmTooltip="Create view"
-            (click)="ui.openCreate('view')"
-          >
-            <svg [lucideIcon]="plus" [size]="13"></svg>
-          </button>
-        </div>
+      <div class="mt-4">
+        <ng-container
+          *ngTemplateOutlet="
+            sectionLabel;
+            context: { $implicit: 'views', label: 'Views', all: 'views', allLabel: 'All views', create: 'view', createLabel: 'Create view' }
+          "
+        />
         @if (!ui.isFolded('views')) {
           <ul hlmSidebarMenu class="gap-px">
             @for (v of store.views(); track v.id) {
@@ -435,7 +255,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                     [size]="14"
                     class="text-muted-foreground"
                   ></svg>
-                  <span class="flex-1 truncate">{{ v.name }}</span>
+                  <span class="truncate-fade flex-1">{{ v.name }}</span>
                   @if (!v.shared) {
                     <svg
                       [lucideIcon]="lock"
@@ -461,41 +281,57 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         }
       </div>
 
-      <div class="mt-4 border-t border-sidebar-border pt-2 md:hidden">
+      <!-- More: Stats, Timer, Activity, Assistant, Connect, Settings. Folded by default, open on its own pages. -->
+      <div class="mt-4">
         <button
           type="button"
-          hlmSidebarMenuButton
-          class="max-md:!h-12 max-md:!rounded-xl max-md:!px-4 max-md:!text-[15px]"
-          (click)="ui.openCommandPalette()"
-          closeMobileSidebarOnClick
+          class="text-muted-foreground hover:text-foreground flex h-7 w-full items-center gap-1 rounded-sm px-2 text-[13px] outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          (click)="ui.toggleFolded('open:more')"
+          [attr.aria-expanded]="moreOpen()"
+          aria-controls="sidebar-more"
         >
-          <svg [lucideIcon]="search" [size]="17" class="text-muted-foreground"></svg>
-          <span>Search</span>
+          More
+          <svg
+            [lucideIcon]="chevronDown"
+            [size]="12"
+            class="transition-transform"
+            [class.-rotate-90]="!moreOpen()"
+            aria-hidden="true"
+          ></svg>
         </button>
+        @if (moreOpen()) {
+          <ul hlmSidebarMenu id="sidebar-more" class="gap-px">
+            @for (item of moreItems(); track item.segment) {
+              <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
+            }
+            <ng-container *ngTemplateOutlet="navLink; context: { $implicit: settingsItem }" />
+          </ul>
+        }
       </div>
     </div>
 
     <!-- footer: user menu + help -->
     <div
       hlmSidebarFooter
-      class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden"
+      class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
     >
       <button
         type="button"
-        class="hover:bg-sidebar-accent data-open:bg-sidebar-accent flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-1.5 text-start outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-start outline-hidden focus-visible:ring-2"
         [hlmDropdownMenuTrigger]="userMenu"
         align="start"
         side="top"
         aria-label="User menu"
       >
         <app-actor-avatar [actor]="meRef()" [size]="20" />
-        <span class="min-w-0 flex-1 truncate text-[13px] font-medium">{{
-          session.user()?.name ?? 'Account'
-        }}</span>
+        <span class="min-w-0 flex-1 truncate text-[13px]">{{ session.user()?.name ?? 'Account' }}</span>
+        <svg [lucideIcon]="chevronDown" [size]="14" class="text-muted-foreground shrink-0"></svg>
       </button>
       <button
-        type="button"
-        class="text-muted-foreground hover:bg-sidebar-accent hover:text-foreground data-open:bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        hlmBtn
+        variant="ghost"
+        size="icon-sm"
+        class="text-muted-foreground data-open:bg-sidebar-accent shrink-0"
         [hlmDropdownMenuTrigger]="helpMenu"
         align="start"
         side="top"
@@ -505,11 +341,54 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       </button>
     </div>
 
+    <!-- sentence-case muted section label; the fold chevron and actions show on hover / focus -->
+    <ng-template #sectionLabel let-id let-label="label" let-all="all" let-allLabel="allLabel" let-create="create" let-createLabel="createLabel">
+      <div class="group/sec flex items-center">
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground focus-visible:ring-sidebar-ring flex h-7 flex-1 items-center gap-1 rounded-sm px-2 text-[13px] outline-hidden focus-visible:ring-2"
+          (click)="ui.toggleFolded(id)"
+          [attr.aria-expanded]="!ui.isFolded(id)"
+        >
+          {{ label }}
+          <svg
+            [lucideIcon]="chevronDown"
+            [size]="12"
+            class="transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
+            [class.-rotate-90]="ui.isFolded(id)"
+            [class.opacity-0]="!ui.isFolded(id)"
+            aria-hidden="true"
+          ></svg>
+        </button>
+        @if (all) {
+          <a
+            [routerLink]="['/', slug(), all]"
+            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-sm opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
+            [hlmTooltip]="allLabel"
+            [attr.aria-label]="allLabel"
+            closeMobileSidebarOnClick
+            ><svg [lucideIcon]="more" [size]="13"></svg
+          ></a>
+        }
+        @if (create) {
+          <button
+            type="button"
+            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-sm opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
+            [attr.aria-label]="createLabel"
+            [hlmTooltip]="createLabel"
+            (click)="ui.openCreate(create)"
+          >
+            <svg [lucideIcon]="plus" [size]="13"></svg>
+          </button>
+        }
+      </div>
+    </ng-template>
+
     <ng-template #navLink let-item>
       <li hlmSidebarMenuItem>
         <a
           hlmSidebarMenuButton
-          [routerLink]="['/', slug(), item.segment]"
+          [routerLink]="['/', slug(), ...item.path]"
           routerLinkActive
           #rla="routerLinkActive"
           [routerLinkActiveOptions]="{
@@ -518,7 +397,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             fragment: 'ignored',
             matrixParams: 'ignored',
           }"
-          [isActive]="rla.isActive && !teamScoped()"
+          [isActive]="rla.isActive"
           [tooltip]="item.label"
           [attr.title]="item.hint ?? null"
           closeMobileSidebarOnClick
@@ -528,20 +407,21 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             [size]="15"
             class="text-muted-foreground group-data-active/menu-button:text-foreground"
           ></svg>
-          <span class="flex-1 truncate">{{ item.label }}</span>
+          <span class="truncate-fade flex-1">{{ item.label }}</span>
           @if (badge(item.badge); as n) {
-            @if (ui.sidebarBadgeStyle() === 'dot') {
-              <span
-                class="size-1.5 shrink-0 rounded-full"
-                [class.bg-primary]="item.badge === 'inbox'"
-                [class.bg-muted-foreground]="item.badge !== 'inbox'"
-                [attr.aria-label]="n + ' pending'"
-              ></span>
-            } @else if (item.badge === 'inbox') {
-              <span
-                class="bg-primary text-primary-foreground min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums"
-                >{{ n }}</span
-              >
+            @if (ui.sidebarBadgeStyle() === 'dot' || item.badge === 'inbox') {
+              <span class="flex items-center gap-1.5">
+                @if (item.badge === 'inbox' && ui.sidebarBadgeStyle() === 'count') {
+                  <span class="text-primary text-[11px] tabular-nums">{{ n }}</span>
+                }
+                <span
+                  class="size-1.5 shrink-0 rounded-full"
+                  [class.bg-primary]="item.badge === 'inbox'"
+                  [class.bg-muted-foreground]="item.badge !== 'inbox'"
+                  role="img"
+                  [attr.aria-label]="n + ' pending'"
+                ></span>
+              </span>
             } @else {
               <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
             }
@@ -590,13 +470,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           <button hlmDropdownMenuItem (triggered)="ui.openCreate('issue')">
             <svg [lucideIcon]="issueIcon" [size]="14"></svg>
             <span class="flex flex-1 flex-col">
-              <span>New issue</span>
+              <span>New task</span>
               <span class="text-muted-foreground text-[11px]">A bug, request or incident</span>
             </span>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('decision')">
-            <svg [lucideIcon]="decisionIcon" [size]="14" class="text-entity-decision"></svg>
-            <span class="flex-1">New decision</span>
           </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
@@ -609,16 +485,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             <svg [lucideIcon]="projectIcon" [size]="14"></svg>
             <span class="flex-1">New project</span>
           </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('repository')">
-            <svg [lucideIcon]="repoIcon" [size]="14"></svg>
-            <span class="flex-1">New repository</span>
-          </button>
-          @if (canAdmin()) {
-            <button hlmDropdownMenuItem (triggered)="ui.openCreate('team')">
-              <svg [lucideIcon]="usersIcon" [size]="14"></svg>
-              <span class="flex-1">New team</span>
-            </button>
-          }
         </hlm-dropdown-menu-group>
       </hlm-dropdown-menu>
     </ng-template>
@@ -757,37 +623,45 @@ export class AppSidebar {
   protected readonly store = inject(TramaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
+  protected readonly sidebar = inject(HlmSidebarService);
   private readonly router = inject(Router);
-  private readonly sidebar = inject(HlmSidebarService);
 
   protected readonly sidebarIcon = LucidePanelLeft;
-  /** Entries the user chose to show, in their order. "Only when badged" entries drop out while their badge is empty. */
+  protected readonly inboxIcon = LucideInbox;
+
+  /** Top entries (Inbox, Tasks) the user chose to show, in their order. Projects live in the tree below. */
   protected readonly primary = computed(() =>
-    this.visible(orderNav(PRIMARY_NAV, this.ui.sidebarOrder().personal)),
+    this.visible(orderNav(PRIMARY_NAV, this.ui.sidebarOrder().personal))
+      .filter((n) => n.segment !== 'projects')
+      .map(withPath),
   );
+  /** "More" entries (Views has its own section). "Only when badged" entries drop out while their badge is empty. */
   protected readonly moreItems = computed(() =>
-    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace)),
+    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace))
+      .filter((n) => n.segment !== 'views')
+      .map(withPath),
   );
+  protected readonly settingsItem = {
+    segment: 'settings',
+    path: ['settings', 'profile'],
+    label: 'Settings',
+    icon: LucideSettings,
+    hint: 'Your profile, workspace, members, integrations and tokens',
+  };
   /** Open by choice, or because the page you are on lives under More. */
   protected readonly moreOpen = computed(() => {
     if (this.ui.isFolded('open:more')) return true;
     const section = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
-    return this.moreItems().some((n) => n.segment === section);
+    return section === 'settings' || this.moreItems().some((n) => n.segment === section);
   });
+  protected readonly inboxCount = computed(() => this.badge('inbox'));
   protected readonly chevronDown = LucideChevronDown;
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
   protected readonly issueIcon = LucideCircleDot;
-  protected readonly decisionIcon = LucideScale;
   protected readonly layers = LucideLayers;
   protected readonly closeIcon = LucideX;
-  protected readonly repoIcon = LucideFolderGit2;
   protected readonly projectIcon = LucideBox;
-  protected readonly usersIcon = LucideUsers;
-  protected readonly teamLinks = [
-    { label: 'Issues', segment: 'issues', icon: LucideCircleDot },
-    { label: 'Team page', segment: '', icon: LucideUsers },
-  ] as const;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -797,39 +671,8 @@ export class AppSidebar {
     ),
     { initialValue: this.router.url },
   );
-  /** `?team=` of the current list page (team sub-links light up instead of the main item). */
-  protected readonly teamScoped = computed(() => /[?&]team=/.test(this.url()));
-
-  /** My teams first, then the rest. */
-  protected readonly sidebarTeams = computed(() => {
-    const mine = this.store.myTeamIds();
-    return [...this.store.teams()].sort((a, b) => Number(mine.has(b.id)) - Number(mine.has(a.id)));
-  });
-  protected readonly openIssuesByTeam = computed(() => {
-    const m = new Map<string, number>();
-    for (const i of this.store.issues()) {
-      if (!i.teamId || i.status === 'done' || i.status === 'canceled') continue;
-      m.set(i.teamId, (m.get(i.teamId) ?? 0) + 1);
-    }
-    return m;
-  });
-
-  protected isTeamLinkActive(teamId: string, teamKey: string, segment: string): boolean {
-    const [path, query = ''] = this.url().split('?');
-    const segs = path.split('/').filter(Boolean);
-    if (!segment)
-      return (
-        segs[1] === 'teams' &&
-        decodeURIComponent(segs[2] ?? '').toUpperCase() === teamKey.toUpperCase()
-      );
-    return (
-      segs[1] === segment && segs.length === 2 && new URLSearchParams(query).get('team') === teamId
-    );
-  }
-
   protected viewIcon(entity: string): LucideIcon {
     if (entity === 'issue') return LucideCircleDot;
-    if (entity === 'decision') return LucideScale;
     return entity === 'project' ? LucideBox : LucideLayers;
   }
   protected readonly chevrons = LucideChevronsUpDown;
@@ -861,7 +704,6 @@ export class AppSidebar {
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
-  protected readonly canAdmin = computed(() => this.store.allowed('createTeams'));
   protected readonly meRef = computed(() => {
     const u = this.session.user();
     return u ? ({ type: 'user', id: u.id } as const) : null;
@@ -886,11 +728,16 @@ export class AppSidebar {
 
   protected showChecklist(): void {
     this.ui.requestChecklist();
-    this.go(['/', this.slug(), 'overview']);
+    this.go(['/', this.slug(), 'inbox']);
   }
 
   protected go(commands: string[]): void {
     void this.router.navigate(commands);
     this.sidebar.setOpenMobile(false);
   }
+}
+
+/** A nav entry with its router path below the workspace. */
+function withPath(item: NavItem): NavItem & { path: string[] } {
+  return { ...item, path: [item.segment] };
 }

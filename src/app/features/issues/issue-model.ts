@@ -37,6 +37,37 @@ export const isClosedIssue = (i: Pick<Issue, 'status'>, entries?: readonly Statu
   return type === 'done' || type === 'canceled';
 };
 
+export interface IssueFlow {
+  /** Not done and not canceled. */
+  open: number;
+  inProgress: number;
+  /** Created in the last 7 days. */
+  opened: number;
+  /** Finished (done or canceled) in the last 7 days. */
+  closed: number;
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** Counts for the list status bar: what is open and how many tasks came and went this week. */
+export function issueFlow(
+  issues: readonly Pick<Issue, 'status' | 'createdAt' | 'completedAt' | 'updatedAt'>[],
+  entries?: readonly StatusEntry<IssueStatus>[],
+  now = Date.now(),
+): IssueFlow {
+  const since = now - WEEK_MS;
+  const flow: IssueFlow = { open: 0, inProgress: 0, opened: 0, closed: 0 };
+  for (const i of issues) {
+    const closed = isClosedIssue(i, entries);
+    if (!closed) {
+      flow.open++;
+      if (statusTypeOf(entries ?? defaultStatusCatalog().issue, i.status) === 'in_progress') flow.inProgress++;
+    } else if (Date.parse(i.completedAt ?? i.updatedAt) >= since) flow.closed++;
+    if (Date.parse(i.createdAt) >= since) flow.opened++;
+  }
+  return flow;
+}
+
 /**
  * Status id for the row Done / Reopen control. Uses the first catalog entry of that type so a
  * renamed workspace status is written, and falls back to the legacy enum when the catalog has none.
@@ -48,6 +79,20 @@ export function quietToggleStatus(
   const type: IssueStatus = quiet ? 'todo' : 'done';
   return entries?.find((entry) => entry.type === type)?.id ?? type;
 }
+/**
+ * Status a new subtask starts in: its parent's, unless the parent is finished or in review (then the
+ * subtask is open work: the catalog's "todo").
+ */
+export function subtaskStatus(
+  parent: { status: string },
+  entries: readonly StatusEntry<IssueStatus>[] | null | undefined,
+): string {
+  const type = statusTypeOf(entries ?? defaultStatusCatalog().issue, parent.status);
+  return type === 'done' || type === 'canceled' || type === 'in_review'
+    ? quietToggleStatus(entries, true)
+    : parent.status;
+}
+
 // ───────────────────────── picker options ─────────────────────────
 
 export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>
@@ -107,7 +152,7 @@ export const ISSUE_TABS: {
   statuses: readonly IssueStatus[] | null;
   hint: string;
 }[] = [
-  { id: 'all', label: 'All issues', statuses: null, hint: 'Every issue' },
+  { id: 'all', label: 'All tasks', statuses: null, hint: 'Every task' },
   {
     id: 'active',
     label: 'Active',
@@ -137,24 +182,21 @@ export type IssueGroup =
   | 'status'
   | 'kind'
   | 'priority'
-  | 'teamId'
   | 'assigneeId'
   | 'projectId'
-  | 'customerId'
-  | 'customerTierId'
+  | 'source'
   | 'none';
+/** Any sortable field of a task (see `FIELD_DEFS.issue`). */
 export type IssueSort =
   | 'updatedAt'
   | 'createdAt'
   | 'priority'
   | 'status'
-  | 'key'
-  | 'title'
-  | 'customerCount'
-  | 'requestCount'
-  | 'customerRevenue';
+  | 'kind'
+  | 'assigneeId'
+  | 'title';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'project' | 'labels' | 'team' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'project' | 'labels' | 'estimate' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -164,17 +206,17 @@ export interface IssueDisplay {
   showEmptyGroups: boolean;
   density: IssueDensity;
   hidden: IssueProp[];
+  /** List layout: show sub-tasks nested under their parent (a collapsible tree). */
+  nested: boolean;
 }
 
 export const GROUPS: readonly IssueGroup[] = [
   'status',
   'kind',
   'priority',
-  'teamId',
   'assigneeId',
   'projectId',
-  'customerId',
-  'customerTierId',
+  'source',
   'none',
 ];
 export const SORTS: readonly IssueSort[] = [
@@ -182,23 +224,19 @@ export const SORTS: readonly IssueSort[] = [
   'createdAt',
   'priority',
   'status',
-  'key',
+  'kind',
+  'assigneeId',
   'title',
-  'customerCount',
-  'requestCount',
-  'customerRevenue',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'team', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'estimate', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
   kind: 'Type',
   priority: 'Priority',
-  teamId: 'Team',
   assigneeId: 'Assignee',
   projectId: 'Project',
-  customerId: 'Customer',
-  customerTierId: 'Customer tier',
+  source: 'Source',
   none: 'No grouping',
 };
 export const SORT_LABEL: Record<IssueSort, string> = {
@@ -206,17 +244,15 @@ export const SORT_LABEL: Record<IssueSort, string> = {
   createdAt: 'Created',
   priority: 'Priority',
   status: 'Status',
-  key: 'Key',
+  kind: 'Type',
+  assigneeId: 'Assignee',
   title: 'Title',
-  customerCount: 'Customers',
-  requestCount: 'Requests',
-  customerRevenue: 'Customer revenue',
 };
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
   project: 'Project',
   labels: 'Labels',
-  team: 'Team',
+  estimate: 'Estimate',
   assignee: 'Assignee',
   date: 'Date',
 };
@@ -229,6 +265,7 @@ export const DEFAULT_DISPLAY: IssueDisplay = {
   showEmptyGroups: false,
   density: 'comfortable',
   hidden: [],
+  nested: true,
 };
 
 export function readDisplay(key: string): IssueDisplay {
@@ -246,6 +283,7 @@ export function readDisplay(key: string): IssueDisplay {
     hidden: Array.isArray(raw.hidden)
       ? raw.hidden.filter((p): p is IssueProp => (PROPS as readonly string[]).includes(p))
       : [],
+    nested: typeof raw.nested === 'boolean' ? raw.nested : DEFAULT_DISPLAY.nested,
   };
 }
 
@@ -262,8 +300,6 @@ export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | 
       return [...PRIORITIES];
     case 'kind':
       return [...ISSUE_KINDS];
-    case 'teamId':
-      return store.teams().map((t) => t.id);
     case 'assigneeId':
       return store.users().map((u) => u.id);
     case 'projectId':
@@ -284,18 +320,14 @@ export function groupLabel(store: TramaStore, group: IssueGroup, key: string): s
       return PRIORITY_META[key as keyof typeof PRIORITY_META]?.label ?? key;
     case 'kind':
       return ISSUE_KIND_META[key as keyof typeof ISSUE_KIND_META]?.label ?? key;
-    case 'teamId':
-      return key ? (store.getTeam(key)?.name ?? 'Unknown team') : 'No team';
     case 'assigneeId':
       return key ? (store.getUser(key)?.name ?? 'Unknown') : 'Unassigned';
     case 'projectId':
       return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
-    case 'customerId':
-      return key ? (store.getCustomer(key)?.name ?? 'Unknown customer') : 'No customer';
-    case 'customerTierId':
-      return key ? (store.settings().customerTiers.find((t) => t.id === key)?.name ?? 'Unknown tier') : 'No tier';
+    case 'source':
+      return key ? (SOURCE_LABEL[key] ?? key) : 'No source';
     default:
-      return 'Issues';
+      return 'Tasks';
   }
 }
 

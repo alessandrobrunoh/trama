@@ -10,6 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideDynamicIcon, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
@@ -43,6 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     HlmButtonImports,
+    HlmCheckbox,
     HlmInputImports,
     LucideDynamicIcon,
     ActorAvatar,
@@ -85,12 +87,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             @if (roleValue() !== 'owner') {
               <div class="px-4 pt-2 pb-3">
                 <label class="flex items-start gap-2 text-[13px]">
-                  <input
-                    type="checkbox"
-                    class="accent-primary mt-0.5 size-4 cursor-pointer"
-                    [checked]="custom()"
-                    (change)="setCustom($any($event.target).checked)"
-                  />
+                  <hlm-checkbox class="mt-0.5" [checked]="custom()" (checkedChange)="setCustom($event)" />
                   <span>
                     <span class="font-medium">Adjust this invitation</span>
                     <span class="text-muted-foreground block text-xs leading-snug">They start from the {{ roleName(roleValue()) }} role. You can hide projects, and add actions that role does not include.</span>
@@ -144,7 +141,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               size="icon-sm"
               class="text-muted-foreground"
               [attr.aria-label]="'Revoke invitation for ' + i.email"
-              (click)="revoke(i)"
+              (click)="confirmRevoke(i)"
             >
               <svg [lucideIcon]="xIcon" [size]="14"></svg>
             </button>
@@ -183,7 +180,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               }
             </div>
             <div class="text-muted-foreground truncate text-xs">
-              {{ m.user.email }}{{ teamsOf(m.user.id) ? ' · ' + teamsOf(m.user.id) : '' }}{{ m.membership.access ? ' · Limited' : '' }}
+              {{ m.user.email }}{{ m.membership.access ? ' · Limited' : '' }}
             </div>
           </div>
           @if (canAdmin()) {
@@ -247,14 +244,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           }
         </div>
         @if (editingId() === m.membership.id) {
-          <div class="bg-muted/20 border-t px-4 py-3">
+          <div class="bg-muted px-4 py-3">
             <label class="flex items-start gap-2 text-[13px]">
-              <input
-                type="checkbox"
-                class="accent-primary mt-0.5 size-4 cursor-pointer"
-                [checked]="draftCustom()"
-                (change)="setDraftCustom(m.membership, $any($event.target).checked)"
-              />
+              <hlm-checkbox class="mt-0.5" [checked]="draftCustom()" (checkedChange)="setDraftCustom(m.membership, $event)" />
               <span>
                 <span class="font-medium">Adjust {{ m.user.name }}</span>
                 <span class="text-muted-foreground block text-xs leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you hide projects or add actions.</span>
@@ -345,14 +337,6 @@ export class MembersSection {
       ? rows.filter((m) => `${m.user.name} ${m.user.email}`.toLowerCase().includes(q))
       : rows;
   });
-  private readonly teamNamesByUser = computed(() => {
-    const map = new Map<string, string[]>();
-    for (const t of this.store.teams())
-      for (const id of t.memberIds)
-        map.set(id, [...(map.get(id) ?? []), t.leadIds.includes(id) ? `${t.key} (lead)` : t.key]);
-    return map;
-  });
-
   constructor() {
     effect(() => {
       if (this.canInvite() && this.store.slug()) untracked(() => void this.invites.load());
@@ -388,9 +372,6 @@ export class MembersSection {
     return days === 1 ? 'expires tomorrow' : `expires in ${days} days`;
   }
 
-  protected teamsOf(userId: string): string {
-    return (this.teamNamesByUser().get(userId) ?? []).join(', ');
-  }
   protected roleName(role: Role): string {
     return workspaceRoleName(this.workspaceRoles(), role);
   }
@@ -464,6 +445,15 @@ export class MembersSection {
     if (link) this.sent.set({ link });
   }
 
+  protected confirmRevoke(i: WorkspaceInvite): void {
+    this.ui.setConfirmDelete({
+      title: `Revoke the invitation for ${i.email}?`,
+      description: 'The invitation link stops working. You can invite them again later.',
+      confirmLabel: 'Revoke',
+      onConfirm: () => this.revoke(i),
+    });
+  }
+
   protected async revoke(i: WorkspaceInvite): Promise<void> {
     if ((await this.invites.revoke(i.id)) && this.sent()?.link.invite.id === i.id)
       this.sent.set(null);
@@ -488,7 +478,7 @@ export class MembersSection {
   protected remove(id: string, name: string): void {
     this.ui.setConfirmDelete({
       title: `Remove ${name}?`,
-      description: 'They lose access to this workspace and leave its teams. Their account stays.',
+      description: 'They lose access to this workspace. Their account stays.',
       confirmLabel: 'Remove',
       onConfirm: async () => {
         await this.store.removeMember(id);

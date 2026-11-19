@@ -1,65 +1,216 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { TramaStore, UiStore, usePageShortcuts } from '../../core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { format } from 'date-fns';
+import { TimeEntriesStore, TramaStore, resolveStatusEntry, statusTypeOf } from '../../core';
+import { StatusBar } from '../../layout/status-bar';
+import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
-import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
-import { OverviewFlow } from './overview-flow';
-import { OverviewGreeting } from './overview-greeting';
-import { OverviewKpis } from './overview-kpis';
-import { OverviewModel } from './overview-model';
-import { OverviewNeedsYou } from './overview-needs-you';
-import { OverviewRail } from './overview-rail';
+import { PreviewLink } from '../issues/list-preview';
+import { DEFAULT_IDLE_DAYS, activityLookup } from '../stats/flow-stats';
+import { OverviewLinks, TONE_VAR } from './overview-links';
+import {
+  dailyFlow,
+  deltaText,
+  headline,
+  lanes,
+  plural,
+  projectRows,
+  pulse,
+  trackScale,
+  watchlist,
+  weekTotals,
+  type HeadlinePart,
+  type OverviewContext,
+} from './overview-model';
+import { OverviewNow } from './overview-now';
+import { OverviewProjects } from './overview-projects';
+import { OverviewRiver } from './overview-river';
+import { OverviewWatch } from './overview-watch';
 
 /**
- * Workspace at a glance. Top to bottom: greeting, 30-day KPIs, then a main column (what needs me,
- * what needs attention and issue flow beside a quiet rail (triage, decisions, activity).
+ * `/:workspace/overview`: the workspace read as a short briefing, top to bottom. A sentence that says where things
+ * stand, the few things worth a look, who is on what right now, four weeks of closing and opening as a river, and
+ * every project against its target. Everything is clickable: one click previews in the right pane, Enter or a double
+ * click opens the full page. The Inbox stays home; this page is for the whole workspace, not just you.
  */
 @Component({
   selector: 'app-overview-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PageHeader, OnboardingChecklist, OverviewGreeting, OverviewKpis, OverviewNeedsYou, OverviewFlow, OverviewRail],
-  providers: [OverviewModel],
+  imports: [
+    EmptyState,
+    OverviewNow,
+    OverviewProjects,
+    OverviewRiver,
+    OverviewWatch,
+    PageHeader,
+    PreviewLink,
+    StatusBar,
+  ],
   host: { class: 'block min-h-full' },
   template: `
-    <app-page-header title="Overview" [description]="subtitle()" />
+    <app-page-header title="Overview" description="Where the workspace stands: what moves, what is stuck, what is late" />
 
-    <div class="mx-auto flex w-full max-w-[1280px] flex-col gap-7 px-4 py-6 sm:px-8">
-      @if (!store.ready()) {
-        <div class="flex flex-col gap-6" aria-busy="true" aria-label="Loading overview">
-          <div class="bg-foreground/[0.06] h-12 w-72 animate-pulse rounded-md"></div>
-          <div class="grid grid-cols-2 gap-3 md:grid-cols-5">
-            @for (n of skeleton; track n) {
-              <div class="bg-foreground/[0.05] h-28 animate-pulse rounded-lg"></div>
-            }
-          </div>
-          <div class="bg-foreground/[0.04] h-64 animate-pulse rounded-lg"></div>
-        </div>
-      } @else {
-        <app-overview-greeting />
-        <app-onboarding-checklist />
-        <app-overview-kpis />
+    @if (!store.ready()) {
+      <p class="text-muted-foreground px-4 py-8 text-sm sm:px-6">Loading…</p>
+    } @else if (store.issues().length === 0 && store.projects().length === 0) {
+      <app-empty-state
+        class="py-16"
+        title="Nothing to read yet"
+        description="Create a project and a few tasks. The Overview turns them into a weekly briefing."
+      />
+    } @else {
+      <div class="@container">
+        <div
+          class="mx-auto grid max-w-[74rem] grid-cols-1 gap-x-12 gap-y-10 px-4 pt-5 pb-14 sm:px-6 @5xl:grid-cols-[minmax(0,1fr)_19rem]"
+        >
+          <!-- 1. the sentence -->
+          <section aria-labelledby="ov-pulse" class="@5xl:col-start-1">
+            <p class="text-meta mb-2" id="ov-pulse">Workspace pulse · {{ today() }}</p>
+            <h2 class="text-[22px] leading-[1.3] font-normal tracking-[-0.01em] text-balance sm:text-[26px]">
+              @for (p of headlineParts(); track $index) {
+                @if (p.target; as t) {
+                  <a
+                    [appPreviewLink]="links.route(t)"
+                    (preview)="links.show(t)"
+                    class="focus-visible:ring-ring/50 rounded-sm underline decoration-[color:var(--border-strong,currentColor)] decoration-dotted underline-offset-[5px] outline-none hover:decoration-solid focus-visible:ring-2"
+                    [class.font-medium]="p.strong"
+                    [style.color]="p.tone ? tone(p) : ''"
+                    >{{ p.text }}</a
+                  >
+                } @else {
+                  <span [class.font-medium]="p.strong" [style.color]="p.tone ? tone(p) : ''">{{ p.text }}</span>
+                }
+              }
+            </h2>
+            <p class="text-meta mt-3 flex flex-wrap items-center gap-x-5 gap-y-1">
+              <span>
+                <span class="text-foreground tabular-nums">{{ pulseNow().closedThisWeek }}</span> closed this week
+                <span class="tabular-nums">· {{ delta(pulseNow().closedThisWeek, pulseNow().closedLastWeek) }}</span>
+              </span>
+              <span>
+                <span class="text-foreground tabular-nums">{{ pulseNow().openedThisWeek }}</span> opened
+                <span class="tabular-nums">· {{ delta(pulseNow().openedThisWeek, pulseNow().openedLastWeek) }}</span>
+              </span>
+              @if (pulseNow().waiting) {
+                <span><span class="text-foreground tabular-nums">{{ pulseNow().waiting }}</span> waiting to start</span>
+              }
+            </p>
+          </section>
 
-        <div class="grid items-start gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-          <div class="flex min-w-0 flex-col gap-10">
-            <app-overview-needs-you />
-            <app-overview-flow />
-          </div>
-          <app-overview-rail />
+          <!-- 2. worth a look -->
+          <section aria-labelledby="ov-watch" class="@5xl:col-start-2 @5xl:row-span-4 @5xl:row-start-1 @5xl:border-s @5xl:ps-8">
+            <div class="@5xl:sticky @5xl:top-4">
+              <h3 id="ov-watch" class="text-muted-foreground mb-2 text-[13px]">Worth a look</h3>
+              <app-overview-watch [items]="watch()" />
+            </div>
+          </section>
+
+          <!-- 3. now -->
+          <section aria-labelledby="ov-now" class="@5xl:col-start-1">
+            <h3 id="ov-now" class="text-muted-foreground mb-3 flex items-baseline gap-2 text-[13px]">
+              Now
+              <span class="text-meta">{{ nowSummary() }}</span>
+            </h3>
+            <app-overview-now [lanes]="laneList()" [now]="nowMs()" />
+          </section>
+
+          <!-- 4. the river -->
+          <section aria-labelledby="ov-river" class="@5xl:col-start-1">
+            <h3 id="ov-river" class="text-muted-foreground mb-3 text-[13px]">Last four weeks</h3>
+            <app-overview-river [days]="flow()" [weeks]="weeks()" />
+          </section>
+
+          <!-- 5. projects -->
+          <section aria-labelledby="ov-projects" class="@5xl:col-start-1">
+            <h3 id="ov-projects" class="text-muted-foreground mb-3 text-[13px]">Projects</h3>
+            <app-overview-projects [rows]="rows()" [scale]="scale()" [now]="now()" />
+          </section>
         </div>
-      }
-    </div>
+      </div>
+    }
+
+    <app-status-bar>
+      <span>{{ plural(openTasks(), 'open task') }}</span>
+      <span>{{ plural(rows().length, 'open project') }}</span>
+      <span end>Stuck means nothing happened for {{ idleDays }} days</span>
+    </app-status-bar>
   `,
 })
 export class OverviewPage {
-  /** From the parent `:workspaceSlug` route segment. */
-  readonly workspaceSlug = input<string>();
-
   protected readonly store = inject(TramaStore);
-  private readonly ui = inject(UiStore);
-  private readonly model = inject(OverviewModel);
-  protected readonly skeleton = [1, 2, 3, 4, 5];
-  protected readonly subtitle = computed(() => this.model.subtitle());
+  protected readonly links = inject(OverviewLinks);
+  private readonly time = inject(TimeEntriesStore);
 
-  private readonly _keys = usePageShortcuts([
-    { keys: 'c', label: 'New issue', group: 'Overview', run: () => this.store.allowed('createIssues') && this.ui.openCreate('issue') },
-  ]);
+  protected readonly plural = plural;
+  protected readonly idleDays = DEFAULT_IDLE_DAYS;
+
+  /** Refreshed every minute so ages and the running timer stay current. */
+  protected readonly now = signal(new Date());
+  protected readonly nowMs = computed(() => this.now().getTime());
+
+  constructor() {
+    void this.time.load();
+    const tick = setInterval(() => this.now.set(new Date()), 60_000);
+    inject(DestroyRef).onDestroy(() => clearInterval(tick));
+  }
+
+  private readonly context = computed<OverviewContext>(() => {
+    const statuses = this.store.settings().statuses;
+    const now = this.now();
+    return {
+      now,
+      issues: this.store.issues(),
+      projects: this.store.projects(),
+      milestones: this.store.milestones(),
+      issueType: (s) => statusTypeOf(statuses.issue, s),
+      projectType: (s) => statusTypeOf(statuses.project, s),
+      issueLabel: (s) => resolveStatusEntry(statuses.issue, s)?.name ?? s,
+      activityAt: activityLookup({
+        events: this.store.eventsBySubject(),
+        artifacts: this.store.artifactsByIssue(),
+        entries: this.time.entries(),
+        now: now.getTime(),
+      }),
+      idleDays: DEFAULT_IDLE_DAYS,
+      attention: this.store.openAttention(),
+      timers: this.time
+        .entries()
+        .filter((e) => !e.endedAt && e.issueId)
+        .map((e) => ({ issueId: e.issueId as string, userId: e.userId, startedAt: e.startedAt })),
+    };
+  });
+
+  protected readonly flow = computed(() => dailyFlow(this.context()));
+  protected readonly weeks = computed(() => weekTotals(this.flow()));
+  protected readonly pulseNow = computed(() => pulse(this.context(), this.flow()));
+  protected readonly rows = computed(() => projectRows(this.context()));
+  protected readonly scale = computed(() => trackScale(this.rows(), this.now()));
+  protected readonly laneList = computed(() => lanes(this.context()));
+  protected readonly watch = computed(() => watchlist(this.context(), this.rows()));
+  protected readonly headlineParts = computed(() => headline(this.pulseNow(), this.rows()));
+
+  protected readonly today = computed(() => format(this.now(), 'EEEE d MMMM'));
+
+  protected readonly openTasks = computed(() => {
+    const issues = this.store.issues();
+    const types = this.store.settings().statuses.issue;
+    return issues.filter((i) => {
+      const t = statusTypeOf(types, i.status);
+      return t !== 'done' && t !== 'canceled';
+    }).length;
+  });
+
+  protected readonly nowSummary = computed(() => {
+    const p = this.pulseNow();
+    const total = p.moving + p.stuck;
+    if (total === 0) return '';
+    return `${plural(total, 'task')} in progress${p.stuck ? `, ${p.stuck} quiet` : ''}`;
+  });
+
+  protected tone(p: HeadlinePart): string {
+    return p.tone ? TONE_VAR[p.tone] : '';
+  }
+
+  protected delta(now: number, before: number): string {
+    return deltaText(now, before);
+  }
 }

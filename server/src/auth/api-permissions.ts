@@ -12,18 +12,13 @@ const SEGMENT_RESOURCE: Record<string, ApiResource> = {
   settings: 'workspace',
   labels: 'workspace',
   statuses: 'workspace',
-  'customer-tiers': 'workspace',
-  'customer-requests': 'customers',
-  // the triage inbox is customer work; the sources behind it are integrations (admin)
-  'customer-intake': 'customers',
-  'intake-sources': 'integrations',
-  // importing from GitHub / Linear is an integration (admin); linking one issue is an issue edit (see issues/:id/external-ref)
+  // importing from GitHub / Linear is an integration (admin); linking one task is a task edit
   imports: 'integrations',
 };
 
 /**
  * Sub-resources mounted under another resource (`/w/:slug/<parent>/:id/<sub>`) that carry their own
- * permission instead of the parent's: `issues/:id/artifacts` needs `artifacts:*`, not `issues:*`.
+ * permission instead of the parent's: `tasks/:id/artifacts` needs `artifacts:*`, not `issues:*`.
  */
 const NESTED_RESOURCE: Record<string, ApiResource> = {
   artifacts: 'artifacts',
@@ -40,14 +35,7 @@ const ACTION_OVERRIDES: Record<
   string,
   Partial<Record<string, ApiPermission>>
 > = {
-  decisions: {
-    accept: 'decisions:accept',
-    reject: 'decisions:accept',
-    supersede: 'decisions:accept',
-  },
-  // an attachment is an artifact: linking or unlinking needs `artifacts:write`, not only the right to edit documents
-  documents: { attach: 'artifacts:write', detach: 'artifacts:write' },
-  issues: { 'bulk-delete': 'issues:delete' },
+  tasks: { 'bulk-delete': 'tasks:delete' },
 };
 
 function actionFor(method: string): ApiAction {
@@ -58,7 +46,7 @@ function actionFor(method: string): ApiAction {
 
 /**
  * The permission a request needs, derived from the matched route pattern (e.g.
- * `/api/w/:slug/issues/:idOrKey`) and the HTTP method. `null` = the route is outside the permission
+ * `/api/w/:slug/tasks/:idOrKey`) and the HTTP method. `null` = the route is outside the permission
  * catalog (not workspace-scoped, an unknown resource, or an action the resource does not offer):
  * `custom` tokens are denied there, so new controllers fail closed until they are added to
  * `API_RESOURCES`.

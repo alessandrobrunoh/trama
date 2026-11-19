@@ -18,16 +18,17 @@ import { Picker, type PickOption } from '../../shared/picker';
   imports: [PropertyRow, Picker, HlmTooltip],
   host: { class: 'contents' },
   template: `
-    <app-property-row label="Milestone" [icon]="diamond">
+    <app-property-row label="Milestone" [icon]="diamond" compact>
       @if (!hasProject()) {
         <span
           class="text-muted-foreground px-1.5 text-[13px]"
-          hlmTooltip="Milestones belong to a project. Set the issue's project to pick a milestone."
+          hlmTooltip="Milestones belong to a project. Set the task's project to pick a milestone."
           >Set a project first</span
         >
       } @else {
         <app-picker
           variant="field"
+          triggerClass="min-h-7 py-0.5"
           label="Milestone"
           placeholder="No milestone"
           [multiple]="true"
@@ -51,7 +52,7 @@ export class IssueMilestoneProp {
   protected readonly diamond = LucideDiamond;
 
   protected readonly canEdit = computed(
-    () => this.store.canEditTeamWork(this.issue().teamId) && !this.issue().duplicateOfId,
+    () => this.store.can('member') && !this.issue().duplicateOfId,
   );
   /** The issue's project is the source of truth for its milestones. */
   private readonly linkedProjects = computed(() => {

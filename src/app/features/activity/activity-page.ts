@@ -14,7 +14,6 @@ import {
   LucideBot,
   LucideDynamicIcon,
   LucideUser,
-  LucideUsers,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -28,12 +27,12 @@ import {
   EventLine,
   eventCategory,
   type EventCategory,
-} from '../overview/event-line';
+} from '../../shared/event-line';
 import { Picker, type PickOption } from '../../shared/picker';
 
 type TypeFilter = 'all' | Exclude<EventCategory, 'other'>;
 
-const TYPE_TABS: TypeFilter[] = ['all', 'issue', 'decision', 'artifact', 'comment', 'input'];
+const TYPE_TABS: TypeFilter[] = ['all', 'issue', 'artifact', 'comment'];
 
 interface DayGroup {
   key: string;
@@ -65,8 +64,8 @@ function dayLabel(iso: string, now = new Date()): string {
 
 /**
  * Workspace-wide activity (VISION §38): meaningful organisational changes, newest first, grouped
- * by day. Filters: event family, actor, team; automated (system) events can be hidden.
- * Query params `?type=issue&actor=user:usr_1&team=tm_1` preselect the filters.
+ * by day. Filters: event family and actor; automated (system) events can be hidden.
+ * Query params `?type=issue&actor=user:usr_1` preselect the filters.
  */
 @Component({
   selector: 'app-activity-page',
@@ -83,7 +82,7 @@ function dayLabel(iso: string, now = new Date()): string {
   host: { class: 'flex min-h-full flex-col' },
   template: `
     <app-page-header title="Activity" [description]="description()">
-      <div class="flex flex-wrap items-center gap-x-1 gap-y-2 border-b px-4 py-2 sm:px-6">
+      <div class="flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-2 sm:px-6">
         <div
           class="-ms-1 flex flex-wrap items-center gap-0.5"
           role="tablist"
@@ -113,15 +112,6 @@ function dayLabel(iso: string, now = new Date()): string {
           [options]="actorOptions()"
           [value]="actors()"
           (valueChange)="actors.set($event)"
-        />
-        <app-picker
-          variant="chip"
-          label="Team"
-          [icon]="teamIcon"
-          [multiple]="true"
-          [options]="teamOptions()"
-          [value]="teams()"
-          (valueChange)="teams.set($event)"
         />
         <button
           type="button"
@@ -159,7 +149,7 @@ function dayLabel(iso: string, now = new Date()): string {
         [description]="
           filtered()
             ? 'Nothing in the loaded history matches these filters. Load older activity or clear the filters.'
-            : 'Reporting issues, recording decisions and linking pull requests all show up here.'
+            : 'Reporting tasks and linking pull requests all show up here.'
         "
       >
         <div class="flex flex-wrap justify-center gap-2">
@@ -219,7 +209,6 @@ export class ActivityPage {
   /** Query params (component input binding). */
   readonly typeParam = input<string | undefined>(undefined, { alias: 'type' });
   readonly actorParam = input<string | undefined>(undefined, { alias: 'actor' });
-  readonly teamParam = input<string | undefined>(undefined, { alias: 'team' });
 
   protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
@@ -228,7 +217,6 @@ export class ActivityPage {
   protected readonly activityIcon = LucideActivity;
   protected readonly botIcon = LucideBot;
   protected readonly userIcon = LucideUser;
-  protected readonly teamIcon = LucideUsers;
   protected readonly xIcon = LucideX;
   protected readonly typeTabs = TYPE_TABS;
 
@@ -236,7 +224,6 @@ export class ActivityPage {
   // Filters survive navigation inside the app (see ListStateStore); query params still win.
   protected readonly type = this.listState.remember<TypeFilter>('activity.type', 'all');
   protected readonly actors = this.listState.remember<string[]>('activity.actors', []);
-  protected readonly teams = this.listState.remember<string[]>('activity.teams', []);
   protected readonly showSystem = this.listState.remember('activity.showSystem', true);
   protected readonly loading = signal(false);
   protected readonly exhausted = signal(false);
@@ -246,11 +233,9 @@ export class ActivityPage {
     effect(() => {
       const t = this.typeParam();
       const a = this.actorParam();
-      const tm = this.teamParam();
       untracked(() => {
         if (t && (TYPE_TABS as string[]).includes(t)) this.type.set(t as TypeFilter);
         if (a) this.actors.set(a.split(','));
-        if (tm) this.teams.set(tm.split(','));
       });
     });
   }
@@ -269,40 +254,17 @@ export class ActivityPage {
       hint: 'agent',
     })),
   ]);
-  protected readonly teamOptions = computed<PickOption[]>(() =>
-    this.store
-      .teams()
-      .map((t) => ({ value: t.id, label: t.name, kind: 'team' as const, hint: t.key })),
-  );
-
   protected readonly filtered = computed(
-    () =>
-      this.type() !== 'all' ||
-      this.actors().length > 0 ||
-      this.teams().length > 0 ||
-      !this.showSystem(),
+    () => this.type() !== 'all' || this.actors().length > 0 || !this.showSystem(),
   );
 
-  /** Teams an event touches directly. */
-  private teamsOf(e: DomainEvent): string[] {
-    const out: string[] = [];
-    if (e.subject.type === 'issue') {
-      const i = this.store.issueById().get(e.subject.id);
-      if (i?.teamId) out.push(i.teamId);
-    }
-    if (e.subject.type === 'team') out.push(e.subject.id);
-    return out;
-  }
-
-  /** Events after actor/team/system filters (before the type filter, so tab counts stay useful). */
+  /** Events after actor/system filters (before the type filter, so tab counts stay useful). */
   private readonly base = computed(() => {
     const actors = new Set(this.actors());
-    const teams = new Set(this.teams());
     const system = this.showSystem();
     return this.store.events().filter((e) => {
       if (!system && e.actor.type === 'system') return false;
       if (actors.size && !actors.has(`${e.actor.type}:${e.actor.id ?? ''}`)) return false;
-      if (teams.size && !this.teamsOf(e).some((t) => teams.has(t))) return false;
       return true;
     });
   });
@@ -370,10 +332,9 @@ export class ActivityPage {
   protected clear(): void {
     this.type.set('all');
     this.actors.set([]);
-    this.teams.set([]);
     this.showSystem.set(true);
     void this.router.navigate([], {
-      queryParams: { type: null, actor: null, team: null },
+      queryParams: { type: null, actor: null },
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });

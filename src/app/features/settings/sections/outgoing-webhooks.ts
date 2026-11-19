@@ -79,7 +79,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
   template: `
     <app-settings-group
       title="Custom webhooks"
-      description="Send a signed JSON POST to your own URL when something happens in Trama (an issue is filed or a decision is accepted…). Feed a chat bridge, a dashboard or any automation."
+      description="Send a signed JSON POST to your own URL when something happens in Trama (a task is filed or a pull request is linked…). Feed a chat bridge, a dashboard or any automation."
     >
       @if (canManage() && !form()) {
         <button aside hlmBtn size="sm" variant="outline" class="h-7" (click)="startCreate()">
@@ -116,7 +116,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
                 <div class="text-[13px] font-medium">Events</div>
                 <div class="text-muted-foreground text-xs">Pick what triggers a delivery. “All” also covers events added later.</div>
               </div>
-              <button type="button" class="rounded-md border px-2 py-1 text-xs transition-colors" [class]="chip(f.events.includes('*'))" [attr.aria-pressed]="f.events.includes('*')" (click)="toggleAll()">
+              <button type="button" class="rounded-md px-2 py-1 text-xs transition-colors" [class]="chip(f.events.includes('*'))" [attr.aria-pressed]="f.events.includes('*')" (click)="toggleAll()">
                 All events
               </button>
             </div>
@@ -139,7 +139,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
                     @for (e of g.events; track e) {
                       <button
                         type="button"
-                        class="rounded-md border px-2 py-0.5 font-mono text-[11px] transition-colors disabled:cursor-default"
+                        class="rounded-md px-2 py-0.5 font-mono text-[11px] transition-colors disabled:cursor-default"
                         [class]="chip(covered(f.events, e))"
                         [disabled]="f.events.includes('*') || f.events.includes(g.entity + '.*')"
                         [attr.aria-pressed]="covered(f.events, e)"
@@ -202,7 +202,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
             }
           </div>
           @if (open() === w.id) {
-            <div class="bg-muted/20 border-t px-4 py-2">
+            <div class="bg-muted px-4 py-2">
               @let log = logs()[w.id];
               @if (!log) {
                 <div class="text-muted-foreground py-3 text-xs">Loading…</div>
@@ -213,7 +213,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
                   <span>When</span><span>Event</span><span>Status</span><span class="text-right">Time</span><span class="hidden text-right sm:block">Attempt</span>
                 </div>
                 @for (d of log; track d.id) {
-                  <div class="grid grid-cols-[4.5rem_minmax(0,1fr)_3rem_4rem] items-baseline gap-x-3 border-t py-1.5 text-xs sm:grid-cols-[6rem_minmax(0,1fr)_4rem_4rem_5rem]">
+                  <div class="grid grid-cols-[4.5rem_minmax(0,1fr)_3rem_4rem] items-baseline gap-x-3 py-1.5 text-xs sm:grid-cols-[6rem_minmax(0,1fr)_4rem_4rem_5rem]">
                     <span class="text-muted-foreground">{{ d.at | relativeTime }}</span>
                     <span class="min-w-0 truncate font-mono">{{ d.event }}</span>
                     <span class="font-mono tabular-nums" [class]="d.ok ? 'text-status-shipped' : 'text-destructive'">{{ d.status || 'ERR' }}</span>
@@ -291,7 +291,7 @@ export class OutgoingWebhooks {
   }
 
   protected chip(on: boolean): string {
-    return on ? 'border-primary bg-selected text-foreground' : 'text-muted-foreground hover:bg-accent hover:text-foreground';
+    return on ? 'bg-selected text-foreground' : 'bg-secondary text-muted-foreground hover:bg-hover hover:text-foreground';
   }
   /** Is `event` selected, directly or through `*` / `entity.*`? */
   protected covered(events: readonly string[], event: string): boolean {

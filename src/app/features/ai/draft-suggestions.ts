@@ -115,7 +115,7 @@ const suggestionDebounceMs = 900;
         <p class="text-destructive text-xs" role="alert">{{ error() }}</p>
       }
       @if (openQuestions().length) {
-        <div class="rounded-md border bg-muted/30">
+        <div class="rounded-md bg-muted">
           <button
             type="button"
             class="text-muted-foreground hover:text-foreground flex w-full items-center gap-1.5 px-2.5 py-1.5 text-xs"
@@ -136,10 +136,10 @@ const suggestionDebounceMs = 900;
             ></svg>
           </button>
           @if (showQuestions()) {
-            <ul class="border-t">
+            <ul>
               @for (question of openQuestions(); track question) {
                 <li
-                  class="group flex items-start gap-2 px-2.5 py-1.5 text-xs [&:not(:last-child)]:border-b"
+                  class="group flex items-start gap-2 px-2.5 py-1.5 text-xs"
                 >
                   <span class="min-w-0 flex-1 leading-snug">{{ question }}</span>
                   <button
@@ -174,7 +174,7 @@ const suggestionDebounceMs = 900;
       max-width: 100%;
       align-items: center;
       gap: 0.375rem;
-      border: 1px dashed var(--border-strong);
+      background: var(--secondary);
       border-radius: var(--radius-md, 0.375rem);
       padding: 0 0.625rem;
       font-size: 0.75rem;
@@ -309,7 +309,6 @@ export class DraftSuggestions {
       priority: 'Priority',
       kind: 'Type',
       estimate: 'Estimate',
-      teamId: 'Team',
       assigneeId: 'Assignee',
     }[field];
   }
@@ -385,10 +384,6 @@ export class DraftSuggestions {
 
   private issueOptions(): AiIssueDraftOptions {
     const query = `${this.title()}\n${this.description()}`;
-    const teams = this.store
-      .teams()
-      .slice(0, 50)
-      .map((team) => ({ id: team.id, label: `${team.name} (${team.key})` }));
     const assignees = this.store
       .users()
       .slice(0, 100)
@@ -427,7 +422,6 @@ export class DraftSuggestions {
         this.store.estimateScale() === 'none'
           ? []
           : estimateOptions(this.store.estimateScale()).map((option) => option.value),
-      teams,
       assignees,
       similar,
     };

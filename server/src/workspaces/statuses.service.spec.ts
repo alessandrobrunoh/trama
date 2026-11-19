@@ -50,12 +50,7 @@ describe('status catalog', () => {
     expect(settings.statuses.issue.map((entry) => entry.id)).toEqual(
       seeded.issue.map((entry) => entry.type),
     );
-    for (const key of [
-      'issue',
-      'project',
-      'decision',
-      'projectHealth',
-    ] as const) {
+    for (const key of ['issue', 'project', 'projectHealth'] as const) {
       const types = settings.statuses[key].map((entry) => entry.type);
       expect(new Set(types).size).toBe(types.length);
       expect(

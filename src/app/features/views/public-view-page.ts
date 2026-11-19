@@ -15,11 +15,9 @@ import { ApiClient } from '../../core/api/api-client';
 import type { PublicView as PublicViewDto, ViewEntity } from '../../core/contracts/domain';
 import { shortDate } from '../../core/format';
 import {
-  DECISION_STATUS_META,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
-  PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
 } from '../../core/meta';
 import { EmptyState } from '../../shared/empty-state';
@@ -53,7 +51,7 @@ type Labels = Record<string, { label: string }>;
       </div>
     } @else if (view(); as v) {
       @if (!embedded()) {
-        <header class="border-b px-4 py-4 sm:px-6">
+        <header class="px-4 py-4 sm:px-6">
           <div class="mx-auto flex max-w-5xl flex-col gap-1">
             <p class="text-meta flex items-center gap-1.5">
               <svg [lucideIcon]="eyeIcon" [size]="12"></svg>
@@ -102,7 +100,7 @@ type Labels = Record<string, { label: string }>;
                   <span class="text-muted-foreground tabular-nums">{{ g.items.length }}</span>
                 </header>
                 @for (item of g.items; track item.id) {
-                  <div class="bg-card flex flex-col gap-1.5 rounded-lg border p-2.5">
+                  <div class="bg-card flex flex-col gap-1.5 rounded-lg p-2.5">
                     <span class="flex items-center gap-1.5">
                       @if (item.status) {
                         <app-status-icon
@@ -136,13 +134,13 @@ type Labels = Record<string, { label: string }>;
         } @else {
           @for (g of v.groups; track g.key) {
             @if (v.groupBy) {
-              <div class="bg-muted/40 flex h-8 items-center gap-2 border-b px-4 sm:px-6">
+              <div class="mt-2 flex h-8 items-center gap-2 px-4 sm:px-6">
                 <span class="text-xs font-medium">{{ label(g.key, g.label) }}</span>
                 <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
               </div>
             }
             @for (item of g.items; track item.id) {
-              <div class="flex min-h-9 items-center gap-3 border-b px-4 py-1.5 sm:px-6">
+              <div class="flex min-h-9 items-center gap-3 px-4 py-1.5 sm:px-6">
                 @if (item.status) {
                   <app-status-icon [status]="asStatus(item.status)" [entity]="statusEntity()" />
                 }
@@ -152,12 +150,9 @@ type Labels = Record<string, { label: string }>;
                 <span class="min-w-0 flex-1 truncate text-sm">{{ item.title }}</span>
                 @for (l of (item.labels ?? []).slice(0, 2); track l) {
                   <span
-                    class="border-border-strong text-muted-foreground hidden h-5 items-center rounded-full border px-1.5 text-[11px] md:inline-flex"
+                    class="bg-secondary text-muted-foreground hidden h-5 items-center rounded-full px-1.5 text-[11px] md:inline-flex"
                     >{{ l }}</span
                   >
-                }
-                @if (item.team) {
-                  <span class="text-meta hidden max-w-32 truncate md:inline">{{ item.team }}</span>
                 }
                 @if (item.assignee) {
                   <span class="text-meta hidden max-w-32 truncate sm:inline">{{
@@ -262,11 +257,9 @@ export class PublicView implements OnInit {
   private enumTable(entity: ViewEntity, field: string | undefined): Labels | null {
     if (field === 'priority') return PRIORITY_META;
     if (field === 'kind') return ISSUE_KIND_META;
-    if (field === 'health') return PROJECT_HEALTH_META;
     if (field !== 'status') return null;
     if (entity === 'issue') return ISSUE_STATUS_META;
-    if (entity === 'project') return PROJECT_STATUS_META;
-    return DECISION_STATUS_META;
+    return PROJECT_STATUS_META;
   }
 }
 

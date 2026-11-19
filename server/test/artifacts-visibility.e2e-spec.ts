@@ -12,7 +12,7 @@ describe('project-scoped artifact access', () => {
   afterAll(() => app.close());
 
   it.each([true, false])(
-    'hides and protects artifacts owned by hidden projects (includeUnassigned=%s)',
+    'hides and protects artifacts of tasks in hidden projects (includeUnassigned=%s)',
     async (includeUnassigned) => {
       const owner = await Client.signup(server, 'Artifact scope owner');
       const workspace = (
@@ -38,7 +38,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const visibleIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Visible issue',
             projectId: visibleProject.id,
@@ -47,7 +47,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const hiddenIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Hidden issue',
             projectId: hiddenProject.id,
@@ -56,7 +56,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const visibleArtifact = (
         await owner.client
-          .post(`${w}/issues/${visibleIssue.id}/artifacts`, {
+          .post(`${w}/tasks/${visibleIssue.id}/artifacts`, {
             kind: 'document',
             title: 'Visible evidence',
           })
@@ -64,17 +64,9 @@ describe('project-scoped artifact access', () => {
       ).body;
       const hiddenIssueArtifact = (
         await owner.client
-          .post(`${w}/issues/${hiddenIssue.id}/artifacts`, {
+          .post(`${w}/tasks/${hiddenIssue.id}/artifacts`, {
             kind: 'document',
             title: 'Hidden issue evidence',
-          })
-          .expect(201)
-      ).body;
-      const hiddenProjectArtifact = (
-        await owner.client
-          .post(`${w}/projects/${hiddenProject.id}/artifacts`, {
-            kind: 'document',
-            title: 'Hidden project evidence',
           })
           .expect(201)
       ).body;
@@ -98,48 +90,33 @@ describe('project-scoped artifact access', () => {
         .body as { id: string }[];
       expect(listed.map((row) => row.id)).toContain(visibleArtifact.id);
       expect(listed.map((row) => row.id)).not.toContain(hiddenIssueArtifact.id);
-      expect(listed.map((row) => row.id)).not.toContain(
-        hiddenProjectArtifact.id,
-      );
       await member.client
         .get(`${w}/artifacts/${hiddenIssueArtifact.id}`)
-        .expect(404);
-      await member.client
-        .get(`${w}/artifacts/${hiddenProjectArtifact.id}`)
         .expect(404);
       expect(
         (
           await member.client
-            .get(`${w}/issues/${hiddenIssue.id}/artifacts`)
+            .get(`${w}/tasks/${hiddenIssue.id}/artifacts`)
             .expect(200)
         ).body,
       ).toEqual([]);
 
       await member.client
-        .get(`${w}/projects/${hiddenProject.id}/artifacts`)
-        .expect(404);
-      await member.client
-        .post(`${w}/issues/${hiddenIssue.id}/artifacts`, {
+        .post(`${w}/tasks/${hiddenIssue.id}/artifacts`, {
           kind: 'document',
           title: 'Attempted hidden issue attach',
         })
         .expect(400);
       await member.client
-        .post(`${w}/projects/${hiddenProject.id}/artifacts`, {
-          kind: 'document',
-          title: 'Attempted hidden project attach',
-        })
-        .expect(404);
-      await member.client
         .post(`${w}/artifacts`, {
           kind: 'document',
-          title: 'Attempted direct hidden project attach',
-          projectId: hiddenProject.id,
+          title: 'Attempted direct hidden issue attach',
+          issueId: hiddenIssue.id,
         })
         .expect(400);
       await member.client
         .patch(`${w}/artifacts/${visibleArtifact.id}`, {
-          projectId: hiddenProject.id,
+          issueId: hiddenIssue.id,
         })
         .expect(400);
       await member.client

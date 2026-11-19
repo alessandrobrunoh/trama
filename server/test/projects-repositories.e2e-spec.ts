@@ -1,7 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { Client, createTestApp } from './app.js';
 
-describe('projects and repositories', () => {
+describe('project repository', () => {
   let app: INestApplication;
   let c: Client;
   let slug: string;
@@ -15,10 +15,18 @@ describe('projects and repositories', () => {
   });
   afterAll(() => app.close());
 
-  it('deleting a repository removes it from the projects that listed it', async () => {
-    const repo = (await c.post(`${base()}/repositories`, { provider: 'github', fullName: 'acme/web' }).expect(201)).body;
-    const p = (await c.post(`${base()}/projects`, { name: 'Has repo', repositoryIds: [repo.id] }).expect(201)).body;
-    await c.delete(`${base()}/repositories/${repo.id}`).expect(204);
-    expect((await c.get(`${base()}/projects/${p.id}`).expect(200)).body.repositoryIds).toEqual([]);
+  it('stores one optional repository string and clears it with null', async () => {
+    const p = (await c.post(`${base()}/projects`, { name: 'Has repo', repository: '  acme/web  ' }).expect(201)).body;
+    expect(p.repository).toBe('acme/web');
+    expect(p).not.toHaveProperty('repositoryIds');
+    expect(p).not.toHaveProperty('teamIds');
+
+    const cleared = (await c.patch(`${base()}/projects/${p.id}`, { repository: null }).expect(200)).body;
+    expect(cleared.repository ?? null).toBeNull();
+    expect((await c.get(`${base()}/projects/${p.id}`).expect(200)).body.repository ?? null).toBeNull();
+  });
+
+  it('rejects an over-long repository', async () => {
+    await c.post(`${base()}/projects`, { name: 'Too long', repository: 'x'.repeat(2049) }).expect(400);
   });
 });

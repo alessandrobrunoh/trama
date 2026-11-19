@@ -24,12 +24,10 @@ export type PickKind =
   | 'plain'
   | 'status'
   | 'priority'
-  | 'team'
   | 'user'
   | 'agent'
   | 'actor'
   | 'provider'
-  | 'repo'
   | 'project'
   | 'label'
   | 'estimate';
@@ -38,7 +36,7 @@ export interface PickOption {
   value: string;
   label: string;
   kind?: PickKind;
-  /** Right-aligned secondary text (e.g. the team key). */
+  /** Right-aligned secondary text (e.g. a task key). */
   hint?: string;
   /** Overrides the search text (defaults to the label). */
   search?: string;
@@ -46,8 +44,6 @@ export interface PickOption {
   status?: string;
   /** Glyph family for status options. */
   statusEntity?: StatusEntity;
-  /** Git provider for `repo` options. */
-  provider?: string;
   /** Single key that picks this option while the list is open and not searchable ("3", "m"). */
   quickKey?: string;
   /** 0..1 position on the estimate scale (kind `estimate`); omitted/0 = empty glyph. */
@@ -151,11 +147,10 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             hlmBtn
             hlmPopoverTrigger
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            class="h-7 max-w-full gap-1.5 px-2 text-xs font-normal"
-            [class.border-dashed]="selected().length === 0"
-            [class.bg-accent]="selected().length > 0"
+            class="bg-muted/60 hover:bg-muted h-7 max-w-full gap-1.5 rounded-md px-2 text-xs font-normal"
+            [class.text-muted-foreground]="selected().length === 0"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
@@ -181,6 +176,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             type="button"
             variant="ghost"
             class="h-auto min-h-8 w-full min-w-0 justify-start gap-1.5 px-1.5 py-1 text-left font-normal"
+            [class]="triggerClass()"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
@@ -304,7 +300,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             }
           </hlm-command-list>
           @if (create()) {
-            <div class="border-t p-1">
+            <div class="p-1">
               <button
                 hlmBtn
                 variant="ghost"
@@ -332,9 +328,6 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
         @case ('priority') {
           <app-priority-icon [priority]="asPriority(o.value)" />
         }
-        @case ('team') {
-          <app-actor-avatar [actor]="teamRef(o.value)" [size]="16" />
-        }
         @case ('user') {
           <app-actor-avatar [actor]="userRef(o.value)" [size]="16" />
         }
@@ -348,13 +341,6 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           <app-provider-icon
             [provider]="asProvider(o.value)"
             [size]="14"
-            class="text-muted-foreground"
-          />
-        }
-        @case ('repo') {
-          <app-provider-icon
-            [provider]="repoProvider(o)"
-            [size]="13"
             class="text-muted-foreground"
           />
         }
@@ -478,11 +464,8 @@ export class Picker {
   protected asStatus = (v: string) => v as AnyStatus;
   protected asPriority = (v: string) => v as Priority;
   protected asProvider = (v: string) => v as AnyProvider;
-  protected teamRef = (v: string): ActorRef => ({ type: 'team', id: v });
   protected projectOf = (id: string) => this.store.getProject(id);
   protected userRef = (v: string): ActorRef => ({ type: 'user', id: v });
   protected agentRef = (v: string): ActorRef => ({ type: 'agent', id: v });
   protected actorRef = (v: string): ActorRef => parseActor(v);
-  protected repoProvider = (o: PickOption): AnyProvider =>
-    o.provider === 'gitlab' ? 'gitlab' : 'github';
 }

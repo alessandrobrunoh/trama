@@ -9,17 +9,8 @@ function makeController(count: number) {
     get: vi.fn(async () => issue),
     visibleParentIds: vi.fn(async () => new Set<string>()),
   };
-  const customers = { attachCounts: vi.fn(async () => undefined) };
-  const permissions = { assertTeamEdit: vi.fn(async () => undefined) };
   const artifacts = { countForIssue: vi.fn(async () => count) };
-  const controller = new IssuesController(
-    service as never,
-    customers as never,
-    permissions as never,
-    artifacts as never,
-    {} as never,
-    {} as never,
-  );
+  const controller = new IssuesController(service as never, artifacts as never);
   return { controller, issue, artifacts };
 }
 
@@ -78,73 +69,13 @@ describe('IssuesController.get', () => {
         get: vi.fn(async () => issue),
         visibleParentIds,
       } as never,
-      { attachCounts: vi.fn(async () => undefined) } as never,
-      {} as never,
       { countForIssue: vi.fn(async () => 0) } as never,
-      {} as never,
-      {} as never,
     );
 
     await controller.get(ctx, session, 'BUG-1');
 
     expect(visibleParentIds).toHaveBeenCalledWith('ws_1', ['in_hidden']);
     expect(issue.parentId).toBeNull();
-  });
-});
-
-describe('IssuesController sub-issue team authorization', () => {
-  it('checks the parent team transactionally for create and reparent writes', async () => {
-    type TeamAuthorizer = (
-      rows: readonly { teamId?: string | null }[],
-    ) => Promise<void>;
-    const service = {
-      create: vi.fn(async (
-        _workspaceId: string,
-        _actor: unknown,
-        _dto: unknown,
-        authorize: TeamAuthorizer,
-      ) => {
-        await authorize([{ teamId: 'tm_locked' }]);
-        return { id: 'in_child', parentId: 'in_parent' };
-      }),
-      update: vi.fn(async (
-        _workspaceId: string,
-        _actor: unknown,
-        _idOrKey: string,
-        _dto: unknown,
-        authorize: TeamAuthorizer,
-      ) => {
-        await authorize([{ teamId: 'tm_locked' }]);
-        return { id: 'in_child', parentId: 'in_parent' };
-      }),
-    };
-    const controller = new IssuesController(
-      service as never,
-      { attachCounts: vi.fn(async () => undefined) } as never,
-      {
-        assertTeamEdit: vi.fn(async (_ctx: unknown, _team: string) => {
-          throw new Error('Team policy rejected the hierarchy change');
-        }),
-      } as never,
-      {} as never,
-      {} as never,
-      {} as never,
-    );
-
-    await expect(
-      controller.create(ctx, session.actor, {
-        kind: 'bug',
-        title: 'Child',
-      } as never),
-    ).rejects.toThrow('Team policy rejected');
-    await expect(
-      controller.update(ctx, session.actor, 'BUG-1', {
-        parentId: 'in_parent',
-      } as never),
-    ).rejects.toThrow('Team policy rejected');
-
-    expect(service.create).toHaveBeenCalledTimes(1);
-    expect(service.update).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -157,56 +88,49 @@ describe('IssuesController.context', () => {
         get: vi.fn(async () => issue),
         visibleParentIds,
       } as never,
-      {} as never,
-      {} as never,
-      { list: vi.fn(async () => []) } as never,
-      { list: vi.fn(async () => []) } as never,
       { list: vi.fn(async () => []) } as never,
     );
 
     const result = await controller.context(ctx, session, 'BUG-1');
 
     expect(visibleParentIds).toHaveBeenCalledWith('ws_1', ['in_hidden']);
-    expect(result.issue.parentId).toBeNull();
+    expect(result).toMatchObject({ issue: { parentId: null } });
   });
 
-  it('returns issue-owned context with open requests and an optional plan summary', async () => {
+  it('returns issue-owned artifacts and an optional plan summary', async () => {
     const issue = { id: 'in_1' } as IssueEntity;
-    const artifact = { id: 'ar_1', kind: 'document', title: 'Plan: rollout' };
-    const decision = { id: 'dc_1', title: 'Plan approval' };
-    const inputRequest = { id: 'ir_1', state: 'open', issueId: 'in_1' };
+    const artifact = {
+      id: 'ar_1',
+      kind: 'document',
+      title: 'Plan: rollout',
+      updatedAt: new Date(0),
+    };
     const controller = new IssuesController(
       { get: vi.fn(async () => issue) } as never,
-      { attachCounts: vi.fn(async () => undefined) } as never,
-      {} as never,
       { list: vi.fn(async () => [artifact]) } as never,
-      { list: vi.fn(async () => [decision]) } as never,
-      { list: vi.fn(async () => [inputRequest]) } as never,
     );
     const result = await controller.context(ctx, session, 'BUG-1');
 
     expect(result).toEqual({
       issue,
-      planSummary: { artifactCount: 1, latestArtifact: artifact, decisions: [decision] },
-      decisions: [decision],
-      inputRequests: [inputRequest],
+      planSummary: { artifactCount: 1, latestArtifact: artifact },
       artifacts: [artifact],
     });
   });
 
-  it('omits planSummary when issue-owned artifacts and decisions have no plans', async () => {
+  it('omits planSummary when issue-owned artifacts are not plans', async () => {
+    const artifact = { id: 'ar_1', kind: 'pull_request', title: 'Fix', updatedAt: new Date(0) };
     const controller = new IssuesController(
       { get: vi.fn(async () => ({ id: 'in_1' })) } as never,
-      { attachCounts: vi.fn(async () => undefined) } as never,
-      {} as never,
-      { list: vi.fn(async () => []) } as never,
-      { list: vi.fn(async () => [{ id: 'dc_1', title: 'Decision', tags: [] }]) } as never,
-      { list: vi.fn(async () => []) } as never,
+      { list: vi.fn(async () => [artifact]) } as never,
     );
 
     const result = await controller.context(ctx, session, 'BUG-1');
-    expect(result.planSummary).toBeUndefined();
-    expect(result.decisions).toEqual([{ id: 'dc_1', title: 'Decision', tags: [] }]);
+    expect(result).toEqual({
+      issue: { id: 'in_1' },
+      planSummary: undefined,
+      artifacts: [artifact],
+    });
   });
 
   it('returns a markdown briefing when markdown is requested', async () => {
@@ -218,15 +142,9 @@ describe('IssuesController.context', () => {
       status: 'todo',
       priority: 'none',
     };
-    const answered = { id: 'ir_1', state: 'answered', question: 'Which?', answer: 'B' };
-    const documentVersions = vi.fn(async () => new Map<string, number>());
     const controller = new IssuesController(
-      { get: vi.fn(async () => issue), documentVersions } as never,
-      {} as never,
-      {} as never,
+      { get: vi.fn(async () => issue) } as never,
       { list: vi.fn(async () => []) } as never,
-      { list: vi.fn(async () => []) } as never,
-      { list: vi.fn(async () => [answered]) } as never,
     );
     const res = { type: vi.fn() };
 
@@ -241,6 +159,6 @@ describe('IssuesController.context', () => {
 
     expect(res.type).toHaveBeenCalledWith('text/markdown; charset=utf-8');
     expect(result).toContain('# BUG-1 — Broken');
-    expect(result).toContain('- Answered: Which? → B');
+    expect(result).not.toContain('Answered');
   });
 });

@@ -22,9 +22,7 @@ import {
   LucideCircleHelp,
   LucideCopy,
   LucideDynamicIcon,
-  LucideFolderGit2,
   LucideGitBranch,
-  LucideGitPullRequest,
   LucideHash,
   LucideInbox,
   LucideListChecks,
@@ -37,10 +35,7 @@ import {
   LucideMoon,
   LucidePanelLeft,
   LucidePlug,
-  LucideFilePlus,
-  LucideFileText,
   LucidePlus,
-  LucideScale,
   LucideBell,
   LucideSearch,
   LucideSlidersHorizontal,
@@ -58,7 +53,6 @@ import {
 import { BrnCommand, BrnCommandInput } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import type {
-  ArtifactKind,
   IssueStatus,
   Project,
 } from '../../core/contracts/domain';
@@ -69,10 +63,8 @@ import {
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
-import { Documents } from '../documents/documents.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
-import { CustomerSubscriptionsStore } from '../../core/stores/customer-subscriptions.store';
 import { FavoritesStore } from '../../core/stores/favorites.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
@@ -80,9 +72,7 @@ import { ThemeService } from '../../core/theme';
 import { ALL_NAV } from '../../layout/nav';
 import { OnboardingStore } from '../../core/stores/onboarding.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
-import { ArtifactIcon } from '../../shared/artifact';
 import { Kbd } from '../../shared/kbd';
-import { ProviderIcon } from '../../shared/provider-icon';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import { fuzzyScore } from './fuzzy';
@@ -128,26 +118,22 @@ interface ItemGroup {
 }
 
 interface Visual {
-  kind: 'status' | 'artifact' | 'avatar' | 'team' | 'repo' | 'project' | 'icon';
+  kind: 'status' | 'avatar' | 'project' | 'icon';
   status?: any;
   project?: Project;
   entity?: StatusEntity;
-  artifactKind?: ArtifactKind;
   color?: string;
   provider?: string;
 }
 
 /** Palette scopes (chips). `all` mixes everything plus Go to / Actions. */
-type Scope = 'all' | 'issue' | 'project' | 'decision' | 'repository' | 'person' | 'team';
+type Scope = 'all' | 'issue' | 'project' | 'person';
 
 const SCOPES: { id: Scope; label: string; placeholder: string }[] = [
   { id: 'all', label: 'All', placeholder: '' },
-  { id: 'issue', label: 'Issues', placeholder: 'Search issues…' },
+  { id: 'issue', label: 'Tasks', placeholder: 'Search tasks…' },
   { id: 'project', label: 'Projects', placeholder: 'Search projects…' },
-  { id: 'decision', label: 'Decisions', placeholder: 'Search decisions…' },
-  { id: 'repository', label: 'Repositories', placeholder: 'Search repositories…' },
   { id: 'person', label: 'People', placeholder: 'Search people…' },
-  { id: 'team', label: 'Teams', placeholder: 'Search teams…' },
 ];
 
 /** Typed prefixes that switch scope ("issue:", "@", …). */
@@ -158,25 +144,16 @@ const PREFIXES: Record<string, Scope> = {
   bug: 'issue',
   project: 'project',
   projects: 'project',
-  decision: 'decision',
-  decisions: 'decision',
-  adr: 'decision',
-  repo: 'repository',
+  task: 'issue',
+  tasks: 'issue',
   people: 'person',
   person: 'person',
   user: 'person',
-  team: 'team',
-  teams: 'team',
 };
 
 const HIT_ICON: Record<ItemType, LucideIcon> = {
   project: LucideBox,
-  decision: LucideScale,
   issue: LucideInbox,
-  customer: LucideBuilding2,
-  artifact: LucideGitPullRequest,
-  repository: LucideFolderGit2,
-  team: LucideUsers,
   person: LucideUserRound,
 };
 
@@ -192,7 +169,6 @@ const SETTINGS_SECTIONS: { id: string; label: string; icon: LucideIcon; keywords
   { id: 'appearance', label: 'Appearance', icon: LucideSunMoon, keywords: 'theme dark light' },
   { id: 'workspace', label: 'Workspace', icon: LucideBuilding2 },
   { id: 'members', label: 'Members & roles', icon: LucideUsers, keywords: 'people invite' },
-  { id: 'teams', label: 'Teams', icon: LucideUsers },
   { id: 'agents', label: 'Agents', icon: LucideBot, keywords: 'claude codex cursor delta' },
   { id: 'tokens', label: 'API tokens', icon: LucideKeyRound, keywords: 'keys secret mcp' },
   {
@@ -218,11 +194,11 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
  */
 export const COMMAND_DIALOG_CLASS =
   // Widths use viewport units: the CDK pane shrink-wraps its content, so a `%` width collapses to the content width.
-  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-md border border-border-strong p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
+  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.
- *  - scope chips (All · Issues · Projects · Decisions · Repositories · People · Teams); Tab cycles,
+ *  - scope chips (All · Issues · Projects · People); Tab cycles,
  *    prefixes like `issue:` / `@` switch scope, Backspace on an empty query goes back to All
  *  - `palette`: context actions for the open issue, recent items, Go to, Actions, live results
  *  - `search`:  recent items and results grouped by type
@@ -236,9 +212,7 @@ export const COMMAND_DIALOG_CLASS =
     LucideDynamicIcon,
     NgTemplateOutlet,
     StatusIcon,
-    ArtifactIcon,
     ActorAvatar,
-    ProviderIcon,
     Kbd,
     BrnCommandInput,
     ProjectGlyph,
@@ -251,19 +225,8 @@ export const COMMAND_DIALOG_CLASS =
         @case ('status') {
           <app-status-icon [status]="v.status" [entity]="v.entity ?? 'auto'" />
         }
-        @case ('artifact') {
-          <app-artifact-icon [kind]="v.artifactKind!" [state]="v.status" />
-        }
         @case ('avatar') {
           <app-actor-avatar [actor]="{ type: 'user', id: h.id }" [size]="16" />
-        }
-        @case ('team') {
-          <span class="flex size-3.5 shrink-0 items-center justify-center"
-            ><span class="size-2.5 rounded-full" [style.background]="v.color"></span
-          ></span>
-        }
-        @case ('repo') {
-          <app-provider-icon [provider]="$any(v.provider)" [size]="14" />
         }
         @case ('project') {
           <app-project-glyph [project]="v.project!" [size]="14" />
@@ -300,12 +263,12 @@ export const COMMAND_DIALOG_CLASS =
       [filter]="filter"
       [(search)]="query"
     >
-      <div class="border-border shrink-0 border-b">
+      <div class="shrink-0">
         <div class="flex h-12 items-center gap-2.5 px-4 max-md:h-14">
           @if (mode() === 'palette' && context(); as ctx) {
             <button
               type="button"
-              class="border-border-strong bg-muted text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md border px-2 font-mono text-xs transition-colors"
+              class="bg-secondary text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 font-mono text-xs transition-colors"
               [attr.aria-label]="page() === 'status' ? 'Back to ' + ctx.key + ' actions' : ctx.key"
               [disabled]="page() === 'root'"
               (mousedown)="$event.preventDefault()"
@@ -548,9 +511,9 @@ export const COMMAND_DIALOG_CLASS =
               class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm"
             >
               <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-              <p>Search issues, projects, decisions, repositories, people and teams.</p>
+              <p>Search tasks, projects and people.</p>
               <p class="text-xs">
-                Tip: type <span class="font-mono">issue:</span>,
+                Tip: type <span class="font-mono">task:</span>,
                 <span class="font-mono">ws:</span> or <span class="font-mono">&#64;</span> to
                 narrow.
               </p>
@@ -560,7 +523,7 @@ export const COMMAND_DIALOG_CLASS =
       </hlm-command-list>
 
       <div
-        class="border-border text-muted-foreground flex h-9 shrink-0 items-center gap-4 border-t px-4 text-[11px] max-sm:hidden"
+        class="text-muted-foreground flex h-9 shrink-0 items-center gap-4 px-4 text-[11px] max-sm:hidden"
       >
         <span class="flex items-center gap-1.5"><app-kbd keys="up down" /> navigate</span>
         <span class="flex items-center gap-1.5"><app-kbd keys="enter" /> select</span>
@@ -582,10 +545,8 @@ export class CommandPanel {
   protected readonly ui = inject(UiStore);
   private readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
-  private readonly customerSubs = inject(CustomerSubscriptionsStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
-  private readonly documents = inject(Documents);
   private readonly theme = inject(ThemeService);
   private readonly searchSvc = inject(SearchService);
   private readonly recents = inject(RecentItems);
@@ -620,7 +581,7 @@ export class CommandPanel {
     if (s?.placeholder) return s.placeholder;
     return this.mode() === 'palette'
       ? 'Type a command or search…'
-      : 'Search issues, projects, decisions…';
+      : 'Search tasks and projects…';
   });
   protected readonly isSearching = computed(() => this.query().trim().length > 0);
   /** The scope chips stay out of the way until you search or narrow the scope (the `/` dialog always shows them). */
@@ -677,29 +638,6 @@ export class CommandPanel {
         return [...s.projects()]
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((p) => ({ type: 'project', id: p.id, title: p.name, subtitle: p.summary }));
-      case 'decision':
-        return [...s.decisions()]
-          .sort(byUpdated)
-          .slice(0, 50)
-          .map((d) => ({
-            type: 'decision',
-            id: d.id,
-            key: d.key,
-            title: d.title,
-          }));
-      case 'repository':
-        return [...s.repositories()]
-          .sort((a, b) => a.fullName.localeCompare(b.fullName))
-          .map((r) => ({
-            type: 'repository',
-            id: r.id,
-            title: r.fullName,
-            subtitle: r.defaultBranch,
-          }));
-      case 'team':
-        return [...s.teams()]
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map((t) => ({ type: 'team', id: t.id, key: t.key, title: t.name }));
       default:
         return [];
     }
@@ -740,7 +678,7 @@ export class CommandPanel {
     const path = this.router.url.split(/[?#]/)[0].split('/').filter(Boolean);
     if (path.length < 3) return null;
     const key = decodeURIComponent(path[2]);
-    if (path[1] === 'issues') {
+    if (path[1] === 'tasks' || path[1] === 'issues') {
       const issue = this.store.getIssue(key);
       return issue
         ? { type: 'issue' as const, id: issue.id, key: issue.key, issue }
@@ -751,7 +689,7 @@ export class CommandPanel {
 
   protected readonly contextLabel = computed(() => {
     const c = this.context();
-    return c ? 'Issue actions' : '';
+    return c ? 'Task actions' : '';
   });
 
   protected readonly contextIcon = computed(() => HIT_ICON.issue);
@@ -791,7 +729,7 @@ export class CommandPanel {
       if (c.issue) {
         out.push({
           id: 'ctx:ai-summarize',
-          label: 'Summarize this issue',
+          label: 'Summarize this task',
           keywords: 'ai tldr summary explain',
           icon: LucideSparkles,
           ai: true,
@@ -826,7 +764,7 @@ export class CommandPanel {
         keywords: 'id',
         icon: LucideHash,
         hint: c.key,
-        keys: c.issue ? 'mod+.' : undefined,
+        keys: c.issue ? 'mod+shift+k' : undefined,
         run: () => void this.clipboard.copy(c.key, 'Key copied'),
       },
       {
@@ -884,7 +822,7 @@ export class CommandPanel {
       id: 'nav:' + n.segment,
       label: n.label,
       keywords:
-        'go to ' + (n.segment === 'repositories' ? 'repository repositories repo git ' : '') + (n.keywords ?? ''),
+        'go to ' + (n.keywords ?? ''),
       icon: n.icon,
       keys: n.keys,
       run: go(n.segment),
@@ -905,22 +843,12 @@ export class CommandPanel {
         run: () => void this.router.navigate(['/', slug, 'inbox'], { queryParams: { tab } }),
       });
     const extra: [string, string, LucideIcon, string][] = [
-      ['teams', 'Teams', LucideUsers, 'g t'],
       ['views', 'Views', LucideLayers, 'g v'],
       ['activity', 'Activity', LucideActivity, 'g e'],
     ];
     for (const [segment, label, icon, keys] of extra) {
       if (!nav.some((n) => n.segment === segment))
         out.push({ id: 'nav:' + segment, label, keywords: 'go to', icon, keys, run: go(segment) });
-    }
-    for (const t of this.store.teams()) {
-      out.push({
-        id: 'team:' + t.id,
-        label: `Team ${t.name}`,
-        keywords: `go to ${t.key}`,
-        icon: LucideUsers,
-        run: go('teams', t.key),
-      });
     }
     for (const v of this.store.views()) {
       out.push({
@@ -950,70 +878,20 @@ export class CommandPanel {
     if (this.store.allowed('createIssues'))
       out.push({
         id: 'new:issue',
-        label: 'Create issue',
+        label: 'Create task',
         keywords: 'new bug feature incident report',
         icon: LucidePlus,
         run: create('issue'),
       });
     if (this.store.can('member'))
       out.push({
-        id: 'new:decision',
-        label: 'Create decision',
-        keywords: 'new adr',
+        id: 'new:project',
+        label: 'Create project',
+        keywords: 'new project',
         icon: LucidePlus,
-        run: create('decision'),
+        run: create('project'),
       });
-    if (this.store.can('member'))
-      out.push({
-        id: 'new:document',
-        label: 'Create document',
-        keywords: 'new doc write note spec plan markdown page',
-        icon: LucideFilePlus,
-        run: () => void this.documents.createAndOpen(),
-      });
-    out.push({
-      id: 'docs:search',
-      label: 'Search documents',
-      keywords: 'find docs notes specs plans text',
-      icon: LucideFileText,
-      run: () => void this.router.navigate(['/', this.slug(), 'documents'], { queryParams: { focus: 'search' } }),
-    });
-    if (this.store.allowed('manageCustomers')) {
-      const here = this.favorites.current();
-      out.push(
-        {
-          id: 'new:customer',
-          label: 'Create customer',
-          keywords: 'new company account add',
-          icon: LucideBuilding2,
-          run: () => this.ui.openCustomerDialog({ kind: 'customer' }),
-        },
-        {
-          id: 'new:customer-request',
-          label: here?.type === 'issue' ? 'Add customer request to this issue' : here?.type === 'project' ? 'Add customer request to this project' : 'Add customer request',
-          keywords: 'new customer asked feedback need demand',
-          icon: LucideBuilding2,
-          run: () =>
-            this.ui.openCustomerDialog({
-              kind: 'request',
-              ...(here?.type === 'issue' ? { issueId: here.id } : {}),
-              ...(here?.type === 'project' ? { projectId: here.id } : {}),
-              ...(here?.type === 'customer' ? { customerId: here.id } : {}),
-            }),
-        },
-      );
-    }
     const page = this.favorites.current();
-    if (page?.type === 'customer') {
-      const following = this.customerSubs.isFollowing(page.id);
-      out.push({
-        id: 'customer:follow',
-        label: following ? 'Stop following this customer' : 'Follow this customer',
-        keywords: 'subscribe notifications bell',
-        icon: LucideBell,
-        run: () => void this.customerSubs.toggle(page.id),
-      });
-    }
     if (page) {
       const pinned = this.favorites.has(page.type, page.id);
       out.push({
@@ -1102,7 +980,7 @@ export class CommandPanel {
         icon: LucideListChecks,
         run: () => {
           this.onboarding.restore();
-          void this.router.navigate(['/', this.slug(), 'overview']);
+          void this.router.navigate(['/', this.slug(), 'inbox']);
         },
       },
       {
@@ -1258,35 +1136,13 @@ export class CommandPanel {
   protected visual(h: PanelItem): Visual {
     const s = this.store;
     switch (h.type) {
-      case 'decision': {
-        const d = s.decisionById().get(h.id);
-        if (d) return { kind: 'status', status: d.status };
-        break;
-      }
       case 'issue': {
         const i = s.issueById().get(h.id);
         if (i) return { kind: 'status', status: i.status, entity: 'issue' };
         break;
       }
-      case 'customer':
-        break;
-      case 'artifact': {
-        const a = s.artifactById().get(h.id);
-        if (a) return { kind: 'artifact', status: a.state, artifactKind: a.kind };
-        break;
-      }
       case 'person':
         return { kind: 'avatar' };
-      case 'team': {
-        const t = s.teamById().get(h.id);
-        if (t) return { kind: 'team', color: t.color };
-        break;
-      }
-      case 'repository': {
-        const r = s.getRepository(h.id);
-        if (r) return { kind: 'repo', provider: r.provider };
-        break;
-      }
       case 'project': {
         const p = s.getProject(h.id);
         if (p) return { kind: 'project', project: p };

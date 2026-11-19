@@ -99,7 +99,7 @@ const VISIBILITY_LABEL = { private: 'Private', workspace: 'Workspace', link: 'Pu
           }
         </section>
 
-        <section class="flex flex-col gap-2 border-t pt-3">
+        <section class="flex flex-col gap-2 pt-4">
           <h3 class="text-muted-foreground text-xs font-medium">General access</h3>
           <hlm-radio-group
             class="gap-1"
@@ -119,7 +119,7 @@ const VISIBILITY_LABEL = { private: 'Private', workspace: 'Workspace', link: 'Pu
             }
           </hlm-radio-group>
           @if (visibility() === 'link') {
-            <p class="text-meta bg-muted/50 rounded-md border px-2.5 py-2 leading-relaxed">
+            <p class="text-meta bg-muted rounded-md px-2.5 py-2 leading-relaxed">
               Anyone with the link can see this view's results, read-only, even without being signed in. They cannot change filters, grouping or display, or see anything else in the workspace.
             </p>
             @if (canManage()) {

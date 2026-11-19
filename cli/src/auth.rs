@@ -570,7 +570,7 @@ fn profile_row(name: &str, p: &Profile, current: Option<&str>) -> Value {
 /// `trama account`: add one or many tokens (or sign in and mint one key per workspace), then list or remove them.
 ///
 /// A token is still bound to exactly one workspace. An *account* is just the name that groups the
-/// profiles `add` created, so `trama issue list --account work` can read all of them at once.
+/// profiles `add` created, so `trama task list --account work` can read all of them at once.
 pub async fn account(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
     match m.subcommand() {
         Some(("add", sm)) => account_add(sm, ctx).await,
@@ -696,7 +696,7 @@ async fn account_add(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
         if added.is_empty() {
             eprintln!("Nothing new: every token was already saved.");
         }
-        eprintln!("Read all of them at once with `trama issue list --account {account}`.");
+        eprintln!("Read all of them at once with `trama task list --account {account}`.");
         return Ok(());
     }
     output::print(
@@ -931,11 +931,11 @@ mod tests {
                 "token": { "id": "tok_1", "name": "ci", "tokenHash": "deadbeef", "prefix": "nbl_3f9a" },
                 "actor": { "type": "user", "id": "usr_1" },
                 "workspace": { "id": "ws_1", "slug": "acme", "name": "Acme" },
-                "permissions": ["issues:write", "issues:read", "issues:read"],
+                "permissions": ["tasks:write", "tasks:read", "tasks:read"],
             }),
         };
         let s = id.summary("https://x/api", Some("default"));
-        assert_eq!(s["permissions"], json!(["issues:read", "issues:write"]));
+        assert_eq!(s["permissions"], json!(["tasks:read", "tasks:write"]));
         assert!(s["token"].get("tokenHash").is_none());
         assert_eq!(s["token"]["prefix"], "nbl_3f9a");
         assert_eq!(id.token_id().as_deref(), Some("tok_1"));

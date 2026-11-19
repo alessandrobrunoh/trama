@@ -97,9 +97,9 @@ describe('auth', () => {
     const agent = (await client.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'claude_code' }).expect(201)).body;
     const agentToken = (await client.post(`/api/w/${slug}/tokens`, { name: 'bot', agentId: agent.id }).expect(201)).body;
     const asAgent = new TokenClient(app.getHttpServer(), agentToken.secret);
-    await asAgent.get(`/api/w/${slug}/teams`).expect(200);
+    await asAgent.get(`/api/w/${slug}/projects`).expect(200);
     await asAgent.get('/api/auth/me').expect(403);
-    await asAgent.post(`/api/w/${slug}/teams`, { name: 'Nope', key: 'NOPE' }).expect(403); // member < admin
+    await asAgent.post(`/api/w/${slug}/agents`, { name: 'Nope', provider: 'codex' }).expect(403); // member < admin
     await asAgent.get(`/api/w/${slug}/snapshot`).expect(403);
 
     // token revoked → 401

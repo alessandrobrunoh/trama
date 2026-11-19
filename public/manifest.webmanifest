@@ -2,7 +2,7 @@
   "id": "/",
   "name": "Trama \u2014 Work for humans and agents",
   "short_name": "Trama",
-  "description": "Issues, workstreams and decisions for teams of people and coding agents.",
+  "description": "Tasks and projects for teams of people and coding agents.",
   "lang": "en",
   "dir": "ltr",
   "display": "standalone",
@@ -35,10 +35,10 @@
       ]
     },
     {
-      "name": "My work",
-      "short_name": "My work",
-      "description": "Issues and workstreams assigned to you",
-      "url": "/a/launch?go=my-work&source=shortcut",
+      "name": "My tasks",
+      "short_name": "My tasks",
+      "description": "Tasks assigned to you",
+      "url": "/a/launch?go=my-tasks&source=shortcut",
       "icons": [
         {
           "src": "icons/icon-96x96.png",
@@ -48,8 +48,8 @@
       ]
     },
     {
-      "name": "New issue",
-      "short_name": "New issue",
+      "name": "New task",
+      "short_name": "New task",
       "description": "Report a bug, request or incident",
       "url": "/a/launch?go=new-issue&source=shortcut",
       "icons": [

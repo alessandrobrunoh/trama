@@ -1,12 +1,12 @@
 import { addMockHistoryToSeed } from '../mock-history.js';
-import { SeedBuilder, SYSTEM, agent, team, user, type SeedData } from './builder.js';
+import { SeedBuilder, SYSTEM, agent, user, type SeedData } from './builder.js';
 
 export const DEMO_EMAIL = 'demo@trama.dev';
 export const DEMO_PASSWORD = 'trama-demo';
 
 /**
  * The "Acme" demo workspace: 14 workstreams covering every derived status, executions with
- * subthreads and dependencies, artifacts, decisions (ADR-1…23), issues, comments, views and
+ * subthreads and dependencies, artifacts, issues, comments, views and
  * ~6 weeks of event history, all relative to `now`. Stored `status` values follow PLAN.md §2
  * so the UI is right before the status engine runs.
  */
@@ -57,11 +57,11 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   // ───────── projects (planning level; workstreams below carry them out)
   const pAuth = b.project({
     name: 'Auth hardening', summary: 'Safer sessions and key management across api, web and auth-service.',
-    color: '#8b5cf6', status: 'in_progress', priority: 'high', lead: maya, teams: [AUTH, SEC], start: 25, target: 20, created: 26, createdBy: maya,
+    color: '#8b5cf6', status: 'in_progress', health: 'at_risk', priority: 'high', lead: maya, teams: [AUTH, SEC], start: 25, target: 20, created: 26, createdBy: maya,
   });
   const pCheckout = b.project({
     name: 'Checkout v2', summary: 'A faster, server-driven checkout that matches the new brand.',
-    color: '#f59e0b', status: 'in_progress', priority: 'high', lead: priya, teams: [WEB, PAY, PLAT], start: 40, target: 30, created: 41, createdBy: priya,
+    color: '#f59e0b', status: 'in_progress', health: 'on_track', priority: 'high', lead: priya, teams: [WEB, PAY, PLAT], start: 40, target: 30, created: 41, createdBy: priya,
   });
 
   // ═══════════════════════════ AUTH-42 — needs_input ═══════════════════════════
@@ -108,12 +108,9 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
     session: 'https://claude.ai/code/session_a42ttl', created: 5, note: 'Waiting for a decision on the refresh token TTL.', notes: [[1, 'Blocked on decision: what should the refresh token TTL be?']],
   });
   b.execution(auth42, {
-    title: 'Security review', team: SEC, repos: [rAuth], performers: [agent(codex), team(SEC)], provider: 'codex', state: 'running', deps: [a42e2b], created: 3,
+    title: 'Security review', team: SEC, repos: [rAuth], performers: [agent(codex)], provider: 'codex', state: 'running', deps: [a42e2b], created: 3,
     notes: [[2, 'Reviewing token family revocation and cookie flags']],
   });
-  b.input(auth42, { execution: a42e4, question: 'Refresh token TTL?', options: ['7 days sliding', '30 days absolute', '90 days absolute'], by: agent(claude), assignee: ale, created: 1 });
-  b.input(auth42, { execution: a42e4, question: 'Should we revoke all sessions on password change?', by: agent(claude), assignee: maya, created: 0.4 });
-  b.input(auth42, { execution: a42e2, question: 'Should replay of a rotated token revoke the whole token family?', options: ['Revoke the token only', 'Revoke the whole family'], by: agent(delta), assignee: maya, created: 14, answer: { text: 'Revoke the whole family and force a re-login.', by: maya, daysAgo: 13 } });
   b.artifact(auth42, { kind: 'pull_request', provider: 'github', title: 'Implement refresh token rotation', execution: a42e2b, repo: rAuth, externalId: '#182', url: 'https://github.com/acme/auth-service/pull/182', state: 'merged', ci: 'passing', review: 'approved', by: agent(claude), created: 11, updated: 8 });
   b.artifact(auth42, { kind: 'pull_request', provider: 'github', title: 'Update web refresh handling', execution: a42e3, repo: rWeb, externalId: '#187', url: 'https://github.com/acme/web/pull/187', state: 'open', ci: 'passing', review: 'requested', by: user(priya), created: 3, updated: 1 });
   b.artifact(auth42, { kind: 'document', provider: 'docs', title: 'Refresh token rotation strategy', externalId: 'ADR-21', url: 'https://docs.acme.dev/adr/021', state: 'published', by: agent(delta), created: 12 });
@@ -195,7 +192,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
     path: ['draft', 'planned', 'working'], target: 20, created: 30, createdBy: ale,
   });
   const p7e2 = b.execution(plat7, { title: 'PAY: Payment intent API contract', team: PAY, repos: [rPay, rApi], performers: [user(jonas)], provider: 'human', state: 'completed', created: 28, done: 20 });
-  const p7e1 = b.execution(plat7, { title: 'PAY: Payments implementation', team: PAY, repos: [rPay], performers: [agent(codex), team(PAY)], provider: 'codex', state: 'running', branch: 'plat-7/payment-intents', session: 'https://delta.dev/t/payments-impl-ab12', created: 25, notes: [[10, 'Payment intent service scaffolded'], [3, 'Idempotency done, 3DS challenge in progress']], note: 'Idempotency done, 3DS challenge in progress' });
+  const p7e1 = b.execution(plat7, { title: 'PAY: Payments implementation', team: PAY, repos: [rPay], performers: [agent(codex)], provider: 'codex', state: 'running', branch: 'plat-7/payment-intents', session: 'https://delta.dev/t/payments-impl-ab12', created: 25, notes: [[10, 'Payment intent service scaffolded'], [3, 'Idempotency done, 3DS challenge in progress']], note: 'Idempotency done, 3DS challenge in progress' });
   b.execution(plat7, { title: 'Idempotency key middleware', parent: p7e1, team: PAY, repos: [rPay], performers: [agent(codex)], provider: 'codex', state: 'completed', created: 18, done: 8 });
   b.execution(plat7, { title: '3DS challenge flow', parent: p7e1, team: PAY, repos: [rPay], performers: [agent(codex)], provider: 'codex', state: 'running', created: 8, notes: [[2, 'Challenge redirect works against the test PSP']] });
   b.execution(plat7, { title: 'AUTH: Authentication integration', team: AUTH, repos: [rAuth], performers: [agent(claude)], provider: 'claude_code', state: 'running', deps: [p7e2], created: 18, notes: [[5, 'Checkout sessions now carry the step-up claim']] });
@@ -230,7 +227,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.artifact(sec9, { kind: 'pull_request', provider: 'github', title: 'Bump vulnerable dependencies (web)', execution: s9e1, repo: rWeb, externalId: '#915', url: 'https://github.com/acme/web/pull/915', state: 'merged', ci: 'passing', review: 'approved', by: agent(codex), created: 4, updated: 1 });
   b.criterionEvents(sec9, 'SEC-9', [{ daysAgo: 1, text: 'No critical CVEs in production dependencies', state: 'met', by: tomas }]);
 
-  // ═══════════════════════════ SEC-11 — needs_input (proposed decision) ═══════════════════════════
+  // ═══════════════════════════ SEC-11 — needs_input  ═══════════════════════════
   const sec11 = b.workstream({
     key: 'SEC-11', title: 'Audit log retention policy', objective: 'Define and implement how long audit logs are kept, and where.',
     owner: SEC, participating: [PLAT], accountable: ale, repos: [rApi], priority: 'medium', labels: ['compliance'],
@@ -250,7 +247,6 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   const a58e1 = b.execution(api58, { title: 'Token bucket middleware', team: API, repos: [rApi], performers: [agent(claude)], provider: 'claude_code', state: 'running', branch: 'api-58/rate-limit', session: 'https://claude.ai/code/session_api58', created: 6, notes: [[2, 'Redis-backed bucket working, adding burst allowance']], note: 'Redis-backed bucket working, adding burst allowance' });
   b.execution(api58, { title: 'Load test limits', team: API, repos: [rApi], performers: [agent(delta)], provider: 'delta', state: 'queued', created: 4 });
   b.execution(api58, { title: 'Document limits for API consumers', team: API, performers: [user(jonas)], provider: 'human', state: 'queued', created: 4 });
-  b.input(api58, { execution: a58e1, question: 'Should limits be per API key or per IP?', options: ['Per API key', 'Per IP', 'Both'], by: agent(claude), assignee: jonas, created: 6, answer: { text: 'Per API key, with a coarse per-IP backstop.', by: jonas, daysAgo: 5 } });
 
   // ═══════════════════════════ API-57 — blocked (merge conflict) ═══════════════════════════
   const api57 = b.workstream({
@@ -286,48 +282,13 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   });
   b.execution(pay15, { title: 'Export CSV endpoint', team: PAY, repos: [rPay], performers: [agent(codex)], provider: 'codex', state: 'canceled', created: 33, done: 20 });
 
-  // ───────── decisions (ADR-1 … ADR-23)
-  const adr = (n: number, title: string, statement: string, rationale: string, tags: string[], o: { by?: typeof SYSTEM; decidedBy?: string; created: number; decided?: number; origin?: string; related?: string[]; status?: 'accepted' | 'rejected' | 'proposed' | 'superseded'; superseded?: string; originExecution?: string }) =>
-    b.decision({ number: n, title, statement, rationale, status: o.status ?? 'accepted', origin: o.origin, originExecution: o.originExecution, related: o.related, by: o.by ?? user(maya), decidedBy: o.status === 'proposed' ? undefined : (o.decidedBy ?? maya), created: o.created, decided: o.status === 'proposed' ? undefined : (o.decided ?? o.created - 1), superseded: o.superseded, tags });
-  adr(1, 'Use PostgreSQL 17 as the primary datastore', 'All services use PostgreSQL 17; no new datastores without an ADR.', 'One operational model, strong consistency, JSONB covers semi-structured needs.', ['data'], { created: 58, decidedBy: ale, by: user(ale) });
-  adr(2, 'TypeScript strict mode across all services', 'Every service compiles with `strict: true`.', 'Catches a class of null bugs before runtime; agents write safer code with strict types.', ['typescript'], { created: 57, decidedBy: ale, by: user(ale) });
-  adr(3, 'Trunk-based development with short-lived branches', 'Branches live less than three days and merge to main behind flags.', 'Reduces merge conflicts, which are costly with parallel agents.', ['process'], { created: 56, decidedBy: ale, by: user(ale) });
-  (() => {
-    const a4 = adr(4, 'Use JWT access tokens with 7-day expiry', 'Web sessions use a single JWT access token with a 7-day expiry.', 'Simple to implement and stateless.', ['auth'], { created: 55, related: [auth42], status: 'superseded' });
-    const a11 = adr(11, 'Use rotating refresh tokens with short-lived access tokens', 'Access tokens live 15 minutes; a refresh token is rotated on every use.', 'Limits the blast radius of a leaked token while keeping sessions seamless.', ['auth'], { created: 40, related: [auth42], status: 'superseded' });
-    const a21 = adr(21, 'Use rotating refresh tokens with a 30-day absolute TTL', 'Refresh tokens rotate on every use and expire 30 days after the session started, regardless of activity.', 'Avoid indefinite sessions while retaining seamless renewal.', ['auth', 'security'], { by: agent(delta), created: 13, decided: 12, origin: auth42, related: [auth42, pay22], originExecution: a42e1 });
-    const rows = b.data.decisions;
-    rows.find((d) => d.id === a4)!.supersededById = a11;
-    rows.find((d) => d.id === a11)!.supersededById = a21;
-    b.superseded(a4, 'ADR-11', 39, maya);
-    b.superseded(a11, 'ADR-21', 12, maya);
-    return a21;
-  })();
-  adr(5, 'Idempotency keys required on all payment mutations', 'Every payment-mutating endpoint requires an Idempotency-Key header.', 'Retries from clients and agents must never double-charge.', ['payments'], { created: 50, origin: plat7, related: [plat7], by: user(jonas), decidedBy: maya });
-  adr(6, 'Feature flags via the env-backed flag service', 'Risky changes ship behind flags from the flag service, never from ad-hoc env checks.', 'Central audit trail, and flags can be flipped without a deploy.', ['process'], { created: 49, decidedBy: ale, by: user(ale) });
-  adr(7, 'Structured JSON logging with trace ids', 'All services log JSON lines including trace and span ids.', 'Required to correlate logs with traces.', ['observability'], { created: 47, related: [inf31], by: user(tomas), decidedBy: maya });
-  adr(8, 'Angular for the web client', 'The web client is built with Angular and Tailwind.', 'Strong conventions suit a large team and agent-written code.', ['web'], { created: 46, decidedBy: ale, by: user(priya) });
-  adr(9, 'Rate limiting at the gateway, not in services', 'Per-key rate limits are enforced by the API gateway layer.', 'One implementation, consistent responses, services stay simple.', ['api'], { created: 30, origin: api58, related: [api58], by: user(jonas), decidedBy: maya });
-  adr(10, 'Event-sourced audit log', 'Security-relevant actions append to an immutable event log.', 'Tamper-evident history and replay for investigations.', ['security'], { created: 44, related: [sec11], by: user(tomas), decidedBy: maya });
-  adr(12, 'Use OpenTelemetry for distributed tracing', 'Services export traces via OpenTelemetry to a central collector.', 'Vendor-neutral and supported by every runtime we use.', ['observability'], { created: 14, origin: inf31, related: [inf31], by: agent(delta), decidedBy: tomas });
-  adr(13, 'Run CI on ARM runners', 'All CI pipelines run on ARM runners by default.', '30% cost reduction with no test regressions.', ['ci'], { created: 35, origin: inf27, related: [inf27], by: user(tomas), decidedBy: maya });
-  adr(14, 'Store money as integer minor units', 'All monetary values are integers in the smallest currency unit plus an ISO currency code.', 'Avoids floating point rounding errors.', ['payments'], { created: 45, related: [plat7, pay22], by: user(jonas), decidedBy: maya });
-  adr(15, 'Webhook retries use exponential backoff, max 8 attempts', 'Failed deliveries retry with exponential backoff and jitter up to 8 attempts, then go to a dead-letter queue.', 'Protects customer endpoints and our queue.', ['api', 'webhooks'], { created: 12, origin: api57, related: [api57], by: agent(claude), decidedBy: jonas });
-  adr(16, 'Design tokens are the source of truth for theming', 'Components consume semantic tokens only; raw colors are forbidden.', 'Enables light/dark/brand themes without component changes.', ['design-system'], { created: 5, origin: web77, related: [web77, web81], by: user(priya), decidedBy: ale });
-  adr(17, 'Do not adopt GraphQL for the public API', 'The public API stays REST + OpenAPI.', 'Operational cost and caching complexity outweigh the benefits for our consumers.', ['api'], { created: 20, status: 'rejected', related: [api61], by: user(jonas), decidedBy: maya });
-  adr(18, 'Signing keys rotate every 90 days', 'JWT signing keys rotate every 90 days; the JWKS publishes the current and previous key.', 'Limits exposure of any single key.', ['auth', 'security'], { created: 25, origin: auth39, related: [auth39], by: user(maya), decidedBy: tomas });
-  adr(19, 'Checkout state lives server-side', 'Cart, pricing and checkout step state are owned by the server; the client renders only.', 'Single source of truth for pricing and 3DS flows.', ['checkout'], { created: 28, origin: plat7, related: [plat7, web81], by: user(ale), decidedBy: maya });
-  adr(20, 'Security findings are triaged within two business days', 'Every incoming security finding gets an owner and severity within two business days.', 'Predictable remediation SLAs.', ['security', 'process'], { created: 22, related: [sec9], by: user(tomas), decidedBy: ale });
-  adr(22, 'Audit log retention: 400 days hot, 7 years cold', 'Keep audit logs queryable for 400 days, then archive to cold storage for 7 years.', 'Covers SOC 2 and the longest regulatory retention requirement we know of.', ['compliance', 'security'], { by: agent(claude), created: 3, origin: sec11, related: [sec11], status: 'proposed' });
-  adr(23, 'Hash refresh tokens at rest with HMAC-SHA256', 'Refresh tokens are stored as HMAC-SHA256 digests keyed with a server secret, never in plaintext.', 'A database leak must not expose usable refresh tokens.', ['auth', 'security'], { by: agent(claude), created: 2, origin: auth42, related: [auth42], status: 'proposed' });
-
   // ───────── milestones (of the projects)
   b.syncProjectRepos();
   const ms42Replay = b.milestone(pAuth, { name: 'Replay detection', description: 'Shared replay detection across both refresh paths.', target: -2, sort: 0, created: 20 });
   const ms42Rollout = b.milestone(pAuth, { name: 'Rollout and metrics', description: 'Gradual rollout with rotation metrics in place.', target: 6, sort: 1, created: 20 });
 
   // ───────── issues
-  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, created: 24, moved: 21, movedBy: maya });
+  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, thread: S('login-redirect-5d2e'), created: 24, moved: 21, movedBy: maya });
   b.issue({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 3, created: 27, moved: 21, movedBy: maya });
   b.issue({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Rollout], estimate: 8, created: 8, moved: 7, movedBy: maya });
   b.issue({ kind: 'bug', number: 150, title: 'Checkout button misaligned on Safari 17', source: 'github', team: WEB, priority: 'medium', status: 'in_progress', workstreams: [web81], created: 16, moved: 15, movedBy: priya, url: 'https://github.com/acme/web/issues/1150' });
@@ -347,14 +308,11 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   b.issue({ kind: 'security', number: 7, title: 'No rate limit on password reset endpoint', source: 'agent', team: SEC, priority: 'high', status: 'done', workstreams: [api58], created: 10, moved: 9, movedBy: tomas });
   b.comment({ type: 'issue', id: bug142 }, null, user(maya), 'Linking this and AUTH-143 to AUTH-42; same root cause (non-deterministic refresh).', 21);
 
-  // ───────── decision comments
-  b.comment({ type: 'decision', id: b.data.decisions.find((d) => d.number === 23)!.id! }, auth42, user(tomas), 'Good idea. Please also specify the key rotation story for the HMAC secret.', 1);
   b.comment({ type: 'artifact', id: b.data.artifacts.find((a) => a.externalId === '#889')!.id! }, api57, user(jonas), 'Please rebase on the queue refactor before the next review round.', 1);
 
   // ───────── saved views
   b.view(ale, 'Blocked work', 'workstream', { filters: [{ field: 'status', op: 'is', value: 'blocked' }], groupBy: 'ownerTeamId', layout: 'board', shared: true, created: 30 });
   b.view(ale, 'My active workstreams', 'workstream', { filters: [{ field: 'accountableUserId', op: 'is', value: ale }, { field: 'status', op: 'not_in', value: ['shipped', 'canceled'] }], sort: { field: 'priority', direction: 'asc' }, layout: 'list', shared: false, created: 25 });
-  b.view(maya, 'Needs a decision', 'decision', { filters: [{ field: 'status', op: 'is', value: 'proposed' }], layout: 'list', shared: true, created: 20 });
   b.view(maya, 'Backlog issues', 'issue', { filters: [{ field: 'status', op: 'is', value: 'backlog' }], sort: { field: 'createdAt', direction: 'desc' }, layout: 'list', shared: true, created: 18 });
   b.view(ale, 'Agents at work', 'execution', { filters: [{ field: 'state', op: 'in', value: ['running', 'needs_input'] }, { field: 'provider', op: 'not_in', value: ['human'] }], groupBy: 'provider', layout: 'board', shared: false, created: 10 });
   b.view(ale, 'Workstream roadmap', 'workstream', { filters: [{ field: 'status', op: 'not_in', value: ['shipped', 'canceled'] }], groupBy: 'projectId', layout: 'timeline', shared: true, created: 8 });

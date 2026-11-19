@@ -11,13 +11,13 @@ export const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90 shadow-[inset_0_1px_0_rgb(255_255_255/0.12),0_1px_2px_rgb(0_0_0/0.15)]',
+          'bg-primary text-primary-foreground hover:bg-primary/90',
         outline:
-          'border-border-strong bg-background hover:bg-accent hover:text-foreground dark:bg-secondary dark:hover:bg-accent shadow-xs aria-expanded:bg-accent aria-expanded:text-foreground',
+          'border-border-strong bg-transparent text-foreground hover:bg-hover aria-expanded:bg-hover aria-expanded:text-foreground',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground',
         ghost:
-          'hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground',
+          'hover:bg-hover hover:text-foreground aria-expanded:bg-selected aria-expanded:text-foreground',
         destructive:
           'bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30',
         link: 'text-primary underline-offset-4 hover:underline',
@@ -49,7 +49,7 @@ export type ButtonVariants = VariantProps<typeof buttonVariants>;
   selector: 'button[hlmBtn], a[hlmBtn]',
   exportAs: 'hlmBtn',
   hostDirectives: [{ directive: BrnButton, inputs: ['disabled'] }],
-  host: { 'data-slot': 'button' },
+  host: { 'data-slot': 'button', '[attr.data-variant]': 'variant()' },
 })
 export class HlmButton {
   private readonly _config = injectBrnButtonConfig();

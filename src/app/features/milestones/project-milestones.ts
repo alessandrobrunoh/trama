@@ -22,8 +22,8 @@ import { ProgressChart } from './progress-chart';
     <section aria-labelledby="project-milestones-title">
       <header class="mb-2 flex items-center gap-2">
         <app-milestone-icon [size]="15" state="idle" />
-        <h2 id="project-milestones-title" class="text-sm font-semibold">Milestones</h2>
-        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this project, each with its own issues and date</span>
+        <h2 id="project-milestones-title" class="text-muted-foreground text-[13px] font-normal">Milestones</h2>
+        <span class="text-muted-foreground text-xs tabular-nums">{{ milestones().length }}</span>
         @if (canEdit()) {
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground hover:text-foreground ml-auto" aria-label="Add milestone" (click)="startAdd()">
             <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -32,17 +32,17 @@ import { ProgressChart } from './progress-chart';
       </header>
 
       @if (showChart() && hasIssues()) {
-        <div class="bg-card mb-3 rounded-lg border border-border-strong px-3 pt-3 pb-2">
+        <div class="bg-card border-border mb-3 rounded-lg border px-3 pt-3 pb-2">
           <app-progress-chart [project]="project()" [height]="190" />
         </div>
       }
 
-      <div class="bg-card overflow-hidden rounded-lg border border-border-strong" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
+      <div class="flex flex-col gap-0.5" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
         @for (m of milestones(); track m.id; let i = $index) {
-          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-card border-b last:border-b-0" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
+          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-background overflow-hidden rounded-md" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
         }
         @if (adding()) {
-          <div class="flex min-h-10 items-center gap-2 border-t px-2.5 first:border-t-0">
+          <div class="flex min-h-10 items-center gap-2 px-2.5">
             <app-milestone-icon [size]="15" state="empty" />
             <input
               #nameInput
@@ -55,7 +55,7 @@ import { ProgressChart } from './progress-chart';
               (keydown.enter)="add()"
               (keydown.escape)="cancel($event)"
             />
-            <app-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 border border-border-strong px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
+            <app-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
               <svg [lucideIcon]="cal" [size]="12" class="text-muted-foreground"></svg>
               <span [class.text-muted-foreground]="!date()">{{ date() ? dateLabel() : 'Target date' }}</span>
             </app-date-picker>
@@ -64,7 +64,7 @@ import { ProgressChart } from './progress-chart';
           </div>
         } @else if (!milestones().length) {
           <p class="text-muted-foreground px-3 py-3 text-sm">
-            Break this project into milestones. Each groups some of its issues and has its own target date.
+            Break this project into milestones. Each groups some of its tasks and has its own target date.
             @if (canEdit()) {
               <button type="button" class="text-foreground underline-offset-2 hover:underline" (click)="startAdd()">Add the first milestone</button>
             }

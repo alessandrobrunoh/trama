@@ -262,24 +262,18 @@ export interface UploadCaller {
   permissions: readonly string[] | null;
 }
 
-/** A place the bytes are still mentioned. `projectScoped: false` is workspace-wide (a document or its history). */
+/** A place the bytes are still mentioned. `projectScoped: false` is workspace-wide. */
 export interface UploadRef {
-  resource:
-    | 'artifacts'
-    | 'issues'
-    | 'projects'
-    | 'comments'
-    | 'documents';
+  resource: 'artifacts' | 'issues' | 'projects' | 'comments';
   projectScoped: boolean;
   projectId: string | null;
 }
 
 const API_READ: Record<UploadRef['resource'], string> = {
   artifacts: 'artifacts:read',
-  issues: 'issues:read',
+  issues: 'tasks:read',
   projects: 'projects:read',
   comments: 'comments:read',
-  documents: 'documents:read',
 };
 
 /** Grants that may stage a file into a description or a comment. Attaching an artifact is separate. */
@@ -289,15 +283,12 @@ const STAGE_GRANTS: readonly MemberGrant[] = [
   'comments:create',
   'comments:update',
   'artifacts:create',
-  'documents:create',
-  'documents:update',
 ];
 const STAGE_PERMISSIONS = [
-  'issues:write',
+  'tasks:write',
   'projects:write',
   'comments:write',
   'artifacts:write',
-  'documents:write',
 ];
 
 export function uploadVisible(

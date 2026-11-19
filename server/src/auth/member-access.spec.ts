@@ -38,9 +38,6 @@ describe('requiredMemberGrant', () => {
         '/api/w/:slug/issues/:idOrKey/artifacts/upload',
       ),
     ).toBe('artifacts:create');
-    expect(
-      requiredMemberGrant('POST', '/api/w/:slug/projects/:id/artifacts/upload'),
-    ).toBe('artifacts:create');
     expect(requiredMemberGrant('GET', '/api/w/:slug/uploads/:id')).toBeNull();
   });
 
@@ -163,14 +160,10 @@ describe('project scope', () => {
         { id: 'in_3', projectId: null },
       ],
       artifacts: [],
-      decisions: [{ id: 'dc_1', originIssueId: 'in_2' }],
-      inputRequests: [{ id: 'ir_1', issueId: 'in_2' }],
       comments: [
         { subject: { type: 'issue', id: 'in_2' } },
         { subject: { type: 'issue', id: 'in_1' } },
       ],
-      customers: [{ id: 'cu_1' }],
-      customerRequests: [{ id: 'cr_1', projectId: 'pj_2', issueId: null }],
       events: [
         { subject: { type: 'issue', id: 'in_2' } },
         { subject: { type: 'issue', id: 'in_1' } },
@@ -185,9 +178,6 @@ describe('project scope', () => {
     expect(scoped.issues.map((i) => i.id)).toEqual(['in_1']);
     expect(scoped.issues[0].parentId).toBeNull();
     expect(scoped.comments.map((c) => c.subject.id)).toEqual(['in_1']);
-    expect(scoped.customerRequests).toEqual([]);
-    expect(scoped.decisions).toEqual([]);
-    expect(scoped.inputRequests).toEqual([]);
     expect(scoped.events.map((e) => e.subject.id)).toEqual(['in_1']);
   });
 });

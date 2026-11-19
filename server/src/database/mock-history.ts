@@ -53,7 +53,6 @@ export interface MockContext {
   estimateScale?: EstimateScale;
   /** People who can own issues (no viewers). */
   userIds: readonly string[];
-  teamIds: readonly string[];
   /** Milestones that already exist (they may receive some mock issues). */
   milestones: readonly { id: string; projectId: string }[];
   /** Last used issue number per key prefix. */
@@ -427,7 +426,6 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
     const actorOf = (): ActorRef => ({ type: 'user', id: assignee ?? reporter ?? person() });
     const creator: ActorRef = reporter ? { type: 'user', id: reporter } : { type: 'system' };
 
-    const teamId = ctx.teamIds.length ? rng.pick(ctx.teamIds) : null;
     const milestoneIds: string[] = [];
 
     // status path: [at, from, to]
@@ -458,11 +456,9 @@ export function generateMockHistory(ctx: MockContext): MockHistory {
       reporterName: external ? (source === 'email' ? `Customer: ${rng.pick(CUSTOMERS)}` : `Support: Zendesk #${rng.int(4000, 4700)}`) : null,
       reporterId: reporter ?? null,
       assigneeId: assignee ?? null,
-      teamId,
       priority: rng.weighted(PRIORITY_WEIGHTS),
       status: p.outcome,
       milestoneIds,
-      releaseId: null,
       aliases: [],
       estimate: p.tier === null ? null : values[p.tier],
       startedAt: startedAt === undefined ? null : ISO(startedAt),
@@ -536,7 +532,6 @@ export function addMockHistoryToSeed(data: SeedData, now: number): void {
     workspaceId,
     estimateScale: resolveScale(data.workspace.settings?.estimateScale),
     userIds: data.users.map((u) => u.id as string).filter((id) => roleOf.get(id) !== 'viewer'),
-    teamIds: data.teams.map((t) => t.id as string),
     milestones: data.milestones.map((m) => ({ id: m.id as string, projectId: m.projectId as string })),
     issueCounters: counters,
     existingIssues: data.issues.map((i) => ({
