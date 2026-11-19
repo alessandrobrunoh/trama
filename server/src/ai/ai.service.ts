@@ -63,10 +63,10 @@ export class AiService {
       throw new BadRequestException('Write a title or description first.');
     const issueOptions = dto.kind === 'issue' ? dto.issueOptions : undefined;
     const triageInstruction = issueOptions
-      ? ` Also suggest issue triage properties from the supplied choices only. Use similar finished issues to calibrate estimates. Always return a property the draft states explicitly (for example "high priority", "priorità alta", "bug", "estimate 5"). Always suggest a priority, a kind and an estimate whenever the text gives any hint. Never infer an assignee or team without evidence; return null for those when uncertain. Return triage with priority, kind, estimate, team, and assignee. Each non-null field is {value: the exact allowed value or id, why: one short evidence-based sentence}. Do not suggest status or labels.`
+      ? ` Also suggest issue triage properties from the supplied choices only. Use similar finished issues to calibrate estimates. Always return a property the draft states explicitly (for example "high priority", "priorità alta", "bug", "estimate 5"). Always suggest a priority, a kind and an estimate whenever the text gives any hint. Never infer an assignee without evidence; return null when uncertain. Return triage with priority, kind, estimate, and assignee. Each non-null field is {value: the exact allowed value or id, why: one short evidence-based sentence}. Do not suggest status or labels.`
       : '';
     const triageSchema = issueOptions
-      ? ', triage: {priority: {value: allowed priority, why: string} | null, kind: {value: allowed kind, why: string} | null, estimate: {value: allowed estimate, why: string} | null, team: {value: allowed team id, why: string} | null, assignee: {value: allowed assignee id, why: string} | null}'
+      ? ', triage: {priority: {value: allowed priority, why: string} | null, kind: {value: allowed kind, why: string} | null, estimate: {value: allowed estimate, why: string} | null, assignee: {value: allowed assignee id, why: string} | null}'
       : '';
     const text = await this.provider.complete(
       [
@@ -171,8 +171,8 @@ export class AiService {
       });
     }
     const addNamedChoice = (
-      field: 'teamId' | 'assigneeId',
-      key: 'team' | 'assignee',
+      field: 'assigneeId',
+      key: 'assignee',
       choices: readonly { id: string; label: string }[],
     ) => {
       const candidate = record(raw[key]);
@@ -189,7 +189,6 @@ export class AiService {
           why: this.draftWhy(candidate?.['why']),
         });
     };
-    addNamedChoice('teamId', 'team', options.teams);
     addNamedChoice('assigneeId', 'assignee', options.assignees);
 
     return { suggestions };

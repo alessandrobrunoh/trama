@@ -163,7 +163,7 @@ function setup(opts: { raceOnce?: boolean } = {}) {
   const uploads = {
     assertAttachable: vi.fn(async () => undefined),
     retained: vi.fn(async () => undefined),
-    idsLostWith: vi.fn(async () => []),
+    idsLostWith: vi.fn(async (): Promise<string[]> => []),
     releaseIds: vi.fn(async () => undefined),
   };
   const refs = {

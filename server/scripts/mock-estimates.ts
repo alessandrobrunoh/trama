@@ -16,7 +16,6 @@ import {
   IssueEntity,
   MembershipEntity,
   MilestoneEntity,
-  TeamEntity,
   WorkspaceEntity,
 } from '../src/database/entities/index.js';
 import {
@@ -81,7 +80,6 @@ async function main() {
       workspaceId,
       estimateScale: resolveScale(resolveWorkspaceSettings(ws.settings).estimateScale),
       userIds: memberships.filter((x) => x.role !== 'viewer').map((x) => x.userId),
-      teamIds: (await ds.getRepository(TeamEntity).findBy({ workspaceId })).map((t) => t.id),
       milestones: (await ds.getRepository(MilestoneEntity).findBy({ workspaceId })).map((m) => ({ id: m.id, projectId: m.projectId })),
       issueCounters,
       existingIssues: real,

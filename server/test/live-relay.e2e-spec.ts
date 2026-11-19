@@ -33,7 +33,7 @@ describe('live events between API instances', () => {
     let n = 0;
     const keepWorking = setInterval(() => {
       // supertest requests are lazy: nothing is sent until `then` is called
-      void client.post(`/api/w/${slug}/issues`, { title: `Relay ${n++}`, kind: 'bug' }).then(() => undefined, () => undefined);
+      void client.post(`/api/w/${slug}/tasks`, { title: `Relay ${n++}`, kind: 'bug' }).then(() => undefined, () => undefined);
     }, 150);
     try {
       const got = await heard;
@@ -54,7 +54,7 @@ describe('live events between API instances', () => {
       .stream$.pipe(filter((e) => e.workspaceId === workspaceId && e.event.entity === 'issue'))
       .subscribe((e) => seen.push(`${e.event.type}:${e.event.id}`));
     await new Promise((r) => setTimeout(r, 500)); // let the listener come up
-    const issue = (await client.post(`/api/w/${slug}/issues`, { title: 'Once', kind: 'bug' }).expect(201)).body;
+    const issue = (await client.post(`/api/w/${slug}/tasks`, { title: 'Once', kind: 'bug' }).expect(201)).body;
     await new Promise((r) => setTimeout(r, 400));
     sub.unsubscribe();
     expect(seen.filter((s) => s === `created:${issue.id}`)).toHaveLength(1);

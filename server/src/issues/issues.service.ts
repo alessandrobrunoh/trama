@@ -1,8 +1,4 @@
 import {
-  demandConditions,
-  type DemandFilter,
-} from '../customers/demand-filter.js';
-import {
   BadRequestException,
   ConflictException,
   Inject,
@@ -30,7 +26,6 @@ import {
   DocumentEntity,
   IssueEntity,
   MilestoneEntity,
-  ReleaseEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import {
@@ -59,7 +54,6 @@ export interface IssueInput {
   reporterName?: string | null;
   goal?: string | null;
   assigneeId?: string | null;
-  teamId?: string | null;
   /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
   projectId?: string | null;
   /** Id or key of the parent issue. `null` makes this issue a root issue. */
@@ -69,8 +63,6 @@ export interface IssueInput {
   status?: string;
   externalUrl?: string | null;
   milestoneIds?: string[];
-  /** Draft release in this workspace. `null` clears it. */
-  releaseId?: string | null;
   labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
   duplicateOfId?: string | null;
@@ -82,9 +74,7 @@ export interface BulkIssuePatch {
   status?: string;
   priority?: Priority;
   assigneeId?: string | null;
-  teamId?: string | null;
   projectId?: string | null;
-  releaseId?: string | null;
   addLabels?: string[];
   removeLabels?: string[];
 }
@@ -104,7 +94,7 @@ interface PreparedUpdate {
 
 type IssueTeamRef = Pick<
   IssueEntity,
-  'id' | 'teamId' | 'projectId' | 'parentId' | 'key' | 'number' | 'aliases'
+  'id' | 'projectId' | 'parentId' | 'key' | 'number' | 'aliases'
 >;
 type IssueTeamAuthorizer = (affectedIssues: readonly IssueTeamRef[]) => Promise<void>;
 
@@ -187,12 +177,10 @@ export class IssuesService {
       kind?: IssueKind;
       /** Catalog id, or a legacy enum (the seeded status of that type). */
       status?: string;
-      teamId?: string;
       assigneeId?: string;
       projectId?: string;
       milestoneId?: string;
-      releaseId?: string;
-    } & DemandFilter & {
+    } & {
         q?: string;
         priority?: Priority[];
         /** Only issues still in play: backlog, todo, in progress, in review. */
@@ -224,7 +212,6 @@ export class IssuesService {
     }
     if (f.priority?.length)
       qb.andWhere('i.priority IN (:...pr)', { pr: f.priority });
-    if (f.teamId) qb.andWhere('i.teamId = :t', { t: f.teamId });
     if (f.assigneeId) qb.andWhere('i.assigneeId = :a', { a: f.assigneeId });
     if (f.projectId)
       qb.andWhere('i.projectId = :p', { p: f.projectId });
@@ -232,9 +219,6 @@ export class IssuesService {
       qb.andWhere('i.milestoneIds @> :m::jsonb', {
         m: JSON.stringify([f.milestoneId]),
       });
-    if (f.releaseId) qb.andWhere('i.releaseId = :releaseId', { releaseId: f.releaseId });
-    for (const c of demandConditions('i', 'issueId', f))
-      qb.andWhere(c.sql, c.params);
     applyProjectScope(qb, 'i', 'projectId');
     if (f.q)
       qb.andWhere(
@@ -339,27 +323,6 @@ export class IssuesService {
     }
   }
 
-  /**
-   * A release must exist in this workspace. Issues may only join a draft;
-   * `null` clears the assignment.
-   */
-  private async assertRelease(
-    workspaceId: string,
-    releaseId: string | null,
-  ): Promise<string | null> {
-    if (!releaseId) return null;
-    const row = await this.ds
-      .getRepository(ReleaseEntity)
-      .findOneBy({ workspaceId, id: releaseId });
-    if (!row)
-      throw new BadRequestException(
-        `Unknown release "${releaseId}" in this workspace`,
-      );
-    if (row.status !== 'draft')
-      throw new BadRequestException('Issues can only join a draft release');
-    return row.id;
-  }
-
   /** Resolve a parent in this workspace and enforce the same project visibility as issue reads. */
   private async resolveParentId(
     workspaceId: string,
@@ -391,7 +354,7 @@ export class IssuesService {
     issueId: string,
   ): Promise<IssueTeamRef> {
     const [row] = (await manager.query(
-      `SELECT "id", "teamId", "projectId", "parentId", "key", "number", "aliases"
+      `SELECT "id", "projectId", "parentId", "key", "number", "aliases"
          FROM "issues" WHERE "workspaceId" = $1 AND "id" = $2`,
       [workspaceId, issueId],
     )) as IssueTeamRef[];
@@ -406,7 +369,7 @@ export class IssuesService {
   ): Promise<Map<string, IssueTeamRef>> {
     if (!ids.length) return new Map();
     const rows = (await manager.query(
-      `SELECT "id", "teamId", "projectId", "parentId", "key", "number", "aliases" FROM "issues"
+      `SELECT "id", "projectId", "parentId", "key", "number", "aliases" FROM "issues"
        WHERE "workspaceId" = $1 AND "id" = ANY($2::varchar[])
        ORDER BY "id" FOR UPDATE`,
       [workspaceId, unique(ids)],
@@ -473,17 +436,9 @@ export class IssuesService {
       input.parentId == null
         ? null
         : await this.resolveParentId(workspaceId, null, input.parentId);
-    await this.refs.teams(
-      workspaceId,
-      [input.teamId].filter((x): x is string => !!x),
-    );
     await this.refs.projects(
       workspaceId,
       [input.projectId].filter((x): x is string => !!x),
-    );
-    const releaseId = await this.assertRelease(
-      workspaceId,
-      input.releaseId ?? null,
     );
     const resolved = this.resolveStoredStatus(
       await this.issueCatalog(workspaceId),
@@ -542,9 +497,7 @@ export class IssuesService {
           goal: input.goal ?? null,
           reporterId: actor.type === 'user' ? (actor.id ?? null) : null,
           assigneeId,
-          teamId: input.teamId ?? null,
           projectId: input.projectId ?? null,
-          releaseId,
           parentId,
           priority: input.priority ?? 'none',
           status,
@@ -663,7 +616,6 @@ export class IssuesService {
           affected.push(nextParent);
         }
         await authorizeParents(affected);
-        if (prepared.patch.teamId === undefined) row.teamId = current.teamId;
         if (prepared.patch.projectId === undefined)
           row.projectId = current.projectId;
         row.parentId = prepared.patch.parentId;
@@ -673,8 +625,6 @@ export class IssuesService {
         if (!lockedRelation || projectHidden(currentAccess(), lockedRelation.projectId))
           throw notFound('Issue', row.id);
         relation = lockedRelation;
-        if (prepared.patch.teamId === undefined)
-          row.teamId = lockedRelation.teamId;
         if (prepared.patch.projectId === undefined)
           row.projectId = lockedRelation.projectId;
         row.parentId = lockedRelation.parentId;
@@ -824,10 +774,6 @@ export class IssuesService {
       throw new BadRequestException('A label cannot be both added and removed');
     if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
     // One lookup per reference for the whole batch instead of one per issue.
-    await this.refs.teams(
-      workspaceId,
-      [patch.teamId].filter((x): x is string => !!x),
-    );
     await this.refs.users(workspaceId, [patch.assigneeId]);
     await this.refs.projects(
       workspaceId,
@@ -847,9 +793,7 @@ export class IssuesService {
       if (patch.status !== undefined) next.status = patch.status;
       if (patch.priority !== undefined) next.priority = patch.priority;
       if (patch.assigneeId !== undefined) next.assigneeId = patch.assigneeId;
-      if (patch.teamId !== undefined) next.teamId = patch.teamId;
       if (patch.projectId !== undefined) next.projectId = patch.projectId;
-      if (patch.releaseId !== undefined) next.releaseId = patch.releaseId;
       if (addLabels.length || removeLabels.length)
         next.labels = unique([...row.labels, ...addLabels]).filter(
           (l) => !removeLabels.includes(l),
@@ -874,7 +818,6 @@ export class IssuesService {
         p.row.key = relation.key;
         p.row.number = relation.number;
         p.row.aliases = relation.aliases;
-        if (p.patch.teamId === undefined) p.row.teamId = relation.teamId;
         if (p.patch.projectId === undefined) p.row.projectId = relation.projectId;
         p.row.parentId = relation.parentId;
         p.projectChanged =
@@ -907,10 +850,6 @@ export class IssuesService {
     const statuses = catalog ?? (await this.issueCatalog(workspaceId));
     const previousAssigneeId = row.assigneeId;
     if (!refsChecked) {
-      await this.refs.teams(
-        workspaceId,
-        [patch.teamId].filter((x): x is string => !!x),
-      );
       await this.refs.users(workspaceId, [patch.assigneeId]);
       await this.refs.projects(
         workspaceId,
@@ -979,10 +918,7 @@ export class IssuesService {
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
     if (patch.goal !== undefined) row.goal = patch.goal;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
-    if (patch.teamId !== undefined) row.teamId = patch.teamId;
     if (patch.projectId !== undefined) row.projectId = patch.projectId;
-    if (patch.releaseId !== undefined)
-      row.releaseId = await this.assertRelease(workspaceId, patch.releaseId);
     if (patch.parentId !== undefined) row.parentId = patch.parentId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
@@ -1218,7 +1154,6 @@ export class IssuesService {
           ])) ?? [];
       }),
     );
-    await this.uploads?.releaseIds(workspaceId, lost);
     await this.events.record({
       workspaceId,
       actor,

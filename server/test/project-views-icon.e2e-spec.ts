@@ -20,7 +20,7 @@ describe('project icon, project views and the project issue filter', () => {
   afterAll(() => app.close());
 
   const mkProject = async (name: string, extra: object = {}) => (await c.post(`${w}/projects`, { name, ...extra }).expect(201)).body;
-  const mkIssue = async (title: string, extra: object = {}) => (await c.post(`${w}/issues`, { kind: 'bug', title, ...extra }).expect(201)).body;
+  const mkIssue = async (title: string, extra: object = {}) => (await c.post(`${w}/tasks`, { kind: 'bug', title, ...extra }).expect(201)).body;
 
   describe('project icon', () => {
     it('accepts lucide names and emoji on create and patch, and null clears it', async () => {
@@ -58,17 +58,17 @@ describe('project icon, project views and the project issue filter', () => {
       expect((await c.get(`${w}/views/${v.id}`).expect(200)).body.layout).toBe('timeline');
     });
 
-    it('refuses the timeline layout on issue and decision views (create and patch)', async () => {
-      for (const entity of ['issue', 'decision']) {
-        const res = await c.post(`${w}/views`, { name: `${entity} gantt`, entity, layout: 'timeline' }).expect(400);
-        expect(res.body.message).toMatch(/timeline/);
-      }
+    it('refuses the timeline layout on issue views (create and patch) and the removed decision entity', async () => {
+      const res = await c.post(`${w}/views`, { name: 'issue gantt', entity: 'issue', layout: 'timeline' }).expect(400);
+      expect(JSON.stringify(res.body.message)).toMatch(/timeline/);
+      await c.post(`${w}/views`, { name: 'decisions', entity: 'decision' }).expect(400);
       const list = (await c.post(`${w}/views`, { name: 'Issues', entity: 'issue' }).expect(201)).body;
       await c.patch(`${w}/views/${list.id}`, { layout: 'timeline' }).expect(400);
       const gantt = (await c.post(`${w}/views`, { name: 'Gantt', entity: 'project', layout: 'timeline' }).expect(201)).body;
       // switching the entity under an existing timeline layout is refused too
       await c.patch(`${w}/views/${gantt.id}`, { entity: 'issue' }).expect(400);
-      await c.patch(`${w}/views/${gantt.id}`, { entity: 'decision', layout: 'list' }).expect(200);
+      await c.patch(`${w}/views/${gantt.id}`, { entity: 'decision', layout: 'list' }).expect(400);
+      await c.patch(`${w}/views/${gantt.id}`, { entity: 'issue', layout: 'list' }).expect(200);
       expect((await c.get(`${w}/views/${list.id}`).expect(200)).body.layout).toBe('list');
     });
 
@@ -79,14 +79,14 @@ describe('project icon, project views and the project issue filter', () => {
     });
   });
 
-  describe('GET /issues?projectId=', () => {
+  describe('GET /tasks?projectId=', () => {
     it('returns only issues directly assigned to the project', async () => {
       const P = await mkProject('Filtered');
       const Q = await mkProject('Other');
       const direct = await mkIssue('direct', { projectId: P.id });
       const plain = await mkIssue('plain');
 
-      const keys = async (q: string) => ((await c.get(`${w}/issues?${q}`).expect(200)).body as { key: string }[]).map((i) => i.key).sort();
+      const keys = async (q: string) => ((await c.get(`${w}/tasks?${q}`).expect(200)).body as { key: string }[]).map((i) => i.key).sort();
       expect(await keys(`projectId=${P.id}`)).toEqual([direct.key]);
       expect(await keys(`projectId=${Q.id}`)).toEqual([]);
       expect(await keys(`projectId=${P.id}&open=true`)).toEqual([direct.key]);
@@ -99,9 +99,9 @@ describe('project icon, project views and the project issue filter', () => {
       await mkIssue('mine', { projectId: P.id });
       const other = await Client.signup(app.getHttpServer(), 'Other Owner');
       const ws = (await other.client.post('/api/workspaces', { name: 'Elsewhere' }).expect(201)).body;
-      await other.client.post(`/api/w/${ws.slug}/issues`, { kind: 'bug', title: 'theirs' }).expect(201);
-      expect((await other.client.get(`/api/w/${ws.slug}/issues?projectId=${P.id}`).expect(200)).body).toEqual([]);
-      await other.client.get(`${w}/issues?projectId=${P.id}`).expect(404);
+      await other.client.post(`/api/w/${ws.slug}/tasks`, { kind: 'bug', title: 'theirs' }).expect(201);
+      expect((await other.client.get(`/api/w/${ws.slug}/tasks?projectId=${P.id}`).expect(200)).body).toEqual([]);
+      await other.client.get(`${w}/tasks?projectId=${P.id}`).expect(404);
     });
   });
 });

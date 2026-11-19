@@ -59,8 +59,6 @@ function makeFacts(extra: Partial<ProjectFacts> = {}): ProjectFacts {
     milestones: [],
     issues: [issue(1), issue(2, { status: 'done' })],
     updates: [],
-    decisions: [],
-    inputRequests: [],
     events: [],
     candidates: [],
     ...extra,

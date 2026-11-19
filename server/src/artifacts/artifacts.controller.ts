@@ -83,7 +83,7 @@ class CreateArtifactDto {
   @IsOptional() @IsString() @MinLength(1) @MaxLength(300) title?: string;
   /** Kind `document` only: attach a Trama document (see POST /documents/:id/attach). */
   @IsOptional() @IsString() @MaxLength(64) documentId?: string;
-  @IsOptional() @IsString() repositoryId?: string;
+  @IsOptional() @IsString() repository?: string;
   @IsOptional() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @IsOptional() @IsString() @MaxLength(1000) url?: string;
   @IsOptional() @IsString() @MaxLength(200) externalId?: string;
@@ -99,7 +99,7 @@ class UpdateArtifactDto {
   @Clearable() @IsString() issueId?: string | null;
   @Clearable() @IsString() @MaxLength(10000) description?: string | null;
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
-  @Clearable() @IsString() repositoryId?: string | null;
+  @Clearable() @IsString() repository?: string | null;
   @OptionalNotNull() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @Clearable() @IsString() @MaxLength(1000) url?: string | null;
   @Clearable() @IsString() @MaxLength(200) externalId?: string | null;
@@ -113,14 +113,14 @@ class UpdateArtifactDto {
 class ListArtifactsQuery {
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() issueId?: string;
-  @IsOptional() @IsString() repositoryId?: string;
+  @IsOptional() @IsString() repository?: string;
   @IsOptional() @IsIn(KINDS) kind?: ArtifactKind;
   @IsOptional() @IsIn(STATES) state?: ArtifactState;
 }
 
 /** Same filters as `ListArtifactsQuery` minus the owner (it comes from the route). */
 class ListOwnedArtifactsQuery {
-  @IsOptional() @IsString() repositoryId?: string;
+  @IsOptional() @IsString() repository?: string;
   @IsOptional() @IsIn(KINDS) kind?: ArtifactKind;
   @IsOptional() @IsIn(STATES) state?: ArtifactState;
 }
@@ -198,7 +198,7 @@ export class ArtifactsController {
     );
   }
 
-  @Get('issues/:idOrKey/artifacts')
+  @Get('tasks/:idOrKey/artifacts')
   async listForIssue(
     @Ctx() ctx: WorkspaceContext,
     @Param('idOrKey') idOrKey: string,
@@ -214,7 +214,7 @@ export class ArtifactsController {
     );
   }
 
-  @Post('issues/:idOrKey/artifacts')
+  @Post('tasks/:idOrKey/artifacts')
   async createForIssue(
     @Ctx() ctx: WorkspaceContext,
     @Actor() actor: ActorRef,

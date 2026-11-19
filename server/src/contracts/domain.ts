@@ -66,6 +66,10 @@ export interface Membership {
 export type MemberAction = 'view' | 'create' | 'update' | 'delete';
 
 /** Work a person's access can see and change. Workspace administration stays with the role. */
+/**
+ * Work a membership grant names. Stays `issues` (not `tasks`): these strings are stored on roles.
+ * Public HTTP and API-token permissions use `tasks` instead. See {@link ApiResource}.
+ */
 export type MemberResource =
   | 'projects'
   | 'milestones'
@@ -73,10 +77,7 @@ export type MemberResource =
   | 'documents'
   | 'artifacts'
   | 'views'
-  | 'comments'
-  | 'decisions'
-  | 'input-requests'
-  | 'customers';
+  | 'comments';
 
 export type MemberGrant = `${MemberResource}:${MemberAction}`;
 
@@ -159,25 +160,6 @@ export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
     description: 'Read a thread, write in it, or edit and delete comments.',
     actions: MEMBER_ACTIONS,
   },
-  decisions: {
-    group: 'Collaboration',
-    label: 'Decisions',
-    description: 'Propose or edit a decision. Accepting one still follows Roles & permissions.',
-    actions: MEMBER_ACTIONS,
-  },
-  'input-requests': {
-    group: 'Collaboration',
-    label: 'Input requests',
-    description: 'Questions attached to issues.',
-    actions: MEMBER_ACTIONS,
-  },
-  customers: {
-    group: 'Collaboration',
-    label: 'Customers',
-    description:
-      'Companies and the requests they file. Deleting one still follows Roles & permissions.',
-    actions: MEMBER_ACTIONS,
-  },
 };
 
 export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
@@ -188,9 +170,6 @@ export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
   'artifacts',
   'views',
   'comments',
-  'decisions',
-  'input-requests',
-  'customers',
 ];
 
 export const MEMBER_ACTION_META: readonly { id: MemberAction; label: string }[] = [
@@ -349,14 +328,9 @@ export function accessWithin(
 /** Why a notification was sent. Each kind can be switched on or off per person and channel. */
 export const NOTIFICATION_KINDS = [
   'assigned',
-  'input_requested',
-  'decision_proposed',
   'review_requested',
   'ci_failed',
   'comment',
-  'customer_request',
-  'customer_important',
-  'customer_delivered',
 ] as const;
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];
 /** Stored notifications from the retired Workstream updater remain readable as legacy inbox rows. */
@@ -367,14 +341,6 @@ export const NOTIFICATION_KIND_META: Record<
   { label: string; description: string }
 > = {
   assigned: { label: 'Assigned to me', description: 'An issue is assigned to you.' },
-  input_requested: {
-    label: 'Questions for me',
-    description: 'Someone, or an agent, asks you a question assigned to you.',
-  },
-  decision_proposed: {
-    label: 'Decisions to review',
-    description: 'A decision is proposed on an issue you are assigned to.',
-  },
   review_requested: {
     label: 'Review requested',
     description: 'A pull request attached to your issue needs a review.',
@@ -387,19 +353,6 @@ export const NOTIFICATION_KIND_META: Record<
     label: 'Comments',
     description:
       'New comments on issues you are assigned or reported.',
-  },
-  customer_request: {
-    label: 'Customer requests',
-    description: 'A request is added for a customer you follow.',
-  },
-  customer_important: {
-    label: 'Important customer requests',
-    description: 'A request of a customer you follow is flagged as important.',
-  },
-  customer_delivered: {
-    label: 'Delivered to customers',
-    description:
-      'The issue or project behind a request is done, for a customer you follow or a request you recorded.',
   },
 };
 
@@ -455,15 +408,7 @@ export interface NotificationList {
 }
 
 /** What a person can pin to their Favorites (per user and workspace, shown in the sidebar). */
-export const FAVORITE_TYPES = [
-  'issue',
-  'project',
-  'decision',
-  'team',
-  'repository',
-  'view',
-  'customer',
-] as const;
+export const FAVORITE_TYPES = ['issue', 'project', 'view'] as const;
 export type FavoriteType = (typeof FAVORITE_TYPES)[number];
 /** Most favorites one person can keep in a workspace. */
 export const MAX_FAVORITES = 100;
@@ -474,7 +419,7 @@ export interface Favorite {
   id: ID;
   workspaceId: ID;
   type: FavoriteType;
-  /** Id (not key) of the issue, project, decision, team, repository or view. */
+  /** Id (not key) of the issue, project, or view. */
   subjectId: ID;
   createdAt: ISODate;
 }
@@ -545,26 +490,11 @@ export interface Agent {
   createdAt: ISODate;
 }
 
-export type ActorType = 'user' | 'agent' | 'team' | 'system';
+export type ActorType = 'user' | 'agent' | 'system';
 export interface ActorRef {
   type: ActorType;
   /** omitted for `system` */
   id?: ID;
-}
-
-export interface Team {
-  id: ID;
-  workspaceId: ID;
-  name: string;
-  /** Uppercase identifier prefix, e.g. AUTH, WEB, INF. Unique per workspace. */
-  key: string;
-  color: string;
-  description?: string;
-  memberIds: ID[];
-  /** Team leads (a subset of `memberIds`). Leads may edit their team in the workspace settings of the team. */
-  leadIds: ID[];
-  /** Who may edit Issues owned by this team. Workspace admins and owners always can. */
-  editPolicy: TeamEditPolicy;
 }
 
 export type GitProvider = 'github' | 'gitlab' | 'bitbucket';
@@ -587,19 +517,8 @@ export const GIT_PROVIDER_META: Record<
   bitbucket: { label: 'Bitbucket', host: 'bitbucket.org', selfHosted: false },
 };
 
-export interface Repository {
-  id: ID;
-  workspaceId: ID;
-  provider: GitProvider;
-  /** e.g. "acme/api" */
-  fullName: string;
-  url: string;
-  defaultBranch: string;
-  teamIds: ID[];
-  /** Workspace label ids (`WorkspaceSettings.labels`). */
-  labels: ID[];
-  createdAt: ISODate;
-}
+/** Longest `Project.repository` / artifact repository string, in characters. */
+export const PROJECT_REPOSITORY_MAX = 2048;
 
 // ───────────────────────────── Projects ─────────────────────────────
 
@@ -616,8 +535,8 @@ export const PROJECT_STATUSES: ProjectStatus[] = [
 ];
 
 /**
- * A planned outcome (Linear-style): what we want to achieve, by when, in which repositories.
- * Issues and milestones belong directly to the project.
+ * A planned outcome (Linear-style): what we want to achieve and by when.
+ * Issues and milestones belong directly to the project. At most one git repository, as a string.
  */
 export interface Project {
   /** `pj_…` */
@@ -640,10 +559,12 @@ export interface Project {
   lastUpdateAt?: ISODate;
   priority: Priority;
   leadId?: ID;
-  /** Teams involved. */
-  teamIds: ID[];
-  /** Repositories where this project's Issues are implemented. */
-  repositoryIds: ID[];
+  /**
+   * One git repository: a URL or `owner/name`. Omitted when unset.
+   * `null` only in PATCH, where it clears the field. At most {@link PROJECT_REPOSITORY_MAX} characters.
+   * Not a repository row id — there is no repository registry.
+   */
+  repository?: string | null;
   /** Workspace label ids (`WorkspaceSettings.labels`). */
   labels: ID[];
   startDate?: ISODate;
@@ -652,16 +573,6 @@ export interface Project {
   updatedAt: ISODate;
   /** Set when the status becomes completed or canceled; cleared on reopen. */
   completedAt?: ISODate;
-  /**
-   * Distinct customers with a request on this project or on its issues. Set on project reads and in the snapshot;
-   * `0` when nobody asked. Not stored on the project row.
-   */
-  customerCount?: number;
-}
-
-/** A project is delivered to the customers who asked for it once it is completed (canceled is not delivery). */
-export function isProjectDelivered(status: string): boolean {
-  return status === 'completed';
 }
 
 /** Linear-style project health, set by whoever posts a project update. */
@@ -704,8 +615,6 @@ export interface ProjectContext {
   /** Issues with `projectId` = project. */
   issues: Issue[];
   artifacts: ProjectContextArtifact[];
-  decisions: Decision[];
-  inputRequests: InputRequest[];
 }
 
 // ── AI suggestions for a project (POST /w/:slug/projects/:id/ai/:kind) ──
@@ -760,65 +669,6 @@ export interface Milestone {
   sortOrder: number;
   createdAt: ISODate;
   updatedAt: ISODate;
-}
-
-export type ReleasePipelineType = 'continuous' | 'scheduled';
-export type ReleaseStatus = 'draft' | 'released' | 'canceled';
-
-/** Groups releases (continuous or a dated schedule). Owned by an optional team. */
-export interface ReleasePipeline {
-  /** `rpl_…` */
-  id: ID;
-  workspaceId: ID;
-  name: string;
-  type: ReleasePipelineType;
-  /** Ownership; suggested statuses still come from the workspace catalog, not the team. */
-  teamId?: ID;
-  /** When completing a scheduled release, leftover open issues move to the next draft. */
-  moveOpenIssuesToNext: boolean;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
-
-/** A version (or SHA) in a pipeline. Issues join it via `Issue.releaseId`. */
-export interface Release {
-  /** `rel_…` */
-  id: ID;
-  workspaceId: ID;
-  pipelineId: ID;
-  /** Version or SHA. */
-  name: string;
-  status: ReleaseStatus;
-  /** Markdown release notes. */
-  notes?: string;
-  /** Scheduled pipelines only. */
-  targetAt?: ISODate;
-  releasedAt?: ISODate;
-  /** Set on reads. */
-  issueCount?: number;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
-
-// ───────────────────────────── Input requests ─────────────────────────
-
-export type InputRequestState = 'open' | 'answered' | 'dismissed';
-
-/** A human question. New records belong to an issue; legacy-only rows retain their former key. */
-export interface InputRequest {
-  id: ID;
-  issueId?: ID;
-  legacyWorkstreamKey?: string;
-  question: string;
-  /** Optional suggested answers. */
-  options?: string[];
-  requestedBy: ActorRef;
-  assigneeUserId?: ID;
-  state: InputRequestState;
-  answer?: string;
-  answeredById?: ID;
-  createdAt: ISODate;
-  answeredAt?: ISODate;
 }
 
 // ───────────────────────────── Issues ─────────────────────────────
@@ -912,7 +762,6 @@ export interface Issue {
   reporterId?: ID;
   /** When a user moves an unassigned issue to `in_progress`, the server sets this to that user. */
   assigneeId?: ID;
-  teamId?: ID;
   priority: Priority;
   status: IssueStatus;
   /** Optional outcome or goal this issue contributes to. */
@@ -923,8 +772,6 @@ export interface Issue {
    * Milestones this issue is in: at most one per project, and only milestones of `projectId`.
    */
   milestoneIds: ID[];
-  /** Upcoming (or completed) release this issue ships in. One at a time; null/absent is unassigned. */
-  releaseId?: ID;
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
   estimate?: number;
   /** First time the status entered in_progress / in_review. Kept when moved back. */
@@ -943,11 +790,6 @@ export interface Issue {
   /** The issue this one was imported from or is linked to in an external tracker (read-only mirror of its status). */
   externalRef?: ExternalRef;
   /**
-   * Distinct customers linked to this issue. Set on issue reads and in the snapshot.
-   * `0` when nobody is linked. Not stored on the issue row.
-   */
-  customerCount?: number;
-  /**
    * Visible artifacts attached to this issue. Set on issue get only when the caller can read artifacts;
    * `0` means there is no need to list artifacts. Not stored on the issue row.
    */
@@ -956,419 +798,20 @@ export interface Issue {
   updatedAt: ISODate;
 }
 
-/** Issue-owned context, with a plan summary only when the issue has plan artifacts or decisions. */
+/**
+ * Public name of an {@link Issue}. The wire type, JSON field names (`issueId`), and discriminators
+ * (`issue`) stay `issue`. HTTP routes and API-token resources use `tasks`.
+ */
+export type Task = Issue;
+
+/** Issue-owned context, with a plan summary only when the issue has plan artifacts. */
 export interface IssueContext {
   issue: Issue;
   planSummary?: {
     artifactCount: number;
     latestArtifact?: Artifact;
-    decisions: Decision[];
   };
-  decisions: Decision[];
-  inputRequests: InputRequest[];
   artifacts: Artifact[];
-}
-
-/** An issue is delivered to the customers who asked for it once it is done (canceled is not delivery). */
-export function isIssueDelivered(status: string): boolean {
-  return status === 'done';
-}
-
-// ───────────────────────────── Customers ─────────────────────────────
-
-export type CustomerStatus = 'prospect' | 'active' | 'churned';
-export const CUSTOMER_STATUSES: CustomerStatus[] = ['prospect', 'active', 'churned'];
-
-/** A tier defined once for the workspace (settings) and assigned to customers by id. */
-export interface CustomerTier {
-  /** `ct_…` */
-  id: ID;
-  name: string;
-  /** `#rrggbb`. */
-  color: string;
-}
-
-export const CUSTOMER_TIER_NAME_MAX = 40;
-export const CUSTOMER_TIERS_MAX = 20;
-export const CUSTOMER_DOMAINS_MAX = 20;
-export const CUSTOMER_REVENUE_MAX = 1_000_000_000_000;
-export const CUSTOMER_SIZE_MAX = 10_000_000;
-export const CUSTOMER_REQUEST_BODY_MAX = 20_000;
-const TIER_COLOR = /^#[0-9a-f]{6}$/;
-
-/** Stored tiers that are well-formed, unique by id and capped. Nothing is invented: a workspace starts with none. */
-export function resolveCustomerTiers(stored?: readonly CustomerTier[] | null): CustomerTier[] {
-  const out: CustomerTier[] = [];
-  for (const item of Array.isArray(stored) ? stored : []) {
-    if (!item || typeof item.id !== 'string' || out.some((t) => t.id === item.id)) continue;
-    const name = typeof item.name === 'string' ? item.name.trim() : '';
-    if (!name || name.length > CUSTOMER_TIER_NAME_MAX || !TIER_COLOR.test(item.color ?? ''))
-      continue;
-    out.push({ id: item.id, name, color: item.color });
-    if (out.length >= CUSTOMER_TIERS_MAX) break;
-  }
-  return out;
-}
-
-/**
- * A company that asked for something, not a contact and not a CRM account.
- * `domains` are its identity inside the workspace: each is stored lower-case, without a scheme,
- * path, port or leading `www.`, and no two customers share one. `domain` is the primary one (`domains[0]`).
- */
-export interface Customer {
-  /** `cus_…` */
-  id: ID;
-  workspaceId: ID;
-  name: string;
-  /** Primary domain, always `domains[0]`. */
-  domain: string;
-  /** Every domain of the company, primary first (1-20). */
-  domains: string[];
-  /** `http(s)` image URL shown as the company logo. */
-  logoUrl?: string;
-  /** Annual revenue as a whole number in the workspace's own currency (>= 0). */
-  revenue?: number;
-  /** Company size in people (>= 0). */
-  size?: number;
-  /** Workspace tier id (`WorkspaceSettings.customerTiers`). */
-  tierId?: ID;
-  status: CustomerStatus;
-  /** Who created the record. */
-  createdBy: ActorRef;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-  /** Set when the customer is archived. The record and its links stay; issues are untouched. */
-  archivedAt?: ISODate;
-}
-
-/**
- * One customer request: what a customer asked for, attached to exactly one issue or one project.
- * A customer can have several requests on the same issue. Deleting the customer, the issue or the
- * project removes its requests and nothing else.
- */
-export interface CustomerRequest {
-  /** `crq_…` */
-  id: ID;
-  workspaceId: ID;
-  customerId: ID;
-  /** Set when the request lives on an issue. Exactly one of `issueId` / `projectId` is set. */
-  issueId?: ID;
-  /** Set when the request lives on a project. */
-  projectId?: ID;
-  /** What the customer asked for, in markdown. */
-  body?: string;
-  /** Flagged by the team as important. */
-  important: boolean;
-  /** Where the request came from (ticket, email thread, call notes): an http(s) URL. */
-  sourceUrl?: string;
-  /** Set when the request arrived through a customer-request source (Intercom, Zendesk, Front, Slack, email, generic webhook). */
-  source?: IntakeProvider;
-  /** The ticket / conversation / message id in the source system (with `source`). */
-  externalId?: string;
-  /** Who asked, as reported by the source. */
-  requesterEmail?: string;
-  requesterName?: string;
-  /** Who recorded the request. */
-  createdBy: ActorRef;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
-
-/**
- * A person following a customer (the bell on its page): they are told when a request is added, flagged as
- * important, or delivered. Private to the person; others never see it. Unique per person and customer.
- */
-export interface CustomerSubscription {
-  /** `csub_…` */
-  id: ID;
-  workspaceId: ID;
-  customerId: ID;
-  createdAt: ISODate;
-}
-
-const CUSTOMER_DOMAIN = /^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/;
-
-/**
- * `https://WWW.Acme.com/pricing` → `acme.com`. `null` when it is not a domain
- * (empty, a single label, an IP, or anything with characters a hostname cannot have).
- */
-export function normalizeCustomerDomain(input: string): string | null {
-  let raw = input.trim().toLowerCase();
-  if (!raw) return null;
-  raw = raw.replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
-  raw = (raw.split(/[/?#]/)[0] ?? '').replace(/:\d+$/, '');
-  if (raw.startsWith('www.')) raw = raw.slice(4);
-  raw = raw.replace(/\.+$/, '');
-  return CUSTOMER_DOMAIN.test(raw) ? raw : null;
-}
-
-/**
- * Normalizes a list of domains (see {@link normalizeCustomerDomain}), keeping the first occurrence of each
- * and the given order. `invalid` lists the inputs that are not domains; empty entries are skipped.
- */
-export function normalizeCustomerDomains(inputs: readonly string[]): {
-  domains: string[];
-  invalid: string[];
-} {
-  const domains: string[] = [];
-  const invalid: string[] = [];
-  for (const input of inputs) {
-    if (!input.trim()) continue;
-    const domain = normalizeCustomerDomain(input);
-    if (!domain) invalid.push(input);
-    else if (!domains.includes(domain)) domains.push(domain);
-  }
-  return { domains, invalid };
-}
-
-// ───────────────────────────── Customer intake ─────────────────────────────
-
-/**
- * Where inbound customer requests come from. Each source of a workspace has its own webhook URL and secret.
- * `generic` is a signed JSON webhook, `email` takes a parsed inbound email (Postmark / SendGrid style JSON).
- */
-export type IntakeProvider = 'intercom' | 'zendesk' | 'front' | 'slack' | 'email' | 'generic';
-export const INTAKE_PROVIDERS: IntakeProvider[] = [
-  'intercom',
-  'zendesk',
-  'front',
-  'slack',
-  'email',
-  'generic',
-];
-
-export interface IntakeProviderMeta {
-  label: string;
-  /** Trama generates the secret (shown once). Otherwise the provider issues it and an admin pastes it. */
-  generatesSecret: boolean;
-  /** Where the secret comes from, for the setup instructions. */
-  secretName: string;
-}
-
-export const INTAKE_PROVIDER_META: Record<IntakeProvider, IntakeProviderMeta> = {
-  intercom: {
-    label: 'Intercom',
-    generatesSecret: false,
-    secretName: 'the app client secret (Developer Hub → your app → Basic information)',
-  },
-  zendesk: {
-    label: 'Zendesk',
-    generatesSecret: false,
-    secretName: 'the webhook signing secret (Admin Center → the webhook → Signing secret)',
-  },
-  front: {
-    label: 'Front',
-    generatesSecret: false,
-    secretName: 'the application secret (Settings → Developers → your app → Basic information)',
-  },
-  slack: {
-    label: 'Slack',
-    generatesSecret: false,
-    secretName: 'the signing secret (api.slack.com/apps → Basic Information)',
-  },
-  email: {
-    label: 'Email forward',
-    generatesSecret: true,
-    secretName: 'the secret Trama generates',
-  },
-  generic: {
-    label: 'Signed webhook',
-    generatesSecret: true,
-    secretName: 'the secret Trama generates',
-  },
-};
-
-export const INTAKE_SOURCE_NAME_MAX = 80;
-export const INTAKE_ITEM_STATUSES = ['pending', 'linked', 'dismissed'] as const;
-export type IntakeItemStatus = (typeof INTAKE_ITEM_STATUSES)[number];
-
-/**
- * An endpoint that turns a provider's tickets or messages into inbound customer requests.
- * The secret is never returned except once, when Trama generates it (create / rotate).
- */
-export interface IntakeSource {
-  /** `isrc_…` */
-  id: ID;
-  workspaceId: ID;
-  provider: IntakeProvider;
-  name: string;
-  enabled: boolean;
-  /** False until the provider's secret has been pasted in: deliveries are refused until then. */
-  hasSecret: boolean;
-  /** Create the customer from the sender's email domain when none matches. Free mail domains never do. */
-  autoCreateCustomers: boolean;
-  /** Requests are attached straight to this project; without one they wait in the triage inbox. */
-  targetProjectId?: ID;
-  /** Provider settings that are not secret (Zendesk: `subdomain`, used to build ticket links). */
-  subdomain?: string;
-  /** Where the provider should POST. */
-  webhookUrl: string;
-  lastReceivedAt?: ISODate;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
-
-/** A request that came in through an {@link IntakeSource}; `pending` ones wait in the triage inbox. */
-export interface IntakeItem {
-  /** `cin_…` */
-  id: ID;
-  workspaceId: ID;
-  sourceId: ID;
-  provider: IntakeProvider;
-  /** Ticket / conversation / message id in the source system. Unique per source: a second delivery is ignored. */
-  externalId: string;
-  externalUrl?: string;
-  requesterEmail?: string;
-  requesterName?: string;
-  subject?: string;
-  body: string;
-  status: IntakeItemStatus;
-  /** The customer matched (or created) from the sender's email domain. */
-  customerId?: ID;
-  /** Set once linked. */
-  issueId?: ID;
-  projectId?: ID;
-  customerRequestId?: ID;
-  receivedAt: ISODate;
-  resolvedAt?: ISODate;
-}
-
-/**
- * How much customers want something: the requests on one issue or project, seen through the customers
- * who made them. Derived, never stored.
- */
-export interface Demand {
-  /** Distinct customers who asked, in the order of their first request. */
-  customerIds: ID[];
-  customerCount: number;
-  requestCount: number;
-  /** Requests flagged important. */
-  importantCount: number;
-  /** Distinct tiers of those customers (customers without a tier add nothing). */
-  tierIds: ID[];
-  /** Annual revenue of the customers, each counted once. Customers without revenue add 0. */
-  revenue: number;
-  /** Size of the largest customer, 0 when unknown. */
-  size: number;
-}
-
-export const NO_DEMAND: Demand = Object.freeze({
-  customerIds: [] as ID[],
-  customerCount: 0,
-  requestCount: 0,
-  importantCount: 0,
-  tierIds: [] as ID[],
-  revenue: 0,
-  size: 0,
-}) as Demand;
-
-/** Demand made of requests (any mix of targets) and the customers behind them. Requests of unknown customers are ignored. */
-export function demandOf(
-  requests: readonly Pick<CustomerRequest, 'customerId' | 'important'>[],
-  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
-): Demand {
-  const customerIds: ID[] = [];
-  const seenCustomerIds = new Set<ID>();
-  let requestCount = 0;
-  let importantCount = 0;
-  for (const r of requests) {
-    if (!customers.has(r.customerId)) continue;
-    requestCount += 1;
-    if (r.important) importantCount += 1;
-    if (!seenCustomerIds.has(r.customerId)) {
-      seenCustomerIds.add(r.customerId);
-      customerIds.push(r.customerId);
-    }
-  }
-  return finishDemand(customerIds, requestCount, importantCount, customers);
-}
-
-function finishDemand(
-  customerIds: ID[],
-  requestCount: number,
-  importantCount: number,
-  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
-): Demand {
-  if (!customerIds.length) return NO_DEMAND;
-  const tierIds: ID[] = [];
-  const seenTierIds = new Set<ID>();
-  let revenue = 0;
-  let size = 0;
-  for (const id of customerIds) {
-    const c = customers.get(id);
-    if (!c) continue;
-    if (c.tierId && !seenTierIds.has(c.tierId)) {
-      seenTierIds.add(c.tierId);
-      tierIds.push(c.tierId);
-    }
-    revenue += c.revenue ?? 0;
-    size = Math.max(size, c.size ?? 0);
-  }
-  return {
-    customerIds,
-    customerCount: customerIds.length,
-    requestCount,
-    importantCount,
-    tierIds,
-    revenue,
-    size,
-  };
-}
-
-/** Demand per issue and per project id (their ids never collide). Targets nobody asked for are absent. */
-export function buildDemandIndex(
-  requests: readonly CustomerRequest[],
-  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
-): Map<ID, Demand> {
-  const byTarget = new Map<ID, CustomerRequest[]>();
-  for (const r of requests) {
-    const target = r.issueId ?? r.projectId;
-    if (!target) continue;
-    const list = byTarget.get(target);
-    if (list) list.push(r);
-    else byTarget.set(target, [r]);
-  }
-  const out = new Map<ID, Demand>();
-  for (const [target, list] of byTarget) {
-    const demand = demandOf(list, customers);
-    if (demand.requestCount) out.set(target, demand);
-  }
-  return out;
-}
-
-/** Several demands as one: a customer who asked for two of the parts counts once, requests add up. */
-export function mergeDemand(
-  parts: readonly Demand[],
-  customers: ReadonlyMap<ID, Pick<Customer, 'tierId' | 'revenue' | 'size'>>,
-): Demand {
-  const customerIds: ID[] = [];
-  const seenCustomerIds = new Set<ID>();
-  let requestCount = 0;
-  let importantCount = 0;
-  for (const part of parts) {
-    requestCount += part.requestCount;
-    importantCount += part.importantCount;
-    for (const id of part.customerIds) {
-      if (seenCustomerIds.has(id)) continue;
-      seenCustomerIds.add(id);
-      customerIds.push(id);
-    }
-  }
-  return finishDemand(customerIds, requestCount, importantCount, customers);
-}
-
-/** A request is delivered once the issue or project it sits on is. */
-export function isRequestDelivered(
-  request: Pick<CustomerRequest, 'issueId' | 'projectId'>,
-  issues: ReadonlyMap<ID, Pick<Issue, 'status'>>,
-  projects: ReadonlyMap<ID, Pick<Project, 'status'>>,
-): boolean {
-  if (request.issueId) {
-    const issue = issues.get(request.issueId);
-    return !!issue && isIssueDelivered(issue.status);
-  }
-  const project = request.projectId ? projects.get(request.projectId) : undefined;
-  return !!project && isProjectDelivered(project.status);
 }
 
 /** The URL when it is a plain `http(s)` URL of at most 2000 characters, otherwise `null`. Never `javascript:` or `data:`. */
@@ -1425,7 +868,12 @@ export interface Artifact {
   issueId?: ID;
   /** Provenance for artifacts retained from a retired Workstream owner. */
   legacyWorkstreamKey?: string;
-  repositoryId?: ID;
+  /**
+   * Git full name (`owner/name`) or URL of the artifact's repository. Not a row id.
+   * Omitted when unknown. `null` only in PATCH, where it clears the field.
+   * At most {@link PROJECT_REPOSITORY_MAX} characters.
+   */
+  repository?: string | null;
   /** Short note on what it is / why it is attached (markdown allowed). */
   description?: string;
   kind: ArtifactKind;
@@ -1524,37 +972,6 @@ export interface DocumentConflict {
   current: Document;
 }
 
-// ───────────────────────────── Decisions ─────────────────────────────
-
-export type DecisionStatus = 'draft' | 'proposed' | 'accepted' | 'superseded' | 'rejected';
-
-/** Reusable project knowledge: what was decided and why. Key: ADR-<n> per workspace. */
-export interface Decision {
-  id: ID;
-  workspaceId: ID;
-  key: string;
-  number: number;
-  title: string;
-  /** What was decided (markdown). */
-  statement: string;
-  /** Why (markdown). */
-  rationale?: string;
-  status: DecisionStatus;
-  /** Primary issue for new decisions. Absent only on legacy history without an issue association. */
-  originIssueId?: ID;
-  relatedIssueIds: ID[];
-  /** Former Workstream keys retained only for legacy history. */
-  legacyWorkstreamKey?: string;
-  legacyWorkstreamKeys?: string[];
-  supersededById?: ID;
-  proposedBy: ActorRef;
-  decidedById?: ID;
-  decidedAt?: ISODate;
-  tags: string[];
-  createdAt: ISODate;
-  updatedAt: ISODate;
-}
-
 // ───────────────────────────── Plans (a convention, not a gate) ─────────────────────────────
 
 /**
@@ -1566,140 +983,17 @@ export function isPlanArtifact(a: Pick<Artifact, 'kind' | 'title'>): boolean {
   return a.kind === 'document' && /^\s*plan\b/i.test(a.title);
 }
 
-/** A human-approved Plan revision is recorded as a Decision on its Issue. */
-export function isPlanDecision(d: Pick<Decision, 'title' | 'tags'>): boolean {
-  return /^\s*plan\b/i.test(d.title) || d.tags.some((t) => t.toLowerCase() === 'plan');
-}
-
-/** One Issue plan, its latest approved revision (if any), and whether it has changed since. */
-export interface IssuePlan {
-  artifactId: ID;
-  title: string;
-  /** Repository file or page the plan lives at (absent for a Trama document). */
-  url?: string;
-  /** Set when the plan is a Trama document. */
-  documentId?: ID;
-  /** Current revision: "v3" (Trama document version) or a commit sha; null when it cannot be told. */
-  revision: string | null;
-  /** The accepted approval decision that cites a revision of this plan; the latest one wins. */
-  approved: { decisionKey: string; revision: string | null } | null;
-  /** The plan is on a newer revision than the approved one: a new decision must be proposed. */
-  changedSinceApproval: boolean;
-  /** A plan decision of this plan that a person has not accepted yet. */
-  proposedDecisionKey?: string;
-}
-
-/** The fields the plan lookup reads; database rows (nullable columns, `Date` times) fit too. */
-type PlanArtifact = Pick<Artifact, 'id' | 'kind' | 'title'> & {
-  url?: string | null;
-  documentId?: string | null;
-  externalId?: string | null;
-};
-type PlanDecision = Pick<Decision, 'key' | 'title' | 'statement' | 'tags' | 'status'> & {
-  originIssueId?: string | null;
-  createdAt: ISODate | Date;
-  decidedAt?: ISODate | Date | null;
-};
-
-const timeOf = (d: PlanDecision): number => new Date(d.decidedAt ?? d.createdAt).getTime();
-
-/** Versions cited as "v3", "rev 3", "revision 3" or "version 3". */
-function citedVersions(text: string): number[] {
-  return [...text.matchAll(/\b(?:v|rev\.?\s?|revision\s|version\s)(\d+)\b/gi)].map((m) =>
-    Number(m[1]),
-  );
-}
-
-/** Commit shas cited in the text: 7 to 40 hex characters with at least one digit. */
-function citedShas(text: string): string[] {
-  return [...text.matchAll(/\b[0-9a-f]{7,40}\b/gi)]
-    .map((m) => m[0].toLowerCase())
-    .filter((s) => /\d/.test(s));
-}
-
-const sameSha = (a: string, b: string): boolean => a.startsWith(b) || b.startsWith(a);
-
-/**
- * Finds plans among an Issue's artifacts and matches approval Decisions to them. Pure, so the server and
- * app show the same facts. `documentVersions` holds current Trama document revisions; only Decisions whose
- * primary Issue is the requested Issue count.
- */
-export function resolveIssuePlans(input: {
-  issueId: ID;
-  artifacts: readonly PlanArtifact[];
-  decisions: readonly PlanDecision[];
-  documentVersions: ReadonlyMap<ID, number>;
-}): IssuePlan[] {
-  const plans = input.artifacts.filter(isPlanArtifact);
-  const decisions = input.decisions
-    .filter((d) => d.originIssueId === input.issueId && isPlanDecision(d))
-    .sort((a, b) => timeOf(b) - timeOf(a));
-  return plans.map((a): IssuePlan => {
-    const docVersion = a.documentId ? input.documentVersions.get(a.documentId) : undefined;
-    const sha =
-      !a.documentId && a.externalId && /^[0-9a-f]{7,40}$/i.test(a.externalId)
-        ? a.externalId.toLowerCase()
-        : null;
-    const revision = docVersion !== undefined ? `v${docVersion}` : sha;
-    const title = a.title.trim().toLowerCase();
-    /** With one plan every plan decision is about it; with several, the decision must name it or cite its sha. */
-    const concerns = (d: PlanDecision) =>
-      plans.length === 1 ||
-      `${d.title} ${d.statement}`.toLowerCase().includes(title) ||
-      (sha !== null && citedShas(`${d.title} ${d.statement}`).some((c) => sameSha(c, sha)));
-    const mine = decisions.filter(concerns);
-    const cited = (d: PlanDecision): string | null => {
-      const text = `${d.title} ${d.statement}`;
-      if (a.documentId) {
-        const v = citedVersions(text)[0];
-        return v === undefined ? null : `v${v}`;
-      }
-      return citedShas(text)[0] ?? null;
-    };
-    // A plan with no known revision (a repository link without a sha) is approved by any accepted decision.
-    const accepted = mine.find(
-      (d) => d.status === 'accepted' && (revision === null || cited(d) !== null),
-    );
-    const approvedRevision = accepted ? cited(accepted) : null;
-    const changed =
-      !!accepted &&
-      approvedRevision !== null &&
-      revision !== null &&
-      (docVersion !== undefined
-        ? docVersion > Number(approvedRevision.slice(1))
-        : !sameSha(approvedRevision, revision));
-    const proposed = mine.find((d) => d.status === 'proposed');
-    return {
-      artifactId: a.id,
-      title: a.title,
-      ...(a.url ? { url: a.url } : {}),
-      ...(a.documentId ? { documentId: a.documentId } : {}),
-      revision,
-      approved: accepted ? { decisionKey: accepted.key, revision: approvedRevision } : null,
-      changedSinceApproval: changed,
-      ...(proposed ? { proposedDecisionKey: proposed.key } : {}),
-    };
-  });
-}
-
 // ───────────────────────────── Comments & events ─────────────────────────────
 
+/** Comment, event, and search subject. `issue` is the task discriminator; it is not renamed to `task`. */
 export type SubjectType =
   | 'issue'
-  | 'customer'
-  | 'customer_request'
   | 'artifact'
-  | 'decision'
-  | 'input_request'
-  | 'repository'
-  | 'team'
   | 'project'
   | 'project_update'
   | 'milestone'
   | 'import'
-  | 'document'
-  | 'release'
-  | 'release_pipeline';
+  | 'document';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -1744,8 +1038,7 @@ export interface CommentIndexEntry {
 /**
  * Append-only activity log (event-based activity model). Written by the server
  * on every mutation and by integrations/agents. `type` examples:
- * input.requested, input.answered, artifact.attached, artifact.updated,
- * decision.proposed, decision.accepted, issue.created, issue.status_changed,
+ * artifact.attached, artifact.updated, issue.created, issue.status_changed,
  * issue.rekeyed, milestone.created, milestone.updated, milestone.deleted,
  * comment.created, review.requested.
  */
@@ -1764,8 +1057,6 @@ export interface DomainEvent {
 // ───────────────────────────── Attention ─────────────────────────────
 
 export type AttentionKind =
-  | 'input_requested'
-  | 'needs_decision'
   | 'review_requested'
   | 'ci_failed'
   | 'conflict'
@@ -1782,8 +1073,6 @@ export interface AttentionItem {
   title: string;
   detail: string;
   artifactId?: ID;
-  decisionId?: ID;
-  inputRequestId?: ID;
   issueId?: ID;
   /** When the underlying condition started. */
   since: ISODate;
@@ -1803,13 +1092,10 @@ export type InsightRange = (typeof INSIGHT_RANGES)[number];
  * cause it, so a lead (or an agent) can act on them. Definitions live in {@link INSIGHT_SIGNALS}.
  */
 export type InsightSignalId =
-  | 'needs_input'
   | 'stale_issues'
   | 'overdue_milestones'
   | 'prs_stuck_in_review'
-  | 'ci_failing'
-  | 'undecided_decisions'
-  | 'customer_demand_waiting';
+  | 'ci_failing';
 
 export interface InsightSignalMeta {
   label: string;
@@ -1820,11 +1106,6 @@ export interface InsightSignalMeta {
 }
 
 export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
-  needs_input: {
-    label: 'Waiting for input',
-    definition: 'Open Issue questions and proposed Decisions, by how long they have waited.',
-    unit: 'question',
-  },
   stale_issues: {
     label: 'Stale issues',
     definition: 'Issues In Progress or In Review that were not updated for the stale threshold.',
@@ -1847,22 +1128,11 @@ export const INSIGHT_SIGNALS: Record<InsightSignalId, InsightSignalMeta> = {
     definition: 'Open pull requests whose latest CI result is failing.',
     unit: 'pull request',
   },
-  undecided_decisions: {
-    label: 'Undecided decisions',
-    definition: 'Decisions that are Proposed and still wait for a person to accept or reject them.',
-    unit: 'decision',
-  },
-  customer_demand_waiting: {
-    label: 'Customer demand waiting',
-    definition:
-      'Issues and projects that customers asked for and that are still open, longest-waiting first.',
-    unit: 'request target',
-  },
 };
 
 export const INSIGHT_SIGNAL_IDS = Object.keys(INSIGHT_SIGNALS) as InsightSignalId[];
 
-export type InsightItemType = 'issue' | 'decision' | 'milestone' | 'artifact' | 'project';
+export type InsightItemType = 'issue' | 'milestone' | 'artifact' | 'project';
 
 /** One thing that causes a signal (or sits in a flow list). Enough to render a row and link to it. */
 export interface InsightItem {
@@ -1909,11 +1179,9 @@ export interface InsightSignal {
   truncated: boolean;
 }
 
-/** Who is the bottleneck: open questions, decisions and reviews waiting on one actor. */
+/** Who is the bottleneck: reviews waiting on one actor. */
 export interface InsightBottleneck {
   actor: InsightActor;
-  inputRequests: number;
-  decisions: number;
   reviews: number;
   oldestDays: number;
   /** Sum of waiting days over everything waiting on this actor. */
@@ -1996,17 +1264,11 @@ export interface InsightContributor {
   issuesDone: number;
   comments: number;
   pullRequests: number;
-  decisionsProposed: number;
-  inputRequestsRaised: number;
   lastActiveAt?: ISODate;
 }
 
 export interface AgentFailureRow {
   agent: InsightActor;
-  inputRequestsRaised: number;
-  inputRequestsOpen: number;
-  /** Median hours from raising a question to the answer. */
-  medianAnswerHours?: number;
   pullRequests: number;
   /** Closed without being merged. */
   pullRequestsAbandoned: number;
@@ -2026,7 +1288,7 @@ export interface InsightActors {
 export interface InsightsReport {
   generatedAt: ISODate;
   range: { days: number; from: ISODate; to: ISODate };
-  scope: { teamId?: ID; projectId?: ID };
+  scope: { projectId?: ID };
   staleDays: number;
   signals: InsightSignal[];
   bottlenecks: InsightBottleneck[];
@@ -2036,13 +1298,14 @@ export interface InsightsReport {
 
 // ───────────────────────────── Views & tokens ─────────────────────────────
 
-export type ViewEntity = 'issue' | 'decision' | 'project';
+/** Saved-view discriminator. `issue` is the task list; it is not renamed to `task`. */
+export type ViewEntity = 'issue' | 'project';
 /** `timeline` (Gantt) is a layout of a saved view, offered for project views. */
 export type ViewLayout = 'list' | 'board' | 'timeline';
 
 export interface ViewFilter {
   field: string;
-  /** `gte` / `lte` compare numeric fields (customer demand such as request count or revenue). */
+  /** `gte` / `lte` compare numeric fields (estimates and similar). */
   op: 'is' | 'is_not' | 'in' | 'not_in' | 'contains' | 'before' | 'after' | 'gte' | 'lte';
   value: string | string[];
 }
@@ -2106,7 +1369,6 @@ export interface PublicViewItem {
   status?: string;
   priority?: Priority;
   health?: string;
-  team?: string;
   assignee?: string;
   project?: string;
   labels?: string[];
@@ -2177,19 +1439,6 @@ export interface IntegrationConnection {
 
 // ───────────────────────────── Permissions & workspace settings ─────────────────────────────
 
-export type TeamEditPolicy = 'workspace' | 'members';
-export const TEAM_EDIT_POLICIES: Record<TeamEditPolicy, { label: string; description: string }> = {
-  workspace: {
-    label: 'Everyone in the workspace',
-    description: "Any member (or above) can edit this team's issues.",
-  },
-  members: {
-    label: 'Team members only',
-    description:
-      'Only people on this team (and workspace admins) can edit its issues.',
-  },
-};
-
 export type TokenScope = 'read' | 'write' | 'admin' | 'custom';
 export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: string }> = {
   read: {
@@ -2216,30 +1465,26 @@ export const TOKEN_SCOPES: Record<TokenScope, { label: string; description: stri
 /**
  * Fine-grained API permissions (`<resource>:<action>`), used by `custom` tokens. The required
  * permission of a request is derived from its route: `/w/:slug/<resource>/…` plus the HTTP method
- * (GET → read, POST/PUT/PATCH → write, DELETE → delete), with a few named exceptions
- * (`decisions:accept`). A route whose resource is not listed here is denied to custom tokens.
+ * (GET → read, POST/PUT/PATCH → write, DELETE → delete). Tasks are served at `/tasks`, so the
+ * resource is `tasks` (`tasks:read`, `tasks:write`, `tasks:delete`), not `issues`.
+ * Membership grants stay `issues:*` — those strings are stored on roles. See {@link MemberResource}.
+ * A route whose resource is not listed here is denied to custom tokens.
  */
-export type ApiAction = 'read' | 'write' | 'delete' | 'accept';
+export type ApiAction = 'read' | 'write' | 'delete';
 export type ApiResource =
   | 'workspace'
   | 'projects'
-  | 'issues'
-  | 'customers'
-  | 'decisions'
+  | 'tasks'
   | 'milestones'
-  | 'releases'
   | 'comments'
   | 'artifacts'
   | 'documents'
-  | 'input-requests'
   | 'views'
   | 'attention'
   | 'search'
   | 'events'
   | 'snapshot'
   | 'insights'
-  | 'teams'
-  | 'repositories'
   | 'members'
   | 'agents'
   | 'tokens'
@@ -2256,23 +1501,17 @@ export interface ApiResourceMeta {
 const RWD = ['read', 'write', 'delete'] as const;
 export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   projects: { label: 'Projects', group: 'Work', actions: RWD },
-  issues: { label: 'Issues', group: 'Work', actions: RWD },
-  customers: { label: 'Customers', group: 'Work', actions: RWD },
-  decisions: { label: 'Decisions', group: 'Work', actions: [...RWD, 'accept'] },
+  tasks: { label: 'Tasks', group: 'Work', actions: RWD },
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
-  releases: { label: 'Releases', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
   documents: { label: 'Documents', group: 'Work', actions: RWD },
-  'input-requests': { label: 'Input requests', group: 'Work', actions: RWD },
   views: { label: 'Views', group: 'Work', actions: RWD },
   attention: { label: 'Attention', group: 'Work', actions: ['read', 'write'] },
   search: { label: 'Search', group: 'Insight', actions: ['read'] },
   events: { label: 'Activity log', group: 'Insight', actions: ['read'] },
   snapshot: { label: 'Snapshot', group: 'Insight', actions: ['read'] },
   insights: { label: 'Insights', group: 'Insight', actions: ['read'] },
-  teams: { label: 'Teams', group: 'Organization', actions: RWD },
-  repositories: { label: 'Repositories', group: 'Organization', actions: RWD },
   workspace: { label: 'Workspace & settings', group: 'Organization', actions: RWD },
   members: { label: 'Members', group: 'Access & automation', actions: RWD },
   agents: { label: 'Agents', group: 'Access & automation', actions: RWD },
@@ -2289,15 +1528,11 @@ export const API_PERMISSIONS: readonly ApiPermission[] = (
 const READ_ALL = API_PERMISSIONS.filter((p) => p.endsWith(':read'));
 const WORK: ApiResource[] = [
   'projects',
-  'issues',
-  'customers',
-  'decisions',
+  'tasks',
   'milestones',
-  'releases',
   'comments',
   'artifacts',
   'documents',
-  'input-requests',
   'views',
   'attention',
 ];
@@ -2352,13 +1587,7 @@ export type Capability =
   | 'manageProjects'
   | 'createIssues'
   | 'deleteIssues'
-  | 'manageCustomers'
-  | 'deleteCustomers'
-  | 'acceptDecisions'
   | 'manageSharedViews'
-  | 'createTeams'
-  | 'manageTeams'
-  | 'manageRepositories'
   | 'inviteMembers'
   | 'manageAgents'
   | 'manageTokens'
@@ -2370,20 +1599,14 @@ export type PermissionMap = Record<Capability, LegacyRole>;
 export interface CapabilityMeta {
   label: string;
   description: string;
-  group: 'Work' | 'Organization' | 'Access & automation';
+  group: 'Work' | 'Access & automation';
 }
 
 export const CAPABILITIES: Capability[] = [
   'manageProjects',
   'createIssues',
   'deleteIssues',
-  'manageCustomers',
-  'deleteCustomers',
-  'acceptDecisions',
   'manageSharedViews',
-  'createTeams',
-  'manageTeams',
-  'manageRepositories',
   'inviteMembers',
   'manageAgents',
   'manageTokens',
@@ -2394,13 +1617,7 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   manageProjects: { group: 'Work', label: 'Manage projects', description: 'Create, edit and delete projects and their milestones.' },
   createIssues: { group: 'Work', label: 'Create issues', description: 'File bugs, features, incidents and other issues.' },
   deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
-  manageCustomers: { group: 'Work', label: 'Manage customers', description: 'Create and edit customers, archive them, and link or unlink their feedback on issues.' },
-  deleteCustomers: { group: 'Work', label: 'Delete customers', description: 'Permanently delete a customer. Linked issues are kept; the links are removed.' },
-  acceptDecisions: { group: 'Work', label: 'Accept and reject decisions', description: 'Accept, reject or supersede a proposed decision. Always needs a person, never an agent.' },
   manageSharedViews: { group: 'Work', label: 'Share views', description: 'Create or publish saved views for the whole workspace.' },
-  createTeams: { group: 'Organization', label: 'Create teams', description: 'Add a team to the workspace.' },
-  manageTeams: { group: 'Organization', label: 'Edit and delete teams', description: 'Rename, re-colour, change members or delete a team. A team lead can always edit their own team.' },
-  manageRepositories: { group: 'Organization', label: 'Manage repositories', description: 'Add, edit and remove repositories.' },
   inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. You can only invite someone into a role whose permissions you already have.' },
   manageAgents: { group: 'Access & automation', label: 'Manage agents', description: 'Register agents, edit them, and mint tokens that act as an agent.' },
   manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). A write-scoped token cannot create an admin-scoped one.' },
@@ -2412,13 +1629,7 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   manageProjects: 'member',
   createIssues: 'member',
   deleteIssues: 'member',
-  manageCustomers: 'member',
-  deleteCustomers: 'member',
-  acceptDecisions: 'member',
   manageSharedViews: 'member',
-  createTeams: 'admin',
-  manageTeams: 'admin',
-  manageRepositories: 'admin',
   inviteMembers: 'admin',
   manageAgents: 'admin',
   manageTokens: 'member',
@@ -2814,23 +2025,13 @@ export function roleAllows(role: WorkspaceRole | null | undefined, gate: RoleGat
 }
 
 /** One catalog per subject. The type is the semantic value boards and done/canceled already understand. */
-export type StatusSubject =
-  | 'issue'
-  | 'project'
-  | 'decision'
-  | 'project_health';
+export type StatusSubject = 'issue' | 'project' | 'project_health';
 
-export const STATUS_SUBJECTS: readonly StatusSubject[] = [
-  'issue',
-  'project',
-  'decision',
-  'project_health',
-];
+export const STATUS_SUBJECTS: readonly StatusSubject[] = ['issue', 'project', 'project_health'];
 
 export const STATUS_SUBJECT_LABEL: Record<StatusSubject, string> = {
   issue: 'Issues',
   project: 'Projects',
-  decision: 'Decisions',
   project_health: 'Project health',
 };
 
@@ -2868,14 +2069,12 @@ export interface StatusEntry<T extends string = string> {
 export interface StatusCatalog {
   issue: StatusEntry<IssueStatus>[];
   project: StatusEntry<ProjectStatus>[];
-  decision: StatusEntry<DecisionStatus>[];
   projectHealth: StatusEntry<ProjectHealth>[];
 }
 
 export const STATUS_CATALOG_KEY: Record<StatusSubject, keyof StatusCatalog> = {
   issue: 'issue',
   project: 'project',
-  decision: 'decision',
   project_health: 'projectHealth',
 };
 
@@ -2913,14 +2112,6 @@ const PROJECT_STATUS_SEEDS: readonly StatusSeed<ProjectStatus>[] = [
   { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
 ];
 
-const DECISION_STATUS_SEEDS: readonly StatusSeed<DecisionStatus>[] = [
-  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
-  { type: 'proposed', name: 'Proposed', icon: 'circle-help', color: AMBER },
-  { type: 'accepted', name: 'Accepted', icon: 'circle-check', color: GREEN },
-  { type: 'superseded', name: 'Superseded', icon: 'circle-minus', color: NEUTRAL },
-  { type: 'rejected', name: 'Rejected', icon: 'circle-x', color: RED },
-];
-
 const PROJECT_HEALTH_SEEDS: readonly StatusSeed<ProjectHealth>[] = [
   { type: 'on_track', name: 'On track', icon: 'circle-check', color: GREEN },
   { type: 'at_risk', name: 'At risk', icon: 'triangle-alert', color: AMBER },
@@ -2930,7 +2121,6 @@ const PROJECT_HEALTH_SEEDS: readonly StatusSeed<ProjectHealth>[] = [
 const STATUS_TYPES: Record<StatusSubject, readonly string[]> = {
   issue: ISSUE_STATUS_SEEDS.map((s) => s.type),
   project: PROJECT_STATUS_SEEDS.map((s) => s.type),
-  decision: DECISION_STATUS_SEEDS.map((s) => s.type),
   project_health: PROJECT_HEALTH_SEEDS.map((s) => s.type),
 };
 
@@ -2943,7 +2133,6 @@ export function defaultStatusCatalog(): StatusCatalog {
   return {
     issue: seedEntries(ISSUE_STATUS_SEEDS),
     project: seedEntries(PROJECT_STATUS_SEEDS),
-    decision: seedEntries(DECISION_STATUS_SEEDS),
     projectHealth: seedEntries(PROJECT_HEALTH_SEEDS),
   };
 }
@@ -2993,7 +2182,6 @@ export function resolveStatusCatalog(stored?: Partial<StatusCatalog> | null): St
   return {
     issue: normalizeStatusEntries('issue', stored?.issue, defaults.issue),
     project: normalizeStatusEntries('project', stored?.project, defaults.project),
-    decision: normalizeStatusEntries('decision', stored?.decision, defaults.decision),
     projectHealth: normalizeStatusEntries('project_health', stored?.projectHealth, defaults.projectHealth),
   };
 }
@@ -3045,8 +2233,6 @@ export function statusStoredValues<T extends string>(entry: StatusEntry<T>, entr
 export interface WorkspaceSettings {
   /** Roles people and invitations can hold. A new workspace stores the four old ranks; older settings without `roles` are migrated on read. */
   roles: WorkspaceRole[];
-  /** Team preselected when creating issues. */
-  defaultTeamId?: ID;
   /** Scale offered for issue estimates. Estimates are stored as numbers either way. */
   estimateScale: EstimateScale;
   weekStart: WeekStart;
@@ -3058,8 +2244,6 @@ export interface WorkspaceSettings {
   iconInitial?: string;
   /** Workspace-defined labels. Assign these ids; do not invent names. */
   labels: WorkspaceLabel[];
-  /** Customer tiers configured for this workspace, in display order. Empty until an admin adds some. */
-  customerTiers: CustomerTier[];
   /** Status catalogs. A new workspace gets today's statuses; admins can rename them and add more of the same type. */
   statuses: StatusCatalog;
 }
@@ -3070,7 +2254,6 @@ export const DEFAULT_WORKSPACE_SETTINGS: WorkspaceSettings = {
   weekStart: 'monday',
   timeZone: 'auto',
   labels: LABEL_TEMPLATES.map((label) => ({ ...label })),
-  customerTiers: [],
   statuses: defaultStatusCatalog(),
 };
 
@@ -3090,14 +2273,19 @@ export function resolveWorkspaceSettings(raw?: StoredWorkspaceSettings | null): 
     roleGrants: _roleGrants,
     roles: _roles,
     deltaThreads: _deltaThreads,
+    defaultTeamId: _defaultTeamId,
+    customerTiers: _customerTiers,
     ...rest
-  } = r as StoredWorkspaceSettings & { deltaThreads?: unknown };
+  } = r as StoredWorkspaceSettings & {
+    deltaThreads?: unknown;
+    defaultTeamId?: unknown;
+    customerTiers?: unknown;
+  };
   return {
     ...DEFAULT_WORKSPACE_SETTINGS,
     ...rest,
     roles,
     labels: resolveLabelCatalog(r.labels),
-    customerTiers: resolveCustomerTiers(r.customerTiers),
     statuses: resolveStatusCatalog(r.statuses),
   };
 }
@@ -3151,50 +2339,12 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   },
   {
     entity: 'issue',
-    label: 'Issues',
+    label: 'Tasks',
     events: [
       'issue.created',
       'issue.updated',
       'issue.status_changed',
       'issue.deleted',
-    ],
-  },
-  {
-    entity: 'customer',
-    label: 'Customers',
-    events: [
-      'customer.created',
-      'customer.updated',
-      'customer.archived',
-      'customer.restored',
-      'customer.deleted',
-      'customer_request.linked',
-      'customer_request.updated',
-      'customer_request.unlinked',
-    ],
-  },
-  {
-    entity: 'decision',
-    label: 'Decisions',
-    events: [
-      'decision.draft',
-      'decision.proposed',
-      'decision.accepted',
-      'decision.rejected',
-      'decision.superseded',
-      'decision.updated',
-      'decision.deleted',
-    ],
-  },
-  {
-    entity: 'input',
-    label: 'Input requests',
-    events: [
-      'input.requested',
-      'input.answered',
-      'input.dismissed',
-      'input.updated',
-      'input.deleted',
     ],
   },
   {
@@ -3214,12 +2364,6 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
     ],
   },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
-  { entity: 'team', label: 'Teams', events: ['team.created', 'team.updated', 'team.deleted'] },
-  {
-    entity: 'repository',
-    label: 'Repositories',
-    events: ['repository.created', 'repository.updated', 'repository.deleted'],
-  },
   {
     entity: 'import',
     label: 'Imports',
@@ -3251,20 +2395,11 @@ export interface WorkspaceSnapshot {
   users: User[];
   memberships: Membership[];
   agents: Agent[];
-  teams: Team[];
-  repositories: Repository[];
   projects: Project[];
   milestones: Milestone[];
-  inputRequests: InputRequest[];
+  /** Tasks. The field name stays `issues`; public routes are `/tasks`. */
   issues: Issue[];
-  /** Companies whose feedback is linked to issues. Includes archived customers. */
-  customers: Customer[];
-  /** Customer requests on issues and projects. Deleting the customer, issue or project removes the row. */
-  customerRequests: CustomerRequest[];
   artifacts: Artifact[];
-  decisions: Decision[];
-  releasePipelines: ReleasePipeline[];
-  releases: Release[];
   /** Every comment in `full` mode (default); empty in `index` mode (see SnapshotCommentsMode). */
   comments: Comment[];
   /** Present only in `index` mode. */
@@ -3286,7 +2421,6 @@ export interface LiveEvent {
     | 'membership'
     | 'invite'
     | 'favorite'
-    | 'customer_subscription'
     | 'notification'
     | 'agent'
     | 'integration'
@@ -3374,7 +2508,10 @@ export interface ImportCredentialRef {
 
 export type ImportTarget = { action: 'map'; id: ID } | { action: 'create' } | { action: 'skip' };
 
-/** The editable mapping from the tracker's entities to Trama's. Keys are the preview's ids. */
+/**
+   * The editable mapping from the tracker's entities to Trama's. Keys are the preview's ids.
+   * `teams` is Linear team ids only. Trama has no teams.
+   */
 export interface ImportMapping {
   teams: Record<string, ImportTarget>;
   projects: Record<string, ImportTarget>;

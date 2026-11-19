@@ -18,8 +18,7 @@ describe('workspaces, RBAC and tenancy', () => {
       await owner.client.post(`/api/w/${slug}/members`, { email: u.email, role }).expect(201);
       roles[role] = u.client;
     }
-    const team = (await owner.client.post(`/api/w/${slug}/teams`, { name: 'Core', key: 'CORE' }).expect(201)).body;
-    return { owner, ws, slug, team, ...roles, ownerUserId: owner.user.id };
+    return { owner, ws, slug, ...roles, ownerUserId: owner.user.id };
   }
 
   it('creator becomes owner; workspaces list shows my role', async () => {
@@ -30,27 +29,24 @@ describe('workspaces, RBAC and tenancy', () => {
   });
 
   it('viewer is read-only (403 on writes, 200 on reads)', async () => {
-    const { viewer, slug, team } = await setup();
+    const { viewer, owner, slug } = await setup();
+    const issue = (await owner.client.post(`/api/w/${slug}/tasks`, { kind: 'bug', title: 'Visible' }).expect(201)).body;
     await viewer.get(`/api/w/${slug}/snapshot`).expect(200);
-    await viewer.get(`/api/w/${slug}/issues`).expect(200);
-    await viewer.post(`/api/w/${slug}/issues`, { kind: 'bug', title: 'Nope', teamId: team.id }).expect(403);
-    await viewer.post(`/api/w/${slug}/comments`, { subject: { type: 'team', id: team.id }, body: 'hi' }).expect(403);
+    await viewer.get(`/api/w/${slug}/tasks`).expect(200);
+    await viewer.post(`/api/w/${slug}/tasks`, { kind: 'bug', title: 'Nope' }).expect(403);
+    await viewer.post(`/api/w/${slug}/comments`, { subject: { type: 'issue', id: issue.id }, body: 'hi' }).expect(403);
   });
 
-  it('member writes domain entities but cannot manage teams, repositories, agents or members', async () => {
-    const { member, slug, team } = await setup();
-    await member.post(`/api/w/${slug}/issues`, { kind: 'bug', title: 'Ok', teamId: team.id }).expect(201);
-    await member.post(`/api/w/${slug}/teams`, { name: 'X', key: 'XX' }).expect(403);
-    await member.post(`/api/w/${slug}/repositories`, { provider: 'github', fullName: 'a/b' }).expect(403);
+  it('member writes domain entities but cannot manage agents or members', async () => {
+    const { member, slug } = await setup();
+    await member.post(`/api/w/${slug}/tasks`, { kind: 'bug', title: 'Ok' }).expect(201);
     await member.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'codex' }).expect(403);
     await member.post(`/api/w/${slug}/members`, { email: 'x@y.dev', role: 'viewer' }).expect(403);
     await member.patch(`/api/w/${slug}`, { name: 'Renamed' }).expect(403);
   });
 
-  it('admin manages teams/repos/agents/members but cannot delete the workspace; only owner can', async () => {
+  it('admin manages agents/members but cannot delete the workspace; only owner can', async () => {
     const { admin, owner, slug } = await setup();
-    await admin.post(`/api/w/${slug}/teams`, { name: 'Second', key: 'SEC' }).expect(201);
-    await admin.post(`/api/w/${slug}/repositories`, { provider: 'github', fullName: 'acme/api' }).expect(201);
     await admin.post(`/api/w/${slug}/agents`, { name: 'Bot', provider: 'codex' }).expect(201);
     await admin.patch(`/api/w/${slug}`, { name: 'Renamed' }).expect(200);
     await admin.delete(`/api/w/${slug}`, { confirm: slug }).expect(403);
@@ -64,12 +60,12 @@ describe('workspaces, RBAC and tenancy', () => {
   it('isolates workspaces: other tenants get 404 on everything, ids do not leak across', async () => {
     const a = await setup();
     const b = await setup();
-    const issueA = (await a.owner.client.post(`/api/w/${a.slug}/issues`, { kind: 'bug', title: 'Secret', teamId: a.team.id }).expect(201)).body;
+    const issueA = (await a.owner.client.post(`/api/w/${a.slug}/tasks`, { kind: 'bug', title: 'Secret' }).expect(201)).body;
     await b.owner.client.get(`/api/w/${a.slug}/snapshot`).expect(404);
-    await b.owner.client.get(`/api/w/${a.slug}/issues`).expect(404);
-    await b.owner.client.post(`/api/w/${a.slug}/issues`, { kind: 'bug', title: 'x' }).expect(404);
-    await b.owner.client.get(`/api/w/${b.slug}/issues/${issueA.id}`).expect(404);
-    await b.owner.client.get(`/api/w/${b.slug}/issues/${issueA.key}`).expect(404);
+    await b.owner.client.get(`/api/w/${a.slug}/tasks`).expect(404);
+    await b.owner.client.post(`/api/w/${a.slug}/tasks`, { kind: 'bug', title: 'x' }).expect(404);
+    await b.owner.client.get(`/api/w/${b.slug}/tasks/${issueA.id}`).expect(404);
+    await b.owner.client.get(`/api/w/${b.slug}/tasks/${issueA.key}`).expect(404);
     // a token of workspace B does not open workspace A either
     const tk = (await b.owner.client.post(`/api/w/${b.slug}/tokens`, { name: 't' }).expect(201)).body;
     await new TokenClient(app.getHttpServer(), tk.secret).get(`/api/w/${a.slug}/snapshot`).expect(404);

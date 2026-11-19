@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import { ArrayMaxSize, IsArray, IsIn, IsObject, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from 'class-validator';
-import { Actor, Can, Ctx, EditsTeamWork, type WorkspaceContext } from '../auth/request-context.js';
+import { Actor, Can, Ctx, type WorkspaceContext } from '../auth/request-context.js';
 import { EXTERNAL_PROVIDERS, type ActorRef, type ExternalProvider } from '../contracts/domain.js';
 import { CredentialsService } from './credentials.service.js';
 import { ExternalLinksService } from './external-links.service.js';
@@ -112,8 +112,7 @@ export class ImportsController {
 }
 
 /** Link an existing issue to GitHub / Linear. Same permission as editing the issue. */
-@Controller('w/:slug/issues')
-@EditsTeamWork('issue')
+@Controller('w/:slug/tasks')
 export class IssueExternalRefController {
   constructor(private readonly links: ExternalLinksService) {}
 

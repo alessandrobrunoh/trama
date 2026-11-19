@@ -15,12 +15,14 @@ export class WebhookDeliveryEntity extends Wire {
 
 /** Git coordinates of a PR/MR/commit artifact, so CI events (which only carry a sha) can find it. */
 @Entity('artifact_sources')
-@Index('IDX_artifact_sources_repo_sha', ['repositoryId', 'headSha'])
+@Index('IDX_artifact_sources_repo_sha', ['repository', 'headSha'])
+
 @ForeignKey(() => ArtifactEntity, ['artifactId'], ['id'], { onDelete: 'CASCADE' })
 export class ArtifactSourceEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) artifactId: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar', nullable: true }) repositoryId: string | null;
+  /** Git full name, matching `artifacts.repository`. */
+  @Column({ type: 'varchar', length: 2048, nullable: true }) repository: string | null;
   @Column({ type: 'varchar', nullable: true }) headSha: string | null;
   @Column({ type: 'varchar', nullable: true }) headBranch: string | null;
 }

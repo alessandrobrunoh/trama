@@ -1,8 +1,6 @@
 import type { ActorRef, SubjectRef } from '../contracts/domain.js';
 import type {
   ArtifactEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
@@ -22,8 +20,6 @@ export interface ProjectContextData {
   updates: ProjectUpdateEntity[];
   issues: IssueEntity[];
   artifacts: ProjectContextArtifactRow[];
-  decisions: DecisionEntity[];
-  inputRequests: InputRequestEntity[];
 }
 
 export interface ProjectContextRows {
@@ -32,9 +28,7 @@ export interface ProjectContextRows {
   updates: readonly ProjectUpdateEntity[];
   issues: readonly IssueEntity[];
   artifacts: readonly ArtifactEntity[];
-  decisions: readonly DecisionEntity[];
-  inputRequests: readonly InputRequestEntity[];
-  /** Markdown fetches records against all project issue ids, while issue details are capped. */
+  /** Markdown fetches artifacts against all project issue ids, while issue details are capped. */
   includeUnmatchedAssociations?: boolean;
 }
 
@@ -80,24 +74,6 @@ export function assembleProjectContext(
     artifacts.push({ artifact, path });
   }
 
-  const decisions = rows.decisions
-    .filter(
-      (d) =>
-        (rows.includeUnmatchedAssociations &&
-          (!!d.originIssueId || (d.relatedIssueIds ?? []).length > 0)) ||
-        (!!d.originIssueId && issueById.has(d.originIssueId)) ||
-        (d.relatedIssueIds ?? []).some((id) => issueById.has(id)),
-    )
-    .sort(byNumber);
-  const inputRequests = rows.inputRequests
-    .filter(
-      (r) =>
-        r.state === 'open' &&
-        !!r.issueId &&
-        (rows.includeUnmatchedAssociations || issueById.has(r.issueId)),
-    )
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-
   return {
     project,
     milestones: rows.milestones
@@ -108,8 +84,6 @@ export function assembleProjectContext(
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
     issues,
     artifacts,
-    decisions,
-    inputRequests,
   };
 }
 
@@ -121,9 +95,7 @@ export const CONTEXT_CAPS = {
   milestones: 20,
   issues: 40,
   artifacts: 40,
-  decisions: 20,
-  inputRequests: 20,
-  /** Characters kept of a free-text body (description, update, statement). */
+  /** Characters kept of a free-text body (description, update). */
   text: 600,
 } as const;
 
@@ -141,7 +113,7 @@ export interface ProjectContextNames {
   names?: ReadonlyMap<string, string>;
   counts?: Partial<
     Record<
-      'issues' | 'openIssues' | 'artifacts' | 'decisions' | 'inputRequests',
+      'issues' | 'openIssues' | 'artifacts',
       number
     >
   >;
@@ -269,40 +241,5 @@ export function projectContextMarkdown(
       : artifactLines,
   );
 
-  const liveDecisions = ctx.decisions.filter(
-    (d) => d.status !== 'rejected' && d.status !== 'draft',
-  );
-  section('Decisions', [
-    ...liveDecisions.slice(0, CONTEXT_CAPS.decisions).map((d) => {
-      const origin = d.originIssueId
-        ? issueById.get(d.originIssueId)?.key
-        : undefined;
-      const state =
-        d.status === 'accepted'
-          ? ''
-          : d.status === 'superseded'
-            ? ' — superseded; do not follow'
-            : ` — ${d.status}, not yet accepted`;
-      return `- ${d.key} ${d.title}: ${oneLine(d.statement, CONTEXT_CAPS.text)}${origin ? ` (from ${origin})` : ''}${state}`;
-    }),
-    ...((opts.counts?.decisions ?? liveDecisions.length) >
-    Math.min(liveDecisions.length, CONTEXT_CAPS.decisions)
-      ? [
-          `- … ${(opts.counts?.decisions ?? liveDecisions.length) - Math.min(liveDecisions.length, CONTEXT_CAPS.decisions)} more`,
-        ]
-      : []),
-  ]);
-  section('Open input requests', [
-    ...ctx.inputRequests.slice(0, CONTEXT_CAPS.inputRequests).map((r) => {
-      const origin = r.issueId ? issueById.get(r.issueId)?.key : undefined;
-      return `- ${origin ? `${origin}: ` : ''}${oneLine(r.question, 300)}${r.options?.length ? ` [options: ${r.options.join(' / ')}]` : ''}`;
-    }),
-    ...((opts.counts?.inputRequests ?? ctx.inputRequests.length) >
-    Math.min(ctx.inputRequests.length, CONTEXT_CAPS.inputRequests)
-      ? [
-          `- … ${(opts.counts?.inputRequests ?? ctx.inputRequests.length) - Math.min(ctx.inputRequests.length, CONTEXT_CAPS.inputRequests)} more`,
-        ]
-      : []),
-  ]);
   return `${out.join('\n').trimEnd()}\n`;
 }

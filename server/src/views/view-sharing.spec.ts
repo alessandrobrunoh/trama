@@ -500,9 +500,9 @@ describe('view query', () => {
     ).toEqual(['a', 'c']);
     expect(
       applyFilters('issue', items, [
-        { field: 'teamId', op: 'is', value: '' },
+        { field: 'projectId', op: 'is', value: '' },
       ]).map((i) => i.id),
-    ).toEqual(['b']);
+    ).toEqual(['c']);
     expect(
       sortItems('issue', items, { field: 'priority', direction: 'asc' }).map(
         (i) => i.id,

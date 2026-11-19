@@ -11,10 +11,10 @@ src/
   database/                       entities/index.ts (all tables), migrations/, ensure-database, seed/, admin.controller
   auth/                           AuthService (users, sessions), TokensService, AuthController, request-context.ts (decorators)
   workspaces/                     AccessGuard (global), WorkspacesService + controllers (workspace, members, agents, tokens)
-  events/                         EventsService (record + SSE), WorkstreamBus, EventsController (list + stream), request-store
-  teams repositories workstreams milestones input-requests issues artifacts decisions dependencies comments views
-  snapshot/ health/
-  status/ attention/ graph/ search/ agent-context/   (backend-intelligence)
+  events/                         EventsService (record + SSE), EventsController (list + stream), request-store
+  projects milestones project-updates issues (the /tasks routes) artifacts documents comments views labels
+  notifications favorites snapshot/ health/
+  status/ (status catalog) attention/ search/ insights/   (backend-intelligence)
 ```
 
 ## Request pipeline
@@ -39,7 +39,7 @@ src/
 
 Helpers: `hasRole(role, min)`, `ROLE_RANK`, types `AppRequest`, `WorkspaceContext`, `AuthInfo`.
 
-Routes are declared as `@Controller('w/:slug/<things>')`; every query must be scoped by `ctx.workspace.id` (all domain rows carry `workspaceId`; it is hidden from the wire on input requests/artifacts because the contract has no such field).
+Routes are declared as `@Controller('w/:slug/<things>')`; every query must be scoped by `ctx.workspace.id` (all domain rows carry `workspaceId`; it is hidden from the wire on artifacts because the contract has no such field). The public path for issues is `/w/:slug/tasks`; the internal type, table and subject type stay `Issue` / `issues` / `issue`, and the stored membership grants stay `issues:*` while API token permissions are `tasks:*`.
 
 Agent tokens: `actor = { type: 'agent', id }`, role `member`, `ctx.userId` undefined (guard user-only logic with `@RequireUser()` or check `ctx.userId`). User tokens act as the user with that user's membership role.
 
@@ -52,7 +52,7 @@ Entities extend `Wire` (`database/entities/wire.ts`): `toJSON()` drops `null`/`u
 `EventsService` (global, `events/events.service.ts`):
 
 ```ts
-record({ workspaceId, actor, type, subject: {type, id}, workstreamId?, data?, at?, manager? }, live?)
+record({ workspaceId, actor, type, subject: {type, id}, data?, at?, manager? }, live?)
   // inserts a DomainEvent AND publishes a LiveEvent for SSE. `<x>.created` → created, `<x>.deleted` → deleted, else updated.
   // live = false  → persist only;   live = { type, entity, id } → custom LiveEvent.
 publish(workspaceId, { type, entity, id })   // LiveEvent only (clientId + at added automatically)
@@ -61,34 +61,23 @@ stream$                                       // Observable<{ workspaceId, event
 
 Every mutating service calls `record(...)`. Event types are listed in API.md; add new types freely (they are plain strings).
 
-### WorkstreamTouched bus (extension point for the status engine)
-
-`WorkstreamBus` (global, `events/workstream-bus.ts`):
-
-```ts
-bus.onTouched(handler: (e: { workspaceId, workstreamId, reason }) => void | Promise<void>): () => void  // returns unsubscribe
-bus.touch(workspaceId, workstreamId, reason): Promise<void>        // awaits handlers sequentially, errors logged not thrown
-bus.touchMany(workspaceId, workstreamIds, reason): Promise<void>
-```
-
-Fired (and awaited, so the response is consistent) after any change to a workstream or its criteria, input requests, artifacts, decisions (origin + related), dependencies (both ends) and linked issues. The status engine (`status/status.service.ts`) subscribes in `onModuleInit`, recomputes `status` / `derivedStatus` / `shippedAt` on `workstreams`, and on a change records `workstream.status_changed` (system actor) and publishes a live event; see "Intelligence modules" below. `status = statusOverride ?? derivedStatus`.
-
 ## Numbering
 
-Issue sequences use `issue-key:<prefix>` (`AUTH-142` or `UNPR-7`) and are atomic per workspace and prefix. `allocateIssueNumbers` checks retained aliases when first initializing a prefix counter, so a project tag can be reused without issuing an ambiguous old key. Project tags are unique in a workspace and limited to four characters; changing a tag or moving an issue re-keys affected issues and keeps prior keys in `aliases`. Changing an issue's `kind` only changes its classification. Workstream counters continue to use `wskey:<teamKey>` and `nextAbove(…, max number already used with that key prefix)`; decision numbers use `adr`.
+Issue sequences use `issue-key:<prefix>` (`AUTH-142` or `UNPR-7`) and are atomic per workspace and prefix. `allocateIssueNumbers` checks retained aliases when first initializing a prefix counter, so a project tag can be reused without issuing an ambiguous old key. Project tags are unique in a workspace and limited to four characters; changing a tag or moving an issue re-keys affected issues and keeps prior keys in `aliases`. Changing an issue's `kind` only changes its classification. `adr` is a reserved project key.
 
 ## Database
 
 - Entities: `database/entities/index.ts` (every table, `ENTITIES` array). Migration: `database/migrations/*-NablaBaseline.ts` (the file and class keep the old name because TypeORM tracks applied migrations by name; do not rename them) (registered explicitly in `migrations/index.ts`). `synchronize` is off; `migrationsRun` is on.
 - The database named in `DATABASE_URL` is created on boot if missing (`database/ensure-database.ts`, connects to `postgres` first).
 - Add a table/column: edit the entity, then `npm run migration:generate -- src/database/migrations/<Name>` (builds first; generated file is `.js`, convert it to a `.ts` class like the baseline), register it in `migrations/index.ts`.
-- Polymorphic references (dependencies `from/to`, comments/events `subject`) have no FKs: services clean them up on delete. Events keep `workstreamId` without an FK so history survives deletion.
+- Polymorphic references (dependencies `from/to`, comments/events `subject`) have no FKs: services clean them up on delete.
+- Removing a product area is a data migration, not just code: `1793860000000-RemoveObsoleteFeatures` deletes the comments, events, favorites, notifications, saved views and attention rows of the removed subjects (teams, repositories, decisions, input requests, releases, customers and intake), keeps every issue row, turns `team` actors into `system`, rewrites `issues:*` token permissions to `tasks:*` and drops the tables. It cannot be reversed (`down()` throws). `1793850000000-ProjectRepository` adds `projects.repository`, which the removal migration fills from the first linked registry repository.
 - Integration secrets: `integration_connections.secret` / `webhookSecret` hold `encryptSecret()` output (AES-256-GCM, key from `SECRETS_KEY`); the entity never serializes them (`webhookConfigured` is derived). `config` (jsonb) is for non-secret provider settings and is also hidden.
 - `attention_state(userId, workspaceId, itemId, state, snoozedUntil, since)` exists for the attention module.
 
 ## Seed
 
-`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it (only with `TRAMA_ENABLE_ADMIN_RESET=true`, never in production). Stored statuses follow the rules in `status/derive-status.ts`. Keep the seed valid when you add columns (there is a unit test).
+`database/seed/` (`builder.ts` = fluent builder that also writes the event history, `seed-data.ts` = the Acme data, `seed.service.ts`). Runs on boot when `users` is empty (not in production, `SEED_DEMO=false` disables); `POST /api/admin/reset` re-runs it (only with `TRAMA_ENABLE_ADMIN_RESET=true`, never in production). Keep the seed valid when you add columns (there is a unit test).
 
 ## How to add a domain module
 
@@ -96,10 +85,10 @@ Issue sequences use `issue-key:<prefix>` (`AUTH-142` or `UNPR-7`) and are atomic
 2. `src/<name>/<name>.module.ts` (`TypeOrmModule.forFeature([...])`), `.service.ts`, `.controller.ts` with `@Controller('w/:slug/<name>')`, add the module to `AppModule`.
 3. Controller methods take `@Ctx() ctx` and `@Actor() actor`; add `@Roles('admin')` on admin-only writes.
 4. Scope every query by `ctx.workspace.id`; validate foreign ids with `RefsService`.
-5. After persisting: `events.record(...)`, and `await bus.touch(workspaceId, workstreamId, reason)` if the change affects a workstream.
+5. After persisting: `events.record(...)`.
 6. e2e test in `test/` (helpers `Client`, `TokenClient`, `createTestApp` in `test/app.ts`).
 
-Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` belong to backend-intelligence (the MCP server is the separate Rust crate in `mcp/`), `server/src/{integrations,webhooks}` to backend-integrations. Webhook routes should be `@Public()` and verify signatures themselves; integration routes under `/w/:slug/integrations` should use `@Roles('admin')`.
+Other agents: `server/src/{attention,status,search,insights}` belong to backend-intelligence (the MCP server is the separate Rust crate in `mcp/`), `server/src/{integrations,webhooks}` to backend-integrations. Webhook routes should be `@Public()` and verify signatures themselves; integration routes under `/w/:slug/integrations` should use `@Roles('admin')`.
 
 ## Testing
 
@@ -111,24 +100,22 @@ Other agents: `server/src/{attention,status,graph,search,agent-context,mcp}` bel
 integrations/  secrets.service (AES-256-GCM, TRAMA_ENCRYPTION_KEY, AAD = connection id + field)
                http-client (abstract HttpClient DI token; FetchHttpClient; tests override it, nothing hits the network)
                providers (GithubClient / GitlabClient: currentUser, listRepositories, getRepository; rate-limit aware errors)
-               integrations.service/controller (connections CRUD, rotate secret, remote repos, link repository)
+               integrations.service/controller (connections CRUD, rotate secret, remote repos)
                artifact-linker.service (candidate -> Artifacts via ArtifactsService; keys from branch names, titles and descriptions, CI by sha)
-               keys.ts (workstream key extraction), candidates.ts (normalized PR/MR + CI patch), entities.ts
+               keys.ts (issue key extraction), candidates.ts (normalized PR/MR + CI patch), entities.ts
 webhooks/      controller (@Public), service (verify -> dedupe -> parse -> apply), events.ts (pure payload mapping),
                signatures.ts, raw-body.ts (JSON-parser `verify` hook, /api/webhooks/* only), fixtures.ts (test payloads)
 ```
 
-- Flow: `WebhooksService.handle` loads the connection, decrypts the webhook secret, verifies the signature against the raw body, claims the delivery id (`webhook_deliveries`, `ON CONFLICT DO NOTHING`), maps the payload with the pure functions in `events.ts` (`PayloadError` -> 400), resolves the `Repository` by provider + full name, then `ArtifactLinkerService.upsert/applyCi`. Artifacts are created/updated through `ArtifactsService`, so events and `WorkstreamBus.touch` behave as for manual edits. Webhooks run as actor `{ type: 'system' }`.
-- Tables (migration `1791500000000-IntegrationsWebhooks`): `webhook_deliveries`, `artifact_sources(artifactId, repositoryId, headSha, headBranch)` — git coordinates so CI events, which only know a sha, can find their PR/MR. `integration_connections.config` (hidden) holds `repositoryIds` (linked repositories) and `lastWebhookAt`.
+- Flow: `WebhooksService.handle` loads the connection, decrypts the webhook secret, verifies the signature against the raw body, claims the delivery id (`webhook_deliveries`, `ON CONFLICT DO NOTHING`), maps the payload with the pure functions in `events.ts` (`PayloadError` -> 400), finds the issue key in the payload, then `ArtifactLinkerService.upsert/applyCi`. The repository is kept as a plain full-name string on the artifact. Artifacts are created/updated through `ArtifactsService`, so events behave as for manual edits. Webhooks run as actor `{ type: 'system' }`.
+- Tables (migration `1791500000000-IntegrationsWebhooks`): `webhook_deliveries`, `artifact_sources(artifactId, repository, headSha, headBranch)` — git coordinates so CI events, which only know a sha, can find their PR/MR. `integration_connections.config` (hidden) holds `lastWebhookAt`.
 - The linker serializes work per artifact identity with an in-process lock; running several API instances would need a DB unique index or advisory locks instead.
 - Adding a webhook event: extend `events.ts` (pure, add a unit test with a fixture), then the `ParsedEvent` kind is applied by `WebhooksService.apply`. Adding a provider call: extend `GitProviderClient` in `providers.ts`.
 
 ## Intelligence modules
 
-**Status engine flow** (`status/`): a domain service persists a change and `await bus.touch(workspaceId, workstreamId, reason)` → `StatusService.onTouched` loads the workstream's open input requests, artifacts, proposed decisions that originate from it and the incoming dependencies (with the sources' current status/state) → pure `deriveStatus()` (`derive-status.ts`, first matching rule wins, returns `{ status, derivedStatus, rule, delivery }`; `delivery` (none / in_review / merged / released / deployed) is evidence from artifacts and is stored in `workstreams.delivery`, separate from the outcome: `shipped` additionally requires met criteria and no blockers, open input requests or proposed decisions) → if `derivedStatus`/`status` changed, update the row (+ `shippedAt` the first time), record `workstream.status_changed` (system actor) → re-derive dependents (workstreams with edges *from* this workstream; cascades while statuses change, cycle-safe) → publish a `LiveEvent` of type `attention`. `onApplicationBootstrap` re-derives all workstreams; `SeedService.reset()` touches every seeded workstream through the bus (an additive hook). `blockers()` in `derive-status.ts` is shared with attention.
-
-**Attention** (`attention/`): `attention-rules.ts` is a pure function (`computeAttention(data)`) from workspace rows to items with an *audience* (user ids); `AttentionService` loads the rows, adds event-log `since` timestamps (one SQL), filters by audience and merges per-user `attention_state`. Nothing is stored for items themselves. **Graph / search / agent-context** are read-only services over the same tables (raw ILIKE SQL for search).
+`status/status-catalog.ts` holds the workspace status catalog. **Attention** (`attention/`): `AttentionService` derives `review_requested` and `ci_failed` items from the artifacts attached to tasks the caller can see, adds the per-user `attention_state` (dismissed / snoozed) and sorts by severity then age. Nothing is stored for the items themselves. **Search** is read-only raw ILIKE SQL over projects, issues, artifacts and documents.
 
 ## Access control, token scopes and outgoing webhooks
 
-`@Can(capability)` (auth/request-context.ts) makes `AccessGuard` take the minimum role from `workspace.resolved().permissions` instead of a hard-coded `@Roles`. Token scopes cap the effective role in the guard (`capRole`), so every `ctx.role` check downstream already respects them; `ctx.memberRole` is the uncapped role. `@EditsTeamWork('workstream'|'issue')` calls `PermissionsService.enforceTeamScope` (team `editPolicy`). Migration `1791820000000-AccessWebhooks`. `src/outgoing-webhooks`: `EventsService.recorded$` (emits every non-backdated DomainEvent after persisting) feeds `OutgoingWebhooksService`, which delivers through the injectable `HttpClient` (tests override it) and logs to `outgoing_webhook_deliveries`.
+`@Can(capability)` (auth/request-context.ts) makes `AccessGuard` take the minimum role from `workspace.resolved().permissions` instead of a hard-coded `@Roles`. Token scopes cap the effective role in the guard (`capRole`), so every `ctx.role` check downstream already respects them; `ctx.memberRole` is the uncapped role. Teams and their edit policies no longer exist. Migration `1791820000000-AccessWebhooks`. `src/outgoing-webhooks`: `EventsService.recorded$` (emits every non-backdated DomainEvent after persisting) feeds `OutgoingWebhooksService`, which delivers through the injectable `HttpClient` (tests override it) and logs to `outgoing_webhook_deliveries`.

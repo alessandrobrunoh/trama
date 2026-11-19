@@ -8,8 +8,6 @@ import type { AttentionItem, AttentionKind } from '../contracts/domain.js';
 import {
   ArtifactEntity,
   AttentionStateEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
 } from '../database/entities/index.js';
 import {
@@ -24,10 +22,6 @@ export class AttentionService {
   constructor(
     @InjectRepository(IssueEntity)
     private readonly issues: Repository<IssueEntity>,
-    @InjectRepository(InputRequestEntity)
-    private readonly requests: Repository<InputRequestEntity>,
-    @InjectRepository(DecisionEntity)
-    private readonly decisions: Repository<DecisionEntity>,
     @InjectRepository(ArtifactEntity)
     private readonly artifacts: Repository<ArtifactEntity>,
     @InjectRepository(AttentionStateEntity)
@@ -51,54 +45,6 @@ export class AttentionService {
     if (issueIds.size === 0) return [];
     const issueById = new Map(visibleIssues.map((issue) => [issue.id, issue]));
     const items: AttentionItem[] = [];
-
-    if (canView('input-requests', access)) {
-      const requests = await this.requests.find({
-        where: { workspaceId, issueId: In([...issueIds]), state: 'open' },
-      });
-      for (const request of requests) {
-        if (request.assigneeUserId && request.assigneeUserId !== userId)
-          continue;
-        const issue = issueById.get(request.issueId!);
-        if (!issue) continue;
-        items.push({
-          id: `input_requested:${request.id}`,
-          kind: 'input_requested',
-          severity: 'medium',
-          title: request.question,
-          detail: `Question on ${issue.key}: ${issue.title}`,
-          issueId: issue.id,
-          inputRequestId: request.id,
-          since: request.createdAt.toISOString(),
-          state: 'open',
-        });
-      }
-    }
-
-    if (canView('decisions', access)) {
-      const decisions = await this.decisions.find({
-        where: {
-          workspaceId,
-          originIssueId: In([...issueIds]),
-          status: 'proposed',
-        },
-      });
-      for (const decision of decisions) {
-        const issue = issueById.get(decision.originIssueId!);
-        if (!issue) continue;
-        items.push({
-          id: `needs_decision:${decision.id}`,
-          kind: 'needs_decision',
-          severity: 'medium',
-          title: decision.title,
-          detail: `Proposed decision on ${issue.key}: ${decision.statement}`,
-          issueId: issue.id,
-          decisionId: decision.id,
-          since: decision.createdAt.toISOString(),
-          state: 'open',
-        });
-      }
-    }
 
     if (canView('artifacts', access)) {
       const artifacts =

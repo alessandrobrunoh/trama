@@ -77,14 +77,14 @@ describe('outgoing webhooks (custom integrations)', () => {
     await owner.post(w, { name: 'x', url: 'http://localhost:3000/hook', events: ['*'] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://a.example.com', events: [] }).expect(400);
     await owner.post(w, { name: 'x', url: 'https://a.example.com', events: ['Issue Created'] }).expect(400);
-    await owner.post(w, { name: 'x', url: 'https://a.example.com', events: ['issue.created', 'team.*', '*'] }).expect(201);
+    await owner.post(w, { name: 'x', url: 'https://a.example.com', events: ['issue.created', 'project.*', '*'] }).expect(201);
   });
 
   it('delivers matching events with a verifiable HMAC signature; other events are not sent', async () => {
     const { owner, base, w } = await setup();
     const { webhook, secret } = await create(owner, w, '/ok', ['issue.*']);
-    const issue = (await owner.post(`${base}/issues`, { kind: 'bug', title: 'Login fails' }).expect(201)).body;
-    await owner.post(`${base}/teams`, { name: 'Core', key: 'CORE' }).expect(201); // team.created: not subscribed
+    const issue = (await owner.post(`${base}/tasks`, { kind: 'bug', title: 'Login fails' }).expect(201)).body;
+    await owner.post(`${base}/projects`, { name: 'Core' }).expect(201); // project.created: not subscribed
     await svc.idle();
 
     const calls = http.to('/ok');
@@ -115,19 +115,19 @@ describe('outgoing webhooks (custom integrations)', () => {
   it('wildcard * receives everything; disabled webhooks receive nothing; re-enabling resumes', async () => {
     const { owner, base, w } = await setup();
     const { webhook } = await create(owner, w, '/ok', ['*']);
-    await owner.post(`${base}/teams`, { name: 'Core', key: 'CORE' }).expect(201);
+    await owner.post(`${base}/projects`, { name: 'Core' }).expect(201);
     await svc.idle();
-    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['team.created']);
+    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['project.created']);
 
     await owner.patch(`${w}/${webhook.id}`, { enabled: false }).expect(200);
-    await owner.post(`${base}/teams`, { name: 'Two', key: 'TWO' }).expect(201);
+    const two = (await owner.post(`${base}/projects`, { name: 'Two' }).expect(201)).body;
     await svc.idle();
     expect(http.to('/ok')).toHaveLength(1);
 
-    await owner.patch(`${w}/${webhook.id}`, { enabled: true, events: ['team.deleted'] }).expect(200);
-    await owner.delete(`${base}/teams/TWO`).expect(204);
+    await owner.patch(`${w}/${webhook.id}`, { enabled: true, events: ['project.deleted'] }).expect(200);
+    await owner.delete(`${base}/projects/${two.id}`).expect(204);
     await svc.idle();
-    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['team.created', 'team.deleted']);
+    expect(http.to('/ok').map((c) => c.headers!['X-Trama-Event'])).toEqual(['project.created', 'project.deleted']);
   });
 
   it('retries once on 5xx / network errors / timeouts, never on 4xx, and records every attempt', async () => {
@@ -137,7 +137,7 @@ describe('outgoing webhooks (custom integrations)', () => {
     const down = await create(owner, w, '/down');
     const slow = await create(owner, w, '/slow');
     const gone = await create(owner, w, '/gone');
-    await owner.post(`${base}/issues`, { kind: 'bug', title: 'Retry me' }).expect(201);
+    await owner.post(`${base}/tasks`, { kind: 'bug', title: 'Retry me' }).expect(201);
     await svc.idle();
 
     expect(http.to('/fail')).toHaveLength(2); // exactly one retry, no storm
@@ -180,7 +180,7 @@ describe('outgoing webhooks (custom integrations)', () => {
     const rotated = (await owner.post(`${w}/${webhook.id}/rotate-secret`).expect(200)).body;
     expect(rotated.secret).toMatch(/^whsec_/);
     expect(rotated.secret).not.toBe(secret);
-    await owner.post(`${base}/issues`, { kind: 'bug', title: 'After rotation' }).expect(201);
+    await owner.post(`${base}/tasks`, { kind: 'bug', title: 'After rotation' }).expect(201);
     await svc.idle();
     const call = http.to('/ok').at(-1)!;
     expect(verifySignature(rotated.secret, call.rawBody!, call.headers!['X-Trama-Signature'])).toBe(true);

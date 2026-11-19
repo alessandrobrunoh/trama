@@ -104,7 +104,6 @@ export const IS_PUBLIC_KEY = 'trama:public';
 export const ROLES_KEY = 'trama:roles';
 export const REQUIRE_USER_KEY = 'trama:require-user';
 export const CAPABILITY_KEY = 'trama:capability';
-export const TEAM_SCOPE_KEY = 'trama:team-scope';
 export const ALLOW_CUSTOM_TOKEN_KEY = 'trama:allow-custom-token';
 export const SESSION_ONLY_KEY = 'trama:session-only';
 export const MULTIPART_KEY = 'trama:multipart';
@@ -124,13 +123,6 @@ export const Roles = (min: Role) => SetMetadata(ROLES_KEY, min);
  */
 export const Can = (capability: Capability) =>
   SetMetadata(CAPABILITY_KEY, capability);
-
-/**
- * The route mutates something owned by a team (an `issue` → its team):
- * the team's `editPolicy` is enforced by PolicyGuard on top of the workspace role.
- */
-export const EditsTeamWork = (kind: 'issue') =>
-  SetMetadata(TEAM_SCOPE_KEY, kind);
 
 /** A non-workspace route that `custom` (fine-grained) tokens may call, e.g. `GET /auth/token`. */
 export const AllowCustomToken = () => SetMetadata(ALLOW_CUSTOM_TOKEN_KEY, true);

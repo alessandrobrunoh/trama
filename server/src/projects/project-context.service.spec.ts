@@ -3,8 +3,6 @@ import type { DataSource } from 'typeorm';
 import { describe, expect, it } from 'vitest';
 import {
   ArtifactEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
@@ -68,38 +66,12 @@ const artifact = (n: number, o: Partial<ArtifactEntity> = {}) =>
     createdAt: at(n),
     ...o,
   });
-const decision = (n: number, o: Partial<DecisionEntity> = {}) =>
-  Object.assign(new DecisionEntity(), {
-    id: `dc_${n}`,
-    workspaceId: WS,
-    key: `ADR-${n}`,
-    number: n,
-    title: `Decision ${n}`,
-    statement: 'Use X',
-    status: 'accepted',
-    originIssueId: null,
-    relatedIssueIds: [],
-    ...o,
-  });
-const input = (n: number, o: Partial<InputRequestEntity> = {}) =>
-  Object.assign(new InputRequestEntity(), {
-    id: `ir_${n}`,
-    workspaceId: WS,
-    issueId: 'in_1',
-    question: `Question ${n}?`,
-    options: null,
-    state: 'open',
-    createdAt: at(n),
-    ...o,
-  });
 const rows = (o: Partial<ProjectContextRows> = {}): ProjectContextRows => ({
   project: project(),
   milestones: [],
   updates: [],
   issues: [],
   artifacts: [],
-  decisions: [],
-  inputRequests: [],
   ...o,
 });
 const pathOf = (ctx: ReturnType<typeof assembleProjectContext>, id: string) =>
@@ -126,69 +98,35 @@ describe('assembleProjectContext', () => {
     expect(ctx.artifacts.map((a) => a.artifact.id)).toEqual(['ar_1', 'ar_2']);
   });
 
-  it('includes only open input requests and decisions related to direct issues', () => {
-    const ctx = assembleProjectContext(
-      rows({
-        issues: [issue(1)],
-        decisions: [
-          decision(1, { originIssueId: 'in_1' }),
-          decision(2, { relatedIssueIds: ['in_1'] }),
-          decision(3, { originIssueId: 'in_old' }),
-        ],
-        inputRequests: [
-          input(1),
-          input(2, { state: 'answered' }),
-          input(3, { issueId: null }),
-        ],
-      }),
-    );
-    expect(ctx.decisions.map((d) => d.key)).toEqual(['ADR-1', 'ADR-2']);
-    expect(ctx.inputRequests.map((r) => r.id)).toEqual(['ir_1']);
-  });
-
   it('renders project-to-issue paths in markdown', () => {
     const ctx = assembleProjectContext(
       rows({
         issues: [issue(12)],
         artifacts: [artifact(1, { issueId: 'in_12', title: 'Design doc' })],
-        decisions: [decision(1, { originIssueId: 'in_12' })],
-        inputRequests: [input(1, { issueId: 'in_12', options: ['a', 'b'] })],
       }),
     );
     const md = projectContextMarkdown(ctx);
     expect(md).toContain('### Billing › BUG-12');
-    expect(md).toContain('ADR-1 Decision 1: Use X (from BUG-12)');
-    expect(md).toContain('BUG-12: Question 1? [options: a / b]');
     expect(md).not.toContain('Workstream');
+    expect(md).not.toContain('Decisions');
+    expect(md).not.toContain('input request');
   });
 
-  it('renders database totals for associations beyond the capped issue window', () => {
+  it('renders database totals for issues beyond the capped window', () => {
     const issues = Array.from({ length: 45 }, (_, i) =>
       issue(i + 1, { status: i < 40 ? 'done' : 'todo' }),
-    );
-    const decisions = Array.from({ length: 22 }, (_, i) =>
-      decision(i + 1, { originIssueId: `in_${i + 41}` }),
-    );
-    const inputRequests = Array.from({ length: 22 }, (_, i) =>
-      input(i + 1, { issueId: `in_${i + 41}` }),
     );
     const ctx = assembleProjectContext(
       rows({
         issues: issues.slice(0, 40),
-        decisions,
-        inputRequests,
-        includeUnmatchedAssociations: true,
       }),
     );
     const md = projectContextMarkdown(ctx, {
-      counts: { issues: 45, openIssues: 5, decisions: 22, inputRequests: 22 },
+      counts: { issues: 45, openIssues: 5 },
     });
 
     expect(ctx.issues).toHaveLength(40);
-    expect(ctx.decisions).toHaveLength(22);
-    expect(ctx.inputRequests).toHaveLength(22);
     expect(md).toContain('_40 more issues are done or canceled._');
-    expect(md).toContain('- … 2 more');
   });
 
   it('caps rendered markdown sections but preserves the full JSON context', () => {
@@ -208,8 +146,6 @@ describe('ProjectContextService', () => {
       [MilestoneEntity, []],
       [IssueEntity, [issue(1)]],
       [ArtifactEntity, [artifact(1, { issueId: 'in_1' })]],
-      [DecisionEntity, [decision(1, { originIssueId: 'in_1' })]],
-      [InputRequestEntity, [input(1)]],
       [ProjectUpdateEntity, []],
     ]);
     const ds = {
@@ -221,8 +157,6 @@ describe('ProjectContextService', () => {
     const ctx = await new ProjectContextService(ds).build(WS, 'pj_1');
     expect(ctx.issues.map((i) => i.id)).toEqual(['in_1']);
     expect(ctx.artifacts.map((a) => a.artifact.id)).toEqual(['ar_1']);
-    expect(ctx.decisions.map((d) => d.id)).toEqual(['dc_1']);
-    expect(ctx.inputRequests.map((r) => r.id)).toEqual(['ir_1']);
   });
 
   it('hides parent ids for Issues whose parent is outside project access', async () => {
@@ -231,8 +165,6 @@ describe('ProjectContextService', () => {
     const entities = new Map<unknown, readonly unknown[]>([
       [MilestoneEntity, []],
       [ArtifactEntity, []],
-      [DecisionEntity, []],
-      [InputRequestEntity, []],
       [ProjectUpdateEntity, []],
     ]);
     const ds = {

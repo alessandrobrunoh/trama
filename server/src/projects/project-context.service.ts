@@ -5,8 +5,6 @@ import { currentAccess, projectHidden } from '../auth/member-access.js';
 import {
   AgentEntity,
   ArtifactEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
@@ -76,27 +74,13 @@ export class ProjectContextService {
     }
     const issueIds = issues.map((i) => i.id);
 
-    const [artifacts, decisions, inputRequests] = await Promise.all([
-      repo(ArtifactEntity).find({
-        where: [
-          { workspaceId, projectId },
-          ...(issueIds.length ? [{ workspaceId, issueId: In(issueIds) }] : []),
-        ],
-        order: { createdAt: 'ASC' },
-      }),
-      issueIds.length
-        ? repo(DecisionEntity).find({
-            where: { workspaceId, originIssueId: In(issueIds) },
-            order: { number: 'ASC' },
-          })
-        : [],
-      issueIds.length
-        ? repo(InputRequestEntity).find({
-            where: { workspaceId, issueId: In(issueIds), state: 'open' },
-            order: { createdAt: 'ASC' },
-          })
-        : [],
-    ]);
+    const artifacts = await repo(ArtifactEntity).find({
+      where: [
+        { workspaceId, projectId },
+        ...(issueIds.length ? [{ workspaceId, issueId: In(issueIds) }] : []),
+      ],
+      order: { createdAt: 'ASC' },
+    });
 
     return assembleProjectContext({
       project,
@@ -104,8 +88,6 @@ export class ProjectContextService {
       updates,
       issues,
       artifacts,
-      decisions,
-      inputRequests,
     });
   }
 
@@ -150,14 +132,7 @@ export class ProjectContextService {
         .where('i.workspaceId = :workspaceId', { workspaceId })
         .andWhere('i.projectId = :projectId', { projectId });
     const artifactRepo = repo(ArtifactEntity);
-    const [
-      artifacts,
-      artifactCount,
-      decisions,
-      decisionCount,
-      inputRequests,
-      inputRequestCount,
-    ] = await Promise.all([
+    const [artifacts, artifactCount] = await Promise.all([
       artifactRepo
         .createQueryBuilder('a')
         .where('a.workspaceId = :workspaceId', { workspaceId })
@@ -183,50 +158,6 @@ export class ProjectContextService {
         )
         .setParameters(issueTargetQuery().getParameters())
         .getCount(),
-      repo(DecisionEntity)
-        .createQueryBuilder('d')
-        .where('d.workspaceId = :workspaceId', { workspaceId })
-        .andWhere("d.status NOT IN ('rejected', 'draft')")
-        .andWhere(
-          '(d."originIssueId" IN (' +
-            issueTargetQuery().getQuery() +
-            ') OR d."relatedIssueIds" ?| ARRAY(SELECT "id" FROM "issues" WHERE "workspaceId" = :workspaceId AND "projectId" = :projectId))',
-          { projectId },
-        )
-        .setParameters(issueTargetQuery().getParameters())
-        .orderBy('d.number', 'ASC')
-        .addOrderBy('d.id', 'ASC')
-        .take(CONTEXT_CAPS.decisions)
-        .getMany(),
-      repo(DecisionEntity)
-        .createQueryBuilder('d')
-        .where('d.workspaceId = :workspaceId', { workspaceId })
-        .andWhere("d.status NOT IN ('rejected', 'draft')")
-        .andWhere(
-          '(d."originIssueId" IN (' +
-            issueTargetQuery().getQuery() +
-            ') OR d."relatedIssueIds" ?| ARRAY(SELECT "id" FROM "issues" WHERE "workspaceId" = :workspaceId AND "projectId" = :projectId))',
-          { projectId },
-        )
-        .setParameters(issueTargetQuery().getParameters())
-        .getCount(),
-      repo(InputRequestEntity)
-        .createQueryBuilder('r')
-        .where('r.workspaceId = :workspaceId', { workspaceId })
-        .andWhere('r.state = :state', { state: 'open' })
-        .andWhere('r.issueId IN (' + issueTargetQuery().getQuery() + ')')
-        .setParameters(issueTargetQuery().getParameters())
-        .orderBy('r.createdAt', 'ASC')
-        .addOrderBy('r.id', 'ASC')
-        .take(CONTEXT_CAPS.inputRequests)
-        .getMany(),
-      repo(InputRequestEntity)
-        .createQueryBuilder('r')
-        .where('r.workspaceId = :workspaceId', { workspaceId })
-        .andWhere('r.state = :state', { state: 'open' })
-        .andWhere('r.issueId IN (' + issueTargetQuery().getQuery() + ')')
-        .setParameters(issueTargetQuery().getParameters())
-        .getCount(),
     ]);
     const ctx = assembleProjectContext({
       project,
@@ -234,8 +165,6 @@ export class ProjectContextService {
       updates,
       issues,
       artifacts,
-      decisions,
-      inputRequests,
       includeUnmatchedAssociations: true,
     });
     return projectContextMarkdown(ctx, {
@@ -244,8 +173,6 @@ export class ProjectContextService {
         issues: issueCount,
         openIssues: openIssueCount,
         artifacts: artifactCount,
-        decisions: decisionCount,
-        inputRequests: inputRequestCount,
       },
     });
   }

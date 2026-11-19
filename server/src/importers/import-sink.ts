@@ -16,17 +16,14 @@ import {
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
-  TeamEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
 import type { MilestonesService } from '../milestones/milestones.service.js';
 import type { ProjectsService } from '../projects/projects.service.js';
 import { allocateIssueNumbers, issueKeyPrefix } from '../issues/issue-keys.js';
-import type { TeamsService } from '../teams/teams.service.js';
 import { ImportFatalError, type ImportSink } from './import-engine.js';
 import { ImportLinkEntity, type ImportLinkKind } from './entities.js';
 import {
-  deriveTeamKey,
   labelColor,
   labelName,
   matchByName,
@@ -41,7 +38,6 @@ const EXTERNAL_REF_INDEX = 'UQ_issues_external_ref';
 export interface SinkDeps {
   ds: DataSource;
   counters: CountersService;
-  teams: TeamsService;
   projects: ProjectsService;
   milestones: MilestonesService;
 }
@@ -143,32 +139,8 @@ export class TypeormImportSink implements ImportSink {
       statuses: { ...mapping.statuses },
     };
 
-    const teamKeys = new Set(
-      (await this.ds.getRepository(TeamEntity).findBy({ workspaceId: ws })).map(
-        (t) => t.key,
-      ),
-    );
-    for (const t of discovery.teams) {
-      plan.teams[t.id] = await this.resolveTarget(
-        'team',
-        'team',
-        t.id,
-        mapping.teams[t.id],
-        (id) =>
-          this.ds.getRepository(TeamEntity).existsBy({ id, workspaceId: ws }),
-        async () => {
-          const key = deriveTeamKey(t.key, t.name, teamKeys);
-          teamKeys.add(key);
-          return (
-            await this.deps.teams.create(ws, this.actor, {
-              name: t.name.slice(0, 80),
-              key,
-              memberIds: [],
-            })
-          ).id;
-        },
-      );
-    }
+    // `mapping.teams` names Linear teams. There is no workspace team to create or attach.
+    for (const t of discovery.teams) plan.teams[t.id] = null;
 
     const projects = await this.ds
       .getRepository(ProjectEntity)
@@ -344,7 +316,6 @@ export class TypeormImportSink implements ImportSink {
             reporterName: n.reporterName,
             reporterId: null,
             assigneeId: n.assigneeId,
-            teamId: n.teamId,
             projectId: n.projectId,
             priority: n.priority,
             status: n.status,

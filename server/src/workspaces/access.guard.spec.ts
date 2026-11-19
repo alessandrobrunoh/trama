@@ -27,7 +27,6 @@ function setup(auth: 'token' | 'session') {
     {} as never,
     { findOneBy: vi.fn(async () => user) } as never,
     {} as never,
-    {} as never,
   );
   const run = (handler: () => void, method: string) => {
     const req = {

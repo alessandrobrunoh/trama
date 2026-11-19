@@ -1,184 +1,31 @@
 import { describe, expect, it } from 'vitest';
-import type { Demand } from '../contracts/domain.js';
-import {
-  applyFilters,
-  groupItems,
-  matchesFilter,
-  sortItems,
-} from './view-query.js';
+import { applyFilters, fieldValues, groupItems } from './view-query.js';
 
-const demand = (over: Partial<Demand>): Demand => ({
-  customerIds: [],
-  customerCount: 0,
-  requestCount: 0,
-  importantCount: 0,
-  tierIds: [],
-  revenue: 0,
-  size: 0,
-  ...over,
-});
+describe('retired view fields', () => {
+  const issue = {
+    id: 'in_a',
+    title: 'A',
+    teamId: 't1',
+    releaseId: 'rel_1',
+    customerCount: 4,
+  };
 
-const rows = [
-  { id: 'in_a', title: 'A' },
-  { id: 'in_b', title: 'B' },
-  { id: 'in_c', title: 'C' },
-];
-const ctx = {
-  demand: new Map<string, Demand>([
-    [
-      'in_a',
-      demand({
-        customerIds: ['cus_1', 'cus_2'],
-        customerCount: 2,
-        requestCount: 3,
-        tierIds: ['ct_gold'],
-        revenue: 150_000,
-      }),
-    ],
-    [
-      'in_b',
-      demand({
-        customerIds: ['cus_1'],
-        customerCount: 1,
-        requestCount: 1,
-        revenue: 100_000,
-      }),
-    ],
-  ]),
-};
-
-describe('customer demand in a view', () => {
-  it('filters numbers with at least / at most, comparing as numbers', () => {
-    const gte = (field: string, value: string) =>
-      applyFilters('issue', rows, [{ field, op: 'gte', value }], ctx).map(
-        (r) => r.id,
-      );
-    expect(gte('customerCount', '2')).toEqual(['in_a']);
-    expect(gte('requestCount', '1')).toEqual(['in_a', 'in_b']);
-    expect(gte('customerRevenue', '99999')).toEqual(['in_a', 'in_b']);
-    expect(gte('customerRevenue', '1000000')).toEqual([]);
-    // "9" is not more than "10" as text, but it is as a number.
-    expect(
-      applyFilters(
-        'issue',
-        rows,
-        [{ field: 'customerRevenue', op: 'lte', value: '9' }],
-        ctx,
-      ).map((r) => r.id),
-    ).toEqual(['in_c']);
-  });
-
-  it('filters by customer and tier like any other id field', () => {
-    expect(
-      applyFilters(
-        'issue',
-        rows,
-        [{ field: 'customerId', op: 'in', value: ['cus_2'] }],
-        ctx,
-      ).map((r) => r.id),
-    ).toEqual(['in_a']);
-    expect(
-      applyFilters(
-        'issue',
-        rows,
-        [{ field: 'customerTierId', op: 'in', value: ['ct_gold'] }],
-        ctx,
-      ).map((r) => r.id),
-    ).toEqual(['in_a']);
-  });
-
-  it('sorts by demand, biggest first when descending', () => {
-    expect(
-      sortItems(
-        'issue',
-        rows,
-        { field: 'customerRevenue', direction: 'desc' },
-        ctx,
-      ).map((r) => r.id),
-    ).toEqual(['in_a', 'in_b', 'in_c']);
-  });
-
-  it('never groups by a customer field, so no customer is named', () => {
-    expect(groupItems('issue', rows, 'customerId', ctx)).toEqual([
-      { key: '', items: rows },
-    ]);
-    expect(groupItems('issue', rows, 'customerTierId', ctx)).toEqual([
-      { key: '', items: rows },
-    ]);
-  });
-
-  it('has no customer values without demand data, and numeric operators on them match nothing', () => {
-    expect(
-      applyFilters(
-        'issue',
-        rows,
-        [{ field: 'customerCount', op: 'gte', value: '0' }],
-        {},
-      ),
-    ).toEqual([]);
-  });
-
-  it('fails closed on an operator it does not know', () => {
-    expect(
-      matchesFilter('issue', rows[0], {
-        field: 'title',
-        op: 'bogus' as never,
-        value: 'A',
-      }),
-    ).toBe(false);
-  });
-
-  it('applies to projects too', () => {
-    const projects = [{ id: 'pj_a', name: 'P' }];
-    const withDemand = {
-      demand: new Map([['pj_a', demand({ customerCount: 4 })]]),
-    };
-    expect(
-      applyFilters(
-        'project',
-        projects,
-        [{ field: 'customerCount', op: 'gte', value: '3' }],
-        withDemand,
-      ),
-    ).toHaveLength(1);
-  });
-});
-
-describe('releaseId in a view', () => {
-  const issues = [
-    { id: 'in_a', title: 'A', releaseId: 'rel_1' },
-    { id: 'in_b', title: 'B', releaseId: 'rel_2' },
-    { id: 'in_c', title: 'C' },
-  ];
-
-  it('filters issues by release, including no release', () => {
-    expect(
-      applyFilters('issue', issues, [
-        { field: 'releaseId', op: 'is', value: 'rel_1' },
-      ]).map((r) => r.id),
-    ).toEqual(['in_a']);
-    expect(
-      applyFilters('issue', issues, [
-        { field: 'releaseId', op: 'is', value: '' },
-      ]).map((r) => r.id),
-    ).toEqual(['in_c']);
-    expect(
-      applyFilters('issue', issues, [
-        { field: 'releaseId', op: 'in', value: ['rel_1', 'rel_2'] },
-      ]).map((r) => r.id),
-    ).toEqual(['in_a', 'in_b']);
-  });
-
-  it('groups by releaseId', () => {
-    expect(
-      groupItems('issue', issues, 'releaseId').map((g) => [
-        g.key,
-        g.items.length,
-      ]),
-    ).toEqual([
-      ['rel_1', 1],
-      ['rel_2', 1],
-      ['', 1],
-    ]);
+  it('does not filter, read, or group by team, release, or customer demand', () => {
+    for (const field of [
+      'teamId',
+      'releaseId',
+      'customerId',
+      'customerCount',
+      'teamIds',
+      'repositoryIds',
+    ]) {
+      expect(fieldValues('issue', issue, field)).toEqual([]);
+      expect(
+        applyFilters('issue', [issue], [{ field, op: 'is', value: 't1' }]),
+      ).toEqual([]);
+      expect(groupItems('issue', [issue], field)).toEqual([
+        { key: '', items: [issue] },
+      ]);
+    }
   });
 });

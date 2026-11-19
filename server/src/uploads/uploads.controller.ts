@@ -118,7 +118,7 @@ export class UploadsController {
     );
   }
 
-  @Post('issues/:idOrKey/artifacts/upload')
+  @Post('tasks/:idOrKey/artifacts/upload')
   @Multipart()
   @UseInterceptors(uploadFile)
   uploadOnIssue(

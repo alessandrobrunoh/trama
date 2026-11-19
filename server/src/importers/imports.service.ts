@@ -15,7 +15,7 @@ import {
 } from '../contracts/domain.js';
 import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
-import { MembershipEntity, ProjectEntity, TeamEntity, UserEntity, WorkspaceEntity } from '../database/entities/index.js';
+import { MembershipEntity, ProjectEntity, UserEntity, WorkspaceEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { HttpClient } from '../integrations/http-client.js';
 import { CredentialsService, createAdapter, providerFailure } from './credentials.service.js';
@@ -69,16 +69,15 @@ export class ImportsService {
   // ───────────── preview ─────────────
 
   private async context(workspaceId: string): Promise<PreviewContext> {
-    const [memberships, teams, projects, ws] = await Promise.all([
+    const [memberships, projects, ws] = await Promise.all([
       this.ds.getRepository(MembershipEntity).findBy({ workspaceId }),
-      this.ds.getRepository(TeamEntity).findBy({ workspaceId }),
       this.ds.getRepository(ProjectEntity).findBy({ workspaceId }),
       this.ds.getRepository(WorkspaceEntity).findOneByOrFail({ id: workspaceId }),
     ]);
     const users = memberships.length ? await this.ds.getRepository(UserEntity).findBy({ id: In(memberships.map((m) => m.userId)) }) : [];
     return {
       members: users.map((u) => ({ id: u.id, name: u.name, email: u.email })),
-      teams: teams.map((t) => ({ id: t.id, name: t.name, key: t.key })),
+      teams: [],
       projects: projects.map((p) => ({ id: p.id, name: p.name })),
       labels: resolveLabelCatalog(ws.settings?.labels).filter((l) => l.scope === 'issue').map((l) => ({ id: l.id, name: l.name })),
     };
@@ -102,7 +101,8 @@ export class ImportsService {
   private async assertMapping(workspaceId: string, mapping: ImportMapping) {
     const ids = (targets: Record<string, { action: string; id?: string }>) =>
       Object.values(targets).flatMap((t) => (t.action === 'map' && t.id ? [t.id] : []));
-    await this.refs.teams(workspaceId, ids(mapping.teams));
+    if (Object.values(mapping.teams).some((t) => t.action === 'map'))
+      throw new BadRequestException('Linear teams are not workspace teams');
     await this.refs.projects(workspaceId, ids(mapping.projects));
     await this.refs.users(workspaceId, Object.values(mapping.users));
     const labelIds = ids(mapping.labels);

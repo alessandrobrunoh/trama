@@ -3,9 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Not, type Repository } from 'typeorm';
 import { PROJECT_HEALTHS, type ProjectHealth } from '../contracts/domain.js';
 import {
-  DecisionEntity,
   DomainEventEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
@@ -35,10 +33,6 @@ export class ProjectAiFactsService {
     private readonly milestones: Repository<MilestoneEntity>,
     @InjectRepository(IssueEntity)
     private readonly issues: Repository<IssueEntity>,
-    @InjectRepository(InputRequestEntity)
-    private readonly inputRequests: Repository<InputRequestEntity>,
-    @InjectRepository(DecisionEntity)
-    private readonly decisions: Repository<DecisionEntity>,
     @InjectRepository(DomainEventEntity)
     private readonly events: Repository<DomainEventEntity>,
     @InjectRepository(UserEntity)
@@ -64,26 +58,7 @@ export class ProjectAiFactsService {
       }),
     ]);
     const issueIds = issues.map((i) => i.id);
-    const [inputRequests, decisions, events, updates, candidates] =
-      await Promise.all([
-        issueIds.length
-          ? this.inputRequests.find({
-              where: {
-                workspaceId,
-                issueId: In(issueIds),
-                state: 'open',
-              },
-              order: { createdAt: 'ASC' },
-              take: 50,
-            })
-          : [],
-        issueIds.length
-          ? this.decisions.find({
-              where: { workspaceId, originIssueId: In(issueIds) },
-              order: { createdAt: 'DESC' },
-              take: 10,
-            })
-          : [],
+    const [events, updates, candidates] = await Promise.all([
         this.recentEvents(workspaceId, project.id, issueIds),
         this.recentUpdates(workspaceId, project.id),
         withCandidates ? this.candidateIssues(workspaceId) : [],
@@ -153,17 +128,6 @@ export class ProjectAiFactsService {
         health: u.health,
         body: u.body,
         createdAt: u.createdAt,
-      })),
-      decisions: decisions.map((d) => ({
-        key: d.key,
-        title: d.title,
-        status: d.status,
-        at: d.createdAt.toISOString(),
-      })),
-      inputRequests: inputRequests.map((r) => ({
-        issueKey: issues.find((i) => i.id === r.issueId)?.key ?? '',
-        question: r.question,
-        createdAt: r.createdAt.toISOString(),
       })),
       events: events.map((e) => ({
         at: e.at.toISOString(),

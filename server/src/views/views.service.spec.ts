@@ -25,7 +25,7 @@ describe('view rules', () => {
   it('allows the timeline only for project views', () => {
     expect(viewLayoutProblem('project', 'timeline')).toBeNull();
     expect(viewLayoutProblem('issue', 'timeline')).toMatch(/timeline/);
-    expect(viewLayoutProblem('decision', 'timeline')).toMatch(/timeline/);
+    expect(VIEW_ENTITIES).not.toContain('decision');
     expect(viewLayoutProblem('issue', 'board')).toBeNull();
     expect(viewLayoutProblem('project', 'list')).toBeNull();
   });

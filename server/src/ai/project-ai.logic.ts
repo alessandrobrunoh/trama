@@ -64,8 +64,6 @@ export interface ProjectFacts {
   /** Issues directly assigned to the project. */
   issues: FactsIssue[];
   updates: { health: string; body: string; createdAt: string }[];
-  decisions: { key: string; title: string; status: string; at: string }[];
-  inputRequests: { issueKey: string; question: string; createdAt: string }[];
   events: { at: string; type: string; summary: string }[];
   /** Open issues that are not part of the project (only loaded for the `issues` kind). */
   candidates: FactsIssue[];
@@ -285,8 +283,6 @@ interface PromptCaps {
   candidates: number;
   events: number;
   updates: number;
-  decisions: number;
-  inputRequests: number;
   text: number;
 }
 
@@ -295,8 +291,6 @@ const FULL_CAPS: PromptCaps = {
   candidates: 60,
   events: 15,
   updates: 3,
-  decisions: 8,
-  inputRequests: 10,
   text: 4000,
 };
 
@@ -355,19 +349,6 @@ function buildFacts(facts: ProjectFacts, caps: PromptCaps) {
       at: day(u.createdAt),
       body: clip(u.body, Math.min(800, caps.text)),
     })),
-    decisions: facts.decisions.slice(0, caps.decisions).map((d) => ({
-      key: d.key,
-      title: clip(d.title, 160),
-      status: d.status,
-      at: day(d.at),
-    })),
-    openInputRequests: facts.inputRequests
-      .slice(0, caps.inputRequests)
-      .map((r) => ({
-        issue: r.issueKey,
-        question: clip(r.question, 240),
-        since: day(r.createdAt),
-      })),
     recentEvents: facts.events.slice(0, caps.events).map((e) => ({
       at: day(e.at),
       type: e.type,

@@ -12,27 +12,19 @@ import {
   type FavoriteType,
 } from '../contracts/domain.js';
 import {
-  CustomerEntity,
-  DecisionEntity,
   FavoriteEntity,
   IssueEntity,
   ProjectEntity,
-  RepositoryEntity,
   SavedViewEntity,
-  TeamEntity,
 } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 
-const TABLES: Partial<
-  Record<FavoriteType, EntityTarget<{ id: string; workspaceId: string }>>
+const TABLES: Record<
+  Exclude<FavoriteType, 'view'>,
+  EntityTarget<{ id: string; workspaceId: string }>
 > = {
   issue: IssueEntity,
   project: ProjectEntity,
-  decision: DecisionEntity,
-  team: TeamEntity,
-  repository: RepositoryEntity,
-  view: SavedViewEntity,
-  customer: CustomerEntity,
 };
 
 @Injectable()

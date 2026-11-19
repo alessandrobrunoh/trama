@@ -220,7 +220,7 @@ describe('project updates', () => {
       await ro.post(pu, { health: 'on_track', body: 'x' }).expect(403);
       const rw = await mint(['projects:write']);
       await rw.post(pu, { health: 'on_track', body: 'x' }).expect(201);
-      const other = await mint(['issues:write']);
+      const other = await mint(['tasks:write']);
       await other.get(pu).expect(403);
     });
   });

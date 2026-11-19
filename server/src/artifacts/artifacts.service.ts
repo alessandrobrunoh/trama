@@ -36,7 +36,7 @@ import { UploadsService } from '../uploads/uploads.service.js';
 export interface ArtifactInput {
   projectId?: string | null;
   issueId?: string | null;
-  repositoryId?: string | null;
+  repository?: string | null;
   /** Create only: points the artifact at a Trama document (kind `document`); the title and provider follow it. */
   documentId?: string | null;
   description?: string | null;
@@ -55,7 +55,7 @@ export interface ArtifactInput {
 export interface ArtifactFilter {
   projectId?: string;
   issueId?: string;
-  repositoryId?: string;
+  repository?: string;
   kind?: ArtifactKind;
   state?: ArtifactState;
 }
@@ -118,8 +118,8 @@ export class ArtifactsService {
       .orderBy('a.createdAt', 'DESC');
     if (f.projectId) qb.andWhere('a.projectId = :p', { p: f.projectId });
     if (f.issueId) qb.andWhere('a.issueId = :i', { i: f.issueId });
-    if (f.repositoryId)
-      qb.andWhere('a.repositoryId = :r', { r: f.repositoryId });
+    if (f.repository)
+      qb.andWhere('a.repository = :r', { r: f.repository });
     if (f.kind) qb.andWhere('a.kind = :k', { k: f.kind });
     if (f.state) qb.andWhere('a.state = :s', { s: f.state });
     const access = currentAccess();
@@ -230,8 +230,6 @@ export class ArtifactsService {
   }
 
   private async validate(workspaceId: string, input: ArtifactInput) {
-    if (input.repositoryId)
-      await this.refs.repositories(workspaceId, [input.repositoryId]);
     await this.validateOwners(workspaceId, input);
   }
 
@@ -310,7 +308,7 @@ export class ArtifactsService {
         workspaceId,
         projectId: input.projectId ?? null,
         issueId: input.issueId ?? null,
-        repositoryId: input.repositoryId ?? null,
+        repository: input.repository ?? null,
         description: input.description?.trim() || null,
         kind: input.kind,
         provider: doc
@@ -396,7 +394,7 @@ export class ArtifactsService {
     for (const k of [
       'projectId',
       'issueId',
-      'repositoryId',
+      'repository',
       'provider',
       'url',
       'externalId',

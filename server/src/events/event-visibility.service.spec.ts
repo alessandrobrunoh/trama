@@ -7,16 +7,10 @@ import type {
 import {
   ArtifactEntity,
   CommentEntity,
-  CustomerEntity,
-  CustomerRequestEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
   ProjectUpdateEntity,
-  ReleaseEntity,
-  ReleasePipelineEntity,
 } from '../database/entities/index.js';
 import { EventVisibilityService } from './event-visibility.service.js';
 
@@ -38,8 +32,7 @@ const p1Rows = new Map<unknown, unknown[]>([
       {
         id: 'pr_1',
         workspaceId: 'ws_1',
-        teamIds: ['tm_1'],
-        repositoryIds: ['repo_1'],
+        repository: 'https://github.com/acme/api',
       },
     ],
   ],
@@ -49,36 +42,9 @@ const p1Rows = new Map<unknown, unknown[]>([
     [{ id: 'ar_1', workspaceId: 'ws_1', projectId: 'pr_1', issueId: 'iss_1' }],
   ],
   [
-    DecisionEntity,
-    [
-      {
-        id: 'dc_1',
-        workspaceId: 'ws_1',
-        originIssueId: 'iss_1',
-        relatedIssueIds: [],
-      },
-    ],
-  ],
-  [InputRequestEntity, [{ id: 'ir_1', workspaceId: 'ws_1', issueId: 'iss_1' }]],
-  [CustomerEntity, [{ id: 'cus_1', workspaceId: 'ws_1' }]],
-  [
-    CustomerRequestEntity,
-    [
-      {
-        id: 'cr_1',
-        workspaceId: 'ws_1',
-        customerId: 'cus_1',
-        issueId: 'iss_1',
-        projectId: null,
-      },
-    ],
-  ],
-  [
     ProjectUpdateEntity,
     [{ id: 'pu_1', workspaceId: 'ws_1', projectId: 'pr_1' }],
   ],
-  [ReleaseEntity, [{ id: 'rel_1', workspaceId: 'ws_1', pipelineId: 'rp_1' }]],
-  [ReleasePipelineEntity, [{ id: 'rp_1', workspaceId: 'ws_1' }]],
   [
     CommentEntity,
     [
@@ -110,9 +76,6 @@ const VIEW_GRANTS: MemberGrant[] = [
   'issues:view',
   'milestones:view',
   'artifacts:view',
-  'decisions:view',
-  'input-requests:view',
-  'customers:view',
   'documents:view',
   'comments:view',
 ];
@@ -134,15 +97,7 @@ const refs: LegacySubjectRef[] = [
   { type: 'issue', id: 'iss_1' },
   { type: 'milestone', id: 'ms_1' },
   { type: 'artifact', id: 'ar_1' },
-  { type: 'decision', id: 'dc_1' },
-  { type: 'input_request', id: 'ir_1' },
-  { type: 'customer_request', id: 'cr_1' },
   { type: 'project_update', id: 'pu_1' },
-  { type: 'team', id: 'tm_1' },
-  { type: 'repository', id: 'repo_1' },
-  { type: 'customer', id: 'cus_1' },
-  { type: 'release', id: 'rel_1' },
-  { type: 'release_pipeline', id: 'rp_1' },
   { type: 'document', id: 'doc_1' },
   { type: 'import', id: 'imp_1' },
 ];
@@ -186,14 +141,6 @@ describe('EventVisibilityService', () => {
       {
         subject: { type: 'artifact', id: 'ar_deleted' } as LegacySubjectRef,
         data: { projectId: null, issueId: 'iss_missing' },
-      },
-      {
-        subject: { type: 'decision', id: 'dc_deleted' } as LegacySubjectRef,
-        data: { title: 'Deleted decision' },
-      },
-      {
-        subject: { type: 'customer', id: 'cus_deleted' } as LegacySubjectRef,
-        data: { name: 'Deleted customer' },
       },
     ];
 

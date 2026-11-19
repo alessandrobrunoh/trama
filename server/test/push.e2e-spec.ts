@@ -53,30 +53,30 @@ describe('push notifications', () => {
   it('sends a system notification to the assignee’s devices when push is on', async () => {
     sent.mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     await dev.put('/api/me/push/subscription').send(SUB('https://push.example/dev-phone')).expect(200);
-    const issue = (await owner.post(`${base()}/issues`, { title: 'Pager duty', kind: 'bug', assigneeId: devId }).expect(201)).body;
+    const issue = (await owner.post(`${base()}/tasks`, { title: 'Pager duty', kind: 'bug', assigneeId: devId }).expect(201)).body;
     await vi.waitFor(() => expect(sent).toHaveBeenCalledTimes(1), { timeout: 3000 });
 
     const [subscription, payload] = sent.mock.calls[0]!;
     expect(subscription.endpoint).toBe('https://push.example/dev-phone');
     const { notification } = JSON.parse(String(payload));
     expect(notification.title).toBe(`Pia Owner assigned you ${issue.key}: Pager duty`);
-    expect(notification.data.onActionClick.default).toEqual({ operation: 'navigateLastFocusedOrOpen', url: `/${slug}/issues/${issue.key}` });
+    expect(notification.data.onActionClick.default).toEqual({ operation: 'navigateLastFocusedOrOpen', url: `/${slug}/tasks/${issue.key}` });
   });
 
   it('respects the per-kind push switch and drops dead subscriptions', async () => {
     await dev.patch('/api/me/notification-settings').send({ settings: { assigned: { push: false } } }).expect(200);
-    await owner.post(`${base()}/issues`, { title: 'Quiet one', kind: 'bug', assigneeId: devId }).expect(201);
+    await owner.post(`${base()}/tasks`, { title: 'Quiet one', kind: 'bug', assigneeId: devId }).expect(201);
     await new Promise((r) => setTimeout(r, 400));
     expect(sent).not.toHaveBeenCalled();
 
     await dev.patch('/api/me/notification-settings').send({ settings: { assigned: { push: true } } }).expect(200);
     sent.mockRejectedValue(Object.assign(new Error('gone'), { statusCode: 410 }));
-    await owner.post(`${base()}/issues`, { title: 'Dead device', kind: 'bug', assigneeId: devId }).expect(201);
+    await owner.post(`${base()}/tasks`, { title: 'Dead device', kind: 'bug', assigneeId: devId }).expect(201);
     await vi.waitFor(() => expect(sent).toHaveBeenCalled(), { timeout: 3000 });
     sent.mockReset();
     sent.mockResolvedValue({ statusCode: 201, body: '', headers: {} });
     await new Promise((r) => setTimeout(r, 200)); // the 410 removes the subscription
-    await owner.post(`${base()}/issues`, { title: 'After the 410', kind: 'bug', assigneeId: devId }).expect(201);
+    await owner.post(`${base()}/tasks`, { title: 'After the 410', kind: 'bug', assigneeId: devId }).expect(201);
     await new Promise((r) => setTimeout(r, 400));
     expect(sent).not.toHaveBeenCalled();
   });

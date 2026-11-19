@@ -186,7 +186,7 @@ export class UploadsService {
           workspaceId,
           projectId: resolved.projectId,
           issueId: resolved.issueId,
-          repositoryId: null,
+          repository: null,
           description: null,
           kind: accepted.kind,
           provider: 'other',

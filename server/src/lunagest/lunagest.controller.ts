@@ -131,7 +131,7 @@ export class LunaGestProjectController {
 }
 
 /** Task push and manual link for one issue. A failed push does not remove the issue. */
-@Controller('w/:slug/issues/:idOrKey/lunagest')
+@Controller('w/:slug/tasks/:idOrKey/lunagest')
 export class LunaGestIssueController {
   constructor(private readonly service: LunagestService) {}
 

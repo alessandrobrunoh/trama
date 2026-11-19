@@ -29,12 +29,10 @@ import { CommentsService } from './comments.service.js';
 const SUBJECTS: SubjectType[] = [
   'issue',
   'artifact',
-  'decision',
-  'input_request',
-  'repository',
-  'team',
   'project',
   'project_update',
+  'milestone',
+  'import',
   'document',
 ];
 

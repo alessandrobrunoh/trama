@@ -3,8 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   ArtifactEntity,
   AttentionStateEntity,
-  DecisionEntity,
-  InputRequestEntity,
   IssueEntity,
 } from '../database/entities/index.js';
 import { AttentionController } from './attention.controller.js';
@@ -14,8 +12,6 @@ import { AttentionService } from './attention.service.js';
   imports: [
     TypeOrmModule.forFeature([
       IssueEntity,
-      InputRequestEntity,
-      DecisionEntity,
       ArtifactEntity,
       AttentionStateEntity,
     ]),

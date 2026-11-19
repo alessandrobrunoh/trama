@@ -1,13 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
-  DecisionEntity,
   DomainEventEntity,
-  InputRequestEntity,
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
-  RepositoryEntity,
   UserEntity,
 } from '../database/entities/index.js';
 import { AiConfig } from './ai.config.js';
@@ -27,11 +24,8 @@ import { AuthModule } from '../auth/auth.module.js';
     AuthModule,
     TypeOrmModule.forFeature([
       IssueEntity,
-      RepositoryEntity,
-      DecisionEntity,
       ProjectEntity,
       MilestoneEntity,
-      InputRequestEntity,
       DomainEventEntity,
       UserEntity,
     ]),

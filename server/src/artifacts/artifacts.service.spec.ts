@@ -272,8 +272,9 @@ describe('ArtifactsService issue artifact counts', () => {
       andWhere: vi.fn().mockReturnThis(),
       getCount: vi.fn(async () => count),
     };
+    const createQueryBuilder = vi.fn(() => query);
     const repo = {
-      createQueryBuilder: vi.fn(() => query),
+      createQueryBuilder,
     } as unknown as Repository<ArtifactEntity>;
     const service = new ArtifactsService(
       {} as DataSource,
@@ -281,17 +282,17 @@ describe('ArtifactsService issue artifact counts', () => {
       {} as EventsService,
       repo,
     );
-    return { service, query, repo };
+    return { service, query, createQueryBuilder };
   }
 
   it.each([0, 3])(
     'returns %i for an issue without loading its artifacts',
     async (count) => {
-      const { service, query, repo } = withCount(count);
+      const { service, query, createQueryBuilder } = withCount(count);
 
       await expect(service.countForIssue('ws_1', 'in_1')).resolves.toBe(count);
 
-      expect(repo.createQueryBuilder.mock.calls).toEqual([['a']]);
+      expect(createQueryBuilder.mock.calls).toEqual([['a']]);
       expect(query.where).toHaveBeenCalledWith('a.workspaceId = :workspaceId', {
         workspaceId: 'ws_1',
       });

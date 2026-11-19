@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DataSource } from 'typeorm';
 import type {
   ArtifactEntity,
-  RepositoryEntity,
 } from '../database/entities/index.js';
 import {
   ArtifactEntity as ArtifactEntityClass,
@@ -39,7 +38,7 @@ describe('ArtifactLinkerService', () => {
 
     const result = await linker.upsert(
       'ws_1',
-      { id: 'rp_1' } as RepositoryEntity,
+      { id: 'rp_1' },
       {
         kind: 'pull_request',
         provider: 'github',

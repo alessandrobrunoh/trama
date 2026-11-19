@@ -32,10 +32,10 @@ describe('TokensController.create privilege ceiling', () => {
 
   it('an admin-scoped token or a session can mint custom tokens', async () => {
     const { controller, tokens, ctx, auth } = setup();
-    await controller.create(ctx('owner'), auth('admin'), { name: 'x', permissions: ['issues:read'] } as never);
+    await controller.create(ctx('owner'), auth('admin'), { name: 'x', permissions: ['tasks:read'] } as never);
     await controller.create(ctx('owner'), { actor: { type: 'user', id: 'u1' }, method: 'session' } as never, {
       name: 'x',
-      permissions: ['issues:read'],
+      permissions: ['tasks:read'],
     } as never);
     expect(tokens.create).toHaveBeenCalledTimes(2);
   });

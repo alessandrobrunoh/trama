@@ -7,7 +7,6 @@ import { InsightsService } from './insights.service.js';
 
 class InsightsQueryDto {
   @IsOptional() @Type(() => Number) @IsIn(INSIGHT_RANGES) days?: number;
-  @IsOptional() @IsString() teamId?: string;
   @IsOptional() @IsString() projectId?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(90) staleDays?: number;
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(500) limit?: number;
@@ -33,7 +32,6 @@ export class InsightsController {
     }
     return this.insights.signal(ctx, id as InsightSignalId, {
       days: query.days,
-      teamId: query.teamId,
       projectId: query.projectId,
       staleDays: query.staleDays,
       limit: query.limit ?? 100,

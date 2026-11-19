@@ -23,11 +23,6 @@ class RemoteReposQuery {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100) perPage?: number;
 }
 
-class LinkRepositoryDto {
-  @IsString() @MinLength(3) @MaxLength(300) fullName: string;
-  @IsOptional() @IsArray() @IsString({ each: true }) teamIds?: string[];
-}
-
 /** Connections to a git host (GitHub, GitLab, Bitbucket) or Delta. Admin and above only; secrets are never returned. */
 @Controller('w/:slug/integrations')
 @Can('manageIntegrations')
@@ -71,22 +66,4 @@ export class IntegrationsController {
     return this.service.remoteRepositories(ctx.workspace.id, id, q.page ?? 1, q.perPage ?? 30);
   }
 
-  @Post(':id/link-repository')
-  async link(
-    @Ctx() ctx: WorkspaceContext,
-    @Actor() actor: ActorRef,
-    @Param('id') id: string,
-    @Body() dto: LinkRepositoryDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { repository, created } = await this.service.linkRepository(ctx.workspace.id, actor, id, dto);
-    res.status(created ? 201 : 200);
-    return repository;
-  }
-
-  @Delete(':id/repositories/:repositoryId')
-  @HttpCode(204)
-  unlink(@Ctx() ctx: WorkspaceContext, @Param('id') id: string, @Param('repositoryId') repositoryId: string) {
-    return this.service.unlinkRepository(ctx.workspace.id, id, repositoryId);
-  }
 }

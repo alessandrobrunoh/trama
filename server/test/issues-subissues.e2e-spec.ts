@@ -24,21 +24,21 @@ describe('issue sub-issues', () => {
 
   it('supports arbitrary nesting with flat parent IDs and independent statuses', async () => {
     const root = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'feature',
         title: 'Root issue',
         status: 'done',
       }).expect(201)
     ).body;
     const child = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'bug',
         title: 'Child issue',
         parentId: root.id,
       }).expect(201)
     ).body;
     const grandchild = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'tech_debt',
         title: 'Grandchild issue',
         parentId: child.key,
@@ -57,72 +57,72 @@ describe('issue sub-issues', () => {
 
   it('allows reparenting and clearing, and rejects self-parenting and ancestor cycles', async () => {
     const root = (
-      await c.post(`${w}/issues`, { kind: 'feature', title: 'Cycle root' }).expect(201)
+      await c.post(`${w}/tasks`, { kind: 'feature', title: 'Cycle root' }).expect(201)
     ).body;
     const otherRoot = (
-      await c.post(`${w}/issues`, { kind: 'feature', title: 'Alternate root' }).expect(201)
+      await c.post(`${w}/tasks`, { kind: 'feature', title: 'Alternate root' }).expect(201)
     ).body;
     const child = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'bug',
         title: 'Cycle child',
         parentId: root.id,
       }).expect(201)
     ).body;
     const grandchild = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'bug',
         title: 'Cycle grandchild',
         parentId: child.id,
       }).expect(201)
     ).body;
 
-    await c.patch(`${w}/issues/${child.id}`, { parentId: child.id }).expect(400);
-    await c.patch(`${w}/issues/${root.id}`, { parentId: grandchild.id }).expect(400);
-    expect((await c.get(`${w}/issues/${child.id}`).expect(200)).body.parentId).toBe(root.id);
+    await c.patch(`${w}/tasks/${child.id}`, { parentId: child.id }).expect(400);
+    await c.patch(`${w}/tasks/${root.id}`, { parentId: grandchild.id }).expect(400);
+    expect((await c.get(`${w}/tasks/${child.id}`).expect(200)).body.parentId).toBe(root.id);
 
     const moved = (
-      await c.patch(`${w}/issues/${child.id}`, { parentId: otherRoot.key }).expect(200)
+      await c.patch(`${w}/tasks/${child.id}`, { parentId: otherRoot.key }).expect(200)
     ).body;
     expect(moved.parentId).toBe(otherRoot.id);
     const cleared = (
-      await c.patch(`${w}/issues/${child.id}`, { parentId: null }).expect(200)
+      await c.patch(`${w}/tasks/${child.id}`, { parentId: null }).expect(200)
     ).body;
     expect(cleared).not.toHaveProperty('parentId');
-    expect((await c.get(`${w}/issues/${grandchild.id}`).expect(200)).body.parentId).toBe(
+    expect((await c.get(`${w}/tasks/${grandchild.id}`).expect(200)).body.parentId).toBe(
       child.id,
     );
   });
 
   it('keeps children when their parent is deleted and rejects cross-workspace links', async () => {
     const parent = (
-      await c.post(`${w}/issues`, { kind: 'feature', title: 'Deleted parent' }).expect(201)
+      await c.post(`${w}/tasks`, { kind: 'feature', title: 'Deleted parent' }).expect(201)
     ).body;
     const child = (
-      await c.post(`${w}/issues`, {
+      await c.post(`${w}/tasks`, {
         kind: 'bug',
         title: 'Surviving child',
         parentId: parent.id,
       }).expect(201)
     ).body;
-    await c.delete(`${w}/issues/${parent.id}`).expect(204);
-    const surviving = (await c.get(`${w}/issues/${child.id}`).expect(200)).body;
+    await c.delete(`${w}/tasks/${parent.id}`).expect(204);
+    const surviving = (await c.get(`${w}/tasks/${child.id}`).expect(200)).body;
     expect(surviving.id).toBe(child.id);
     expect(surviving).not.toHaveProperty('parentId');
 
     const foreignParent = (
-      await c.post(`${otherW}/issues`, {
+      await c.post(`${otherW}/tasks`, {
         kind: 'feature',
         title: 'Foreign parent',
       }).expect(201)
     ).body;
     await c
-      .post(`${w}/issues`, {
+      .post(`${w}/tasks`, {
         kind: 'bug',
         title: 'Cross-workspace child',
         parentId: foreignParent.id,
       })
       .expect(404);
-    await c.patch(`${w}/issues/${child.id}`, { parentId: foreignParent.id }).expect(404);
+    await c.patch(`${w}/tasks/${child.id}`, { parentId: foreignParent.id }).expect(404);
   });
 });

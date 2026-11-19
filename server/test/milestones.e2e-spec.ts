@@ -9,7 +9,7 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   const base = () => `/api/w/${slug}`;
   const mkProject = async (name: string) => (await c.post(`${base()}/projects`, { name }).expect(201)).body;
   const mkIssue = async (kind: string, title: string, extra: object = {}) =>
-    (await c.post(`${base()}/issues`, { kind, title, ...extra }).expect(201)).body;
+    (await c.post(`${base()}/tasks`, { kind, title, ...extra }).expect(201)).body;
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -55,41 +55,41 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const b1 = (await c.post(`${base()}/milestones`, { projectId: pB.id, name: 'B1' }).expect(201)).body;
     const issue = await mkIssue('feature', 'Direct project', { projectId: pA.id });
     expect(issue.projectId).toBe(pA.id);
-    await c.post(`${base()}/issues`, { kind: 'bug', title: 'Ghost', projectId: 'pj_missing' }).expect(400);
-    await c.patch(`${base()}/issues/${issue.key}`, { projectId: 'pj_missing' }).expect(400);
+    await c.post(`${base()}/tasks`, { kind: 'bug', title: 'Ghost', projectId: 'pj_missing' }).expect(400);
+    await c.patch(`${base()}/tasks/${issue.key}`, { projectId: 'pj_missing' }).expect(400);
 
     // milestones of its own project; other projects stay out of reach
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [b1.id] }).expect(400);
-    expect((await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(200)).body.milestoneIds).toEqual([a1.id]);
-    expect((await c.get(`${base()}/issues?projectId=${pA.id}`).expect(200)).body.map((i: { key: string }) => i.key)).toEqual([issue.key]);
-    expect((await c.get(`${base()}/issues?projectId=${pB.id}`).expect(200)).body).toEqual([]);
+    await c.patch(`${base()}/tasks/${issue.key}`, { milestoneIds: [b1.id] }).expect(400);
+    expect((await c.patch(`${base()}/tasks/${issue.key}`, { milestoneIds: [a1.id] }).expect(200)).body.milestoneIds).toEqual([a1.id]);
+    expect((await c.get(`${base()}/tasks?projectId=${pA.id}`).expect(200)).body.map((i: { key: string }) => i.key)).toEqual([issue.key]);
+    expect((await c.get(`${base()}/tasks?projectId=${pB.id}`).expect(200)).body).toEqual([]);
 
     // clearing its project removes access to the project's milestone
-    const cleared = (await c.patch(`${base()}/issues/${issue.key}`, { projectId: null }).expect(200)).body;
+    const cleared = (await c.patch(`${base()}/tasks/${issue.key}`, { projectId: null }).expect(200)).body;
     expect(cleared.projectId).toBeUndefined();
     expect(cleared.milestoneIds).toEqual([]);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
+    expect((await c.get(`${base()}/tasks/${issue.key}`).expect(200)).body.milestoneIds).toEqual([]);
 
     // moving to another project drops the old project's milestone
-    await c.patch(`${base()}/issues/${issue.key}`, { projectId: pA.id }).expect(200);
-    await c.patch(`${base()}/issues/${issue.key}`, { milestoneIds: [a1.id] }).expect(200);
-    const moved = (await c.patch(`${base()}/issues/${issue.key}`, { projectId: pB.id }).expect(200)).body;
+    await c.patch(`${base()}/tasks/${issue.key}`, { projectId: pA.id }).expect(200);
+    await c.patch(`${base()}/tasks/${issue.key}`, { milestoneIds: [a1.id] }).expect(200);
+    const moved = (await c.patch(`${base()}/tasks/${issue.key}`, { projectId: pB.id }).expect(200)).body;
     expect(moved.projectId).toBe(pB.id);
     expect(moved.milestoneIds).toEqual([]);
 
     // deleting the project detaches its issues
     await c.delete(`${base()}/projects/${pB.id}`).expect(204);
-    expect((await c.get(`${base()}/issues/${issue.key}`).expect(200)).body.projectId).toBeUndefined();
+    expect((await c.get(`${base()}/tasks/${issue.key}`).expect(200)).body.projectId).toBeUndefined();
   });
 
   it('estimate: validated, nullable, recorded in issue.updated', async () => {
     const issue = await mkIssue('feature', 'Estimated', { estimate: 3 });
     expect(issue.estimate).toBe(3);
-    await c.patch(`${base()}/issues/${issue.key}`, { estimate: -1 }).expect(400);
-    await c.patch(`${base()}/issues/${issue.key}`, { estimate: 'big' }).expect(400);
-    expect((await c.patch(`${base()}/issues/${issue.key}`, { estimate: 0 }).expect(200)).body.estimate).toBe(0);
-    expect((await c.patch(`${base()}/issues/${issue.key}`, { estimate: 8.5 }).expect(200)).body.estimate).toBe(8.5);
-    expect((await c.patch(`${base()}/issues/${issue.key}`, { estimate: null }).expect(200)).body.estimate).toBeUndefined();
+    await c.patch(`${base()}/tasks/${issue.key}`, { estimate: -1 }).expect(400);
+    await c.patch(`${base()}/tasks/${issue.key}`, { estimate: 'big' }).expect(400);
+    expect((await c.patch(`${base()}/tasks/${issue.key}`, { estimate: 0 }).expect(200)).body.estimate).toBe(0);
+    expect((await c.patch(`${base()}/tasks/${issue.key}`, { estimate: 8.5 }).expect(200)).body.estimate).toBe(8.5);
+    expect((await c.patch(`${base()}/tasks/${issue.key}`, { estimate: null }).expect(200)).body.estimate).toBeUndefined();
     const evs = (await c.get(`${base()}/events?type=issue.updated`).expect(200)).body as { subject: { id: string }; data: { fields: string[] } }[];
     expect(evs.some((e) => e.subject.id === issue.id && e.data.fields.includes('estimate'))).toBe(true);
   });
@@ -97,20 +97,20 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   it('startedAt / completedAt follow the status', async () => {
     const issue = await mkIssue('bug', 'Timed');
     expect(issue.startedAt).toBeUndefined();
-    const todo = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'todo' }).expect(200)).body;
+    const todo = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'todo' }).expect(200)).body;
     expect(todo.startedAt).toBeUndefined();
-    const started = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'in_progress' }).expect(200)).body;
+    const started = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(started.startedAt).toBeTruthy();
-    const back = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'backlog' }).expect(200)).body;
+    const back = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'backlog' }).expect(200)).body;
     expect(back.startedAt).toBe(started.startedAt); // first start is kept
-    const review = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'in_review' }).expect(200)).body;
+    const review = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'in_review' }).expect(200)).body;
     expect(review.startedAt).toBe(started.startedAt);
-    const done = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'done' }).expect(200)).body;
+    const done = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'done' }).expect(200)).body;
     expect(done.completedAt).toBeTruthy();
-    const reopened = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'in_progress' }).expect(200)).body;
+    const reopened = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(reopened.completedAt).toBeUndefined();
     expect(reopened.startedAt).toBe(started.startedAt);
-    const canceled = (await c.patch(`${base()}/issues/${issue.key}`, { status: 'canceled' }).expect(200)).body;
+    const canceled = (await c.patch(`${base()}/tasks/${issue.key}`, { status: 'canceled' }).expect(200)).body;
     expect(canceled.completedAt).toBeTruthy();
 
     // A new Issue starts in backlog; moving it explicitly starts the work clock.
@@ -118,7 +118,7 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     expect(linked.status).toBe('backlog');
     expect(linked.startedAt).toBeFalsy();
     expect(linked.assigneeId).toBeFalsy();
-    const started2 = (await c.patch(`${base()}/issues/${linked.key}`, { status: 'in_progress' }).expect(200)).body;
+    const started2 = (await c.patch(`${base()}/tasks/${linked.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(started2.status).toBe('in_progress');
     expect(started2.startedAt).toBeTruthy();
     expect(started2.assigneeId).toBe(me);
@@ -132,17 +132,17 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const filed = await mkIssue('bug', 'Filed only');
     expect(filed.assigneeId).toBeUndefined();
 
-    const started = (await c.patch(`${base()}/issues/${filed.key}`, { status: 'in_progress' }).expect(200)).body;
+    const started = (await c.patch(`${base()}/tasks/${filed.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(started.assigneeId).toBe(me);
-    const review = (await c.patch(`${base()}/issues/${filed.key}`, { status: 'in_review' }).expect(200)).body;
+    const review = (await c.patch(`${base()}/tasks/${filed.key}`, { status: 'in_review' }).expect(200)).body;
     expect(review.assigneeId).toBe(me);
 
     const kept = await mkIssue('bug', 'Already owned', { assigneeId: me, status: 'todo' });
-    const moved = (await c.patch(`${base()}/issues/${kept.key}`, { status: 'in_progress' }).expect(200)).body;
+    const moved = (await c.patch(`${base()}/tasks/${kept.key}`, { status: 'in_progress' }).expect(200)).body;
     expect(moved.assigneeId).toBe(me);
 
     const declined = await mkIssue('bug', 'Leave empty');
-    const empty = (await c.patch(`${base()}/issues/${declined.key}`, { status: 'in_progress', assigneeId: null }).expect(200)).body;
+    const empty = (await c.patch(`${base()}/tasks/${declined.key}`, { status: 'in_progress', assigneeId: null }).expect(200)).body;
     expect(empty.assigneeId).toBeUndefined();
 
     const born = await mkIssue('bug', 'Born started', { status: 'in_progress' });
@@ -158,7 +158,7 @@ describe('milestones, estimates, issue facts and re-keying', () => {
   it('changing an issue kind does not change its project-scoped key', async () => {
     const bug = await mkIssue('bug', 'Actually a feature');
     const feat0 = await mkIssue('feature', 'Existing feature');
-    const changed = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', title: 'Now a feature' }).expect(200)).body;
+    const changed = (await c.patch(`${base()}/tasks/${bug.key}`, { kind: 'feature', title: 'Now a feature' }).expect(200)).body;
     expect(changed.id).toBe(bug.id);
     expect(changed.kind).toBe('feature');
     expect(changed.key).toBe(bug.key);
@@ -167,17 +167,17 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     expect(changed.title).toBe('Now a feature');
 
     // Issue keys are based on project tags, not issue kinds.
-    expect((await c.get(`${base()}/issues/${bug.key}`).expect(200)).body.key).toBe(bug.key);
-    expect((await c.get(`${base()}/issues/${bug.key.toLowerCase()}`).expect(200)).body.id).toBe(bug.id);
-    expect((await c.get(`${base()}/issues?q=${bug.key}`).expect(200)).body.map((i: { id: string }) => i.id)).toContain(bug.id);
+    expect((await c.get(`${base()}/tasks/${bug.key}`).expect(200)).body.key).toBe(bug.key);
+    expect((await c.get(`${base()}/tasks/${bug.key.toLowerCase()}`).expect(200)).body.id).toBe(bug.id);
+    expect((await c.get(`${base()}/tasks?q=${bug.key}`).expect(200)).body.map((i: { id: string }) => i.id)).toContain(bug.id);
 
     // Changing the classification again still leaves the key and aliases untouched.
-    const same = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'feature', priority: 'high' }).expect(200)).body;
+    const same = (await c.patch(`${base()}/tasks/${bug.key}`, { kind: 'feature', priority: 'high' }).expect(200)).body;
     expect(same.key).toBe(bug.key);
     expect(same.aliases).toEqual([]);
     const next = await mkIssue('bug', 'Next bug');
     expect(next.number).toBe(feat0.number + 1);
-    const back = (await c.patch(`${base()}/issues/${bug.key}`, { kind: 'bug' }).expect(200)).body;
+    const back = (await c.patch(`${base()}/tasks/${bug.key}`, { kind: 'bug' }).expect(200)).body;
     expect(back.key).toBe(bug.key);
     expect(back.number).toBe(bug.number);
     expect(back.aliases).toEqual([]);
@@ -185,7 +185,7 @@ describe('milestones, estimates, issue facts and re-keying', () => {
     const evs = (await c.get(`${base()}/events?type=issue.rekeyed`).expect(200)).body as { subject: { id: string }; data: { from: string; to: string } }[];
     const mine = evs.filter((e) => e.subject.id === bug.id);
     expect(mine).toEqual([]);
-    await c.patch(`${base()}/issues/${bug.key}`, { kind: 'nonsense' }).expect(400);
+    await c.patch(`${base()}/tasks/${bug.key}`, { kind: 'nonsense' }).expect(400);
   });
 
   it('commit and branch artifacts are no longer accepted', async () => {

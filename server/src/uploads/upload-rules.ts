@@ -276,7 +276,7 @@ export interface UploadRef {
 
 const API_READ: Record<UploadRef['resource'], string> = {
   artifacts: 'artifacts:read',
-  issues: 'issues:read',
+  issues: 'tasks:read',
   projects: 'projects:read',
   comments: 'comments:read',
   documents: 'documents:read',
@@ -293,7 +293,7 @@ const STAGE_GRANTS: readonly MemberGrant[] = [
   'documents:update',
 ];
 const STAGE_PERMISSIONS = [
-  'issues:write',
+  'tasks:write',
   'projects:write',
   'comments:write',
   'artifacts:write',

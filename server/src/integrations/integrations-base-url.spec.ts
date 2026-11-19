@@ -27,7 +27,7 @@ function setup() {
   };
   const repo = { findOneBy: async () => row, save: async (x: unknown) => x };
   const events = { publish: vi.fn() };
-  const service = new IntegrationsService(http as never, secrets, events as never, {} as never, repo as never, {} as never);
+  const service = new IntegrationsService(http as never, secrets, events as never, repo as never);
   return { service, row, http, seen };
 }
 

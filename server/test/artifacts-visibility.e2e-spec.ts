@@ -38,7 +38,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const visibleIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Visible issue',
             projectId: visibleProject.id,
@@ -47,7 +47,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const hiddenIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Hidden issue',
             projectId: hiddenProject.id,
@@ -56,7 +56,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const visibleArtifact = (
         await owner.client
-          .post(`${w}/issues/${visibleIssue.id}/artifacts`, {
+          .post(`${w}/tasks/${visibleIssue.id}/artifacts`, {
             kind: 'document',
             title: 'Visible evidence',
           })
@@ -64,7 +64,7 @@ describe('project-scoped artifact access', () => {
       ).body;
       const hiddenIssueArtifact = (
         await owner.client
-          .post(`${w}/issues/${hiddenIssue.id}/artifacts`, {
+          .post(`${w}/tasks/${hiddenIssue.id}/artifacts`, {
             kind: 'document',
             title: 'Hidden issue evidence',
           })
@@ -110,7 +110,7 @@ describe('project-scoped artifact access', () => {
       expect(
         (
           await member.client
-            .get(`${w}/issues/${hiddenIssue.id}/artifacts`)
+            .get(`${w}/tasks/${hiddenIssue.id}/artifacts`)
             .expect(200)
         ).body,
       ).toEqual([]);
@@ -119,7 +119,7 @@ describe('project-scoped artifact access', () => {
         .get(`${w}/projects/${hiddenProject.id}/artifacts`)
         .expect(404);
       await member.client
-        .post(`${w}/issues/${hiddenIssue.id}/artifacts`, {
+        .post(`${w}/tasks/${hiddenIssue.id}/artifacts`, {
           kind: 'document',
           title: 'Attempted hidden issue attach',
         })

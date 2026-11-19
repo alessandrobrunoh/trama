@@ -9,10 +9,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import type { GitProvider } from '../contracts/domain.js';
-import {
-  IntegrationConnectionEntity,
-  RepositoryEntity,
-} from '../database/entities/index.js';
+import { IntegrationConnectionEntity } from '../database/entities/index.js';
 import { ArtifactLinkerService } from '../integrations/artifact-linker.service.js';
 import { WebhookDeliveryEntity } from '../integrations/entities.js';
 import { SecretsService } from '../integrations/secrets.service.js';
@@ -181,22 +178,7 @@ export class WebhooksService {
         body: { status: 'ignored', reason: parsed.reason },
       };
 
-    const repo = await this.ds
-      .getRepository(RepositoryEntity)
-      .createQueryBuilder('r')
-      .where(
-        'r.workspaceId = :w AND r.provider = :p AND lower(r.fullName) = lower(:n)',
-        { w: conn.workspaceId, p: conn.provider, n: parsed.repo.fullName },
-      )
-      .getOne();
-    if (!repo)
-      return {
-        httpStatus: 202,
-        body: {
-          status: 'ignored',
-          reason: `repository ${parsed.repo.fullName} is not linked`,
-        },
-      };
+    const repo = { id: parsed.repo.fullName };
 
     if (parsed.kind === 'ci') {
       const updated = await this.linker.applyCi(

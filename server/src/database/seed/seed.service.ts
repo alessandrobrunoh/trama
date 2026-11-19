@@ -5,19 +5,15 @@ import {
   AgentEntity,
   ArtifactEntity,
   CommentEntity,
-  DecisionEntity,
   DependencyEntity,
   DomainEventEntity,
   ENTITIES,
-  InputRequestEntity,
   IssueEntity,
   IntegrationConnectionEntity,
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
-  RepositoryEntity,
   SavedViewEntity,
-  TeamEntity,
   UserEntity,
   WorkspaceCounterEntity,
   WorkspaceEntity,
@@ -51,8 +47,6 @@ export class SeedService implements OnApplicationBootstrap {
       await insert(m, WorkspaceEntity, [data.workspace]);
       await insert(m, MembershipEntity, data.memberships);
       await insert(m, AgentEntity, data.agents);
-      await insert(m, TeamEntity, data.teams);
-      await insert(m, RepositoryEntity, data.repositories);
       await insert(m, ProjectEntity, data.projects);
       for (const row of data.legacyWorkstreams)
         await m.query(
@@ -61,10 +55,8 @@ export class SeedService implements OnApplicationBootstrap {
           [row.id, row.key, row.title, row.objective],
         );
       await insert(m, MilestoneEntity, data.milestones);
-      await insert(m, InputRequestEntity, data.inputRequests);
       await insert(m, IssueEntity, data.issues);
       await insert(m, ArtifactEntity, data.artifacts);
-      await insert(m, DecisionEntity, data.decisions);
       await insert(m, DependencyEntity, data.dependencies);
       await insert(m, CommentEntity, data.comments);
       await insert(m, DomainEventEntity, data.events);

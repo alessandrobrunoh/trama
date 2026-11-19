@@ -5,7 +5,6 @@ import { ArtifactsService } from '../artifacts/artifacts.service.js';
 import {
   ArtifactEntity,
   IssueEntity,
-  type RepositoryEntity,
 } from '../database/entities/index.js';
 import type { ArtifactCandidate, CiPatch } from './candidates.js';
 import { ArtifactSourceEntity } from './entities.js';
@@ -57,7 +56,7 @@ export class ArtifactLinkerService {
 
   upsert(
     workspaceId: string,
-    repo: RepositoryEntity,
+    repo: { id: string },
     c: ArtifactCandidate,
   ): Promise<LinkResult> {
     return this.serial(
@@ -68,7 +67,7 @@ export class ArtifactLinkerService {
 
   private async doUpsert(
     workspaceId: string,
-    repo: RepositoryEntity,
+    repo: { id: string },
     c: ArtifactCandidate,
   ): Promise<LinkResult> {
     const keyMap = await this.keyMap(workspaceId);
@@ -81,7 +80,7 @@ export class ArtifactLinkerService {
     const artifactRepo = this.ds.getRepository(ArtifactEntity);
     const existing = await artifactRepo.findBy({
       workspaceId,
-      repositoryId: repo.id,
+      repository: repo.id,
       kind: c.kind,
       externalId: c.externalId,
     });
@@ -126,7 +125,7 @@ export class ArtifactLinkerService {
           title: c.title,
           url: c.url,
           externalId: c.externalId,
-          repositoryId: repo.id,
+          repository: repo.id,
           state: c.state,
           ci: c.ci,
           review: c.review,
@@ -139,7 +138,7 @@ export class ArtifactLinkerService {
           {
             artifactId: row.id,
             workspaceId,
-            repositoryId: repo.id,
+            repository: repo.id,
             ...(c.headSha ? { headSha: c.headSha } : {}),
             ...(c.headBranch ? { headBranch: c.headBranch } : {}),
           },
@@ -152,7 +151,7 @@ export class ArtifactLinkerService {
   /** Applies a CI result to the PR/MR artifacts of a commit. Returns how many artifacts changed. */
   async applyCi(
     workspaceId: string,
-    repo: RepositoryEntity,
+    repo: { id: string },
     patch: CiPatch,
   ): Promise<number> {
     const ids = new Set<string>();
@@ -161,7 +160,7 @@ export class ArtifactLinkerService {
         .getRepository(ArtifactSourceEntity)
         .createQueryBuilder('s')
         .where(
-          's.workspaceId = :workspaceId AND s.repositoryId = :repo AND s.headSha = :sha',
+          's.workspaceId = :workspaceId AND s.repository = :repo AND s.headSha = :sha',
           { workspaceId, repo: repo.id, sha: patch.sha },
         )
         .getMany();
@@ -171,7 +170,7 @@ export class ArtifactLinkerService {
       const rows = await this.ds.getRepository(ArtifactEntity).find({
         where: {
           workspaceId,
-          repositoryId: repo.id,
+          repository: repo.id,
           externalId: In(patch.prExternalIds),
         },
         select: { id: true, kind: true },

@@ -1,11 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Not, type Repository } from 'typeorm';
-import {
-  DecisionEntity,
-  IssueEntity,
-  RepositoryEntity,
-} from '../database/entities/index.js';
+import { IssueEntity, ProjectEntity } from '../database/entities/index.js';
 import type { WorkspaceContext } from '../auth/request-context.js';
 import type { ChatContextDto } from './ai.dto.js';
 
@@ -14,10 +10,8 @@ export class AiContextService {
   constructor(
     @InjectRepository(IssueEntity)
     private readonly issues: Repository<IssueEntity>,
-    @InjectRepository(RepositoryEntity)
-    private readonly projects: Repository<RepositoryEntity>,
-    @InjectRepository(DecisionEntity)
-    private readonly decisions: Repository<DecisionEntity>,
+    @InjectRepository(ProjectEntity)
+    private readonly projects: Repository<ProjectEntity>,
   ) {}
 
   /** `withTools`: the model can look records up itself, so no record lists are pre-loaded into the prompt. */
@@ -64,25 +58,17 @@ export class AiContextService {
         },
       });
     }
-    if (context.kind === 'decision') {
-      const item = await this.decisions.findOne({ where });
-      if (!item) throw new NotFoundException('Decision not found');
-      return JSON.stringify({
-        ...base,
-        decision: {
-          key: item.key,
-          title: item.title,
-          statement: item.statement?.slice(0, 10000),
-          rationale: item.rationale?.slice(0, 4000),
-          status: item.status,
-        },
-      });
-    }
     const item = await this.projects.findOneBy({ workspaceId, id });
     if (!item) throw new NotFoundException('Project not found');
     return JSON.stringify({
       ...base,
-      project: { fullName: item.fullName, provider: item.provider },
+      project: {
+        name: item.name,
+        key: item.key,
+        summary: item.summary,
+        status: item.status,
+        repository: item.repository,
+      },
     });
   }
 

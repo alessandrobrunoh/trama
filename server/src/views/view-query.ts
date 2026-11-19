@@ -2,12 +2,12 @@
 // Mirrors src/app/core/query/{fields,query}.ts, with one deliberate difference: only the fields
 // listed below can be filtered, sorted or grouped on. An unknown field never falls back to the raw
 // property, so a crafted view cannot be used to probe columns the view does not display.
-import type { Demand, ViewEntity, ViewFilter } from '../contracts/domain.js';
+import type { ViewEntity, ViewFilter } from '../contracts/domain.js';
 
 type Row = Record<string, unknown>;
 type FieldKind =
   'enum' | 'id' | 'multi-id' | 'tags' | 'text' | 'date' | 'number';
-export type RefKind = 'team' | 'user' | 'project' | 'release';
+export type RefKind = 'user' | 'project';
 
 interface FieldSpec {
   kind: FieldKind;
@@ -24,32 +24,9 @@ const enumOf = (values: readonly string[]): FieldSpec => ({
   values,
 });
 const ref = (refersTo: RefKind): FieldSpec => ({ kind: 'id', refersTo });
-const refs = (refersTo: RefKind): FieldSpec => ({ kind: 'multi-id', refersTo });
 const text: FieldSpec = { kind: 'text' };
 const date: FieldSpec = { kind: 'date' };
 const tags: FieldSpec = { kind: 'tags' };
-const count: FieldSpec = { kind: 'number' };
-
-/**
- * Customer demand on issues and projects (derived from the customer requests, see `Demand`). It can filter and
- * sort a public view but never group it, and nothing about a customer (name, tier name) is ever returned.
- */
-const DEMAND_FIELDS: Record<string, FieldSpec> = {
-  customerId: { kind: 'multi-id', groupable: false },
-  customerTierId: { kind: 'multi-id', groupable: false },
-  customerCount: count,
-  requestCount: count,
-  importantCount: count,
-  customerRevenue: count,
-  customerSize: count,
-};
-const DEMAND_NUMBER = {
-  customerCount: 'customerCount',
-  requestCount: 'requestCount',
-  importantCount: 'importantCount',
-  customerRevenue: 'revenue',
-  customerSize: 'size',
-} as const;
 
 /** Queryable fields per entity; enum values are in display order. */
 export const VIEW_FIELDS: Partial<
@@ -75,24 +52,12 @@ export const VIEW_FIELDS: Partial<
       'canceled',
     ]),
     assigneeId: ref('user'),
-    teamId: ref('team'),
     priority: enumOf(PRIORITIES),
-    source: enumOf(['manual', 'github', 'gitlab', 'email', 'api', 'agent']),
+    source: enumOf(['manual', 'github', 'gitlab', 'linear', 'email', 'api', 'agent']),
     projectId: ref('project'),
-    releaseId: ref('release'),
     milestoneIds: { kind: 'multi-id' },
     labels: tags,
     title: text,
-    createdAt: date,
-    updatedAt: date,
-    ...DEMAND_FIELDS,
-  },
-  decision: {
-    status: enumOf(['draft', 'proposed', 'accepted', 'superseded', 'rejected']),
-    tags,
-    originIssueId: ref('project'),
-    title: text,
-    decidedAt: date,
     createdAt: date,
     updatedAt: date,
   },
@@ -108,22 +73,17 @@ export const VIEW_FIELDS: Partial<
     priority: enumOf(PRIORITIES),
     health: enumOf(['on_track', 'at_risk', 'off_track']),
     leadId: ref('user'),
-    teamIds: refs('team'),
-    repositoryIds: { kind: 'multi-id' },
+    repository: text,
     labels: tags,
     targetDate: date,
     startDate: date,
     name: text,
     createdAt: date,
     updatedAt: date,
-    ...DEMAND_FIELDS,
   },
 };
 
-export interface QueryContext {
-  /** Customer demand per issue and project id; without it the customer fields have no value. */
-  demand?: ReadonlyMap<string, Demand>;
-}
+export interface QueryContext {}
 
 const asArray = (v: string | string[]): string[] =>
   Array.isArray(v) ? v : [v];
@@ -150,23 +110,10 @@ export function fieldValues(
   entity: ViewEntity,
   item: Row,
   field: string,
-  ctx: QueryContext = {},
+  _ctx: QueryContext = {},
 ): string[] {
   const fields = VIEW_FIELDS[entity] ?? {};
   if (!Object.hasOwn(fields, field)) return [];
-  if (Object.hasOwn(DEMAND_FIELDS, field)) {
-    const demand = ctx.demand?.get(String(item['id']));
-    if (field === 'customerId') return demand ? [...demand.customerIds] : [];
-    if (field === 'customerTierId') return demand ? [...demand.tierIds] : [];
-    // Numbers are 0 for work nobody asked for; without a demand map there is no value at all.
-    return ctx.demand
-      ? [
-          String(
-            demand?.[DEMAND_NUMBER[field as keyof typeof DEMAND_NUMBER]] ?? 0,
-          ),
-        ]
-      : [];
-  }
   return toStrings(item[field]);
 }
 

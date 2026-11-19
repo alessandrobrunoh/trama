@@ -30,7 +30,6 @@ const COLUMNS: Partial<
 > = {
   issue: [{ table: 'issues', column: 'status' }],
   project: [{ table: 'projects', column: 'status' }],
-  decision: [{ table: 'decisions', column: 'status' }],
   project_health: [
     { table: 'projects', column: 'health' },
     { table: 'project_updates', column: 'health' },

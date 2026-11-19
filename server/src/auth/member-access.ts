@@ -18,15 +18,11 @@ const API_TO_MEMBER: Record<string, MemberResource | undefined> = {
   projects: 'projects',
   milestones: 'milestones',
   issues: 'issues',
+  tasks: 'issues',
   documents: 'documents',
   artifacts: 'artifacts',
   views: 'views',
   comments: 'comments',
-  decisions: 'decisions',
-  'input-requests': 'input-requests',
-  customers: 'customers',
-  'customer-intake': 'customers',
-  'customer-requests': 'customers',
 };
 
 /** `POST …/<verb>` that changes something which already exists, rather than creating a row of that resource. */
@@ -74,7 +70,7 @@ function actionFor(
 /**
  * The member grant a workspace route needs, or null when the route is not work this table covers
  * (members, teams, tokens, settings, search, snapshot). Those stay gated only by the role.
- * Create and edit are separate: `POST /issues` is `issues:create`, `PATCH /issues/:id` is `issues:update`.
+ * Create and edit are separate: `POST /tasks` is `issues:create`, `PATCH /tasks/:id` is `issues:update`.
  */
 export function requiredMemberGrant(
   method: string,
@@ -165,20 +161,8 @@ export interface AccessSnapshot {
     projectId?: string | null;
     issueId?: string | null;
   }[];
-  decisions: {
-    id: string;
-    originIssueId?: string | null;
-    relatedIssueIds?: string[];
-  }[];
-  inputRequests: { id: string; issueId: string | null }[];
   comments: { subject: Ref }[];
   commentIndex?: { subject: Ref }[];
-  customers: unknown[];
-  customerRequests: {
-    id: string;
-    projectId?: string | null;
-    issueId?: string | null;
-  }[];
   events: { subject: Ref }[];
   views: unknown[];
 }
@@ -221,43 +205,17 @@ export function scopeSnapshot<T extends AccessSnapshot>(
         return true;
       })
     : [];
-  const decisions = allows(access, 'decisions')
-    ? snapshot.decisions.filter(
-        (row) =>
-          (!row.originIssueId || issueIds.has(row.originIssueId)) &&
-          (row.relatedIssueIds ?? []).every((id) => issueIds.has(id)),
-      )
-    : [];
-  const inputRequests = allows(access, 'input-requests')
-    ? snapshot.inputRequests.filter(
-        (row) => !!row.issueId && issueIds.has(row.issueId),
-      )
-    : [];
   const artifactIds = new Set(artifacts.map((row) => row.id));
-  const decisionIds = new Set(decisions.map((row) => row.id));
-  const inputIds = new Set(inputRequests.map((row) => row.id));
   const visible = new Map<string, Set<string>>([
     ['project', projectIds],
     ['issue', issueIds],
     ['milestone', milestoneIds],
     ['artifact', artifactIds],
-    ['decision', decisionIds],
-    ['input_request', inputIds],
   ]);
   const refOk = (ref: Ref) => {
     const set = visible.get(ref.type);
     return set ? set.has(ref.id) : true;
   };
-  const customersOk = allows(access, 'customers');
-  const customerRequests = customersOk
-    ? snapshot.customerRequests.filter((row) => {
-        if (row.projectId && !projectOk(row.projectId)) return false;
-        if (row.issueId && !issueIds.has(row.issueId)) return false;
-        return true;
-      })
-    : [];
-  const requestIds = new Set(customerRequests.map((row) => row.id));
-  visible.set('customer_request', requestIds);
   const commentsOk = allows(access, 'comments');
   return {
     ...snapshot,
@@ -265,10 +223,6 @@ export function scopeSnapshot<T extends AccessSnapshot>(
     issues: scopedIssues,
     milestones,
     artifacts,
-    decisions,
-    inputRequests,
-    customers: customersOk ? snapshot.customers : [],
-    customerRequests,
     comments: commentsOk
       ? snapshot.comments.filter((row) => refOk(row.subject))
       : [],

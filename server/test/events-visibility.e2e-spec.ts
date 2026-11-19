@@ -52,7 +52,7 @@ describe('project-scoped event history', () => {
 
     const visibleIssue = (
       await owner.client
-        .post(`${w}/issues`, {
+        .post(`${w}/tasks`, {
           kind: 'bug',
           title: 'Visible issue event',
           projectId: visibleProject.id,
@@ -61,7 +61,7 @@ describe('project-scoped event history', () => {
     ).body;
     const hiddenIssue = (
       await owner.client
-        .post(`${w}/issues`, {
+        .post(`${w}/tasks`, {
           kind: 'bug',
           title: 'Hidden issue event',
           projectId: hiddenProject.id,

@@ -59,9 +59,8 @@ class UpdateWorkspaceDto {
   @OptionalNotNull() @IsString() @MaxLength(40) slug?: string;
 }
 
-/** Everything optional; `null` clears `defaultTeamId` / `iconColor` / `iconInitial`. Roles have their own endpoints. */
+/** Everything optional; `null` clears `iconColor` / `iconInitial`. Roles have their own endpoints. */
 class UpdateSettingsDto {
-  @Clearable() @IsString() defaultTeamId?: string | null;
   @OptionalNotNull() @IsIn(ESTIMATE_SCALES) estimateScale?: EstimateScale;
   @OptionalNotNull() @IsIn(WEEK_STARTS) weekStart?: WeekStart;
   @OptionalNotNull() @IsString() @MaxLength(64) timeZone?: string;

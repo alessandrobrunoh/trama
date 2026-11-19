@@ -28,10 +28,6 @@ import { CountersService } from '../common/counters.service.js';
 import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
 import { IssueEntity, ProjectEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
-import {
-  demandConditions,
-  type DemandFilter,
-} from '../customers/demand-filter.js';
 import { LabelsService } from '../workspaces/labels.service.js';
 import { isProjectIcon } from './project-icon.js';
 import {
@@ -55,19 +51,16 @@ export interface ProjectInput {
   status?: string;
   priority?: Priority;
   leadId?: string | null;
-  teamIds?: string[];
-  repositoryIds?: string[];
+  repository?: string | null;
   labels?: string[];
   startDate?: string | null;
   targetDate?: string | null;
 }
 
-export interface ProjectFilter extends DemandFilter {
+export interface ProjectFilter {
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
-  teamId?: string;
   leadId?: string;
-  repositoryId?: string;
   q?: string;
 }
 
@@ -108,16 +101,6 @@ export class ProjectsService {
       });
     }
     if (f.leadId) qb.andWhere('p.leadId = :leadId', { leadId: f.leadId });
-    if (f.teamId)
-      qb.andWhere('p.teamIds @> :tid::jsonb', {
-        tid: JSON.stringify([f.teamId]),
-      });
-    if (f.repositoryId)
-      qb.andWhere('p.repositoryIds @> :rid::jsonb', {
-        rid: JSON.stringify([f.repositoryId]),
-      });
-    for (const c of demandConditions('p', 'projectId', f))
-      qb.andWhere(c.sql, c.params);
     if (f.q) qb.andWhere('p.name ILIKE :q', { q: `%${f.q}%` });
     applyProjectScope(qb, 'p', 'id');
     return qb.getMany();
@@ -162,8 +145,7 @@ export class ProjectsService {
           status,
           priority: input.priority ?? 'none',
           leadId: input.leadId ?? null,
-          teamIds: unique(input.teamIds),
-          repositoryIds: unique(input.repositoryIds),
+          repository: input.repository?.trim() || null,
           labels:
             (await this.labels.assign(workspaceId, input.labels, 'project')) ??
             [],
@@ -220,9 +202,7 @@ export class ProjectsService {
     if (patch.icon !== undefined) row.icon = patch.icon;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.leadId !== undefined) row.leadId = patch.leadId;
-    if (patch.teamIds !== undefined) row.teamIds = unique(patch.teamIds);
-    if (patch.repositoryIds !== undefined)
-      row.repositoryIds = unique(patch.repositoryIds);
+    if (patch.repository !== undefined) row.repository = patch.repository?.trim() || null;
     if (patch.labels !== undefined)
       row.labels =
         (await this.labels.assign(
@@ -399,8 +379,6 @@ export class ProjectsService {
       throw new BadRequestException(
         'icon must be a lucide icon name (kebab-case) or a single emoji',
       );
-    await this.refs.teams(workspaceId, input.teamIds);
-    await this.refs.repositories(workspaceId, input.repositoryIds);
     await this.refs.users(workspaceId, [input.leadId]);
   }
 

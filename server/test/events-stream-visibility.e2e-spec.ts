@@ -140,7 +140,7 @@ describe('project-scoped live event streams', () => {
         .expect(200);
       const hiddenIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Hidden live issue',
             projectId: hiddenProject.id,
@@ -149,7 +149,7 @@ describe('project-scoped live event streams', () => {
       ).body;
       const visibleIssue = (
         await owner.client
-          .post(`${w}/issues`, {
+          .post(`${w}/tasks`, {
             kind: 'bug',
             title: 'Visible live issue',
             projectId: visibleProject.id,
