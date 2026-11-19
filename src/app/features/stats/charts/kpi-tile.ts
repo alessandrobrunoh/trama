@@ -37,7 +37,7 @@ export interface KpiDelta {
         </span>
       }
     </div>
-    <div class="text-meta min-h-4 truncate text-[11px]">{{ hint() }}</div>
+    <div class="text-meta min-h-4 text-[11px] leading-4">{{ hint() }}</div>
     @if (spark().length > 1) {
       <app-sparkline class="mt-1" [values]="spark()" [color]="sparkColor()" />
     }

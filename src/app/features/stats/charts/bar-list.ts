@@ -1,9 +1,19 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
+import type { Priority, Project } from '../../../core';
+import { PriorityIcon } from '../../../shared/priority-icon';
+import { StatusIcon } from '../../../shared/status';
+import { ProjectGlyph } from '../../projects/project-glyph';
 
 export interface BarRow {
   key?: string;
   label: string;
+  /** Task status glyph shown before the label. */
+  status?: string;
+  /** Priority glyph shown before the label. */
+  priority?: Priority;
+  /** Project glyph shown before the label. */
+  project?: Project;
   /** Small mono suffix, e.g. a task key. */
   hint?: string;
   value: number;
@@ -18,7 +28,7 @@ export interface BarRow {
 @Component({
   selector: 'app-bar-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTooltip],
+  imports: [HlmTooltip, StatusIcon, PriorityIcon, ProjectGlyph],
   host: { class: 'block' },
   template: `
     @if (rows().length) {
@@ -34,7 +44,14 @@ export interface BarRow {
             (click)="interactive() && rowClick.emit(row)"
             (keydown.enter)="interactive() && rowClick.emit(row)"
           >
-            <span class="flex min-w-0 items-baseline gap-1.5">
+            <span class="flex min-w-0 items-center gap-1.5">
+              @if (row.status) {
+                <app-status-icon [status]="row.status" entity="issue" [size]="13" />
+              } @else if (row.priority) {
+                <app-priority-icon [priority]="row.priority" />
+              } @else if (row.project) {
+                <app-project-glyph [project]="row.project" [size]="13" />
+              }
               <span class="truncate">{{ row.label }}</span>
               @if (row.hint) {
                 <span class="text-meta shrink-0 font-mono text-[10px]">{{ row.hint }}</span>
