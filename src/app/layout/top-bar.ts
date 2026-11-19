@@ -2,80 +2,170 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
-import { LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
-import { HlmSidebarTrigger } from '@spartan-ng/helm/sidebar';
+import {
+  LucideChevronRight,
+  LucideDynamicIcon,
+  LucideInbox,
+  LucidePanelLeft,
+  LucidePanelRight,
+  LucideSearch,
+} from '@lucide/angular';
+import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmSidebarService } from '@spartan-ng/helm/sidebar';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { filter, map, startWith } from 'rxjs';
 import { FavoritesStore } from '../core/stores/favorites.store';
+import { NotificationsStore } from '../core/stores/notifications.store';
+import { RightPaneStore } from '../core/stores/right-pane.store';
 import { TramaStore } from '../core/stores/trama.store';
-import { FavoriteButton } from '../shared/favorite-button';
+import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport } from '../core/viewport';
+import { AvatarStack } from '../shared/actor-avatar';
+import { FavoriteButton } from '../shared/favorite-button';
+import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
+import { PANE_SECTIONS } from './right-pane';
 import { PageChrome, type Crumb } from './page-chrome';
-import { ALL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 
-/** Top bar: sidebar toggle, breadcrumb trail, live-sync dot and the page's action slot. */
+/**
+ * Main pane header (one slim row, `h-11`): [sidebar toggle + search + inbox, only while the sidebar
+ * is collapsed] page title (muted parents, regular weight) · favorite star · stacked avatars of the
+ * people involved · live-sync dot … text+icon actions (the page's `appTopBarActions` slot) · the
+ * right pane toggle. The sidebar and right pane have their own header rows; all three share the
+ * height so the hairline under them reads as one line.
+ */
 @Component({
   selector: 'app-top-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger, FavoriteButton],
+  imports: [
+    NgTemplateOutlet,
+    RouterLink,
+    LucideDynamicIcon,
+    HlmButtonImports,
+    HlmTooltip,
+    AvatarStack,
+    FavoriteButton,
+  ],
   host: {
     class:
-      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 px-3 max-md:hidden',
+      'bg-background border-border sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1.5 border-b px-3 max-md:hidden',
   },
   template: `
     @if (!viewport.isMobile()) {
-    <button hlmSidebarTrigger class="-ml-1 hidden size-7 md:inline-flex" srOnlyText="Toggle sidebar (⌘B)"></button>
-
-    <nav aria-label="Breadcrumb" class="flex min-w-0 flex-1 items-center gap-1.5">
-      @if (sectionIcon(); as icon) {
-        <svg [lucideIcon]="icon" [size]="15" class="text-muted-foreground shrink-0 max-sm:hidden"></svg>
+      @if (sidebarCollapsed()) {
+        <div class="-ml-1 flex items-center gap-0.5">
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            class="text-muted-foreground"
+            hlmTooltip="Show sidebar  ⌘B"
+            position="bottom"
+            aria-label="Show sidebar (⌘B)"
+            (click)="sidebar.toggleSidebar()"
+          >
+            <svg [lucideIcon]="panelLeft" [size]="16"></svg>
+          </button>
+          <button
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            class="text-muted-foreground"
+            hlmTooltip="Search  ⌘K"
+            position="bottom"
+            aria-label="Search (⌘K)"
+            (click)="ui.openCommandPalette()"
+          >
+            <svg [lucideIcon]="search" [size]="16"></svg>
+          </button>
+          <a
+            hlmBtn
+            variant="ghost"
+            size="icon-sm"
+            class="text-muted-foreground relative"
+            [routerLink]="['/', slug(), 'inbox']"
+            hlmTooltip="Inbox"
+            position="bottom"
+            aria-label="Inbox"
+          >
+            <svg [lucideIcon]="inbox" [size]="16"></svg>
+            @if (inboxCount() > 0) {
+              <span class="bg-primary ring-background absolute top-1 right-1 size-1.5 rounded-full ring-2" aria-hidden="true"></span>
+            }
+          </a>
+        </div>
       }
-      <ol class="flex min-w-0 items-center gap-0.5 text-[13px]">
-        @for (c of crumbs(); track $index; let last = $last) {
-          <li class="flex min-w-0 items-center gap-1" [class.shrink-0]="!last" [class.min-w-0]="last">
-            @if (c.link && !last) {
-              <a
-                [routerLink]="c.link"
-                class="text-muted-foreground hover:text-foreground hover:bg-accent truncate rounded-md px-1.5 py-0.5 transition-colors"
-                [class.font-mono]="c.mono"
-                >{{ c.label }}</a
-              >
-            } @else {
-              <span
-                class="truncate px-1.5 font-medium"
-                [class.font-mono]="c.mono"
-                [class.text-muted-foreground]="!last"
-                [attr.aria-current]="last ? 'page' : null"
-                >{{ c.label }}</span
-              >
-            }
-            @if (!last) {
-              <svg [lucideIcon]="sep" [size]="12" class="text-muted-foreground/50 shrink-0" aria-hidden="true"></svg>
-            }
-          </li>
-        }
-      </ol>
+
+      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-1.5">
+        <ol class="flex min-w-0 items-center gap-0.5 text-[13px]">
+          @for (c of crumbs(); track $index; let last = $last) {
+            <li class="flex min-w-0 items-center gap-1" [class.shrink-0]="!last">
+              @if (c.link && !last) {
+                <a
+                  [routerLink]="c.link"
+                  class="text-muted-foreground hover:text-foreground hover:bg-hover truncate rounded-sm px-1.5 py-0.5 transition-colors"
+                  [class.font-mono]="c.mono"
+                  >{{ c.label }}</a
+                >
+              } @else {
+                <span
+                  class="truncate px-1.5"
+                  [class.font-mono]="c.mono"
+                  [class.text-muted-foreground]="!last"
+                  [attr.aria-current]="last ? 'page' : null"
+                  >{{ c.label }}</span
+                >
+              }
+              @if (!last) {
+                <svg [lucideIcon]="sep" [size]="12" class="text-muted-foreground/50 shrink-0" aria-hidden="true"></svg>
+              }
+            </li>
+          }
+        </ol>
+      </nav>
+
+      @if (actors().length) {
+        <app-avatar-stack [actors]="actors()" [max]="3" [size]="20" class="ms-1 shrink-0" />
+      }
+
+      @if (favoriteTarget(); as t) {
+        <app-favorite-button [type]="t.type" [subjectId]="t.id" class="max-sm:hidden" />
+      }
+
       @if (description(); as d) {
-        <span class="text-muted-foreground/90 min-w-0 shrink-[20] truncate text-[13px] max-lg:hidden">{{ d }}</span>
+        <span class="text-muted-foreground/90 min-w-0 shrink-[20] truncate text-[13px] max-xl:hidden">{{ d }}</span>
       }
-    </nav>
 
-    @if (favoriteTarget(); as t) {
-      <app-favorite-button [type]="t.type" [subjectId]="t.id" />
-    }
-
-    @if (sync.live() === 'reconnecting' || sync.lastError()) {
-      <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status" [title]="sync.lastError() ?? sync.label()">
-        <span class="bg-status-needs-input size-1.5 rounded-full"></span>
-        <span class="max-sm:hidden">{{ sync.label() }}</span>
-      </span>
-    }
-
-    <div class="top-bar__actions flex shrink-0 items-center gap-1.5 empty:hidden">
-      @if (chrome.actions(); as tpl) {
-        <ng-container *ngTemplateOutlet="tpl" />
+      @if (sync.live() === 'reconnecting' || sync.lastError()) {
+        <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status" [attr.aria-label]="sync.lastError() ?? sync.label()">
+          <span class="bg-status-needs-input size-1.5 rounded-full"></span>
+          <span class="max-sm:hidden">{{ sync.label() }}</span>
+        </span>
       }
-    </div>
+
+      <span class="flex-1"></span>
+
+      <div class="top-bar__actions flex shrink-0 items-center gap-0.5 empty:hidden">
+        @if (chrome.actions(); as tpl) {
+          <ng-container *ngTemplateOutlet="tpl" />
+        }
+      </div>
+
+      @if (paneAvailable()) {
+        <button
+          hlmBtn
+          variant="ghost"
+          size="icon-sm"
+          class="text-muted-foreground -mr-1"
+          [hlmTooltip]="rightPane.open() ? 'Hide preview  ⌘.' : 'Show preview  ⌘.'"
+          position="bottom"
+          [attr.aria-label]="rightPane.open() ? 'Hide preview pane' : 'Show preview pane'"
+          [attr.aria-pressed]="rightPane.open()"
+          (click)="rightPane.toggle()"
+        >
+          <svg [lucideIcon]="panelRight" [size]="16"></svg>
+        </button>
+      }
     }
   `,
 })
@@ -84,10 +174,19 @@ export class TopBar {
   protected readonly viewport = inject(Viewport);
   protected readonly chrome = inject(PageChrome);
   protected readonly sync = inject(SyncStatus);
+  protected readonly ui = inject(UiStore);
+  protected readonly sidebar = inject(HlmSidebarService);
+  protected readonly rightPane = inject(RightPaneStore);
   private readonly router = inject(Router);
   private readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
+  private readonly notifications = inject(NotificationsStore);
+
   protected readonly sep = LucideChevronRight;
+  protected readonly panelLeft = LucidePanelLeft;
+  protected readonly panelRight = LucidePanelRight;
+  protected readonly search = LucideSearch;
+  protected readonly inbox = LucideInbox;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -98,12 +197,18 @@ export class TopBar {
     { initialValue: this.router.url },
   );
 
-  protected readonly sectionIcon = computed(() => {
-    const seg = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
-    return ALL_NAV.find((n) => n.segment === seg)?.icon ?? null;
+  /** The right pane exists on the sections that feed it (inbox, tasks, projects, views). */
+  protected readonly paneAvailable = computed(() => {
+    const section = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
+    return section !== undefined && PANE_SECTIONS.has(section);
   });
-
+  protected readonly sidebarCollapsed = computed(() => this.sidebar.state() === 'collapsed');
+  protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly inboxCount = computed(
+    () => this.store.attentionCount() + this.notifications.updatesUnread(),
+  );
   protected readonly favoriteTarget = this.favorites.current;
+  protected readonly actors = computed(() => this.chrome.page()?.actors ?? []);
 
   /** Page description from <app-page-header>, shown after the trail (muted). */
   protected readonly description = computed(() => {

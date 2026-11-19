@@ -54,8 +54,7 @@ export const SHORTCUT_GROUPS: ShortcutGroup[] = [
     items: [
       { label: 'Move focus', keys: 'up down', alt: 'j k' },
       { label: 'Open focused', keys: 'enter' },
-      { label: 'Select', keys: 'x' },
-      { label: 'Preview a task; select on other lists', keys: 'space' },
+      { label: 'Select', keys: 'x', alt: 'space' },
       { label: 'Clear selection', keys: 'esc' },
     ],
   },

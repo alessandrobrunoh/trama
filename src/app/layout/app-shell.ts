@@ -1,10 +1,13 @@
-import { DOCUMENT } from '@angular/common';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
-import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
+import { KeyboardShortcuts, usePageShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
 import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
+import { RightPaneStore } from '../core/stores/right-pane.store';
 import { UiStore } from '../core/stores/ui.store';
+import { PageChrome } from './page-chrome';
+import { RightPane } from './right-pane';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
 import { SearchDialog } from '../features/command/search-dialog';
@@ -21,7 +24,8 @@ import { Viewport } from '../core/viewport';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
- *   desktop: [sidebar | top bar + scrolling content]   (⌘B collapses the sidebar)
+ *   desktop: [sidebar | top bar + scrolling content + status bar | right pane]
+ *            (⌘B collapses the sidebar, ⌘. the right pane; panes are split by hairlines)
  *   mobile (≤768px): the same sidebar becomes a bottom navigation sheet, opened from the mobile bar
  * Global overlays (command palette, shortcuts, destructive confirm) are mounted once here and driven
  * by `UiStore.modal`. The create dialog (features/create) and `/` search (features/command) are mounted here too.
@@ -30,6 +34,8 @@ import { Viewport } from '../core/viewport';
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
+    RightPane,
     RouterOutlet,
     HlmSidebarImports,
     AppSidebar,
@@ -61,8 +67,8 @@ import { Viewport } from '../core/viewport';
       class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-1.5 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >Skip to content</a
     >
-    <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden max-md:h-dvh">
-      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
+    <div hlmSidebarWrapper class="bg-sidebar relative h-svh min-h-0 overflow-hidden max-md:h-dvh">
+      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0 border-e border-sidebar-border" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
         <app-sidebar />
       </hlm-sidebar>
       <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh">
@@ -74,8 +80,12 @@ import { Viewport } from '../core/viewport';
         <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
         </div>
+        @if (chrome.statusBar(); as bar) {
+          <ng-container *ngTemplateOutlet="bar" />
+        }
         <app-mobile-nav />
       </main>
+      <app-right-pane />
     </div>
 
     @if (ui.pendingG()) {
@@ -111,7 +121,9 @@ import { Viewport } from '../core/viewport';
 })
 export class AppShell {
   protected readonly ui = inject(UiStore);
+  protected readonly chrome = inject(PageChrome);
   protected readonly viewport = inject(Viewport);
+  private readonly rightPane = inject(RightPaneStore);
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */
@@ -121,6 +133,19 @@ export class AppShell {
   private readonly compact = signal(false);
 
   constructor() {
+    // ⌘. toggles the right pane (⌘B owns the sidebar).
+    usePageShortcuts([
+      {
+        keys: 'mod+.',
+        label: 'Toggle preview pane',
+        group: 'General',
+        allowWhileTyping: true,
+        run: (e) => {
+          e.preventDefault();
+          this.rightPane.toggle();
+        },
+      },
+    ]);
     const win = inject(DOCUMENT).defaultView;
     if (win?.matchMedia) {
       const query = win.matchMedia('(min-width: 768px) and (max-width: 1023.98px)');

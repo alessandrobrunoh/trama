@@ -14,7 +14,6 @@ export * from './notify/notifier';
 export * from './stores/trama.store';
 export * from './stores/time-entries.store';
 export * from './stores/ui.store';
-export * from './stores/peek.store';
 export * from './stores/draft.store';
 export * from './stores/list-state.store';
 export * from './stores/invites.store';

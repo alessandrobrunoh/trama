@@ -6,7 +6,9 @@ import {
   effect,
   inject,
   signal,
+  type WritableSignal,
 } from '@angular/core';
+import type { ActorInput } from '../shared/actor-avatar';
 
 export interface Crumb {
   label: string;
@@ -26,6 +28,8 @@ export interface Crumb {
 export interface PageTitle {
   title: string;
   description?: string;
+  /** People involved (assignee, reporter, commenters…): shown as a stacked avatar group after the title. */
+  actors?: readonly ActorInput[];
 }
 
 @Injectable({ providedIn: 'root' })
@@ -35,6 +39,12 @@ export class PageChrome {
   /** Title + description registered by <app-page-header>; the top bar renders them in place of the last crumb. */
   readonly page = signal<PageTitle | null>(null);
   readonly actions = signal<TemplateRef<unknown> | null>(null);
+  /** Content of the slim status bar under the main pane (see `<app-status-bar>`). */
+  readonly statusBar = signal<TemplateRef<unknown> | null>(null);
+  /** Optional replacement for the right pane's tab strip, set by `<ng-template appRightPaneTabs>`. */
+  readonly rightPaneTabs = signal<TemplateRef<unknown> | null>(null);
+  /** Optional extra icon actions in the right pane header, set by `<ng-template appRightPaneActions>`. */
+  readonly rightPaneActions = signal<TemplateRef<unknown> | null>(null);
 }
 
 /**
@@ -50,16 +60,39 @@ export function usePageCrumbs(build: () => readonly Crumb[]): void {
   inject(DestroyRef).onDestroy(() => chrome.crumbs.set(null));
 }
 
+/**
+ * Registers its template as a chrome slot while the host page is alive (the previous owner wins back
+ * nothing: slots are cleared only if still ours).
+ */
+function claimSlot(slot: WritableSignal<TemplateRef<unknown> | null>): void {
+  const tpl = inject<TemplateRef<unknown>>(TemplateRef);
+  slot.set(tpl);
+  inject(DestroyRef).onDestroy(() => {
+    if (slot() === tpl) slot.set(null);
+  });
+}
+
 /** Registers its template as the top bar's action slot while the host page is alive. */
 @Directive({ selector: 'ng-template[appTopBarActions]' })
 export class TopBarActions {
   constructor() {
-    const chrome = inject(PageChrome);
-    const tpl = inject<TemplateRef<unknown>>(TemplateRef);
-    chrome.actions.set(tpl);
-    inject(DestroyRef).onDestroy(() => {
-      if (chrome.actions() === tpl) chrome.actions.set(null);
-    });
+    claimSlot(inject(PageChrome).actions);
+  }
+}
+
+/** Replaces the right pane's tab strip (e.g. `Details | Subtasks | Time`) while the host is alive. */
+@Directive({ selector: 'ng-template[appRightPaneTabs]' })
+export class RightPaneTabs {
+  constructor() {
+    claimSlot(inject(PageChrome).rightPaneTabs);
+  }
+}
+
+/** Adds icon actions at the far right of the right pane header while the host is alive. */
+@Directive({ selector: 'ng-template[appRightPaneActions]' })
+export class RightPaneActions {
+  constructor() {
+    claimSlot(inject(PageChrome).rightPaneActions);
   }
 }
 

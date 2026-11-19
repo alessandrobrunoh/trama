@@ -52,10 +52,10 @@ export class KanbanLabelDirective {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list" cdkDropListGroup>
         @for (g of columns(); track g.key) {
           <section>
-            <div class="group/gh bg-muted/40 hover:bg-muted/60 sticky top-0 z-[2] flex min-h-9 items-center pr-2 sm:pr-4">
+            <div class="group/gh bg-background sticky top-0 z-[2] mt-1 flex min-h-8 items-center pr-2 sm:pr-4">
               <button
                 type="button"
-                class="flex min-h-9 min-w-0 flex-1 items-center gap-2 px-4 text-left text-[13px] outline-none sm:px-6"
+                class="text-muted-foreground flex min-h-8 min-w-0 flex-1 items-center gap-2 px-4 text-left text-[13px] outline-none focus-visible:underline sm:px-5"
                 [attr.aria-expanded]="!collapsed().has(g.key)"
                 (click)="toggle(g.key)"
               >
@@ -100,8 +100,8 @@ export class KanbanLabelDirective {
       <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden max-md:snap-x max-md:snap-mandatory max-md:scroll-px-4">
         <div class="flex h-full min-w-max gap-3 px-4 py-3 sm:px-6" cdkDropListGroup>
           @for (g of columns(); track g.key) {
-            <section class="board-column group/col bg-muted/30 flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
-              <header class="flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
+            <section class="board-column group/col bg-muted flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
+              <header class="text-muted-foreground flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
                 <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.items.length }}</span>
                 @if (addable()) {

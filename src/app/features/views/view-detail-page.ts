@@ -439,15 +439,15 @@ type PageLayout = 'list' | 'board' | 'timeline';
           }
         </app-empty-state>
       } @else if (layout() === 'board') {
-        <div class="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 py-3 sm:px-6">
+        <div class="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 py-3 sm:px-5">
           @for (g of groups(); track g.key) {
-            <section class="flex w-72 shrink-0 flex-col" [attr.aria-label]="g.label">
-              <header class="flex h-8 shrink-0 items-center gap-2 px-1">
+            <section class="bg-muted flex w-72 shrink-0 flex-col rounded-lg" [attr.aria-label]="g.label">
+              <header class="text-muted-foreground flex h-9 shrink-0 items-center gap-2 px-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
-                <span class="truncate text-xs font-medium">{{ g.label }}</span>
-                <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
+                <span class="truncate">{{ g.label }}</span>
+                <span class="tabular-nums">{{ g.items.length }}</span>
               </header>
-              <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pb-4">
+              <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
                 @for (item of g.items; track item.id) {
                   @switch (v.entity) {
                     @case ('issue') {
@@ -477,11 +477,11 @@ type PageLayout = 'list' | 'board' | 'timeline';
           @for (g of groups(); track g.key) {
             @if (grouped()) {
               <div
-                class="bg-background/90 sticky top-0 z-10 mt-2 flex h-8 items-center gap-2 px-4 backdrop-blur sm:px-6"
+                class="text-muted-foreground bg-background sticky top-0 z-10 mt-1 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5"
               >
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
-                <span class="text-xs font-medium">{{ g.label }}</span>
-                <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
+                <span>{{ g.label }}</span>
+                <span class="tabular-nums">{{ g.items.length }}</span>
               </div>
             }
             @for (item of g.items; track item.id) {

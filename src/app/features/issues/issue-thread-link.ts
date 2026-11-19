@@ -51,18 +51,19 @@ export function threadLabel(url: string): string {
 }
 
 /**
- * The link to the Delta thread working on a task, in one line under the title. Empty: a quiet "Add thread
- * link"; set: the link (new tab) with edit and clear on hover.
+ * The link to the Delta thread working on a task. `action` (task header): a compact "Open thread" link, or a
+ * quiet "Add thread link" when empty. `row` (inspector): the link itself. Either way: new tab, with edit and
+ * clear on hover.
  */
 @Component({
   selector: 'app-issue-thread-link',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmInputImports, HlmTooltip, LucideDynamicIcon],
-  host: { class: 'mt-1.5 block min-w-0 empty:hidden' },
+  host: { class: 'block min-w-0 empty:hidden' },
   template: `
     @let url = issue().threadUrl;
     @if (editing()) {
-      <form class="flex min-w-0 flex-col gap-1" (submit)="save($event)">
+      <form class="flex min-w-0 flex-col gap-1" [class.w-64]="variant() === 'action'" (submit)="save($event)">
         <div class="flex items-center gap-1.5">
           <svg [lucideIcon]="threadIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
           <input
@@ -86,16 +87,17 @@ export function threadLabel(url: string): string {
         }
       </form>
     } @else if (url) {
-      <div class="group/thread -ml-1.5 flex min-w-0 items-center gap-0.5">
+      <div class="group/thread flex min-w-0 items-center gap-0.5" [class.-ml-1.5]="variant() === 'row'">
         <a
           [href]="url"
           target="_blank"
           rel="noopener noreferrer"
           class="hover:bg-hover focus-visible:ring-ring flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
+          [class]="variant() === 'action' ? 'text-muted-foreground hover:text-foreground' : ''"
           [hlmTooltip]="'Open thread · ' + url"
         >
-          <svg [lucideIcon]="threadIcon" [size]="14" class="text-primary shrink-0"></svg>
-          <span class="truncate">{{ label(url) }}</span>
+          <svg [lucideIcon]="threadIcon" [size]="14" class="shrink-0" [class.text-primary]="variant() === 'row'"></svg>
+          <span class="truncate">{{ variant() === 'action' ? 'Open thread' : label(url) }}</span>
           <svg [lucideIcon]="openIcon" [size]="12" class="text-muted-foreground shrink-0"></svg>
         </a>
         @if (canEdit()) {
@@ -126,7 +128,8 @@ export function threadLabel(url: string): string {
     } @else if (canEdit()) {
       <button
         type="button"
-        class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring -ml-1.5 flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
+        class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
+        [class.-ml-1.5]="variant() === 'row'"
         (click)="start()"
       >
         <svg [lucideIcon]="addIcon" [size]="14"></svg>
@@ -140,6 +143,7 @@ export class IssueThreadLink {
 
   readonly issue = input.required<Issue>();
   readonly canEdit = input(false);
+  readonly variant = input<'action' | 'row'>('action');
 
   protected readonly threadIcon = LucideMessageSquare;
   protected readonly openIcon = LucideExternalLink;

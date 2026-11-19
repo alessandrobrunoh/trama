@@ -1,4 +1,4 @@
-// AI cards of the issue page sidebar: summary, suggested properties and a clearer description.
+// AI cards of the task page (shown in its stream): summary, suggested properties and a clearer description.
 // Each card starts its request when it appears (the person just pressed its button), cancels it
 // when closed, and only ever proposes: nothing changes until "Apply" / "Accept".
 import {
@@ -357,14 +357,15 @@ export class AiImproveCard implements OnInit, OnDestroy {
 type CardKind = 'summarize' | 'triage' | 'improve';
 
 /**
- * "AI" block at the top of the issue sidebar: three quiet buttons and their result cards.
+ * "AI" block of a task: optional quiet buttons and the result cards (the task page shows only the cards, in its stream).
  * Other places (header menu, command palette) ask for an action with `AiActions.request(...)`.
  */
 @Component({
   selector: 'app-ai-issue-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [AiButton, AiSummaryCard, AiTriageCard, AiImproveCard, HlmTooltip, LucideDynamicIcon, RouterLink],
-  host: { class: 'block' },
+  // Without open cards (and no action row) there is nothing to show, so the host takes no space in the stream.
+  host: { class: 'block min-w-0 [&:not(:has(section>*))]:hidden' },
   template: `
     @if (ai.available()) {
       <section aria-label="AI" class="flex flex-col gap-2">

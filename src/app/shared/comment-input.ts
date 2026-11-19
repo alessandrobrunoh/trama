@@ -4,6 +4,7 @@ import {
   Component,
   ElementRef,
   afterNextRender,
+  booleanAttribute,
   computed,
   inject,
   input,
@@ -39,7 +40,7 @@ const PER_KIND = 4;
       #field
       hlmTextarea
       class="min-h-16 w-full resize-y"
-      rows="2"
+      [attr.rows]="compact() ? 1 : 2"
       role="combobox"
       aria-autocomplete="list"
       [attr.aria-expanded]="open()"
@@ -95,6 +96,8 @@ export class CommentInput {
   readonly placeholder = input('');
   readonly label = input('');
   readonly autofocus = input(false);
+  /** One line that grows with the text (the docked task composer); the caller sizes the textarea. */
+  readonly compact = input(false, { transform: booleanAttribute });
   readonly keyed = output<KeyboardEvent>();
 
   protected readonly listId = `comment-input-${CommentInput.nextId++}`;
@@ -165,6 +168,17 @@ export class CommentInput {
 
   focus(): void {
     this.field().nativeElement.focus();
+  }
+
+  /** Adds `text` as a new paragraph at the end and puts the caret after it. */
+  append(text: string): void {
+    const element = this.field().nativeElement;
+    const current = element.value.trimEnd();
+    const next = current ? `${current}\n\n${text}` : text;
+    element.value = next;
+    this.value.set(next);
+    element.focus();
+    element.setSelectionRange(next.length, next.length);
   }
 
   insert(text: string): void {

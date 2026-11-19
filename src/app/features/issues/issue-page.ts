@@ -76,7 +76,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
             class="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors"
             [class]="
               tab() === t.id
-                ? 'bg-accent text-foreground font-medium'
+                ? 'bg-selected text-foreground'
                 : 'text-muted-foreground hover:bg-hover hover:text-foreground'
             "
             [attr.aria-current]="tab() === t.id ? 'page' : null"

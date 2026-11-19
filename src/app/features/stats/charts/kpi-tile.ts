@@ -17,11 +17,11 @@ export interface KpiDelta {
   selector: 'app-kpi-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTooltip, Sparkline],
-  host: { class: 'bg-card flex min-w-0 flex-col gap-1 rounded-lg px-4 py-3' },
+  host: { class: 'bg-card border-border flex min-w-0 flex-col gap-1 rounded-lg border px-4 py-3' },
   template: `
     <div class="text-muted-foreground truncate text-xs">{{ label() }}</div>
     <div class="flex items-baseline gap-2">
-      <span class="text-[26px] leading-8 font-semibold tracking-tight">{{ value() }}</span>
+      <span class="text-[26px] leading-8 tracking-tight">{{ value() }}</span>
       @if (delta(); as d) {
         <span
           class="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums"

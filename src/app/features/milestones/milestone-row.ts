@@ -100,7 +100,7 @@ import { ProgressChart } from './progress-chart';
           (blur)="commitRename()"
         />
       } @else {
-        <button type="button" class="min-w-0 flex-1 truncate text-left font-medium outline-none focus-visible:underline" (click)="toggle()">{{ m.name }}</button>
+        <button type="button" class="min-w-0 flex-1 truncate text-left outline-none focus-visible:underline" (click)="toggle()">{{ m.name }}</button>
       }
       <span class="text-muted-foreground shrink-0 text-xs tabular-nums max-sm:hidden" [hlmTooltip]="tip()" position="bottom">{{ label() }}</span>
 
@@ -143,7 +143,7 @@ import { ProgressChart } from './progress-chart';
         }
         <div>
           <div class="mb-1 flex items-center gap-2">
-            <h3 class="text-muted-foreground text-xs font-medium">Tasks <span class="tabular-nums">{{ issues().length }}</span></h3>
+            <h3 class="text-muted-foreground text-xs">Tasks <span class="tabular-nums">{{ issues().length }}</span></h3>
             @if (canEdit() && addable().length) {
               <app-picker
                 class="ml-auto"

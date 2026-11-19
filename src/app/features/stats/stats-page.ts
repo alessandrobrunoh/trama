@@ -127,7 +127,7 @@ const RUNNING_SHOWN = 10;
 
         <!-- 1. how much gets finished -->
         <section class="mb-10" aria-labelledby="stats-finished">
-          <h2 id="stats-finished" class="text-base font-semibold">How much gets finished?</h2>
+          <h2 id="stats-finished" class="text-base">How much gets finished?</h2>
           <p class="text-meta mt-1 mb-4 max-w-3xl text-xs">
             Tasks moved to Done. Canceled tasks are not counted. “Typical time to finish” is the median from the day a task
             was started to the day it was completed, so it includes any waiting in between. It only looks at finished tasks,
@@ -202,7 +202,7 @@ const RUNNING_SHOWN = 10;
 
         <!-- 2. what is open -->
         <section class="mb-10" aria-labelledby="stats-open">
-          <h2 id="stats-open" class="text-base font-semibold">What is open right now?</h2>
+          <h2 id="stats-open" class="text-base">What is open right now?</h2>
           <p class="text-meta mt-1 mb-4 max-w-3xl text-xs">
             {{ openTotal() }} {{ openTotal() === 1 ? 'task is' : 'tasks are' }} open: not done and not canceled, backlog included.
             “By status” and “By project” follow the person filter; “By person” always shows everyone.
@@ -234,13 +234,13 @@ const RUNNING_SHOWN = 10;
 
         <!-- 3. in progress and idle -->
         <section class="mb-10" aria-labelledby="stats-running">
-          <h2 id="stats-running" class="text-base font-semibold">What is in progress, and what has gone idle?</h2>
+          <h2 id="stats-running" class="text-base">What is in progress, and what has gone idle?</h2>
           <p class="text-meta mt-1 mb-4 max-w-3xl text-xs">
             Tasks in In progress or In review. A task is <strong>idle</strong> when nothing has happened on it for
             {{ idleDays() }} days: no edit, comment, linked pull request or tracked time. Idle tasks are listed first and are
             left out of every average on this page.
           </p>
-          <div class="bg-card rounded-lg">
+          <div class="bg-card border-border rounded-lg border">
             <div class="flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 pt-3 pb-2 text-sm">
               <span><span class="font-semibold tabular-nums">{{ running().length }}</span> in progress or in review</span>
               <span [class.text-status-needs-input]="idleCount() > 0" [class.text-muted-foreground]="idleCount() === 0">
@@ -297,7 +297,7 @@ const RUNNING_SHOWN = 10;
 
         <!-- 4. estimates vs the time I tracked -->
         <section class="mb-4" aria-labelledby="stats-estimates">
-          <h2 id="stats-estimates" class="text-base font-semibold">Do your estimates match the time you tracked?</h2>
+          <h2 id="stats-estimates" class="text-base">Do your estimates match the time you tracked?</h2>
           <p class="text-meta mt-1 mb-4 max-w-3xl text-xs">
             For each finished task that has an estimate, this compares the estimate with the time <strong>you</strong> tracked on
             it with the timer, never with the time it sat in a status. Only your own tracked time counts here, so it looks at

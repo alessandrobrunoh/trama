@@ -61,7 +61,8 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { IssueKindLabel } from '../../shared/issue';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
-import { PeekPanel } from '../../shared/peek-panel';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
+import { StatusBar } from '../../layout/status-bar';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
@@ -85,6 +86,7 @@ import {
   groupLabel,
   groupUniverse,
   issueKindOptions,
+  issueFlow,
   issueStatusOptions,
   milestoneFilterOptions,
   readDisplay,
@@ -94,6 +96,7 @@ import {
   type IssueProp,
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
+import { useKeyboardPreview } from './list-preview';
 import { LabelPicker } from '../../shared/label-picker';
 import { SearchInput } from '../../shared/search-input';
 
@@ -103,6 +106,16 @@ interface Column {
 }
 
 const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
+
+const FILTER_LABEL: Record<string, string> = {
+  status: 'Status',
+  kind: 'Type',
+  priority: 'Priority',
+  assigneeId: 'Assignee',
+  labels: 'Label',
+  projectId: 'Project',
+  milestoneIds: 'Milestone',
+};
 
 @Component({
   selector: 'app-issue-board',
@@ -132,7 +145,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
     KanbanItemDirective,
     KanbanLabelDirective,
     Kbd,
-    PeekPanel,
+    StatusBar,
   ],
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
@@ -474,7 +487,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
               }
             }
           }
-          <span class="truncate font-medium">{{ label(key) }}</span>
+          <span class="truncate">{{ label(key) }}</span>
         </ng-template>
       </app-kanban>
     }
@@ -511,7 +524,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
           <button hlmDropdownMenuItem (triggered)="actions.copyKeys(ids)">
             <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy
             {{ ids.length > 1 ? 'keys' : 'key' }}
-            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+." /></hlm-dropdown-menu-shortcut>
+            <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+k" /></hlm-dropdown-menu-shortcut>
           </button>
           <button hlmDropdownMenuItem (triggered)="actions.copyLinks(ids)">
             <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy
@@ -602,7 +615,31 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
       </ng-template>
     </ng-template>
 
-    <app-peek-panel />
+    <!-- Status bar: what is open, this week's delta and the active filters. -->
+    <app-status-bar>
+      <span class="tabular-nums">{{ flow().open }} open · {{ flow().inProgress }} in progress</span>
+      <span
+        class="flex items-center gap-1.5 tabular-nums"
+        [attr.aria-label]="flow().opened + ' opened and ' + flow().closed + ' closed this week'"
+      >
+        <span class="text-diff-add">+{{ flow().opened }}</span>
+        <span class="text-diff-del">−{{ flow().closed }}</span>
+        <span>this week</span>
+      </span>
+      @if (hasFilters()) {
+        <span class="truncate">{{ shown() }} shown · {{ filterSummary() }}</span>
+      }
+      @if (hasFilters()) {
+        <button
+          end
+          type="button"
+          class="hover:text-foreground underline-offset-2 hover:underline"
+          (click)="clearFilters()"
+        >
+          Clear filters
+        </button>
+      }
+    </app-status-bar>
 
     <!-- Bulk action bar -->
     @if (selection().length) {
@@ -697,7 +734,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
             size="icon-sm"
             class="size-7"
             aria-label="Copy keys"
-            hlmTooltip="Copy keys · ⌘."
+            hlmTooltip="Copy keys · ⇧⌘K"
             (click)="actions.copyKeys(selection())"
           >
             <svg [lucideIcon]="copyIcon" [size]="14"></svg>
@@ -724,6 +761,7 @@ export class IssueBoard {
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
   protected readonly favorites = inject(FavoritesStore);
+  private readonly pane = inject(RightPaneStore);
   private readonly document = inject(DOCUMENT);
 
   /** Issues this board shows. */
@@ -813,6 +851,25 @@ export class IssueBoard {
   protected readonly dateField = computed(() =>
     this.d().sortField === 'createdAt' ? 'createdAt' : 'updatedAt',
   );
+
+  protected readonly flow = computed(() =>
+    issueFlow(this.issues(), this.store.settings().statuses.issue),
+  );
+  protected readonly filterSummary = computed(() => {
+    const parts = this.filters().map((f) => {
+      const n = Array.isArray(f.value) ? f.value.length : 1;
+      return `${FILTER_LABEL[f.field] ?? f.field}${n > 1 ? ` (${n})` : ''}`;
+    });
+    const q = this.search().trim();
+    if (q) parts.push(`“${q}”`);
+    return parts.join(', ');
+  });
+
+  /** Arrow keys and j/k show the focused task in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => {
+    const issue = this.issues().find((i) => i.id === id);
+    if (issue) this.pane.show({ kind: 'task', idOrKey: issue.key });
+  });
 
   /** Issues inside the current view tab. */
   protected readonly scoped = computed(() => {
@@ -915,7 +972,7 @@ export class IssueBoard {
       run: () => this.actions.openPrompt('project', this.targets()),
     },
     {
-      keys: 'mod+.',
+      keys: 'mod+shift+k',
       label: 'Copy task key',
       group: 'Tasks',
       when: () => this.targets().length > 0 && !this.typing(),

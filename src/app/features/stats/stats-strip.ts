@@ -12,15 +12,13 @@ import { DAY, DEFAULT_IDLE_DAYS, activityLookup, isDone, isRunning } from './flo
   host: { class: 'block' },
   template: `
     @if (figures(); as f) {
-      <div class="text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-1 px-4 py-2 text-xs sm:px-6">
-        <span><span class="text-foreground font-medium tabular-nums">{{ f.open }}</span> open</span>
-        <span><span class="text-foreground font-medium tabular-nums">{{ f.running }}</span> in progress</span>
+      <div class="text-muted-foreground flex flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-1 pb-0.5 text-xs sm:px-5">
         @if (f.idle) {
           <span class="text-status-needs-input" [hlmTooltip]="'No activity for ' + idleDays + ' days'">
-            <span class="font-medium tabular-nums">{{ f.idle }}</span> idle
+            <span class="tabular-nums">{{ f.idle }}</span> idle
           </span>
         }
-        <span><span class="text-foreground font-medium tabular-nums">{{ f.doneWeek }}</span> completed in 7 days</span>
+        <span><span class="tabular-nums">{{ f.doneWeek }}</span> completed in 7 days</span>
         <a class="hover:text-foreground ms-auto" [routerLink]="['/', store.slug(), 'stats']">Statistics</a>
       </div>
     }
@@ -47,8 +45,6 @@ export class StatsStrip {
     });
     const running = issues.filter(isRunning);
     return {
-      open: issues.filter((i) => i.status !== 'done' && i.status !== 'canceled' && i.status !== 'draft').length,
-      running: running.length,
       idle: running.filter((i) => now - activityAt(i) >= this.idleDays * DAY).length,
       doneWeek: issues.filter((i) => isDone(i) && now - Date.parse(i.completedAt!) < 7 * DAY).length,
     };

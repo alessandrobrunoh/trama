@@ -9,6 +9,8 @@ import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { StatusIcon } from '../../shared/status';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
+import { useKeyboardPreview } from '../issues/list-preview';
 import { DEFAULT_IDLE_DAYS, activityLookup, weekSummary } from '../stats/flow-stats';
 import { formatDuration } from '../stats/insights';
 import { MyTaskRow } from './my-task-row';
@@ -89,7 +91,7 @@ type Scope = 'assigned' | 'created';
         <section [attr.aria-label]="g.label">
           <button
             type="button"
-            class="hover:bg-hover mt-2 flex h-8 w-full items-center gap-2 px-4 text-left text-xs sm:px-6"
+            class="text-muted-foreground hover:bg-hover mt-1 flex h-8 w-full items-center gap-2 px-4 text-left text-[13px] outline-none focus-visible:underline sm:px-5"
             [attr.aria-expanded]="!isFolded(g.id)"
             (click)="toggleFold(g.id)"
           >
@@ -100,8 +102,8 @@ type Scope = 'assigned' | 'created';
               <svg [lucideIcon]="chevron" [size]="12"></svg>
             </span>
             <app-status-icon entity="issue" [status]="g.status" />
-            <span class="font-medium">{{ g.label }}</span>
-            <span class="text-muted-foreground tabular-nums">{{ g.items.length }}</span>
+            <span>{{ g.label }}</span>
+            <span class="tabular-nums">{{ g.items.length }}</span>
             <span class="text-meta ms-2 hidden truncate md:inline">{{ g.hint }}</span>
           </button>
           @if (!isFolded(g.id)) {
@@ -164,6 +166,13 @@ export class MyTasks {
   private readonly folded = signal<ReadonlySet<string>>(new Set());
   /** Re-read the clock once a minute so "idle" does not go stale on a long-open tab. */
   private readonly now = signal(Date.now());
+
+  private readonly pane = inject(RightPaneStore);
+  /** Arrow keys and j/k show the focused task in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => {
+    const issue = this.store.issueById().get(id);
+    if (issue) this.pane.show({ kind: 'task', idOrKey: issue.key });
+  });
 
   constructor() {
     this.ui.setFocusedRow(null);

@@ -22,8 +22,8 @@ import { ProgressChart } from './progress-chart';
     <section aria-labelledby="project-milestones-title">
       <header class="mb-2 flex items-center gap-2">
         <app-milestone-icon [size]="15" state="idle" />
-        <h2 id="project-milestones-title" class="text-sm font-semibold">Milestones</h2>
-        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this project, each with its own tasks and date</span>
+        <h2 id="project-milestones-title" class="text-muted-foreground text-[13px] font-normal">Milestones</h2>
+        <span class="text-muted-foreground text-xs tabular-nums">{{ milestones().length }}</span>
         @if (canEdit()) {
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground hover:text-foreground ml-auto" aria-label="Add milestone" (click)="startAdd()">
             <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -32,7 +32,7 @@ import { ProgressChart } from './progress-chart';
       </header>
 
       @if (showChart() && hasIssues()) {
-        <div class="bg-card mb-3 rounded-lg px-3 pt-3 pb-2">
+        <div class="bg-card border-border mb-3 rounded-lg border px-3 pt-3 pb-2">
           <app-progress-chart [project]="project()" [height]="190" />
         </div>
       }

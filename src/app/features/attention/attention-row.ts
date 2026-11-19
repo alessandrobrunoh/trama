@@ -22,12 +22,15 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ATTENTION_KIND_META,
   TramaStore,
+  Viewport,
   shortDate,
   type AttentionItem,
 } from '../../core';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
+import { PreviewLink, isPreviewClick } from '../issues/list-preview';
 import { EntityChip, Kbd, type EntityChipType } from '../../shared';
 import { AgoPipe } from '../../shared/ago';
-import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
+import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW } from './attention-kinds';
 import { snoozePresets, type SnoozePreset } from './snooze';
 
 /**
@@ -39,6 +42,7 @@ import { snoozePresets, type SnoozePreset } from './snooze';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
+    PreviewLink,
     LucideDynamicIcon,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -51,55 +55,49 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     class: 'group/row relative block outline-none',
     '[attr.data-row-id]': 'item().id',
     '[attr.data-focused]': 'focused() ? "" : null',
-    '[class.bg-accent/60]': 'focused()',
-    '(click)': 'rowClicked.emit()',
+    '[class.bg-selected]': 'selected()',
+    '[class.hover:bg-hover]': '!selected()',
+    '(click)': 'onRowClick($event)',
   },
   template: `
-    <span
-      class="absolute inset-y-0 start-0 w-0.5"
-      [class]="severityBar()"
-      aria-hidden="true"
-    ></span>
-
     <div
-      class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-3 gap-y-2 px-4 py-2.5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:px-6"
+      class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-x-2.5 gap-y-1.5 px-4 py-1.5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-center sm:px-5"
     >
       <span
-        class="mt-0.5 inline-flex cursor-help"
+        class="mt-0.5 inline-flex cursor-help sm:mt-0"
         [hlmTooltip]="kindLabel() + ': ' + help()"
         position="right"
         tabindex="-1"
       >
         <svg
           [lucideIcon]="kind().icon"
-          [size]="16"
+          [size]="15"
           [strokeWidth]="1.75"
           [class]="kind().color"
         ></svg>
       </span>
 
-      <div class="min-w-0">
-        <div class="flex min-w-0 items-baseline gap-2">
-          <a
-            [routerLink]="primaryLink().commands"
-            [queryParams]="primaryLink().query"
-            class="hover:underline min-w-0 truncate text-sm font-medium focus-visible:underline focus-visible:outline-none"
-            >{{ item().title }}</a
-          >
-          @if (item().severity === 'high' && mode() === 'open') {
-            <span class="text-status-blocked shrink-0 text-[11px] font-medium">High</span>
-          }
-        </div>
+      <div class="flex min-w-0 flex-col sm:flex-row sm:items-baseline sm:gap-2.5">
+        <a
+          [appPreviewLink]="primaryLink().commands"
+          [queryParams]="primaryLink().query"
+          [previewable]="!!issueKey()"
+          class="min-w-0 truncate text-[13px] focus-visible:underline focus-visible:outline-none sm:shrink-0 sm:max-w-[70%]"
+          [class.text-muted-foreground]="mode() !== 'open'"
+          (preview)="preview()"
+          >{{ item().title }}</a
+        >
         @if (item().detail) {
-          <p class="text-meta mt-0.5 line-clamp-2 sm:truncate">{{ item().detail }}</p>
+          <p class="text-meta line-clamp-2 min-w-0 sm:truncate">{{ item().detail }}</p>
         }
-
-
       </div>
 
       <div class="col-span-full flex items-center gap-2 max-sm:ps-7 sm:col-span-1 sm:justify-end">
         @if (subjectChip(); as c) {
           <app-entity-chip [type]="c.type" [ref]="c.ref" compact class="max-sm:me-auto" />
+        }
+        @if (item().severity === 'high' && mode() === 'open') {
+          <span class="bg-primary size-2 shrink-0 rounded-full" role="img" aria-label="High priority"></span>
         }
         <span
           class="text-meta w-9 text-end tabular-nums max-sm:w-auto"
@@ -255,9 +253,16 @@ export class AttentionRow {
       return { type: 'issue', ref: it.issueId };
     return null;
   });
-  protected readonly severityBar = computed(() =>
-    this.mode() === 'open' ? SEVERITY_VIEW[this.item().severity].bar : 'bg-transparent',
-  );
+  /** The task this item is about, when it has one. */
+  protected readonly issueKey = computed(() => {
+    const id = this.item().issueId;
+    return id ? this.store.issueById().get(id)?.key : undefined;
+  });
+  protected readonly selected = computed(() => {
+    const key = this.issueKey();
+    const c = this.pane.content();
+    return this.focused() || (!!key && c?.kind === 'task' && c.idOrKey === key);
+  });
   protected readonly artifactUrl = computed(() => {
     const id = this.item().artifactId;
     return id ? this.store.artifactById().get(id)?.url : undefined;
@@ -285,6 +290,21 @@ export class AttentionRow {
   });
 
   private readonly router = inject(Router);
+  private readonly pane = inject(RightPaneStore);
+  private readonly viewport = inject(Viewport);
+
+  protected preview(): void {
+    const key = this.issueKey();
+    if (key) this.pane.show({ kind: 'task', idOrKey: key });
+  }
+
+  /** A click anywhere on the row (not on a control) previews its task. */
+  protected onRowClick(e: MouseEvent): void {
+    this.rowClicked.emit();
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    if (target?.closest('a, button') || this.viewport.isMobile() || !isPreviewClick(e)) return;
+    this.preview();
+  }
 
   protected go(commands: unknown[]): void {
     void this.router.navigate(commands);

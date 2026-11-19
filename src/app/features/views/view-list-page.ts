@@ -50,23 +50,22 @@ interface ViewSection {
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
         @for (s of sections(); track s.id) {
-          <div class="bg-background/90 sticky top-0 z-10 mt-2 flex h-8 items-center gap-2 px-4 backdrop-blur sm:px-6">
-            <span class="text-xs font-medium">{{ s.title }}</span>
-            <span class="text-muted-foreground text-xs tabular-nums">{{ s.views.length }}</span>
+          <div class="text-muted-foreground bg-background sticky top-0 z-10 mt-1 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5">
+            <span>{{ s.title }}</span>
+            <span class="tabular-nums">{{ s.views.length }}</span>
           </div>
           @for (v of s.views; track v.id) {
             <a
               role="listitem"
               [routerLink]="['/', slug(), 'views', v.id]"
               [attr.data-row-id]="v.id"
-              class="hover:bg-hover focus-visible:bg-hover focus-visible:ring-ring flex min-h-14 items-center gap-3 px-4 py-2.5 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-9 md:py-1.5"
+              class="hover:bg-hover focus-visible:bg-hover focus-visible:ring-ring flex min-h-14 items-center gap-3 px-4 py-2.5 outline-none focus-visible:ring-1 focus-visible:ring-inset sm:px-5 md:min-h-9 md:py-1.5"
               [class.bg-selected]="ui.focusedRowId() === v.id"
             >
               <svg
                 [lucideIcon]="entityIcon(v)"
                 [size]="14"
-                [class]="v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
-                class="shrink-0"
+                class="text-muted-foreground shrink-0"
               ></svg>
               <span class="min-w-0 shrink truncate text-sm">{{ v.name }}</span>
               <span class="text-meta hidden min-w-0 flex-1 truncate md:inline">{{ summary(v) }}</span>

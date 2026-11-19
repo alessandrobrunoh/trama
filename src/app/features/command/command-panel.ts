@@ -764,7 +764,7 @@ export class CommandPanel {
         keywords: 'id',
         icon: LucideHash,
         hint: c.key,
-        keys: c.issue ? 'mod+.' : undefined,
+        keys: c.issue ? 'mod+shift+k' : undefined,
         run: () => void this.clipboard.copy(c.key, 'Key copied'),
       },
       {

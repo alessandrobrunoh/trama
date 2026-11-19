@@ -1,15 +1,18 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { TramaStore, UiStore } from '../../core';
+import { TramaStore, UiStore, statusTypeOf } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { TopBarActions } from '../../layout/page-chrome';
+import { StatusBar } from '../../layout/status-bar';
+import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { PriorityIcon } from '../../shared/priority-icon';
 import { FullDatePipe } from '../../shared/pipes';
+import { PreviewLink, useKeyboardPreview } from '../issues/list-preview';
+import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
 import { ProjectGlyph } from './project-glyph';
 import {
@@ -30,7 +33,7 @@ import { SearchInput } from '../../shared/search-input';
     SearchInput,
     LabelPicker,
     LabelChips,
-    RouterLink,
+    PreviewLink,
     HlmButtonImports,
     LucideDynamicIcon,
     PageHeader,
@@ -38,7 +41,8 @@ import { SearchInput } from '../../shared/search-input';
     Kbd,
     EmptyState,
     TopBarActions,
-    PriorityIcon,
+    ActorAvatar,
+    StatusBar,
     FullDatePipe,
     ProjectGlyph,
   ],
@@ -56,7 +60,24 @@ import { SearchInput } from '../../shared/search-input';
 
     <app-page-header title="Projects" [description]="description()" />
 
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-6">
+    <app-status-bar>
+      <span class="tabular-nums">{{ total() }} {{ total() === 1 ? 'project' : 'projects' }} · {{ inProgress() }} in progress</span>
+      @if (hasFilters()) {
+        <span class="truncate">{{ rows().length }} shown</span>
+      }
+      @if (hasFilters()) {
+        <button
+          end
+          type="button"
+          class="hover:text-foreground underline-offset-2 hover:underline"
+          (click)="clearFilters()"
+        >
+          Clear filters
+        </button>
+      }
+    </app-status-bar>
+
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-5">
       <app-search-input noun="projects" [(value)]="search" />
       <div
         class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
@@ -115,77 +136,79 @@ import { SearchInput } from '../../shared/search-input';
       </app-empty-state>
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
-        <div
-          class="text-muted-foreground hidden items-center gap-3 px-4 py-1.5 text-xs sm:px-6 md:flex"
-        >
-          <span class="flex-1">Name</span>
-          <span class="w-24">Priority</span>
-          <span class="w-28">Status</span>
-          <span class="w-24">Health</span>
-          <span class="w-28">Lead</span>
-          <span class="w-28">Target</span>
-          <span class="w-36 text-right">Repository</span>
-        </div>
-        @for (row of rows(); track row.project.id) {
-          @let p = row.project;
-          <a
-            [routerLink]="['/', slug(), 'projects', p.id]"
-            [attr.data-row-id]="p.id"
-            role="listitem"
-            class="hover:bg-hover focus-visible:bg-hover focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
-            [class.bg-muted]="ui.focusedRowId() === p.id"
-          >
-            <span class="flex min-w-0 flex-1 items-center gap-2.5">
-              <app-project-glyph [project]="p" [size]="16" />
-              <span class="min-w-0">
-                <span class="block truncate text-sm font-medium">
-                  <span class="text-muted-foreground mr-1.5 font-mono text-xs">{{ p.key }}</span>
-                  {{ p.name }}
-                </span>
-                @if (p.summary) {
-                  <span class="text-muted-foreground block truncate text-xs">{{ p.summary }}</span>
-                }
-                @if (p.labels.length) {
-                  <app-label-chips class="mt-1" [ids]="p.labels" />
-                }
-              </span>
-            </span>
-            <span
-              class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[22px] max-md:text-[13px] md:contents"
-            >
-              <span class="flex w-24 items-center max-md:w-auto"
-                ><app-priority-icon [priority]="p.priority" [showLabel]="true"
-              /></span>
-              <span
-                class="flex w-28 items-center gap-1.5 max-md:w-auto"
-                [style.color]="row.status.color"
+        @for (g of groups(); track g.id) {
+          <section [attr.aria-label]="g.label">
+            <h2 class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] font-normal sm:px-5">
+              <span class="size-2 shrink-0 rounded-full" [style.background]="g.color"></span>
+              {{ g.label }}
+              <span class="tabular-nums">{{ g.rows.length }}</span>
+            </h2>
+            @for (row of g.rows; track row.project.id) {
+              @let p = row.project;
+              <a
+                [appPreviewLink]="['/', slug(), 'projects', p.id]"
+                (preview)="showProject(p.id)"
+                [attr.data-row-id]="p.id"
+                [attr.aria-current]="isPreviewed(p.id) ? 'true' : null"
+                role="listitem"
+                class="focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset sm:px-5 md:min-h-9 md:flex-nowrap md:py-1.5"
+                [class]="
+                  isPreviewed(p.id) || ui.focusedRowId() === p.id
+                    ? 'bg-selected'
+                    : 'hover:bg-hover'
+                "
               >
+                <span class="flex min-w-0 flex-1 items-center gap-2.5">
+                  <app-project-glyph [project]="p" [size]="16" />
+                  <span class="max-w-[14rem] min-w-0 shrink-0 truncate">{{ p.name }}</span>
+                  @if (p.summary) {
+                    <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs max-lg:hidden">{{ p.summary }}</span>
+                  }
+                  @if (p.labels.length) {
+                    <app-label-chips class="shrink-0 max-xl:hidden" [ids]="p.labels" [max]="2" />
+                  }
+                </span>
                 <span
-                  class="size-2 shrink-0 rounded-full"
-                  [style.background]="row.status.color"
-                ></span>
-                {{ row.status.label }}
-              </span>
-              @if (row.health; as h) {
-                <span class="flex w-24 items-center gap-1.5 max-md:w-auto" [style.color]="h.color">
-                  <span class="size-2 shrink-0 rounded-full" [style.background]="h.color"></span>
-                  {{ h.label }}
+                  class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] max-md:text-[13px] md:contents"
+                >
+                  <span class="flex w-24 items-center gap-1.5 max-md:w-auto">
+                    @if (row.health; as h) {
+                      <span class="size-2 shrink-0 rounded-full" [style.background]="h.color"></span>
+                      {{ h.label }}
+                    } @else {
+                      <span class="max-md:hidden">—</span>
+                    }
+                  </span>
+                  <span
+                    class="flex w-28 items-center gap-2 max-md:w-auto"
+                    [attr.aria-label]="row.percent + '% complete'"
+                  >
+                    <span class="bg-foreground/10 h-1 w-14 overflow-hidden rounded-full" aria-hidden="true">
+                      <span
+                        class="bg-status-done block h-full rounded-full"
+                        [style.width.%]="row.percent"
+                      ></span>
+                    </span>
+                    <span class="tabular-nums">{{ row.percent }}%</span>
+                  </span>
+                  <span class="flex w-32 items-center gap-1.5 max-md:w-auto max-md:max-w-36">
+                    @if (p.leadId) {
+                      <app-actor-avatar [actor]="{ type: 'user', id: p.leadId }" [size]="18" />
+                      <span class="truncate">{{ row.lead }}</span>
+                    } @else {
+                      <span>—</span>
+                    }
+                  </span>
+                  <span
+                    class="w-24 whitespace-nowrap max-md:hidden"
+                    [class.text-status-blocked]="row.overdue"
+                  >
+                    {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
+                  </span>
                 </span>
-              } @else {
-                <span class="w-24 max-md:hidden">—</span>
-              }
-              <span class="w-28 truncate max-md:w-auto max-md:max-w-32">{{ row.lead ?? '—' }}</span>
-              <span
-                class="w-28 whitespace-nowrap max-md:w-auto"
-                [class.text-status-blocked]="row.overdue"
-              >
-                {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
-              </span>
-              <span class="w-36 truncate text-right font-mono text-[11px] max-md:w-auto">{{
-                row.repository || '—'
-              }}</span>
-            </span>
-          </a>
+              </a>
+            }
+          </section>
         }
       </div>
     }
@@ -241,15 +264,56 @@ export class ProjectListPage {
           Number(isClosed(a, entries)) - Number(isClosed(b, entries)) || a.name.localeCompare(b.name)
         );
       })
-      .map((project) => ({
-        project,
-        status: projectStatusView(project.status, this.store.settings().statuses.project),
-        health: projectHealthView(project.health, this.store.settings().statuses.projectHealth),
-        lead: project.leadId ? users.get(project.leadId)?.name : undefined,
-        overdue: isOverdue(project),
-        repository: project.repository ?? '',
-      }));
+      .map((project) => {
+        const issues = this.store.issuesByProject().get(project.id) ?? [];
+        return {
+          project,
+          status: projectStatusView(project.status, this.store.settings().statuses.project),
+          health: projectHealthView(project.health, this.store.settings().statuses.projectHealth),
+          lead: project.leadId ? users.get(project.leadId)?.name : undefined,
+          overdue: isOverdue(project),
+          percent: milestoneStats(issues, usesPoints(issues, this.store.estimateScale())).percent,
+        };
+      });
   });
+
+  /** Rows under a muted header per project status, in the workspace's status order. */
+  protected readonly groups = computed(() => {
+    const rows = this.rows();
+    return this.store
+      .settings()
+      .statuses.project.map((entry) => ({
+        id: entry.id,
+        label: entry.name,
+        color: entry.color,
+        rows: rows.filter((r) => r.project.status === entry.id),
+      }))
+      .filter((g) => g.rows.length > 0);
+  });
+
+  protected readonly inProgress = computed(
+    () =>
+      this.store
+        .projects()
+        .filter((p) => statusTypeOf(this.store.settings().statuses.project, p.status) === 'in_progress')
+        .length,
+  );
+
+  private readonly pane = inject(RightPaneStore);
+
+  /** Arrow keys and j/k show the focused project in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => this.pane.show({ kind: 'project', id }));
+
+  protected isPreviewed(id: string): boolean {
+    const c = this.pane.content();
+    return c?.kind === 'project' && c.id === id;
+  }
+
+  /** A single click previews the project; Enter, a double click and phones open it. */
+  protected showProject(id: string): void {
+    this.ui.setFocusedRow(id);
+    this.pane.show({ kind: 'project', id });
+  }
 
   protected readonly description = computed(() => {
     const n = this.total();

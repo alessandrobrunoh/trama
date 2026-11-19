@@ -1,10 +1,11 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, input } from '@angular/core';
 import { PageChrome, type PageTitle } from '../layout/page-chrome';
+import type { ActorInput } from './actor-avatar';
 
 /**
- * Page title + optional toolbar. The title and description are rendered by the shell's top bar
- * (one Linear-style header row: breadcrumb › title · description … actions), so pages don't
- * repeat their name twice. Projected slots render in a compact toolbar row under the top bar,
+ * Page title + optional toolbar. The title, description and `actors` are rendered by the shell's
+ * main header (one slim row: title · avatar group · description … text actions), so pages don't
+ * repeat their name twice. Projected slots render in a compact toolbar row under the header,
  * which is hidden when nothing is projected:
  *   [leading]  icon / status glyph
  *   [meta]     key chip, badges
@@ -35,11 +36,18 @@ import { PageChrome, type PageTitle } from '../layout/page-chrome';
 export class PageHeader {
   readonly title = input.required<string>();
   readonly description = input<string>();
+  /** People involved; shown as a stacked avatar group right after the title in the main header. */
+  readonly actors = input<readonly ActorInput[]>();
 
   constructor() {
     const chrome = inject(PageChrome);
     let mine: PageTitle | null = null;
-    effect(() => chrome.page.set((mine = { title: this.title(), description: this.description() })));
+    effect(
+      () =>
+        chrome.page.set(
+          (mine = { title: this.title(), description: this.description(), actors: this.actors() }),
+        ),
+    );
     inject(DestroyRef).onDestroy(() => {
       if (chrome.page() === mine) chrome.page.set(null);
     });

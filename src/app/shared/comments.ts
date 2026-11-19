@@ -1,7 +1,10 @@
 // Comment composer, single comment and a thread bound to a subject.
+import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  booleanAttribute,
   computed,
   effect,
   inject,
@@ -11,7 +14,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
-import { LucideDynamicIcon, LucidePencil, LucideTrash2 } from '@lucide/angular';
+import { LucideArrowUp, LucideDynamicIcon, LucidePencil, LucideQuote, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
@@ -30,53 +33,96 @@ import { Markdown } from './markdown';
 import { RelativeTimePipe } from './pipes';
 import { UploadFile } from './upload-file';
 import { CommentInput } from './comment-input';
+import { splitQuote, toQuote } from './comment-quote';
 
+/**
+ * Comment box. The default is a card (input on top, hint and send row under it). `dock` is the bottom bar of
+ * the task page: one expanding line with the projected context (status chip, assignee…) on the left and
+ * attach + send on the right.
+ */
 @Component({
   selector: 'app-comment-composer',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, Kbd, CommentInput, UploadFile],
+  imports: [HlmButtonImports, Kbd, CommentInput, UploadFile, LucideDynamicIcon, HlmTooltip],
   host: {
-    class:
-      'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:px-4 max-md:py-2',
+    class: 'block min-w-0',
+    '[class]': 'dock() ? \'\' : mobileSticky',
   },
   template: `
-    <div class="bg-card focus-within:ring-ring/40 overflow-hidden rounded-lg focus-within:ring-2">
-      <app-comment-input
-        #composer
-        class="[&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
-        [placeholder]="placeholder()"
-        [(value)]="draft"
-        (keyed)="onKeydown($event)"
-      />
-      <div class="flex items-center justify-between gap-2 px-3 py-2 max-md:justify-end">
-        <span class="text-meta max-md:hidden"
-          >Markdown · @ to mention, # to link{{
-            prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''
-          }}</span
+    @if (dock()) {
+      <div
+        class="bg-card focus-within:ring-ring/40 flex items-end gap-1.5 rounded-xl py-1 pr-1.5 pl-2 focus-within:ring-2"
+      >
+        <div class="flex shrink-0 items-center gap-0.5 self-center max-sm:hidden">
+          <ng-content />
+        </div>
+        <app-comment-input
+          #composer
+          class="min-w-0 flex-1 [&_textarea]:max-h-40 [&_textarea]:min-h-8 [&_textarea]:resize-none [&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-1 [&_textarea]:py-1.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0 dark:[&_textarea]:bg-transparent"
+          compact
+          [placeholder]="placeholder()"
+          [(value)]="draft"
+          (keyed)="onKeydown($event)"
+        />
+        <app-upload-file
+          class="self-center"
+          label="Attach"
+          variant="ghost"
+          [busy]="uploading()"
+          (file)="attach($event)"
+        />
+        <button
+          hlmBtn
+          size="icon-sm"
+          type="button"
+          class="self-center"
+          aria-label="Send comment"
+          [hlmTooltip]="'Send · ' + (prefs.sendsOnEnter() ? '↵' : '⌘↵')"
+          [disabled]="!draft().trim() || busy()"
+          (click)="send()"
         >
-        <span class="ml-auto flex items-center gap-2">
-          <app-upload-file
-            label="Attach"
-            variant="ghost"
-            [busy]="uploading()"
-            (file)="attach($event)"
-          />
-          <button
-            hlmBtn
-            size="sm"
-            type="button"
-            [disabled]="!draft().trim() || busy()"
-            (click)="send()"
-          >
-            Comment
-            <app-kbd
-              [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'"
-              class="opacity-70 max-sm:hidden"
-            />
-          </button>
-        </span>
+          <svg [lucideIcon]="sendIcon" [size]="15" aria-hidden="true"></svg>
+        </button>
       </div>
-    </div>
+    } @else {
+      <div class="bg-card focus-within:ring-ring/40 overflow-hidden rounded-lg focus-within:ring-2">
+        <app-comment-input
+          #composer
+          class="[&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
+          [placeholder]="placeholder()"
+          [(value)]="draft"
+          (keyed)="onKeydown($event)"
+        />
+        <div class="flex items-center justify-between gap-2 px-3 py-2 max-md:justify-end">
+          <span class="text-meta max-md:hidden"
+            >Markdown · @ to mention, # to link{{
+              prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''
+            }}</span
+          >
+          <span class="ml-auto flex items-center gap-2">
+            <app-upload-file
+              label="Attach"
+              variant="ghost"
+              [busy]="uploading()"
+              (file)="attach($event)"
+            />
+            <button
+              hlmBtn
+              size="sm"
+              type="button"
+              [disabled]="!draft().trim() || busy()"
+              (click)="send()"
+            >
+              Comment
+              <app-kbd
+                [keys]="prefs.sendsOnEnter() ? 'enter' : 'mod+enter'"
+                class="opacity-70 max-sm:hidden"
+              />
+            </button>
+          </span>
+        </div>
+      </div>
+    }
   `,
 })
 export class CommentComposer {
@@ -84,7 +130,12 @@ export class CommentComposer {
   private readonly drafts = inject(DraftStore);
   private readonly store = inject(TramaStore);
   private readonly composer = viewChild<CommentInput>('composer');
+  protected readonly sendIcon = LucideArrowUp;
+  protected readonly mobileSticky =
+    'max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:px-4 max-md:py-2';
   readonly placeholder = input('Leave a comment…');
+  /** The slim bottom bar of the task page instead of the card. */
+  readonly dock = input(false, { transform: booleanAttribute });
   /** Keeps the unsent text under this key, so it survives navigation and refresh (e.g. `comment:issue:in_x`). */
   readonly draftKey = input<string>();
   readonly submitted = output<string>();
@@ -116,6 +167,15 @@ export class CommentComposer {
       const text = this.draft();
       if (key) this.drafts.set(key, text.trim() ? text : null);
     });
+  }
+
+  /** Starts the draft with a quote of `text` (the "Quote reply" action) and focuses the box. */
+  quote(text: string): void {
+    this.composer()?.append(toQuote(text));
+  }
+
+  focus(): void {
+    this.composer()?.focus();
   }
 
   /** Parent awaits the write and calls this to clear the draft. */
@@ -161,13 +221,16 @@ export class CommentComposer {
     CommentInput,
     UploadFile,
   ],
-  host: { class: 'group/comment block min-w-0' },
+  host: {
+    class: 'group/comment block min-w-0',
+    '[attr.id]': '"comment-" + comment().id',
+  },
   template: `
     <div class="flex min-w-0 gap-3">
-      <app-actor-avatar [actor]="comment().author" [size]="28" class="mt-0.5" />
+      <app-actor-avatar [actor]="comment().author" [size]="24" class="mt-0.5" />
       <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-baseline gap-x-2 gap-y-0.5">
-          <span class="text-foreground truncate text-sm font-medium">{{
+          <span class="text-foreground truncate text-sm">{{
             store.actorName(comment().author)
           }}</span>
           @if (comment().author.type === 'agent') {
@@ -188,30 +251,44 @@ export class CommentComposer {
               >edited</span
             >
           }
-          @if (mine() && !editing()) {
+          @if (!editing() && (mine() || quotable())) {
             <span
               class="ml-auto flex shrink-0 items-center opacity-100 sm:opacity-0 sm:group-focus-within/comment:opacity-100 sm:group-hover/comment:opacity-100"
             >
-              <button
-                hlmBtn
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Edit comment"
-                hlmTooltip="Edit"
-                (click)="startEdit()"
-              >
-                <svg [lucideIcon]="pencil" [size]="12"></svg>
-              </button>
-              <button
-                hlmBtn
-                variant="ghost"
-                size="icon-xs"
-                aria-label="Delete comment"
-                hlmTooltip="Delete"
-                (click)="remove()"
-              >
-                <svg [lucideIcon]="trash" [size]="12"></svg>
-              </button>
+              @if (quotable()) {
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Quote in a reply"
+                  hlmTooltip="Quote reply"
+                  (click)="quoteReply()"
+                >
+                  <svg [lucideIcon]="quoteIcon" [size]="12"></svg>
+                </button>
+              }
+              @if (mine()) {
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Edit comment"
+                  hlmTooltip="Edit"
+                  (click)="startEdit()"
+                >
+                  <svg [lucideIcon]="pencil" [size]="12"></svg>
+                </button>
+                <button
+                  hlmBtn
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label="Delete comment"
+                  hlmTooltip="Delete"
+                  (click)="remove()"
+                >
+                  <svg [lucideIcon]="trash" [size]="12"></svg>
+                </button>
+              }
             </span>
           }
         </div>
@@ -234,8 +311,22 @@ export class CommentComposer {
               (file)="attach($event)"
             />
           </div>
+        } @else if (parts().quote; as quoted) {
+          <!-- A reply to quoted text: the quote on top, the answer under a colored bar. -->
+          <div class="border-border bg-card mt-1.5 overflow-hidden rounded-lg border">
+            <p class="px-3 pt-2 text-sm leading-relaxed">
+              <span class="bg-tone-violet/15 decoration-tone-violet/60 rounded-sm px-0.5 whitespace-pre-line underline decoration-1 underline-offset-2">{{ quoted }}</span>
+            </p>
+            @if (parts().rest) {
+              <div class="border-tone-violet bg-background m-2 rounded-sm border-l-2 px-3 py-1.5">
+                <app-markdown [source]="parts().rest" [link]="refs.linker()" class="block [&_a]:underline [&_a]:underline-offset-2" />
+              </div>
+            } @else {
+              <div class="h-2"></div>
+            }
+          </div>
         } @else {
-          <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-1 block" />
+          <app-markdown [source]="comment().body" [link]="refs.linker()" class="mt-1 block [&_a]:underline [&_a]:underline-offset-2" />
         }
       </div>
     </div>
@@ -244,9 +335,25 @@ export class CommentComposer {
 export class CommentItem {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly document = inject(DOCUMENT);
   protected readonly refs = inject(EntityRefs);
   protected readonly full = fullDate;
   readonly comment = input.required<Comment>();
+  /** Offers "Quote reply": emits the selected text of this comment, or its whole text. */
+  readonly quotable = input(false, { transform: booleanAttribute });
+  readonly quote = output<string>();
+  protected readonly quoteIcon = LucideQuote;
+  protected readonly parts = computed(() => splitQuote(this.comment().body));
+
+  protected quoteReply(): void {
+    const selection = this.document.getSelection();
+    const selected = selection?.toString().trim() ?? '';
+    const inside = !!selection?.anchorNode && this.host.nativeElement.contains(selection.anchorNode);
+    const { quote, rest } = this.parts();
+    const text = inside && selected ? selected : (rest || quote || '').trim();
+    if (text) this.quote.emit(text.length > 400 ? `${text.slice(0, 400).trimEnd()}…` : text);
+  }
   protected readonly editing = signal(false);
   protected readonly draft = signal('');
   protected readonly uploading = signal(false);

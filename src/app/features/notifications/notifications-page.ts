@@ -3,13 +3,26 @@ import { Router } from '@angular/router';
 import { LucideBell, LucideCheck, LucideCheckCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
-import { TramaStore, NotificationsStore, UiStore, usePageShortcuts, type Notification } from '../../core';
+import {
+  TramaStore,
+  NotificationsStore,
+  UiStore,
+  Viewport,
+  usePageShortcuts,
+  type Notification,
+} from '../../core';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
+import { isPreviewClick, useKeyboardPreview } from '../issues/list-preview';
 import { EmptyState } from '../../shared/empty-state';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { NOTIFICATION_KIND_VISUAL } from './notification-kinds';
 
 type Filter = 'all' | 'unread';
+
+/** Task key of a notification link (`tasks/AUTH-42`), when it points at a task. */
+const taskKey = (link: string): string | undefined =>
+  /^\/?(?:tasks|issues)\/([^/?#]+)/.exec(link)?.[1];
 
 /** The "Updates" tab of the Inbox: what happened that concerns you, newest first. */
 @Component({
@@ -18,7 +31,7 @@ type Filter = 'all' | 'unread';
   imports: [LucideDynamicIcon, HlmButtonImports, HlmToggleGroupImports, ActorAvatar, EmptyState, RelativeTimePipe],
   host: { class: 'flex flex-1 flex-col' },
   template: `
-    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 sm:px-6">
+    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 sm:px-5">
       <p class="text-meta" aria-live="polite">{{ description() }}</p>
       <span class="flex-1"></span>
       <hlm-toggle-group
@@ -40,28 +53,28 @@ type Filter = 'all' | 'unread';
 
     @for (g of groups(); track g.label) {
       <section [attr.aria-label]="g.label">
-        <header class="mt-2 flex h-8 items-center gap-2 px-4 sm:px-6">
-          <h2 class="text-xs font-medium">{{ g.label }}</h2>
-          <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
+        <header class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5">
+          <h2 class="font-normal">{{ g.label }}</h2>
+          <span class="tabular-nums">{{ g.items.length }}</span>
         </header>
         @for (n of g.items; track n.id) {
-          <div class="group/row relative" [class.bg-selected]="ui.focusedRowId() === n.id">
+          <div class="group/row relative" [class.bg-selected]="isSelected(n)">
           <button
             type="button"
-            class="hover:bg-hover focus-visible:bg-hover flex w-full items-start gap-3 px-4 py-3 text-left outline-none sm:px-6"
+            class="hover:bg-hover focus-visible:bg-hover flex w-full items-start gap-2.5 px-4 py-2 text-left outline-none sm:px-5"
             [attr.data-row-id]="n.id"
-            (click)="open(n)"
+            (click)="onClick(n, $event)"
           >
             <span class="mt-1.5 flex size-2 shrink-0 items-center justify-center" aria-hidden="true">
               @if (!n.readAt) {
                 <span class="bg-primary size-2 rounded-full"></span>
               }
             </span>
-            <span class="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-md" [class]="visual[n.kind].tint">
+            <span class="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-md" [class]="visual[n.kind].tint">
               <svg [lucideIcon]="visual[n.kind].icon" [size]="14"></svg>
             </span>
             <span class="min-w-0 flex-1">
-              <span class="block text-[13px] leading-snug" [class.font-medium]="!n.readAt" [class.text-muted-foreground]="!!n.readAt">{{ n.title }}</span>
+              <span class="block text-[13px] leading-snug" [class.text-muted-foreground]="!!n.readAt">{{ n.title }}</span>
               @if (n.body) {
                 <span class="text-muted-foreground mt-0.5 line-clamp-2 block text-xs leading-relaxed">{{ n.body }}</span>
               }
@@ -157,9 +170,37 @@ export class NotificationsPage {
     if (value === 'all' || value === 'unread') this.filter.set(value);
   }
 
+  private readonly pane = inject(RightPaneStore);
+  private readonly viewport = inject(Viewport);
+  /** Arrow keys and j/k show the focused update's task in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => {
+    const n = this.store.items().find((x) => x.id === id);
+    const key = n ? taskKey(n.link) : undefined;
+    if (key) this.pane.show({ kind: 'task', idOrKey: key });
+  });
+
+  protected isSelected(n: Notification): boolean {
+    if (this.ui.focusedRowId() === n.id) return true;
+    const key = taskKey(n.link);
+    const c = this.pane.content();
+    return !!key && c?.kind === 'task' && c.idOrKey === key;
+  }
+
+  /** A single click previews the task and marks the update read; Enter or a double click opens it. */
+  protected onClick(n: Notification, e: MouseEvent): void {
+    const key = taskKey(n.link);
+    if (key && !this.viewport.isMobile() && isPreviewClick(e)) {
+      this.ui.setFocusedRow(n.id);
+      if (!n.readAt) void this.store.markRead([n.id]);
+      this.pane.show({ kind: 'task', idOrKey: key });
+      return;
+    }
+    this.open(n);
+  }
+
   protected open(n: Notification): void {
     if (!n.readAt) void this.store.markRead([n.id]);
-    void this.router.navigate(['/', this.trama.slug(), ...n.link.split('/')]);
+    void this.router.navigate(['/', this.trama.slug(), ...n.link.split('/').filter(Boolean)]);
   }
 
   protected openSettings(): void {

@@ -25,7 +25,9 @@ import {
   usePageShortcuts,
   type AttentionItem,
 } from '../../core';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { EmptyState, Kbd } from '../../shared';
+import { useKeyboardPreview } from '../issues/list-preview';
 import { ATTENTION_SECTIONS } from './attention-kinds';
 import { AttentionRow } from './attention-row';
 import { morningOf, snoozePresets } from './snooze';
@@ -77,10 +79,10 @@ type Tab = 'open' | 'archived';
     } @else if (tab() === 'open') {
       @for (s of sections(); track s.sec.id) {
         <section [attr.aria-label]="s.sec.title">
-          <header class="mt-2 flex h-8 items-center gap-2 px-4 sm:px-6">
-            <svg [lucideIcon]="s.sec.icon" [size]="13" class="text-muted-foreground"></svg>
-            <h2 class="text-xs font-medium">{{ s.sec.title }}</h2>
-            <span class="text-muted-foreground text-xs tabular-nums">{{ s.items.length }}</span>
+          <header class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5">
+            <svg [lucideIcon]="s.sec.icon" [size]="13"></svg>
+            <h2 class="font-normal">{{ s.sec.title }}</h2>
+            <span class="tabular-nums">{{ s.items.length }}</span>
             <span class="text-meta ms-2 hidden truncate md:inline">{{ s.sec.hint }}</span>
           </header>
           @for (it of s.items; track it.id) {
@@ -252,6 +254,14 @@ export class AttentionPage {
   protected readonly pickedDate = signal<Date | null>(null);
   protected readonly presets = computed(() => (this.snoozeFor() ? snoozePresets() : []));
   protected readonly minDate = computed(() => (this.snoozeFor() ? new Date() : new Date()));
+
+  private readonly pane = inject(RightPaneStore);
+  /** Arrow keys and j/k show the focused item's task in the right pane. */
+  private readonly _preview = useKeyboardPreview((id) => {
+    const issueId = this.flat().find((a) => a.id === id)?.issueId;
+    const key = issueId ? this.store.issueById().get(issueId)?.key : undefined;
+    if (key) this.pane.show({ kind: 'task', idOrKey: key });
+  });
 
   constructor() {
     this.ui.setFocusedRow(null);

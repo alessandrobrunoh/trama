@@ -4,6 +4,7 @@ import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { TramaStore } from '../../core/stores/trama.store';
 import { NotificationsStore } from '../../core/stores/notifications.store';
 import { usePageShortcuts } from '../../core/keyboard/keyboard-shortcuts.service';
+import { StatusBar } from '../../layout/status-bar';
 import { PageHeader } from '../../shared/page-header';
 import { AttentionPage } from '../attention/attention-page';
 import { NotificationsPage } from '../notifications/notifications-page';
@@ -33,11 +34,11 @@ const LABELS: Record<InboxTab, string> = {
 @Component({
   selector: 'app-inbox-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmTabsImports, PageHeader, AttentionPage, NotificationsPage, MyTasks, OnboardingChecklist],
+  imports: [HlmTabsImports, PageHeader, StatusBar,AttentionPage, NotificationsPage, MyTasks, OnboardingChecklist],
   host: { class: 'flex min-h-full flex-col' },
   template: `
     <app-page-header title="Inbox" [description]="summary()">
-      <div class="px-4 sm:px-6">
+      <div class="px-4 sm:px-5">
         <hlm-tabs [tab]="current()" (tabActivated)="select($event)">
           <hlm-tabs-list variant="line" class="scrollbar-none -mb-px h-9 max-w-full overflow-x-auto p-0" aria-label="Inbox sections">
             <button hlmTabsTrigger="needs-you" class="shrink-0 px-2">
@@ -51,7 +52,10 @@ const LABELS: Record<InboxTab, string> = {
             <button hlmTabsTrigger="updates" class="shrink-0 px-2">
               Updates
               @if (notifications.unread()) {
-                <span class="bg-primary text-primary-foreground ms-1.5 min-w-[18px] rounded-full px-1.5 text-center text-[10px] leading-[16px] font-semibold tabular-nums">{{ notifications.unread() }}</span>
+                <span class="ms-1.5 inline-flex items-center gap-1 text-xs">
+                  <span class="bg-primary size-1.5 rounded-full" aria-hidden="true"></span>
+                  <span class="text-muted-foreground tabular-nums">{{ notifications.unread() }}</span>
+                </span>
               }
             </button>
             <button hlmTabsTrigger="later" class="shrink-0 px-2">
@@ -62,6 +66,10 @@ const LABELS: Record<InboxTab, string> = {
         </hlm-tabs>
       </div>
     </app-page-header>
+
+    <app-status-bar>
+      <span>{{ summary() }}</span>
+    </app-status-bar>
 
     <app-onboarding-checklist compact class="px-4 pt-3 sm:px-6" />
 

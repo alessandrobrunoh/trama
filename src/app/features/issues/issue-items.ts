@@ -22,6 +22,7 @@ import {
   LucideUserRoundX,
 } from '@lucide/angular';
 import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
+import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
@@ -32,12 +33,19 @@ import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue, quietToggleStatus } from './issue-model';
 import { IssueActions } from './issue-actions';
 import { IssueProp } from './issue-prop';
+import { NeedsYou, PreviewLink, isTaskPreviewed } from './list-preview';
 
 /** Shared bits of row + card. */
 @Directive()
 abstract class IssueItemBase {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
+  private readonly pane = inject(RightPaneStore);
+  private readonly needs = inject(NeedsYou);
+  /** The right pane shows this task. */
+  protected readonly previewed = computed(() => isTaskPreviewed(this.pane, this.issue()));
+  /** An open attention item is waiting on the current user. */
+  protected readonly needsYou = computed(() => this.needs.issueIds().has(this.issue().id));
   readonly issue = input.required<Issue>();
   // Keep focus consumption in the item: a hover must not recheck every binding on the board.
   protected readonly focused = computed(() => this.ui.focusedRowId() === this.issue().id);
@@ -79,11 +87,19 @@ abstract class IssueItemBase {
     inject(DestroyRef).onDestroy(() => element.removeEventListener('mouseenter', enter));
   }
 
+  /** Shift-click selects a range; the link itself previews or opens (see `PreviewLink`). */
   protected onLinkClick(e: MouseEvent): void {
     if (e.shiftKey && this.selectable()) {
       e.preventDefault();
       this.toggleSelect.emit(e);
     }
+  }
+
+  /** A single click shows the task in the right pane. */
+  protected preview(): void {
+    const issue = this.issue();
+    this.ui.setFocusedRow(issue.id);
+    this.pane.show({ kind: 'task', idOrKey: issue.key });
   }
 
   protected onCheck(e: MouseEvent): void {
@@ -97,7 +113,7 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
+  imports: [RouterLink, PreviewLink, LucideDynamicIcon, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -176,18 +192,20 @@ abstract class IssueItemBase {
     } @else {
     <div
       [attr.data-row-id]="i.id"
-      class="group/row relative flex items-center gap-2 pr-3 pl-1.5 text-[13px] sm:pr-5 sm:pl-2.5"
+      class="group/row relative flex items-center gap-2.5 pr-3 pl-3 text-[13px] sm:pr-5 sm:pl-5"
       [class]="rowState()"
     >
       <a
-        [routerLink]="['/', slug(), 'tasks', i.key]"
+        [appPreviewLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
         [attr.aria-label]="i.key + ' ' + i.title"
+        [attr.aria-current]="previewed() ? 'true' : null"
+        (preview)="preview()"
         (click)="onLinkClick($event)"
       ></a>
 
       @if (selectable()) {
-        <span class="relative flex w-5 shrink-0 justify-center">
+        <span class="relative -ml-1 flex w-4 shrink-0 justify-center">
           <button
             type="button"
             role="checkbox"
@@ -202,22 +220,19 @@ abstract class IssueItemBase {
             }
           </button>
         </span>
-      } @else {
-        <span class="w-1.5 shrink-0"></span>
       }
 
-      <app-issue-prop class="relative" [issue]="i" field="priority" />
-      @if (s.kind) {
-        <app-issue-kind [kind]="i.kind" class="max-sm:hidden" />
-      }
-      <span class="text-muted-foreground w-[4.5rem] shrink-0 truncate font-mono text-xs max-sm:hidden">{{ i.key }}</span>
       <app-issue-prop class="relative" [issue]="i" field="status" />
+      <span class="text-muted-foreground w-[4.5rem] shrink-0 truncate font-mono text-xs max-sm:hidden">{{ i.key }}</span>
       <span class="min-w-0 flex-1 truncate" [class.text-muted-foreground]="quiet()">
         {{ i.title }}
         @if (i.duplicateOfId) {
           <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
         }
       </span>
+      @if (s.labels && i.labels.length) {
+        <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
+      }
       @if (hasEstimate()) {
         <app-estimate class="relative text-xs max-sm:hidden" [value]="i.estimate" />
       }
@@ -226,11 +241,19 @@ abstract class IssueItemBase {
           <app-project-chip [projectId]="pid" />
         </span>
       }
-      @if (s.labels && i.labels.length) {
-        <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
+      @if (i.priority !== 'none') {
+        <app-issue-prop class="relative" [issue]="i" field="priority" />
+      }
+      @if (needsYou()) {
+        <span class="bg-primary size-2 shrink-0 rounded-full" role="img" aria-label="Needs you"></span>
       }
       @if (s.assignee) {
-        <app-issue-prop class="relative" [issue]="i" field="assignee" />
+        <app-issue-prop
+          class="relative"
+          [class]="i.assigneeId ? '' : 'opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100'"
+          [issue]="i"
+          field="assignee"
+        />
       }
       @if (s.date) {
         <span class="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums max-sm:hidden" [attr.aria-label]="dateTitle()">{{ date() }}</span>
@@ -313,7 +336,11 @@ export class IssueRow extends IssueItemBase {
   protected readonly rowState = computed(
     () =>
       (this.compact() ? 'min-h-8 ' : 'min-h-10 ') +
-      (this.selected() ? 'bg-selected' : this.focused() ? 'bg-hover' : 'hover:bg-hover'),
+      (this.selected() || this.previewed()
+        ? 'bg-selected'
+        : this.focused()
+          ? 'bg-hover'
+          : 'hover:bg-hover'),
   );
 }
 
@@ -321,7 +348,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
+  imports: [PreviewLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -329,12 +356,14 @@ export class IssueRow extends IssueItemBase {
     <div
       [attr.data-row-id]="i.id"
       class="group/card relative rounded-lg px-3 py-2.5 transition-colors"
-      [class]="selected() ? 'bg-selected' : focused() ? 'bg-secondary ring-1 ring-ring/40' : 'bg-secondary hover:bg-accent'"
+      [class]="selected() || previewed() ? 'bg-selected' : focused() ? 'bg-background ring-1 ring-ring/40' : 'bg-background hover:bg-hover'"
     >
       <a
-        [routerLink]="['/', slug(), 'tasks', i.key]"
+        [appPreviewLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 rounded-lg outline-none focus-visible:ring-2"
         [attr.aria-label]="i.key + ' ' + i.title"
+        [attr.aria-current]="previewed() ? 'true' : null"
+        (preview)="preview()"
         (click)="onLinkClick($event)"
       ></a>
       <div class="flex h-5 items-center gap-1.5">
@@ -358,6 +387,9 @@ export class IssueRow extends IssueItemBase {
           <app-issue-kind [kind]="i.kind" [size]="13" />
         }
         <span class="flex-1"></span>
+        @if (needsYou()) {
+          <span class="bg-primary size-2 shrink-0 rounded-full" role="img" aria-label="Needs you"></span>
+        }
         @if (s.assignee) {
           <app-issue-prop class="relative -mr-1" [issue]="i" field="assignee" [avatarSize]="18" />
         }
@@ -366,10 +398,12 @@ export class IssueRow extends IssueItemBase {
         @if (showStatus()) {
           <app-issue-prop class="relative -ml-1 -mt-0.5" [issue]="i" field="status" />
         }
-        <span class="line-clamp-2 text-[13px] leading-snug font-medium" [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
+        <span class="line-clamp-2 text-[13px] leading-snug " [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-1.5">
-        <app-issue-prop class="relative -ml-0.5 rounded-md" [issue]="i" field="priority" />
+        @if (i.priority !== 'none') {
+          <app-issue-prop class="relative -ml-0.5 rounded-md" [issue]="i" field="priority" />
+        }
         @if (s.project && projectId(); as pid) {
           <app-project-chip [projectId]="pid" />
         }

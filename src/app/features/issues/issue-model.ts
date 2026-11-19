@@ -37,6 +37,37 @@ export const isClosedIssue = (i: Pick<Issue, 'status'>, entries?: readonly Statu
   return type === 'done' || type === 'canceled';
 };
 
+export interface IssueFlow {
+  /** Not done and not canceled. */
+  open: number;
+  inProgress: number;
+  /** Created in the last 7 days. */
+  opened: number;
+  /** Finished (done or canceled) in the last 7 days. */
+  closed: number;
+}
+
+const WEEK_MS = 7 * 86_400_000;
+
+/** Counts for the list status bar: what is open and how many tasks came and went this week. */
+export function issueFlow(
+  issues: readonly Pick<Issue, 'status' | 'createdAt' | 'completedAt' | 'updatedAt'>[],
+  entries?: readonly StatusEntry<IssueStatus>[],
+  now = Date.now(),
+): IssueFlow {
+  const since = now - WEEK_MS;
+  const flow: IssueFlow = { open: 0, inProgress: 0, opened: 0, closed: 0 };
+  for (const i of issues) {
+    const closed = isClosedIssue(i, entries);
+    if (!closed) {
+      flow.open++;
+      if (statusTypeOf(entries ?? defaultStatusCatalog().issue, i.status) === 'in_progress') flow.inProgress++;
+    } else if (Date.parse(i.completedAt ?? i.updatedAt) >= since) flow.closed++;
+    if (Date.parse(i.createdAt) >= since) flow.opened++;
+  }
+  return flow;
+}
+
 /**
  * Status id for the row Done / Reopen control. Uses the first catalog entry of that type so a
  * renamed workspace status is written, and falls back to the legacy enum when the catalog has none.

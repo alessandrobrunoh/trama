@@ -28,6 +28,7 @@ import {
   TramaStore,
   UiStore,
   usePageShortcuts,
+  type ActorRef,
   type DomainEvent,
   type Issue,
   type IssueStatus,
@@ -40,8 +41,10 @@ import { Clipboard } from '../../core/notify/notifier';
 import { EmptyState } from '../../shared/empty-state';
 import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
-import { StatusLabel } from '../../shared/status';
+import { StatusBar } from '../../layout/status-bar';
+import { PageHeader } from '../../shared/page-header';
 import { IssueRow } from '../issues/issue-items';
+import { isClosedIssue, type IssueProp } from '../issues/issue-model';
 import { ProjectMilestones } from '../milestones/project-milestones';
 import { EventLine } from '../../shared/event-line';
 import { CommentThread } from '../../shared/comments';
@@ -91,7 +94,8 @@ const ACTIVITY_CAP = 20;
     ProjectMilestones,
     HlmTabsImports,
     HlmTooltip,
-    StatusLabel,
+    PageHeader,
+    StatusBar,
     IssueRow,
     ProjectAiSummaryButton,
     ProjectIssueSuggestions,
@@ -103,7 +107,27 @@ const ACTIVITY_CAP = 20;
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
     @if (project(); as p) {
+      <app-page-header [title]="p.name" [actors]="members()" />
+
+      <app-status-bar>
+        <span class="tabular-nums">{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }} · {{ openCount() }} open</span>
+        @if (milestoneCount()) {
+          <span class="tabular-nums">{{ milestoneCount() }} {{ milestoneCount() === 1 ? 'milestone' : 'milestones' }}</span>
+        }
+        @if (p.repository) {
+          <span class="truncate font-mono">{{ p.repository }}</span>
+        }
+      </app-status-bar>
+
       <ng-template appTopBarActions>
+        @if (canCreateIssue()) {
+          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="newIssue()">
+            <svg [lucideIcon]="plus" [size]="14"></svg>Add task
+          </button>
+        }
+        <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="copyLink()">
+          <svg [lucideIcon]="linkIcon" [size]="14"></svg>Copy link
+        </button>
         <button
           hlmBtn
           variant="ghost"
@@ -116,9 +140,6 @@ const ACTIVITY_CAP = 20;
         </button>
         <ng-template #more>
           <hlm-dropdown-menu class="w-48">
-            <button hlmDropdownMenuItem (triggered)="copyLink()">
-              <svg [lucideIcon]="linkIcon" [size]="14"></svg> Copy link
-            </button>
             @if (canManage()) {
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
                 <svg [lucideIcon]="trash" [size]="14"></svg> Delete project
@@ -128,13 +149,13 @@ const ACTIVITY_CAP = 20;
         </ng-template>
       </ng-template>
 
-      <header class="px-4 pt-5 sm:px-6">
+      <header class="px-4 pt-4 sm:px-5">
         <div class="flex min-w-0 items-center gap-2.5">
           <app-project-glyph-picker [project]="p" [canEdit]="canManage()" />
           <app-inline-text
             class="min-w-0 flex-1"
             label="project name"
-            textClass="text-xl font-semibold tracking-tight"
+            textClass="text-xl tracking-tight"
             [value]="p.name"
             [canEdit]="canManage()"
             (save)="update({ name: $event })"
@@ -193,35 +214,17 @@ const ACTIVITY_CAP = 20;
       @switch (current()) {
         @case ('tasks') {
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 px-4 py-2 sm:px-6">
-              <span class="text-muted-foreground text-xs tabular-nums"
-                >{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }}</span
-              >
-              @if (canCreateIssue()) {
-                <button
-                  hlmBtn
-                  variant="outline"
-                  size="sm"
-                  class="ml-auto gap-1"
-                  (click)="newIssue()"
-                >
-                  <svg [lucideIcon]="plus" [size]="14"></svg>Add task
-                </button>
-              }
-            </div>
             @if (issueGroups().length) {
               @for (g of issueGroups(); track g.status) {
                 <section [attr.aria-label]="g.label">
                   <h2
-                    class="mt-2 flex items-center gap-2 px-4 py-1.5 text-xs font-medium sm:px-6"
+                    class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] font-normal sm:px-5"
                   >
-                    <app-status-label [status]="g.status" />
-                    <span class="text-muted-foreground font-normal tabular-nums">{{
-                      g.issues.length
-                    }}</span>
+                    {{ g.label }}
+                    <span class="tabular-nums">{{ g.issues.length }}</span>
                   </h2>
                   @for (i of g.issues; track i.id) {
-                    <app-issue-row [issue]="i" />
+                    <app-issue-row [issue]="i" [hidden]="hiddenProps" />
                   }
                 </section>
               }
@@ -247,7 +250,7 @@ const ACTIVITY_CAP = 20;
         }
         @default {
           <div
-            class="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem]"
+            class="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 px-4 py-5 sm:px-5 lg:grid-cols-[minmax(0,1fr)_17rem]"
           >
             <div class="flex min-w-0 flex-col gap-8">
               <section aria-label="Description">
@@ -271,7 +274,7 @@ const ACTIVITY_CAP = 20;
               <app-project-milestones [project]="p" />
 
               <section>
-                <h2 class="mb-1 text-[13px] font-semibold">Activity</h2>
+                <h2 class="text-muted-foreground mb-1 text-[13px] font-normal">Activity</h2>
                 @if (activity().length) {
                   <div class="flex flex-col">
                     @for (e of shownActivity(); track e.id) {
@@ -297,7 +300,7 @@ const ACTIVITY_CAP = 20;
               </section>
 
               <section>
-                <h2 class="mb-2 text-[13px] font-semibold">Comments</h2>
+                <h2 class="text-muted-foreground mb-2 text-[13px] font-normal">Comments</h2>
                 <app-comment-thread [subject]="{ type: 'project', id: p.id }" />
               </section>
             </div>
@@ -448,6 +451,8 @@ export class ProjectDetailPage {
   protected readonly linkIcon = LucideLink;
   protected readonly plus = LucidePlus;
   protected readonly issueIcon = LucideCircleDot;
+  /** Rows inside a project do not repeat the project. */
+  protected readonly hiddenProps: readonly IssueProp[] = ['project'];
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
   protected get statuses() {
@@ -491,6 +496,21 @@ export class ProjectDetailPage {
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
     tasks: this.issues().length,
   }));
+  protected readonly openCount = computed(
+    () => this.issues().filter((i) => !isClosedIssue(i, this.store.settings().statuses.issue)).length,
+  );
+  protected readonly milestoneCount = computed(
+    () => this.store.milestonesByProject().get(this.id() ?? '')?.length ?? 0,
+  );
+  /** People working on the project: its lead, then the assignees of its open tasks. */
+  protected readonly members = computed<ActorRef[]>(() => {
+    const ids = new Set<string>();
+    const lead = this.project()?.leadId;
+    if (lead) ids.add(lead);
+    for (const i of this.issues())
+      if (i.assigneeId && !isClosedIssue(i, this.store.settings().statuses.issue)) ids.add(i.assigneeId);
+    return [...ids].map((id) => ({ type: 'user', id }));
+  });
   protected readonly activity = computed(() => {
     const id = this.project()?.id;
     if (!id) return [] as DomainEvent[];
