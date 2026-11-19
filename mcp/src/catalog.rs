@@ -342,7 +342,7 @@ mod tests {
     #[test]
     fn embedded_catalog_is_valid() {
         let tools = load().unwrap();
-        assert!(tools.len() > 80);
+        assert!(tools.len() > 60);
         for t in &tools {
             assert!(t.description.len() < 400, "{} description too long", t.name);
             // every schema must be serializable and object-typed
@@ -421,47 +421,33 @@ mod tests {
     }
 
     #[test]
-    fn project_update_tools_use_the_nested_route() {
-        let call = tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "health": "at_risk", "body": "Slipping." })).unwrap();
-        assert_eq!(call.method, Method::Post);
-        assert_eq!(call.path, "/projects/prj_1/updates");
-        assert_eq!(call.body, Some(json!({ "health": "at_risk", "body": "Slipping." })));
-        assert!(tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "health": "fine", "body": "x" })).unwrap_err().contains("one of"));
-        assert!(tool("create_project_update").build_call(&json!({ "projectId": "prj_1", "body": "x" })).unwrap_err().contains("health"));
-
-        let call = tool("update_project_update").build_call(&json!({ "projectId": "prj_1", "id": "pu_1", "health": "on_track" })).unwrap();
-        assert_eq!((call.method, call.path.as_str()), (Method::Patch, "/projects/prj_1/updates/pu_1"));
-        assert_eq!(call.body, Some(json!({ "health": "on_track" })));
-
-        assert_eq!(tool("delete_project_update").permission, "projects:delete");
-        assert_eq!(tool("list_project_updates").build_call(&json!({ "projectId": "prj_1" })).unwrap().path, "/projects/prj_1/updates");
+    fn removed_project_and_document_tools_are_not_in_the_catalog() {
+        let tools = load().unwrap();
+        for gone in ["get_project_context", "list_project_artifacts", "create_project_update", "list_project_updates", "list_documents", "create_document", "attach_document"] {
+            assert!(!tools.iter().any(|t| t.name == gone), "{gone} is still in the catalog");
+        }
+        for tool in &tools {
+            assert!(!tool.path.contains("/documents") && !tool.path.contains("/updates") && !tool.path.contains("context.md"), "{}", tool.name);
+            assert!(!tool.params.iter().any(|p| p.name == "goal"), "{} still has a goal param", tool.name);
+        }
+        let raw = TOOLS_JSON.to_ascii_lowercase();
+        assert!(!raw.contains("project_update") && !raw.contains("\"goal\""));
     }
 
     #[test]
-    fn project_context_is_the_markdown_route() {
-        let t = tool("get_project_context");
-        assert_eq!(t.build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/context.md");
-        assert_eq!(t.permission, "projects:read");
-        assert!(t.listing()["annotations"]["readOnlyHint"].as_bool().unwrap());
-    }
-
-    #[test]
-    fn artifacts_attach_to_a_project_or_issue() {
+    fn artifacts_attach_to_a_task() {
         let t = tool("create_artifact");
         let s = t.input_schema();
-        assert_eq!(s["required"], json!(["kind", "title"]));
-        assert!(s["properties"]["kind"]["enum"].as_array().unwrap().contains(&json!("link")));
-        for owner in ["projectId", "issueId"] {
-            assert!(s["properties"][owner].is_object(), "{owner}");
-        }
-        let call = t.build_call(&json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })).unwrap();
-        assert_eq!(call.body, Some(json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })));
+        assert_eq!(s["required"], json!(["issueId", "kind", "title"]));
+        let kinds = s["properties"]["kind"]["enum"].as_array().unwrap();
+        assert!(kinds.contains(&json!("link")) && kinds.contains(&json!("pull_request")));
+        assert!(s["properties"]["projectId"].is_null());
+        let call = t.build_call(&json!({ "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design notes" })).unwrap();
+        assert_eq!(call.body, Some(json!({ "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design notes" })));
         assert!(t.listing()["description"].as_str().unwrap().contains("[requires permission artifacts:write]"));
-        assert_eq!(tool("list_project_artifacts").build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/artifacts");
         let call = tool("list_task_artifacts").build_call(&json!({ "idOrKey": "BUG-1" })).unwrap();
         assert_eq!(call.path, "/tasks/BUG-1/artifacts");
         assert_eq!(tool("list_task_artifacts").permission, "artifacts:read");
-        assert_eq!(tool("list_project_artifacts").permission, "artifacts:read");
     }
 
     #[test]

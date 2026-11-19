@@ -7,7 +7,7 @@
   </picture>
 </a>
 
-### Tasks describe problems and goals. Agents work directly from Tasks.
+### Tasks describe problems. Agents work directly from Tasks.
 
 **Trama is the source-available coordination layer for software teams that work with coding agents.**<br>
 Tasks stay granular. Projects group them, comments keep the context, and artifacts show what the work produced.
@@ -45,12 +45,12 @@ Trama keeps one problem per Task without forcing a session that spans several Ta
 Trama keeps Tasks first-class and does not copy what execution tools already hold (transcripts, prompts, file edits): it links to that context. Comments and artifacts preserve only what helps someone understand and continue the work.
 
 ```text
-  Task            "What is the problem, context and desired goal?"
+  Task            "What is the problem and its context?"
      │
      ├── Comments               "What was found, decided or asked?"
      └── Artifacts              "What did the work produce?"
      │
-     └── PRs, builds, documents, deployments
+     └── PRs, builds, deployments
 ```
 
 The name is Italian for *weft*: the thread that runs across a loom and turns separate strands into one fabric. Read the thesis in [VISION.md](VISION.md) (two pages) and what Trama deliberately does not do in [NON-GOALS.md](NON-GOALS.md). The original long-form write-up is kept as historical background in [docs/vision-detailed.md](docs/vision-detailed.md); it predates the current model.
@@ -61,10 +61,10 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 
 | Concept | What it is |
 |---|---|
-| **Task** | A problem, request or piece of work: bug, feature, incident, tech debt, feedback, idea, security finding. Its optional goal describes what should be true when resolved. Tasks can have sub-tasks. |
+| **Task** | A problem, request or piece of work: bug, feature, incident, tech debt, feedback, idea, security finding. Tasks can have sub-tasks. |
 | **Artifact** | Proof of delivery: pull/merge requests, builds, test reports, designs, deployments, with live CI and review state. |
 | **Attention** | A queue of what needs *human* judgment right now: reviews, failing CI, conflicts, triage. Human attention is the scarce resource. |
-| **Project** | Planning context for Tasks: milestones, status updates and documents. It has one optional `repository` (`owner/name` or a URL), which is how a checkout finds its project. Supporting, not core. |
+| **Project** | Planning context for Tasks: milestones. It has one optional `repository` (`owner/name` or a URL), which is how a checkout finds its project. Supporting, not core. |
 
 **One status, one source of truth.** The Task status tracks the work. Nothing else creates a second execution status.
 
@@ -72,7 +72,7 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 
 **Core**
 
-- **Task-first work.** Goal, sub-tasks, comments and artifacts are available from the Task when needed.
+- **Task-first work.** Sub-tasks, comments and artifacts are available from the Task when needed.
 - **Humans and agents as actors.** Agents are first-class members with scoped tokens, usage caps and an auditable activity trail. Accountability stays with a human.
 - **Git integrations**: GitHub, GitLab and Bitbucket Cloud, including self-hosted GitLab and GitHub Enterprise. Link PRs and receive webhooks.
 - **MCP server** (Rust) for Claude, Cursor, VS Code or any MCP client: <!-- mcp-tools-count:start -->17 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. Everything else is one `list_capabilities` away, or switch to `TRAMA_MCP_PROFILE=full`. Plus a **CLI** with the same commands, always on the full catalog.
@@ -82,7 +82,7 @@ The name is Italian for *weft*: the thread that runs across a loom and turns sep
 
 **Supporting (scope under review, see [NON-GOALS.md](NON-GOALS.md))**
 
-- Projects with milestones, updates and documents, saved views, outgoing webhooks, notifications (in-app and email), an installable PWA.
+- Projects with milestones, saved views, outgoing webhooks, notifications (in-app and email), an installable PWA.
 - Importing tasks from GitHub Issues or Linear, and linking a Task to an external issue.
 - An optional built-in assistant and "suggest improvements" for any OpenAI-compatible model. Off by default; keys stay on the server.
 - Statistics, a timeline, a roadmap page and marketing pages exist in the app today and are proposed for removal or merging.

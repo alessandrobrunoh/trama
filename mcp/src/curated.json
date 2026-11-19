@@ -1,34 +1,31 @@
 [
   {
     "name": "get_context",
-    "summary": "Read task, project or artifact context by key or id",
+    "summary": "Read task or artifact context by key or id",
     "kind": "composite",
     "readOnly": true,
     "visibleIf": [
       "tasks:read",
-      "projects:read",
       "artifacts:read"
     ],
     "uses": [
       "get_task_context",
-      "get_project_context",
       "get_artifact",
       "list_task_artifacts",
       "list_comments"
     ],
-    "description": "Read one task, project, or artifact by key or id. Task context comes from the task context endpoint; project context is markdown. Pass comments:true to include the task thread. The wire type stays issue. Example: {\"id\":\"CORA-142\"}.",
+    "description": "Read one task or artifact by key or id. Task context comes from the task context endpoint. Pass comments:true to include the task thread. The wire type stays issue. Example: {\"id\":\"CORA-142\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Key or id: CORA-142, pj_…, ar_…."
+          "description": "Key or id: CORA-142, ar_…."
         },
         "type": {
           "type": "string",
           "enum": [
             "issue",
-            "project",
             "artifact"
           ],
           "description": "Only when the kind cannot be inferred from the id. issue is the task discriminator."
@@ -113,7 +110,7 @@
     "name": "search",
     "summary": "Full-text search across every object type; run it before creating anything",
     "kind": "catalog",
-    "description": "Full-text search across supported object types: tasks, projects, artifacts and documents. The type token for a task is still issue. Run it before creating anything so you reuse what exists. `types` narrows the results. Returns type, id, key, title and subtitle."
+    "description": "Full-text search across supported object types: tasks, projects and artifacts. The type token for a task is still issue. Run it before creating anything so you reuse what exists. `types` narrows the results. Returns type, id, key, title and subtitle."
   },
   {
     "name": "get_insights",
@@ -131,7 +128,7 @@
     "name": "list_projects",
     "summary": "Projects; filter by repository string to find the project of a checkout",
     "kind": "catalog",
-    "description": "Projects contain related tasks and planning context. Filter by repository (owner/name or URL, case-insensitive) to find the project of this checkout, or by q, status, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its tasks and get_context {id:'pj_…'} reads it whole."
+    "description": "Projects group related tasks. Filter by repository (owner/name or URL, case-insensitive) to find the project of this checkout, or by q, status, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its tasks."
   },
   {
     "name": "create_task",
@@ -145,7 +142,7 @@
       "search",
       "create_task"
     ],
-    "description": "File one task after checking for duplicates. Tasks are the unit of work; set a concise goal when it helps clarify the desired result. Use parentId to create a sub-task; sub-tasks keep independent statuses and can be nested. There is no team. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
+    "description": "File one task after checking for duplicates. Tasks are the unit of work. Use parentId to create a sub-task; sub-tasks keep independent statuses and can be nested. There is no team. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -168,10 +165,6 @@
         "body": {
           "type": "string",
           "description": "Markdown: steps, expected vs actual, where you saw it."
-        },
-        "goal": {
-          "type": "string",
-          "description": "Desired task outcome."
         },
         "priority": {
           "type": "string",
@@ -289,7 +282,7 @@
   },
   {
     "name": "report_progress",
-    "summary": "Record artifacts, task status, project update and a comment",
+    "summary": "Record artifacts, task status and a comment",
     "kind": "composite",
     "readOnly": false,
     "visibleIf": [
@@ -299,26 +292,19 @@
     ],
     "uses": [
       "get_task",
-      "get_project",
       "list_task_artifacts",
-      "list_project_artifacts",
       "create_artifact",
       "update_artifact",
       "update_task",
-      "create_project_update",
       "create_comment"
     ],
-    "description": "Record task or project progress: artifact, issueStatus, projectUpdate, and/or comment. issueStatus is the wire name for the task status. Do not set a task done until its fix is verified and merged.",
+    "description": "Record task progress: artifact, issueStatus, and/or comment. issueStatus is the wire name for the task status. Do not set a task done until its fix is verified and merged.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "issue": {
           "type": "string",
           "description": "Task key or id (for issueStatus, artifacts and comments). The argument name stays issue."
-        },
-        "project": {
-          "type": "string",
-          "description": "Project id (for projectUpdate, artifacts and comments)."
         },
         "artifact": {
           "type": "object",
@@ -403,31 +389,9 @@
           ],
           "description": "New status of the task. in_review while its PR is open; done only once merged."
         },
-        "projectUpdate": {
-          "type": "object",
-          "properties": {
-            "health": {
-              "type": "string",
-              "enum": [
-                "on_track",
-                "at_risk",
-                "off_track"
-              ]
-            },
-            "body": {
-              "type": "string",
-              "description": "Markdown: shipped, next, risks."
-            }
-          },
-          "required": [
-            "health",
-            "body"
-          ],
-          "additionalProperties": false
-        },
         "comment": {
           "type": "string",
-          "description": "One factual comment on the task or project."
+          "description": "One factual comment on the task."
         }
       },
       "additionalProperties": false
@@ -435,7 +399,7 @@
   },
   {
     "name": "attach_artifact",
-    "summary": "Attach or update a PR, build, document or link on a task or project",
+    "summary": "Attach or update a PR, build or link on a task",
     "kind": "composite",
     "readOnly": false,
     "visibleIf": [
@@ -443,23 +407,17 @@
     ],
     "uses": [
       "get_task",
-      "get_project",
       "list_task_artifacts",
-      "list_project_artifacts",
       "create_artifact",
       "update_artifact"
     ],
-    "description": "Attach proof of work or a reference to a task or project: pull request, build, test report, deployment, design, document or link. Idempotent when the same external id or URL is repeated. Pass issue for the task.",
+    "description": "Attach proof of work or a reference to a task: pull request, build, test report, deployment, design or link. Idempotent when the same external id or URL is repeated. Pass issue for the task.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "issue": {
           "type": "string",
           "description": "Task key or id."
-        },
-        "project": {
-          "type": "string",
-          "description": "Project id."
         },
         "kind": {
           "type": "string",
@@ -523,6 +481,7 @@
         }
       },
       "required": [
+        "issue",
         "kind",
         "title"
       ],

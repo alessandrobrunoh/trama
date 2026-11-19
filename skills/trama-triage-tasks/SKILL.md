@@ -15,7 +15,7 @@ Read `.trama` at the repository root first. If it matches the checkout, search w
 
 Read workspace settings with `get_workspace` first: it lists the label ids and the estimate scale. Then call `create_task`; it refuses to create a task when an open one has the same title, unless you pass `force`.
 
-Include a clear `title` and a concise `body`, and a `kind` (`bug`, `feature`, `incident`, `tech_debt`, `feedback`, `idea` or `security`). For bugs, capture steps to reproduce, expected versus actual behavior, and relevant environment. Use `goal` for the desired result when it clarifies the task. Use only valid priorities, statuses and label ids (ids, never names). Pass `projectId` from the saved scope, and `parentId` to create a sub-task. Set optional fields only when justified.
+Include a clear `title` and a concise `body`, and a `kind` (`bug`, `feature`, `incident`, `tech_debt`, `feedback`, `idea` or `security`). For bugs, capture steps to reproduce, expected versus actual behavior, and relevant environment. Use only valid priorities, statuses and label ids (ids, never names). Pass `projectId` from the saved scope, and `parentId` to create a sub-task. Set optional fields only when justified.
 
 Do not put secrets, tokens, customer data, or full execution transcripts in a task. Keep transcripts in execution tools.
 

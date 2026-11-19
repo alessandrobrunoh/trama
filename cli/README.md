@@ -13,8 +13,6 @@ the MCP server's shorter default tool list is a separate layer on top (`mcp/src/
 ```bash
 trama task list --open --priority urgent,high --fields key,title,status
 trama task context AUTH-142              # markdown task context
-trama project context prj_…               # markdown "mega context" of a whole project
-trama project-update post prj_… --health on_track --file body=update.md
 trama artifact add --issue-id AUTH-142 --kind pull_request --title "Fix login" --url https://…
 trama task create --kind bug --title "Login times out" --file body=notes.md
 trama task update AUTH-142 --status in_progress --unset estimate
@@ -104,11 +102,11 @@ over every selection.
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `task` `artifact` `document` `comment` `project`
-`project-update` `milestone` `member` `agent` `token` `view` `attention` `event` `integration`
+Resources: `task` `artifact` `comment` `project`
+`milestone` `member` `agent` `token` `view` `attention` `event` `integration`
 `outgoing-webhook` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
-plus actions (`task context`, `project context`, `project artifacts`, …).
-Aliases: `tasks`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`).
+plus actions (`task context`, `task artifacts`, …).
+Aliases: `tasks`, `webhook`; `ls`, `show`, `rm`; `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`).
 
 ```bash
 trama commands                      # every command with its HTTP route and permission

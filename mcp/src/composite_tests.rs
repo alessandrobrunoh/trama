@@ -142,7 +142,7 @@ fn not_found() -> (u16, String) {
 async fn task_context_uses_task_routes() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
         ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login", "status": "todo" })),
-        ("GET", "/tasks/BUG-1/context") => j(json!({ "id": "in_1", "key": "BUG-1", "goal": "Allow login" })),
+        ("GET", "/tasks/BUG-1/context") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login" })),
         ("GET", "/tasks/BUG-1/artifacts") => j(json!([])),
         _ => not_found(),
     });
@@ -215,12 +215,12 @@ async fn attach_artifact_creates_on_the_issue_when_none_matches() {
         ("POST", "/artifacts") => j(json!({ "id": "ar_2", "kind": "link", "title": "Spec" })),
         _ => not_found(),
     });
-    let args = json!({ "issue": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test/spec", "description": "Design doc" });
+    let args = json!({ "issue": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test/spec", "description": "Design notes" });
     let (err, text) = call(&server(&mock), &all(), "attach_artifact", args).await;
     assert!(!err, "{text}");
     assert_eq!(parsed(&text)["action"], "created");
     let w = mock.writes();
-    assert_eq!(w[0].body, json!({ "issueId": "in_1", "kind": "link", "title": "Spec", "url": "https://x.test/spec", "description": "Design doc" }));
+    assert_eq!(w[0].body, json!({ "issueId": "in_1", "kind": "link", "title": "Spec", "url": "https://x.test/spec", "description": "Design notes" }));
 }
 
 #[tokio::test]
@@ -315,14 +315,14 @@ async fn start_work_updates_the_issue_and_returns_its_context() {
         ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "t", "status": "backlog" })),
         ("PATCH", "/tasks/in_1") => j(json!({})),
         ("POST", "/comments") => j(json!({ "id": "cm_1" })),
-        ("GET", "/tasks/in_1/context") => j(json!({ "goal": "Ship login" })),
+        ("GET", "/tasks/in_1/context") => j(json!({ "summary": "Ship login" })),
         _ => not_found(),
     });
     let (err, text) = call(&server(&mock), &all(), "start_work", json!({ "key": "BUG-1", "plan": "Fixing the timeout." })).await;
     assert!(!err, "{text}");
     let value = parsed(&text);
     assert_eq!(value["ready"], true);
-    assert_eq!(value["briefing"]["goal"], "Ship login");
+    assert_eq!(value["briefing"]["summary"], "Ship login");
     assert_eq!(value["task"]["key"], "BUG-1");
     let writes = mock.writes();
     assert_eq!(writes.len(), 2);

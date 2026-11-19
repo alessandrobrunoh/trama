@@ -1,6 +1,6 @@
 # Trama Vision
 
-> **Tasks describe problems and goals. Comments and artifacts preserve what helps the work continue.**
+> **Tasks describe problems. Comments and artifacts preserve what helps the work continue.**
 
 This is the authoritative statement of what Trama is. [`NON-GOALS.md`](NON-GOALS.md) says what it is not. The original long-form write-up is kept as historical background in [`docs/vision-detailed.md`](docs/vision-detailed.md); it predates the current model, and where the two disagree, this file wins.
 
@@ -13,7 +13,7 @@ Project-management tools often make people group work into a second unit of exec
 - The reason behind a choice lives in a chat thread nobody will find in a month.
 - An agent that finishes a change needs a place to show what it produced.
 
-The Task is both the report of a problem and the place to coordinate its response. Its description explains the problem and context; its optional goal says what should be true when resolved.
+The Task is both the report of a problem and the place to coordinate its response. Its description explains the problem and context.
 
 ## Who it is for
 
@@ -25,15 +25,15 @@ Tasks are the unit of work. Optional details appear when they help.
 
 | Object | Answers | Notes |
 |---|---|---|
-| **Task** | What problem exists, and what should be true when it is resolved? | The unit of work. Its goal is optional; the description explains the problem and context. Tasks can have sub-tasks with their own status. |
-| **Artifact** | What did the work produce? | Pull requests, builds, documents, deployments, with live CI and review state. |
+| **Task** | What problem exists? | The unit of work. The description explains the problem and context. Tasks can have sub-tasks with their own status. |
+| **Artifact** | What did the work produce? | Pull requests, builds, deployments, with live CI and review state. |
 | **Comment** | What was found, asked or concluded along the way? | Short factual notes on a task, project or artifact. |
 | **Attention** | Where is a person needed right now? | A queue derived from the work: reviews, failing CI, conflicts, triage. It never creates a parallel status. |
 
-A **Project** groups tasks with milestones, status updates and documents. It optionally points at one Git repository (`owner/name` or a URL), which is how a checkout finds its project. Projects provide planning context; they do not create another execution unit.
+A **Project** groups tasks with milestones. It optionally points at one Git repository (`owner/name` or a URL), which is how a checkout finds its project. Projects provide planning context; they do not create another execution unit.
 
 ```text
-Task (problem + goal)
+Task (problem + context)
   ├── Sub-tasks
   ├── Comments
   └── Artifacts
@@ -46,7 +46,7 @@ Task (problem + goal)
 2. **Do not duplicate execution.** Transcripts, prompts, tool calls, and file edits belong to the execution tool. Trama links to that context and keeps only what helps the next person continue.
 3. **One status, one source of truth.** Task status is the work status. Attention feeds on it; it does not create a parallel status lifecycle.
 4. **Automation over administration.** Use agents and integrations to reduce manual entry, not to create more fields to maintain.
-5. **Optional complexity.** A simple Task needs only its problem; goal, sub-tasks and a project appear when useful.
+5. **Optional complexity.** A simple Task needs only its problem; sub-tasks and a project appear when useful.
 6. **Self-hostable and boring.** One Postgres, a few small services, server-side secrets, authorization enforced on the server.
 
 ## What makes it different
@@ -60,7 +60,7 @@ Task (problem + goal)
 ## How humans and agents work together
 
 1. Tasks arrive from people, monitoring, imports or agents.
-2. A Task describes the problem and context; an optional goal states the desired result.
+2. A Task describes the problem and context.
 3. Agents work from one or more Tasks through MCP, the CLI or the API, using the Task context.
 4. Agents record factual progress, comments and artifacts on the Task.
 5. Anything that needs a person (a review, failing CI, a conflict) appears in Attention.

@@ -43,7 +43,7 @@ Contributions should generally reinforce these principles:
 
 4. **Keep one source of work status.** Attention is derived from the work; it does not create a parallel execution status.
 
-5. **Context should transfer.** Goals, comments, and artifacts should remain useful to future humans and agents.
+5. **Context should transfer.** Descriptions, comments, and artifacts should remain useful to future humans and agents.
 
 6. **Keep structure optional**  
    A simple Task needs only its problem; extra structure should appear only when it helps.

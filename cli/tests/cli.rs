@@ -588,94 +588,8 @@ fn issue_context_is_markdown_by_default_and_json_on_request() {
 }
 
 #[test]
-fn project_updates_are_posted_edited_and_removed_under_the_project() {
+fn artifacts_attach_to_a_task_and_project_level_commands_are_gone() {
     let mock = Mock::start(vec![
-        route(
-            "POST",
-            "/api/w/acme/projects/prj_1/updates",
-            201,
-            json!({ "id": "pu_1", "health": "at_risk" }),
-        ),
-        route(
-            "PATCH",
-            "/api/w/acme/projects/prj_1/updates/pu_1",
-            200,
-            json!({ "id": "pu_1", "health": "on_track" }),
-        ),
-        route(
-            "DELETE",
-            "/api/w/acme/projects/prj_1/updates/pu_1",
-            204,
-            Value::Null,
-        ),
-        route(
-            "GET",
-            "/api/w/acme/projects/prj_1/updates",
-            200,
-            json!([{ "id": "pu_1" }]),
-        ),
-    ]);
-    let run = Run::new().with_key(&mock.api());
-    std::fs::write(run.cwd.join("update.md"), "Shipped the importer.\n").unwrap();
-    let o = run.run(&[
-        "project-update",
-        "post",
-        "prj_1",
-        "--health",
-        "at_risk",
-        "--file",
-        "body=update.md",
-    ]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(
-        mock.last().json(),
-        json!({ "health": "at_risk", "body": "Shipped the importer." })
-    );
-    let o = run.run(&[
-        "project-update",
-        "edit",
-        "prj_1",
-        "pu_1",
-        "--health",
-        "on_track",
-    ]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(mock.last().json(), json!({ "health": "on_track" }));
-    assert_eq!(
-        code(&run.run(&["project-update", "rm", "prj_1", "pu_1"])),
-        0
-    );
-    assert_eq!(
-        out_json(&run.run(&["project-updates", "ls", "prj_1"])),
-        json!([{ "id": "pu_1" }])
-    );
-    // health is an enum
-    assert_eq!(
-        code(&run.run(&[
-            "project-update",
-            "create",
-            "prj_1",
-            "--health",
-            "fine",
-            "--body",
-            "x"
-        ])),
-        2
-    );
-}
-
-#[test]
-fn project_context_is_markdown_and_artifacts_attach_to_any_owner() {
-    let md = Route {
-        method: "GET",
-        path: "/api/w/acme/projects/prj_1/context.md",
-        status: 200,
-        content_type: "text/markdown; charset=utf-8",
-        body: "# Project\n\nMega context\n".into(),
-        headers: vec![],
-    };
-    let mock = Mock::start(vec![
-        md,
         route(
             "POST",
             "/api/w/acme/artifacts",
@@ -685,15 +599,17 @@ fn project_context_is_markdown_and_artifacts_attach_to_any_owner() {
         route("GET", "/api/w/acme/tasks/BUG-1/artifacts", 200, json!([])),
     ]);
     let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["project", "context", "prj_1"]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(stdout(&o), "# Project\n\nMega context\n");
-    assert!(mock.last().headers["accept"].starts_with("text/markdown"));
+    for gone in [
+        &["project", "context", "prj_1"][..],
+        &["project", "artifacts", "prj_1"],
+        &["project-update", "list", "prj_1"],
+        &["document", "list"],
+    ] {
+        assert_eq!(code(&run.run(gone)), 2, "{gone:?}");
+    }
     let o = run.run(&[
         "artifact",
         "add",
-        "--project-id",
-        "prj_1",
         "--issue-id",
         "BUG-1",
         "--kind",
@@ -706,7 +622,7 @@ fn project_context_is_markdown_and_artifacts_attach_to_any_owner() {
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     assert_eq!(
         mock.last().json(),
-        json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test" })
+        json!({ "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test" })
     );
     assert_eq!(code(&run.run(&["task", "artifacts", "BUG-1"])), 0);
 }
@@ -1406,7 +1322,7 @@ fn mcp_config_prints_client_snippets() {
 fn commands_and_schema_describe_the_whole_surface() {
     let run = Run::new();
     let all = out_json(&run.run(&["commands"]));
-    assert!(all.as_array().unwrap().len() > 90);
+    assert!(all.as_array().unwrap().len() > 70);
     let detail = out_json(&run.run(&["commands", "task", "--detail"]));
     let create = detail
         .as_array()

@@ -172,7 +172,6 @@ async fn run_tool(
     // Context briefings are markdown unless JSON was requested.
     let accept = match entry.tool.name.as_str() {
         "get_task_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
-        "get_project_context" => http::ACCEPT_MARKDOWN,
         _ => http::ACCEPT_JSON,
     };
     exec::run(&label, &call, accept, ctx).await

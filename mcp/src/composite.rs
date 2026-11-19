@@ -259,7 +259,6 @@ fn issue_summary(v: &Value) -> Value {
             "priority",
             "assigneeId",
             "projectId",
-            "goal",
             "parentId",
             "duplicateOfId",
         ],
@@ -408,7 +407,7 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let hint = text(a, "type").and_then(Kind::parse);
     let cands = candidates(id, hint);
     if cands.is_empty() {
-        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, CORA-142, iss_…, in_…, pj_…)"));
+        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, CORA-142, iss_…, in_…, ar_…)"));
     }
     let mut missing = String::new();
     for kind in cands {
@@ -423,7 +422,7 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
 
 async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Result<Outcome, StepError> {
     match kind {
-        Kind::Project => Ok(Outcome::ok(ex.call("get_project_context", json!({ "id": id })).await?)),
+        Kind::Project => Err(StepError::Invalid("get_context reads tasks and artifacts; read a project with run_tool get_project".into())),
         Kind::Issue => {
             let issue = ex.call("get_task_context", json!({ "idOrKey": id })).await?;
             let mut warnings: Vec<String> = vec![];
@@ -546,7 +545,6 @@ async fn create_task(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     for k in [
         "title",
         "body",
-        "goal",
         "reporterName",
         "assigneeId",
         "projectId",
@@ -594,7 +592,6 @@ async fn start_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         "ready": ready,
         "stopBecause": if ready { Value::Null } else { json!([format!("the task is already {status}")]) },
         "task": issue_summary(issue.raw()),
-        "goal": issue.raw()["goal"],
         "actions": actions,
         "briefing": ex.call("get_task_context", json!({ "idOrKey": issue.id })).await.unwrap_or(Value::Null),
     })))
@@ -604,21 +601,13 @@ async fn start_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
 
 const ARTIFACT_FIELDS: &[&str] = &["kind", "title", "url", "externalId", "provider", "state", "ci", "review", "hasConflicts", "environment", "repository", "description"];
 
-struct Owners {
-    issue: Option<String>,
-    project: Option<String>,
-}
-
-/// Creates the artifact, or updates the one already attached with the same kind and externalId / url.
-async fn upsert_artifact(ex: &Exec<'_>, owners: &Owners, fields: &Map<String, Value>) -> Result<(&'static str, Value), String> {
-    let existing = if let Some(i) = &owners.issue {
-        ex.call("list_task_artifacts", json!({ "idOrKey": i })).await
-    } else if let Some(p) = &owners.project {
-        ex.call("list_project_artifacts", json!({ "id": p })).await
-    } else {
-        return Err("an artifact needs a task or a project to attach to".into());
+/// Creates the artifact, or updates the one already attached to the task `issue` with the same
+/// kind and externalId / url.
+async fn upsert_artifact(ex: &Exec<'_>, issue: &str, fields: &Map<String, Value>) -> Result<(&'static str, Value), String> {
+    if issue.is_empty() {
+        return Err("an artifact needs a task to attach to".into());
     }
-    .map_err(|e| e.message())?;
+    let existing = ex.call("list_task_artifacts", json!({ "idOrKey": issue })).await.map_err(|e| e.message())?;
     let kind = fields.get("kind").and_then(Value::as_str);
     let external = fields.get("externalId").and_then(Value::as_str);
     let url = fields.get("url").and_then(Value::as_str);
@@ -639,11 +628,7 @@ async fn upsert_artifact(ex: &Exec<'_>, owners: &Owners, fields: &Map<String, Va
         return Ok(("updated", updated));
     }
     let mut body = Map::new();
-    for (k, v) in [("issueId", &owners.issue), ("projectId", &owners.project)] {
-        if let Some(v) = v {
-            body.insert(k.into(), json!(v));
-        }
-    }
+    body.insert("issueId".into(), json!(issue));
     for (k, v) in fields {
         body.insert(k.clone(), v.clone());
     }
@@ -655,30 +640,18 @@ fn artifact_summary(v: &Value) -> Value {
     pick(v, &["id", "kind", "title", "state", "ci", "review", "hasConflicts", "url", "externalId"])
 }
 
-async fn owners_from(a: &Map<String, Value>, ex: &Exec<'_>) -> Result<Owners, String> {
-    let issue = match text(a, "issue") {
-        Some(i) => Some(resolve(ex, i, Some(Kind::Issue), false).await?.id),
-        None => None,
-    };
-    let project = match text(a, "project") {
-        Some(p) => Some(resolve(ex, p, Some(Kind::Project), false).await?.id),
-        None => None,
-    };
-    Ok(Owners { issue, project })
-}
-
 async fn attach_artifact(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
-    let owners = owners_from(a, ex).await?;
-    if owners.issue.is_none() && owners.project.is_none() {
-        return Err("pass issue (the task) or project".into());
-    }
+    let issue = match text(a, "issue") {
+        Some(i) => resolve(ex, i, Some(Kind::Issue), false).await?.id,
+        None => return Err("pass issue (the task)".into()),
+    };
     let mut fields = Map::new();
     for k in ARTIFACT_FIELDS {
         if let Some(v) = a.get(*k) {
             fields.insert((*k).into(), v.clone());
         }
     }
-    let (action, artifact) = upsert_artifact(ex, &owners, &fields).await?;
+    let (action, artifact) = upsert_artifact(ex, &issue, &fields).await?;
     Ok(Outcome::ok(json!({ "action": action, "artifact": artifact_summary(&artifact) })))
 }
 
@@ -686,25 +659,15 @@ async fn attach_artifact(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
 
 async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let has = |k: &str| a.get(k).is_some();
-    if !(has("artifact") || has("issueStatus") || has("projectUpdate") || has("comment")) {
-        return Err("nothing to report: pass artifact, issueStatus, projectUpdate and/or comment".into());
+    if !(has("artifact") || has("issueStatus") || has("comment")) {
+        return Err("nothing to report: pass artifact, issueStatus and/or comment".into());
     }
-    if has("issueStatus") && text(a, "issue").is_none() {
-        return Err("issueStatus needs `issue`".into());
-    }
-    if has("projectUpdate") && text(a, "project").is_none() {
-        return Err("projectUpdate needs `project`".into());
-    }
-    if (has("artifact") || has("comment")) && text(a, "issue").is_none() && text(a, "project").is_none() {
-        return Err("artifact and comment need a task (`issue`) or a project".into());
+    if (has("artifact") || has("issueStatus") || has("comment")) && text(a, "issue").is_none() {
+        return Err("artifact, issueStatus and comment need a task (`issue`)".into());
     }
 
     let issue = match text(a, "issue") {
         Some(i) => Some(resolve(ex, i, Some(Kind::Issue), false).await?),
-        None => None,
-    };
-    let project = match text(a, "project") {
-        Some(p) => Some(resolve(ex, p, Some(Kind::Project), false).await?),
         None => None,
     };
 
@@ -713,8 +676,8 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
 
     let mut artifact_out = Value::Null;
     if let Some(Value::Object(art)) = a.get("artifact") {
-        let owners = Owners { issue: issue.as_ref().map(|i| i.id.clone()), project: project.as_ref().map(|p| p.id.clone()) };
-        match upsert_artifact(ex, &owners, art).await {
+        let owner = issue.as_ref().map(|i| i.id.clone()).unwrap_or_default();
+        match upsert_artifact(ex, &owner, art).await {
             Ok((action, artifact)) => {
                 applied.push(format!("artifact {action}"));
                 artifact_out = artifact_summary(&artifact);
@@ -730,20 +693,10 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         }
     }
 
-    if let (Some(Value::Object(pu)), Some(p)) = (a.get("projectUpdate"), &project) {
-        match ex.call("create_project_update", json!({ "projectId": p.id, "health": pu["health"], "body": pu["body"] })).await {
-            Ok(_) => applied.push("project update posted".into()),
-            Err(e) => failed.push(format!("project update: {}", e.message())),
-        }
-    }
-
-    if let Some(body) = text(a, "comment") {
-        let subject = issue.as_ref().or(project.as_ref()).map(Entity::subject);
-        if let Some(subject) = subject {
-            match ex.call("create_comment", json!({ "subject": subject, "body": body })).await {
-                Ok(_) => applied.push("comment added".into()),
-                Err(e) => failed.push(format!("comment: {}", e.message())),
-            }
+    if let (Some(body), Some(i)) = (text(a, "comment"), &issue) {
+        match ex.call("create_comment", json!({ "subject": i.subject(), "body": body })).await {
+            Ok(_) => applied.push("comment added".into()),
+            Err(e) => failed.push(format!("comment: {}", e.message())),
         }
     }
 

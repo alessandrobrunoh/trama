@@ -9,7 +9,7 @@ Understand the task, read its context, and check its state before implementation
 
 ## 1. Load context
 
-Call `whoami`, then use `get_context` to read the task context before acting. Pass `comments: true` to include the thread. If the user provides multiple tasks, read each one. Check its goal, sub-tasks, comments, related artifacts and the project it belongs to. The task title alone is not a sufficient briefing.
+Call `whoami`, then use `get_context` to read the task context before acting. Pass `comments: true` to include the thread. If the user provides multiple tasks, read each one. Check its sub-tasks, comments, related artifacts and the project it belongs to. The task title alone is not a sufficient briefing.
 
 If the user only describes the work, use `find_work` or `search` for matching tasks and reuse them. If no task matches, use `create_task` through `trama-triage-tasks`. When several workspaces are connected, identify the workspace for each write.
 

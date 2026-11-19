@@ -43,4 +43,4 @@ If `.trama` already exists but is incomplete, preserve its valid values and fill
 - Prefer project-filtered listing with the requested text/status filters over global full-text search. The global search operation spans multiple resource types and projects.
 - A user request that explicitly asks for tasks across projects overrides this default; clarify workspace if needed.
 - If the saved project no longer exists or the repository remote changes, stop and ask the user to refresh `.trama`. Do not fall back to a broad search.
-- `.trama` contains non-secret project context and may be committed so teammates and agents share the mapping.
+- `.trama` contains a non-secret project mapping and may be committed so teammates and agents share the mapping.

@@ -45,8 +45,6 @@ pub struct Registry {
 const OVERRIDES: &[(&str, &str, &str)] = &[
     ("change_member_role", "member", "set-role"),
     ("get_task_context", "task", "context"),
-    ("get_project_context", "project", "context"),
-    ("list_project_artifacts", "project", "artifacts"),
     ("list_task_artifacts", "task", "artifacts"),
     ("list_webhook_deliveries", "outgoing-webhook", "deliveries"),
 ];
@@ -55,7 +53,6 @@ const OVERRIDES: &[(&str, &str, &str)] = &[
 const GROUP_ABOUT: &[(&str, &str)] = &[
     ("task", "Bugs, features, incidents, debt, feedback, ideas and security items"),
     ("member", "Workspace members and their roles"),
-    ("project-update", "Status updates (health + write-up) posted on a project"),
     ("token", "API tokens (never their secrets)"),
     ("event", "Activity log of every change"),
 ];
@@ -64,7 +61,7 @@ const GROUP_ABOUT: &[(&str, &str)] = &[
 const GROUP_ALIASES: &[(&str, &str)] = &[("outgoing-webhook", "webhook")];
 
 /// Extra verbs for commands people already have a word for: `(group, verb, alias)`.
-const VERB_ALIASES: &[(&str, &str, &str)] = &[("project-update", "create", "post"), ("project-update", "update", "edit"), ("artifact", "create", "add")];
+const VERB_ALIASES: &[(&str, &str, &str)] = &[("artifact", "create", "add")];
 
 fn singular(word: &str) -> String {
     if let Some(stem) = word.strip_suffix("ies") {
@@ -430,7 +427,7 @@ mod tests {
         for e in &reg.entries {
             assert!(seen.insert(e.command_name()), "duplicate command {}", e.command_name());
         }
-        assert!(reg.entries.len() > 80);
+        assert!(reg.entries.len() > 60);
     }
 
     #[test]
@@ -452,9 +449,11 @@ mod tests {
     #[test]
     fn removed_resources_are_not_commands() {
         let reg = registry();
-        for gone in ["workstream", "criterion", "dependency", "team", "repository", "decision", "customer", "input-request", "release"] {
+        for gone in ["workstream", "criterion", "dependency", "team", "repository", "decision", "customer", "input-request", "release", "document", "project-update"] {
             assert!(!reg.entries.iter().any(|entry| entry.group == gone), "{gone}");
         }
+        assert!(reg.find("project", Some("context")).is_none());
+        assert!(reg.find("project", Some("artifacts")).is_none());
     }
 
     #[test]
@@ -492,8 +491,8 @@ mod tests {
         assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "issue", "id": "iss_1" }));
         let (e, m) = parse(&["comment", "create", "--subject", "type=project,id=prj_1", "--body", "hi"]);
         assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "project", "id": "prj_1" }));
-        let (e, m) = parse(&["comment", "create", "--subject", r#"{"type":"project_update","id":"pu_1"}"#, "--body", "hi"]);
-        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "project_update", "id": "pu_1" }));
+        let (e, m) = parse(&["comment", "create", "--subject", r#"{"type":"artifact","id":"ar_1"}"#, "--body", "hi"]);
+        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "artifact", "id": "ar_1" }));
         let (e, m) = parse(&["comment", "create", "--subject", "nonsense", "--body", "hi"]);
         assert!(extract(&e, &m).is_err());
         let (e, m) = parse(&["comment", "create", "--subject", "a=1,b", "--body", "hi"]);

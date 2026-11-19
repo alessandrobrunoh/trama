@@ -13,7 +13,7 @@ Read `.trama` at the repository root first. If its repository matches the checko
 
 ## 2. Read the task context
 
-Read context for every task the work will touch with `get_context`. If the user names several tasks, work across them directly without adding another unit of execution or duplicating their status. A task's goal and its sub-tasks are part of its context; sub-tasks keep independent statuses.
+Read context for every task the work will touch with `get_context`. If the user names several tasks, work across them directly without adding another unit of execution or duplicating their status. A task's sub-tasks are part of its context; sub-tasks keep independent statuses.
 
 When the user describes work but names no task, search first. If nothing matches, create a task with `create_task` or follow the `trama-triage-tasks` workflow.
 

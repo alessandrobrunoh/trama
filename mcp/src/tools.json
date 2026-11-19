@@ -76,10 +76,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across projects, tasks, artifacts and documents (titles).",
+  "description": "Full-text search across projects, tasks and artifacts (titles).",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: project,issue,artifact,document",
+   "types": "query string Comma-separated: project,issue,artifact",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -331,226 +331,6 @@
   }
  },
  {
-  "name": "get_project_context",
-  "method": "GET",
-  "path": "/projects/{id}/context.md",
-  "permission": "projects:read",
-  "description": "Markdown briefing for a whole project: overview, latest updates, milestones, tasks and artifacts. Read it before working on a project.",
-  "params": {
-   "id": "path string! Project id"
-  }
- },
- {
-  "name": "list_project_updates",
-  "method": "GET",
-  "path": "/projects/{projectId}/updates",
-  "permission": "projects:read",
-  "description": "Status updates posted on a project (health + markdown write-up), newest first.",
-  "params": {
-   "projectId": "path string! Project id"
-  }
- },
- {
-  "name": "get_project_update",
-  "method": "GET",
-  "path": "/projects/{projectId}/updates/{id}",
-  "permission": "projects:read",
-  "description": "One project update.",
-  "params": {
-   "projectId": "path string! Project id",
-   "id": "path string! Project update id (pu_…)"
-  }
- },
- {
-  "name": "create_project_update",
-  "method": "POST",
-  "path": "/projects/{projectId}/updates",
-  "permission": "projects:write",
-  "description": "Post a status update on a project. The newest update sets the project's health. Report facts, not guesses.",
-  "params": {
-   "projectId": "path string! Project id",
-   "health": "body string(on_track|at_risk|off_track)! Project health",
-   "body": "body string! Markdown write-up: what shipped, what is next, risks"
-  }
- },
- {
-  "name": "update_project_update",
-  "method": "PATCH",
-  "path": "/projects/{projectId}/updates/{id}",
-  "permission": "projects:write",
-  "description": "Edit the health or body of a project update.",
-  "params": {
-   "projectId": "path string! Project id",
-   "id": "path string! Project update id (pu_…)",
-   "health": "body string(on_track|at_risk|off_track) Project health",
-   "body": "body string Markdown write-up"
-  }
- },
- {
-  "name": "delete_project_update",
-  "method": "DELETE",
-  "path": "/projects/{projectId}/updates/{id}",
-  "permission": "projects:delete",
-  "description": "Delete a project update; the project's health falls back to the previous update.",
-  "params": {
-   "projectId": "path string! Project id",
-   "id": "path string! Project update id (pu_…)"
-  }
- },
- {
-  "name": "list_documents",
-  "method": "GET",
-  "path": "/documents",
-  "permission": "documents:read",
-  "description": "Markdown documents of the workspace (specs, plans and notes that are not source files), without their body: title, excerpt, where they are attached. With q, full-text search over titles and text (every word is a prefix), best match first, with the matching passage in snippet.",
-  "params": {
-   "q": "query string Search text (title and body)",
-   "projectId": "query string Only documents attached to this project",
-   "issueId": "query string Only documents attached to this issue (id or key)",
-   "attached": "query boolean true = attached somewhere, false = loose documents",
-   "archived": "query string(false|only|all) Archived documents: false (default) hides them, only shows just them",
-   "authorId": "query string Author actor id (usr_… or ag_…)",
-   "sort": "query string(updated|created|title) Sort field (default: relevance with q, else updated)",
-   "order": "query string(asc|desc) Sort order",
-   "limit": "query integer Max results (1-200, default 100)",
-   "offset": "query integer Skip this many results"
-  }
- },
- {
-  "name": "get_document",
-  "method": "GET",
-  "path": "/documents/{id}",
-  "permission": "documents:read",
-  "description": "One document with its Markdown body, its version and where it is attached (links). Read it before update_document: edits must name this version.",
-  "params": {
-   "id": "path string! Document id (doc_…)"
-  }
- },
- {
-  "name": "create_document",
-  "method": "POST",
-  "path": "/documents",
-  "permission": "documents:write",
-  "description": "Create a Markdown document (specs, plans, notes). Give projectId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate an existing task.",
-  "params": {
-   "title": "body string! Title (max 200 characters)",
-   "body": "body string Markdown body (max 150000 characters)",
-   "icon": "body string One emoji",
-   "projectId": "body string Attach to this project",
-   "issueId": "body string Attach to this issue (id or key)"
-  }
- },
- {
-  "name": "update_document",
-  "method": "PATCH",
-  "path": "/documents/{id}",
-  "permission": "documents:write",
-  "description": "Change the title, body or icon of a document. baseVersion is required: if somebody saved since, nothing is written and the answer is 409 with the current document (merge and retry). The whole body is replaced.",
-  "params": {
-   "id": "path string! Document id (doc_…)",
-   "baseVersion": "body integer! The document version this edit is based on (read it with get_document). A stale one answers 409 with the current document in `current`: merge, then retry.",
-   "title": "body string New title",
-   "body": "body string New Markdown body (replaces the old one)",
-   "icon": "body string One emoji; null clears it"
-  }
- },
- {
-  "name": "archive_document",
-  "method": "POST",
-  "path": "/documents/{id}/archive",
-  "permission": "documents:write",
-  "description": "Archive a document: hidden from lists, read only, restorable. Prefer this to deleting.",
-  "params": {
-   "id": "path string! Document id (doc_…)"
-  }
- },
- {
-  "name": "restore_document",
-  "method": "POST",
-  "path": "/documents/{id}/restore",
-  "permission": "documents:write",
-  "description": "Bring an archived document back.",
-  "params": {
-   "id": "path string! Document id (doc_…)"
-  }
- },
- {
-  "name": "delete_document",
-  "method": "DELETE",
-  "path": "/documents/{id}",
-  "permission": "documents:delete",
-  "description": "Permanently delete a document with its history and attachments (author or admin only). Prefer archive_document.",
-  "params": {
-   "id": "path string! Document id (doc_…)"
-  }
- },
- {
-  "name": "list_document_revisions",
-  "method": "GET",
-  "path": "/documents/{id}/revisions",
-  "permission": "documents:read",
-  "description": "Version history of a document, newest first (without bodies). Saves by the same person within a few minutes share one revision.",
-  "params": {
-   "id": "path string! Document id (doc_…)"
-  }
- },
- {
-  "name": "get_document_revision",
-  "method": "GET",
-  "path": "/documents/{id}/revisions/{version}",
-  "permission": "documents:read",
-  "description": "One earlier state of a document with its body, to compare or restore.",
-  "params": {
-   "id": "path string! Document id (doc_…)",
-   "version": "path integer! Version number from list_document_revisions"
-  }
- },
- {
-  "name": "restore_document_revision",
-  "method": "POST",
-  "path": "/documents/{id}/revisions/{version}/restore",
-  "permission": "documents:write",
-  "description": "Make an earlier revision the current text as a new version (history is kept). Needs the current baseVersion.",
-  "params": {
-   "id": "path string! Document id (doc_…)",
-   "version": "path integer! Revision to bring back",
-   "baseVersion": "body integer! The document version this edit is based on (read it with get_document). A stale one answers 409 with the current document in `current`: merge, then retry."
-  }
- },
- {
-  "name": "attach_document",
-  "method": "POST",
-  "path": "/documents/{id}/attach",
-  "permission": "artifacts:write",
-  "description": "Attach a document to exactly one project or task (it then appears in their artifacts as a document artifact). Idempotent. issueId is the task.",
-  "params": {
-   "id": "path string! Document id (doc_…)",
-   "projectId": "body string Project id",
-   "issueId": "body string Issue id or key"
-  }
- },
- {
-  "name": "detach_document",
-  "method": "POST",
-  "path": "/documents/{id}/detach",
-  "permission": "artifacts:write",
-  "description": "Remove one attachment of a document (the document itself stays). artifactId comes from the document links.",
-  "params": {
-   "id": "path string! Document id (doc_…)",
-   "artifactId": "body string! The document artifact to remove (ar_…)"
-  }
- },
- {
-  "name": "list_project_artifacts",
-  "method": "GET",
-  "path": "/projects/{id}/artifacts",
-  "permission": "artifacts:read",
-  "description": "Artifacts attached to the project itself and its tasks.",
-  "params": {
-   "id": "path string! Project id"
-  }
- },
- {
   "name": "list_milestones",
   "method": "GET",
   "path": "/milestones",
@@ -675,7 +455,6 @@
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security)! Kind",
-   "goal": "body string Issue outcome or desired result",
    "source": "body string(manual|github|gitlab|email|api|agent) Source",
    "labels": "body string[] Workspace label ids"
   }
@@ -739,7 +518,7 @@
   "method": "GET",
   "path": "/artifacts",
   "permission": "artifacts:read",
-  "description": "PRs, docs, builds, deployments, links etc. attached to tasks and projects.",
+  "description": "PRs, builds, deployments, links etc. attached to tasks.",
   "params": {
    "kind": "query string Kind",
    "state": "query string State",
@@ -761,10 +540,9 @@
   "method": "POST",
   "path": "/artifacts",
   "permission": "artifacts:write",
-  "description": "Attach an artifact (PR, build, document, link…) to a project or task. At least one of projectId or issueId is required. issueId stays the wire field for the task.",
+  "description": "Attach an artifact (PR, build, link…) to a task. issueId is required and stays the wire field for the task.",
   "params": {
-   "projectId": "body string Project id",
-   "issueId": "body string Issue id (the task)",
+   "issueId": "body string! Issue id (the task)",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release)! Kind",
    "title": "body string! Title",
    "description": "body string Why it is attached / what it is (markdown)",
@@ -827,7 +605,7 @@
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(issue|artifact|project|project_update) Subject type",
+   "subjectType": "query string(issue|artifact|project) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -838,7 +616,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: issue|artifact|project|project_update, id}",
+   "subject": "body object! {type: issue|artifact|project, id}",
    "body": "body string! Comment (markdown)"
   }
  },

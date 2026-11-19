@@ -5,7 +5,7 @@ description: Work with Trama tasks and their context from the `trama` CLI when M
 
 # Trama through the `trama` CLI
 
-Use the CLI for the same task-first workflow described in `trama`: a Task is the unit of work, with an optional goal, sub-tasks, comments and artifacts, and it can belong to a Project. Agents can work across multiple tasks directly. Keep full transcripts in execution tools, not Trama.
+Use the CLI for the same task-first workflow described in `trama`: a Task is the unit of work, with sub-tasks, comments and artifacts, and it can belong to a Project. Agents can work across multiple tasks directly. Keep full transcripts in execution tools, not Trama.
 
 ## Connect and discover
 
@@ -17,7 +17,7 @@ trama schema task create
 trama task list --open --project-id prj_1 --priority urgent,high --fields key,title,status
 trama task context BUG-142
 trama task get BUG-142
-trama task create --kind bug --title "Login timeout" --goal "Login eventually succeeds"
+trama task create --kind bug --title "Login timeout"
 trama task update BUG-142 --priority high
 trama comment list --subject-type issue --subject-id in_1
 trama artifact list
@@ -25,13 +25,10 @@ trama artifact create --issue-id in_1 --kind pull_request --title "Fix login" --
 trama attention list --scope mine
 trama search --q "login timeout" --types issue,project
 trama project list --q billing
-trama project context prj_1
-trama project artifacts prj_1
 trama view list
 trama milestone list --project-id prj_1
 trama snapshot get
 trama workspace get
-trama project-update create prj_1 --health on_track --body "Latest status"
 ```
 
 If not signed in, ask the user to authenticate. Never print, log, or commit credentials. Consult `trama commands`, per-command help, and `trama schema` for current names, flags, fields, and lifecycle actions. Do not guess commands from earlier API versions.

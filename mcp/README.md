@@ -61,7 +61,7 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | Tool | What it does |
 |---|---|
 | `whoami` | Which workspace and permissions this API key has, its caps and expiry |
-| `get_context` | Read task, project or artifact context by key or id |
+| `get_context` | Read task or artifact context by key or id |
 | `find_work` | Find tasks with filters (assignee `me`, status, project…) |
 | `search` | Full-text search across every object type; run it before creating anything |
 | `get_insights` | Where the problems are: stale or overdue tasks, bottlenecks, stuck PRs, flow metrics, agent failures |
@@ -70,8 +70,8 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | `create_task` | File a task (duplicate-checked) |
 | `update_task` | Change a task's status, priority, assignee, labels, parent, duplicate marker… |
 | `start_work` | Pick up a task: context, safety checks, marks the start |
-| `report_progress` | Record artifacts, task status, project update and a comment |
-| `attach_artifact` | Attach or update a PR, build, document or link on a task or project |
+| `report_progress` | Record artifacts, task status and a comment |
+| `attach_artifact` | Attach or update a PR, build or link on a task |
 | `add_comment` | Comment on any object by key or id |
 | `triage_tasks` | Triage up to 25 tasks in one call (priority, duplicates, grouping) |
 | `list_capabilities` | Discover the full catalog: search it, get a tool's schema and how to call it |
@@ -120,11 +120,8 @@ The curated layer is separate on purpose, so catalog changes and curation change
 `cargo test` fails when the tool count or table above is stale; refresh them with
 `UPDATE_MCP_DOCS=1 cargo test generated_tool_docs_are_current`.
 
-Project-level tools: `get_project_context` (markdown context for a project: updates, milestones,
-tasks and artifacts), `list_project_updates` / `get_project_update` /
-`create_project_update` / `update_project_update` / `delete_project_update` (health + markdown status posts),
-`list_project_artifacts` and `list_task_artifacts`, and `create_artifact` with either `projectId` or `issueId`.
-Project routes are permissioned as `projects:*` and task routes as `tasks:*`. The wire field for a task is still `issueId`.
+Artifact tools: `list_task_artifacts` and `create_artifact`, which attaches a PR, build or link to a task by `issueId`
+(the wire field for a task is still `issueId`). Project routes are permissioned as `projects:*` and task routes as `tasks:*`.
 
 ## Security notes
 
