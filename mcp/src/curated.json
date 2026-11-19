@@ -1,45 +1,110 @@
 [
   {
     "name": "get_context",
-    "summary": "Read issue, project, decision or input request context by key or id",
+    "summary": "Read task, project or artifact context by key or id",
     "kind": "composite",
     "readOnly": true,
-    "visibleIf": ["issues:read", "projects:read", "decisions:read", "input-requests:read", "artifacts:read"],
-    "uses": ["get_issue_context", "get_project_context", "get_decision", "get_input_request", "get_artifact", "list_issue_artifacts", "list_comments"],
-    "description": "Read one issue, project, decision, input request, or artifact by key or id. Issue context comes from the issue context endpoint; project context is markdown. Pass comments:true to include the issue thread. Use the input-request id to inspect a human's answer. Example: {\"id\":\"CORA-142\"}.",
+    "visibleIf": [
+      "tasks:read",
+      "projects:read",
+      "artifacts:read"
+    ],
+    "uses": [
+      "get_task_context",
+      "get_project_context",
+      "get_artifact",
+      "list_task_artifacts",
+      "list_comments"
+    ],
+    "description": "Read one task, project, or artifact by key or id. Task context comes from the task context endpoint; project context is markdown. Pass comments:true to include the task thread. The wire type stays issue. Example: {\"id\":\"CORA-142\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "id": { "type": "string", "description": "Key or id: CORA-142, ADR-21, in_…, pj_…, ir_…, ar_…." },
-        "type": { "type": "string", "enum": ["issue", "project", "decision", "input_request", "artifact"], "description": "Only when the kind cannot be inferred from the id." },
-        "comments": { "type": "boolean", "description": "Issues only: include the comment thread (last 20)." }
+        "id": {
+          "type": "string",
+          "description": "Key or id: CORA-142, pj_…, ar_…."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "project",
+            "artifact"
+          ],
+          "description": "Only when the kind cannot be inferred from the id. issue is the task discriminator."
+        },
+        "comments": {
+          "type": "boolean",
+          "description": "Tasks only: include the comment thread (last 20)."
+        }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "find_work",
-    "summary": "Find issues, input requests or decisions with filters (assignee `me`, status, project…)",
+    "summary": "Find tasks with filters (assignee `me`, status, project…)",
     "kind": "composite",
     "readOnly": true,
-    "visibleIf": ["issues:read", "input-requests:read", "decisions:read"],
-    "uses": ["list_issues", "list_input_requests", "list_decisions"],
-    "description": "Find issues to work on or existing human input requests and decisions. scope: all (default: issues), issues, input_requests (default state open), decisions. Filters: q, assignee ('me' or user id), status, priority, kind, projectId, teamId, issueId, open (default true for issues), and limit. Global request/decision listings include legacy records without an issue link. Use get_context for detail.",
+    "visibleIf": [
+      "tasks:read"
+    ],
+    "uses": [
+      "list_tasks"
+    ],
+    "description": "Find tasks to work on. Filters: q, assignee ('me' or user id), status, priority, kind, projectId, open (default true), and limit. There is no team filter. Use get_context for detail.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "scope": { "type": "string", "enum": ["all", "issues", "input_requests", "decisions"] },
-        "issueId": { "type": "string", "description": "Optional issue filter for human input and decisions." },
-        "q": { "type": "string", "description": "Text filter." },
-        "assignee": { "type": "string", "description": "'me' or a user id (assignee for issues and input requests)." },
-        "status": { "type": "string", "description": "Status of the selected scope: issue, input request, or decision status." },
-        "priority": { "type": "string", "enum": ["urgent", "high", "medium", "low", "none"] },
-        "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"], "description": "Issues only." },
-        "projectId": { "type": "string" },
-        "teamId": { "type": "string" },
-        "open": { "type": "boolean", "description": "Default true." },
-        "limit": { "type": "integer", "description": "Per section, 1-100, default 20." }
+        "q": {
+          "type": "string",
+          "description": "Text filter."
+        },
+        "assignee": {
+          "type": "string",
+          "description": "'me' or a user id."
+        },
+        "status": {
+          "type": "string",
+          "description": "Task status."
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "urgent",
+            "high",
+            "medium",
+            "low",
+            "none"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bug",
+            "feature",
+            "incident",
+            "tech_debt",
+            "feedback",
+            "idea",
+            "security"
+          ],
+          "description": "Tasks only."
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "open": {
+          "type": "boolean",
+          "description": "Default true."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Per section, 1-100, default 20."
+        }
       },
       "additionalProperties": false
     }
@@ -48,212 +113,419 @@
     "name": "search",
     "summary": "Full-text search across every object type; run it before creating anything",
     "kind": "catalog",
-    "description": "Full-text search across supported object types: issues, projects, decisions, artifacts, repositories, teams and customers. Run it before creating anything so you reuse what exists. `types` narrows the results. Returns type, id, key, title and subtitle."
+    "description": "Full-text search across supported object types: tasks, projects, artifacts and documents. The type token for a task is still issue. Run it before creating anything so you reuse what exists. `types` narrows the results. Returns type, id, key, title and subtitle."
   },
   {
     "name": "get_insights",
-    "summary": "Where the problems are: stale or overdue issues, bottlenecks, stuck PRs, flow metrics, agent failures",
+    "summary": "Where the problems are: stale or overdue tasks, bottlenecks, stuck PRs, flow metrics, agent failures",
     "kind": "catalog",
-    "description": "Where are the problems? Health signals for blocked or stale issues, bottlenecks, PRs stuck in review, failing CI, undecided decisions, customer demand waiting, flow metrics and agent failures. Use it to decide what needs attention before picking work. Narrow with projectId or teamId; days is 7, 30 or 90. The full list behind one signal: run_tool {name:'get_insight_signal', arguments:{id:'<signal>'}}."
+    "description": "Where are the problems? Health signals for blocked or stale tasks, bottlenecks, PRs stuck in review, failing CI, flow metrics and agent failures. Use it to decide what needs attention before picking work. Narrow with projectId; days is 7, 30 or 90. The full list behind one signal: run_tool {name:'get_insight_signal', arguments:{id:'<signal>'}}."
   },
   {
     "name": "get_workspace",
     "summary": "Workspace settings: label ids, estimate scale",
     "kind": "catalog",
-    "description": "The workspace and its settings: label catalog (ids to pass as `labels`), estimateScale (none, fibonacci, linear, exponential, tshirt), customer tiers. Read it once before filing issues so you assign real label ids and a valid estimate. Takes no arguments."
-  },
-  {
-    "name": "list_repositories",
-    "summary": "Registered git repositories (maps a checkout to its project)",
-    "kind": "catalog",
-    "description": "Registered git repositories (id, provider, fullName, url). To find the project of a git checkout, match its remote's owner/name to `fullName` (case-insensitive, after following any rename), then use the id with list_projects. No match means the checkout is not registered: say so, do not guess."
+    "description": "The workspace and its settings: label catalog (ids to pass as `labels`), estimateScale (none, fibonacci, linear, exponential, tshirt). Read it once before filing tasks so you assign real label ids and a valid estimate. Takes no arguments."
   },
   {
     "name": "list_projects",
-    "summary": "Projects; filter by repository to find the project of a checkout",
+    "summary": "Projects; filter by repository string to find the project of a checkout",
     "kind": "catalog",
-    "description": "Projects contain related issues and planning context. Filter by repositoryId to find the project of this checkout, or by q, status, teamId, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its issues and get_context {id:'pj_…'} reads it whole."
+    "description": "Projects contain related tasks and planning context. Filter by repository (owner/name or URL, case-insensitive) to find the project of this checkout, or by q, status, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its tasks and get_context {id:'pj_…'} reads it whole."
   },
   {
-    "name": "create_issue",
-    "summary": "File an issue (duplicate-checked)",
+    "name": "create_task",
+    "summary": "File a task (duplicate-checked)",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["issues:write"],
-    "uses": ["search", "create_issue"],
-    "description": "File one issue after checking for duplicates. Issues are the sole unit of work; set a concise goal when it helps clarify the desired result. Use parentId to create a sub-issue; sub-issues keep independent statuses and can be nested. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
+    "visibleIf": [
+      "tasks:write"
+    ],
+    "uses": [
+      "search",
+      "create_task"
+    ],
+    "description": "File one task after checking for duplicates. Tasks are the unit of work; set a concise goal when it helps clarify the desired result. Use parentId to create a sub-task; sub-tasks keep independent statuses and can be nested. There is no team. source defaults to agent. Labels are ids from get_workspace settings.labels, never names.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"] },
-        "title": { "type": "string", "description": "The symptom or request in plain words, under ~80 chars." },
-        "body": { "type": "string", "description": "Markdown: steps, expected vs actual, where you saw it." },
-        "goal": { "type": "string", "description": "Desired issue outcome." },
-        "priority": { "type": "string", "enum": ["none", "urgent", "high", "medium", "low"] },
-        "status": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "Default backlog." },
-        "projectId": { "type": "string" },
-        "parentId": { "type": "string", "description": "Id or key of the parent issue." },
-        "teamId": { "type": "string" },
-        "assigneeId": { "type": "string", "description": "Leave empty for backlog issues." },
-        "labels": { "type": "array", "items": { "type": "string" }, "description": "Workspace label ids." },
-        "estimate": { "type": "number", "description": "Only when the size is clear and the workspace uses estimates." },
-        "externalUrl": { "type": "string" },
-        "reporterName": { "type": "string" },
-        "source": { "type": "string", "enum": ["manual", "github", "gitlab", "email", "api", "agent"], "description": "Default agent." },
-        "force": { "type": "boolean", "description": "Create even if an open issue has the same title." }
+        "kind": {
+          "type": "string",
+          "enum": [
+            "bug",
+            "feature",
+            "incident",
+            "tech_debt",
+            "feedback",
+            "idea",
+            "security"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "description": "The symptom or request in plain words, under ~80 chars."
+        },
+        "body": {
+          "type": "string",
+          "description": "Markdown: steps, expected vs actual, where you saw it."
+        },
+        "goal": {
+          "type": "string",
+          "description": "Desired task outcome."
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "none",
+            "urgent",
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "backlog",
+            "todo",
+            "in_progress",
+            "in_review",
+            "done",
+            "canceled"
+          ],
+          "description": "Default backlog."
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string",
+          "description": "Id or key of the parent task."
+        },
+        "assigneeId": {
+          "type": "string",
+          "description": "Leave empty for backlog tasks."
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Workspace label ids."
+        },
+        "estimate": {
+          "type": "number",
+          "description": "Only when the size is clear and the workspace uses estimates."
+        },
+        "externalUrl": {
+          "type": "string"
+        },
+        "reporterName": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "manual",
+            "github",
+            "gitlab",
+            "email",
+            "api",
+            "agent"
+          ],
+          "description": "Default agent."
+        },
+        "force": {
+          "type": "boolean",
+          "description": "Create even if an open task has the same title."
+        }
       },
-      "required": ["kind", "title"],
+      "required": [
+        "kind",
+        "title"
+      ],
       "additionalProperties": false
     }
   },
   {
-    "name": "update_issue",
-    "summary": "Change an issue's status, priority, assignee, labels, parent, duplicate marker…",
+    "name": "update_task",
+    "summary": "Change a task's status, priority, assignee, labels, parent, duplicate marker…",
     "kind": "catalog",
-    "description": "Update one issue: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another issue). Changing project re-keys the issue and keeps its old key as an alias. Sub-issues keep independent statuses and can be nested. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several issues at once: triage_issues. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
+    "description": "Update one task: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another task). Changing project re-keys the task and keeps its old key as an alias. Sub-tasks keep independent statuses and can be nested. There is no team. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several tasks at once: triage_tasks. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
   },
   {
     "name": "start_work",
-    "summary": "Pick up an issue: context, safety checks, marks the start",
+    "summary": "Pick up a task: context, safety checks, marks the start",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["issues:read"],
-    "uses": ["get_issue", "get_issue_context", "list_input_requests", "list_decisions", "update_issue", "create_comment"],
-    "description": "Start work on an issue: load issue context, inspect linked questions and decisions, and set the issue in_progress. Completed and canceled issues are not changed. Pass a short plan to leave it as a comment.",
+    "visibleIf": [
+      "tasks:read"
+    ],
+    "uses": [
+      "get_task",
+      "get_task_context",
+      "update_task",
+      "create_comment"
+    ],
+    "description": "Start work on a task: load task context and set it in_progress. Completed and canceled tasks are not changed. Pass a short plan to leave it as a comment.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "key": { "type": "string", "description": "Issue key/id." },
-        "plan": { "type": "string", "description": "One comment: what you will do." }
+        "key": {
+          "type": "string",
+          "description": "Task key/id."
+        },
+        "plan": {
+          "type": "string",
+          "description": "One comment: what you will do."
+        }
       },
-      "required": ["key"],
+      "required": [
+        "key"
+      ],
       "additionalProperties": false
     }
   },
   {
     "name": "report_progress",
-    "summary": "Record artifacts, issue status, project update and a comment",
+    "summary": "Record artifacts, task status, project update and a comment",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["artifacts:write", "comments:write", "issues:write"],
-    "uses": ["get_issue", "get_project", "list_issue_artifacts", "list_project_artifacts", "create_artifact", "update_artifact", "update_issue", "create_project_update", "create_comment"],
-    "description": "Record issue or project progress: artifact, issueStatus, projectUpdate, and/or comment. Do not set an issue done until its fix is verified and merged.",
+    "visibleIf": [
+      "artifacts:write",
+      "comments:write",
+      "tasks:write"
+    ],
+    "uses": [
+      "get_task",
+      "get_project",
+      "list_task_artifacts",
+      "list_project_artifacts",
+      "create_artifact",
+      "update_artifact",
+      "update_task",
+      "create_project_update",
+      "create_comment"
+    ],
+    "description": "Record task or project progress: artifact, issueStatus, projectUpdate, and/or comment. issueStatus is the wire name for the task status. Do not set a task done until its fix is verified and merged.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "issue": { "type": "string", "description": "Issue key or id (for issueStatus, artifacts and comments)." },
-        "project": { "type": "string", "description": "Project id (for projectUpdate, artifacts and comments)." },
+        "issue": {
+          "type": "string",
+          "description": "Task key or id (for issueStatus, artifacts and comments). The argument name stays issue."
+        },
+        "project": {
+          "type": "string",
+          "description": "Project id (for projectUpdate, artifacts and comments)."
+        },
         "artifact": {
           "type": "object",
           "properties": {
-            "kind": { "type": "string", "enum": ["pull_request", "merge_request", "document", "link", "design", "image", "file", "build", "test_report", "deployment", "release"] },
-            "title": { "type": "string" },
-            "url": { "type": "string" },
-            "externalId": { "type": "string", "description": "PR number, sha, build id: used to find the existing artifact." },
-            "provider": { "type": "string" },
-            "state": { "type": "string", "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)." },
-            "ci": { "type": "string", "enum": ["pending", "passing", "failing"] },
-            "review": { "type": "string", "enum": ["none", "requested", "approved", "changes_requested"] },
-            "hasConflicts": { "type": "boolean" },
-            "environment": { "type": "string" },
-            "repositoryId": { "type": "string" },
-            "description": { "type": "string", "description": "Only used when the artifact is created." }
+            "kind": {
+              "type": "string",
+              "enum": [
+                "pull_request",
+                "merge_request",
+                "document",
+                "link",
+                "design",
+                "image",
+                "file",
+                "build",
+                "test_report",
+                "deployment",
+                "release"
+              ]
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "externalId": {
+              "type": "string",
+              "description": "PR number, sha, build id: used to find the existing artifact."
+            },
+            "provider": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string",
+              "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)."
+            },
+            "ci": {
+              "type": "string",
+              "enum": [
+                "pending",
+                "passing",
+                "failing"
+              ]
+            },
+            "review": {
+              "type": "string",
+              "enum": [
+                "none",
+                "requested",
+                "approved",
+                "changes_requested"
+              ]
+            },
+            "hasConflicts": {
+              "type": "boolean"
+            },
+            "environment": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string",
+              "description": "Only used when the artifact is created."
+            }
           },
-          "required": ["kind", "title"],
+          "required": [
+            "kind",
+            "title"
+          ],
           "additionalProperties": false
         },
-        "issueStatus": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"], "description": "New status of `issue`. in_review while its PR is open; done only once merged." },
+        "issueStatus": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "backlog",
+            "todo",
+            "in_progress",
+            "in_review",
+            "done",
+            "canceled"
+          ],
+          "description": "New status of the task. in_review while its PR is open; done only once merged."
+        },
         "projectUpdate": {
           "type": "object",
           "properties": {
-            "health": { "type": "string", "enum": ["on_track", "at_risk", "off_track"] },
-            "body": { "type": "string", "description": "Markdown: shipped, next, risks." }
+            "health": {
+              "type": "string",
+              "enum": [
+                "on_track",
+                "at_risk",
+                "off_track"
+              ]
+            },
+            "body": {
+              "type": "string",
+              "description": "Markdown: shipped, next, risks."
+            }
           },
-          "required": ["health", "body"],
+          "required": [
+            "health",
+            "body"
+          ],
           "additionalProperties": false
         },
-        "comment": { "type": "string", "description": "One factual comment on the issue or project." }
+        "comment": {
+          "type": "string",
+          "description": "One factual comment on the task or project."
+        }
       },
-      "additionalProperties": false
-    }
-  },
-  {
-    "name": "ask_human",
-    "summary": "Ask a person one question (an input request), once",
-    "kind": "composite",
-    "readOnly": false,
-    "visibleIf": ["input-requests:write"],
-    "uses": ["list_input_requests", "create_input_request", "list_decisions", "create_decision", "update_decision", "get_issue"],
-    "description": "One Human input feature with two modes. mode=question creates an input request linked to an issue; a human answers it later, preserving the request lifecycle. mode=decision proposes a lasting decision linked to the issue; a human accepts, rejects or supersedes it. Question mode is the default.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "mode": { "type": "string", "enum": ["question", "decision"], "description": "Question request (default) or a lasting decision proposal." },
-        "issue": { "type": "string", "description": "Issue key or id." },
-        "question": { "type": "string" },
-        "options": { "type": "array", "items": { "type": "string" } },
-        "assignee": { "type": "string", "description": "User id who should answer." },
-        "title": { "type": "string", "description": "Decision title (required in decision mode)." },
-        "statement": { "type": "string", "description": "Proposed rule or choice (required in decision mode)." },
-        "rationale": { "type": "string", "description": "Why this decision is needed, including alternatives." },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "related": { "type": "array", "items": { "type": "string" }, "description": "Related issue keys or ids." }
-      },
-      "required": ["issue"],
-      "additionalProperties": false
-    }
-  },
-  {
-    "name": "record_decision",
-    "summary": "Propose a lasting decision (a person accepts it)",
-    "kind": "composite",
-    "readOnly": false,
-    "visibleIf": ["decisions:write"],
-    "uses": ["get_issue", "list_decisions", "create_decision", "update_decision"],
-    "description": "Propose a lasting decision attached to an issue. A person must accept, reject or supersede it; the agent never accepts its own proposal. Pass originIssue or issue to associate it.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "title": { "type": "string" },
-        "statement": { "type": "string" },
-        "rationale": { "type": "string" },
-        "originIssue": { "type": "string", "description": "Origin issue key or id." },
-        "related": { "type": "array", "items": { "type": "string" }, "description": "Related issue keys or ids." },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "status": { "type": "string", "enum": ["draft", "proposed"], "description": "Default proposed." },
-        "decision": { "type": "string", "description": "Existing decision key/id to edit instead of creating." }
-      },
-      "required": ["title", "statement", "originIssue"],
       "additionalProperties": false
     }
   },
   {
     "name": "attach_artifact",
-    "summary": "Attach or update a PR, build, document or link on an issue or project",
+    "summary": "Attach or update a PR, build, document or link on a task or project",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["artifacts:write"],
-    "uses": ["get_issue", "get_project", "list_issue_artifacts", "list_project_artifacts", "create_artifact", "update_artifact"],
-    "description": "Attach proof of work or a reference to an issue or project: pull request, build, test report, deployment, design, document or link. Idempotent when the same external id or URL is repeated.",
+    "visibleIf": [
+      "artifacts:write"
+    ],
+    "uses": [
+      "get_task",
+      "get_project",
+      "list_task_artifacts",
+      "list_project_artifacts",
+      "create_artifact",
+      "update_artifact"
+    ],
+    "description": "Attach proof of work or a reference to a task or project: pull request, build, test report, deployment, design, document or link. Idempotent when the same external id or URL is repeated. Pass issue for the task.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "issue": { "type": "string", "description": "Issue key or id." },
-        "project": { "type": "string", "description": "Project id." },
-        "kind": { "type": "string", "enum": ["pull_request", "merge_request", "document", "link", "design", "image", "file", "build", "test_report", "deployment", "release"] },
-        "title": { "type": "string" },
-        "url": { "type": "string" },
-        "externalId": { "type": "string", "description": "PR number, sha, build id: used to find the existing artifact." },
-        "description": { "type": "string", "description": "What it is / why attached (only used on create)." },
-        "provider": { "type": "string" },
-        "state": { "type": "string", "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)." },
-        "ci": { "type": "string", "enum": ["pending", "passing", "failing"] },
-        "review": { "type": "string", "enum": ["none", "requested", "approved", "changes_requested"] },
-        "hasConflicts": { "type": "boolean" },
-        "environment": { "type": "string" },
-        "repositoryId": { "type": "string" }
+        "issue": {
+          "type": "string",
+          "description": "Task key or id."
+        },
+        "project": {
+          "type": "string",
+          "description": "Project id."
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "pull_request",
+            "merge_request",
+            "document",
+            "link",
+            "design",
+            "image",
+            "file",
+            "build",
+            "test_report",
+            "deployment",
+            "release"
+          ]
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "externalId": {
+          "type": "string",
+          "description": "PR number, sha, build id: used to find the existing artifact."
+        },
+        "description": {
+          "type": "string",
+          "description": "What it is / why attached (only used on create)."
+        },
+        "provider": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string",
+          "description": "draft|open|merged|closed (PRs); pending|running|succeeded|failed (builds, tests); healthy|degraded (deployments); published (releases)."
+        },
+        "ci": {
+          "type": "string",
+          "enum": [
+            "pending",
+            "passing",
+            "failing"
+          ]
+        },
+        "review": {
+          "type": "string",
+          "enum": [
+            "none",
+            "requested",
+            "approved",
+            "changes_requested"
+          ]
+        },
+        "hasConflicts": {
+          "type": "boolean"
+        },
+        "environment": {
+          "type": "string"
+        }
       },
-      "required": ["kind", "title"],
+      "required": [
+        "kind",
+        "title"
+      ],
       "additionalProperties": false
     }
   },
@@ -262,28 +534,55 @@
     "summary": "Comment on any object by key or id",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["comments:write"],
-    "uses": ["get_issue", "get_decision", "create_comment"],
-    "description": "Comment on an issue or decision by key or id. Use for a factual note after a meaningful step; skip trivial steps because the activity log records changes.",
+    "visibleIf": [
+      "comments:write"
+    ],
+    "uses": [
+      "get_task",
+      "create_comment"
+    ],
+    "description": "Comment on a task, project, or artifact by key or id. The wire subject type for a task is issue. Use for a factual note after a meaningful step; skip trivial steps because the activity log records changes.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "on": { "type": "string", "description": "Key or id of what you comment on." },
-        "type": { "type": "string", "enum": ["issue", "project", "decision", "input_request", "artifact"], "description": "Only when the kind cannot be inferred." },
-        "body": { "type": "string" }
+        "on": {
+          "type": "string",
+          "description": "Key or id of what you comment on."
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "issue",
+            "project",
+            "artifact"
+          ],
+          "description": "Only when the kind cannot be inferred. issue is a task."
+        },
+        "body": {
+          "type": "string"
+        }
       },
-      "required": ["on", "body"],
+      "required": [
+        "on",
+        "body"
+      ],
       "additionalProperties": false
     }
   },
   {
-    "name": "triage_issues",
-    "summary": "Triage up to 25 issues in one call (priority, duplicates, grouping)",
+    "name": "triage_tasks",
+    "summary": "Triage up to 25 tasks in one call (priority, duplicates, grouping)",
     "kind": "composite",
     "readOnly": false,
-    "visibleIf": ["issues:write"],
-    "uses": ["get_issue", "update_issue", "create_comment"],
-    "description": "Triage up to 25 issues in one call: priority, duplicate marker, assignment, project, status, labels, and comment. Items fail independently.",
+    "visibleIf": [
+      "tasks:write"
+    ],
+    "uses": [
+      "get_task",
+      "update_task",
+      "create_comment"
+    ],
+    "description": "Triage up to 25 tasks in one call: priority, duplicate marker, assignment, project, status, labels, and comment. Items fail independently. There is no team.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -293,25 +592,80 @@
           "items": {
             "type": "object",
             "properties": {
-              "issue": { "type": "string", "description": "Issue key or id." },
-              "priority": { "type": "string", "enum": ["none", "urgent", "high", "medium", "low"] },
-              "kind": { "type": "string", "enum": ["bug", "feature", "incident", "tech_debt", "feedback", "idea", "security"] },
-              "status": { "type": "string", "enum": ["draft", "backlog", "todo", "in_progress", "in_review", "done", "canceled"] },
-              "labels": { "type": "array", "items": { "type": "string" } },
-              "assigneeId": { "type": "string" },
-              "teamId": { "type": "string" },
-              "projectId": { "type": "string" },
-              "estimate": { "type": "number" },
-              "title": { "type": "string" },
-              "duplicateOf": { "type": "string", "description": "Key or id of the original issue." },
-              "comment": { "type": "string" }
+              "issue": {
+                "type": "string",
+                "description": "Task key or id. The argument name stays issue."
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "urgent",
+                  "high",
+                  "medium",
+                  "low"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "bug",
+                  "feature",
+                  "incident",
+                  "tech_debt",
+                  "feedback",
+                  "idea",
+                  "security"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "draft",
+                  "backlog",
+                  "todo",
+                  "in_progress",
+                  "in_review",
+                  "done",
+                  "canceled"
+                ]
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "assigneeId": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": "string"
+              },
+              "estimate": {
+                "type": "number"
+              },
+              "title": {
+                "type": "string"
+              },
+              "duplicateOf": {
+                "type": "string",
+                "description": "Key or id of the original task."
+              },
+              "comment": {
+                "type": "string"
+              }
             },
-            "required": ["issue"],
+            "required": [
+              "issue"
+            ],
             "additionalProperties": false
           }
         }
       },
-      "required": ["items"],
+      "required": [
+        "items"
+      ],
       "additionalProperties": false
     }
   },
@@ -323,14 +677,26 @@
     "local": true,
     "visibleIf": [],
     "uses": [],
-    "description": "Discover the long tail beyond this tool list: every Trama operation your key may use (137 catalog operations: teams, projects, milestones, customers, views, webhooks, members…). No arguments: groups with counts. q or group: matching tools with a one-line summary. tool:'<name>': full detail with the exact input schema and how to call it. Then run it with run_tool. Use it when none of the task tools above fits, instead of guessing names. Example: {\"q\":\"milestone\"} then {\"tool\":\"create_milestone\"}.",
+    "description": "Discover the long tail beyond this tool list: every Trama operation your key may use. No arguments: groups with counts. q or group: matching tools with a one-line summary. tool:'<name>': full detail with the exact input schema and how to call it. Then run it with run_tool. Use it when none of the task tools above fits, instead of guessing names. Example: {\"q\":\"milestone\"} then {\"tool\":\"create_milestone\"}.",
     "inputSchema": {
       "type": "object",
       "properties": {
-        "q": { "type": "string", "description": "Words that must all appear in a tool's name, description or route." },
-        "group": { "type": "string", "description": "Resource group, e.g. issues, projects, milestones, teams, customers." },
-        "tool": { "type": "string", "description": "Exact tool name: returns its schema and call example." },
-        "all": { "type": "boolean", "description": "Also list tools your key cannot use (marked unavailable)." }
+        "q": {
+          "type": "string",
+          "description": "Words that must all appear in a tool's name, description or route."
+        },
+        "group": {
+          "type": "string",
+          "description": "Resource group, e.g. tasks, projects, milestones."
+        },
+        "tool": {
+          "type": "string",
+          "description": "Exact tool name: returns its schema and call example."
+        },
+        "all": {
+          "type": "boolean",
+          "description": "Also list tools your key cannot use (marked unavailable)."
+        }
       },
       "additionalProperties": false
     }
@@ -347,10 +713,18 @@
     "inputSchema": {
       "type": "object",
       "properties": {
-        "name": { "type": "string", "description": "Tool name from list_capabilities." },
-        "arguments": { "type": "object", "description": "That tool's arguments (see list_capabilities {tool})." }
+        "name": {
+          "type": "string",
+          "description": "Tool name from list_capabilities."
+        },
+        "arguments": {
+          "type": "object",
+          "description": "That tool's arguments (see list_capabilities {tool})."
+        }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     }
   }

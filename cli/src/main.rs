@@ -103,13 +103,13 @@ impl Ctx {
 fn build_cli(reg: &Registry) -> Command {
     let mut root = Command::new("trama")
         .version(VERSION)
-        .about("Agent-first command line for Trama: issues, decisions and more")
+        .about("Agent-first command line for Trama: tasks, projects and more")
         .long_about(
             "Agent-first command line for Trama.\n\n\
              Every Trama API route is a command: `trama <resource> <verb>`. Output is JSON when piped, a table in a terminal.\n\
              Errors go to stderr as JSON with a stable exit code (see `trama --help` footer).\n\n\
              Connect:   trama login            trama account add    (or export TRAMA_API_KEY and TRAMA_API_URL)\n\
-             Discover:  trama commands         trama schema issue create\n\
+             Discover:  trama commands         trama schema task create\n\
              Agents:    trama skill install    trama mcp config",
         )
         .after_help(
@@ -171,7 +171,7 @@ async fn run_tool(
     }
     // Context briefings are markdown unless JSON was requested.
     let accept = match entry.tool.name.as_str() {
-        "get_issue_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
+        "get_task_context" if !ctx.fmt.mode.wants_json() => http::ACCEPT_MARKDOWN,
         "get_project_context" => http::ACCEPT_MARKDOWN,
         _ => http::ACCEPT_JSON,
     };

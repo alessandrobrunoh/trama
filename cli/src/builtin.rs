@@ -35,7 +35,7 @@ pub fn definitions() -> Vec<Command> {
             .arg(flag("password-stdin", "With --email: read the password from stdin (or set TRAMA_PASSWORD)"))
             .arg(Arg::new("workspace").long("workspace").value_name("SLUG").help("With --email: workspace to create the token in"))
             .arg(Arg::new("scope").long("scope").value_name("SCOPE").value_parser(["read", "write", "admin", "custom"]).help("With --email: token scope (server default: write)"))
-            .arg(Arg::new("permissions").long("permissions").value_name("RESOURCE:ACTION").value_delimiter(',').action(ArgAction::Append).help("With --email: custom token with exactly these permissions, e.g. issues:read,issues:write"))
+            .arg(Arg::new("permissions").long("permissions").value_name("RESOURCE:ACTION").value_delimiter(',').action(ArgAction::Append).help("With --email: custom token with exactly these permissions, e.g. tasks:read,tasks:write"))
             .arg(Arg::new("expires-in").long("expires-in").value_name("DURATION").help("With --email: token lifetime, e.g. 30d, 12h, never (default: never)"))
             .arg(Arg::new("token-name").long("token-name").value_name("NAME").help("With --email: name shown in Settings → API tokens (default: trama-cli@<host>)")),
         Command::new("logout")
@@ -49,7 +49,7 @@ pub fn definitions() -> Vec<Command> {
                 "An account groups one profile per workspace, so a read can cover more than the current one.\n\n\
                  Add keys you already have (one per line):\n  printf '%s\\n' \"$KEY_ACME\" \"$KEY_BETA\" | trama account add --with-token --api-url https://trama.example.com --name work\n\n\
                  Or sign in once and mint a key in every workspace the account belongs to:\n  trama account add --email you@acme.com --name work --workspace acme,beta\n\n\
-                 Then: trama issue list --account work",
+                 Then: trama task list --account work",
             )
             .subcommand_required(false)
             .subcommand(
@@ -85,17 +85,17 @@ pub fn definitions() -> Vec<Command> {
             .about("Call any workspace route directly")
             .long_about("Escape hatch for routes without a dedicated command. PATH is relative to the workspace (e.g. /integrations); the key's permissions still apply.")
             .arg(Arg::new("method").value_name("METHOD").required(true).value_parser(clap::builder::PossibleValuesParser::new(["GET", "POST", "PATCH", "DELETE", "get", "post", "patch", "delete"])).help("HTTP method"))
-            .arg(Arg::new("path").value_name("PATH").required(true).help("Workspace-relative path, e.g. /issues/CORA-1"))
+            .arg(Arg::new("path").value_name("PATH").required(true).help("Workspace-relative path, e.g. /tasks/CORA-1"))
             .arg(Arg::new("query").long("query").short('Q').value_name("KEY=VALUE").action(ArgAction::Append).help("Query parameter (repeatable)"))
             .arg(Arg::new("data").long("data").short('d').value_name("JSON").help("JSON body: inline, @file.json, or - for stdin"))
-            .after_help("Example:\n  trama api GET /issues -Q open=true -Q limit=5\n  trama api POST /outgoing-webhooks/ow_1/test -d '{}'"),
+            .after_help("Example:\n  trama api GET /tasks -Q open=true -Q limit=5\n  trama api POST /outgoing-webhooks/ow_1/test -d '{}')"),
         Command::new("commands")
             .about("List every resource command with its HTTP route and permission")
-            .arg(Arg::new("group").value_name("RESOURCE").help("Only this resource, e.g. issue"))
+            .arg(Arg::new("group").value_name("RESOURCE").help("Only this resource, e.g. task"))
             .arg(flag("detail", "Include every flag with type, allowed values and description")),
         Command::new("schema")
             .about("JSON input schema of one command")
-            .arg(Arg::new("command").value_name("RESOURCE [VERB]").required(true).num_args(1..=2).help("e.g. `issue create` (the MCP tool name, e.g. create_issue, works too)")),
+            .arg(Arg::new("command").value_name("RESOURCE [VERB]").required(true).num_args(1..=2).help("e.g. `task create` (the MCP tool name, e.g. create_task, works too)")),
         Command::new("completion")
             .about("Shell completion script")
             .arg(Arg::new("shell").required(true).value_parser(clap::value_parser!(clap_complete::Shell)))

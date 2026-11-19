@@ -139,76 +139,34 @@ fn not_found() -> (u16, String) {
 }
 
 #[tokio::test]
-async fn issue_context_and_human_question_use_issue_routes() {
+async fn task_context_uses_task_routes() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login", "status": "todo" })),
-        ("GET", "/issues/BUG-1/context") => j(json!({ "id": "in_1", "key": "BUG-1", "goal": "Allow login" })),
-        ("GET", "/issues/BUG-1/artifacts") => j(json!([])),
-        ("GET", "/input-requests") => j(json!([])),
-        ("POST", "/input-requests") => j(json!({ "id": "ir_1", "question": "Which provider?", "state": "open" })),
+        ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login", "status": "todo" })),
+        ("GET", "/tasks/BUG-1/context") => j(json!({ "id": "in_1", "key": "BUG-1", "goal": "Allow login" })),
+        ("GET", "/tasks/BUG-1/artifacts") => j(json!([])),
         _ => not_found(),
     });
     let s = server(&mock);
     let a = all();
     let (err, context) = call(&s, &a, "get_context", json!({ "id": "BUG-1" })).await;
     assert!(!err, "{context}");
-    assert!(mock.calls().iter().any(|r| r.is("GET", "/issues/BUG-1/context")));
-
-    let (err, answer) = call(&s, &a, "ask_human", json!({ "mode": "question", "issue": "BUG-1", "question": "Which provider?" })).await;
-    assert!(!err, "{answer}");
-    assert_eq!(mock.writes().last().unwrap().body["issueId"], "in_1");
+    assert!(mock.calls().iter().any(|r| r.is("GET", "/tasks/BUG-1/context")));
+    assert!(parsed(&context)["type"] == "issue");
 }
 
 #[tokio::test]
-async fn human_input_modes_use_issue_scoped_request_and_decision_apis() {
+async fn find_work_lists_tasks_without_a_team_filter() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login" })),
-        ("GET", "/input-requests") => j(json!([])),
-        ("GET", "/decisions") => j(json!([])),
-        ("POST", "/decisions") => j(json!({ "id": "dc_1", "key": "ADR-21", "title": "T", "status": "proposed" })),
+        ("GET", "/tasks") => j(json!([{ "id": "in_1", "key": "BUG-1", "title": "Login", "status": "todo" }])),
         _ => not_found(),
     });
-    let s = server(&mock);
-    let a = all();
-
-    let (err, requests) = call(
-        &s,
-        &a,
-        "find_work",
-        json!({ "scope": "input_requests", "issueId": "in_1" }),
-    )
-    .await;
-    assert!(!err, "{requests}");
-    assert!(mock.calls().iter().any(|r| {
-        r.path == "/input-requests" && r.query.contains("issueId=in_1")
-    }));
-
-    let (err, decisions) = call(
-        &s,
-        &a,
-        "find_work",
-        json!({ "scope": "decisions", "issueId": "in_1" }),
-    )
-    .await;
-    assert!(!err, "{decisions}");
-    assert!(mock.calls().iter().any(|r| {
-        r.path == "/decisions" && r.query.contains("issueId=in_1")
-    }));
-
-    let (err, decision) = call(
-        &s,
-        &a,
-        "ask_human",
-        json!({ "mode": "decision", "issue": "BUG-1", "title": "T", "statement": "S" }),
-    )
-    .await;
-    assert!(!err, "{decision}");
-    let writes = mock.writes();
-    assert_eq!(writes.last().unwrap().path, "/decisions");
-    assert_eq!(
-        writes.last().unwrap().body,
-        json!({ "title": "T", "statement": "S", "status": "proposed", "originIssueId": "in_1" })
-    );
+    let (err, text) = call(&server(&mock), &all(), "find_work", json!({ "projectId": "prj_1", "q": "login" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["tasks"][0]["key"], "BUG-1");
+    let call = &mock.calls()[0];
+    assert_eq!(call.path, "/tasks");
+    assert!(call.query.contains("projectId=prj_1"), "{}", call.query);
+    assert!(!call.query.contains("teamId"));
 }
 
 fn parsed(text: &str) -> Value {
@@ -225,14 +183,12 @@ fn all() -> [Account; 1] {
 fn references_are_classified_by_id_prefix_and_key_shape() {
     assert_eq!(candidates("BUG-142", None), vec![Kind::Issue]);
     assert_eq!(candidates("fb-3", None), vec![Kind::Issue]);
-    assert_eq!(candidates("ADR-21", None), vec![Kind::Decision]);
     assert_eq!(candidates("AUTH-42", None), vec![Kind::Issue]);
     assert_eq!(candidates("A1C-42", None), vec![Kind::Issue]);
     assert!(candidates("1ABC-42", None).is_empty());
     assert!(candidates("wk_abc", None).is_empty());
     assert_eq!(candidates("in_abc", None), vec![Kind::Issue]);
     assert_eq!(candidates("pj_abc", None), vec![Kind::Project]);
-    assert_eq!(candidates("ir_abc", None), vec![Kind::InputRequest]);
     assert!(candidates("something", None).is_empty());
     assert_eq!(candidates("AUTH-42", Some(Kind::Issue)), vec![Kind::Issue]);
 }
@@ -244,7 +200,7 @@ async fn get_context_reports_a_missing_thing_clearly() {
     let mock = Mock::spawn(|_| not_found());
     let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-999" })).await;
     assert!(err);
-    assert!(text.contains("no issue 'BUG-999'"), "{text}");
+    assert!(text.contains("no task 'BUG-999'"), "{text}");
 }
 
 // ── report_progress ──
@@ -254,8 +210,8 @@ async fn get_context_reports_a_missing_thing_clearly() {
 #[tokio::test]
 async fn attach_artifact_creates_on_the_issue_when_none_matches() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1" })),
-        ("GET", "/issues/in_1/artifacts") => j(json!([])),
+        ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1" })),
+        ("GET", "/tasks/in_1/artifacts") => j(json!([])),
         ("POST", "/artifacts") => j(json!({ "id": "ar_2", "kind": "link", "title": "Spec" })),
         _ => not_found(),
     });
@@ -270,10 +226,10 @@ async fn attach_artifact_creates_on_the_issue_when_none_matches() {
 #[tokio::test]
 async fn report_progress_updates_issue_status_attaches_artifact_and_comments() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1" })),
-        ("GET", "/issues/in_1/artifacts") => j(json!([])),
+        ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1" })),
+        ("GET", "/tasks/in_1/artifacts") => j(json!([])),
         ("POST", "/artifacts") => j(json!({ "id": "ar_1", "kind": "pull_request", "title": "Fix", "state": "open" })),
-        ("PATCH", "/issues/in_1") => j(json!({})),
+        ("PATCH", "/tasks/in_1") => j(json!({})),
         ("POST", "/comments") => j(json!({ "id": "cm_1" })),
         _ => not_found(),
     });
@@ -287,7 +243,7 @@ async fn report_progress_updates_issue_status_attaches_artifact_and_comments() {
     assert!(!err, "{text}");
     assert_eq!(
         parsed(&text)["applied"],
-        json!(["artifact created", "issue status in_progress", "comment added"])
+        json!(["artifact created", "task status in_progress", "comment added"])
     );
     let writes = mock.writes();
     assert_eq!(writes.len(), 3);
@@ -296,29 +252,13 @@ async fn report_progress_updates_issue_status_attaches_artifact_and_comments() {
     assert_eq!(writes[2].body["subject"], json!({ "type": "issue", "id": "in_1" }));
 }
 
-// ── ask_human ──
-
-// ── record_decision ──
+// ── create_task ──
 
 #[tokio::test]
-async fn record_decision_does_not_duplicate_an_existing_title() {
-    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/decisions") => j(json!([{ "id": "dc_1", "key": "ADR-5", "title": "Use  OAuth", "status": "accepted" }])),
-        _ => not_found(),
-    });
-    let (err, text) = call(&server(&mock), &all(), "record_decision", json!({ "title": "use oauth", "statement": "S", "originIssue": "BUG-1" })).await;
-    assert!(!err);
-    assert_eq!(parsed(&text)["created"], false);
-    assert!(mock.writes().is_empty());
-}
-
-// ── create_issue ──
-
-#[tokio::test]
-async fn create_issue_blocks_exact_duplicates_unless_forced() {
+async fn create_task_blocks_exact_duplicates_unless_forced() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
         ("GET", "/search") => j(json!({ "results": [{ "type": "issue", "id": "in_1", "key": "BUG-1", "title": "Login times out", "subtitle": "bug · backlog" }] })),
-        ("POST", "/issues") => j(json!({
+        ("POST", "/tasks") => j(json!({
             "id": "in_2",
             "key": "BUG-2",
             "title": "Login times out",
@@ -330,7 +270,7 @@ async fn create_issue_blocks_exact_duplicates_unless_forced() {
     });
     let s = server(&mock);
     let a = all();
-    let (err, text) = call(&s, &a, "create_issue", json!({ "kind": "bug", "title": "login times out" })).await;
+    let (err, text) = call(&s, &a, "create_task", json!({ "kind": "bug", "title": "login times out" })).await;
     assert!(!err);
     let v = parsed(&text);
     assert_eq!(v["created"], false);
@@ -340,7 +280,7 @@ async fn create_issue_blocks_exact_duplicates_unless_forced() {
     let (err, text) = call(
         &s,
         &a,
-        "create_issue",
+        "create_task",
         json!({
             "kind": "bug",
             "title": "login times out",
@@ -352,8 +292,8 @@ async fn create_issue_blocks_exact_duplicates_unless_forced() {
     assert!(!err, "{text}");
     let v = parsed(&text);
     assert_eq!(v["created"], true);
-    assert_eq!(v["similarOpenIssues"][0]["key"], "BUG-1");
-    assert_eq!(v["issue"]["parentId"], "in_parent");
+    assert_eq!(v["similarOpenTasks"][0]["key"], "BUG-1");
+    assert_eq!(v["task"]["parentId"], "in_parent");
     let w = mock.writes();
     assert_eq!(
         w[0].body,
@@ -372,12 +312,10 @@ async fn create_issue_blocks_exact_duplicates_unless_forced() {
 #[tokio::test]
 async fn start_work_updates_the_issue_and_returns_its_context() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "t", "status": "backlog" })),
-        ("GET", "/input-requests") => j(json!([{ "id": "ir_1", "question": "Keep v1?" }])),
-        ("GET", "/decisions") => j(json!([])),
-        ("PATCH", "/issues/in_1") => j(json!({})),
+        ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "t", "status": "backlog" })),
+        ("PATCH", "/tasks/in_1") => j(json!({})),
         ("POST", "/comments") => j(json!({ "id": "cm_1" })),
-        ("GET", "/issues/in_1/context") => j(json!({ "goal": "Ship login" })),
+        ("GET", "/tasks/in_1/context") => j(json!({ "goal": "Ship login" })),
         _ => not_found(),
     });
     let (err, text) = call(&server(&mock), &all(), "start_work", json!({ "key": "BUG-1", "plan": "Fixing the timeout." })).await;
@@ -385,10 +323,10 @@ async fn start_work_updates_the_issue_and_returns_its_context() {
     let value = parsed(&text);
     assert_eq!(value["ready"], true);
     assert_eq!(value["briefing"]["goal"], "Ship login");
-    assert!(value["cautions"][0].as_str().unwrap().contains("open human questions"));
+    assert_eq!(value["task"]["key"], "BUG-1");
     let writes = mock.writes();
     assert_eq!(writes.len(), 2);
-    assert!(writes[0].is("PATCH", "/issues/in_1"));
+    assert!(writes[0].is("PATCH", "/tasks/in_1"));
     assert_eq!(writes[0].body, json!({ "status": "in_progress" }));
     assert_eq!(writes[1].body["subject"], json!({ "type": "issue", "id": "in_1" }));
 }
@@ -398,7 +336,7 @@ async fn start_work_updates_the_issue_and_returns_its_context() {
 #[tokio::test]
 async fn add_comment_resolves_keys_to_the_ids_the_api_wants() {
     let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
-        ("GET", "/issues/BUG-142") => j(json!({ "id": "in_142", "key": "BUG-142" })),
+        ("GET", "/tasks/BUG-142") => j(json!({ "id": "in_142", "key": "BUG-142" })),
         ("POST", "/comments") => j(json!({ "id": "cm_1" })),
         _ => not_found(),
     });
@@ -417,12 +355,12 @@ async fn composites_are_hidden_and_refused_without_their_permissions() {
     let a = [account("acme", &read_only)];
     let listed: Vec<String> = s.list_tools(&a).iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
     assert!(listed.contains(&"get_context".to_string()) && listed.contains(&"find_work".to_string()));
-    for hidden in ["create_issue", "report_progress", "ask_human", "record_decision", "attach_artifact", "add_comment", "triage_issues", "update_issue"] {
+    for hidden in ["create_task", "report_progress", "attach_artifact", "add_comment", "triage_tasks", "update_task"] {
         assert!(!listed.contains(&hidden.to_string()), "{hidden} must be hidden for a read-only key");
     }
-    let (err, text) = call(&s, &a, "ask_human", json!({ "issue": "BUG-1", "question": "q" })).await;
+    let (err, text) = call(&s, &a, "create_task", json!({ "kind": "bug", "title": "q" })).await;
     assert!(err, "calling a hidden tool by name is still refused");
-    assert!(text.contains("input-requests:write"), "{text}");
+    assert!(text.contains("tasks:write"), "{text}");
     assert!(mock.calls().is_empty(), "refused before any API call");
 }
 
@@ -445,9 +383,10 @@ async fn list_capabilities_reveals_the_long_tail_with_schemas() {
     let v = parsed(&text);
     assert_eq!(v["tools"][0]["name"], "reorder_milestones");
 
-    let (_, text) = call(&s, &a, "list_capabilities", json!({ "group": "teams" })).await;
+    let (_, text) = call(&s, &a, "list_capabilities", json!({ "group": "tasks" })).await;
     let names: Vec<String> = parsed(&text)["tools"].as_array().unwrap().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
-    assert!(names.contains(&"create_team".to_string()));
+    assert!(names.contains(&"create_task".to_string()));
+    assert!(!names.iter().any(|n| n.contains("team") || n.contains("decision") || n.contains("customer")));
 
     let (_, text) = call(&s, &a, "list_capabilities", json!({ "tool": "create_milestone" })).await;
     let v = parsed(&text);
@@ -519,9 +458,9 @@ async fn run_tool_on_several_workspaces_follows_the_read_write_rule() {
 
 #[tokio::test]
 async fn tools_the_core_profile_does_not_list_still_answer_by_name() {
-    let mock = Mock::spawn(|r| if r.is("GET", "/teams") { j(json!([{ "id": "tm_1" }])) } else { not_found() });
+    let mock = Mock::spawn(|r| if r.is("GET", "/views") { j(json!([{ "id": "vw_1" }])) } else { not_found() });
     let s = server(&mock);
-    let (err, text) = call(&s, &all(), "list_teams", json!({})).await;
+    let (err, text) = call(&s, &all(), "list_views", json!({})).await;
     assert!(!err, "{text}");
-    assert!(!s.list_tools(&all()).iter().any(|t| t["name"] == "list_teams"));
+    assert!(!s.list_tools(&all()).iter().any(|t| t["name"] == "list_views"));
 }

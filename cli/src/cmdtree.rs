@@ -44,25 +44,24 @@ pub struct Registry {
 /// Tool names whose `<verb>_<noun>` split would not give the command we want.
 const OVERRIDES: &[(&str, &str, &str)] = &[
     ("change_member_role", "member", "set-role"),
-    ("get_issue_context", "issue", "context"),
+    ("get_task_context", "task", "context"),
     ("get_project_context", "project", "context"),
     ("list_project_artifacts", "project", "artifacts"),
-    ("list_issue_artifacts", "issue", "artifacts"),
+    ("list_task_artifacts", "task", "artifacts"),
     ("list_webhook_deliveries", "outgoing-webhook", "deliveries"),
 ];
 
 /// One-line descriptions for groups whose first tool description reads badly as a heading.
 const GROUP_ABOUT: &[(&str, &str)] = &[
-    ("issue", "Bugs, features, incidents, debt, feedback, ideas and security items"),
+    ("task", "Bugs, features, incidents, debt, feedback, ideas and security items"),
     ("member", "Workspace members and their roles"),
-    ("team", "Teams and their keys"),
     ("project-update", "Status updates (health + write-up) posted on a project"),
     ("token", "API tokens (never their secrets)"),
     ("event", "Activity log of every change"),
 ];
 
 /// Short names people actually type.
-const GROUP_ALIASES: &[(&str, &str)] = &[("repository", "repo"), ("outgoing-webhook", "webhook")];
+const GROUP_ALIASES: &[(&str, &str)] = &[("outgoing-webhook", "webhook")];
 
 /// Extra verbs for commands people already have a word for: `(group, verb, alias)`.
 const VERB_ALIASES: &[(&str, &str, &str)] = &[("project-update", "create", "post"), ("project-update", "update", "edit"), ("artifact", "create", "add")];
@@ -77,7 +76,7 @@ fn singular(word: &str) -> String {
     }
 }
 
-/// `list_input_requests` → (`input-request`, `list`). Single-word tools return `(name, None)`.
+/// `list_tasks` → (`task`, `list`). Single-word tools return `(name, None).
 pub fn route(tool: &str) -> (String, Option<String>) {
     if let Some((_, group, verb)) = OVERRIDES.iter().find(|(n, _, _)| *n == tool) {
         return (group.to_string(), Some(verb.to_string()));
@@ -144,7 +143,7 @@ impl Registry {
                 if let Some((_, alias)) = GROUP_ALIASES.iter().find(|(g, _)| *g == group) {
                     cmd = cmd.visible_alias(*alias);
                 }
-                // `issues`, `repositories`: the plural people type for the list.
+                // `tasks`: the plural people type for the list.
                 if let Some(list) = entries.iter().find(|e| e.verb.as_deref() == Some("list")) {
                     let plural = list.tool.name.strip_prefix("list_").unwrap_or("").replace('_', "-");
                     if !plural.is_empty() && plural != group {
@@ -415,12 +414,10 @@ mod tests {
     #[test]
     fn routes_tool_names_to_commands() {
         let r = |n| route(n);
-        assert_eq!(r("list_issues"), ("issue".into(), Some("list".into())));
-        assert_eq!(r("list_repositories"), ("repository".into(), Some("list".into())));
-        assert_eq!(r("create_input_request"), ("input-request".into(), Some("create".into())));
+        assert_eq!(r("list_tasks"), ("task".into(), Some("list".into())));
         assert_eq!(r("get_outgoing_webhook"), ("outgoing-webhook".into(), Some("get".into())));
         assert_eq!(r("list_attention"), ("attention".into(), Some("list".into())));
-        assert_eq!(r("get_issue_context"), ("issue".into(), Some("context".into())));
+        assert_eq!(r("get_task_context"), ("task".into(), Some("context".into())));
         assert_eq!(r("change_member_role"), ("member".into(), Some("set-role".into())));
         assert_eq!(r("reorder_milestones"), ("milestone".into(), Some("reorder".into())));
         assert_eq!(r("search"), ("search".into(), None));
@@ -444,45 +441,48 @@ mod tests {
 
     #[test]
     fn builds_a_body_from_flags() {
-        let (e, m) = parse(&["issue", "create", "--kind", "bug", "--title", "-x crashes", "--estimate", "3", "--priority", "high"]);
+        let (e, m) = parse(&["task", "create", "--kind", "bug", "--title", "-x crashes", "--estimate", "3", "--priority", "high"]);
         let args = extract(&e, &m).unwrap();
         assert_eq!(args, json!({ "kind": "bug", "title": "-x crashes", "estimate": 3.0, "priority": "high" }));
         let call = e.tool.build_call(&args).unwrap();
-        assert_eq!(call.path, "/issues");
+        assert_eq!(call.path, "/tasks");
         assert_eq!(call.body.unwrap()["title"], "-x crashes");
     }
 
     #[test]
     fn removed_resources_are_not_commands() {
         let reg = registry();
-        assert!(!reg.entries.iter().any(|entry| entry.group == "workstream" || entry.group == "criterion" || entry.group == "dependency"));
+        for gone in ["workstream", "criterion", "dependency", "team", "repository", "decision", "customer", "input-request", "release"] {
+            assert!(!reg.entries.iter().any(|entry| entry.group == gone), "{gone}");
+        }
     }
 
     #[test]
     fn lists_filters_booleans_and_arrays() {
-        let (e, m) = parse(&["issue", "list", "--open", "--priority", "urgent,high", "--q", "login"]);
+        let (e, m) = parse(&["task", "list", "--open", "--priority", "urgent,high", "--q", "login"]);
         let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();
         assert!(call.query.contains(&("open".into(), "true".into())));
         assert!(call.query.contains(&("q".into(), "login".into())));
-        let (e, m) = parse(&["team", "create", "--name", "Auth", "--key", "AUTH", "--member-ids", "usr_1,usr_2"]);
-        assert_eq!(extract(&e, &m).unwrap()["memberIds"], json!(["usr_1", "usr_2"]));
+        assert!(!call.query.iter().any(|(k, _)| k == "teamId"));
+        let (e, m) = parse(&["project", "create", "--name", "Auth", "--labels", "lb_1,lb_2"]);
+        assert_eq!(extract(&e, &m).unwrap()["labels"], json!(["lb_1", "lb_2"]));
     }
 
     #[test]
     fn unset_sends_null_only_for_optional_patch_fields() {
-        let (e, m) = parse(&["issue", "update", "BUG-1", "--status", "done", "--unset", "estimate,assigneeId"]);
+        let (e, m) = parse(&["task", "update", "BUG-1", "--status", "done", "--unset", "estimate,assigneeId"]);
         let call = e.tool.build_call(&extract(&e, &m).unwrap()).unwrap();
         assert_eq!(call.body, Some(json!({ "status": "done", "estimate": null, "assigneeId": null })));
-        let (e, m) = parse(&["issue", "update", "BUG-1", "--unset", "idOrKey"]);
+        let (e, m) = parse(&["task", "update", "BUG-1", "--unset", "idOrKey"]);
         assert!(extract(&e, &m).is_err());
     }
 
     #[test]
     fn data_is_the_base_and_flags_win() {
-        let (e, m) = parse(&["issue", "create", "--data", r#"{"kind":"bug","title":"from json","priority":"low"}"#, "--title", "from flag"]);
+        let (e, m) = parse(&["task", "create", "--data", r#"{"kind":"bug","title":"from json","priority":"low"}"#, "--title", "from flag"]);
         let args = extract(&e, &m).unwrap();
         assert_eq!(args, json!({ "kind": "bug", "title": "from flag", "priority": "low" }));
-        let (e, m) = parse(&["issue", "create", "--data", "[1]"]);
+        let (e, m) = parse(&["task", "create", "--data", "[1]"]);
         assert!(extract(&e, &m).is_err());
     }
 
@@ -490,10 +490,10 @@ mod tests {
     fn object_flags_accept_shorthand_json_and_files() {
         let (e, m) = parse(&["comment", "create", "--subject", "issue:iss_1", "--body", "hi"]);
         assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "issue", "id": "iss_1" }));
-        let (e, m) = parse(&["comment", "create", "--subject", "type=decision,id=dec_1", "--body", "hi"]);
-        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "decision", "id": "dec_1" }));
-        let (e, m) = parse(&["comment", "create", "--subject", r#"{"type":"team","id":"tm_1"}"#, "--body", "hi"]);
-        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "team", "id": "tm_1" }));
+        let (e, m) = parse(&["comment", "create", "--subject", "type=project,id=prj_1", "--body", "hi"]);
+        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "project", "id": "prj_1" }));
+        let (e, m) = parse(&["comment", "create", "--subject", r#"{"type":"project_update","id":"pu_1"}"#, "--body", "hi"]);
+        assert_eq!(extract(&e, &m).unwrap()["subject"], json!({ "type": "project_update", "id": "pu_1" }));
         let (e, m) = parse(&["comment", "create", "--subject", "nonsense", "--body", "hi"]);
         assert!(extract(&e, &m).is_err());
         let (e, m) = parse(&["comment", "create", "--subject", "a=1,b", "--body", "hi"]);
@@ -502,13 +502,13 @@ mod tests {
 
     #[test]
     fn rejects_bad_enum_values_at_parse_time() {
-        let r = root().try_get_matches_from(["trama", "issue", "create", "--kind", "nope", "--title", "x"]);
+        let r = root().try_get_matches_from(["trama", "task", "create", "--kind", "nope", "--title", "x"]);
         assert!(r.is_err());
     }
 
     #[test]
     fn aliases_work() {
-        for args in [["issues", "ls"], ["repo", "ls"], ["repositories", "list"], ["webhook", "list"]] {
+        for args in [["tasks", "ls"], ["webhook", "list"]] {
             assert!(root().try_get_matches_from(["trama", args[0], args[1]]).is_ok(), "{args:?}");
         }
     }
@@ -516,7 +516,7 @@ mod tests {
     #[test]
     fn friendly_messages_use_flag_names() {
         let reg = registry();
-        let e = reg.find("issue", Some("create")).unwrap();
+        let e = reg.find("task", Some("create")).unwrap();
         assert_eq!(friendly(e, "missing required argument 'kind'"), "missing required option --kind");
         assert_eq!(friendly(e, "argument 'title' must be string"), "--title must be string");
         assert_eq!(friendly(e, "unknown argument 'zzz'"), "unknown field zzz");

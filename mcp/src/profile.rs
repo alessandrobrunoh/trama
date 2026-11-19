@@ -402,7 +402,7 @@ mod tests {
         let names = core_names(&entries);
         assert!((15..=25).contains(&names.len()), "core has {} tools: {names:?}", names.len());
         assert!(names.len() < 25,"with list_accounts the core must still fit 25");
-        for must in ["get_context", "find_work", "create_issue", "start_work", "report_progress", "ask_human", "record_decision", "attach_artifact", "search", "list_capabilities", "run_tool", "api_request"] {
+        for must in ["get_context", "find_work", "create_task", "start_work", "report_progress", "triage_tasks", "attach_artifact", "search", "list_capabilities", "run_tool", "api_request"] {
             assert!(names.iter().any(|n| n == must), "core misses {must}");
         }
     }

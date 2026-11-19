@@ -300,13 +300,13 @@ fn whoami_introspects_the_key_and_hides_hashes() {
         "GET",
         "/api/auth/token",
         200,
-        identity(&["issues:write", "issues:read"]),
+        identity(&["tasks:write", "tasks:read"]),
     )]);
     let o = Run::new().with_key(&mock.api()).run(&["whoami"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     let v = out_json(&o);
     assert_eq!(v["workspace"]["slug"], "acme");
-    assert_eq!(v["permissions"], json!(["issues:read", "issues:write"]));
+    assert_eq!(v["permissions"], json!(["tasks:read", "tasks:write"]));
     assert!(v["token"].get("tokenHash").is_none());
     assert_eq!(mock.last().headers["authorization"], "Bearer nbl_test");
 }
@@ -314,9 +314,9 @@ fn whoami_introspects_the_key_and_hides_hashes() {
 #[test]
 fn lists_with_filters_projection_and_compact_json() {
     let issues = json!([{ "id": "iss_1", "key": "BUG-1", "title": "Crash", "status": "todo", "body": "long" }, { "id": "iss_2", "key": "BUG-2", "title": "Slow", "status": "done" }]);
-    let mock = Mock::start(vec![route("GET", "/api/w/acme/issues", 200, issues)]);
+    let mock = Mock::start(vec![route("GET", "/api/w/acme/tasks", 200, issues)]);
     let o = Run::new().with_key(&mock.api()).run(&[
-        "issue",
+        "task",
         "list",
         "--open",
         "--limit",
@@ -346,14 +346,14 @@ fn lists_with_filters_projection_and_compact_json() {
 fn creates_with_flags_and_text_from_a_file() {
     let mock = Mock::start(vec![route(
         "POST",
-        "/api/w/acme/issues",
+        "/api/w/acme/tasks",
         201,
         json!({ "id": "iss_9", "key": "BUG-9" }),
     )]);
     let run = Run::new().with_key(&mock.api());
     std::fs::write(run.cwd.join("notes.md"), "line one\n\n**line two**\n").unwrap();
     let o = run.run(&[
-        "issue",
+        "task",
         "create",
         "--kind",
         "bug",
@@ -377,13 +377,13 @@ fn creates_with_flags_and_text_from_a_file() {
 fn data_from_stdin_is_the_base_and_unset_sends_null() {
     let mock = Mock::start(vec![route(
         "PATCH",
-        "/api/w/acme/issues/BUG-1",
+        "/api/w/acme/tasks/BUG-1",
         200,
         json!({ "key": "BUG-1" }),
     )]);
     let o = Run::new().with_key(&mock.api()).run_stdin(
         &[
-            "issue",
+            "task",
             "update",
             "BUG-1",
             "--data",
@@ -406,16 +406,16 @@ fn data_from_stdin_is_the_base_and_unset_sends_null() {
 fn delete_returns_ok_and_dry_run_sends_nothing() {
     let mock = Mock::start(vec![route(
         "DELETE",
-        "/api/w/acme/issues/BUG-1",
+        "/api/w/acme/tasks/BUG-1",
         204,
         Value::Null,
     )]);
     let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["issue", "delete", "BUG-1", "--dry-run"]);
+    let o = run.run(&["task", "delete", "BUG-1", "--dry-run"]);
     assert_eq!(code(&o), 0);
     assert_eq!(out_json(&o)["request"]["method"], "DELETE");
     assert!(mock.requests().is_empty(), "dry-run must not call the API");
-    let o = run.run(&["issue", "delete", "BUG-1"]);
+    let o = run.run(&["task", "delete", "BUG-1"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     assert_eq!(out_json(&o), json!({ "ok": true }));
 }
@@ -433,13 +433,13 @@ fn maps_http_errors_to_stable_exit_codes() {
     for (status, exit, name) in cases {
         let mock = Mock::start(vec![route(
             "GET",
-            "/api/w/acme/issues/BUG-1",
+            "/api/w/acme/tasks/BUG-1",
             status,
             json!({ "statusCode": status, "message": "nope here" }),
         )]);
         let o = Run::new()
             .with_key(&mock.api())
-            .run(&["issue", "get", "BUG-1"]);
+            .run(&["task", "get", "BUG-1"]);
         assert_eq!(code(&o), exit, "status {status}: {}", stderr(&o));
         let e = err_json(&o);
         assert_eq!(e["error"]["code"], name);
@@ -456,12 +456,12 @@ fn maps_http_errors_to_stable_exit_codes() {
 fn issue_get_reports_artifact_count_without_an_artifact_request() {
     let mock = Mock::start(vec![route(
         "GET",
-        "/api/w/acme/issues/BUG-1",
+        "/api/w/acme/tasks/BUG-1",
         200,
         json!({ "key": "BUG-1", "title": "A bug", "status": "todo", "artifactCount": 0 }),
     )]);
     let o = Run::new().with_key(&mock.api()).run(&[
-        "issue",
+        "task",
         "get",
         "BUG-1",
         "--fields",
@@ -481,7 +481,7 @@ fn server_errors_on_reads_are_retried_but_writes_are_not() {
     let mock = Mock::start(vec![
         route(
             "GET",
-            "/api/w/acme/teams",
+            "/api/w/acme/projects",
             503,
             json!({ "message": "down" }),
         ),
@@ -493,7 +493,7 @@ fn server_errors_on_reads_are_retried_but_writes_are_not() {
         ),
     ]);
     let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["team", "list"]);
+    let o = run.run(&["project", "list"]);
     assert_eq!(code(&o), 7);
     assert_eq!(mock.requests().len(), 3);
     let o = run.run(&[
@@ -514,7 +514,7 @@ fn server_errors_on_reads_are_retried_but_writes_are_not() {
 
 #[test]
 fn not_signed_in_is_an_auth_error_with_a_hint() {
-    let o = Run::new().run(&["issue", "list"]);
+    let o = Run::new().run(&["task", "list"]);
     assert_eq!(code(&o), 3);
     let e = err_json(&o);
     assert_eq!(e["error"]["code"], "auth");
@@ -524,7 +524,7 @@ fn not_signed_in_is_an_auth_error_with_a_hint() {
 #[test]
 fn usage_errors_are_json_and_name_what_is_missing() {
     let run = Run::new();
-    let e = err_json(&run.run(&["issue", "update"]));
+    let e = err_json(&run.run(&["task", "update"]));
     assert_eq!(e["error"]["code"], "usage");
     assert!(
         e["error"]["message"]
@@ -533,9 +533,9 @@ fn usage_errors_are_json_and_name_what_is_missing() {
             .contains("<ID_OR_KEY>"),
         "{e}"
     );
-    let e = err_json(&run.run(&["issue", "create", "--title", "x"]));
+    let e = err_json(&run.run(&["task", "create", "--title", "x"]));
     assert_eq!(e["error"]["message"], "missing required option --kind");
-    let e = err_json(&run.run(&["issue", "create", "--kind", "nope", "--title", "x"]));
+    let e = err_json(&run.run(&["task", "create", "--kind", "nope", "--title", "x"]));
     assert!(
         e["error"]["message"].as_str().unwrap().contains("nope"),
         "{e}"
@@ -543,7 +543,7 @@ fn usage_errors_are_json_and_name_what_is_missing() {
     assert_eq!(code(&run.run(&["no-such-command"])), 2);
     // help and version are not errors
     assert_eq!(code(&run.run(&["--help"])), 0);
-    assert_eq!(code(&run.run(&["issue", "create", "--help"])), 0);
+    assert_eq!(code(&run.run(&["task", "create", "--help"])), 0);
     assert!(stdout(&run.run(&["--version"])).starts_with("trama "));
 }
 
@@ -571,7 +571,7 @@ fn refuses_plain_http_to_remote_hosts_and_unknown_key_formats() {
 fn issue_context_is_markdown_by_default_and_json_on_request() {
     let md = Route {
         method: "GET",
-        path: "/api/w/acme/issues/BUG-42/context",
+        path: "/api/w/acme/tasks/BUG-42/context",
         status: 200,
         content_type: "text/markdown; charset=utf-8",
         body: "# BUG-42\n\nBriefing\n".into(),
@@ -579,11 +579,11 @@ fn issue_context_is_markdown_by_default_and_json_on_request() {
     };
     let mock = Mock::start(vec![md]);
     let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["issue", "context", "BUG-42"]);
+    let o = run.run(&["task", "context", "BUG-42"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     assert_eq!(stdout(&o), "# BUG-42\n\nBriefing\n");
     assert!(mock.last().headers["accept"].starts_with("text/markdown"));
-    run.run(&["issue", "context", "BUG-42", "-o", "json"]);
+    run.run(&["task", "context", "BUG-42", "-o", "json"]);
     assert_eq!(mock.last().headers["accept"], "application/json");
 }
 
@@ -682,7 +682,7 @@ fn project_context_is_markdown_and_artifacts_attach_to_any_owner() {
             201,
             json!({ "id": "art_1" }),
         ),
-        route("GET", "/api/w/acme/issues/BUG-1/artifacts", 200, json!([])),
+        route("GET", "/api/w/acme/tasks/BUG-1/artifacts", 200, json!([])),
     ]);
     let run = Run::new().with_key(&mock.api());
     let o = run.run(&["project", "context", "prj_1"]);
@@ -708,7 +708,7 @@ fn project_context_is_markdown_and_artifacts_attach_to_any_owner() {
         mock.last().json(),
         json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test" })
     );
-    assert_eq!(code(&run.run(&["issue", "artifacts", "BUG-1"])), 0);
+    assert_eq!(code(&run.run(&["task", "artifacts", "BUG-1"])), 0);
 }
 
 #[test]
@@ -732,8 +732,8 @@ fn api_escape_hatch_validates_paths() {
 #[test]
 fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
     let mock = Mock::start(vec![
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
-        route("GET", "/api/w/acme/issues", 200, json!([])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
+        route("GET", "/api/w/acme/tasks", 200, json!([])),
     ]);
     let run = Run::new();
     let o = run.run_stdin(
@@ -761,7 +761,7 @@ fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
     }
 
     let before = mock.requests().len();
-    let o = run.run(&["issue", "list"]);
+    let o = run.run(&["task", "list"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
     let calls: Vec<String> = mock.requests()[before..]
         .iter()
@@ -769,7 +769,7 @@ fn login_with_token_saves_a_private_profile_and_later_calls_need_no_env() {
         .collect();
     assert_eq!(
         calls,
-        vec!["/api/w/acme/issues"],
+        vec!["/api/w/acme/tasks"],
         "the saved slug avoids an introspection round trip"
     );
 
@@ -831,7 +831,7 @@ fn login_with_email_mints_a_token_and_closes_the_session() {
             json!({ "token": { "id": "tok_2" }, "secret": "trm_minted_for_this_machine" }),
         ),
         route("POST", "/api/auth/logout", 204, Value::Null),
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
     ]);
     let run = Run::new();
     let o = run.run_stdin(
@@ -926,14 +926,14 @@ fn logout_can_revoke_the_key_server_side() {
     assert_eq!(mock.last().method, "DELETE");
     let o = run.run(&["profile", "list"]);
     assert_eq!(out_json(&o), json!([]));
-    assert_eq!(code(&run.run(&["issue", "list"])), 3);
+    assert_eq!(code(&run.run(&["task", "list"])), 3);
 }
 
 #[test]
 fn doctor_reports_each_check_and_fails_on_a_bad_key() {
     let good = Mock::start(vec![
         route("GET", "/api/health", 200, json!({ "status": "ok" })),
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
     ]);
     let o = Run::new().with_key(&good.api()).run(&["doctor"]);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
@@ -973,10 +973,10 @@ fn doctor_reports_each_check_and_fails_on_a_bad_key() {
 #[test]
 fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
     let mock = Mock::start(vec![
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
         route(
             "GET",
-            "/api/w/acme/issues",
+            "/api/w/acme/tasks",
             200,
             json!([{ "key": "BUG-1" }]),
         ),
@@ -985,7 +985,7 @@ fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
         json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } }),
         json!({ "jsonrpc": "2.0", "method": "notifications/initialized" }),
         json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
-        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "list_issues", "arguments": {} } }),
+        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "list_tasks", "arguments": {} } }),
     ]
     .iter()
     .map(Value::to_string)
@@ -1008,7 +1008,7 @@ fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
         .iter()
         .filter_map(|t| t["name"].as_str())
         .collect();
-    assert!(names.contains(&"list_issues") && !names.contains(&"delete_issue"));
+    assert!(names.contains(&"list_tasks") && !names.contains(&"delete_task"));
     assert!(
         replies[2]["result"]["content"][0]["text"]
             .as_str()
@@ -1020,18 +1020,18 @@ fn mcp_stdio_serves_only_the_tools_the_key_may_use() {
 #[test]
 fn mcp_stdio_lists_the_curated_core_tools_by_default_and_full_on_request() {
     let mock = Mock::start(vec![
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
         route(
             "GET",
-            "/api/w/acme/issues",
+            "/api/w/acme/tasks",
             200,
             json!([{ "key": "BUG-1", "title": "t", "status": "todo" }]),
         ),
     ]);
     let input = [
         json!({ "jsonrpc": "2.0", "id": 1, "method": "tools/list" }),
-        json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "find_work", "arguments": { "scope": "issues" } } }),
-        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "run_tool", "arguments": { "name": "list_issues" } } }),
+        json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": { "name": "find_work", "arguments": {} } }),
+        json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "run_tool", "arguments": { "name": "list_tasks" } } }),
     ]
     .iter()
     .map(Value::to_string)
@@ -1060,7 +1060,7 @@ fn mcp_stdio_lists_the_curated_core_tools_by_default_and_full_on_request() {
     let names = tool_names(&r[0]);
     assert!(names.len() < 25, "{names:?}");
     assert!(names.contains(&"get_context".to_string()) && names.contains(&"find_work".to_string()));
-    assert!(!names.contains(&"list_issues".to_string()));
+    assert!(!names.contains(&"list_tasks".to_string()));
     assert!(r[1]["result"]["content"][0]["text"].as_str().unwrap().contains("BUG-1"));
     assert!(r[2]["result"]["content"][0]["text"].as_str().unwrap().contains("BUG-1"), "run_tool reaches the long tail");
 
@@ -1070,12 +1070,12 @@ fn mcp_stdio_lists_the_curated_core_tools_by_default_and_full_on_request() {
         .env("TRAMA_MCP_PROFILE", "full")
         .run_stdin(&["mcp"], &input);
     assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert!(tool_names(&replies(&o)[0]).contains(&"list_issues".to_string()));
+    assert!(tool_names(&replies(&o)[0]).contains(&"list_tasks".to_string()));
     let o = Run::new()
         .with_key(&mock.api())
         .env("TRAMA_MCP_PROFILE", "full")
         .run_stdin(&["mcp", "--tools", "core"], &input);
-    assert!(!tool_names(&replies(&o)[0]).contains(&"list_issues".to_string()));
+    assert!(!tool_names(&replies(&o)[0]).contains(&"list_tasks".to_string()));
 
     // a typo is a usage error, not a silent fallback
     let o = Run::new()
@@ -1123,13 +1123,13 @@ fn handle_keyed(mut stream: TcpStream, log: &Arc<Mutex<Vec<Recorded>>>) {
         .unwrap_or("");
     let body = if path == "/api/auth/token" {
         match key {
-            "Bearer trm_acme" => identity_in("acme", "Acme", &["issues:read"]),
-            "Bearer trm_beta" => identity_in("beta", "Beta", &["issues:read"]),
+            "Bearer trm_acme" => identity_in("acme", "Acme", &["tasks:read"]),
+            "Bearer trm_beta" => identity_in("beta", "Beta", &["tasks:read"]),
             _ => json!({ "message": "unknown key" }),
         }
-    } else if path == "/api/w/acme/issues" {
+    } else if path == "/api/w/acme/tasks" {
         json!([{ "key": "BUG-1", "title": "from acme" }])
-    } else if path == "/api/w/beta/issues" {
+    } else if path == "/api/w/beta/tasks" {
         json!([{ "key": "BUG-2", "title": "from beta" }])
     } else {
         json!({ "message": "no such route" })
@@ -1192,7 +1192,7 @@ fn account_add_saves_one_profile_per_token_and_reads_span_them() {
     assert_eq!(listed[0]["profiles"], 2);
 
     // Without a selection only the current profile is read, exactly as before.
-    let one = out_json(&run.run(&["issue", "list"]));
+    let one = out_json(&run.run(&["task", "list"]));
     assert!(
         one.as_array()
             .unwrap()
@@ -1200,7 +1200,7 @@ fn account_add_saves_one_profile_per_token_and_reads_span_them() {
             .all(|row| row.get("workspace").is_none())
     );
 
-    let both = out_json(&run.run(&["issue", "list", "--account", "work"]));
+    let both = out_json(&run.run(&["task", "list", "--account", "work"]));
     let keys: Vec<&str> = both
         .as_array()
         .unwrap()
@@ -1217,7 +1217,7 @@ fn account_add_saves_one_profile_per_token_and_reads_span_them() {
 
     // A write must not be fanned out: it would create the issue in every workspace.
     let o = run.run(&[
-        "issue",
+        "task",
         "create",
         "--account",
         "work",
@@ -1272,7 +1272,7 @@ fn account_add_with_email_mints_one_key_per_workspace() {
             json!({ "secret": "trm_minted_beta" }),
         ),
         route("POST", "/api/auth/logout", 204, Value::Null),
-        route("GET", "/api/auth/token", 200, identity(&["issues:read"])),
+        route("GET", "/api/auth/token", 200, identity(&["tasks:read"])),
     ]);
     let run = Run::new();
     let o = run.run_stdin(
@@ -1328,8 +1328,8 @@ fn mcp_stdio_reads_across_every_saved_profile() {
         json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } }),
         json!({ "jsonrpc": "2.0", "id": 2, "method": "tools/list" }),
         json!({ "jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": { "name": "list_accounts" } }),
-        json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": { "name": "list_issues", "arguments": {} } }),
-        json!({ "jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": { "name": "list_issues", "arguments": { "workspace": "beta" } } }),
+        json!({ "jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": { "name": "list_tasks", "arguments": {} } }),
+        json!({ "jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": { "name": "list_tasks", "arguments": { "workspace": "beta" } } }),
     ]
     .iter()
     .map(Value::to_string)
@@ -1361,7 +1361,7 @@ fn mcp_stdio_reads_across_every_saved_profile() {
             .as_array()
             .unwrap()
             .iter()
-            .any(|t| t["name"] == "list_issues"
+            .any(|t| t["name"] == "list_tasks"
                 && t["inputSchema"]["properties"].get("workspace").is_some())
     );
 
@@ -1407,12 +1407,12 @@ fn commands_and_schema_describe_the_whole_surface() {
     let run = Run::new();
     let all = out_json(&run.run(&["commands"]));
     assert!(all.as_array().unwrap().len() > 90);
-    let detail = out_json(&run.run(&["commands", "issue", "--detail"]));
+    let detail = out_json(&run.run(&["commands", "task", "--detail"]));
     let create = detail
         .as_array()
         .unwrap()
         .iter()
-        .find(|c| c["command"] == "issue create")
+        .find(|c| c["command"] == "task create")
         .unwrap();
     assert!(
         create["params"]
@@ -1421,16 +1421,16 @@ fn commands_and_schema_describe_the_whole_surface() {
             .iter()
             .any(|p| p["flag"] == "--kind" && p["required"] == true)
     );
-    let s = out_json(&run.run(&["schema", "create_issue"]));
-    assert_eq!(s["command"], "trama issue create");
+    let s = out_json(&run.run(&["schema", "create_task"]));
+    assert_eq!(s["command"], "trama task create");
     assert_eq!(s["inputSchema"]["required"], json!(["kind", "title"]));
     assert_eq!(s["inputSchema"]["properties"]["parentId"]["type"], "string");
-    let s = out_json(&run.run(&["schema", "update_issue"]));
+    let s = out_json(&run.run(&["schema", "update_task"]));
     assert_eq!(
         s["inputSchema"]["properties"]["parentId"]["type"],
         json!(["string", "null"])
     );
-    assert_eq!(code(&run.run(&["schema", "issue", "nope"])), 2);
+    assert_eq!(code(&run.run(&["schema", "task", "nope"])), 2);
     assert_eq!(code(&run.run(&["commands", "nope"])), 2);
 }
 

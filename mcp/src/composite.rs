@@ -1,5 +1,5 @@
 //! Composite (task-level) tools of the curated profile. Each one orchestrates several catalog
-//! calls (`tools.json`) so an agent expresses an intent ("report progress", "ask a human") in one
+//! calls (`tools.json`) so an agent expresses an intent ("report progress", "file a task") in one
 //! tool call instead of choosing among dozens of CRUD endpoints.
 //!
 //! They add no authority: every step goes through the same catalog validation, the same permission
@@ -18,14 +18,12 @@ use crate::upstream::Upstream;
 pub const HANDLERS: &[&str] = &[
     "get_context",
     "find_work",
-    "create_issue",
+    "create_task",
     "start_work",
     "report_progress",
-    "ask_human",
-    "record_decision",
     "attach_artifact",
     "add_comment",
-    "triage_issues",
+    "triage_tasks",
 ];
 
 /// What a composite returns: a value to render, and whether any step failed.
@@ -219,9 +217,6 @@ fn text<'a>(a: &'a Map<String, Value>, k: &str) -> Option<&'a str> {
     a.get(k).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty())
 }
 
-fn strings(a: &Map<String, Value>, k: &str) -> Vec<String> {
-    a.get(k).and_then(Value::as_array).map(|v| v.iter().filter_map(Value::as_str).map(str::to_string).collect()).unwrap_or_default()
-}
 
 fn flag(a: &Map<String, Value>, k: &str) -> Option<bool> {
     a.get(k).and_then(Value::as_bool)
@@ -264,7 +259,6 @@ fn issue_summary(v: &Value) -> Value {
             "priority",
             "assigneeId",
             "projectId",
-            "teamId",
             "goal",
             "parentId",
             "duplicateOfId",
@@ -278,18 +272,14 @@ fn issue_summary(v: &Value) -> Value {
 enum Kind {
     Issue,
     Project,
-    Decision,
-    InputRequest,
     Artifact,
 }
 
 impl Kind {
     fn parse(s: &str) -> Option<Kind> {
         Some(match s {
-            "issue" => Kind::Issue,
+            "issue" | "task" => Kind::Issue,
             "project" => Kind::Project,
-            "decision" => Kind::Decision,
-            "input_request" => Kind::InputRequest,
             "artifact" => Kind::Artifact,
             _ => return None,
         })
@@ -298,18 +288,22 @@ impl Kind {
         match self {
             Kind::Issue => "issue",
             Kind::Project => "project",
-            Kind::Decision => "decision",
-            Kind::InputRequest => "input_request",
+            Kind::Artifact => "artifact",
+        }
+    }
+    /// What a person calls it (a task's wire type is `issue`).
+    fn label(self) -> &'static str {
+        match self {
+            Kind::Issue => "task",
+            Kind::Project => "project",
             Kind::Artifact => "artifact",
         }
     }
     /// The catalog tool that reads one, and the name of its path argument.
     fn getter(self) -> (&'static str, &'static str) {
         match self {
-            Kind::Issue => ("get_issue", "idOrKey"),
+            Kind::Issue => ("get_task", "idOrKey"),
             Kind::Project => ("get_project", "id"),
-            Kind::Decision => ("get_decision", "idOrKey"),
-            Kind::InputRequest => ("get_input_request", "id"),
             Kind::Artifact => ("get_artifact", "id"),
         }
     }
@@ -319,8 +313,6 @@ fn kind_by_id_prefix(r: &str) -> Option<Kind> {
     match r.split_once('_')?.0 {
         "in" | "iss" => Some(Kind::Issue),
         "pj" | "prj" => Some(Kind::Project),
-        "dc" | "dec" => Some(Kind::Decision),
-        "ir" => Some(Kind::InputRequest),
         "ar" => Some(Kind::Artifact),
         _ => None,
     }
@@ -344,10 +336,6 @@ fn candidates(r: &str, hint: Option<Kind>) -> Vec<Kind> {
         && !number.is_empty()
         && number.chars().all(|c| c.is_ascii_digit())
     {
-        let up = prefix.to_ascii_uppercase();
-        if up == "ADR" {
-            return vec![Kind::Decision];
-        }
         return vec![Kind::Issue];
     }
     vec![]
@@ -373,7 +361,7 @@ impl Entity {
 async fn resolve(ex: &Exec<'_>, r: &str, hint: Option<Kind>, fetch: bool) -> Result<Entity, String> {
     let cands = candidates(r, hint);
     if cands.is_empty() {
-        return Err(format!("'{r}' is not an id or a key (expected e.g. AUTH-42, CORA-142, ADR-21, wk_…, in_…)"));
+        return Err(format!("'{r}' is not an id or a key (expected e.g. AUTH-42, CORA-142, iss_…, in_…)"));
     }
     let by_id = kind_by_id_prefix(r).is_some();
     if by_id && !fetch {
@@ -387,7 +375,7 @@ async fn resolve(ex: &Exec<'_>, r: &str, hint: Option<Kind>, fetch: bool) -> Res
                 let id = v["id"].as_str().unwrap_or(r).to_string();
                 return Ok(Entity { kind: *kind, id, raw: Some(v) });
             }
-            Err(e) if e.not_found() => missing = format!("no {} '{r}' (or it is not visible to this key)", kind.subject().replace('_', " ")),
+            Err(e) if e.not_found() => missing = format!("no {} '{r}' (or it is not visible to this key)", kind.label()),
             Err(e) => return Err(e.message()),
         }
     }
@@ -403,14 +391,12 @@ pub async fn run(name: &str, args: &Value, ex: &Exec<'_>) -> Option<Res> {
     Some(match name {
         "get_context" => get_context(a, ex).await,
         "find_work" => find_work(a, ex).await,
-        "create_issue" => create_issue(a, ex).await,
+        "create_task" => create_task(a, ex).await,
         "start_work" => start_work(a, ex).await,
         "report_progress" => report_progress(a, ex).await,
-        "ask_human" => ask_human(a, ex).await,
-        "record_decision" => record_decision(a, ex).await,
         "attach_artifact" => attach_artifact(a, ex).await,
         "add_comment" => add_comment(a, ex).await,
-        "triage_issues" => triage_issues(a, ex).await,
+        "triage_tasks" => triage_tasks(a, ex).await,
         _ => return None,
     })
 }
@@ -422,13 +408,13 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let hint = text(a, "type").and_then(Kind::parse);
     let cands = candidates(id, hint);
     if cands.is_empty() {
-        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, CORA-142, ADR-21, wk_…, in_…, pj_…)"));
+        return Err(format!("'{id}' is not an id or a key (expected e.g. AUTH-42, CORA-142, iss_…, in_…, pj_…)"));
     }
     let mut missing = String::new();
     for kind in cands {
         match context_of(kind, id, flag(a, "comments").unwrap_or(false), ex).await {
             Ok(out) => return Ok(out),
-            Err(e) if e.not_found() => missing = format!("no {} '{id}' (or it is not visible to this key)", kind.subject().replace('_', " ")),
+            Err(e) if e.not_found() => missing = format!("no {} '{id}' (or it is not visible to this key)", kind.label()),
             Err(e) => return Err(e.message()),
         }
     }
@@ -439,9 +425,9 @@ async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Resu
     match kind {
         Kind::Project => Ok(Outcome::ok(ex.call("get_project_context", json!({ "id": id })).await?)),
         Kind::Issue => {
-            let issue = ex.call("get_issue_context", json!({ "idOrKey": id })).await?;
+            let issue = ex.call("get_task_context", json!({ "idOrKey": id })).await?;
             let mut warnings: Vec<String> = vec![];
-            let artifacts = match ex.call("list_issue_artifacts", json!({ "idOrKey": id })).await {
+            let artifacts = match ex.call("list_task_artifacts", json!({ "idOrKey": id })).await {
                 Ok(v) => rows(&v).iter().map(|x| pick(x, &["id", "kind", "title", "state", "ci", "review", "url", "externalId"])).collect::<Vec<_>>(),
                 Err(e) => {
                     warnings.push(format!("artifacts: {}", e.message()));
@@ -465,7 +451,7 @@ async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Resu
             }
             Ok(Outcome::ok(out))
         }
-        Kind::Decision | Kind::InputRequest | Kind::Artifact => {
+        Kind::Artifact => {
             let (tool, arg) = kind.getter();
             let v = ex.call(tool, json!({ arg: id })).await?;
             Ok(Outcome::ok(json!({ "type": kind.subject(), "record": v })))
@@ -476,7 +462,6 @@ async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Resu
 // ───────────────────────────── find_work ─────────────────────────────
 
 async fn find_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
-    let scope = text(a, "scope").unwrap_or("all");
     let limit = a.get("limit").and_then(Value::as_u64).unwrap_or(20).clamp(1, 100) as usize;
     let open = flag(a, "open").unwrap_or(true);
     let status = text(a, "status");
@@ -485,66 +470,39 @@ async fn find_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         Some(other) => Some(other.to_string()),
         None => None,
     };
-    let all = scope == "all";
     let mut out = Map::new();
     let mut hint = vec![];
     let mut failed = false;
 
-    if scope == "issues" || all {
-        // A status unsupported by the issue endpoint should not produce a misleading empty result.
-        let fits = status.is_none_or(|s| ex.accepts("list_issues", "status", s));
-        if fits {
-            let mut q = Map::new();
-            for (k, v) in [("q", text(a, "q")), ("priority", text(a, "priority")), ("kind", text(a, "kind")), ("projectId", text(a, "projectId")), ("teamId", text(a, "teamId")), ("status", status)] {
-                if let Some(v) = v {
-                    q.insert(k.into(), json!(v));
-                }
-            }
-            if let Some(u) = &assignee {
-                q.insert("assigneeId".into(), json!(u));
-            }
-            if open && status.is_none() {
-                q.insert("open".into(), json!(true));
-            }
-            q.insert("limit".into(), json!(limit));
-            match ex.call("list_issues", Value::Object(q)).await {
-                Ok(v) => {
-                    let list = rows(&v);
-                    out.insert("issues".into(), Value::Array(list.iter().take(limit).map(issue_summary).collect()));
-                    if list.len() >= limit {
-                        hint.push(format!("issues capped at {limit}: narrow with q, status or projectId"));
-                    }
-                }
-                Err(e) => {
-                    failed = true;
-                    out.insert("issuesError".into(), json!(e.message()));
-                }
-            }
-        }
-    }
-    if scope == "input_requests" {
+    // A status unsupported by the task endpoint should not produce a misleading empty result.
+    let fits = status.is_none_or(|s| ex.accepts("list_tasks", "status", s));
+    if fits {
         let mut q = Map::new();
-        q.insert("state".into(), json!(status.unwrap_or("open")));
-        if let Some(issue_id) = text(a, "issueId") {
-            q.insert("issueId".into(), json!(issue_id));
-        }
-        if let Some(u) = &assignee {
-            q.insert("assigneeUserId".into(), json!(u));
-        }
-        let v = ex.call("list_input_requests", Value::Object(q)).await.map_err(|e| e.message())?;
-        let list = rows(&v);
-        out.insert("inputRequests".into(), Value::Array(list.into_iter().take(limit).collect()));
-    }
-    if scope == "decisions" {
-        let mut q = Map::new();
-        for (k, v) in [("q", text(a, "q")), ("status", status), ("issueId", text(a, "issueId"))] {
+        for (k, v) in [("q", text(a, "q")), ("priority", text(a, "priority")), ("kind", text(a, "kind")), ("projectId", text(a, "projectId")), ("status", status)] {
             if let Some(v) = v {
                 q.insert(k.into(), json!(v));
             }
         }
-        let v = ex.call("list_decisions", Value::Object(q)).await.map_err(|e| e.message())?;
-        let list = rows(&v);
-        out.insert("decisions".into(), Value::Array(list.iter().take(limit).map(|d| pick(d, &["key", "id", "title", "status", "originIssueId", "tags"])).collect()));
+        if let Some(u) = &assignee {
+            q.insert("assigneeId".into(), json!(u));
+        }
+        if open && status.is_none() {
+            q.insert("open".into(), json!(true));
+        }
+        q.insert("limit".into(), json!(limit));
+        match ex.call("list_tasks", Value::Object(q)).await {
+            Ok(v) => {
+                let list = rows(&v);
+                out.insert("tasks".into(), Value::Array(list.iter().take(limit).map(issue_summary).collect()));
+                if list.len() >= limit {
+                    hint.push(format!("tasks capped at {limit}: narrow with q, status or projectId"));
+                }
+            }
+            Err(e) => {
+                failed = true;
+                out.insert("tasksError".into(), json!(e.message()));
+            }
+        }
     }
     if !hint.is_empty() {
         out.insert("hint".into(), json!(hint));
@@ -552,14 +510,15 @@ async fn find_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     Ok(Outcome::with(Value::Object(out), failed))
 }
 
-// ───────────────────────────── create_issue ─────────────────────────────
+// ───────────────────────────── create_task ─────────────────────────────
 
-async fn create_issue(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+async fn create_task(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let title = text(a, "title").ok_or("title is required")?;
     let force = flag(a, "force").unwrap_or(false);
     let mut similar: Vec<Value> = vec![];
 
-    // Search first: an open issue with the very same title is a duplicate, not a new issue.
+    // Search first: an open task with the very same title is a duplicate, not a new task.
+    // The search type token stays `issue`.
     if ex.uses.iter().any(|u| u == "search")
         && let Ok(found) = ex.call("search", json!({ "q": title, "types": "issue", "limit": 10 })).await
     {
@@ -572,9 +531,9 @@ async fn create_issue(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
             if open && norm(r["title"].as_str().unwrap_or("")) == norm(title) && !force {
                 return Ok(Outcome::ok(json!({
                     "created": false,
-                    "reason": "an open issue with this title already exists",
+                    "reason": "an open task with this title already exists",
                     "existing": pick(&r, &["key", "id", "title", "subtitle"]),
-                    "hint": "Update or comment on it (update_issue, add_comment), or pass force:true to create anyway.",
+                    "hint": "Update or comment on it (update_task, add_comment), or pass force:true to create anyway.",
                 })));
             }
             if open {
@@ -590,7 +549,6 @@ async fn create_issue(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         "goal",
         "reporterName",
         "assigneeId",
-        "teamId",
         "projectId",
         "parentId",
         "priority",
@@ -606,12 +564,12 @@ async fn create_issue(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         }
     }
     body.entry("source").or_insert(json!("agent"));
-    let created = ex.call("create_issue", Value::Object(body)).await.map_err(|e| e.message())?;
-    let mut out = json!({ "created": true, "issue": issue_summary(&created) });
+    let created = ex.call("create_task", Value::Object(body)).await.map_err(|e| e.message())?;
+    let mut out = json!({ "created": true, "task": issue_summary(&created) });
 
     if !similar.is_empty() {
         similar.truncate(5);
-        out["similarOpenIssues"] = json!(similar);
+        out["similarOpenTasks"] = json!(similar);
     }
     Ok(Outcome::ok(out))
 }
@@ -623,27 +581,10 @@ async fn start_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let issue = resolve(ex, key, Some(Kind::Issue), true).await?;
     let status = issue.raw()["status"].as_str().unwrap_or("");
     let ready = !matches!(status, "done" | "canceled");
-    let mut cautions = Vec::new();
-    for (tool, filter, label) in [
-        ("list_input_requests", "issueId", "open human questions"),
-        ("list_decisions", "issueId", "decisions"),
-    ] {
-        let mut query = Map::new();
-        query.insert(filter.into(), json!(issue.id));
-        if tool == "list_input_requests" {
-            query.insert("state".into(), json!("open"));
-        }
-        if let Ok(value) = ex.call(tool, Value::Object(query)).await {
-            let matching = rows(&value);
-            if !matching.is_empty() {
-                cautions.push(format!("{} {} linked to this issue; review before proceeding", matching.len(), label));
-            }
-        }
-    }
     let mut actions = Vec::new();
     if ready && status != "in_progress" {
-        ex.call("update_issue", json!({ "idOrKey": issue.id, "status": "in_progress" })).await.map_err(|e| e.message())?;
-        actions.push("issue set to in_progress");
+        ex.call("update_task", json!({ "idOrKey": issue.id, "status": "in_progress" })).await.map_err(|e| e.message())?;
+        actions.push("task set to in_progress");
     }
     if ready && let Some(plan) = text(a, "plan") {
         ex.call("create_comment", json!({ "subject": issue.subject(), "body": plan })).await.map_err(|e| e.message())?;
@@ -651,18 +592,17 @@ async fn start_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     }
     Ok(Outcome::ok(json!({
         "ready": ready,
-        "stopBecause": if ready { Value::Null } else { json!([format!("the issue is already {status}")]) },
-        "issue": issue_summary(issue.raw()),
+        "stopBecause": if ready { Value::Null } else { json!([format!("the task is already {status}")]) },
+        "task": issue_summary(issue.raw()),
         "goal": issue.raw()["goal"],
-        "cautions": cautions,
         "actions": actions,
-        "briefing": ex.call("get_issue_context", json!({ "idOrKey": issue.id })).await.unwrap_or(Value::Null),
+        "briefing": ex.call("get_task_context", json!({ "idOrKey": issue.id })).await.unwrap_or(Value::Null),
     })))
 }
 
 // ───────────────────────────── artifacts ─────────────────────────────
 
-const ARTIFACT_FIELDS: &[&str] = &["kind", "title", "url", "externalId", "provider", "state", "ci", "review", "hasConflicts", "environment", "repositoryId", "description"];
+const ARTIFACT_FIELDS: &[&str] = &["kind", "title", "url", "externalId", "provider", "state", "ci", "review", "hasConflicts", "environment", "repository", "description"];
 
 struct Owners {
     issue: Option<String>,
@@ -672,11 +612,11 @@ struct Owners {
 /// Creates the artifact, or updates the one already attached with the same kind and externalId / url.
 async fn upsert_artifact(ex: &Exec<'_>, owners: &Owners, fields: &Map<String, Value>) -> Result<(&'static str, Value), String> {
     let existing = if let Some(i) = &owners.issue {
-        ex.call("list_issue_artifacts", json!({ "idOrKey": i })).await
+        ex.call("list_task_artifacts", json!({ "idOrKey": i })).await
     } else if let Some(p) = &owners.project {
         ex.call("list_project_artifacts", json!({ "id": p })).await
     } else {
-        return Err("an artifact needs an issue or a project to attach to".into());
+        return Err("an artifact needs a task or a project to attach to".into());
     }
     .map_err(|e| e.message())?;
     let kind = fields.get("kind").and_then(Value::as_str);
@@ -730,7 +670,7 @@ async fn owners_from(a: &Map<String, Value>, ex: &Exec<'_>) -> Result<Owners, St
 async fn attach_artifact(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let owners = owners_from(a, ex).await?;
     if owners.issue.is_none() && owners.project.is_none() {
-        return Err("pass issue or project".into());
+        return Err("pass issue (the task) or project".into());
     }
     let mut fields = Map::new();
     for k in ARTIFACT_FIELDS {
@@ -756,7 +696,7 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         return Err("projectUpdate needs `project`".into());
     }
     if (has("artifact") || has("comment")) && text(a, "issue").is_none() && text(a, "project").is_none() {
-        return Err("artifact and comment need an issue or a project".into());
+        return Err("artifact and comment need a task (`issue`) or a project".into());
     }
 
     let issue = match text(a, "issue") {
@@ -784,9 +724,9 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     }
 
     if let (Some(status), Some(i)) = (text(a, "issueStatus"), &issue) {
-        match ex.call("update_issue", json!({ "idOrKey": i.id, "status": status })).await {
-            Ok(_) => applied.push(format!("issue status {status}")),
-            Err(e) => failed.push(format!("issue status: {}", e.message())),
+        match ex.call("update_task", json!({ "idOrKey": i.id, "status": status })).await {
+            Ok(_) => applied.push(format!("task status {status}")),
+            Err(e) => failed.push(format!("task status: {}", e.message())),
         }
     }
 
@@ -819,107 +759,6 @@ async fn report_progress(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     Ok(Outcome::with(Value::Object(out), !failed.is_empty()))
 }
 
-// ───────────────────────────── ask_human ─────────────────────────────
-
-async fn ask_human(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
-    let mode = text(a, "mode").unwrap_or("question");
-    if mode == "decision" {
-        let mut decision_args = a.clone();
-        decision_args.remove("mode");
-        decision_args.remove("issue");
-        decision_args.insert("originIssue".into(), json!(text(a, "issue").ok_or("issue is required")?));
-        return record_decision(&decision_args, ex).await;
-    }
-    if mode != "question" {
-        return Err("mode must be question or decision".into());
-    }
-    let question = text(a, "question").ok_or("question is required")?;
-    let issue = resolve(ex, text(a, "issue").ok_or("issue is required")?, Some(Kind::Issue), false).await?;
-    let open = ex.call("list_input_requests", json!({ "issueId": issue.id, "state": "open" })).await.map_err(|e| e.message())?;
-    let open = rows(&open);
-    if let Some(same) = open.iter().find(|r| norm(r["question"].as_str().unwrap_or("")) == norm(question)) {
-        return Ok(Outcome::ok(json!({
-            "created": false,
-            "reason": "this question is already open on the issue; ask once",
-            "inputRequest": pick(same, &["id", "question", "options", "state", "assigneeUserId"]),
-        })));
-    }
-    let mut body = Map::new();
-    body.insert("issueId".into(), json!(issue.id));
-    body.insert("question".into(), json!(question));
-    if let Some(o) = a.get("options") {
-        body.insert("options".into(), o.clone());
-    }
-    if let Some(u) = text(a, "assignee") {
-        body.insert("assigneeUserId".into(), json!(u));
-    }
-    let created = ex.call("create_input_request", Value::Object(body)).await.map_err(|e| e.message())?;
-    let id = created["id"].as_str().unwrap_or("").to_string();
-    Ok(Outcome::ok(json!({
-        "created": true,
-        "inputRequest": pick(&created, &["id", "question", "options", "state", "assigneeUserId"]),
-        "issue": issue_summary(issue.raw()),
-        "next": format!("Read the answer later with get_context {{\"id\":\"{id}\"}}. Do not answer it yourself."),
-    })))
-}
-
-// ───────────────────────────── record_decision ─────────────────────────────
-
-async fn record_decision(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
-    if let Some(existing) = text(a, "decision") {
-        let mut body = Map::new();
-        body.insert("idOrKey".into(), json!(existing));
-        for k in ["title", "statement", "rationale", "tags"] {
-            if let Some(v) = a.get(k) {
-                body.insert(k.into(), v.clone());
-            }
-        }
-        if body.len() == 1 {
-            return Err("pass at least one of title, statement, rationale, tags to change".into());
-        }
-        let updated = ex.call("update_decision", Value::Object(body)).await.map_err(|e| e.message())?;
-        return Ok(Outcome::ok(json!({ "created": false, "updated": true, "decision": pick(&updated, &["key", "id", "title", "status"]) })));
-    }
-    let title = text(a, "title").ok_or("title is required to record a decision")?;
-    let statement = text(a, "statement").ok_or("statement is required to record a decision")?;
-    // Same title already on record (and not rejected): point at it instead of duplicating.
-    if let Ok(found) = ex.call("list_decisions", json!({ "q": title })).await
-        && let Some(same) = rows(&found).into_iter().find(|d| norm(d["title"].as_str().unwrap_or("")) == norm(title) && d["status"] != "rejected")
-    {
-        return Ok(Outcome::ok(json!({
-            "created": false,
-            "reason": "a decision with this title already exists",
-            "decision": pick(&same, &["key", "id", "title", "status"]),
-            "hint": "Edit it with decision:'<key>' if you proposed it, or propose a new one with a different title.",
-        })));
-    }
-    let mut body = Map::new();
-    body.insert("title".into(), json!(title));
-    body.insert("statement".into(), json!(statement));
-    for k in ["rationale", "tags"] {
-        if let Some(v) = a.get(k) {
-            body.insert(k.into(), v.clone());
-        }
-    }
-    body.insert("status".into(), json!(text(a, "status").unwrap_or("proposed")));
-    let origin = text(a, "originIssue").or_else(|| text(a, "issue")).ok_or("originIssue is required")?;
-    body.insert("originIssueId".into(), json!(resolve(ex, origin, Some(Kind::Issue), false).await?.id));
-    let related = strings(a, "related");
-    if !related.is_empty() {
-        let mut ids = Vec::new();
-        for issue in related {
-            ids.push(resolve(ex, &issue, Some(Kind::Issue), false).await?.id);
-        }
-        body.insert("relatedIssueIds".into(), json!(ids));
-    }
-    let created = ex.call("create_decision", Value::Object(body)).await.map_err(|e| e.message())?;
-    Ok(Outcome::ok(json!({
-        "created": true,
-        "decision": pick(&created, &["key", "id", "title", "status"]),
-        "next": "A person must accept, reject or supersede it. Tell the user the decision key.",
-    })))
-}
-
 // ───────────────────────────── add_comment ─────────────────────────────
 
 async fn add_comment(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
@@ -931,12 +770,12 @@ async fn add_comment(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     Ok(Outcome::ok(json!({ "commented": true, "on": target.subject(), "comment": pick(&created, &["id", "createdAt"]) })))
 }
 
-// ───────────────────────────── triage_issues ─────────────────────────────
+// ───────────────────────────── triage_tasks ─────────────────────────────
 
-async fn triage_issues(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+async fn triage_tasks(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     let items = a.get("items").and_then(Value::as_array).ok_or("items is required")?;
     if items.is_empty() || items.len() > 25 {
-        return Err("items must hold 1 to 25 issues".into());
+        return Err("items must hold 1 to 25 tasks".into());
     }
     let mut results = vec![];
     let mut any_failed = false;
@@ -955,7 +794,7 @@ async fn triage_issues(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         };
         let mut patch = Map::new();
         patch.insert("idOrKey".into(), json!(issue.id));
-        for k in ["priority", "kind", "status", "labels", "assigneeId", "teamId", "projectId", "estimate", "title"] {
+        for k in ["priority", "kind", "status", "labels", "assigneeId", "projectId", "estimate", "title"] {
             if let Some(v) = item.get(k) {
                 patch.insert(k.into(), v.clone());
             }
@@ -964,7 +803,7 @@ async fn triage_issues(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
             patch.insert("duplicateOfId".into(), json!(original));
         }
         if patch.len() > 1 {
-            match ex.call("update_issue", Value::Object(patch)).await {
+            match ex.call("update_task", Value::Object(patch)).await {
                 Ok(_) => applied.push("updated".into()),
                 Err(e) => error = Some(format!("update: {}", e.message())),
             }

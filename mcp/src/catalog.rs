@@ -365,7 +365,7 @@ mod tests {
 
     #[test]
     fn builds_path_query_and_body() {
-        let call = tool("update_issue")
+        let call = tool("update_task")
             .build_call(&json!({
                 "idOrKey": "BUG 1/2",
                 "status": "done",
@@ -374,21 +374,21 @@ mod tests {
             }))
             .unwrap();
         assert_eq!(call.method, Method::Patch);
-        assert_eq!(call.path, "/issues/BUG%201%2F2");
+        assert_eq!(call.path, "/tasks/BUG%201%2F2");
         assert_eq!(
             call.body,
             Some(json!({ "status": "done", "estimate": null, "parentId": null }))
         );
 
-        let call = tool("list_issues").build_call(&json!({ "kind": "bug", "q": "login" })).unwrap();
-        assert_eq!(call.path, "/issues");
+        let call = tool("list_tasks").build_call(&json!({ "kind": "bug", "q": "login" })).unwrap();
+        assert_eq!(call.path, "/tasks");
         assert_eq!(call.query, vec![("kind".into(), "bug".into()), ("q".into(), "login".into())]);
         assert!(call.body.is_none());
     }
 
     #[test]
     fn validates_arguments() {
-        let t = tool("create_issue");
+        let t = tool("create_task");
         assert!(t.build_call(&json!({ "title": "x" })).unwrap_err().contains("kind"));
         assert!(t.build_call(&json!({ "kind": "nope", "title": "x" })).unwrap_err().contains("one of"));
         assert!(t.build_call(&json!({ "kind": "bug", "title": "x", "wat": 1 })).unwrap_err().contains("unknown argument"));
@@ -397,9 +397,9 @@ mod tests {
         assert!(t.build_call(&json!({ "kind": "bug", "title": null })).is_err());
         let call = t.build_call(&json!({ "kind": "bug", "title": "x", "body": null, "assigneeId": null })).unwrap();
         assert_eq!(call.body, Some(json!({ "kind": "bug", "title": "x" })));
-        let call = tool("list_issues").build_call(&json!({ "kind": null, "status": "", "q": "a" })).unwrap();
+        let call = tool("list_tasks").build_call(&json!({ "kind": null, "status": "", "q": "a" })).unwrap();
         assert_eq!(call.query, vec![("q".into(), "a".into())]);
-        assert!(tool("get_issue").build_call(&json!({ "idOrKey": "" })).is_err());
+        assert!(tool("get_task").build_call(&json!({ "idOrKey": "" })).is_err());
     }
 
     #[test]
@@ -410,11 +410,11 @@ mod tests {
 
     #[test]
     fn nullable_only_on_optional_patch_fields() {
-        let s = tool("update_issue").input_schema();
+        let s = tool("update_task").input_schema();
         assert_eq!(s["properties"]["status"]["type"], json!(["string", "null"]));
         assert_eq!(s["properties"]["parentId"]["type"], json!(["string", "null"]));
         assert_eq!(s["properties"]["idOrKey"]["type"], json!("string"));
-        let s = tool("create_issue").input_schema();
+        let s = tool("create_task").input_schema();
         assert_eq!(s["properties"]["status"]["type"], json!("string"));
         assert_eq!(s["properties"]["parentId"]["type"], json!("string"));
         assert!(s["required"].as_array().unwrap().contains(&json!("kind")));
@@ -458,9 +458,9 @@ mod tests {
         assert_eq!(call.body, Some(json!({ "projectId": "prj_1", "issueId": "BUG-1", "kind": "link", "title": "Spec", "url": "https://x.test", "description": "Design doc" })));
         assert!(t.listing()["description"].as_str().unwrap().contains("[requires permission artifacts:write]"));
         assert_eq!(tool("list_project_artifacts").build_call(&json!({ "id": "prj_1" })).unwrap().path, "/projects/prj_1/artifacts");
-        let call = tool("list_issue_artifacts").build_call(&json!({ "idOrKey": "BUG-1" })).unwrap();
-        assert_eq!(call.path, "/issues/BUG-1/artifacts");
-        assert_eq!(tool("list_issue_artifacts").permission, "artifacts:read");
+        let call = tool("list_task_artifacts").build_call(&json!({ "idOrKey": "BUG-1" })).unwrap();
+        assert_eq!(call.path, "/tasks/BUG-1/artifacts");
+        assert_eq!(tool("list_task_artifacts").permission, "artifacts:read");
         assert_eq!(tool("list_project_artifacts").permission, "artifacts:read");
     }
 
@@ -468,17 +468,27 @@ mod tests {
     fn catalog_contains_only_issue_first_routes() {
         let tools = load().unwrap();
         let raw = TOOLS_JSON.to_ascii_lowercase();
-        for retired_term in ["workstream", "criterion", "dependency", "graph"] {
+        for retired_term in ["workstream", "criterion", "dependency", "graph", "input-request", "decision", "customer", "/teams", "/repositories"] {
             assert!(!raw.contains(retired_term), "raw catalog still contains {retired_term}");
         }
-        assert!(!tools.iter().any(|tool| tool.path.starts_with("/workstreams") || tool.path.starts_with("/dependencies")));
-        assert!(!tools.iter().any(|tool| matches!(tool.name.as_str(), "link_issue" | "add_criterion" | "update_criterion" | "remove_criterion")));
-        let context = tools.iter().find(|tool| tool.name == "get_issue_context").unwrap();
-        assert_eq!(context.path, "/issues/{idOrKey}/context");
-        let requests = tools.iter().find(|tool| tool.name == "list_input_requests").unwrap();
-        assert!(requests.params.iter().any(|param| param.name == "issueId"));
-        let decisions = tools.iter().find(|tool| tool.name == "create_decision").unwrap();
-        assert!(decisions.params.iter().any(|param| param.name == "originIssueId"));
+        assert!(!tools.iter().any(|tool| {
+            tool.path.starts_with("/workstreams")
+                || tool.path.starts_with("/dependencies")
+                || tool.path.starts_with("/issues")
+                || tool.path.starts_with("/teams")
+                || tool.path.starts_with("/repositories")
+                || tool.path.starts_with("/customers")
+                || tool.path.starts_with("/decisions")
+                || tool.path.starts_with("/input-requests")
+                || tool.path.starts_with("/releases")
+        }));
+        assert!(!tools.iter().any(|tool| matches!(tool.name.as_str(), "link_issue" | "add_criterion" | "update_criterion" | "remove_criterion" | "list_teams" | "list_repositories" | "create_decision" | "create_input_request" | "list_customers")));
+        let context = tools.iter().find(|tool| tool.name == "get_task_context").unwrap();
+        assert_eq!(context.path, "/tasks/{idOrKey}/context");
+        assert_eq!(context.permission, "tasks:read");
+        let project = tools.iter().find(|tool| tool.name == "update_project").unwrap();
+        assert!(project.params.iter().any(|param| param.name == "repository"));
+        assert!(!project.params.iter().any(|param| param.name == "teamIds" || param.name == "repositoryIds"));
     }
 
     #[test]

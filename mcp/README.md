@@ -1,7 +1,7 @@
 # trama-mcp
 
 MCP server for Trama, written in Rust. It exposes the REST API to any MCP client (Claude, Cursor, VS Code, or the
-in-app Assistant) with <!-- mcp-tools-count:start -->20 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
+in-app Assistant) with <!-- mcp-tools-count:start -->17 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
 
 **It holds no data and no secrets.** Each client connects with its own API key
 (Settings → API tokens → *Custom*). The server forwards that key to the API, which remains the only authority:
@@ -61,33 +61,30 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | Tool | What it does |
 |---|---|
 | `whoami` | Which workspace and permissions this API key has, its caps and expiry |
-| `get_context` | Read issue, project, decision or input request context by key or id |
-| `find_work` | Find issues, input requests or decisions with filters (assignee `me`, status, project…) |
+| `get_context` | Read task, project or artifact context by key or id |
+| `find_work` | Find tasks with filters (assignee `me`, status, project…) |
 | `search` | Full-text search across every object type; run it before creating anything |
-| `get_insights` | Where the problems are: stale or overdue issues, bottlenecks, stuck PRs, flow metrics, agent failures |
+| `get_insights` | Where the problems are: stale or overdue tasks, bottlenecks, stuck PRs, flow metrics, agent failures |
 | `get_workspace` | Workspace settings: label ids, estimate scale |
-| `list_repositories` | Registered git repositories (maps a checkout to its project) |
-| `list_projects` | Projects; filter by repository to find the project of a checkout |
-| `create_issue` | File an issue (duplicate-checked) |
-| `update_issue` | Change an issue's status, priority, assignee, labels, parent, duplicate marker… |
-| `start_work` | Pick up an issue: context, safety checks, marks the start |
-| `report_progress` | Record artifacts, issue status, project update and a comment |
-| `ask_human` | Ask a person one question (an input request), once |
-| `record_decision` | Propose a lasting decision (a person accepts it) |
-| `attach_artifact` | Attach or update a PR, build, document or link on an issue or project |
+| `list_projects` | Projects; filter by repository string to find the project of a checkout |
+| `create_task` | File a task (duplicate-checked) |
+| `update_task` | Change a task's status, priority, assignee, labels, parent, duplicate marker… |
+| `start_work` | Pick up a task: context, safety checks, marks the start |
+| `report_progress` | Record artifacts, task status, project update and a comment |
+| `attach_artifact` | Attach or update a PR, build, document or link on a task or project |
 | `add_comment` | Comment on any object by key or id |
-| `triage_issues` | Triage up to 25 issues in one call (priority, duplicates, grouping) |
+| `triage_tasks` | Triage up to 25 tasks in one call (priority, duplicates, grouping) |
 | `list_capabilities` | Discover the full catalog: search it, get a tool's schema and how to call it |
 | `run_tool` | Run any catalog operation by name, with the usual validation and permissions |
 | `api_request` | Escape hatch: call any workspace REST route that has no tool (path-restricted) |
 <!-- mcp-tools-table:end -->
 
 `list_accounts` is added when several keys are connected. The composite tools (`get_context`, `find_work`, `start_work`,
-`report_progress`, `ask_human`, `record_decision`, `attach_artifact`, `add_comment`, `triage_issues`, `create_issue`)
+`report_progress`, `attach_artifact`, `add_comment`, `triage_tasks`, `create_task`)
 orchestrate several API calls with the caller's own key, check each step's permission and validate every argument, so
 they can do nothing a plain tool could not. A tool whose permissions the key lacks is hidden.
 
-**The long tail stays reachable.** `list_capabilities` searches the whole catalog (`{"q":"milestone"}`, `{"group":"teams"}`)
+**The long tail stays reachable.** `list_capabilities` searches the whole catalog (`{"q":"milestone"}`, `{"group":"tasks"}`)
 and returns the exact schema of one tool (`{"tool":"create_milestone"}`); `run_tool` runs it by name with the same
 validation and permission checks as a listed tool; `api_request` reaches routes that have no tool at all. Tools that a
 profile does not list can also still be called by name, so existing prompts keep working.
@@ -101,7 +98,7 @@ profile does not list can also still be called by name, so existing prompts keep
 | Per connection, header | `--header "X-Trama-Profile: full"` |
 | Per connection, URL | `https://<host>/mcp?profile=full` |
 
-The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (137 catalog operations,
+The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (92 catalog operations,
 with a much larger context cost); `core` is the default. Neither changes what a key may do: the API enforces permissions.
 
 ## Catalog
@@ -124,10 +121,10 @@ The curated layer is separate on purpose, so catalog changes and curation change
 `UPDATE_MCP_DOCS=1 cargo test generated_tool_docs_are_current`.
 
 Project-level tools: `get_project_context` (markdown context for a project: updates, milestones,
-issues, artifacts and decisions), `list_project_updates` / `get_project_update` /
+tasks and artifacts), `list_project_updates` / `get_project_update` /
 `create_project_update` / `update_project_update` / `delete_project_update` (health + markdown status posts),
-`list_project_artifacts` and `list_issue_artifacts`, and `create_artifact` with either `projectId` or `issueId`.
-Project routes are permissioned as `projects:*` and issue routes as `issues:*`.
+`list_project_artifacts` and `list_task_artifacts`, and `create_artifact` with either `projectId` or `issueId`.
+Project routes are permissioned as `projects:*` and task routes as `tasks:*`. The wire field for a task is still `issueId`.
 
 ## Security notes
 

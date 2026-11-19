@@ -47,7 +47,7 @@
   "method": "POST",
   "path": "/labels/{id}/merge",
   "permission": "workspace:write",
-  "description": "Merge a custom label into another (admin): everything labelled with it (issues, projects, repositories and saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
+  "description": "Merge a custom label into another (admin): everything labelled with it (tasks, projects and saved-view filters) moves to the target and the source is removed. Templates cannot be merged away. Returns the workspace.",
   "params": {
    "id": "path string! Label id to merge away",
    "into": "body string! Label id that takes over"
@@ -58,7 +58,7 @@
   "method": "DELETE",
   "path": "/labels/{id}",
   "permission": "workspace:delete",
-  "description": "Delete a custom workspace label and remove it from issues, projects and repositories (admin). Templates cannot be deleted.",
+  "description": "Delete a custom workspace label and remove it from tasks and projects (admin). Templates cannot be deleted.",
   "params": {
    "id": "path string! Label id"
   }
@@ -68,7 +68,7 @@
   "method": "GET",
   "path": "/snapshot",
   "permission": "snapshot:read",
-  "description": "Everything in the workspace in one (large) payload: users, teams, issues, decisions, artifacts, events, attention and views. Prefer targeted list_* tools; only usable by user-acting tokens.",
+  "description": "Everything in the workspace in one (large) payload: users, tasks, artifacts, events, attention and views. Prefer targeted list_* tools; only usable by user-acting tokens.",
   "params": {}
  },
  {
@@ -76,10 +76,10 @@
   "method": "GET",
   "path": "/search",
   "permission": "search:read",
-  "description": "Full-text search across projects, issues, decisions, artifacts, documents (titles), repositories and teams.",
+  "description": "Full-text search across projects, tasks, artifacts and documents (titles).",
   "params": {
    "q": "query string! Search text",
-   "types": "query string Comma-separated: project,issue,customer,decision,artifact,document,repository,team",
+   "types": "query string Comma-separated: project,issue,artifact,document",
    "limit": "query integer Max results (1-100)"
   }
  },
@@ -256,140 +256,16 @@
   }
  },
  {
-  "name": "list_teams",
-  "method": "GET",
-  "path": "/teams",
-  "permission": "teams:read",
-  "description": "All teams.",
-  "params": {}
- },
- {
-  "name": "get_team",
-  "method": "GET",
-  "path": "/teams/{idOrKey}",
-  "permission": "teams:read",
-  "description": "One team.",
-  "params": {
-   "idOrKey": "path string! Team id or key (e.g. AUTH)"
-  }
- },
- {
-  "name": "create_team",
-  "method": "POST",
-  "path": "/teams",
-  "permission": "teams:write",
-  "description": "Create a team (admin). The key is immutable.",
-  "params": {
-   "name": "body string! Name",
-   "key": "body string! 2-8 uppercase letters/digits, starts with a letter (e.g. AUTH)",
-   "color": "body string Color",
-   "description": "body string Description",
-   "memberIds": "body string[] Member user ids",
-   "leadIds": "body string[] Lead user ids (subset of memberIds)",
-   "editPolicy": "body string(workspace|members) Who may edit its work"
-  }
- },
- {
-  "name": "update_team",
-  "method": "PATCH",
-  "path": "/teams/{idOrKey}",
-  "permission": "teams:write",
-  "description": "Update a team (admin).",
-  "params": {
-   "idOrKey": "path string! Team id or key (e.g. AUTH)",
-   "name": "body string Name",
-   "color": "body string Color",
-   "description": "body string Description",
-   "memberIds": "body string[] Member user ids",
-   "leadIds": "body string[] Lead user ids",
-   "editPolicy": "body string(workspace|members) Edit policy"
-  }
- },
- {
-  "name": "delete_team",
-  "method": "DELETE",
-  "path": "/teams/{idOrKey}",
-  "permission": "teams:delete",
-  "description": "Delete a team.",
-  "params": {
-   "idOrKey": "path string! Team id or key (e.g. AUTH)"
-  }
- },
- {
-  "name": "list_repositories",
-  "method": "GET",
-  "path": "/repositories",
-  "permission": "repositories:read",
-  "description": "Linked git repositories.",
-  "params": {}
- },
- {
-  "name": "get_repository",
-  "method": "GET",
-  "path": "/repositories/{id}",
-  "permission": "repositories:read",
-  "description": "One repository.",
-  "params": {
-   "id": "path string! Repository id"
-  }
- },
- {
-  "name": "create_repository",
-  "method": "POST",
-  "path": "/repositories",
-  "permission": "repositories:write",
-  "description": "Register a repository.",
-  "params": {
-   "provider": "body string!(github|gitlab) Provider",
-   "fullName": "body string! 'owner/name'",
-   "url": "body string URL",
-   "defaultBranch": "body string Default branch",
-   "teamIds": "body string[] Owning team ids",
-   "labels": "body string[] Workspace label ids"
-  }
- },
- {
-  "name": "update_repository",
-  "method": "PATCH",
-  "path": "/repositories/{id}",
-  "permission": "repositories:write",
-  "description": "Update a repository.",
-  "params": {
-   "id": "path string! Repository id",
-   "url": "body string URL",
-   "defaultBranch": "body string Default branch",
-   "teamIds": "body string[] Team ids",
-   "labels": "body string[] Workspace label ids"
-  }
- },
- {
-  "name": "delete_repository",
-  "method": "DELETE",
-  "path": "/repositories/{id}",
-  "permission": "repositories:delete",
-  "description": "Remove a repository.",
-  "params": {
-   "id": "path string! Repository id"
-  }
- },
- {
   "name": "list_projects",
   "method": "GET",
   "path": "/projects",
   "permission": "projects:read",
-  "description": "Projects: planned outcomes. Each project carries customerCount (distinct customers who asked for it).",
+  "description": "Projects: planned outcomes. Filter by the repository string to find the project of a checkout.",
   "params": {
    "status": "query string(backlog|planned|in_progress|paused|completed|canceled) Status",
-   "teamId": "query string Team",
    "leadId": "query string Lead user",
-   "repositoryId": "query string Repository",
    "q": "query string Text filter",
-   "customerId": "query string Only projects this customer asked for",
-   "tierId": "query string Only projects a customer of this tier asked for (workspace.settings.customerTiers id)",
-   "minCustomers": "query integer At least this many distinct requesting customers",
-   "minRequests": "query integer At least this many customer requests",
-   "minRevenue": "query integer The requesting customers' annual revenue adds up to at least this (each customer counted once)",
-   "important": "query boolean true = only projects with at least one request flagged important"
+   "repository": "query string Match the project repository string (case-insensitive)"
   }
  },
  {
@@ -407,7 +283,7 @@
   "method": "POST",
   "path": "/projects",
   "permission": "projects:write",
-  "description": "Create a project (a planned outcome). Milestones belong to it.",
+  "description": "Create a project (a planned outcome). Milestones belong to it. repository is one nullable owner/name or URL string.",
   "params": {
    "name": "body string! Name",
    "summary": "body string One-line summary",
@@ -416,11 +292,10 @@
    "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status (default backlog)",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "leadId": "body string Lead user id",
-   "teamIds": "body string[] Team ids",
-   "repositoryIds": "body string[] Repository ids (where the work happens)",
    "labels": "body string[] Workspace label ids",
    "startDate": "body string ISO date",
-   "targetDate": "body string ISO date"
+   "targetDate": "body string ISO date",
+   "repository": "body string Git repository as owner/name or URL (null clears)"
   }
  },
  {
@@ -439,11 +314,10 @@
    "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "leadId": "body string Lead user id (null clears)",
-   "teamIds": "body string[] Team ids",
-   "repositoryIds": "body string[] Repository ids",
    "labels": "body string[] Workspace label ids",
    "startDate": "body string ISO date (null clears)",
-   "targetDate": "body string ISO date (null clears)"
+   "targetDate": "body string ISO date (null clears)",
+   "repository": "body string Git repository as owner/name or URL (null clears)"
   }
  },
  {
@@ -461,7 +335,7 @@
   "method": "GET",
   "path": "/projects/{id}/context.md",
   "permission": "projects:read",
-  "description": "Markdown briefing for a whole project: overview, latest updates, milestones, issues, artifacts, decisions and open questions. Read it before working on a project.",
+  "description": "Markdown briefing for a whole project: overview, latest updates, milestones, tasks and artifacts. Read it before working on a project.",
   "params": {
    "id": "path string! Project id"
   }
@@ -528,7 +402,7 @@
   "method": "GET",
   "path": "/documents",
   "permission": "documents:read",
-  "description": "Markdown documents of the workspace (specs, plans and notes that do not live in a repository), without their body: title, excerpt, where they are attached. With q, full-text search over titles and text (every word is a prefix), best match first, with the matching passage in snippet.",
+  "description": "Markdown documents of the workspace (specs, plans and notes that are not source files), without their body: title, excerpt, where they are attached. With q, full-text search over titles and text (every word is a prefix), best match first, with the matching passage in snippet.",
   "params": {
    "q": "query string Search text (title and body)",
    "projectId": "query string Only documents attached to this project",
@@ -557,7 +431,7 @@
   "method": "POST",
   "path": "/documents",
   "permission": "documents:write",
-  "description": "Create a Markdown document (specs, plans, notes that are not in a repository). Give projectId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate what already lives in a repository or an issue.",
+  "description": "Create a Markdown document (specs, plans, notes). Give projectId and/or issueId to attach it there as a document artifact in the same call. Do not duplicate an existing task.",
   "params": {
    "title": "body string! Title (max 200 characters)",
    "body": "body string Markdown body (max 150000 characters)",
@@ -648,7 +522,7 @@
   "method": "POST",
   "path": "/documents/{id}/attach",
   "permission": "artifacts:write",
-  "description": "Attach a document to exactly one project or issue (it then appears in their artifacts as a document artifact). Idempotent.",
+  "description": "Attach a document to exactly one project or task (it then appears in their artifacts as a document artifact). Idempotent. issueId is the task.",
   "params": {
    "id": "path string! Document id (doc_…)",
    "projectId": "body string Project id",
@@ -671,7 +545,7 @@
   "method": "GET",
   "path": "/projects/{id}/artifacts",
   "permission": "artifacts:read",
-  "description": "Artifacts attached to the project itself and its issues.",
+  "description": "Artifacts attached to the project itself and its tasks.",
   "params": {
    "id": "path string! Project id"
   }
@@ -746,143 +620,56 @@
   }
  },
  {
-  "name": "list_input_requests",
+  "name": "list_tasks",
   "method": "GET",
-  "path": "/input-requests",
-  "permission": "input-requests:read",
-  "description": "Questions agents/people asked humans.",
-  "params": {
-   "state": "query string(open|answered|dismissed) State",
-   "issueId": "query string Issue",
-   "assigneeUserId": "query string Assignee"
-  }
- },
- {
-  "name": "get_input_request",
-  "method": "GET",
-  "path": "/input-requests/{id}",
-  "permission": "input-requests:read",
-  "description": "One input request.",
-  "params": {
-   "id": "path string! Input request id"
-  }
- },
- {
-  "name": "create_input_request",
-  "method": "POST",
-  "path": "/input-requests",
-  "permission": "input-requests:write",
-  "description": "Create a human input request, optionally linked to an issue.",
-  "params": {
-   "question": "body string! Question",
-   "issueId": "body string Issue id",
-   "options": "body string[] Suggested answers",
-   "assigneeUserId": "body string Who should answer"
-  }
- },
- {
-  "name": "update_input_request",
-  "method": "PATCH",
-  "path": "/input-requests/{id}",
-  "permission": "input-requests:write",
-  "description": "Edit an open input request.",
-  "params": {
-   "id": "path string! Input request id",
-   "question": "body string Question",
-   "options": "body string[] Options",
-   "assigneeUserId": "body string Assignee"
-  }
- },
- {
-  "name": "answer_input_request",
-  "method": "POST",
-  "path": "/input-requests/{id}/answer",
-  "permission": "input-requests:write",
-  "description": "Answer an open input request.",
-  "params": {
-   "id": "path string! Input request id",
-   "answer": "body string! Answer"
-  }
- },
- {
-  "name": "dismiss_input_request",
-  "method": "POST",
-  "path": "/input-requests/{id}/dismiss",
-  "permission": "input-requests:write",
-  "description": "Dismiss an open input request.",
-  "params": {
-   "id": "path string! Input request id"
-  }
- },
- {
-  "name": "delete_input_request",
-  "method": "DELETE",
-  "path": "/input-requests/{id}",
-  "permission": "input-requests:delete",
-  "description": "Delete an input request.",
-  "params": {
-   "id": "path string! Input request id"
-  }
- },
- {
-  "name": "list_issues",
-  "method": "GET",
-  "path": "/issues",
-  "permission": "issues:read",
-  "description": "List issues (bugs, features, incidents, debt, feedback, ideas, security). Filter by team, assignee, project, milestone, customer demand or text.",
+  "path": "/tasks",
+  "permission": "tasks:read",
+  "description": "List tasks (bugs, features, incidents, debt, feedback, ideas, security). Filter by assignee, project, milestone or text. Tasks are not assigned to a team.",
   "params": {
    "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "priority": "query string Comma-separated: urgent,high,medium,low,none (e.g. 'high,urgent' = important)",
    "open": "query boolean true = only issues still in play (backlog, todo, in_progress, in_review)",
    "limit": "query integer Newest first, at most this many (1-500)",
-   "teamId": "query string Team",
    "assigneeId": "query string Assignee",
    "projectId": "query string Project",
    "milestoneId": "query string Milestone",
-   "customerId": "query string Only issues linked to this customer",
-   "minCustomers": "query integer At least this many distinct linked customers",
-   "q": "query string Text filter",
-   "minRequests": "query integer At least this many customer requests",
-   "tierId": "query string Only issues a customer of this tier asked for (workspace.settings.customerTiers id)",
-   "minRevenue": "query integer The requesting customers' annual revenue adds up to at least this (each customer counted once)",
-   "important": "query boolean true = only issues with at least one request flagged important"
+   "q": "query string Text filter"
   }
  },
  {
-  "name": "get_issue",
+  "name": "get_task",
   "method": "GET",
-  "path": "/issues/{idOrKey}",
-  "permission": "issues:read",
-  "description": "One issue. Previous project keys and migrated legacy keys still resolve as aliases. Includes visible artifactCount for callers with artifacts:read; 0 means skip list_issue_artifacts.",
+  "path": "/tasks/{idOrKey}",
+  "permission": "tasks:read",
+  "description": "One task. Previous project keys and migrated legacy keys still resolve as aliases. Includes visible artifactCount for callers with artifacts:read; 0 means skip list_task_artifacts.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)"
   }
  },
  {
-  "name": "get_issue_context",
+  "name": "get_task_context",
   "method": "GET",
-  "path": "/issues/{idOrKey}/context",
-  "permission": "issues:read",
-  "description": "Full context for an issue, returned as JSON or markdown according to the requested representation.",
+  "path": "/tasks/{idOrKey}/context",
+  "permission": "tasks:read",
+  "description": "Full context for a task, returned as JSON or markdown according to the requested representation.",
   "params": {
-   "idOrKey": "path string! Issue id or key"
+   "idOrKey": "path string! Task id or key"
   }
  },
  {
-  "name": "create_issue",
+  "name": "create_task",
   "method": "POST",
-  "path": "/issues",
-  "permission": "issues:write",
-  "description": "Create an issue; status defaults to backlog. Subject to per-token write caps.",
+  "path": "/tasks",
+  "permission": "tasks:write",
+  "description": "Create a task; status defaults to backlog. Subject to per-token write caps. There is no team assignment.",
   "params": {
    "title": "body string! Title",
    "body": "body string Markdown body",
    "reporterName": "body string Reporter name",
    "assigneeId": "body string Assignee user id",
-   "teamId": "body string Team id",
    "projectId": "body string Project id",
-   "parentId": "body string Id or key of the parent issue",
+   "parentId": "body string Id or key of the parent task",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
@@ -894,299 +681,57 @@
   }
  },
  {
-  "name": "update_issue",
+  "name": "update_task",
   "method": "PATCH",
-  "path": "/issues/{idOrKey}",
-  "permission": "issues:write",
-  "description": "Partially update an issue. Changing project re-keys it and keeps the previous key as an alias; kind changes classification only. duplicateOfId marks it a duplicate; parentId sets its parent; null clears optional fields.",
+  "path": "/tasks/{idOrKey}",
+  "permission": "tasks:write",
+  "description": "Partially update a task. Changing project re-keys it and keeps the previous key as an alias; kind changes classification only. duplicateOfId marks it a duplicate; parentId sets its parent; null clears optional fields. There is no team assignment.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. CORA-142)",
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)",
    "title": "body string Title",
    "body": "body string Markdown body",
    "reporterName": "body string Reporter name",
    "assigneeId": "body string Assignee user id",
-   "teamId": "body string Team id",
    "projectId": "body string Project id (null clears; drops that project's milestone)",
-   "parentId": "body string Parent issue id or key (null makes this a root issue)",
+   "parentId": "body string Parent task id or key (null makes this a root task)",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
    "estimate": "body number Estimate in points (>=0, <=1000)",
-   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Issue classification; does not change the key",
+   "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Task classification; does not change the key",
    "duplicateOfId": "body string Id or key of the original (null clears)",
    "labels": "body string[] Workspace label ids"
   }
  },
  {
-  "name": "delete_issue",
+  "name": "delete_task",
   "method": "DELETE",
-  "path": "/issues/{idOrKey}",
-  "permission": "issues:delete",
-  "description": "Delete an issue.",
+  "path": "/tasks/{idOrKey}",
+  "permission": "tasks:delete",
+  "description": "Delete a task.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)"
   }
  },
  {
-  "name": "bulk_update_issues",
+  "name": "bulk_update_tasks",
   "method": "POST",
-  "path": "/issues/bulk",
-  "permission": "issues:write",
-  "description": "Apply one patch to up to 100 issues atomically (all or nothing, one transaction, events per issue). Labels are added or removed, not replaced. Unknown issues or references, or a team you may not edit, reject the whole request.",
+  "path": "/tasks/bulk",
+  "permission": "tasks:write",
+  "description": "Apply one patch to up to 100 tasks atomically (all or nothing, one transaction, events per task). Labels are added or removed, not replaced. Unknown tasks or references reject the whole request.",
   "params": {
-   "ids": "body string[]! Issue ids or keys (1-100)",
-   "patch": "body object! Changes for every issue: {status?, priority?, assigneeId? (null clears), teamId? (null clears), projectId? (null clears), addLabels?, removeLabels?}"
+   "ids": "body string[]! Task ids or keys (1-100)",
+   "patch": "body object! Changes for every task: {status?, priority?, assigneeId? (null clears), projectId? (null clears), addLabels?, removeLabels?}"
   }
  },
  {
-  "name": "bulk_delete_issues",
+  "name": "bulk_delete_tasks",
   "method": "POST",
-  "path": "/issues/bulk-delete",
-  "permission": "issues:delete",
-  "description": "Delete up to 100 issues in one transaction (their comments go too). Returns the deleted ids.",
+  "path": "/tasks/bulk-delete",
+  "permission": "tasks:delete",
+  "description": "Delete up to 100 tasks in one transaction (their comments go too). Returns the deleted ids.",
   "params": {
-   "ids": "body string[]! Issue ids or keys (1-100)"
-  }
- },
- {
-  "name": "list_customers",
-  "method": "GET",
-  "path": "/customers",
-  "permission": "customers:read",
-  "description": "Companies that asked for things (customers), with domains, logo, revenue, size, tier and status. Archived customers are hidden unless archived=true or archived=all.",
-  "params": {
-   "archived": "query string(true|false|all) true = only archived, all = both, otherwise active",
-   "issueId": "query string Only customers with a request on this issue",
-   "projectId": "query string Only customers with a request on this project",
-   "tierId": "query string Only customers of this tier (workspace.settings.customerTiers id)",
-   "status": "query string(prospect|active|churned) Customer status",
-   "q": "query string Name or any domain"
-  }
- },
- {
-  "name": "get_customer",
-  "method": "GET",
-  "path": "/customers/{id}",
-  "permission": "customers:read",
-  "description": "One customer (company), archived or not.",
-  "params": {
-   "id": "path string! Customer id"
-  }
- },
- {
-  "name": "create_customer",
-  "method": "POST",
-  "path": "/customers",
-  "permission": "customers:write",
-  "description": "Create a customer (a company). Domains are normalized (lower-case, no scheme or www), the first is the primary, and none may belong to another customer of the workspace (409). Send domains or domain. tierId must be a tier from get_workspace settings.customerTiers.",
-  "params": {
-   "name": "body string! Customer name",
-   "domains": "body string[] Domains, primary first (1-20), e.g. [\"acme.com\",\"acme.io\"]",
-   "domain": "body string Single domain; use domains for several",
-   "logoUrl": "body string http(s) URL of the logo",
-   "revenue": "body integer Annual revenue, whole number >= 0 (workspace currency)",
-   "size": "body integer Company size in people, whole number >= 0",
-   "tierId": "body string Customer tier id (settings.customerTiers)",
-   "status": "body string(prospect|active|churned) Default active"
-  }
- },
- {
-  "name": "update_customer",
-  "method": "PATCH",
-  "path": "/customers/{id}",
-  "permission": "customers:write",
-  "description": "Edit a customer: name, domains (replaces the list), domain (replaces only the primary), logoUrl, revenue, size, tierId, status, or archive/restore it. null clears logoUrl, revenue, size and tierId. Archiving keeps requests and issues.",
-  "params": {
-   "id": "path string! Customer id",
-   "name": "body string Name",
-   "domains": "body string[] Replaces all domains, primary first (1-20)",
-   "domain": "body string Replaces the primary domain, keeps the others",
-   "logoUrl": "body string http(s) logo URL, null clears",
-   "revenue": "body integer Annual revenue >= 0, null clears",
-   "size": "body integer Company size >= 0, null clears",
-   "tierId": "body string Customer tier id, null clears",
-   "status": "body string(prospect|active|churned) Status",
-   "archived": "body boolean true archives, false restores"
-  }
- },
- {
-  "name": "delete_customer",
-  "method": "DELETE",
-  "path": "/customers/{id}",
-  "permission": "customers:delete",
-  "description": "Delete a customer and its requests. Issues and projects are kept.",
-  "params": {
-   "id": "path string! Customer id"
-  }
- },
- {
-  "name": "list_customer_requests",
-  "method": "GET",
-  "path": "/customers/{id}/requests",
-  "permission": "customers:read",
-  "description": "Requests of one customer, newest first, in full (markdown body, important, sourceUrl, source/externalId/requester when they came from Intercom, Zendesk…), each with its issue or project.",
-  "params": {
-   "id": "path string! Customer id"
-  }
- },
- {
-  "name": "create_customer_request",
-  "method": "POST",
-  "path": "/customers/{id}/requests",
-  "permission": "customers:write",
-  "description": "Record what a customer asked for, on exactly one issue (issueId) or one project (projectId). body is markdown, sourceUrl an http(s) link to the ticket or thread. A customer can have several requests on one issue.",
-  "params": {
-   "id": "path string! Customer id",
-   "issueId": "body string Issue id (exactly one of issueId / projectId)",
-   "projectId": "body string Project id (exactly one of issueId / projectId)",
-   "body": "body string Markdown: what the customer asked for",
-   "important": "body boolean Flag the request as important (default false)",
-   "sourceUrl": "body string http(s) URL of the source ticket, email thread or call notes"
-  }
- },
- {
-  "name": "update_customer_request",
-  "method": "PATCH",
-  "path": "/customers/{id}/requests/{requestId}",
-  "permission": "customers:write",
-  "description": "Edit a customer request: markdown body, important flag, sourceUrl. null clears body and sourceUrl.",
-  "params": {
-   "id": "path string! Customer id",
-   "requestId": "path string! Customer request id",
-   "body": "body string Markdown body, null clears",
-   "important": "body boolean Important flag",
-   "sourceUrl": "body string http(s) source URL, null clears"
-  }
- },
- {
-  "name": "find_customer_requests",
-  "method": "GET",
-  "path": "/customer-requests",
-  "permission": "customers:read",
-  "description": "Customer requests across customers, newest first, in full. Filter by customer, issue, project or importance to see what is asked on an issue or project.",
-  "params": {
-   "customerId": "query string Only this customer",
-   "issueId": "query string Only requests on this issue",
-   "projectId": "query string Only requests on this project",
-   "important": "query string(true|false) Only important (true) or not (false)"
-  }
- },
- {
-  "name": "unlink_customer_request",
-  "method": "POST",
-  "path": "/customers/{id}/requests/{requestId}/unlink",
-  "permission": "customers:write",
-  "description": "Delete a customer request. The issue or project is kept.",
-  "params": {
-   "id": "path string! Customer id",
-   "requestId": "path string! Customer request id"
-  }
- },
- {
-  "name": "list_intake_sources",
-  "method": "GET",
-  "path": "/intake-sources",
-  "permission": "integrations:read",
-  "description": "Sources of inbound customer requests (Intercom, Zendesk, Front, Slack, email, signed webhook) with their webhookUrl, hasSecret and lastReceivedAt. Never the secret. Admin.",
-  "params": {}
- },
- {
-  "name": "create_intake_source",
-  "method": "POST",
-  "path": "/intake-sources",
-  "permission": "integrations:write",
-  "description": "Add a source of inbound customer requests. Email and generic sources get a generated secret, returned once; for the others pass the provider's own signing secret now or later with update_intake_source. Admin.",
-  "params": {
-   "provider": "body string(intercom|zendesk|front|slack|email|generic)! Tool the requests come from",
-   "name": "body string! Name shown in the inbox (<= 80 chars)",
-   "autoCreateCustomers": "body boolean Create a prospect customer from the sender's company domain when none matches (default true; mailbox providers never do)",
-   "targetProjectId": "body string Attach requests from known customers straight to this project; otherwise they wait in the inbox",
-   "subdomain": "body string Zendesk only: the part before .zendesk.com, to link tickets",
-   "secret": "body string Provider-issued signing secret (not for email / generic)",
-   "enabled": "body boolean Accept deliveries (default true)"
-  }
- },
- {
-  "name": "update_intake_source",
-  "method": "PATCH",
-  "path": "/intake-sources/{id}",
-  "permission": "integrations:write",
-  "description": "Edit a source: name, enabled, autoCreateCustomers, targetProjectId (null clears), subdomain (null clears) or the provider-issued secret. Admin.",
-  "params": {
-   "id": "path string! Source id",
-   "name": "body string Name",
-   "enabled": "body boolean Accept deliveries",
-   "autoCreateCustomers": "body boolean Create customers from unknown domains",
-   "targetProjectId": "body string Project to attach to, null clears",
-   "subdomain": "body string Zendesk subdomain, null clears",
-   "secret": "body string Provider-issued signing secret (not for email / generic, use rotate_intake_source)"
-  }
- },
- {
-  "name": "delete_intake_source",
-  "method": "DELETE",
-  "path": "/intake-sources/{id}",
-  "permission": "integrations:delete",
-  "description": "Delete a source. Requests still waiting in the inbox from it are removed; requests already linked stay. Admin.",
-  "params": {
-   "id": "path string! Source id"
-  }
- },
- {
-  "name": "rotate_intake_source",
-  "method": "POST",
-  "path": "/intake-sources/{id}/rotate-secret",
-  "permission": "integrations:write",
-  "description": "Generate a new secret for an email or generic source (returned once). The old one stops working at once. Admin.",
-  "params": {
-   "id": "path string! Source id"
-  }
- },
- {
-  "name": "test_intake_source",
-  "method": "POST",
-  "path": "/intake-sources/{id}/test",
-  "permission": "integrations:write",
-  "description": "Dry run: a sample delivery signed with the stored secret goes through verification, parsing and customer matching. Reports what would happen; nothing is saved. Admin.",
-  "params": {
-   "id": "path string! Source id"
-  }
- },
- {
-  "name": "list_intake_items",
-  "method": "GET",
-  "path": "/customer-intake",
-  "permission": "customers:read",
-  "description": "The triage inbox of inbound customer requests, newest first: source, external ticket id and URL, requester, subject, body, matched customerId, status. Default status is pending.",
-  "params": {
-   "status": "query string(pending|linked|dismissed|all) Inbox state (default pending)",
-   "limit": "query integer 1-500 (default 200)"
-  }
- },
- {
-  "name": "link_intake_item",
-  "method": "POST",
-  "path": "/customer-intake/{id}/link",
-  "permission": "customers:write",
-  "description": "Turn a pending inbox item into a customer request on exactly one issue (issueId) or project (projectId). Without a matched customer pass customerId, or createCustomer to create one from the sender's company domain.",
-  "params": {
-   "id": "path string! Inbox item id",
-   "issueId": "body string Issue id (exactly one of issueId / projectId)",
-   "projectId": "body string Project id (exactly one of issueId / projectId)",
-   "customerId": "body string Customer id (overrides the matched one)",
-   "createCustomer": "body boolean Create the customer from the sender's email domain",
-   "customerName": "body string Name for the new customer",
-   "important": "body boolean Flag the request as important"
-  }
- },
- {
-  "name": "dismiss_intake_item",
-  "method": "POST",
-  "path": "/customer-intake/{id}/dismiss",
-  "permission": "customers:write",
-  "description": "Dismiss a pending inbox item (spam, not a request). POST /customer-intake/{id}/restore brings it back.",
-  "params": {
-   "id": "path string! Inbox item id"
+   "ids": "body string[]! Task ids or keys (1-100)"
   }
  },
  {
@@ -1194,11 +739,11 @@
   "method": "GET",
   "path": "/artifacts",
   "permission": "artifacts:read",
-  "description": "PRs, docs, builds, deployments, links etc. attached to issues and projects.",
+  "description": "PRs, docs, builds, deployments, links etc. attached to tasks and projects.",
   "params": {
-   "repositoryId": "query string Repository",
    "kind": "query string Kind",
-   "state": "query string State"
+   "state": "query string State",
+   "repository": "query string Git full name or URL"
   }
  },
  {
@@ -1216,14 +761,14 @@
   "method": "POST",
   "path": "/artifacts",
   "permission": "artifacts:write",
-  "description": "Attach an artifact (PR, build, document, link…) to a project or issue. At least one of projectId or issueId is required.",
+  "description": "Attach an artifact (PR, build, document, link…) to a project or task. At least one of projectId or issueId is required. issueId stays the wire field for the task.",
   "params": {
    "projectId": "body string Project id",
-   "issueId": "body string Issue id",
+   "issueId": "body string Issue id (the task)",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release)! Kind",
    "title": "body string! Title",
    "description": "body string Why it is attached / what it is (markdown)",
-   "repositoryId": "body string Repository id",
+   "repository": "body string Git full name or URL (max 2048, null clears)",
    "provider": "body string Provider",
    "url": "body string URL",
    "externalId": "body string External id",
@@ -1244,7 +789,7 @@
    "id": "path string! Artifact id",
    "kind": "body string(pull_request|merge_request|document|link|design|image|file|build|test_report|deployment|release) Kind",
    "title": "body string Title",
-   "repositoryId": "body string Repository id",
+   "repository": "body string Git full name or URL (max 2048, null clears)",
    "provider": "body string Provider",
    "url": "body string URL",
    "externalId": "body string External id",
@@ -1266,109 +811,13 @@
   }
  },
  {
-  "name": "list_issue_artifacts",
+  "name": "list_task_artifacts",
   "method": "GET",
-  "path": "/issues/{idOrKey}/artifacts",
+  "path": "/tasks/{idOrKey}/artifacts",
   "permission": "artifacts:read",
-  "description": "Artifacts attached to an issue.",
+  "description": "Artifacts attached to a task.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. CORA-142)"
-  }
- },
- {
-  "name": "list_decisions",
-  "method": "GET",
-  "path": "/decisions",
-  "permission": "decisions:read",
-  "description": "Architecture/product decisions (ADR-n).",
-  "params": {
-   "status": "query string(draft|proposed|accepted|superseded|rejected) Status",
-   "issueId": "query string Issue",
-   "tag": "query string Tag",
-   "q": "query string Text"
-  }
- },
- {
-  "name": "get_decision",
-  "method": "GET",
-  "path": "/decisions/{idOrKey}",
-  "permission": "decisions:read",
-  "description": "One decision.",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
-  }
- },
- {
-  "name": "create_decision",
-  "method": "POST",
-  "path": "/decisions",
-  "permission": "decisions:write",
-  "description": "Propose a decision (status proposed or draft; accepted/rejected need a person).",
-  "params": {
-   "title": "body string! Title",
-   "statement": "body string! Decision statement",
-   "rationale": "body string Rationale",
-   "originIssueId": "body string! Origin issue",
-   "relatedIssueIds": "body string[] Related issues",
-   "tags": "body string[] Tags",
-   "status": "body string(draft|proposed) Initial status"
-  }
- },
- {
-  "name": "update_decision",
-  "method": "PATCH",
-  "path": "/decisions/{idOrKey}",
-  "permission": "decisions:write",
-  "description": "Update a decision's content.",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)",
-   "title": "body string Title",
-   "statement": "body string Decision statement",
-   "rationale": "body string Rationale",
-   "originIssueId": "body string! Origin issue",
-   "relatedIssueIds": "body string[] Related issues",
-   "tags": "body string[] Tags"
-  }
- },
- {
-  "name": "accept_decision",
-  "method": "POST",
-  "path": "/decisions/{idOrKey}/accept",
-  "permission": "decisions:accept",
-  "description": "Accept a proposed decision (people only; may be refused for agent tokens).",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
-  }
- },
- {
-  "name": "reject_decision",
-  "method": "POST",
-  "path": "/decisions/{idOrKey}/reject",
-  "permission": "decisions:accept",
-  "description": "Reject a proposed decision.",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
-  }
- },
- {
-  "name": "supersede_decision",
-  "method": "POST",
-  "path": "/decisions/{idOrKey}/supersede",
-  "permission": "decisions:accept",
-  "description": "Mark a decision superseded by another.",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)",
-   "byId": "body string! Id or key of the replacement"
-  }
- },
- {
-  "name": "delete_decision",
-  "method": "DELETE",
-  "path": "/decisions/{idOrKey}",
-  "permission": "decisions:delete",
-  "description": "Delete a decision.",
-  "params": {
-   "idOrKey": "path string! Decision id or key (e.g. ADR-21)"
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)"
   }
  },
  {
@@ -1378,7 +827,7 @@
   "permission": "comments:read",
   "description": "Comments on an entity.",
   "params": {
-   "subjectType": "query string(issue|artifact|decision|input_request|repository|team|project|project_update) Subject type",
+   "subjectType": "query string(issue|artifact|project|project_update) Subject type",
    "subjectId": "query string Subject id"
   }
  },
@@ -1389,7 +838,7 @@
   "permission": "comments:write",
   "description": "Comment on an entity.",
   "params": {
-   "subject": "body object! {type: issue|artifact|decision|input_request|repository|team|project|project_update, id}",
+   "subject": "body object! {type: issue|artifact|project|project_update, id}",
    "body": "body string! Comment (markdown)"
   }
  },
@@ -1440,8 +889,8 @@
   "description": "Create a saved view.",
   "params": {
    "name": "body string! Name",
-   "entity": "body string(issue|decision|project)! Entity",
-   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
+   "entity": "body string(issue|project)! Entity",
+   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|timeline) Layout (timeline only for project views)",
@@ -1458,8 +907,8 @@
   "params": {
    "id": "path string! View id",
    "name": "body string Name",
-   "entity": "body string(issue|decision|project) Entity",
-   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte. Issue and project views also filter on customerId, customerTierId (ids) and, with gte/lte, customerCount, requestCount, importantCount, customerRevenue, customerSize",
+   "entity": "body string(issue|project) Entity",
+   "filters": "body object[] [{field, op, value}]. op: is|is_not|in|not_in|contains|before|after|gte|lte",
    "sort": "body object {field, direction: asc|desc}",
    "groupBy": "body string Group-by field",
    "layout": "body string(list|board|timeline) Layout (timeline only for project views)",
@@ -1482,13 +931,12 @@
   "method": "GET",
   "path": "/insights",
   "permission": "insights:read",
-  "description": "Where are the problems? Health signals (waiting for input, stale or overdue issues, scope creep, PRs stuck in review, failing CI, undecided decisions and customer demand waiting), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
+  "description": "Where are the problems? Health signals (stale or overdue tasks, scope creep, PRs stuck in review, failing CI), flow metrics (cycle/lead p50/p85, throughput, WIP, aging, cumulative flow) and agent failure signals. Each signal lists its items.",
   "params": {
-    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
-    "teamId": "query string Only this team's work",
-    "projectId": "query string Only this project's work",
-    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
-    "limit": "query integer Items kept per signal, 1-500 (default 25); counts always cover everything"
+   "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+   "projectId": "query string Only this project's work",
+   "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+   "limit": "query integer Items kept per signal, 1-500 (default 25); counts always cover everything"
   }
  },
  {
@@ -1498,12 +946,11 @@
   "permission": "insights:read",
   "description": "The full item list behind one health signal (what a tile of get_insights drills into).",
   "params": {
-    "id": "path string(needs_input|stale_issues|overdue_milestones|scope_creep|prs_stuck_in_review|ci_failing|undecided_decisions|customer_demand_waiting)! Signal id",
-    "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
-    "teamId": "query string Only this team's work",
-    "projectId": "query string Only this project's work",
-    "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
-    "limit": "query integer Items returned, 1-500 (default 100)"
+   "id": "path string(stale_issues|overdue_milestones|scope_creep|prs_stuck_in_review|ci_failing)! Signal id",
+   "days": "query integer Look-back window in days: 7, 30 or 90 (default 30)",
+   "projectId": "query string Only this project's work",
+   "staleDays": "query integer Days without activity before work is stale (1-90, default 7)",
+   "limit": "query integer Items returned, 1-500 (default 100)"
   }
  },
  {
@@ -1511,7 +958,7 @@
   "method": "GET",
   "path": "/attention",
   "permission": "attention:read",
-  "description": "Things waiting for a human (input requested, decisions, failing CI, blocked, deadlines...). Needs a user token.",
+  "description": "Things waiting for a human (failing CI, blocked work, deadlines...). Needs a user token.",
   "params": {
    "scope": "query string(mine|all) mine (default) or all (admin)",
    "state": "query string(open|snoozed|dismissed|active) State filter"
@@ -1561,7 +1008,7 @@
   "method": "POST",
   "path": "/imports/preview",
   "permission": "integrations:write",
-  "description": "Read a GitHub repository or Linear workspace and return counts plus the suggested mapping (teams, projects, labels, users, statuses). Writes nothing. Public GitHub repositories need no credential. Admin.",
+  "description": "Read a GitHub repository or Linear workspace and return counts plus the suggested mapping (projects, labels, users, statuses). Writes nothing. Public GitHub repositories need no credential. Admin.",
   "params": {
    "provider": "body string(github|linear)! Tracker",
    "source": "body object! GitHub: {repository: 'owner/name'}. Linear: {teamIds?: string[]} (empty = all teams)",
@@ -1574,13 +1021,13 @@
   "method": "POST",
   "path": "/imports",
   "permission": "integrations:write",
-  "description": "Queue a background import and return the job (poll get_import). Idempotent: issues already imported are skipped, so it can be re-run. Without mapping, the preview's suggestions are used. One import at a time per workspace. Admin.",
+  "description": "Queue a background import and return the job (poll get_import). Idempotent: tasks already imported are skipped, so it can be re-run. Without mapping, the preview suggestions are used. One import at a time per workspace. Admin.",
   "params": {
    "provider": "body string(github|linear)! Tracker",
    "source": "body object! GitHub: {repository: 'owner/name'}. Linear: {teamIds?: string[]}",
    "credentialId": "body string Saved credential id. Required for Linear",
    "connectionId": "body string GitHub only: reuse a GitHub integration connection",
-   "mapping": "body object Edited preview mapping {teams,projects,labels: {externalId: {action: map|create|skip, id?}}, users: {externalId: userId|null}, statuses: {externalId: issueStatus}}",
+   "mapping": "body object Edited preview mapping {teams,projects,labels: {externalId: {action: map|create|skip, id?}}, users: {externalId: userId|null}, statuses: {externalId: taskStatus}}. teams are Linear team ids, not Trama teams",
    "options": "body object {includeComments?: boolean, includeClosed?: boolean, defaultKind?: bug|feature|incident|tech_debt|feedback|idea|security}"
   }
  },
@@ -1613,24 +1060,24 @@
   }
  },
  {
-  "name": "link_external_issue",
+  "name": "link_external_task",
   "method": "POST",
-  "path": "/issues/{idOrKey}/external-ref",
-  "permission": "issues:write",
-  "description": "Link a Trama issue to a GitHub or Linear issue by URL, so its external status shows as a read-only badge (the Trama status is never changed). One external issue links to one Trama issue.",
+  "path": "/tasks/{idOrKey}/external-ref",
+  "permission": "tasks:write",
+  "description": "Link a Trama task to a GitHub or Linear issue by URL, so its external status shows as a read-only badge (the Trama status is never changed). One external issue links to one Trama task.",
   "params": {
-   "idOrKey": "path string! Issue id or key (e.g. CORA-142)",
+   "idOrKey": "path string! Task id or key (e.g. CORA-142)",
    "url": "body string! https://github.com/owner/repo/issues/12 or https://linear.app/team/issue/ENG-123/..."
   }
  },
  {
-  "name": "refresh_external_issue",
+  "name": "refresh_external_task",
   "method": "POST",
-  "path": "/issues/{idOrKey}/external-ref/refresh",
-  "permission": "issues:write",
+  "path": "/tasks/{idOrKey}/external-ref/refresh",
+  "permission": "tasks:write",
   "description": "Re-read the status of the linked external issue (read-only mirror).",
   "params": {
-   "idOrKey": "path string! Issue id or key"
+   "idOrKey": "path string! Task id or key"
   }
  }
 ]

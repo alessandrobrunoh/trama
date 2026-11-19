@@ -11,13 +11,13 @@ a route added to the catalog appears here with its flags, types and allowed valu
 the MCP server's shorter default tool list is a separate layer on top (`mcp/src/curated.json`) and never shrinks the CLI.
 
 ```bash
-trama issue list --open --priority urgent,high --fields key,title,status
-trama issue context AUTH-142              # markdown issue context
+trama task list --open --priority urgent,high --fields key,title,status
+trama task context AUTH-142              # markdown task context
 trama project context prj_…               # markdown "mega context" of a whole project
 trama project-update post prj_… --health on_track --file body=update.md
 trama artifact add --issue-id AUTH-142 --kind pull_request --title "Fix login" --url https://…
-trama issue create --kind bug --title "Login times out" --file body=notes.md
-trama issue update AUTH-142 --status in_progress --unset estimate
+trama task create --kind bug --title "Login times out" --file body=notes.md
+trama task update AUTH-142 --status in_progress --unset estimate
 ```
 
 ## Install
@@ -84,10 +84,10 @@ printf '%s\n' "$KEY_ACME" "$KEY_BETA" | trama account add --with-token --api-url
 trama account add --email you@acme.com --name work                 # add --workspace acme,beta to limit it
 
 trama account list
-trama issue list --account work            # one row per issue, each stamped with its workspace
-trama issue list --all-workspaces         # every saved profile
-trama issue list --workspace acme,beta
-trama issue get AUTH-142 --workspace acme  # a single workspace, by slug
+trama task list --account work            # one row per task, each stamped with its workspace
+trama task list --all-workspaces         # every saved profile
+trama task list --workspace acme,beta
+trama task get AUTH-142 --workspace acme  # a single workspace, by slug
 ```
 
 Reads (`list`, `get`, `search`, the markdown briefings) run once per matching profile and merge the
@@ -104,23 +104,23 @@ over every selection.
 trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 ```
 
-Resources: `issue` `decision` `artifact` `document` `input-request` `comment` `project`
-`project-update` `milestone` `team` `repository` `member` `agent` `token` `view` `attention` `event` `integration`
+Resources: `task` `artifact` `document` `comment` `project`
+`project-update` `milestone` `member` `agent` `token` `view` `attention` `event` `integration`
 `outgoing-webhook` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
-plus actions (`decision accept`, `input-request answer`, `issue context`, `project context`, `project artifacts`, …).
-Aliases: `issues`, `repo`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`, `ADR-21`).
+plus actions (`task context`, `project context`, `project artifacts`, …).
+Aliases: `tasks`, `webhook`; `ls`, `show`, `rm`; `project-update post|edit` (= `create|update`), `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`).
 
 ```bash
 trama commands                      # every command with its HTTP route and permission
-trama commands issue --detail       # …with every flag, type and allowed value
-trama schema issue create           # JSON input schema (the MCP tool name works too: create_issue)
-trama issue create --help
+trama commands task --detail       # …with every flag, type and allowed value
+trama schema task create           # JSON input schema (the MCP tool name works too: create_task)
+trama task create --help
 trama api GET /integrations -Q limit=5      # any route without a dedicated command
 ```
 
 How flags are built from the catalog:
 
-- path parameters are positional (`trama issue update AUTH-142 --status in_progress`); everything else is `--kebab-case`;
+- path parameters are positional (`trama task update AUTH-142 --status in_progress`); everything else is `--kebab-case`;
 - enums are validated before sending; lists are comma-separated (`--label a,b`); booleans can be bare (`--open`) or explicit (`--open false`);
 - objects accept `type:id` for subjects (`--subject issue:iss_1`), `k=v,k=v`, JSON, or `@file`;
 - `--data '{…}'` / `@file.json` / `-` supplies a whole JSON body; explicit flags win over it;
@@ -136,8 +136,8 @@ Everything is predictable so an agent can use it without reading docs twice.
   `{"results":[…]}` envelopes handled). Terminal control characters in human-readable tables, Markdown context
   briefings, and text errors are escaped visibly to prevent terminal control/spoofing sequences. Explicit
   `-o raw`, JSON output modes, and JSON errors (`TRAMA_ERRORS=json`) remain machine-oriented and unescaped.
-- **Issue artifacts.** `trama issue get AUTH-142 --fields key,title,status,artifactCount` includes a count for callers with
-  `artifacts:read`; zero means skip `trama issue artifacts`. The field is absent without artifact access.
+- **Task artifacts.** `trama task get AUTH-142 --fields key,title,status,artifactCount` includes a count for callers with
+  `artifacts:read`; zero means skip `trama task artifacts`. The field is absent without artifact access.
 - **Errors.** JSON on stderr: `{"error":{"code","message","status","hint"}}` (plain text in a terminal), and a stable exit code:
 
   | exit | code | |
