@@ -62,10 +62,10 @@ import { Viewport } from '../core/viewport';
       >Skip to content</a
     >
     <div hlmSidebarWrapper class="bg-sidebar h-svh min-h-0 overflow-hidden max-md:h-dvh">
-      <hlm-sidebar collapsible="offcanvas" variant="inset" mobileSide="bottom" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
+      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
         <app-sidebar />
       </hlm-sidebar>
-      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh md:h-[calc(100svh-1rem)]">
+      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh">
         <app-top-bar />
         @if (viewport.isMobile()) {
           <app-mobile-header />
@@ -88,7 +88,7 @@ import { Viewport } from '../core/viewport';
         <div class="grid grid-cols-3 gap-x-4 gap-y-1">
           @for (r of goRoutes; track r[0]) {
             <span class="flex items-center gap-2 px-1 text-xs">
-              <kbd class="border-border-strong bg-muted text-muted-foreground flex size-5 items-center justify-center rounded border font-mono text-[11px]">{{ r[0].toUpperCase() }}</kbd>
+              <kbd class="bg-muted text-muted-foreground flex size-5 items-center justify-center rounded font-mono text-[11px]">{{ r[0].toUpperCase() }}</kbd>
               {{ r[1].label }}
             </span>
           }

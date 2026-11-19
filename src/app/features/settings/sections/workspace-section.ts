@@ -34,7 +34,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
           </app-settings-row>
           <app-settings-row label="URL" description="Changing it moves everyone to the new address. Old links stop working." wide>
             <div class="border-input focus-within:ring-ring/50 focus-within:border-ring flex h-8 items-center overflow-hidden rounded-md border focus-within:ring-3">
-              <span class="text-muted-foreground bg-muted/50 flex h-full items-center border-r px-2 font-mono text-xs">{{ host }}/</span>
+              <span class="text-muted-foreground bg-muted flex h-full items-center px-2 font-mono text-xs">{{ host }}/</span>
               <input
                 class="h-full min-w-0 flex-1 bg-transparent px-2 font-mono text-xs outline-none disabled:opacity-50"
                 [value]="slugValue()"
@@ -141,8 +141,8 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
             role="radio"
             [attr.aria-checked]="scale() === d.id"
             [disabled]="!canAdmin() || savingScale()"
-            class="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-3 disabled:cursor-not-allowed"
-            [class]="scale() === d.id ? 'border-primary bg-accent/50' : 'border-border enabled:hover:border-border-strong enabled:hover:bg-hover'"
+            class="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-lg p-3 text-left outline-none transition-colors focus-visible:ring-3 disabled:cursor-not-allowed"
+            [class]="scale() === d.id ? 'bg-selected' : 'bg-secondary enabled:hover:bg-hover'"
             (click)="setScale(d.id)"
           >
             <span class="flex items-center gap-2">
@@ -152,7 +152,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
               }
               <span
                 class="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full border"
-                [class]="scale() === d.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border-strong'"
+                [class]="scale() === d.id ? 'bg-primary border-primary text-primary-foreground' : 'border-input'"
                 aria-hidden="true"
               >
                 @if (scale() === d.id) {

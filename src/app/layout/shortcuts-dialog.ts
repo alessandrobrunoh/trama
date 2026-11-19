@@ -37,7 +37,7 @@ function searchText(label: string, keys: string, alt?: string): string {
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="ui.closeModal()">
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="flex max-h-[85svh] flex-col gap-0 overflow-hidden p-0 sm:max-w-3xl">
-        <hlm-dialog-header class="border-b px-5 pt-4 pb-3">
+        <hlm-dialog-header class="px-5 pt-4 pb-3">
           <h2 hlmDialogTitle class="flex items-center gap-2 text-sm font-semibold">
             <svg [lucideIcon]="keyboard" [size]="15" class="text-muted-foreground"></svg>
             Keyboard shortcuts
@@ -46,7 +46,7 @@ function searchText(label: string, keys: string, alt?: string): string {
           <div class="relative mt-3">
             <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
             <input
-              class="bg-background border-border focus-visible:border-border-strong h-8 w-full rounded-md border pr-2 pl-8 text-[13px] outline-none"
+              class="bg-secondary focus-visible:ring-ring/50 h-8 w-full rounded-md pr-2 pl-8 text-[13px] outline-none focus-visible:ring-2"
               placeholder="Search shortcuts…"
               aria-label="Search shortcuts"
               autocomplete="off"
@@ -65,7 +65,7 @@ function searchText(label: string, keys: string, alt?: string): string {
                   <h3 class="text-muted-foreground mb-1 text-xs font-medium">{{ g.title }}</h3>
                   <ul>
                     @for (i of g.items; track i.label + i.keys) {
-                      <li class="border-border flex min-h-8 items-center justify-between gap-3 border-b text-[13px] last:border-b-0">
+                      <li class="flex min-h-8 items-center justify-between gap-3 text-[13px]">
                         <span class="min-w-0 truncate">{{ i.label }}</span>
                         <span class="flex shrink-0 items-center gap-1.5">
                           <app-kbd [keys]="i.keys" />
@@ -88,7 +88,7 @@ function searchText(label: string, keys: string, alt?: string): string {
           }
         </div>
 
-        <div class="text-muted-foreground flex h-9 shrink-0 items-center gap-3 border-t px-5 text-xs">
+        <div class="text-muted-foreground flex h-9 shrink-0 items-center gap-3 px-5 text-xs">
           <span>Single-key shortcuts are ignored while you type in a field.</span>
           <span class="ml-auto flex items-center gap-1 max-sm:hidden"><app-kbd keys="mod+k" /> command palette</span>
         </div>

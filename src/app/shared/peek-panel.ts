@@ -33,12 +33,12 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
   template: `
     @if (peek.open()) {
       <aside
-        class="bg-background border-border-strong absolute inset-y-0 right-0 z-30 flex w-full flex-col border-l shadow-[var(--shadow-menu)] sm:w-[26rem]"
+        class="bg-popover absolute inset-y-0 right-0 z-30 flex w-full flex-col shadow-[var(--shadow-menu)] sm:w-[26rem]"
         role="complementary"
         aria-label="Preview"
         data-testid="peek-panel"
       >
-        <div class="flex h-10 shrink-0 items-center gap-2 border-b pr-1.5 pl-4 text-xs">
+        <div class="flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-4 text-xs">
           <span class="text-muted-foreground">Preview</span>
           <span class="text-muted-foreground ml-auto flex items-center gap-1 max-sm:hidden"><app-kbd keys="j k" /> next / previous</span>
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground" aria-label="Close preview" (click)="peek.close()">
@@ -73,7 +73,7 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
                 <dt class="text-muted-foreground">Labels</dt>
                 <dd class="flex flex-wrap gap-1">
                   @for (l of labels(i.labels); track l.id) {
-                    <span class="border-border-strong inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs">
+                    <span class="bg-foreground/[0.06] inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs">
                       <span class="size-2 rounded-full" [style.background]="l.color"></span>{{ l.name }}
                     </span>
                   }
@@ -83,15 +83,9 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
               <dd class="text-muted-foreground">{{ date(i.updatedAt) }}</dd>
             </dl>
             @if (i.body) {
-              <div class="mt-5 border-t pt-4 text-[13px]"><app-markdown [source]="i.body" [link]="refs.linker()" /></div>
+              <div class="mt-5 text-[13px]"><app-markdown [source]="i.body" [link]="refs.linker()" /></div>
             } @else {
-              <p class="text-muted-foreground mt-5 border-t pt-4 text-[13px]">No description.</p>
-            }
-            @if (i.goal) {
-              <div class="mt-4 border-t pt-4">
-                <h3 class="text-muted-foreground mb-1 text-xs font-medium">Goal</h3>
-                <div class="text-[13px]"><app-markdown [source]="i.goal" [link]="refs.linker()" /></div>
-              </div>
+              <p class="text-muted-foreground mt-5 text-[13px]">No description.</p>
             }
           </div>
         } @else {
@@ -99,7 +93,7 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
         }
 
         @if (issue()) {
-          <div class="flex h-11 shrink-0 items-center gap-1 border-t px-2">
+          <div class="flex h-11 shrink-0 items-center gap-1 px-2">
             <button hlmBtn size="sm" class="h-7 gap-1.5" (click)="open()">
               <svg [lucideIcon]="openIcon" [size]="13"></svg>Open <app-kbd keys="enter" class="opacity-70" />
             </button>

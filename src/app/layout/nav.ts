@@ -4,13 +4,10 @@ import {
   LucideBox,
   LucideChartColumn,
   LucideCircleDot,
-  LucideFileText,
   LucideLayers,
-  LucideLayoutDashboard,
   LucideMessageSquare,
   LucidePlug,
   LucideTimer,
-  LucideUserRoundCheck,
   type LucideIcon,
 } from '@lucide/angular';
 
@@ -29,8 +26,8 @@ export interface NavItem {
 }
 
 /**
- * The five places people live in, always visible at the top of the sidebar.
- * Inbox merges what used to be My Attention and Notifications.
+ * The places people live in, always visible at the top of the sidebar.
+ * Inbox merges what used to be My Attention, Notifications and My Work.
  */
 export const PRIMARY_NAV: NavItem[] = [
   {
@@ -39,16 +36,8 @@ export const PRIMARY_NAV: NavItem[] = [
     icon: LucideInbox,
     keys: 'g a',
     badge: 'inbox',
-    hint: 'Everything waiting on you: questions, reviews, blockers, mentions and updates',
-    keywords: 'attention notifications needs you updates unread',
-  },
-  {
-    segment: 'my-work',
-    label: 'My work',
-    icon: LucideUserRoundCheck,
-    keys: 'g m',
-    hint: 'Tasks assigned to you or reported by you',
-    keywords: 'issues',
+    hint: 'What needs you, your tasks and what changed: reviews, blockers, mentions and updates',
+    keywords: 'attention notifications needs you updates unread my work my tasks assigned overview',
   },
   {
     segment: 'tasks',
@@ -78,20 +67,6 @@ export const MORE_NAV: NavItem[] = [
     hint: 'Start, stop, or add your own time. It stays in Trama.',
   },
   {
-    segment: 'overview',
-    label: 'Overview',
-    icon: LucideLayoutDashboard,
-    keys: 'g o',
-    hint: 'What is in flight across the workspace',
-  },
-  {
-    segment: 'documents',
-    label: 'Documents',
-    icon: LucideFileText,
-    keys: 'g u',
-    hint: 'Specs, plans and notes',
-  },
-  {
     segment: 'views',
     label: 'Views',
     icon: LucideLayers,
@@ -111,7 +86,7 @@ export const MORE_NAV: NavItem[] = [
     label: 'Statistics',
     icon: LucideChartColumn,
     keys: 'g y',
-    hint: 'Throughput, health and trends',
+    hint: 'Finished work, work in progress and estimates',
   },
   {
     segment: 'assistant',
@@ -147,17 +122,14 @@ export function orderNav(items: readonly NavItem[], order: readonly string[]): N
 
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
-  overview: 'Overview',
   timer: 'Timer',
   stats: 'Statistics',
   inbox: 'Inbox',
-  'my-work': 'My work',
   assistant: 'Assistant',
   connect: 'Connect your agent',
   tasks: 'Tasks',
   issues: 'Tasks',
   projects: 'Projects',
-  documents: 'Documents',
   views: 'Views',
   activity: 'Activity',
   settings: 'Settings',
@@ -168,7 +140,6 @@ export const SECTIONS_WITH_LIST = new Set([
   'tasks',
   'issues',
   'projects',
-  'documents',
   'views',
   'settings',
 ]);

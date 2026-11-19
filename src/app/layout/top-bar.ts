@@ -20,7 +20,7 @@ import { ALL_NAV, SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
   imports: [NgTemplateOutlet, RouterLink, LucideDynamicIcon, HlmSidebarTrigger, FavoriteButton],
   host: {
     class:
-      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 border-b px-3 max-md:hidden md:rounded-t-lg',
+      'bg-background sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2 px-3 max-md:hidden',
   },
   template: `
     @if (!viewport.isMobile()) {

@@ -11,7 +11,6 @@ import {
   LucideActivity,
   LucideBot,
   LucideDynamicIcon,
-  LucideFileText,
   LucideFlag,
   LucideBox,
   LucideDiamond,
@@ -32,11 +31,11 @@ import {
   TramaStore,
   type DomainEvent,
   type IssueStatus,
-} from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { EntityChip, type EntityChipType } from '../../shared/entity-chip';
-import { FullDatePipe } from '../../shared/pipes';
-import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
+} from '../core';
+import { ActorAvatar } from './actor-avatar';
+import { EntityChip, type EntityChipType } from './entity-chip';
+import { FullDatePipe } from './pipes';
+import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 import { AgoPipe } from './ago';
 
 /** Coarse event family, used by the Activity page filters. */
@@ -55,7 +54,6 @@ export function eventCategory(e: DomainEvent): EventCategory {
     case 'issue':
       return 'issue';
     case 'artifact':
-    case 'document':
     case 'review':
       return 'artifact';
     case 'comment':
@@ -180,25 +178,6 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         verb: 'requested review on',
         text: [str(d['externalId']), str(d['title'])].filter(Boolean).join(' ') || 'a pull request',
       };
-    case 'document.created':
-    case 'document.updated':
-    case 'document.archived':
-    case 'document.restored':
-    case 'document.deleted': {
-      const verbs: Record<string, string> = {
-        created: 'created document',
-        updated: 'edited document',
-        archived: 'archived document',
-        restored: 'restored document',
-        deleted: 'deleted document',
-      };
-      return {
-        icon: LucideFileText,
-        verb: verbs[e.type.split('.')[1]],
-        text: str(d['title']),
-        link: e.type !== 'document.deleted' ? ['/', slug, 'documents', e.subject.id] : undefined,
-      };
-    }
     case 'issue.created':
       return { icon: LucideInbox, verb: 'reported', subject: issueRef() };
     case 'issue.updated':
@@ -307,7 +286,7 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         <span class="font-medium">{{ actorName() }}</span>
         @if (isAgent()) {
           <span
-            class="text-muted-foreground border-border-strong inline-flex h-4 items-center gap-0.5 rounded border px-1 text-[10px] leading-none"
+            class="text-muted-foreground bg-secondary inline-flex h-4 items-center gap-0.5 rounded px-1 text-[10px] leading-none"
           >
             <svg [lucideIcon]="bot" [size]="9" [strokeWidth]="2"></svg>agent
           </span>

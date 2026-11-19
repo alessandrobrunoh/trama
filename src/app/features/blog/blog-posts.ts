@@ -27,7 +27,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
     slug: 'trama-vs-trello-jira-linear',
     title: 'Trama vs Trello, Jira and Linear: why another issue tracker?',
     description:
-      'Trello, Jira and Linear are excellent at tracking tickets. Trama keeps work Issue-first, with optional Goals, Plans and Documents and human input requests in Question or Decision mode.',
+      'Trello, Jira and Linear are excellent at tracking tickets. Trama keeps work task-first, with human input requests in Question or Decision mode.',
     date: '2026-10-08',
     readingMinutes: 8,
     tag: 'Comparison',
@@ -102,14 +102,14 @@ export const BLOG_POSTS: readonly BlogPost[] = [
         type: 'list',
         items: [
           '<strong>Issues</strong> describe demand: the bug, the request, the incident.',
-          '<strong>Optional Goals</strong> state a desired outcome without replacing the Issue as the unit of work. Plans and Documents can add context when useful.',
+          '<strong>Tasks stay the unit of work</strong>: every task keeps its own status, estimate, pull requests and tracked time.',
           '<strong>Decisions</strong> preserve the why: proposed, accepted or superseded, linked to the work they shaped.',
-          '<strong>Artifacts</strong> show what was delivered: pull requests, documents and releases, with CI and review state, traced back to the issues they addressed.',
+          '<strong>Artifacts</strong> show what was delivered: pull requests, builds and releases, with CI and review state, traced back to the issues they addressed.',
         ],
       },
       {
         type: 'p',
-        html: 'Two principles follow from that. First, <strong>Issues stay granular</strong>: each tracks a unit of work, while a Goal is optional context for the desired outcome. Second, <strong>agents work alongside people</strong>: they can ask humans for input in Question or Decision mode, and use API tokens scoped per resource and action, with usage caps.',
+        html: 'Two principles follow from that. First, <strong>Tasks stay granular</strong>: each tracks a unit of work. Second, <strong>agents work alongside people</strong>: they can ask humans for input in Question or Decision mode, and use API tokens scoped per resource and action, with usage caps.',
       },
       { type: 'h2', id: 'side-by-side', text: 'Side by side' },
       { type: 'comparison' },
@@ -120,7 +120,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       { type: 'h2', id: 'switching', text: 'Do I have to switch everything?' },
       {
         type: 'p',
-        html: 'No. Trama is designed for gradual adoption. Start with an issue and add an optional Goal, Plan or Document only when useful. Issues can arrive from the API, email, GitHub, GitLab or an agent. The current model keeps Issues as granular units of work.',
+        html: 'No. Trama is designed for gradual adoption. Start with a task. Tasks can arrive from the API, email, GitHub, GitLab or an agent. The current model keeps tasks as granular units of work.',
       },
       { type: 'h2', id: 'summary', text: 'The short version' },
       {
@@ -138,7 +138,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
     slug: 'introducing-trama',
     title: 'Introducing Trama',
     description:
-      'A historical launch announcement introducing Trama’s original model. Today, Issues are granular units of work with optional Goals, Plans and Documents.',
+      'A historical launch announcement introducing Trama’s original model. Today, tasks are granular units of work.',
     date: '2026-10-06',
     readingMinutes: 6,
     tag: 'Announcement',
@@ -189,7 +189,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       },
       {
         type: 'p',
-        html: '<strong>Artifacts</strong> are what the work produced: pull requests, documents, designs, builds and releases, with their CI and review state. They are traced back to the issues they addressed, so you can always answer <em>why does this PR exist, and what did it fix?</em>',
+        html: '<strong>Artifacts</strong> are what the work produced: pull requests, builds and releases, with their CI and review state. They are traced back to the issues they addressed, so you can always answer <em>why does this PR exist, and what did it fix?</em>',
       },
       { type: 'h2', id: 'facts', text: 'Facts, not fake progress' },
       {
@@ -221,7 +221,7 @@ export const BLOG_POSTS: readonly BlogPost[] = [
       },
       {
         type: 'p',
-        html: 'The product model has since changed: Issues are granular units of work, Goals are optional desired outcomes, and Plans or Documents add context only when useful. Human input requests use Question or Decision mode. For a current comparison, read <a href="/blog/trama-vs-trello-jira-linear">Trama vs Trello, Jira and Linear</a>.',
+        html: 'The product model has since changed: tasks are granular units of work, and the product no longer has Goals, Plans or Documents. Human input requests use Question or Decision mode. For a current comparison, read <a href="/blog/trama-vs-trello-jira-linear">Trama vs Trello, Jira and Linear</a>.',
       },
     ],
   },

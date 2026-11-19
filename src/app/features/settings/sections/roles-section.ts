@@ -8,6 +8,7 @@ import {
   untracked,
 } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   CAPABILITIES,
@@ -34,7 +35,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmCheckbox, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -141,13 +142,12 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
               </div>
               @for (cap of capsIn(group); track cap) {
                 <label class="flex items-start gap-2 py-1.5">
-                  <input
-                    type="checkbox"
-                    class="accent-primary mt-0.5 size-4 cursor-pointer disabled:cursor-default"
+                  <hlm-checkbox
+                    class="mt-0.5"
                     [checked]="hasCap(role, cap)"
                     [disabled]="!isOwner() || busy() || locked(role, cap)"
-                    [attr.aria-label]="meta(cap).label"
-                    (change)="toggleCap(role, cap, $any($event.target).checked)"
+                    [aria-label]="meta(cap).label"
+                    (checkedChange)="toggleCap(role, cap, $event)"
                   />
                   <span class="min-w-0">
                     <span class="block text-[13px] font-medium">{{ meta(cap).label }}</span>

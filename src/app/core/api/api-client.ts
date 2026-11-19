@@ -19,9 +19,6 @@ import type {
   Comment,
   CommentPage,
   SnapshotCommentsMode,
-  Document,
-  DocumentRevision,
-  DocumentSummary,
   DomainEvent,
   Favorite,
   ImportCredential,
@@ -35,19 +32,13 @@ import type {
   NotificationSettings,
   InviteLink,
   InvitePreview,
-  InsightSignal,
-  InsightSignalId,
-  InsightsReport,
   Issue,
-  IssueContext,
   Membership,
   Milestone,
   OutgoingWebhook,
   Project,
   ProjectAiKind,
   ProjectAiResult,
-  ProjectContext,
-  ProjectUpdate,
   Role,
   PublicView,
   SavedView,
@@ -67,10 +58,6 @@ import type {
   AttentionQuery,
   CreateAgentInput,
   CreateCommentInput,
-  CreateDocumentInput,
-  DocumentOwnerInput,
-  DocumentsQuery,
-  UpdateDocumentInput,
   CreateInviteInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
@@ -80,26 +67,21 @@ import type {
   IntegrationDetail,
   IntegrationWithWebhook,
   UpdateIntegrationInput,
-  CreateOwnedArtifactInput,
   CreateProjectInput,
-  CreateProjectUpdateInput,
   CreateTokenInput,
   CreatedToken,
   CreateViewInput,
   InviteViewInput,
   CreateWorkspaceInput,
   EventsQuery,
-  InsightsQuery,
   LoginInput,
   MeResponse,
   SearchResults,
   SignupInput,
   UpdateAgentInput,
-  UpdateArtifactInput,
   UpdateIssueInput,
   UpdateMemberInput,
   UpdateProjectInput,
-  UpdateProjectUpdateInput,
   UpdateViewInput,
   UpdateWorkspaceInput,
   CreateLabelInput,
@@ -116,6 +98,8 @@ import type {
   LinkLunaGestProjectInput,
   LinkLunaGestTaskInput,
   LunaGestConnection,
+  LunaGestImportResult,
+  LunaGestImportableProject,
   LunaGestIssueLink,
   LunaGestRemoteTask,
   LunaGestConnectionConfigured,
@@ -393,42 +377,6 @@ export class ApiClient {
 
   // ───────────────────────── domain ─────────────────────────
 
-  /** Markdown documents of the workspace, with revisions; attached to work through `document` artifacts. */
-  readonly documents = {
-    list: (slug: string, query: DocumentsQuery = {}) =>
-      this.get<DocumentSummary[]>(`${this.w(slug)}/documents`, { ...query }),
-    get: (slug: string, id: ID) =>
-      this.get<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
-    create: (slug: string, input: CreateDocumentInput) =>
-      this.post<Document>(`${this.w(slug)}/documents`, input),
-    /** 409 (`ApiError.body.current`) when `baseVersion` is stale. */
-    update: (slug: string, id: ID, input: UpdateDocumentInput, o?: RequestOptions) =>
-      this.patch<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}`, input, o),
-    remove: (slug: string, id: ID) =>
-      this.del(`${this.w(slug)}/documents/${encodeURIComponent(id)}`),
-    archive: (slug: string, id: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/archive`),
-    restore: (slug: string, id: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/restore`),
-    revisions: (slug: string, id: ID) =>
-      this.get<DocumentRevision[]>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions`),
-    revision: (slug: string, id: ID, version: number) =>
-      this.get<DocumentRevision>(
-        `${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}`,
-      ),
-    restoreRevision: (slug: string, id: ID, version: number, baseVersion: number) =>
-      this.post<Document>(
-        `${this.w(slug)}/documents/${encodeURIComponent(id)}/revisions/${version}/restore`,
-        { baseVersion },
-      ),
-    attach: (slug: string, id: ID, owner: DocumentOwnerInput) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/attach`, owner),
-    detach: (slug: string, id: ID, artifactId: ID) =>
-      this.post<Document>(`${this.w(slug)}/documents/${encodeURIComponent(id)}/detach`, {
-        artifactId,
-      }),
-  };
-
   readonly projects = {
     list: (slug: string) => this.get<Project[]>(`${this.w(slug)}/projects`),
     get: (slug: string, id: ID) => this.get<Project>(`${this.w(slug)}/projects/${id}`),
@@ -437,46 +385,15 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateProjectInput) =>
       this.patch<Project>(`${this.w(slug)}/projects/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/projects/${id}`),
-    /** Status posts, newest first. */
-    updates: {
-      list: (slug: string, projectId: ID) =>
-        this.get<ProjectUpdate[]>(`${this.w(slug)}/projects/${projectId}/updates`),
-      get: (slug: string, projectId: ID, id: ID) =>
-        this.get<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
-      create: (slug: string, projectId: ID, input: CreateProjectUpdateInput) =>
-        this.post<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates`, input),
-      update: (slug: string, projectId: ID, id: ID, input: UpdateProjectUpdateInput) =>
-        this.patch<ProjectUpdate>(`${this.w(slug)}/projects/${projectId}/updates/${id}`, input),
-      remove: (slug: string, projectId: ID, id: ID) =>
-        this.del(`${this.w(slug)}/projects/${projectId}/updates/${id}`),
-    },
-    /** The project, its issues, artifacts and updates. */
-    context: (slug: string, projectId: ID) =>
-      this.get<ProjectContext>(`${this.w(slug)}/projects/${projectId}/context`),
-    /** The same context rendered as markdown (for agents / copy). */
-    contextMarkdown: (slug: string, projectId: ID) =>
-      this.request<string>('GET', `${this.w(slug)}/projects/${projectId}/context.md`, {
-        text: true,
-        accept: 'text/markdown',
-      }),
     /** AI suggestion; the `kind` of the result matches the requested one. */
     ai: (slug: string, projectId: ID, kind: ProjectAiKind) =>
       this.post<ProjectAiResult>(`${this.w(slug)}/projects/${projectId}/ai/${kind}`),
-    /** Artifacts attached to the project itself (use `context` for the whole tree). */
-    artifacts: {
-      list: (slug: string, projectId: ID) =>
-        this.get<Artifact[]>(`${this.w(slug)}/projects/${projectId}/artifacts`),
-      create: (slug: string, projectId: ID, input: CreateOwnedArtifactInput) =>
-        this.post<Artifact>(`${this.w(slug)}/projects/${projectId}/artifacts`, input),
-    },
   };
 
   readonly issues = {
     list: (slug: string) => this.get<Issue[]>(`${this.w(slug)}/tasks`),
     get: (slug: string, idOrKey: string) =>
       this.get<Issue>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}`),
-    context: (slug: string, idOrKey: string) =>
-      this.get<IssueContext>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/context`),
     create: (slug: string, input: CreateIssueInput) =>
       this.post<Issue>(`${this.w(slug)}/tasks`, input),
     update: (slug: string, id: ID, input: UpdateIssueInput) =>
@@ -500,15 +417,6 @@ export class ApiClient {
       unlink: (slug: string, idOrKey: string) =>
         this.del<Issue>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/external-ref`),
     },
-    artifacts: {
-      list: (slug: string, idOrKey: string) =>
-        this.get<Artifact[]>(`${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/artifacts`),
-      create: (slug: string, idOrKey: string, input: CreateOwnedArtifactInput) =>
-        this.post<Artifact>(
-          `${this.w(slug)}/tasks/${encodeURIComponent(idOrKey)}/artifacts`,
-          input,
-        ),
-    },
   };
 
   readonly milestones = {
@@ -526,9 +434,6 @@ export class ApiClient {
 
   readonly artifacts = {
     list: (slug: string) => this.get<Artifact[]>(`${this.w(slug)}/artifacts`),
-    update: (slug: string, id: ID, input: UpdateArtifactInput) =>
-      this.patch<Artifact>(`${this.w(slug)}/artifacts/${id}`, input),
-    remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/artifacts/${id}`),
   };
 
   readonly uploads = {
@@ -544,14 +449,11 @@ export class ApiClient {
         markdown: string;
       }>(`${this.w(slug)}/uploads`, file),
     /** Attach the file as an image or file artifact. The URL form is unchanged. */
-    attach: (slug: string, target: { type: 'issue' | 'project'; id: string }, file: File) => {
-      const id = encodeURIComponent(target.id);
-      const path =
-        target.type === 'issue'
-          ? `${this.w(slug)}/tasks/${id}/artifacts/upload`
-          : `${this.w(slug)}/projects/${id}/artifacts/upload`;
-      return this.postForm<Artifact>(path, file);
-    },
+    attach: (slug: string, target: { type: 'issue'; id: string }, file: File) =>
+      this.postForm<Artifact>(
+        `${this.w(slug)}/tasks/${encodeURIComponent(target.id)}/artifacts/upload`,
+        file,
+      ),
     discard: (slug: string, id: string, o?: RequestOptions) =>
       this.del(`${this.w(slug)}/uploads/${encodeURIComponent(id)}`, o),
   };
@@ -584,15 +486,6 @@ export class ApiClient {
   readonly events = {
     list: (slug: string, query: EventsQuery = {}) =>
       this.get<DomainEvent[]>(`${this.w(slug)}/events`, { ...query }),
-  };
-
-  readonly insights = {
-    /** Health signals, flow metrics and agent failure signals (GET /insights). */
-    report: (slug: string, query: InsightsQuery = {}) =>
-      this.get<InsightsReport>(`${this.w(slug)}/insights`, { ...query }),
-    /** One signal with up to `limit` items: what a health tile drills into. */
-    signal: (slug: string, id: InsightSignalId, query: InsightsQuery = {}) =>
-      this.get<InsightSignal>(`${this.w(slug)}/insights/signals/${id}`, { ...query }),
   };
 
   readonly attention = {
@@ -709,6 +602,18 @@ export class ApiClient {
       );
       return Array.isArray(res) ? res : (res.projects ?? []);
     },
+    /** Remote projects with their task count and whether each is already bound to a Trama project. */
+    importable: async (slug: string, o?: RequestOptions): Promise<LunaGestImportableProject[]> => {
+      const res = await this.get<{ projects: LunaGestImportableProject[] }>(
+        `${this.w(slug)}/lunagest/import/projects`,
+        undefined,
+        o,
+      );
+      return res.projects ?? [];
+    },
+    /** Idempotent: projects and tasks that are already bound are reused. At most 25 projects per call. */
+    importProjects: (slug: string, remoteProjectIds: string[], o?: RequestOptions) =>
+      this.post<LunaGestImportResult>(`${this.w(slug)}/lunagest/import`, { remoteProjectIds }, o),
     project: (slug: string, projectId: ID, o?: RequestOptions) =>
       this.get<LunaGestProjectLink>(`${this.w(slug)}/projects/${projectId}/lunagest`, undefined, o),
     linkProject: (

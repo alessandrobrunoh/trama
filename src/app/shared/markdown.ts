@@ -348,7 +348,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
             /></del>
           }
           @case ('image') {
-            <img [src]="n.href" [alt]="n.alt" class="my-2 max-h-96 max-w-full rounded-md border" />
+            <img [src]="n.href" [alt]="n.alt" class="my-2 max-h-96 max-w-full rounded-md" />
           }
           @case ('link') {
             @if (isUpload(n.href)) {
@@ -417,7 +417,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           }
           @case ('ul') {
             @if (b.entities) {
-              <div class="bg-card my-2 divide-y overflow-hidden rounded-lg border">
+              <div class="bg-card my-2 overflow-hidden rounded-lg">
                 @for (it of b.items; track $index) {
                   <app-entity-row [token]="lead(it.inline)!" [trailText]="text(trail(it.inline))">
                     <ng-container
@@ -462,7 +462,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           }
           @case ('ol') {
             @if (b.entities) {
-              <div class="bg-card my-2 divide-y overflow-hidden rounded-lg border">
+              <div class="bg-card my-2 overflow-hidden rounded-lg">
                 @for (it of b.items; track $index) {
                   <app-entity-row [token]="lead(it.inline)!" [trailText]="text(trail(it.inline))">
                     <ng-container
@@ -483,9 +483,9 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
             }
           }
           @case ('table') {
-            <div class="bg-card my-3 overflow-x-auto rounded-lg border">
+            <div class="bg-card my-3 overflow-x-auto rounded-lg">
               <table class="w-full border-collapse text-[13px]">
-                <thead class="bg-muted/40 text-muted-foreground">
+                <thead class="text-muted-foreground">
                   <tr>
                     @for (h of b.head; track $index) {
                       <th
@@ -497,7 +497,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
                     }
                   </tr>
                 </thead>
-                <tbody class="divide-y">
+                <tbody>
                   @for (row of b.rows; track $index) {
                     <tr class="hover:bg-accent/40 transition-colors">
                       @for (cell of row; track $index) {
@@ -521,7 +521,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
           }
           @case ('code') {
             <pre
-              class="bg-muted my-3 overflow-x-auto rounded-md border px-3 py-2 font-mono text-xs leading-relaxed"
+              class="bg-muted my-3 overflow-x-auto rounded-md px-3 py-2 font-mono text-xs leading-relaxed"
             ><code>{{ b.v }}</code></pre>
           }
           @case ('quote') {

@@ -74,7 +74,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <div class="border-sidebar-border flex items-center gap-2 border-b px-5 py-4 md:hidden">
+    <div class="flex items-center gap-2 px-5 py-4 md:hidden">
       <button
         type="button"
         class="hover:bg-sidebar-accent flex min-w-0 flex-1 items-center gap-3 rounded-2xl px-2 py-2 text-start"
@@ -129,7 +129,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         </button>
         <button
           type="button"
-          class="bg-background border-sidebar-border text-foreground hover:bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-md border shadow-xs outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-8 shrink-0 items-center justify-center rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           [hlmDropdownMenuTrigger]="createMenu"
           align="end"
           hlmTooltip="Create  C"
@@ -328,7 +328,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         }
       </div>
 
-      <div class="mt-4 border-t border-sidebar-border pt-2 md:hidden">
+      <div class="mt-4 pt-2 md:hidden">
         <button
           type="button"
           hlmSidebarMenuButton
@@ -345,7 +345,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     <!-- footer: user menu + help -->
     <div
       hlmSidebarFooter
-      class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden"
+      class="flex-row items-center gap-1 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] max-md:hidden"
     >
       <button
         type="button"
@@ -700,7 +700,7 @@ export class AppSidebar {
 
   protected showChecklist(): void {
     this.ui.requestChecklist();
-    this.go(['/', this.slug(), 'overview']);
+    this.go(['/', this.slug(), 'inbox']);
   }
 
   protected go(commands: string[]): void {

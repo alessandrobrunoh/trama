@@ -29,7 +29,7 @@ import { SiteHeader } from '../landing/site-header';
       </h1>
       <p class="text-muted-foreground mt-4 max-w-xl text-[15px] leading-relaxed">
         Release history, newest first; each entry describes Trama as it was when that change shipped.
-        Today, Tasks are granular units of work, with optional Goals, Plans and Documents.
+        Today, Tasks are granular units of work.
       </p>
       <a
         routerLink="/roadmap"
@@ -40,7 +40,7 @@ import { SiteHeader } from '../landing/site-header';
 
       <ol class="mt-14 flex flex-col">
         @for (entry of entries; track entry.title) {
-          <li class="border-border grid gap-4 border-t py-10 sm:grid-cols-[10rem_1fr] sm:gap-8">
+          <li class="grid gap-4 py-10 sm:grid-cols-[10rem_1fr] sm:gap-8">
             <time [attr.datetime]="entry.date" class="text-muted-foreground text-[13px] sm:pt-1.5">
               {{ entry.date | date: 'MMMM d, y' }}
             </time>
@@ -66,7 +66,7 @@ import { SiteHeader } from '../landing/site-header';
         }
       </ol>
 
-      <section class="border-border mt-12 border-t pt-8">
+      <section class="mt-12 pt-8">
         <h2 class="text-2xl font-semibold tracking-[-0.02em]">Completed tasks</h2>
         <p class="text-muted-foreground mt-2 text-[14px] leading-relaxed">
           Tasks currently marked done in the Trama project.

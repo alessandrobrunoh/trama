@@ -12,15 +12,15 @@ import {
   type Priority,
 } from '../../core';
 import { IssueKindLabel } from '../../shared/issue';
-import { AgoPipe } from '../overview/ago';
+import { AgoPipe } from '../../shared/ago';
 import { IssueStatusMenu, PriorityMenu } from './inline-menus';
 
 const ROW =
-  'group/row hover:bg-hover data-[focused]:bg-accent/70 flex h-9 items-center gap-2.5 border-b border-border/60 px-4 outline-none sm:px-6';
+  'group/row hover:bg-hover data-[focused]:bg-selected flex min-h-8 items-center gap-2.5 px-4 outline-none sm:px-6';
 
-/** My issue: priority · status · type · key · title · updated. */
+/** One of my tasks: priority · status · key · title · type · updated. */
 @Component({
-  selector: 'app-my-issue-row',
+  selector: 'app-my-task-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink, HlmTooltip, IssueStatusMenu, PriorityMenu, IssueKindLabel, AgoPipe],
   host: { class: 'block' },
@@ -38,18 +38,20 @@ const ROW =
     </div>
   `,
 })
-export class MyIssueRow {
+export class MyTaskRow {
   private readonly store = inject(TramaStore);
   private readonly notifier = inject(Notifier);
   readonly issue = input.required<Issue>();
   readonly focused = input(false);
+  /** Mute the title (idle tasks). Done and canceled tasks are always muted. */
+  readonly dim = input(false);
 
   protected readonly row = ROW;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly quiet = computed(() => {
     const s = this.issue().status;
-    return s === 'done' || s === 'canceled';
+    return this.dim() || s === 'done' || s === 'canceled';
   });
   protected async setStatus(status: string): Promise<void> {
     const i = this.issue();

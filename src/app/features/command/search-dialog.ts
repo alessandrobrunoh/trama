@@ -11,7 +11,7 @@ import { COMMAND_DIALOG_CLASS, CommandPanel } from './command-panel';
   template: `
     <hlm-command-dialog
       title="Search"
-      description="Search tasks, projects and artifacts."
+      description="Search tasks and projects."
       [state]="open() ? 'open' : 'closed'"
       (stateChange)="onState($event)"
       [dialogContentClass]="dialogClass"

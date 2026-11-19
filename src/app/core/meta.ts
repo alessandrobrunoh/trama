@@ -9,7 +9,6 @@ import type {
   IssueKind,
   IssueStatus,
   Priority,
-  ProjectHealth,
   ProjectStatus,
   LegacyRole,
   ViewLayout,
@@ -38,13 +37,6 @@ export const PROJECT_STATUS_META: Record<ProjectStatus, Meta> = {
   paused: { label: 'Paused', tone: 'warning', order: 3 },
   completed: { label: 'Completed', tone: 'success', order: 4 },
   canceled: { label: 'Canceled', tone: 'muted', order: 5 },
-};
-
-/** Project health (set by whoever posts a project update). */
-export const PROJECT_HEALTH_META: Record<ProjectHealth, Meta> = {
-  on_track: { label: 'On track', tone: 'success', order: 0 },
-  at_risk: { label: 'At risk', tone: 'warning', order: 1 },
-  off_track: { label: 'Off track', tone: 'danger', order: 2 },
 };
 
 /** Layouts a saved view can use, in picker order. */

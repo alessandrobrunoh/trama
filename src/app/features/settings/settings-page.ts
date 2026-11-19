@@ -8,7 +8,6 @@ import {
   LucideBell,
   LucideDownload,
   LucideKeyboard,
-  LucideMoon,
   LucideShieldCheck,
   LucidePlug,
   LucideSlidersHorizontal,
@@ -27,7 +26,6 @@ import { AgentsSection } from './sections/agents-section';
 import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
 import { ImportSection } from './sections/import-section';
-import { LunagestSection } from './sections/lunagest-section';
 import { IntegrationsSection } from './sections/integrations-section';
 import { LabelsSection } from './sections/labels-section';
 import { StatusesSection } from './sections/statuses-section';
@@ -73,7 +71,6 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'tokens', label: 'API tokens', icon: LucideKeyRound },
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
       { id: 'import', label: 'Import', icon: LucideDownload },
-      { id: 'lunagest', label: 'LunaGest', icon: LucideMoon },
     ],
   },
 ];
@@ -84,6 +81,8 @@ const ALIASES: Record<string, string> = {
   general: 'workspace',
   account: 'profile',
   theme: 'appearance',
+  // LunaGest is one of the integrations now.
+  lunagest: 'integrations',
 };
 
 /**
@@ -113,14 +112,13 @@ const ALIASES: Record<string, string> = {
     LabelsSection,
     StatusesSection,
     ImportSection,
-    LunagestSection,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <app-page-header [title]="current()?.label ?? 'Settings'" />
     <div class="flex min-h-0 flex-1 flex-col md:flex-row">
       <nav
-        class="scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 md:w-56 md:flex-col md:gap-0 md:overflow-y-auto md:border-r md:border-b-0 md:px-3 md:py-6"
+        class="scrollbar-none flex shrink-0 gap-1 overflow-x-auto px-3 py-2 md:w-56 md:flex-col md:gap-0 md:overflow-y-auto md:px-3 md:py-6"
         aria-label="Settings sections"
       >
         @for (g of groups; track g.title; let first = $first) {
@@ -186,9 +184,6 @@ const ALIASES: Record<string, string> = {
             }
             @case ('import') {
               <app-import-section />
-            }
-            @case ('lunagest') {
-              <app-lunagest-section />
             }
             @default {
               <app-empty-state [icon]="warn" title="Unknown settings section" description="Pick a section from the list on the left." />

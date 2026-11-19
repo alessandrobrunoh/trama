@@ -157,7 +157,7 @@ export class PreferencesSection {
   }));
 
   protected setHome(value: string): void {
-    this.prefs.homeView.set(oneOf(value, HOME_VIEWS, 'overview'));
+    this.prefs.homeView.set(oneOf(value, HOME_VIEWS, 'inbox'));
   }
   protected setSendKey(value: string): void {
     this.prefs.sendKey.set(oneOf(value, SEND_KEYS, 'mod-enter'));

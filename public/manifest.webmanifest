@@ -35,10 +35,10 @@
       ]
     },
     {
-      "name": "My work",
-      "short_name": "My work",
+      "name": "My tasks",
+      "short_name": "My tasks",
       "description": "Tasks assigned to you",
-      "url": "/a/launch?go=my-work&source=shortcut",
+      "url": "/a/launch?go=my-tasks&source=shortcut",
       "icons": [
         {
           "src": "icons/icon-96x96.png",

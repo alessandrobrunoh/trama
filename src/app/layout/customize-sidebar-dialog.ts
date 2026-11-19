@@ -15,16 +15,29 @@ import {
   type SidebarSection,
   type SidebarVisibility,
 } from '../core/stores/ui.store';
+import { AppSelect, type Option } from '../shared/app-select';
 import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
-const SELECT_CLASS =
-  'text-muted-foreground hover:text-foreground h-7 cursor-pointer rounded-md border-0 bg-transparent px-1.5 text-[13px] outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const BADGE_OPTIONS: Option[] = [
+  { value: 'count', label: 'Count' },
+  { value: 'dot', label: 'Dot' },
+];
+const VISIBILITY_PLAIN: Option[] = [
+  { value: 'always', label: 'Always show' },
+  { value: 'hidden', label: 'Hide' },
+];
+const VISIBILITY_BADGED: Option[] = [
+  { value: 'always', label: 'Always show' },
+  { value: 'badged', label: 'Only when badged' },
+  { value: 'hidden', label: 'Hide' },
+];
 
 /** "Customize sidebar": badge style, and per entry whether it is shown, plus drag-to-reorder. */
 @Component({
   selector: 'app-customize-sidebar-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    AppSelect,
     HlmDialogImports,
     HlmButtonImports,
     LucideDynamicIcon,
@@ -50,15 +63,14 @@ const SELECT_CLASS =
             class="bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2 text-[13px]"
           >
             <label for="sidebar-badge-style" class="font-medium">Default badge style</label>
-            <select
-              id="sidebar-badge-style"
-              class="${SELECT_CLASS}"
+            <app-select
+              class="w-28"
+              size="sm"
+              controlId="sidebar-badge-style"
+              [options]="badgeOptions"
               [value]="ui.sidebarBadgeStyle()"
-              (change)="setBadgeStyle($any($event.target).value)"
-            >
-              <option value="count">Count</option>
-              <option value="dot">Dot</option>
-            </select>
+              (valueChange)="setBadgeStyle($any($event))"
+            />
           </div>
 
           @for (group of groups(); track group.section) {
@@ -89,18 +101,14 @@ const SELECT_CLASS =
                       class="text-muted-foreground shrink-0"
                     ></svg>
                     <span class="min-w-0 flex-1 truncate">{{ item.label }}</span>
-                    <select
-                      class="${SELECT_CLASS}"
-                      [attr.aria-label]="'Visibility of ' + item.label"
+                    <app-select
+                      class="w-40"
+                      size="sm"
+                      [label]="'Visibility of ' + item.label"
+                      [options]="item.badge ? visibilityBadged : visibilityPlain"
                       [value]="ui.sidebarVisibilityOf(item.segment)"
-                      (change)="setVisibility(item.segment, $any($event.target).value)"
-                    >
-                      <option value="always">Always show</option>
-                      @if (item.badge) {
-                        <option value="badged">Only when badged</option>
-                      }
-                      <option value="hidden">Hide</option>
-                    </select>
+                      (valueChange)="setVisibility(item.segment, $any($event))"
+                    />
                   </li>
                 }
               </ul>
@@ -108,7 +116,7 @@ const SELECT_CLASS =
           }
         </div>
 
-        <div class="flex h-12 shrink-0 items-center justify-between border-t px-5">
+        <div class="flex h-12 shrink-0 items-center justify-between px-5">
           <button
             hlmBtn
             variant="ghost"
@@ -127,6 +135,9 @@ const SELECT_CLASS =
 export class CustomizeSidebarDialog {
   protected readonly ui = inject(UiStore);
   protected readonly grip = LucideGripVertical;
+  protected readonly badgeOptions = BADGE_OPTIONS;
+  protected readonly visibilityPlain = VISIBILITY_PLAIN;
+  protected readonly visibilityBadged = VISIBILITY_BADGED;
   protected readonly open = computed(() => this.ui.modal() === 'customize-sidebar');
 
   protected readonly groups = computed<

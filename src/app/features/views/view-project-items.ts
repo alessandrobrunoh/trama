@@ -7,7 +7,6 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { ProjectHealthBadge } from '../projects/project-health';
 import { PROJECT_STATUS_META, isOverdue } from '../projects/project-model';
 
 @Directive()
@@ -21,18 +20,18 @@ abstract class ProjectItemBase {
   protected readonly overdue = computed(() => isOverdue(this.project()));
 }
 
-/** One dense list row: glyph · name · priority · status · health · lead · target date. */
+/** One dense list row: glyph · name · priority · status · lead · target date. */
 @Component({
   selector: 'app-view-project-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, ProjectHealthBadge],
+  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph],
   host: { class: 'block' },
   template: `
     @let p = project();
     <a
       [routerLink]="['/', slug(), 'projects', p.id]"
       [attr.data-row-id]="p.id"
-      class="hover:bg-hover focus-visible:bg-hover flex min-h-10 items-center gap-3 border-b px-4 py-1.5 outline-none sm:px-6"
+      class="hover:bg-hover focus-visible:bg-hover flex min-h-10 items-center gap-3 px-4 py-1.5 outline-none sm:px-6"
       [class.bg-selected]="focused()"
     >
       <app-project-glyph [project]="p" [size]="16" />
@@ -40,13 +39,6 @@ abstract class ProjectItemBase {
       <app-priority-icon [priority]="p.priority" class="max-md:hidden" />
       <span class="flex w-28 shrink-0 items-center gap-1.5 text-xs max-sm:hidden" [class]="status().text">
         <span class="size-2 shrink-0 rounded-full" [class]="status().dot"></span>{{ status().label }}
-      </span>
-      <span class="flex w-24 shrink-0 items-center max-md:hidden">
-        @if (p.health) {
-          <app-project-health [health]="p.health" [compact]="true" />
-        } @else {
-          <span class="text-muted-foreground text-xs" aria-label="No update yet">—</span>
-        }
       </span>
       <span class="flex w-6 shrink-0 justify-center max-sm:hidden">
         @if (p.leadId) {
@@ -61,19 +53,20 @@ abstract class ProjectItemBase {
 })
 export class ViewProjectRow extends ProjectItemBase {}
 
-/** Board card: glyph + name, then priority, health and the target date. */
+/** Board card: glyph + name, then priority and the target date. */
 @Component({
   selector: 'app-view-project-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, ProjectHealthBadge],
+  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph],
   host: { class: 'block' },
   template: `
     @let p = project();
     <a
       [routerLink]="['/', slug(), 'projects', p.id]"
       [attr.data-row-id]="p.id"
-      class="bg-card hover:border-foreground/25 block rounded-lg border p-2.5 transition-colors"
-      [class.border-primary]="focused()"
+      class="bg-card hover:bg-secondary block rounded-lg p-2.5 transition-colors"
+      [class.ring-1]="focused()"
+      [class.ring-ring]="focused()"
     >
       <span class="flex items-center gap-2">
         <app-project-glyph [project]="p" [size]="16" />
@@ -90,9 +83,6 @@ export class ViewProjectRow extends ProjectItemBase {}
         <span class="flex items-center gap-1.5 text-xs" [class]="status().text">
           <span class="size-2 shrink-0 rounded-full" [class]="status().dot"></span>{{ status().label }}
         </span>
-        @if (p.health) {
-          <app-project-health [health]="p.health" [compact]="true" />
-        }
         @if (p.targetDate) {
           <span class="text-muted-foreground ml-auto text-[11px] whitespace-nowrap" [class.text-status-blocked]="overdue()">{{ p.targetDate | fullDate }}</span>
         }

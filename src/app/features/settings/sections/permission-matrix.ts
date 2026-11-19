@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, model } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import {
   API_PERMISSIONS,
   API_RESOURCES,
@@ -22,7 +23,7 @@ const SENSITIVE: ApiPermission[] = ['tokens:write', 'members:write', 'members:de
 @Component({
   selector: 'app-permission-matrix',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports],
+  imports: [HlmButtonImports, HlmCheckbox],
   host: { class: 'flex flex-col gap-2' },
   template: `
     <div class="flex flex-wrap items-center gap-1.5">
@@ -35,27 +36,25 @@ const SENSITIVE: ApiPermission[] = ['tokens:write', 'members:write', 'members:de
       <span class="text-muted-foreground ml-auto text-xs">{{ value().length }} of {{ total }} selected</span>
     </div>
 
-    <div class="rounded-md border" role="group" aria-label="API permissions">
-      <div class="bg-muted/40 text-muted-foreground flex items-center gap-3 border-b px-3 py-1.5 text-[11px] font-medium uppercase">
+    <div class="bg-card overflow-hidden rounded-lg" role="group" aria-label="API permissions">
+      <div class="text-muted-foreground flex items-center gap-3 px-3 py-1.5 text-[11px] font-medium uppercase">
         <span class="flex-1">Resource</span>
         @for (c of columns; track c.id) {
           <span class="w-14 text-center">{{ c.label }}</span>
         }
       </div>
       @for (g of groups; track g.name) {
-        <div class="text-muted-foreground bg-muted/20 border-b px-3 py-1 text-[11px] font-medium">{{ g.name }}</div>
+        <div class="text-muted-foreground bg-muted px-3 py-1 text-[11px] font-medium">{{ g.name }}</div>
         @for (r of g.items; track r.id) {
-          <div class="flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
+          <div class="flex items-center gap-3 px-3 py-1.5">
             <span class="flex-1 text-[13px]">{{ r.label }}</span>
             @for (c of columns; track c.id) {
               <span class="flex w-14 justify-center">
                 @if (r.actions.includes(c.id)) {
-                  <input
-                    type="checkbox"
-                    class="accent-primary size-4 cursor-pointer"
+                  <hlm-checkbox
                     [checked]="has(r.id, c.id)"
-                    [attr.aria-label]="c.label + ' ' + r.label"
-                    (change)="toggle(r.id, c.id, $any($event.target).checked)"
+                    [aria-label]="c.label + ' ' + r.label"
+                    (checkedChange)="toggle(r.id, c.id, $event)"
                   />
                 }
               </span>

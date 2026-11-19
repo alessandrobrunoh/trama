@@ -30,7 +30,7 @@ const ACCESS: { id: Access; label: string; description: string }[] = [
   {
     id: 'contributor',
     label: 'Contributor (recommended)',
-    description: 'Read everything and create or update work: tasks, comments, documents and artifacts. Cannot delete, or touch members, tokens and integrations.',
+    description: 'Read everything and create or update work: tasks, comments and artifacts. Cannot delete, or touch members, tokens and integrations.',
   },
   { id: 'read-only', label: 'Read-only', description: 'Read every resource. The agent can look but never change anything.' },
 ];
@@ -70,7 +70,7 @@ const EXPIRY: Option[] = [
             Your role cannot create API tokens here. Ask an admin for a token, then continue with step 2 using the placeholder.
           </app-readonly-note>
         } @else if (secret(); as s) {
-          <div class="bg-card flex flex-col gap-3 rounded-lg border p-4">
+          <div class="bg-card flex flex-col gap-3 rounded-lg p-4">
             <p class="text-status-needs-input flex items-center gap-1.5 text-[13px] font-medium">
               <svg [lucideIcon]="warn" [size]="14"></svg>
               Copy this token now. You will not be able to see it again.
@@ -79,7 +79,7 @@ const EXPIRY: Option[] = [
             <p class="text-muted-foreground text-xs">The commands below already contain it. Manage or revoke it in <a class="underline underline-offset-2" [routerLink]="['/', slug(), 'settings', 'tokens']">Settings → API tokens</a>.</p>
           </div>
         } @else {
-          <form class="bg-card flex flex-col gap-4 rounded-lg border p-4" (submit)="create($event)">
+          <form class="bg-card flex flex-col gap-4 rounded-lg p-4" (submit)="create($event)">
             <label class="flex flex-col gap-1.5 text-[13px] font-medium">
               Name
               <input hlmInput class="h-8 text-[13px] font-normal" [value]="name()" (input)="rename($any($event.target).value)" placeholder="Claude Code on my laptop" />
@@ -90,8 +90,8 @@ const EXPIRY: Option[] = [
                 <button
                   type="button"
                   role="radio"
-                  class="hover:bg-accent rounded-md border px-3 py-2 text-left transition-colors"
-                  [class.border-primary]="level() === a.id"
+                  class="hover:bg-hover rounded-md px-3 py-2 text-left transition-colors"
+                  [class.bg-secondary]="level() !== a.id"
                   [class.bg-selected]="level() === a.id"
                   [attr.aria-checked]="level() === a.id"
                   (click)="level.set(a.id)"
@@ -150,7 +150,7 @@ const EXPIRY: Option[] = [
           <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-full text-[11px]">3</span>
           Check the connection
         </h2>
-        <div class="bg-card flex flex-col gap-2 rounded-lg border p-4 text-[13px]" role="status" aria-live="polite">
+        <div class="bg-card flex flex-col gap-2 rounded-lg p-4 text-[13px]" role="status" aria-live="polite">
           @if (connected()) {
             <p class="text-status-done flex items-center gap-2 font-medium">
               <svg [lucideIcon]="check" [size]="15" [strokeWidth]="2.5"></svg>

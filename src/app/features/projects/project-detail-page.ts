@@ -2,16 +2,13 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   signal,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
-  LucideActivity,
   LucideBox,
-  LucideCircleAlert,
   LucideCircleDot,
   LucideDynamicIcon,
   LucideEllipsis,
@@ -21,6 +18,7 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
+import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { PROJECT_KEY_MAX } from '../../core/contracts/domain';
@@ -42,12 +40,10 @@ import { Clipboard } from '../../core/notify/notifier';
 import { EmptyState } from '../../shared/empty-state';
 import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { Markdown } from '../../shared/markdown';
 import { StatusLabel } from '../../shared/status';
 import { IssueRow } from '../issues/issue-items';
 import { ProjectMilestones } from '../milestones/project-milestones';
-import { EventLine } from '../overview/event-line';
+import { EventLine } from '../../shared/event-line';
 import { CommentThread } from '../../shared/comments';
 import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
@@ -55,24 +51,17 @@ import { priorityOptions, userOptions } from '../../shared/picker-options';
 import { DatePicker } from '../../shared/date-picker';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
-import { ProjectDocumentsTab } from '../documents/project-documents-tab';
-import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectLunagest } from './project-lunagest';
-import { ProjectHealthBadge } from './project-health';
-import { canPostUpdate, isOverdue, isUpdateOverdue, projectStatusOptions } from './project-model';
+import { isOverdue, projectHealthOptions, projectStatusOptions } from './project-model';
 import { ProjectStatsTab } from './project-stats-tab';
-import { ProjectUpdatesTab } from './project-updates-tab';
 import { LabelPicker } from '../../shared/label-picker';
 
-const TABS = ['overview', 'updates', 'tasks', 'documents', 'context', 'stats'] as const;
+const TABS = ['overview', 'tasks', 'stats'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
-  updates: 'Updates',
   tasks: 'Tasks',
-  documents: 'Documents',
-  context: 'Context',
   stats: 'Stats',
 };
 
@@ -86,6 +75,7 @@ const ACTIVITY_CAP = 20;
     RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
+    HlmInputImports,
     LucideDynamicIcon,
     TopBarActions,
     EmptyState,
@@ -101,20 +91,14 @@ const ACTIVITY_CAP = 20;
     ProjectMilestones,
     HlmTabsImports,
     HlmTooltip,
-    ActorAvatar,
-    Markdown,
     StatusLabel,
     IssueRow,
     ProjectAiSummaryButton,
     ProjectIssueSuggestions,
     ProjectRisksCard,
-    ProjectContextTab,
-    ProjectDocumentsTab,
     ProjectGlyphPicker,
     ProjectLunagest,
-    ProjectHealthBadge,
     ProjectStatsTab,
-    ProjectUpdatesTab,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -144,7 +128,7 @@ const ACTIVITY_CAP = 20;
         </ng-template>
       </ng-template>
 
-      <header class="border-b px-4 pt-5 sm:px-6">
+      <header class="px-4 pt-5 sm:px-6">
         <div class="flex min-w-0 items-center gap-2.5">
           <app-project-glyph-picker [project]="p" [canEdit]="canManage()" />
           <app-inline-text
@@ -166,18 +150,6 @@ const ACTIVITY_CAP = 20;
             hlmTooltip="Project tag; changing it updates this project's task keys"
             (save)="update({ key: $event })"
           />
-          <app-project-health class="shrink-0" [health]="p.health" />
-          @if (updateOverdue()) {
-            <a
-              class="text-status-needs-input hover:bg-status-needs-input/10 inline-flex h-6 shrink-0 items-center gap-1 rounded-full px-2 text-xs max-sm:hidden"
-              [routerLink]="[]"
-              [queryParams]="{ tab: 'updates' }"
-              queryParamsHandling="merge"
-              hlmTooltip="No update in the last 7 days"
-            >
-              <svg [lucideIcon]="alertIcon" [size]="12"></svg>Update overdue
-            </a>
-          }
         </div>
         <div class="mt-1 flex min-w-0 items-start gap-2">
           <app-inline-text
@@ -219,12 +191,9 @@ const ACTIVITY_CAP = 20;
       </header>
 
       @switch (current()) {
-        @case ('updates') {
-          <app-project-updates-tab [project]="p" />
-        }
         @case ('tasks') {
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2 border-b px-4 py-2 sm:px-6">
+            <div class="flex items-center gap-2 px-4 py-2 sm:px-6">
               <span class="text-muted-foreground text-xs tabular-nums"
                 >{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }}</span
               >
@@ -244,7 +213,7 @@ const ACTIVITY_CAP = 20;
               @for (g of issueGroups(); track g.status) {
                 <section [attr.aria-label]="g.label">
                   <h2
-                    class="bg-muted/30 flex items-center gap-2 border-b px-4 py-1.5 text-xs font-medium sm:px-6"
+                    class="mt-2 flex items-center gap-2 px-4 py-1.5 text-xs font-medium sm:px-6"
                   >
                     <app-status-label [status]="g.status" />
                     <span class="text-muted-foreground font-normal tabular-nums">{{
@@ -271,16 +240,6 @@ const ACTIVITY_CAP = 20;
             }
           </div>
         }
-        @case ('documents') {
-          <div class="min-w-0 flex-1 px-4 py-5 sm:px-6">
-            <app-project-documents-tab [project]="p" />
-          </div>
-        }
-        @case ('context') {
-          <div class="min-w-0 flex-1 px-4 py-5 sm:px-6">
-            <app-project-context-tab [project]="p" />
-          </div>
-        }
         @case ('stats') {
           <div class="min-w-0 flex-1 px-4 py-5 sm:px-6">
             <app-project-stats-tab [project]="p" />
@@ -291,62 +250,6 @@ const ACTIVITY_CAP = 20;
             class="grid min-w-0 grid-cols-1 gap-x-10 gap-y-6 px-4 py-5 sm:px-6 lg:grid-cols-[minmax(0,1fr)_17rem]"
           >
             <div class="flex min-w-0 flex-col gap-8">
-              <section aria-label="Latest update">
-                <h2 class="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
-                  Latest update
-                  <a
-                    class="text-muted-foreground hover:text-foreground ml-auto text-xs font-normal"
-                    [routerLink]="[]"
-                    [queryParams]="{ tab: 'updates' }"
-                    queryParamsHandling="merge"
-                  >
-                    All updates
-                  </a>
-                </h2>
-                @if (latest(); as u) {
-                  <div class="flex min-w-0 gap-2.5 rounded-lg border p-3">
-                    <app-actor-avatar [actor]="u.author" [size]="24" class="mt-0.5" />
-                    <div class="min-w-0 flex-1">
-                      <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-                        <span class="text-foreground truncate text-sm font-medium">{{
-                          authorName()
-                        }}</span>
-                        <app-project-health [health]="u.health" [compact]="true" />
-                        <span class="text-muted-foreground">{{ u.createdAt | relativeTime }}</span>
-                        @if (u.editedAt) {
-                          <span class="text-muted-foreground">· edited</span>
-                        }
-                      </div>
-                      <div class="mt-1.5 max-h-48 overflow-y-auto">
-                        <app-markdown [source]="u.body" />
-                      </div>
-                    </div>
-                  </div>
-                } @else if (updatesState() === 'loading' || updatesState() === 'idle') {
-                  <div
-                    class="text-muted-foreground rounded-lg border border-dashed px-3 py-4 text-[13px]"
-                  >
-                    Loading…
-                  </div>
-                } @else {
-                  <div
-                    class="text-muted-foreground flex items-center gap-2 rounded-lg border border-dashed px-3 py-4 text-[13px]"
-                  >
-                    <svg [lucideIcon]="activityIcon" [size]="15" [strokeWidth]="1.5"></svg>
-                    No update yet.
-                    @if (canPost()) {
-                      <a
-                        class="text-primary hover:underline"
-                        [routerLink]="[]"
-                        [queryParams]="{ tab: 'updates' }"
-                        queryParamsHandling="merge"
-                        >Post the first one</a
-                      >
-                    }
-                  </div>
-                }
-              </section>
-
               <section aria-label="Description">
                 <app-editable-markdown
                   label="description"
@@ -412,17 +315,18 @@ const ACTIVITY_CAP = 20;
                 />
               </app-property-row>
               <app-property-row label="Health">
-                <span class="flex min-h-8 min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 px-1.5">
-                  <app-project-health [health]="p.health" [compact]="true" [showEmpty]="true" />
-                  @if (p.lastUpdateAt) {
-                    <span class="text-muted-foreground text-xs">{{
-                      p.lastUpdateAt | relativeTime
-                    }}</span>
-                  }
-                  @if (updateOverdue()) {
-                    <span class="text-status-needs-input text-xs">Update overdue</span>
-                  }
-                </span>
+                <app-picker
+                  variant="field"
+                  label="Health"
+                  placeholder="No health"
+                  [searchable]="false"
+                  [clearable]="true"
+                  clearLabel="No health"
+                  [disabled]="!canManage()"
+                  [options]="healths()"
+                  [value]="p.health ? [p.health] : []"
+                  (valueChange)="update({ health: $any($event[0] ?? null) })"
+                />
               </app-property-row>
               <app-property-row label="Priority">
                 <app-picker
@@ -458,7 +362,8 @@ const ACTIVITY_CAP = 20;
               </app-property-row>
               <app-property-row label="Repository">
                 <input
-                  class="border-input bg-background h-8 w-full rounded-md border px-2 font-mono text-xs"
+                  hlmInput
+                  class="h-8 w-full font-mono text-xs"
                   [value]="p.repository ?? ''"
                   [disabled]="!canManage()"
                   placeholder="owner/name or URL"
@@ -542,8 +447,6 @@ export class ProjectDetailPage {
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
   protected readonly plus = LucidePlus;
-  protected readonly alertIcon = LucideCircleAlert;
-  protected readonly activityIcon = LucideActivity;
   protected readonly issueIcon = LucideCircleDot;
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
@@ -551,6 +454,9 @@ export class ProjectDetailPage {
     return projectStatusOptions(this.store.settings().statuses.project);
   }
   protected readonly priorities = priorityOptions();
+  protected readonly healths = computed(() =>
+    projectHealthOptions(this.store.settings().statuses.projectHealth),
+  );
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
   protected readonly activityCap = ACTIVITY_CAP;
   protected readonly allActivity = signal(false);
@@ -565,28 +471,10 @@ export class ProjectDetailPage {
     return !!p && isOverdue(p);
   });
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
-  protected readonly canPost = computed(() => {
-    const p = this.project();
-    return !!p && canPostUpdate(this.store, p);
-  });
   protected readonly current = computed<Tab>(() => {
     const t = this.tab();
     return (TABS as readonly string[]).includes(t ?? '') ? (t as Tab) : 'overview';
   });
-  protected readonly updateOverdue = computed(() => {
-    const p = this.project();
-    return !!p && isUpdateOverdue(p);
-  });
-  protected readonly updates = computed(() => {
-    const id = this.project()?.id;
-    return id ? this.store.projectUpdates(id)() : [];
-  });
-  protected readonly updatesState = computed(() => {
-    const id = this.project()?.id;
-    return id ? this.store.projectUpdatesState(id)() : 'idle';
-  });
-  protected readonly latest = computed(() => this.updates()[0]);
-  protected readonly authorName = computed(() => this.store.actorName(this.latest()?.author));
   protected readonly issues = computed<readonly Issue[]>(() => {
     const id = this.project()?.id;
     return id ? (this.store.issuesByProject().get(id) ?? []) : [];
@@ -601,11 +489,7 @@ export class ProjectDetailPage {
     }));
   });
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
-    updates: this.updatesState() === 'ready' ? this.updates().length : 0,
-    issues: this.issues().length,
-    documents: (this.store.artifactsByProject().get(this.project()?.id ?? '') ?? []).filter(
-      (a) => a.documentId,
-    ).length,
+    tasks: this.issues().length,
   }));
   protected readonly activity = computed(() => {
     const id = this.project()?.id;
@@ -634,14 +518,6 @@ export class ProjectDetailPage {
       when: () => !!this.project(),
     })),
   );
-
-  constructor() {
-    // The Updates feed is loaded once per project (a no-op while cached): the Overview card and the tab count read it.
-    effect(() => {
-      const id = this.project()?.id;
-      if (id) void this.store.loadProjectUpdates(id);
-    });
-  }
 
   protected setTab(t: string | null | undefined): void {
     if (!t) return;

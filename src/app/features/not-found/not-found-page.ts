@@ -41,13 +41,13 @@ import { Kbd } from '../../shared/kbd';
         @if (serverError()) {
           <button hlmBtn size="sm" (click)="reload()">Try again</button>
         } @else if (home(); as h) {
-          <a hlmBtn size="sm" [routerLink]="h">Go to overview</a>
+          <a hlmBtn size="sm" [routerLink]="h">Go to inbox</a>
         } @else {
           <a hlmBtn size="sm" routerLink="/">Go home</a>
         }
         @if (workspaces().length > 1 && !serverError()) {
           @for (w of otherWorkspaces(); track w.id) {
-            <a hlmBtn size="sm" variant="outline" [routerLink]="['/', w.slug, 'overview']">Open {{ w.name }}</a>
+            <a hlmBtn size="sm" variant="outline" [routerLink]="['/', w.slug, 'inbox']">Open {{ w.name }}</a>
           }
         }
         @if (!session.isAuthenticated() && !inShell()) {
@@ -85,7 +85,7 @@ export class NotFoundPage {
 
   protected readonly home = computed(() => {
     const slug = this.workspaceSlug();
-    if (slug && this.inShell()) return ['/', slug, 'overview'];
+    if (slug && this.inShell()) return ['/', slug, 'inbox'];
     if (this.session.isAuthenticated() && this.workspaces().length) return [this.session.defaultWorkspaceUrl()];
     return null;
   });

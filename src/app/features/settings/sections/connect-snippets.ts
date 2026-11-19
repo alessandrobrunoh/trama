@@ -11,7 +11,7 @@ import { TramaStore } from '../../../core/stores/trama.store';
   selector: 'app-code-block',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, LucideDynamicIcon],
-  host: { class: 'bg-muted/50 relative block min-w-0 rounded-md border' },
+  host: { class: 'bg-secondary relative block min-w-0 rounded-md' },
   template: `
     <pre class="overflow-x-auto p-3 pr-11 font-mono text-xs leading-relaxed whitespace-pre select-all" tabindex="0"><code>{{ code() }}</code></pre>
     <button

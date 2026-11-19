@@ -24,7 +24,7 @@ import type { ViewGroup } from '../views/view-model';
       <div class="overflow-auto">
         <table class="w-full min-w-[600px] text-sm">
           <thead>
-            <tr class="text-muted-foreground border-b text-xs">
+            <tr class="text-muted-foreground text-xs">
               <th class="px-4 py-2 text-start font-medium">Project</th>
               <th class="px-3 py-2 text-start font-medium">Status</th>
               <th class="px-3 py-2 text-start font-medium">Start</th>
@@ -34,13 +34,13 @@ import type { ViewGroup } from '../views/view-model';
           @for (group of projects(); track group.key) {
             @if (projects().length > 1) {
               <tbody>
-                <tr class="bg-muted/30 border-b">
+                <tr>
                   <th colspan="4" class="px-4 py-2 text-start text-xs font-medium">{{ group.label }} <span class="text-muted-foreground ms-1">{{ group.items.length }}</span></th>
                 </tr>
             }
             <tbody>
               @for (project of group.items; track project.id) {
-                <tr class="hover:bg-hover border-b">
+                <tr class="hover:bg-hover">
                   <td class="px-4 py-2">
                     <a class="inline-flex items-center gap-2 hover:underline" [routerLink]="['/', slug(), 'projects', project.id]">
                       <app-project-glyph [project]="project" />

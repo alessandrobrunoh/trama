@@ -57,7 +57,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
           </hlm-dialog-header>
 
           <div class="flex flex-col gap-4 text-[13px]">
-            <div class="border-status-needs-input/30 bg-status-needs-input/10 text-status-needs-input flex items-start gap-2 rounded-md border px-3 py-2 text-xs">
+            <div class="bg-status-needs-input/10 text-status-needs-input flex items-start gap-2 rounded-md px-3 py-2 text-xs">
               <svg [lucideIcon]="warn" [size]="14" class="mt-px shrink-0"></svg>
               <span>Copy the secret now. It is shown only once; rotate it later if you lose it.</span>
             </div>
@@ -86,7 +86,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
             </div>
 
             @if (guide(); as g) {
-              <div class="bg-muted/40 rounded-md border px-3 py-2.5">
+              <div class="bg-muted rounded-md px-3 py-2.5">
                 <p class="text-xs font-medium">{{ g.where }}</p>
                 <ol class="text-muted-foreground mt-1.5 list-decimal space-y-0.5 pl-4 text-xs">
                   @for (step of g.steps; track step) {

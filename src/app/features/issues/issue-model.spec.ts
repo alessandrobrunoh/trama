@@ -1,5 +1,24 @@
-import { quietToggleStatus } from './issue-model';
+import { quietToggleStatus, subtaskStatus } from './issue-model';
 import type { StatusEntry, IssueStatus } from '../../core';
+
+describe('subtaskStatus', () => {
+  const entries: StatusEntry<IssueStatus>[] = [
+    { id: 'st_todo', name: 'Ready', icon: 'circle', color: '#888888', type: 'todo' },
+    { id: 'st_doing', name: 'Doing', icon: 'circle-dot', color: '#2255cc', type: 'in_progress' },
+    { id: 'st_review', name: 'Review', icon: 'circle-ellipsis', color: '#7733cc', type: 'in_review' },
+    { id: 'st_done', name: 'Shipped', icon: 'check', color: '#228833', type: 'done' },
+  ];
+
+  it('inherits the status of an open parent', () => {
+    expect(subtaskStatus({ status: 'st_doing' }, entries)).toBe('st_doing');
+    expect(subtaskStatus({ status: 'backlog' }, undefined)).toBe('backlog');
+  });
+
+  it('starts as todo when the parent is finished or in review', () => {
+    expect(subtaskStatus({ status: 'st_done' }, entries)).toBe('st_todo');
+    expect(subtaskStatus({ status: 'st_review' }, entries)).toBe('st_todo');
+  });
+});
 
 describe('quietToggleStatus', () => {
   const entries: StatusEntry<IssueStatus>[] = [

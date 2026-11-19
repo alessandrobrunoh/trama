@@ -88,7 +88,7 @@ export class OnboardingStore {
       {
         id: 'issue',
         title: 'Create your first task',
-        description: 'Record a problem or request, with an optional goal describing the desired result.',
+        description: 'Record a problem or request.',
         cta: 'New task',
         action: { kind: 'create', what: 'issue' },
         done: s.issues().length > 0,

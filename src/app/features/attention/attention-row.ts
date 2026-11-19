@@ -26,7 +26,7 @@ import {
   type AttentionItem,
 } from '../../core';
 import { EntityChip, Kbd, type EntityChipType } from '../../shared';
-import { AgoPipe } from '../overview/ago';
+import { AgoPipe } from '../../shared/ago';
 import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
 import { snoozePresets, type SnoozePreset } from './snooze';
 
@@ -48,7 +48,7 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     AgoPipe,
   ],
   host: {
-    class: 'group/row relative block border-b outline-none',
+    class: 'group/row relative block outline-none',
     '[attr.data-row-id]': 'item().id',
     '[attr.data-focused]': 'focused() ? "" : null',
     '[class.bg-accent/60]': 'focused()',

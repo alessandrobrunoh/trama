@@ -19,9 +19,7 @@ import type {
   LunaGestRemoteProject,
 } from '../../core/api/api.types';
 import { TramaStore } from '../../core/stores/trama.store';
-
-const SELECT =
-  'border-border bg-background h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px] sm:max-w-xs';
+import { AppSelect, type Option } from '../create/form-kit';
 
 /**
  * Project overview: link this project to a LunaGest project when the workspace connection exists.
@@ -30,7 +28,7 @@ const SELECT =
 @Component({
   selector: 'app-project-lunagest',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports],
+  imports: [RouterLink, HlmButtonImports, AppSelect],
   host: { class: 'block' },
   template: `
     <section class="flex flex-col gap-2" aria-label="LunaGest">
@@ -72,19 +70,14 @@ const SELECT =
             }
             <div class="flex flex-wrap items-center gap-2">
               @if (!remoteError()) {
-                <select
-                  [class]="select"
-                  aria-label="LunaGest project"
-                  [value]="remoteProjectId()"
-                  (change)="remoteProjectId.set($any($event.target).value)"
-                >
-                  <option value="" [selected]="remoteProjectId() === ''">Select a project</option>
-                  @for (project of choices(); track project.id) {
-                    <option [value]="project.id" [selected]="remoteProjectId() === project.id">
-                      {{ project.name }}
-                    </option>
-                  }
-                </select>
+                <app-select
+                  class="min-w-0 flex-1 sm:max-w-xs"
+                  size="sm"
+                  label="LunaGest project"
+                  placeholder="Select a project"
+                  [options]="projectOptions()"
+                  [(value)]="remoteProjectId"
+                />
                 <button
                   hlmBtn
                   type="button"
@@ -126,7 +119,7 @@ const SELECT =
                 }
               </p>
               @for (conflict of report.conflicts; track conflict.issueId + conflict.field) {
-                <div class="flex flex-col gap-1 rounded-md border px-2 py-2 text-[13px]">
+                <div class="flex flex-col gap-1 bg-muted rounded-md px-2 py-2 text-[13px]">
                   <p>
                     {{ conflict.issueKey }} {{ conflict.field }} differs.
                     <span class="text-muted-foreground">Trama: {{ conflict.local || 'empty' }}</span>
@@ -174,7 +167,6 @@ export class ProjectLunagest {
   readonly projectId = input.required<string>();
   readonly canManage = input(false);
 
-  protected readonly select = SELECT;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly loading = signal(true);
   protected readonly busy = signal(false);
@@ -202,6 +194,9 @@ export class ProjectLunagest {
     }
     return [{ id: link.remoteProjectId, name: link.remoteProjectName }, ...projects];
   });
+  protected readonly projectOptions = computed<Option[]>(() =>
+    this.choices().map((project) => ({ value: project.id, label: project.name })),
+  );
 
   private generation = 0;
 

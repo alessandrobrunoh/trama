@@ -47,7 +47,7 @@ import { SiteHeader } from './site-header';
       <section class="mx-auto max-w-6xl px-4 pt-16 pb-12 text-center sm:px-6 sm:pt-24">
         <a
           [routerLink]="['/blog', 'introducing-trama']"
-          class="border-border bg-card/70 text-muted-foreground hover:text-foreground mx-auto inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs transition-colors"
+          class="bg-secondary text-muted-foreground hover:text-foreground mx-auto inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs transition-colors"
         >
           <span class="bg-primary size-1.5 rounded-full"></span>
           Introducing Trama · source-available, built for humans and coding agents
@@ -62,10 +62,9 @@ import { SiteHeader } from './site-header';
         <p
           class="text-muted-foreground mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-pretty sm:text-base"
         >
-          Trello, Jira and Linear treat every ticket as a unit of work. Trama keeps your issues, and
-          adds what teams need around them: an optional <span class="text-foreground">Goal</span>
-          for the desired outcome, optional <span class="text-foreground">Plans and Documents</span>,
-          and human input requests in Question or Decision mode.
+          Trello, Jira and Linear treat every ticket as a unit of work. Trama keeps your tasks, and
+          adds what teams need around them: pull requests traced back to the work, and human input
+          requests in Question or Decision mode.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a hlmBtn size="lg" routerLink="/register">
@@ -84,11 +83,11 @@ import { SiteHeader } from './site-header';
             class="bg-primary/15 absolute inset-x-10 -top-6 -z-10 h-40 rounded-full blur-3xl"
           ></div>
           <div
-            class="border-border/80 bg-card overflow-hidden rounded-xl border shadow-[0_30px_80px_-30px_rgb(0_0_0/0.35)]"
+            class="bg-card overflow-hidden rounded-xl shadow-[0_30px_80px_-30px_rgb(0_0_0/0.35)]"
             role="img"
-            aria-label="Preview of a Trama issue with an optional Goal, related issues and human input request"
+            aria-label="Preview of a Trama task with related tasks, activity and a human input request"
           >
-            <div class="border-border/70 flex h-9 items-center gap-1.5 border-b px-3.5">
+            <div class="flex h-9 items-center gap-1.5 px-3.5">
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="bg-border-strong size-2.5 rounded-full"></span>
               <span class="bg-border-strong size-2.5 rounded-full"></span>
@@ -98,7 +97,7 @@ import { SiteHeader } from './site-header';
             </div>
             <div class="flex">
               <aside
-                class="bg-sidebar border-sidebar-border hidden w-48 shrink-0 border-r p-2.5 text-[12.5px] md:block"
+                class="bg-sidebar hidden w-48 shrink-0 p-2.5 text-[12.5px] md:block"
               >
                 @for (item of sidebar; track item.label) {
                   <div
@@ -143,7 +142,7 @@ import { SiteHeader } from './site-header';
                         Related issues
                       </p>
                       <ul
-                        class="border-border/70 divide-border/70 divide-y rounded-lg border text-[13px]"
+                        class="bg-muted rounded-lg text-[13px]"
                       >
                         @for (issue of issues; track issue.key) {
                           <li class="flex items-center gap-2.5 px-3 py-2">
@@ -163,31 +162,6 @@ import { SiteHeader } from './site-header';
                             <span class="truncate">{{ issue.title }}</span>
                           </li>
                         }
-                      </ul>
-                    </div>
-                    <div>
-                      <p
-                        class="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase"
-                      >
-                        Optional Goal
-                      </p>
-                      <ul class="flex flex-col gap-1.5 text-[13px]">
-                        <li class="flex items-center gap-2">
-                          <svg
-                            [lucideIcon]="doneIcon"
-                            [size]="14"
-                            class="text-tone-green shrink-0"
-                          ></svg>
-                          Keep sessions valid during token rotation
-                        </li>
-                        <li class="flex items-center gap-2">
-                          <svg
-                            [lucideIcon]="openIcon"
-                            [size]="14"
-                            class="text-muted-foreground shrink-0"
-                          ></svg>
-                          Document the expected refresh-token behavior
-                        </li>
                       </ul>
                     </div>
                   </div>
@@ -269,11 +243,11 @@ import { SiteHeader } from './site-header';
           </p>
         </div>
         <div class="mt-12 grid gap-4 lg:grid-cols-2">
-          <div class="border-border bg-card/60 rounded-xl border p-6">
+          <div class="bg-card rounded-xl p-6">
             <p class="text-muted-foreground text-[13px] font-medium">Trello, Jira, Linear</p>
             <ol class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[12px]">
               @for (s of ticketFlow; track s; let last = $last) {
-                <li class="border-border bg-background rounded-md border px-2.5 py-1.5">{{ s }}</li>
+                <li class="bg-background rounded-md px-2.5 py-1.5">{{ s }}</li>
                 @if (!last) {
                   <li aria-hidden="true" class="text-muted-foreground">→</li>
                 }
@@ -284,11 +258,11 @@ import { SiteHeader } from './site-header';
               become just another assignee, one ticket at a time.
             </p>
           </div>
-          <div class="border-primary/30 bg-primary/5 rounded-xl border p-6">
+          <div class="bg-primary/10 rounded-xl p-6">
             <p class="text-primary text-[13px] font-medium">Trama</p>
             <ol class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[12px]">
               @for (s of tramaFlow; track s; let last = $last) {
-                <li class="border-primary/25 bg-background rounded-md border px-2.5 py-1.5">
+                <li class="bg-background rounded-md px-2.5 py-1.5">
                   {{ s }}
                 </li>
                 @if (!last) {
@@ -297,8 +271,8 @@ import { SiteHeader } from './site-header';
               }
             </ol>
             <p class="text-muted-foreground mt-5 text-[13px] leading-relaxed">
-              Issues are granular units of work. Add a Goal for the desired outcome, and optional
-              Plans or Documents for context; agents can ask a human a question or request a decision.
+              Tasks are granular units of work; agents can ask a human a question or request a
+              decision.
             </p>
           </div>
         </div>
@@ -319,7 +293,7 @@ import { SiteHeader } from './site-header';
         <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           @for (d of differentiators; track d.title) {
             <article
-              class="border-border/80 bg-card/60 hover:border-border-strong flex flex-col rounded-xl border p-5 transition-colors"
+              class="bg-card hover:bg-secondary flex flex-col rounded-xl p-5 transition-colors"
             >
               <span class="flex size-8 items-center justify-center rounded-lg" [class]="d.tint">
                 <svg [lucideIcon]="d.icon" [size]="16"></svg>
@@ -327,7 +301,7 @@ import { SiteHeader } from './site-header';
               <h3 class="mt-4 font-medium">{{ d.title }}</h3>
               <p class="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">{{ d.body }}</p>
               <p
-                class="text-muted-foreground/80 border-border/60 mt-4 border-t pt-3 text-[12px] leading-relaxed"
+                class="text-muted-foreground/80 mt-4 pt-1 text-[12px] leading-relaxed"
               >
                 <span class="text-foreground/80 font-medium">Elsewhere:</span> {{ d.elsewhere }}
               </p>
@@ -360,7 +334,7 @@ import { SiteHeader } from './site-header';
       <!-- Agents -->
       <section id="agents" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
         <div
-          class="border-border bg-card grid items-center gap-10 rounded-2xl border p-6 sm:p-10 lg:grid-cols-2"
+          class="bg-card grid items-center gap-10 rounded-2xl p-6 sm:p-10 lg:grid-cols-2"
         >
           <div>
             <p class="text-primary text-[13px] font-medium">Agents</p>
@@ -369,7 +343,7 @@ import { SiteHeader } from './site-header';
             </h2>
             <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
               Claude Code, Codex, Cursor or your own agents connect through the MCP server and the
-              API. They work on issues, attach optional Plans or Documents, and ask a human a
+              API. They work on tasks, link their pull requests, and ask a human a
               question or request a decision when they're blocked.
             </p>
             <ul class="mt-5 flex flex-col gap-2 text-[14px]">
@@ -390,10 +364,10 @@ import { SiteHeader } from './site-header';
             </a>
           </div>
           <div
-            class="border-border/80 bg-background overflow-x-auto rounded-xl border font-mono text-[12px]"
+            class="bg-muted overflow-x-auto rounded-xl font-mono text-[12px]"
           >
             <div
-              class="border-border/70 text-muted-foreground flex items-center gap-2 border-b px-4 py-2.5"
+              class="text-muted-foreground flex items-center gap-2 px-4 py-2.5"
             >
               <svg [lucideIcon]="keyIcon" [size]="13"></svg>
               api-token · ci-agent
@@ -409,7 +383,7 @@ import { SiteHeader } from './site-header';
               </thead>
               <tbody>
                 @for (row of permissions; track row.resource) {
-                  <tr class="border-border/60 border-t">
+                  <tr>
                     <td class="px-4 py-2">{{ row.resource }}</td>
                     @for (allowed of row.actions; track $index) {
                       <td
@@ -423,7 +397,7 @@ import { SiteHeader } from './site-header';
                 }
               </tbody>
             </table>
-            <div class="border-border/70 text-muted-foreground border-t px-4 py-2.5">
+            <div class="text-muted-foreground px-4 py-2.5">
               limit · 500 requests / day
             </div>
           </div>
@@ -445,10 +419,10 @@ import { SiteHeader } from './site-header';
             </p>
           </div>
           <dl
-            class="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-border bg-border"
+            class="grid grid-cols-2 gap-2"
           >
             @for (fact of facts; track fact.label) {
-              <div class="bg-card p-5">
+              <div class="bg-card rounded-xl p-5">
                 <dt class="text-muted-foreground text-[12px]">{{ fact.label }}</dt>
                 <dd class="mt-1 text-lg font-semibold tracking-tight">{{ fact.value }}</dd>
               </div>
@@ -477,7 +451,7 @@ import { SiteHeader } from './site-header';
           @for (post of posts; track post.slug) {
             <a
               [routerLink]="['/blog', post.slug]"
-              class="group border-border/80 bg-card/60 hover:border-border-strong flex flex-col rounded-xl border p-6 transition-colors"
+              class="group bg-card hover:bg-secondary flex flex-col rounded-xl p-6 transition-colors"
             >
               <span class="text-muted-foreground flex items-center gap-2 text-xs">
                 <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{{
@@ -508,8 +482,8 @@ import { SiteHeader } from './site-header';
           Weave your team's work together.
         </h2>
         <p class="text-muted-foreground mx-auto mt-3 max-w-md text-[15px]">
-          Create a workspace in under a minute. Start with an issue; add a Goal or supporting
-          documents only when useful.
+          Create a workspace in under a minute. Start with a task and invite an agent when you are
+          ready.
         </p>
         <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
           <a hlmBtn size="lg" routerLink="/register">Get started</a>
@@ -549,19 +523,14 @@ export class LandingPage {
   ];
 
   protected readonly ticketFlow = ['Issue', 'Assignee', 'Branch', 'PR', 'Done'];
-  protected readonly tramaFlow = [
-    'Issue',
-    'Optional Goal',
-    'Optional Plan / Document',
-    'Question / Decision',
-  ];
+  protected readonly tramaFlow = ['Task', 'Question / Decision', 'Branch', 'PR', 'Done'];
 
   protected readonly differentiators = [
     {
       icon: LucideCircleDot,
       tint: 'bg-entity-issue/12 text-entity-issue',
       title: 'Issues are the unit of work',
-      body: 'Keep work granular and actionable. Add an optional Goal to state the desired outcome; Plans and Documents are there when more context helps.',
+      body: 'Keep work granular and actionable. Each task tracks one piece of work, with its own status, estimate and pull requests.',
       elsewhere: 'tickets overloaded with requests, plans and discussion.',
     },
     {
@@ -575,14 +544,14 @@ export class LandingPage {
       icon: LucideGitPullRequest,
       tint: 'bg-tone-green/12 text-tone-green',
       title: 'Artifacts with traceability',
-      body: 'Optional Plans and Documents keep useful context close to issues. Artifacts trace shipped work back to the issues they address.',
+      body: 'Pull requests and builds are linked to the task they address, with CI and review state, so shipped work traces back to its task.',
       elsewhere: 'PR links scattered across individual tickets.',
     },
     {
       icon: LucideCircleCheck,
       tint: 'bg-tone-blue/12 text-tone-blue',
       title: 'Facts, not fake progress',
-      body: 'Issue status reflects the work at hand. A Goal can state the desired outcome without adding a second required lifecycle.',
+      body: 'Task status reflects the work at hand, and time statistics come from tracked time, not from how long a task sat in a status.',
       elsewhere: 'story points, burndowns and manual status updates.',
     },
     {

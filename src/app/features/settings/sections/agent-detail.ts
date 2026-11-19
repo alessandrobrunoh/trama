@@ -9,7 +9,7 @@ import { UiStore } from '../../../core/stores/ui.store';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { AppSelect, type Option } from '../../create/form-kit';
-import { EventLine } from '../../overview/event-line';
+import { EventLine } from '../../../shared/event-line';
 import { ConnectSnippets } from './connect-snippets';
 import { SECTION_KIT } from './section-kit';
 
@@ -68,9 +68,9 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
           }
         </div>
 
-        <dl class="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-lg border bg-[var(--border)] sm:grid-cols-4">
+        <dl class="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
           @for (s of stats(); track s.label) {
-            <div class="bg-card px-4 py-3">
+            <div class="bg-card rounded-lg px-4 py-3">
               <dt class="text-muted-foreground text-xs">{{ s.label }}</dt>
               <dd class="mt-0.5 text-[15px] font-semibold tabular-nums">{{ s.value }}</dd>
             </div>

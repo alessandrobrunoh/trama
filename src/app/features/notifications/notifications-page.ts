@@ -18,7 +18,7 @@ type Filter = 'all' | 'unread';
   imports: [LucideDynamicIcon, HlmButtonImports, HlmToggleGroupImports, ActorAvatar, EmptyState, RelativeTimePipe],
   host: { class: 'flex flex-1 flex-col' },
   template: `
-    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 sm:px-6">
+    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 sm:px-6">
       <p class="text-meta" aria-live="polite">{{ description() }}</p>
       <span class="flex-1"></span>
       <hlm-toggle-group
@@ -40,15 +40,15 @@ type Filter = 'all' | 'unread';
 
     @for (g of groups(); track g.label) {
       <section [attr.aria-label]="g.label">
-        <header class="bg-muted/40 flex h-8 items-center gap-2 border-b px-4 sm:px-6">
+        <header class="mt-2 flex h-8 items-center gap-2 px-4 sm:px-6">
           <h2 class="text-xs font-medium">{{ g.label }}</h2>
           <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
         </header>
         @for (n of g.items; track n.id) {
-          <div class="group/row relative" [class.bg-accent/60]="ui.focusedRowId() === n.id">
+          <div class="group/row relative" [class.bg-selected]="ui.focusedRowId() === n.id">
           <button
             type="button"
-            class="hover:bg-hover focus-visible:bg-hover flex w-full items-start gap-3 border-b px-4 py-3 text-left outline-none sm:px-6"
+            class="hover:bg-hover focus-visible:bg-hover flex w-full items-start gap-3 px-4 py-3 text-left outline-none sm:px-6"
             [attr.data-row-id]="n.id"
             (click)="open(n)"
           >

@@ -13,82 +13,65 @@ import { ApiClient } from '../../core/api/api-client';
 import { ApiError } from '../../core/api/api-error';
 import type { LunaGestIssueApplicable, LunaGestRemoteTask } from '../../core/api/api.types';
 import { TramaStore } from '../../core/stores/trama.store';
-
-const SELECT =
-  'border-border bg-background h-8 min-w-0 flex-1 rounded-md border px-2 text-[13px]';
+import { AppSelect, type Option } from '../create/form-kit';
+import { IssueSection } from './issue-section';
 
 /**
- * Sidebar card for an issue on a LunaGest-linked project.
+ * Collapsed inspector group for an issue on a LunaGest-linked project.
  * Push creates or updates the remote task. A failure stays on this issue.
  */
 @Component({
   selector: 'app-issue-lunagest',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports],
-  host: { class: 'bg-card border-border block rounded-lg border' },
+  imports: [HlmButtonImports, AppSelect, IssueSection],
+  host: { class: 'block' },
   template: `
     @if (link(); as current) {
-      <div class="flex items-center gap-1.5 px-3 pt-2.5 pb-1">
-        <h3 class="text-muted-foreground text-xs font-medium">LunaGest</h3>
-      </div>
-      <div class="flex flex-col gap-2 px-3 py-2">
-        <p class="text-[13px]">
-          @switch (current.state) {
-            @case ('linked') {
-              Linked<span class="text-muted-foreground"> · {{ current.remoteTaskId }}</span>
-            }
-            @case ('push_failed') {
-              Not on LunaGest
-            }
-            @default {
-              Not linked
-            }
+      <app-issue-section label="LunaGest" [summary]="stateLabel()" [open]="!!current.lastError">
+        <div class="flex flex-col gap-2 px-1 py-1">
+          @if (current.state === 'linked') {
+            <p class="text-muted-foreground text-xs">Remote task {{ current.remoteTaskId }}</p>
           }
-        </p>
-        @if (current.lastError) {
-          <p class="text-destructive text-[13px]" role="alert">{{ current.lastError }}</p>
-        }
-        @if (current.state !== 'linked') {
-          <div class="flex flex-wrap items-center gap-2">
-            <button hlmBtn type="button" size="sm" [disabled]="busy()" (click)="push()">
+          @if (current.lastError) {
+            <p class="text-destructive text-xs" role="alert">{{ current.lastError }}</p>
+          }
+          @if (current.state !== 'linked') {
+            <button hlmBtn type="button" size="sm" class="w-full" [disabled]="busy()" (click)="push()">
               {{ current.remoteTaskId ? 'Retry push' : 'Create on LunaGest' }}
             </button>
-          </div>
-          @if (tasksLoading()) {
-            <p class="text-muted-foreground text-[13px]">Loading tasks…</p>
-          } @else if (!tasksError()) {
-            <div class="flex flex-wrap items-center gap-2">
-              <select
-                [class]="select"
-                aria-label="LunaGest task"
-                [value]="remoteTaskId()"
-                (change)="remoteTaskId.set($any($event.target).value)"
-              >
-                <option value="">Link an existing task</option>
-                @for (task of tasks(); track task.id) {
-                  <option [value]="task.id">{{ task.title }}</option>
-                }
-              </select>
-              <button
-                hlmBtn
-                type="button"
-                size="sm"
-                variant="outline"
-                [disabled]="!remoteTaskId() || busy()"
-                (click)="linkExisting()"
-              >
-                Link
-              </button>
-            </div>
+            @if (tasksLoading()) {
+              <p class="text-muted-foreground text-xs">Loading tasks…</p>
+            } @else if (!tasksError()) {
+              <div class="flex items-center gap-1.5">
+                <app-select
+                  class="min-w-0 flex-1"
+                  size="sm"
+                  label="LunaGest task"
+                  placeholder="Link an existing task"
+                  [options]="taskOptions()"
+                  [(value)]="remoteTaskId"
+                />
+                <button
+                  hlmBtn
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  [disabled]="!remoteTaskId() || busy()"
+                  (click)="linkExisting()"
+                >
+                  Link
+                </button>
+              </div>
+            }
           }
-        }
-        @if (tasksError(); as message) {
-          <p class="text-destructive text-[13px]" role="alert">{{ message }}</p>
-        }
-        @if (actionError(); as message) {
-          <p class="text-destructive text-[13px]" role="alert">{{ message }}</p>
-        }
-      </div>
+          @if (tasksError(); as message) {
+            <p class="text-destructive text-xs" role="alert">{{ message }}</p>
+          }
+          @if (actionError(); as message) {
+            <p class="text-destructive text-xs" role="alert">{{ message }}</p>
+          }
+        </div>
+      </app-issue-section>
     }
   `,
 })
@@ -98,7 +81,6 @@ export class IssueLunagest {
 
   readonly issueId = input.required<string>();
 
-  protected readonly select = SELECT;
   protected readonly busy = signal(false);
   protected readonly tasksLoading = signal(false);
   protected readonly tasksError = signal('');
@@ -107,6 +89,20 @@ export class IssueLunagest {
   protected readonly tasks = signal<LunaGestRemoteTask[]>([]);
   protected readonly remoteTaskId = signal('');
   private readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly taskOptions = computed<Option[]>(() =>
+    this.tasks().map((task) => ({ value: task.id, label: task.title })),
+  );
+  /** One word for the collapsed header. */
+  protected readonly stateLabel = computed(() => {
+    switch (this.link()?.state) {
+      case 'linked':
+        return 'Linked';
+      case 'push_failed':
+        return 'Not pushed';
+      default:
+        return 'Not linked';
+    }
+  });
 
   constructor() {
     effect(() => {

@@ -5,7 +5,6 @@ import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
-  PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
   PROVIDER_META,
 } from '../meta';
@@ -35,7 +34,6 @@ export function enumOrder(entity: ViewEntity, field: string, value: string): num
   const table = (): Record<string, { order: number }> | null => {
     if (field === 'status' && entity === 'issue') return ISSUE_STATUS_META;
     if (field === 'status' && entity === 'project') return PROJECT_STATUS_META;
-    if (field === 'health' && entity === 'project') return PROJECT_HEALTH_META;
     if (field === 'kind' && entity === 'issue') return ISSUE_KIND_META;
     if (field === 'priority') return PRIORITY_META;
     if (field === 'provider') return PROVIDER_META;

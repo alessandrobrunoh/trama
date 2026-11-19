@@ -109,13 +109,9 @@ export const routes: Routes = [
     component: AppShell,
     canActivate: [authGuard, workspaceGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'overview' },
-      {
-        path: 'overview',
-        title: 'Overview · Trama',
-        loadComponent: () =>
-          import('./features/overview/overview-page').then((m) => m.OverviewPage),
-      },
+      { path: '', pathMatch: 'full', redirectTo: 'inbox' },
+      // Overview was removed; the Inbox is home.
+      { path: 'overview', pathMatch: 'full', redirectTo: 'inbox' },
       {
         path: 'assistant',
         title: 'Assistant · Trama',
@@ -126,9 +122,10 @@ export const routes: Routes = [
         title: 'Inbox · Trama',
         loadComponent: () => import('./features/inbox/inbox-page').then((m) => m.InboxPage),
       },
-      // My Attention and Notifications became tabs of the Inbox; old links keep working.
+      // My Attention, Notifications and My Work became tabs of the Inbox; old links keep working.
       redirectInbox('attention', 'needs-you'),
       redirectInbox('notifications', 'updates'),
+      redirectInbox('my-work', 'tasks'),
       {
         path: 'connect',
         title: 'Connect your agent · Trama',
@@ -139,11 +136,6 @@ export const routes: Routes = [
         path: 'stats',
         title: 'Statistics · Trama',
         loadComponent: () => import('./features/stats/stats-page').then((m) => m.StatsPage),
-      },
-      {
-        path: 'my-work',
-        title: 'My Work · Trama',
-        loadComponent: () => import('./features/my-work/my-work-page').then((m) => m.MyWorkPage),
       },
       {
         path: 'activity',
@@ -183,18 +175,6 @@ export const routes: Routes = [
         title: 'Project · Trama',
         loadComponent: () =>
           import('./features/projects/project-detail-page').then((m) => m.ProjectDetailPage),
-      },
-      {
-        path: 'documents',
-        title: 'Documents · Trama',
-        loadComponent: () =>
-          import('./features/documents/document-list-page').then((m) => m.DocumentListPage),
-      },
-      {
-        path: 'documents/:id',
-        title: 'Document · Trama',
-        loadComponent: () =>
-          import('./features/documents/document-page').then((m) => m.DocumentPage),
       },
       {
         path: 'views',

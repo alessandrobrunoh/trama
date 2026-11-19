@@ -17,6 +17,7 @@ import {
   LucideDynamicIcon,
   LucideBox,
   LucideLayers,
+  LucideMessageSquare,
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
@@ -48,13 +49,12 @@ import {
   PRIORITY_META,
 } from '../../core/meta';
 import { Notifier } from '../../core/notify/notifier';
-import { formatBytes } from '../../core/format';
 import { DraftStore } from '../../core/stores/draft.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { StatusIcon } from '../../shared/status';
-import { UploadFile } from '../../shared/upload-file';
 import { issueEstimateOptions } from '../issues/issue-model';
+import { isValidThreadUrl, toThreadUrl } from '../issues/issue-thread-link';
 import { Picker, type PickOption } from '../../shared/picker';
 import { AppSelect, FormRow, type Option } from './form-kit';
 import { DraftSuggestions } from '../ai/draft-suggestions';
@@ -62,9 +62,6 @@ import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 import { EntityChip } from '../../shared/entity-chip';
 
 type ComposerKind = 'issue';
-
-/** Kinds whose records can own file/image artifacts, so the dialog accepts attachments for them. */
-const ATTACHABLE = new Set<CreateKind>(['issue', 'project']);
 
 interface KindDef {
   kind: ComposerKind;
@@ -104,8 +101,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
  * (title · description · property chips), plus compact forms for project and view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
- *   issue:      status, priority, kind, assigneeId, projectId, parentId, title, body,
- *               and optional goal
+ *   issue:      status, priority, kind, assigneeId, projectId, parentId, title, body
  *   project:    name, key, summary, optional repository string (URL or owner/name)
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
  *
@@ -130,7 +126,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     AppSelect,
     FormRow,
     DraftSuggestions,
-    UploadFile,
     EntityChip,
   ],
   template: `
@@ -229,49 +224,27 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 </p>
               }
               @if (kind() === 'issue') {
-                <div class="border-border-strong mt-2 border-t pt-2">
-                  <label for="cr-goal" class="text-muted-foreground text-xs font-medium">Goal <span class="font-normal">(optional)</span></label>
-                  <textarea
-                    id="cr-goal"
-                    class="placeholder:text-muted-foreground/60 field-sizing-content max-h-32 min-h-12 w-full resize-none bg-transparent py-1 text-sm leading-relaxed outline-none"
-                    rows="2"
-                    placeholder="The desired result, not a technical plan."
-                    [(ngModel)]="goal"
-                    name="goal"
-                    aria-label="Goal"
-                  ></textarea>
-                </div>
-              }
-              @if (canAttach()) {
-                <div
-                  class="mt-2 flex flex-wrap items-center gap-1.5"
-                  data-testid="create-attachments"
-                >
-                  <app-upload-file
-                    label="Attach files"
-                    variant="ghost"
-                    size="xs"
-                    [multiple]="true"
-                    [busy]="busy()"
-                    (file)="addAttachment($event)"
+                <div class="mt-1 flex items-center gap-2">
+                  <svg
+                    [lucideIcon]="threadIcon"
+                    [size]="14"
+                    class="text-muted-foreground shrink-0"
+                    aria-hidden="true"
+                  ></svg>
+                  <input
+                    class="placeholder:text-muted-foreground/60 w-full bg-transparent py-1 text-sm outline-none"
+                    placeholder="Thread link (optional), e.g. https://delta.dev/…"
+                    [(ngModel)]="threadUrl"
+                    name="threadUrl"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-label="Thread link"
+                    [attr.aria-invalid]="!!err('thread')"
                   />
-                  @for (f of attachments(); track $index) {
-                    <span
-                      class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
-                    >
-                      <span class="truncate">{{ f.name }}</span>
-                      <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
-                      <button
-                        type="button"
-                        class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
-                        [attr.aria-label]="'Remove ' + f.name"
-                        (click)="removeAttachment($index)"
-                      >
-                        <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                      </button>
-                    </span>
-                  }
                 </div>
+                @if (err('thread'); as e) {
+                  <p class="text-destructive pl-6 text-xs" role="alert">{{ e }}</p>
+                }
               }
             </div>
 
@@ -410,32 +383,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Repository"
                     />
                   </app-form-row>
-                  <div class="flex flex-wrap items-center gap-1.5" data-testid="create-attachments">
-                    <app-upload-file
-                      label="Attach files"
-                      variant="ghost"
-                      size="xs"
-                      [multiple]="true"
-                      [busy]="busy()"
-                      (file)="addAttachment($event)"
-                    />
-                    @for (f of attachments(); track $index) {
-                      <span
-                        class="bg-muted inline-flex max-w-full items-center gap-1.5 rounded-md py-1 pr-1 pl-2 text-xs"
-                      >
-                        <span class="truncate">{{ f.name }}</span>
-                        <span class="text-muted-foreground shrink-0 tabular-nums">{{ bytes(f.size) }}</span>
-                        <button
-                          type="button"
-                          class="hover:bg-accent inline-flex size-5 shrink-0 items-center justify-center rounded"
-                          [attr.aria-label]="'Remove ' + f.name"
-                          (click)="removeAttachment($index)"
-                        >
-                          <svg [lucideIcon]="closeIcon" [size]="12"></svg>
-                        </button>
-                      </span>
-                    }
-                  </div>
                 }
                 @case ('view') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -520,6 +467,7 @@ export class CreateDialog {
   private readonly titleEl = viewChild<ElementRef<HTMLInputElement>>('titleEl');
 
   protected readonly userIcon = LucideCircleUser;
+  protected readonly threadIcon = LucideMessageSquare;
   protected readonly closeIcon = LucideX;
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
@@ -533,7 +481,6 @@ export class CreateDialog {
   // ── form state (shared across kinds; reset on open, carried over on switch) ──
   protected readonly title = signal('');
   protected readonly text = signal('');
-  protected readonly goal = signal('');
   protected readonly text2 = signal('');
   protected readonly tags = signal('');
   protected readonly priority = signal<string>('none');
@@ -555,9 +502,8 @@ export class CreateDialog {
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
   /** Parent issue supplied by the opening context; not persisted in the generic issue draft. */
   protected readonly parentId = signal('');
-  /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
-  protected readonly attachments = signal<File[]>([]);
-  protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
+  /** Optional link to the Delta thread working on the task. */
+  protected readonly threadUrl = signal('');
   private projectKeyTouched = false;
   protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
@@ -647,18 +593,18 @@ export class CreateDialog {
       const draft = {
         title: this.title(),
         text: this.text(),
-        goal: this.goal(),
         text2: this.text2(),
         priority: this.priority(),
         issueKind: this.issueKind(),
         assigneeId: this.assigneeId(),
         projectId: this.projectId(),
         tags: this.tags(),
+        threadUrl: this.threadUrl(),
       };
       const kind = this.kind();
       untracked(() => {
         // Nothing to keep until there is a title or a description.
-        const hasText = !!(draft.title.trim() || draft.text.trim() || draft.goal.trim());
+        const hasText = !!(draft.title.trim() || draft.text.trim());
         this.drafts.set(this.draftKey(kind), hasText ? draft : null);
       });
     });
@@ -672,18 +618,18 @@ export class CreateDialog {
   private restoreDraft(kind: CreateKind, d: Record<string, unknown>): void {
     this.restored.set(false);
     if (!SWITCHER.some((k) => k.kind === kind)) return;
-    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement']) || asStr(d['goal'])) return;
+    if (asStr(d['title']) || asStr(d['name']) || asStr(d['body']) || asStr(d['description']) || asStr(d['statement'])) return;
     const draft = this.drafts.get<Record<string, unknown>>(this.draftKey(kind));
-    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim() || asStr(draft['goal']).trim())) return;
+    if (!draft || !(asStr(draft['title']).trim() || asStr(draft['text']).trim())) return;
     this.title.set(asStr(draft['title']));
     this.text.set(asStr(draft['text']));
-    this.goal.set(asStr(draft['goal']));
     this.text2.set(asStr(draft['text2']));
     this.priority.set(oneOf(PRIORITIES, draft['priority']) ?? this.priority());
     this.issueKind.set(oneOf(ISSUE_KINDS, draft['issueKind']) ?? this.issueKind());
     if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
     if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
     this.tags.set(asStr(draft['tags']));
+    this.threadUrl.set(asStr(draft['threadUrl']));
     this.restored.set(true);
   }
 
@@ -699,7 +645,6 @@ export class CreateDialog {
     this.kind.set(kind);
     this.title.set(asStr(d['title']) || asStr(d['name']));
     this.text.set(asStr(d['body']) || asStr(d['description']) || asStr(d['statement']));
-    this.goal.set(asStr(d['goal']));
     this.text2.set(asStr(d['rationale']));
     this.tags.set(asTags(d['tags']).join(', '));
     this.priority.set(oneOf(PRIORITIES, d['priority']) ?? 'none');
@@ -725,7 +670,7 @@ export class CreateDialog {
           )
         : '',
     );
-    this.attachments.set([]);
+    this.threadUrl.set(asStr(d['threadUrl']));
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'issue');
     this.viewLayout.set(oneOf(VIEW_LAYOUTS, d['layout']) ?? 'list');
@@ -783,26 +728,6 @@ export class CreateDialog {
     if (values[0]) sig.set(values[0]);
   }
 
-  protected addAttachment(file: File): void {
-    this.attachments.update((list) => [...list, file]);
-  }
-
-  protected removeAttachment(at: number): void {
-    this.attachments.update((list) => list.filter((_, i) => i !== at));
-  }
-
-  protected bytes(size: number): string {
-    return formatBytes(size);
-  }
-
-  /** Upload the picked files onto the new record. The store toasts each failure itself. */
-  private async uploadAttachments(
-    target: { type: 'issue' | 'project'; id: string },
-  ): Promise<void> {
-    for (const file of this.attachments())
-      await this.store.uploadArtifactFile(target, file);
-  }
-
   protected onClosed(): void {
     if (this.ui.modal() === 'create') this.ui.closeModal();
   }
@@ -823,10 +748,16 @@ export class CreateDialog {
     this.projectKey.set(v.toUpperCase());
   }
 
-  protected err(field: 'title' | 'key'): string | null {
+  protected err(field: 'title' | 'key' | 'thread'): string | null {
     if (!this.submitted()) return null;
     const k = this.kind();
     switch (field) {
+      case 'thread': {
+        const raw = this.threadUrl().trim();
+        return k !== 'issue' || !raw || isValidThreadUrl(toThreadUrl(raw))
+          ? null
+          : 'Use a full http(s) link, for example https://delta.dev/…';
+      }
       case 'title':
         return this.title().trim() ? null : k === 'issue' ? 'Give it a title.' : 'Required.';
       case 'key':
@@ -845,7 +776,7 @@ export class CreateDialog {
   }
 
   private valid(): boolean {
-    return (['title', 'key'] as const).every((f) => !this.err(f));
+    return (['title', 'key', 'thread'] as const).every((f) => !this.err(f));
   }
 
   private focusTitle(): void {
@@ -879,7 +810,7 @@ export class CreateDialog {
     ev.stopPropagation();
     if (this.busy()) return;
     if (asDraft) {
-      if (!this.title().trim()) {
+      if (!this.title().trim() || this.err('thread')) {
         this.submitted.set(true);
         return;
       }
@@ -901,17 +832,16 @@ export class CreateDialog {
             kind: this.issueKind() as IssueKind,
             title,
             body: this.text().trim() || undefined,
-            goal: this.goal().trim() || undefined,
             priority: this.priority() as Priority,
             status,
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
             parentId: this.parentId() || undefined,
+            threadUrl: this.threadUrl().trim() ? toThreadUrl(this.threadUrl()) : undefined,
           });
           if (i) {
-            await this.uploadAttachments({ type: 'issue', id: i.id });
-            done = { label: `${i.key} created`, path: ['tasks', i.key] };
+            done ={ label: `${i.key} created`, path: ['tasks', i.key] };
           }
           break;
         }
@@ -923,7 +853,6 @@ export class CreateDialog {
             repository: this.repositoryText().trim() || undefined,
           });
           if (p) {
-            await this.uploadAttachments({ type: 'project', id: p.id });
             done = { label: `Project ${p.name} created`, path: ['projects', p.id] };
           }
           break;
@@ -959,7 +888,7 @@ export class CreateDialog {
         this.title.set('');
         this.text.set('');
         this.text2.set('');
-        this.attachments.set([]);
+        this.threadUrl.set('');
         this.submitted.set(false);
         this.draftAttempt.set(false);
         this.focusTitle();

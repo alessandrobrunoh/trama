@@ -58,7 +58,7 @@ const PER_KIND = 4;
       <ul
         [id]="listId"
         role="listbox"
-        class="bg-popover text-popover-foreground absolute top-full left-0 z-30 mt-1 max-h-64 w-72 max-w-full overflow-y-auto rounded-md border p-1 shadow-md"
+        class="bg-popover text-popover-foreground absolute top-full left-0 z-30 mt-1 max-h-64 w-72 max-w-full overflow-y-auto rounded-md p-1 shadow-md"
       >
         @for (s of suggestions(); track s.id; let i = $index) {
           <li

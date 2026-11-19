@@ -34,10 +34,12 @@ import {
   LucideTrash2,
   LucideX,
 } from '@lucide/angular';
+import { AppSelect, type Option } from '../create/form-kit';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
+import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
   ISSUE_STATUSES,
@@ -110,6 +112,8 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
     LabelPicker,
     HlmButtonImports,
     HlmPopoverImports,
+    HlmSwitchImports,
+    AppSelect,
     HlmContextMenuImports,
     HlmDropdownMenuImports,
     HlmTooltip,
@@ -134,14 +138,14 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
   template: `
     <!-- Filter + display toolbar -->
     <div
-      class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-1.5 sm:px-6 max-md:contents"
+      class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-6 max-md:contents"
     >
-      <div class="contents max-md:block max-md:w-full max-md:border-b max-md:px-4 max-md:py-2">
+      <div class="contents max-md:block max-md:w-full max-md:px-4 max-md:py-2">
         <app-search-input noun="issues" [(value)]="search" />
       </div>
       <!-- Phones: this row sticks under the header while the list scrolls (see styles.css, [data-mobile-sticky]). -->
       <div
-        class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:border-b max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2"
+        class="contents max-md:sticky max-md:top-0 max-md:z-[3] max-md:flex max-md:basis-full max-md:items-center max-md:gap-1 max-md:bg-background max-md:py-1.5 max-md:pl-4 max-md:pr-2"
         data-mobile-sticky
       >
         <div
@@ -274,30 +278,28 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
             </button>
             <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-72 p-0 text-[13px]">
               <div class="flex flex-col gap-2.5 p-3">
-                <label class="flex items-center justify-between gap-3">
+                <div class="flex items-center justify-between gap-3">
                   <span class="text-muted-foreground">Grouping</span>
-                  <select
-                    class="border-input bg-background h-7 w-36 rounded-md border px-1.5 text-xs"
+                  <app-select
+                    class="w-36"
+                    size="sm"
+                    label="Grouping"
+                    [options]="groupOptions"
                     [value]="d().groupBy"
-                    (change)="patch({ groupBy: $any($event.target).value })"
-                  >
-                    @for (g of groups; track g) {
-                      <option [value]="g">{{ groupLabels[g] }}</option>
-                    }
-                  </select>
-                </label>
+                    (valueChange)="patch({ groupBy: $any($event) })"
+                  />
+                </div>
                 <div class="flex items-center justify-between gap-3">
                   <span class="text-muted-foreground">Ordering</span>
                   <span class="flex items-center gap-1">
-                    <select
-                      class="border-input bg-background h-7 w-[7.25rem] rounded-md border px-1.5 text-xs"
+                    <app-select
+                      class="w-[7.25rem]"
+                      size="sm"
+                      label="Ordering"
+                      [options]="sortOptions"
                       [value]="d().sortField"
-                      (change)="patch({ sortField: $any($event.target).value })"
-                    >
-                      @for (s of sorts; track s) {
-                        <option [value]="s">{{ sortLabels[s] }}</option>
-                      }
-                    </select>
+                      (valueChange)="patch({ sortField: $any($event) })"
+                    />
                     <button
                       hlmBtn
                       variant="outline"
@@ -316,11 +318,11 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
                 </div>
                 <label class="flex cursor-pointer items-center justify-between gap-3">
                   <span class="text-muted-foreground">Show empty groups</span>
-                  <input
-                    type="checkbox"
-                    class="accent-primary size-3.5"
+                  <hlm-switch
+                    size="sm"
+                    aria-label="Show empty groups"
                     [checked]="d().showEmptyGroups"
-                    (change)="patch({ showEmptyGroups: $any($event.target).checked })"
+                    (checkedChange)="patch({ showEmptyGroups: $event })"
                   />
                 </label>
                 @if (d().layout === 'list') {
@@ -343,17 +345,17 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
                   </div>
                 }
               </div>
-              <div class="border-t p-3">
+              <div class="p-3 pt-1">
                 <p class="text-muted-foreground mb-2 text-xs">Display properties</p>
                 <div class="flex flex-wrap gap-1.5">
                   @for (p of props; track p) {
                     <button
                       type="button"
-                      class="h-6 rounded-md border px-2 text-xs transition-colors"
+                      class="h-6 rounded-md px-2 text-xs transition-colors"
                       [class]="
                         isShown(p)
-                          ? 'border-border-strong bg-accent text-foreground'
-                          : 'border-border text-muted-foreground hover:text-foreground'
+                          ? 'bg-selected text-foreground'
+                          : 'bg-secondary text-muted-foreground hover:text-foreground'
                       "
                       [attr.aria-pressed]="isShown(p)"
                       (click)="toggleProp(p)"
@@ -363,7 +365,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
                   }
                 </div>
               </div>
-              <div class="flex justify-end border-t px-3 py-2">
+              <div class="flex justify-end px-3 pb-2">
                 <button
                   hlmBtn
                   variant="ghost"
@@ -613,7 +615,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
           aria-label="Bulk actions"
         >
           <span
-            class="flex items-center gap-1 rounded-md border border-dashed px-2 py-0.5 text-xs whitespace-nowrap"
+            class="flex items-center gap-1 bg-muted rounded-md px-2 py-0.5 text-xs whitespace-nowrap"
           >
             <span class="tabular-nums">{{ selection().length }}</span> selected
             <button
@@ -638,7 +640,7 @@ const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
               Select all
             </button>
           }
-          <span class="bg-border mx-1 h-4 w-px shrink-0"></span>
+          <span class="mx-1 h-4 shrink-0"></span>
           <button
             hlmBtn
             variant="ghost"
@@ -763,6 +765,8 @@ export class IssueBoard {
   private readonly queryCtx = computed(() => ({}));
   protected readonly groups = GROUPS;
   protected readonly sorts = SORTS;
+  protected readonly groupOptions: Option[] = GROUPS.map((g) => ({ value: g, label: GROUP_LABEL[g] }));
+  protected readonly sortOptions: Option[] = SORTS.map((s) => ({ value: s, label: SORT_LABEL[s] }));
   protected readonly props = PROPS;
   protected readonly groupLabels = GROUP_LABEL;
   protected readonly sortLabels = SORT_LABEL;

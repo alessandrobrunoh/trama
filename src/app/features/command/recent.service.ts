@@ -73,7 +73,6 @@ export class RecentItems {
       switch (r.type) {
         case 'issue': return this.store.issueById().has(r.id);
         case 'project': return this.store.projectById().has(r.id);
-        case 'artifact': return true;
         default: return false;
       }
     };

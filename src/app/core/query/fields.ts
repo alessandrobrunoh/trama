@@ -5,7 +5,6 @@ import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
-  PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
 } from '../meta';
 
@@ -53,7 +52,6 @@ export const FIELD_DEFS: Record<ViewEntity, readonly FieldDef[]> = {
   project: [
     { field: 'status', label: 'Status', kind: 'enum', values: keysByOrder(PROJECT_STATUS_META), sortable: true, groupable: true },
     { field: 'priority', label: 'Priority', kind: 'enum', values: keysByOrder(PRIORITY_META), sortable: true, groupable: true },
-    { field: 'health', label: 'Health', kind: 'enum', values: keysByOrder(PROJECT_HEALTH_META), sortable: true, groupable: true },
     { field: 'leadId', label: 'Lead', kind: 'id', refersTo: 'user', sortable: true, groupable: true },
     { field: 'repository', label: 'Repository', kind: 'text', sortable: true, groupable: false },
     { field: 'labels', label: 'Labels', kind: 'tags', sortable: false, groupable: false },

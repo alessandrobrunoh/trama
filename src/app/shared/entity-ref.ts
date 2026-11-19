@@ -99,7 +99,7 @@ export class EntityRefs {
         {{ r.key }}
       </div>
       <div class="text-[13px] leading-snug font-medium">{{ r.title }}</div>
-      <div class="border-t pt-2 text-xs">
+      <div class="pt-2 text-xs">
         @switch (r.type) {
           @case ('issue') {
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5">
@@ -149,7 +149,7 @@ function statusOf(
         <a
           hlmHoverCardTrigger
           [routerLink]="r.link"
-          class="border-border-strong hover:bg-accent hover:border-foreground/20 mx-px inline-flex h-[1.4em] max-w-full items-center gap-1 rounded-md border px-1.5 align-baseline font-mono text-[0.85em] whitespace-nowrap no-underline transition-colors"
+          class="bg-foreground/[0.06] hover:bg-accent mx-px inline-flex h-[1.4em] max-w-full items-center gap-1 rounded-md px-1.5 align-baseline font-mono text-[0.85em] whitespace-nowrap no-underline transition-colors"
         >
           @if (visual(); as v) {
             <app-status-icon [status]="v.status" [entity]="v.entity" [size]="12" />

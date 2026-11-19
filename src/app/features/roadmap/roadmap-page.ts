@@ -47,7 +47,7 @@ import { SiteHeader } from '../landing/site-header';
       </div>
 
       <div class="mx-auto max-w-6xl px-4 sm:px-6">
-        <section class="border-border mt-16 rounded-2xl border border-dashed p-6 sm:p-8">
+        <section class="bg-muted mt-16 rounded-2xl p-6 sm:p-8">
           <div class="flex items-center gap-2">
             <svg [lucideIcon]="banIcon" [size]="16" class="text-muted-foreground"></svg>
             <h2 class="font-semibold">Deliberately not on the roadmap</h2>

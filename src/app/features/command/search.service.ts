@@ -3,7 +3,7 @@ import { ApiClient } from '../../core/api/api-client';
 import { TramaStore } from '../../core/stores/trama.store';
 import { fuzzyScore } from './fuzzy';
 
-export type HitType = 'project' | 'issue' | 'artifact';
+export type HitType = 'project' | 'issue';
 
 /** One search result, normalised from `GET /search` or computed locally from the store. */
 export interface SearchHit {
@@ -14,16 +14,14 @@ export interface SearchHit {
   subtitle?: string;
 }
 
-export const HIT_ORDER: HitType[] = ['project', 'issue', 'artifact'];
+export const HIT_ORDER: HitType[] = ['project', 'issue'];
 export const HIT_LABEL: Record<HitType, string> = {
   project: 'Projects',
   issue: 'Tasks',
-  artifact: 'Artifacts',
 };
 export const HIT_SINGULAR: Record<HitType, string> = {
   project: 'Project',
   issue: 'Task',
-  artifact: 'Artifact',
 };
 
 const TYPE_ALIASES: Record<string, HitType> = {
@@ -32,8 +30,6 @@ const TYPE_ALIASES: Record<string, HitType> = {
   issues: 'issue',
   issue: 'issue',
   tasks: 'issue',
-  artifacts: 'artifact',
-  artifact: 'artifact',
 };
 
 function asHit(raw: unknown, forcedType?: HitType): SearchHit | null {
@@ -106,8 +102,6 @@ export class SearchService {
     };
     for (const p of s.projects()) push({ type: 'project', id: p.id, title: p.name }, p.name, p.summary ?? '');
     for (const i of s.issues()) push({ type: 'issue', id: i.id, key: i.key, title: i.title }, `${i.key} ${i.title}`, i.body ?? '');
-    for (const a of s.artifacts())
-      push({ type: 'artifact', id: a.id, title: a.title, subtitle: a.externalId }, a.title, a.externalId ?? '');
 
     const counts = new Map<HitType, number>();
     return scored
@@ -127,18 +121,10 @@ export class SearchService {
         return ['tasks', h.key ?? h.id];
       case 'project':
         return ['projects', h.id];
-      case 'artifact': {
-        const a = this.store.artifactById().get(h.id);
-        const issue = this.store.getIssue(a?.issueId);
-        if (issue) return ['tasks', issue.key];
-        return a?.projectId ? ['projects', a.projectId] : ['tasks'];
-      }
     }
   }
 
-  queryParams(h: SearchHit): Record<string, string> | undefined {
-    if (h.type !== 'artifact') return undefined;
-    const a = this.store.artifactById().get(h.id);
+  queryParams(_h: SearchHit): Record<string, string> | undefined {
     return undefined;
   }
 }

@@ -57,6 +57,7 @@ import { LabelChip, LabelChips } from './label-chip';
             type="button"
             variant="ghost"
             class="h-auto min-h-8 w-full min-w-0 justify-start gap-1.5 px-1.5 py-1 text-left font-normal"
+            [class]="triggerClass()"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
@@ -129,10 +130,10 @@ import { LabelChip, LabelChips } from './label-chip';
             }
           </div>
           @if (atMax()) {
-            <div class="text-muted-foreground border-t px-3 py-1.5 text-[11px]">At most {{ catalog.maxPerRecord }} labels per item.</div>
+            <div class="text-muted-foreground px-3 py-1.5 text-[11px]">At most {{ catalog.maxPerRecord }} labels per item.</div>
           }
           @if (catalog.canManage() && manageLink()) {
-            <div class="border-t p-1">
+            <div class="p-1">
               <a
                 hlmBtn
                 variant="ghost"
@@ -158,6 +159,8 @@ export class LabelPicker {
   /** Selected label ids. */
   readonly value = input<readonly string[]>([]);
   readonly variant = input<'field' | 'chip'>('field');
+  /** Extra classes for the field trigger (e.g. a shorter row in the task inspector). */
+  readonly triggerClass = input('');
   readonly label = input('Labels');
   readonly placeholder = input('Add labels');
   readonly disabled = input(false);

@@ -1,61 +1,27 @@
-// "What does this issue really cost?": cycle time (startedAt → completedAt, or running so far) set against
-// the median of finished issues with the same estimate. Pure, so it is cheap to reason about and test.
+// "What does this task really cost?": the time tracked with the timer on the task, set against the median
+// tracked time of finished tasks with the same estimate. Wall-clock time spent in a status is never used.
+// Pure, so it is cheap to reason about and test.
 import type { Issue } from '../../core';
-import { REF_MIN, dist } from '../stats/perf';
-
-const DAY = 86_400_000;
+import { REF_MIN, typicalTracked } from '../stats/flow-stats';
 
 export type CostVerdict = 'faster' | 'on_track' | 'longer';
 
 export interface IssueCost {
   state: 'not_started' | 'running' | 'done' | 'canceled';
-  /** Start → completion (done / canceled) or start → now (running); undefined before it starts. */
-  cycleMs?: number;
-  /** The cycle time is still counting. */
-  running: boolean;
-  /** Present when the issue has an estimate. */
+  /** Finished tracked time on this task; undefined when nothing was tracked. */
+  trackedMs?: number;
+  /** The task is still open, so the tracked time can still grow. */
+  open: boolean;
+  /** Present when the task has an estimate. */
   compare?: {
     estimate: number;
-    /** Finished issues in the selected comparison group (not counting this one). */
+    /** Finished tasks at this estimate with tracked time (not counting this one). */
     n: number;
-    /** True when the comparison uses this assignee's history. */
-    personalized: boolean;
-    /** Median cycle time of those; undefined below REF_MIN. */
+    /** Median tracked time of those; undefined below REF_MIN. */
     typicalMs?: number;
     ratio?: number;
     verdict?: CostVerdict;
   };
-}
-
-const ms = (iso: string | undefined): number | undefined => {
-  if (!iso) return undefined;
-  const t = Date.parse(iso);
-  return Number.isFinite(t) ? t : undefined;
-};
-
-/** Cycle times (days) of finished issues sharing `estimate`, excluding `exceptId`. */
-export function finishedCycles(all: readonly Issue[], estimate: number, exceptId?: string): number[] {
-  const out: number[] = [];
-  for (const i of all) {
-    if (i.id === exceptId || i.status !== 'done' || i.estimate !== estimate) continue;
-    const a = ms(i.startedAt);
-    const b = ms(i.completedAt);
-    if (a !== undefined && b !== undefined && b >= a) out.push((b - a) / DAY);
-  }
-  return out;
-}
-
-/** Prefer the assignee's estimate history once it has enough samples; otherwise use workspace history. */
-export function estimateCycles(all: readonly Issue[], estimate: number, assigneeId?: string, exceptId?: string) {
-  const workspace = finishedCycles(all, estimate, exceptId);
-  const personal = assigneeId
-    ? all
-        .filter((issue) => issue.assigneeId === assigneeId)
-        .flatMap((issue) => finishedCycles([issue], estimate, exceptId))
-    : [];
-  return personal.length >= REF_MIN
-    ? { cycles: personal, personalized: true }
-    : { cycles: workspace, personalized: false };
 }
 
 export function verdictFor(ratio: number, finished: boolean): CostVerdict {
@@ -64,35 +30,35 @@ export function verdictFor(ratio: number, finished: boolean): CostVerdict {
   return 'on_track';
 }
 
-export function issueCost(issue: Issue, all: readonly Issue[], now: number): IssueCost {
-  const started = ms(issue.startedAt);
-  const completed = ms(issue.completedAt);
+export function issueCost(
+  issue: Issue,
+  all: readonly Issue[],
+  tracked: ReadonlyMap<string, number>,
+): IssueCost {
   const closed = issue.status === 'done' || issue.status === 'canceled';
-  const state: IssueCost['state'] = issue.status === 'done' ? 'done' : issue.status === 'canceled' ? 'canceled' : started !== undefined ? 'running' : 'not_started';
+  const state: IssueCost['state'] =
+    issue.status === 'done'
+      ? 'done'
+      : issue.status === 'canceled'
+        ? 'canceled'
+        : issue.startedAt
+          ? 'running'
+          : 'not_started';
+  const trackedMs = tracked.get(issue.id);
+  const cost: IssueCost = { state, trackedMs, open: !closed };
 
-  let cycleMs: number | undefined;
-  let running = false;
-  if (started !== undefined) {
-    if (closed && completed !== undefined) cycleMs = Math.max(0, completed - started);
-    else if (!closed) {
-      cycleMs = Math.max(0, now - started);
-      running = true;
-    }
-  }
-
-  const cost: IssueCost = { state, cycleMs, running };
   if (issue.estimate !== undefined && issue.estimate !== null) {
-    const { cycles: days, personalized } = estimateCycles(all, issue.estimate, issue.assigneeId, issue.id);
-    const d = dist(days);
-    const typicalMs = d && d.n >= REF_MIN ? d.median * DAY : undefined;
+    const { n, medianMs } = typicalTracked(all, tracked, issue.estimate, issue.id);
     let ratio: number | undefined;
     let verdict: CostVerdict | undefined;
     // canceled work says nothing about the estimate
-    if (typicalMs && typicalMs > 0 && cycleMs !== undefined && state !== 'canceled') {
-      ratio = cycleMs / typicalMs;
+    if (medianMs && medianMs > 0 && trackedMs !== undefined && state !== 'canceled') {
+      ratio = trackedMs / medianMs;
       verdict = verdictFor(ratio, state === 'done');
     }
-    cost.compare = { estimate: issue.estimate, n: days.length, personalized, typicalMs, ratio, verdict };
+    cost.compare = { estimate: issue.estimate, n, typicalMs: medianMs, ratio, verdict };
   }
   return cost;
 }
+
+export { REF_MIN };

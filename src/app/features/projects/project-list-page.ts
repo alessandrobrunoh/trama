@@ -2,36 +2,26 @@ import { ChangeDetectionStrategy, Component, computed, inject, input, signal } f
 import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import {
-  PROJECT_HEALTH_META,
-  TramaStore,
-  UiStore,
-  type Project,
-} from '../../core';
+import { TramaStore, UiStore } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
-import { FullDatePipe, RelativeTimePipe } from '../../shared/pipes';
+import { FullDatePipe } from '../../shared/pipes';
 import { Picker } from '../../shared/picker';
 import { ProjectGlyph } from './project-glyph';
-import { ProjectHealthBadge } from './project-health';
 import {
-  HEALTH_ORDER,
-  PROJECT_STATUS_META,
   isClosed,
   isOverdue,
-  isUpdateOverdue,
+  projectHealthView,
   projectStatusOptions,
   projectStatusView,
 } from './project-model';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
-
-const NO_UPDATES = 'none';
 
 @Component({
   selector: 'app-project-list-page',
@@ -50,9 +40,7 @@ const NO_UPDATES = 'none';
     TopBarActions,
     PriorityIcon,
     FullDatePipe,
-    RelativeTimePipe,
     ProjectGlyph,
-    ProjectHealthBadge,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -68,7 +56,7 @@ const NO_UPDATES = 'none';
 
     <app-page-header title="Projects" [description]="description()" />
 
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 border-b px-4 py-2 sm:px-6">
+    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-6">
       <app-search-input noun="projects" [(value)]="search" />
       <div
         class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
@@ -81,15 +69,6 @@ const NO_UPDATES = 'none';
           [options]="statuses"
           [value]="statusFilter()"
           (valueChange)="statusFilter.set($event)"
-        />
-        <app-picker
-          variant="chip"
-          label="Health"
-          [multiple]="true"
-          [searchable]="false"
-          [options]="healths"
-          [value]="healthFilter()"
-          (valueChange)="healthFilter.set($event)"
         />
         <app-label-picker
           variant="chip"
@@ -118,7 +97,7 @@ const NO_UPDATES = 'none';
       <app-empty-state
         [icon]="boxIcon"
         title="No projects yet"
-        description="A project groups planned tasks, milestones and project context."
+        description="A project groups planned tasks and milestones."
       >
         @if (canManage()) {
           <button hlmBtn size="sm" (click)="create()">
@@ -137,16 +116,15 @@ const NO_UPDATES = 'none';
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list">
         <div
-          class="text-muted-foreground bg-muted/30 hidden items-center gap-3 border-b px-4 py-1.5 text-xs sm:px-6 md:flex"
+          class="text-muted-foreground hidden items-center gap-3 px-4 py-1.5 text-xs sm:px-6 md:flex"
         >
           <span class="flex-1">Name</span>
           <span class="w-24">Priority</span>
           <span class="w-28">Status</span>
           <span class="w-24">Health</span>
-          <span class="w-24">Updated</span>
-          <span class="w-32">Lead</span>
+          <span class="w-28">Lead</span>
           <span class="w-28">Target</span>
-          <span class="w-40 text-right">Repository</span>
+          <span class="w-36 text-right">Repository</span>
         </div>
         @for (row of rows(); track row.project.id) {
           @let p = row.project;
@@ -154,7 +132,7 @@ const NO_UPDATES = 'none';
             [routerLink]="['/', slug(), 'projects', p.id]"
             [attr.data-row-id]="p.id"
             role="listitem"
-            class="hover:bg-muted/60 focus-visible:bg-muted/60 focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
+            class="hover:bg-hover focus-visible:bg-hover focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-inset sm:px-6 md:min-h-10 md:flex-nowrap md:py-2"
             [class.bg-muted]="ui.focusedRowId() === p.id"
           >
             <span class="flex min-w-0 flex-1 items-center gap-2.5">
@@ -188,27 +166,22 @@ const NO_UPDATES = 'none';
                 ></span>
                 {{ row.status.label }}
               </span>
-              <span class="flex w-24 items-center max-md:w-auto">
-                @if (p.health) {
-                  <app-project-health [health]="p.health" [compact]="true" />
-                } @else {
-                  <span aria-label="No update yet">—</span>
-                }
-              </span>
-              <span
-                class="w-24 whitespace-nowrap max-md:w-auto"
-                [class.text-status-needs-input]="row.updateOverdue"
-              >
-                {{ p.lastUpdateAt ? (p.lastUpdateAt | relativeTime) : '—' }}
-              </span>
-              <span class="w-32 truncate max-md:w-auto max-md:max-w-32">{{ row.lead ?? '—' }}</span>
+              @if (row.health; as h) {
+                <span class="flex w-24 items-center gap-1.5 max-md:w-auto" [style.color]="h.color">
+                  <span class="size-2 shrink-0 rounded-full" [style.background]="h.color"></span>
+                  {{ h.label }}
+                </span>
+              } @else {
+                <span class="w-24 max-md:hidden">—</span>
+              }
+              <span class="w-28 truncate max-md:w-auto max-md:max-w-32">{{ row.lead ?? '—' }}</span>
               <span
                 class="w-28 whitespace-nowrap max-md:w-auto"
                 [class.text-status-blocked]="row.overdue"
               >
                 {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
               </span>
-              <span class="w-40 truncate text-right font-mono text-[11px] max-md:w-auto">{{
+              <span class="w-36 truncate text-right font-mono text-[11px] max-md:w-auto">{{
                 row.repository || '—'
               }}</span>
             </span>
@@ -233,15 +206,10 @@ export class ProjectListPage {
   protected get statuses() {
     return projectStatusOptions(this.store.settings().statuses.project);
   }
-  protected readonly healths = [
-    ...HEALTH_ORDER.map((h) => ({ value: h as string, label: PROJECT_HEALTH_META[h].label })),
-    { value: NO_UPDATES, label: 'No updates' },
-  ];
 
   // Filters survive navigation inside the app (see ListStateStore).
   protected readonly search = this.listState.remember('projects.search', '');
   protected readonly statusFilter = this.listState.remember<string[]>('projects.status', []);
-  protected readonly healthFilter = this.listState.remember<string[]>('projects.health', []);
   protected readonly labelFilter = this.listState.remember<string[]>('projects.labels', []);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
@@ -251,21 +219,18 @@ export class ProjectListPage {
     () =>
       !!this.search().trim() ||
       this.statusFilter().length > 0 ||
-      this.healthFilter().length > 0 ||
       this.labelFilter().length > 0,
   );
 
   protected readonly rows = computed(() => {
     const q = this.search().trim().toLowerCase();
     const statuses = new Set(this.statusFilter());
-    const healths = new Set(this.healthFilter());
     const labels = this.labelFilter();
     const users = this.store.userById();
     return this.store
       .projects()
       .filter((p) => {
         if (statuses.size && !statuses.has(p.status)) return false;
-        if (healths.size && !healths.has(p.health ?? NO_UPDATES)) return false;
         if (labels.length && !labels.some((id) => p.labels.includes(id))) return false;
         return !q || `${p.name} ${p.summary ?? ''} ${p.repository ?? ''}`.toLowerCase().includes(q);
       })
@@ -279,9 +244,9 @@ export class ProjectListPage {
       .map((project) => ({
         project,
         status: projectStatusView(project.status, this.store.settings().statuses.project),
+        health: projectHealthView(project.health, this.store.settings().statuses.projectHealth),
         lead: project.leadId ? users.get(project.leadId)?.name : undefined,
         overdue: isOverdue(project),
-        updateOverdue: isUpdateOverdue(project),
         repository: project.repository ?? '',
       }));
   });
@@ -299,7 +264,6 @@ export class ProjectListPage {
   protected clearFilters(): void {
     this.search.set('');
     this.statusFilter.set([]);
-    this.healthFilter.set([]);
     this.labelFilter.set([]);
   }
 }

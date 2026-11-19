@@ -9,16 +9,13 @@
 //  - after writes settle the snapshot is re-fetched (debounced) because the server derives
 //    status + attention; unchanged entities keep their object identity;
 //  - mutation methods NEVER reject: they toast on failure and resolve `undefined` / `false`.
-import { Injectable, computed, inject, signal, type Signal, type WritableSignal } from '@angular/core';
+import { Injectable, computed, inject, signal, type WritableSignal } from '@angular/core';
 import { ApiClient } from '../api/api-client';
 import { ApiError } from '../api/api-error';
 import type {
   AddMemberInput,
   UpdateMemberInput,
   CreateAgentInput,
-  CreateOwnedArtifactInput,
-  CreateProjectUpdateInput,
-  UpdateProjectUpdateInput,
   BulkIssuePatch,
   CreateIssueInput,
   CreateMilestoneInput,
@@ -44,7 +41,6 @@ import type {
   SharingInput,
   EventsQuery,
   UpdateAgentInput,
-  UpdateArtifactInput,
   UpdateIssueInput,
   UpdateProjectInput,
   UpdateViewInput,
@@ -73,9 +69,6 @@ import type {
   Project,
   ProjectAiKind,
   ProjectAiResult,
-  ProjectContext,
-  ProjectContextArtifact,
-  ProjectUpdate,
   Role,
   SavedView,
   SubjectRef,
@@ -92,7 +85,7 @@ import { uploadIdsIn } from '../upload-url';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
 import { Notifier } from '../notify/notifier';
-import { reconcileList, reconcileOne, sameJson } from '../sync/reconcile';
+import { reconcileList, reconcileOne } from '../sync/reconcile';
 import { SyncStatus } from '../sync/sync-status';
 
 type Row = { id: string };
@@ -112,7 +105,7 @@ export interface ResolvedActor {
   known: boolean;
 }
 
-/** Load state of an on-demand resource (project updates, project context). */
+/** Load state of an on-demand resource (comment threads). */
 export type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 /** Where a subject's comment thread stands: the newest page is loaded, `nextCursor` leads to older ones. */
@@ -122,13 +115,6 @@ export interface CommentThreadInfo {
   loadingMore: boolean;
 }
 const IDLE_THREAD: CommentThreadInfo = { state: 'idle', nextCursor: null, loadingMore: false };
-
-/** A project or issue node in the local artifact tree. */
-export interface ArtifactTreeNode {
-  subject: SubjectRef;
-  artifacts: Artifact[];
-  children: ArtifactTreeNode[];
-}
 
 export interface MemberRow {
   membership: Membership;
@@ -177,22 +163,6 @@ function applyPatch<T>(entity: T, patch: object): T {
 }
 
 const subjectKey = (type: string, id: string) => `${type}:${id}`;
-
-const NO_UPDATES: readonly ProjectUpdate[] = [];
-
-/** Live event entities that can change what a project's `/context` contains. */
-const PROJECT_CONTEXT_ENTITIES: ReadonlySet<string> = new Set([
-  'project',
-  'project_update',
-  'issue',
-  'artifact',
-  'milestone',
-]);
-
-/** A shallow copy without `undefined` values (so spreading a PATCH body does not wipe fields). */
-function definedOnly<T extends object>(patch: T): Partial<T> {
-  return Object.fromEntries(Object.entries(patch).filter(([, v]) => v !== undefined)) as Partial<T>;
-}
 
 @Injectable({ providedIn: 'root' })
 export class TramaStore {
@@ -286,8 +256,6 @@ export class TramaStore {
     return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
   });
 
-  /** Artifacts attached directly to a project (by project id). */
-  readonly artifactsByProject = computed(() => groupBy(this._artifacts(), (a) => a.projectId));
   /** Artifacts attached directly to an issue (by issue id). */
   readonly artifactsByIssue = computed(() => groupBy(this._artifacts(), (a) => a.issueId));
   /** Milestones of a project (by project id), ordered by `sortOrder`. */
@@ -304,50 +272,6 @@ export class TramaStore {
   readonly issuesByMilestone = computed(() =>
     groupBy(this._issues(), (i) => (i.milestoneIds?.length ? i.milestoneIds : undefined)),
   );
-  /** Each project with its directly planned issues and attached artifacts. */
-  readonly projectArtifactTree = computed(() => {
-    const byIssue = this.artifactsByIssue();
-    const byProject = this.artifactsByProject();
-    const ownIssues = groupBy(this._issues(), (i) => i.projectId);
-    const issueNode = (i: Issue): ArtifactTreeNode => ({
-      subject: { type: 'issue', id: i.id },
-      artifacts: byIssue.get(i.id) ?? [],
-      children: [],
-    });
-    const tree = new Map<ID, ArtifactTreeNode>();
-    for (const p of this._projects()) {
-      const children = (ownIssues.get(p.id) ?? []).map(issueNode);
-      tree.set(p.id, {
-        subject: { type: 'project', id: p.id },
-        artifacts: byProject.get(p.id) ?? [],
-        children,
-      });
-    }
-    return tree;
-  });
-  /**
-   * Every artifact reachable from a project with the chain back to its owner (same shape as
-   * `ProjectContext.artifacts`), derived from the snapshot. Keyed by project id; each artifact appears once.
-   */
-  readonly projectArtifacts = computed(() => {
-    const out = new Map<ID, ProjectContextArtifact[]>();
-    for (const [projectId, root] of this.projectArtifactTree()) {
-      const seen = new Set<ID>();
-      const list: ProjectContextArtifact[] = [];
-      const walk = (node: ArtifactTreeNode, path: SubjectRef[]): void => {
-        const here = [...path, node.subject];
-        for (const artifact of node.artifacts) {
-          if (seen.has(artifact.id)) continue;
-          seen.add(artifact.id);
-          list.push({ artifact, path: here });
-        }
-        for (const child of node.children) walk(child, here);
-      };
-      walk(root, []);
-      out.set(projectId, list);
-    }
-    return out;
-  });
   /** Comments by `type:id`, oldest first. */
   readonly commentsBySubject = computed(() => {
     const map = groupBy(this._comments(), (c) => subjectKey(c.subject.type, c.subject.id));
@@ -584,7 +508,6 @@ export class TramaStore {
     this.commentReloadTimer = null;
     this._integrationDetails.set([]);
     this._outgoingWebhooks.set([]);
-    this.resetProjectData();
   }
 
   /** Re-fetch the snapshot now and merge it, preserving identity of unchanged entities. */
@@ -764,7 +687,6 @@ export class TramaStore {
       this.epoch++;
       this.sync.pendingWrites.set(this.pending);
       if (options.refetch !== false) this.scheduleRefetch();
-      this.invalidateProjectContexts();
     }
   }
 
@@ -897,7 +819,7 @@ export class TramaStore {
     if (!this.issueById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._issues, id);
-    for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId)) tx.remove(this._artifacts, a.id);
+    for (const a of this._artifacts().filter((x) => x.issueId === id)) tx.remove(this._artifacts, a.id);
     return this.ok('delete task', (s) => this.api.issues.remove(s, id), { tx });
   }
 
@@ -916,7 +838,7 @@ export class TramaStore {
     const gone = new Set(targets);
     const tx = this.tx();
     for (const id of targets) tx.remove(this._issues, id);
-    for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId) && !x.projectId)) tx.remove(this._artifacts, a.id);
+    for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId))) tx.remove(this._artifacts, a.id);
     for (const id of targets) this.stagedDeletes.add(id);
     const release = () => targets.forEach((id) => this.stagedDeletes.delete(id));
     let state: 'pending' | 'committed' | 'canceled' = 'pending';
@@ -1007,43 +929,6 @@ export class TramaStore {
 
 
 
-
-
-
-
-
-  /** Attach an artifact to a project itself (a link, a spec, a design...). Waits for the server. */
-  async attachProjectArtifact(projectId: ID, input: CreateOwnedArtifactInput): Promise<Artifact | undefined> {
-    return this.write('attach artifact', (s) => this.api.projects.artifacts.create(s, projectId, input), {
-      onResult: (a) => this.upsert(this._artifacts, a),
-    });
-  }
-
-  /** Attach an artifact to an issue (`ref` = id or key). Waits for the server. */
-  async attachIssueArtifact(ref: string, input: CreateOwnedArtifactInput): Promise<Artifact | undefined> {
-    const issue = this.getIssue(ref);
-    if (!issue) return undefined;
-    return this.write('attach artifact', (s) => this.api.issues.artifacts.create(s, issue.id, input), {
-      onResult: (a) => this.upsert(this._artifacts, a),
-    });
-  }
-
-  async updateArtifact(id: ID, patch: UpdateArtifactInput): Promise<boolean> {
-    if (!this.artifactById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._artifacts, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update artifact', (s) => this.api.artifacts.update(s, id, patch), {
-      tx,
-      onResult: (a) => this.upsert(this._artifacts, a),
-    }).then((r) => !!r);
-  }
-
-  async removeArtifact(id: ID): Promise<boolean> {
-    if (!this.artifactById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._artifacts, id);
-    return this.ok('remove artifact', (s) => this.api.artifacts.remove(s, id), { tx });
-  }
 
 
 
@@ -1264,217 +1149,16 @@ export class TramaStore {
     if (!this.projectById().has(id)) return false;
     const tx = this.tx();
     tx.remove(this._projects, id);
-    for (const a of this._artifacts().filter((x) => x.projectId === id && !x.issueId)) tx.remove(this._artifacts, a.id);
-    this.dropProjectData(id);
     // its milestones go with it
     this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
     return this.ok('delete project', (s) => this.api.projects.remove(s, id), { tx });
   }
 
-  // ─────────────────────────── project updates ───────────────────────────
-
-  private readonly _projectUpdates = signal<ReadonlyMap<ID, readonly ProjectUpdate[]>>(new Map());
-  private readonly _projectUpdatesState = signal<ReadonlyMap<ID, LoadState>>(new Map());
-  private readonly projectUpdateSignals = new Map<ID, Signal<readonly ProjectUpdate[]>>();
-  private readonly projectUpdateStateSignals = new Map<ID, Signal<LoadState>>();
-  private readonly updatesInflight = new Map<ID, Promise<void>>();
+  // ─────────────────────────── project AI & live events ───────────────────────────
 
   /**
-   * The updates feed of a project, newest first. Empty until `loadProjectUpdates(id)` resolved
-   * (check `projectUpdatesState`). The signal for an id is stable, so it is safe to call from a computed.
-   */
-  projectUpdates(projectId: ID): Signal<readonly ProjectUpdate[]> {
-    let sig = this.projectUpdateSignals.get(projectId);
-    if (!sig) {
-      sig = computed(() => this._projectUpdates().get(projectId) ?? NO_UPDATES);
-      this.projectUpdateSignals.set(projectId, sig);
-    }
-    return sig;
-  }
-
-  /** `idle` (never loaded) | `loading` | `ready` | `error` for the updates feed of a project. */
-  projectUpdatesState(projectId: ID): Signal<LoadState> {
-    let sig = this.projectUpdateStateSignals.get(projectId);
-    if (!sig) {
-      sig = computed(() => this._projectUpdatesState().get(projectId) ?? 'idle');
-      this.projectUpdateStateSignals.set(projectId, sig);
-    }
-    return sig;
-  }
-
-  /**
-   * Load (or with `force` reload) the updates feed of a project. Never rejects: failures toast and the state becomes
-   * `error`. Concurrent calls share one request. A loaded feed is kept fresh by live `project_update` events.
-   */
-  loadProjectUpdates(projectId: ID, options: { force?: boolean; quiet?: boolean } = {}): Promise<void> {
-    const slug = this.slug();
-    if (!slug) return Promise.resolve();
-    if (!options.force && this._projectUpdatesState().get(projectId) === 'ready') return Promise.resolve();
-    const running = this.updatesInflight.get(projectId);
-    if (running) return running;
-    const hadData = this._projectUpdates().has(projectId);
-    if (!hadData) this.setMapEntry(this._projectUpdatesState, projectId, 'loading');
-    const promise = this.api.projects.updates
-      .list(slug, projectId)
-      .then((list) => {
-        if (this.slug() !== slug) return;
-        this.setUpdatesList(projectId, list);
-        this.setMapEntry(this._projectUpdatesState, projectId, 'ready');
-      })
-      .catch((e: unknown) => {
-        if (this.slug() !== slug) return;
-        const err = ApiError.from(e);
-        this.setMapEntry(this._projectUpdatesState, projectId, hadData ? 'ready' : 'error');
-        if (!options.quiet && err.status !== 401 && err.status !== 403) {
-          this.notifier.error('Could not load project updates', { description: err.message });
-        }
-      })
-      .finally(() => this.updatesInflight.delete(projectId));
-    this.updatesInflight.set(projectId, promise);
-    return promise;
-  }
-
-  /** Post a status update (health + markdown). Waits for the server; resolves the created update. */
-  async createProjectUpdate(projectId: ID, input: CreateProjectUpdateInput): Promise<ProjectUpdate | undefined> {
-    if (!this.projectById().has(projectId)) return undefined;
-    return this.write('post project update', (s) => this.api.projects.updates.create(s, projectId, input), {
-      onResult: (u) => {
-        if (this._projectUpdatesState().get(projectId) === 'ready') {
-          this.applyUpdatesChange(projectId, [u, ...this.projectUpdates(projectId)().filter((x) => x.id !== u.id)]);
-        } else {
-          // feed not loaded: still keep the project's health badge right
-          this.patchProjectHealth(projectId, u.health, u.createdAt);
-        }
-      },
-    });
-  }
-
-  /** Edit health and/or body of an update (optimistic). */
-  async updateProjectUpdate(projectId: ID, id: ID, patch: UpdateProjectUpdateInput): Promise<boolean> {
-    const current = this.projectUpdates(projectId)().find((u) => u.id === id);
-    if (!current) return false;
-    const undo = this.applyUpdatesChange(
-      projectId,
-      this.projectUpdates(projectId)().map((u) =>
-        u.id === id ? { ...u, ...definedOnly(patch), editedAt: this.nowIso() } : u,
-      ),
-    );
-    return this.write('update project update', (s) => this.api.projects.updates.update(s, projectId, id, patch), {
-      tx: { rollback: undo },
-      onResult: (u) =>
-        this.applyUpdatesChange(
-          projectId,
-          this.projectUpdates(projectId)().map((x) => (x.id === u.id ? u : x)),
-        ),
-    }).then((r) => !!r);
-  }
-
-  /** Delete an update (optimistic); the project's health falls back to the previous update. */
-  async deleteProjectUpdate(projectId: ID, id: ID): Promise<boolean> {
-    if (!this.projectUpdates(projectId)().some((u) => u.id === id)) return false;
-    const undo = this.applyUpdatesChange(
-      projectId,
-      this.projectUpdates(projectId)().filter((u) => u.id !== id),
-    );
-    return this.ok('delete project update', (s) => this.api.projects.updates.remove(s, projectId, id), {
-      tx: { rollback: undo },
-    });
-  }
-
-  /**
-   * Replace the loaded feed of a project, keep `Project.health` / `lastUpdateAt` in line with its newest update
-   * and return a function that restores both. Only called for feeds that are loaded.
-   */
-  private applyUpdatesChange(projectId: ID, list: readonly ProjectUpdate[]): () => void {
-    const prevList = this._projectUpdates().get(projectId);
-    const prevProject = this.projectById().get(projectId);
-    this.setUpdatesList(projectId, list);
-    const newest = this.projectUpdates(projectId)()[0];
-    this.patchProjectHealth(projectId, newest?.health, newest?.createdAt);
-    return () => {
-      if (prevList) this.setUpdatesList(projectId, prevList);
-      if (prevProject) this._projects.update((all) => all.map((p) => (p.id === projectId ? prevProject : p)));
-    };
-  }
-
-  private setUpdatesList(projectId: ID, list: readonly ProjectUpdate[]): void {
-    const sorted = [...list].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-    const prev = this._projectUpdates().get(projectId);
-    this.setMapEntry(this._projectUpdates, projectId, prev ? reconcileList(prev, sorted) : sorted);
-  }
-
-  /** `undefined` health clears `health` / `lastUpdateAt` (no updates left). */
-  private patchProjectHealth(projectId: ID, health: ProjectUpdate['health'] | undefined, at: string | undefined): void {
-    this._projects.update((all) =>
-      all.map((p) => {
-        if (p.id !== projectId || (p.health === health && p.lastUpdateAt === at)) return p;
-        const { health: _h, lastUpdateAt: _l, ...rest } = p;
-        return health && at ? { ...rest, health, lastUpdateAt: at } : rest;
-      }),
-    );
-  }
-
-  private setMapEntry<V>(sig: WritableSignal<ReadonlyMap<ID, V>>, key: ID, value: V): void {
-    sig.update((m) => (m.get(key) === value ? m : new Map(m).set(key, value)));
-  }
-
-  // ─────────────────────────── project context & AI ───────────────────────────
-
-  private readonly _projectContexts = signal<ReadonlyMap<ID, ProjectContext>>(new Map());
-  private readonly _projectContextState = signal<ReadonlyMap<ID, LoadState>>(new Map());
-  private readonly projectContextSignals = new Map<ID, Signal<ProjectContext | undefined>>();
-  private readonly projectContextStateSignals = new Map<ID, Signal<LoadState>>();
-  private readonly contextInflight = new Map<ID, Promise<ProjectContext | undefined>>();
-  private readonly staleContexts = new Set<ID>();
-  private contextTimer: ReturnType<typeof setTimeout> | null = null;
-
-  /** The cached `/context` of a project (undefined until `projectContext(id)` resolved). Stable per id. */
-  projectContextOf(projectId: ID): Signal<ProjectContext | undefined> {
-    let sig = this.projectContextSignals.get(projectId);
-    if (!sig) {
-      sig = computed(() => this._projectContexts().get(projectId));
-      this.projectContextSignals.set(projectId, sig);
-    }
-    return sig;
-  }
-
-  /** `idle` | `loading` | `ready` | `error` of the first `/context` load of a project. */
-  projectContextState(projectId: ID): Signal<LoadState> {
-    let sig = this.projectContextStateSignals.get(projectId);
-    if (!sig) {
-      sig = computed(() => this._projectContextState().get(projectId) ?? 'idle');
-      this.projectContextStateSignals.set(projectId, sig);
-    }
-    return sig;
-  }
-
-  /**
-   * Fetch the whole project tree (`GET /projects/:id/context`) on demand. Served from cache while fresh; a cached
-   * context is invalidated by live events and by this tab's writes and then reloaded in the background (stale data
-   * stays visible meanwhile). Never rejects: resolves `undefined` after a toast on failure.
-   */
-  projectContext(projectId: ID, options: { force?: boolean } = {}): Promise<ProjectContext | undefined> {
-    const cached = this._projectContexts().get(projectId);
-    if (cached && !options.force && !this.staleContexts.has(projectId)) return Promise.resolve(cached);
-    return this.fetchProjectContext(projectId, false);
-  }
-
-  /** The project's context as markdown (to copy or hand to an agent). Not cached. */
-  async projectContextMarkdown(projectId: ID): Promise<string | undefined> {
-    const slug = this.slug();
-    if (!slug) return undefined;
-    try {
-      return await this.api.projects.contextMarkdown(slug, projectId);
-    } catch (e) {
-      this.toastReadError('load project context', e);
-      return undefined;
-    }
-  }
-
-  /**
-   * Ask the AI assistant about a project: `update_draft` ({health, body} to post as an update),
-   * `summary` ({summary, description}), `issues` (suggested existing issues) or `risks`.
-   * Nothing is saved; apply the result with `createProjectUpdate` / `updateProject` / `updateIssue`.
+   * Ask the AI assistant about a project: `summary` ({summary, description}), `issues` (suggested existing issues)
+   * or `risks`. Nothing is saved; apply the result with `updateProject` / `updateIssue`.
    * Resolves `undefined` (after a toast) on failure.
    */
   async aiProject<K extends ProjectAiKind>(
@@ -1492,34 +1176,9 @@ export class TramaStore {
     }
   }
 
-  private fetchProjectContext(projectId: ID, quiet: boolean): Promise<ProjectContext | undefined> {
-    const slug = this.slug();
-    if (!slug) return Promise.resolve(undefined);
-    const running = this.contextInflight.get(projectId);
-    if (running) return running;
-    const hadData = this._projectContexts().has(projectId);
-    if (!hadData) this.setMapEntry(this._projectContextState, projectId, 'loading');
-    this.staleContexts.delete(projectId);
-    const promise = this.api.projects
-      .context(slug, projectId)
-      .then((ctx) => {
-        if (this.slug() !== slug) return undefined;
-        const prev = this._projectContexts().get(projectId);
-        const next = prev && sameJson(prev, ctx) ? prev : ctx;
-        this.setMapEntry(this._projectContexts, projectId, next);
-        this.setMapEntry(this._projectContextState, projectId, 'ready');
-        return next;
-      })
-      .catch((e: unknown) => {
-        if (this.slug() !== slug) return undefined;
-        this.staleContexts.add(projectId);
-        this.setMapEntry(this._projectContextState, projectId, hadData ? 'ready' : 'error');
-        if (!quiet) this.toastReadError('load project context', e);
-        return this._projectContexts().get(projectId);
-      })
-      .finally(() => this.contextInflight.delete(projectId));
-    this.contextInflight.set(projectId, promise);
-    return promise;
+  /** Called by LiveSync for every event from another client or an agent. Keeps loaded comment threads fresh. */
+  handleLiveEvent(event: Pick<LiveEvent, 'entity' | 'type'>): void {
+    if (event.entity === 'comment') this.refreshLoadedComments();
   }
 
   private toastReadError(label: string, e: unknown): void {
@@ -1527,60 +1186,6 @@ export class TramaStore {
     if (err.status !== 401 && err.status !== 403) {
       this.notifier.error(`Could not ${label}`, { description: err.message });
     }
-  }
-
-  /** Mark every cached project context stale and reload them (debounced) in the background. */
-  invalidateProjectContexts(): void {
-    const loaded = this._projectContexts();
-    if (!loaded.size) return;
-    for (const id of loaded.keys()) this.staleContexts.add(id);
-    if (this.contextTimer) clearTimeout(this.contextTimer);
-    this.contextTimer = setTimeout(() => {
-      this.contextTimer = null;
-      if (this.pending > 0) return this.invalidateProjectContexts();
-      for (const id of [...this.staleContexts]) {
-        if (this._projectContexts().has(id)) void this.fetchProjectContext(id, true);
-        else this.staleContexts.delete(id);
-      }
-    }, REFETCH_DEBOUNCE_MS);
-  }
-
-  /**
-   * Called by LiveSync for every event from another client or an agent. Keeps the on-demand project data fresh:
-   * `project_update` reloads the loaded feeds; anything that can appear in a project's context reloads the cached contexts.
-   */
-  handleLiveEvent(event: Pick<LiveEvent, 'entity' | 'type'>): void {
-    if (event.entity === 'comment') this.refreshLoadedComments();
-    if (event.entity === 'project_update') {
-      for (const [id, state] of this._projectUpdatesState()) {
-        if (state === 'ready') void this.loadProjectUpdates(id, { force: true, quiet: true });
-      }
-    }
-    if (PROJECT_CONTEXT_ENTITIES.has(event.entity)) this.invalidateProjectContexts();
-  }
-
-  private dropProjectData(projectId: ID): void {
-    for (const sig of [this._projectUpdates, this._projectUpdatesState, this._projectContexts, this._projectContextState]) {
-      (sig as WritableSignal<ReadonlyMap<ID, unknown>>).update((m) => {
-        if (!m.has(projectId)) return m;
-        const next = new Map(m);
-        next.delete(projectId);
-        return next;
-      });
-    }
-    this.staleContexts.delete(projectId);
-  }
-
-  private resetProjectData(): void {
-    this._projectUpdates.set(new Map());
-    this._projectUpdatesState.set(new Map());
-    this._projectContexts.set(new Map());
-    this._projectContextState.set(new Map());
-    this.staleContexts.clear();
-    this.updatesInflight.clear();
-    this.contextInflight.clear();
-    if (this.contextTimer) clearTimeout(this.contextTimer);
-    this.contextTimer = null;
   }
 
   // ─────────────────────────── admin: members, agents, tokens, integrations ───────────────────────────
@@ -1718,9 +1323,9 @@ export class TramaStore {
     }
   }
 
-  /** Attach an uploaded file as an image or file artifact. */
+  /** Attach an uploaded file to a task as an image or file artifact. */
   async uploadArtifactFile(
-    target: { type: 'issue' | 'project'; id: string },
+    target: { type: 'issue'; id: string },
     file: File,
   ): Promise<Artifact | undefined> {
     return this.write('upload file', (s) => this.api.uploads.attach(s, target, file), {

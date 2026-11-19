@@ -32,17 +32,17 @@ import { ProgressChart } from './progress-chart';
       </header>
 
       @if (showChart() && hasIssues()) {
-        <div class="bg-card mb-3 rounded-lg border border-border-strong px-3 pt-3 pb-2">
+        <div class="bg-card mb-3 rounded-lg px-3 pt-3 pb-2">
           <app-progress-chart [project]="project()" [height]="190" />
         </div>
       }
 
-      <div class="bg-card overflow-hidden rounded-lg border border-border-strong" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
+      <div class="flex flex-col gap-0.5" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
         @for (m of milestones(); track m.id; let i = $index) {
-          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-card border-b last:border-b-0" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
+          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-background overflow-hidden rounded-md" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
         }
         @if (adding()) {
-          <div class="flex min-h-10 items-center gap-2 border-t px-2.5 first:border-t-0">
+          <div class="flex min-h-10 items-center gap-2 px-2.5">
             <app-milestone-icon [size]="15" state="empty" />
             <input
               #nameInput
@@ -55,7 +55,7 @@ import { ProgressChart } from './progress-chart';
               (keydown.enter)="add()"
               (keydown.escape)="cancel($event)"
             />
-            <app-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 border border-border-strong px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
+            <app-date-picker label="New milestone target date" align="end" triggerClass="h-7 gap-1.5 px-2 text-xs" [value]="dateIso()" (dateChange)="date.set($event)">
               <svg [lucideIcon]="cal" [size]="12" class="text-muted-foreground"></svg>
               <span [class.text-muted-foreground]="!date()">{{ date() ? dateLabel() : 'Target date' }}</span>
             </app-date-picker>

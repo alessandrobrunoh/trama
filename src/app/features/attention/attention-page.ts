@@ -54,7 +54,7 @@ type Tab = 'open' | 'archived';
   ],
   host: { class: 'flex flex-1 flex-col' },
   template: `
-    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-1.5 sm:px-6">
+    <div class="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5 sm:px-6">
       <p class="text-meta" aria-live="polite">{{ description() }}</p>
       <span class="flex-1"></span>
       @if (canSeeAll()) {
@@ -77,7 +77,7 @@ type Tab = 'open' | 'archived';
     } @else if (tab() === 'open') {
       @for (s of sections(); track s.sec.id) {
         <section [attr.aria-label]="s.sec.title">
-          <header class="bg-muted/40 flex h-8 items-center gap-2 border-b px-4 sm:px-6">
+          <header class="mt-2 flex h-8 items-center gap-2 px-4 sm:px-6">
             <svg [lucideIcon]="s.sec.icon" [size]="13" class="text-muted-foreground"></svg>
             <h2 class="text-xs font-medium">{{ s.sec.title }}</h2>
             <span class="text-muted-foreground text-xs tabular-nums">{{ s.items.length }}</span>

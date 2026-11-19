@@ -114,7 +114,7 @@ export class IssueProp {
       dialogContentClass="sm:max-w-lg top-[14%] sm:top-[20%] translate-y-0 max-sm:max-w-[calc(100%-1rem)]"
     >
       @if (prompt(); as p) {
-        <div class="text-muted-foreground flex items-center gap-2 border-b px-3 pt-2.5 pb-2 text-xs">
+        <div class="text-muted-foreground flex items-center gap-2 px-3 pt-2.5 pb-2 text-xs">
           <span class="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">{{ actions.subject(p.ids) }}</span>
           @if (p.ids.length === 1) {
             <span class="truncate">{{ firstTitle() }}</span>

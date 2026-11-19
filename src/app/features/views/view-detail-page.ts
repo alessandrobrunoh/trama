@@ -223,11 +223,11 @@ type PageLayout = 'list' | 'board' | 'timeline';
         </span>
 
         <!-- filter / sort / group row -->
-        <div class="flex flex-wrap items-center gap-1.5 border-b px-4 py-2 sm:px-6">
+        <div class="flex flex-wrap items-center gap-1.5 px-4 py-2 sm:px-6">
           @for (f of activeFilters(); track f.field) {
             @if (f.numeric) {
               <span
-                class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs"
+                class="bg-secondary inline-flex h-7 items-stretch gap-0.5 overflow-hidden rounded-md text-xs"
               >
                 <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
                 <span class="text-muted-foreground flex items-center px-2">at least</span>
@@ -255,7 +255,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
             } @else if (f.editable) {
               <!-- Linear-style chip: field · operator · value · × -->
               <span
-                class="border-border-strong bg-secondary/60 divide-border-strong inline-flex h-7 items-stretch divide-x overflow-hidden rounded-md border text-xs"
+                class="bg-secondary inline-flex h-7 items-stretch gap-0.5 overflow-hidden rounded-md text-xs"
               >
                 <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
                 <span class="text-muted-foreground flex items-center px-2">{{
@@ -283,7 +283,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
               </span>
             } @else {
               <span
-                class="border-border-strong bg-secondary/60 inline-flex h-7 items-center gap-1 rounded-md border ps-2 pe-1 text-xs"
+                class="bg-secondary inline-flex h-7 items-center gap-1 rounded-md ps-2 pe-1 text-xs"
               >
                 {{ f.text }}
                 @if (canEdit()) {
@@ -477,7 +477,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
           @for (g of groups(); track g.key) {
             @if (grouped()) {
               <div
-                class="bg-muted/40 sticky top-0 z-10 flex h-8 items-center gap-2 border-b px-4 backdrop-blur sm:px-6"
+                class="bg-background/90 sticky top-0 z-10 mt-2 flex h-8 items-center gap-2 px-4 backdrop-blur sm:px-6"
               >
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
                 <span class="text-xs font-medium">{{ g.label }}</span>
@@ -618,7 +618,7 @@ export class ViewDetailPage {
     if (!field) return [{ key: '__all', label: '', items: this.rows() }];
     const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
     const include =
-      this.layout() === 'board' && (field === 'status' || field === 'health')
+      this.layout() === 'board' && field === 'status'
         ? statusColumnIds(this.store, v.entity, field)
         : this.layout() === 'board' && def?.kind === 'enum'
           ? def.values

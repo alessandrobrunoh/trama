@@ -27,7 +27,7 @@ import {
   EventLine,
   eventCategory,
   type EventCategory,
-} from '../overview/event-line';
+} from '../../shared/event-line';
 import { Picker, type PickOption } from '../../shared/picker';
 
 type TypeFilter = 'all' | Exclude<EventCategory, 'other'>;
@@ -82,7 +82,7 @@ function dayLabel(iso: string, now = new Date()): string {
   host: { class: 'flex min-h-full flex-col' },
   template: `
     <app-page-header title="Activity" [description]="description()">
-      <div class="flex flex-wrap items-center gap-x-1 gap-y-2 border-b px-4 py-2 sm:px-6">
+      <div class="flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-2 sm:px-6">
         <div
           class="-ms-1 flex flex-wrap items-center gap-0.5"
           role="tablist"

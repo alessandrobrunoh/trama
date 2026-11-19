@@ -12,12 +12,12 @@ import { AssistantChat } from './assistant-chat';
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     @if (!ai.active()) {
-      <div class="flex h-12 shrink-0 items-center border-b px-4">
+      <div class="flex h-12 shrink-0 items-center px-4">
         <h1 class="text-sm font-medium">New chat</h1>
       </div>
     }
     @if (ai.active(); as chat) {
-      <div class="flex h-12 shrink-0 items-center gap-2 border-b px-4">
+      <div class="flex h-12 shrink-0 items-center gap-2 px-4">
         <h1 class="min-w-0 flex-1 truncate text-sm font-medium">{{ chat.title }}</h1>
         <button
           hlmBtn

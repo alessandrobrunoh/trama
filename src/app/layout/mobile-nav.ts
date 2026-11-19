@@ -24,7 +24,7 @@ interface SheetGroup {
 }
 
 /**
- * Phone navigation (< md): a docked tab bar (Inbox, My work, Issues, Search, More) with badges and
+ * Phone navigation (< md): a docked tab bar (Inbox, Tasks, Projects, Search, More) with badges and
  * a "More" sheet that carries every other section, the workspace switcher and the assistant.
  * Everything here is `md:hidden`; the desktop sidebar is untouched.
  */
@@ -170,10 +170,10 @@ export class MobileNav {
   /** Inbox = what waits on you (attention) plus unread updates. */
   protected readonly inbox = computed(() => this.store.attentionCount() + this.notifications.updatesUnread());
 
-  /** The first three primary places live in the bar; Projects opens from More. */
+  /** The primary places (Inbox, Tasks, Projects) live in the bar. */
   protected readonly tabs = PRIMARY_NAV.slice(0, 3);
   /** Tabs live in the bar; the sheet lists everything else. */
-  private static readonly IN_BAR = new Set(['inbox', 'my-work', 'tasks', 'assistant', 'settings']);
+  private static readonly IN_BAR = new Set(['inbox', 'tasks', 'projects', 'assistant', 'settings']);
   protected readonly groups = computed<SheetGroup[]>(() => {
     const rest = (items: NavItem[]) => items.filter((n) => !MobileNav.IN_BAR.has(n.segment));
     return [

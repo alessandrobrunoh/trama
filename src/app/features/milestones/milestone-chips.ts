@@ -18,7 +18,7 @@ import { Picker, type PickOption } from '../../shared/picker';
   imports: [PropertyRow, Picker, HlmTooltip],
   host: { class: 'contents' },
   template: `
-    <app-property-row label="Milestone" [icon]="diamond">
+    <app-property-row label="Milestone" [icon]="diamond" compact>
       @if (!hasProject()) {
         <span
           class="text-muted-foreground px-1.5 text-[13px]"
@@ -28,6 +28,7 @@ import { Picker, type PickOption } from '../../shared/picker';
       } @else {
         <app-picker
           variant="field"
+          triggerClass="min-h-7 py-0.5"
           label="Milestone"
           placeholder="No milestone"
           [multiple]="true"

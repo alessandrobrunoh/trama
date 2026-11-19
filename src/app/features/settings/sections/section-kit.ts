@@ -46,7 +46,7 @@ export class SectionHeader {
         <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
       </div>
     }
-    <div class="bg-card divide-border overflow-hidden rounded-lg border [&>*+*]:border-t"><ng-content /></div>
+    <div class="bg-card overflow-hidden rounded-lg"><ng-content /></div>
   `,
 })
 export class SettingsGroup {
@@ -84,7 +84,7 @@ export class SettingsRow {
 @Component({
   selector: 'app-readonly-note',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'text-muted-foreground bg-muted/40 mb-6 block rounded-md border px-3 py-2 text-xs' },
+  host: { class: 'text-muted-foreground bg-muted mb-6 block rounded-md px-3 py-2 text-xs' },
   template: `<ng-content />`,
 })
 export class ReadonlyNote {}
@@ -94,7 +94,7 @@ export class ReadonlyNote {}
   selector: 'app-copy-field',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, LucideDynamicIcon],
-  host: { class: 'bg-muted/50 flex min-w-0 items-center gap-2 rounded-md border py-1 pr-1 pl-2.5' },
+  host: { class: 'bg-secondary flex min-w-0 items-center gap-2 rounded-md py-1 pr-1 pl-2.5' },
   template: `
     <code class="min-w-0 flex-1 font-mono text-xs break-all select-all" [class.blur-sm]="masked()">{{ value() }}</code>
     <ng-content />

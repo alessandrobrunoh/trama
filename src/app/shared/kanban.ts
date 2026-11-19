@@ -52,7 +52,7 @@ export class KanbanLabelDirective {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list" cdkDropListGroup>
         @for (g of columns(); track g.key) {
           <section>
-            <div class="group/gh bg-muted/40 hover:bg-muted/60 sticky top-0 z-[2] flex min-h-9 items-center border-b pr-2 sm:pr-4">
+            <div class="group/gh bg-muted/40 hover:bg-muted/60 sticky top-0 z-[2] flex min-h-9 items-center pr-2 sm:pr-4">
               <button
                 type="button"
                 class="flex min-h-9 min-w-0 flex-1 items-center gap-2 px-4 text-left text-[13px] outline-none sm:px-6"
@@ -130,7 +130,7 @@ export class KanbanLabelDirective {
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 } @empty {
-                  <p class="text-muted-foreground/70 border-border rounded-md border border-dashed px-1 py-5 text-center text-xs">{{ emptyText() }}</p>
+                  <p class="text-muted-foreground/70 rounded-md px-1 py-5 text-center text-xs">{{ emptyText() }}</p>
                 }
               </div>
             </section>

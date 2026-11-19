@@ -42,7 +42,7 @@ import { ThemeService } from '../../core/theme';
           <img src="/icons/trama-horizontal-black.svg" alt="Trama" class="h-10 w-auto dark:hidden" />
           <img src="/icons/trama-horizontal-white.svg" alt="Trama" class="hidden h-10 w-auto dark:block" />
         </a>
-        <section class="border-border/70 bg-card/95 rounded-2xl border px-6 py-7 shadow-[var(--shadow-menu)] sm:px-8 sm:py-8">
+        <section class="bg-card/95 rounded-2xl px-6 py-7 shadow-[var(--shadow-menu)] sm:px-8 sm:py-8">
           <div class="mb-7 flex flex-col items-center text-center">
             <h1 class="text-[22px] font-semibold tracking-tight">{{ title() }}</h1>
             @if (subtitle()) {
@@ -50,7 +50,7 @@ import { ThemeService } from '../../core/theme';
             }
           </div>
           <ng-content />
-          <div class="text-muted-foreground mt-6 border-border/60 border-t pt-5 text-center text-[13px] empty:hidden">
+          <div class="text-muted-foreground mt-6 pt-2 text-center text-[13px] empty:hidden">
             <ng-content select="[footer]" />
           </div>
         </section>

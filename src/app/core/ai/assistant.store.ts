@@ -107,7 +107,7 @@ export class AssistantStore {
   readonly context = computed<ChatContext>(() => {
     const parts =
       this.router.parseUrl(this.url()).root.children['primary']?.segments.map((s) => s.path) ?? [];
-    const page = parts[1] ?? 'overview';
+    const page = parts[1] ?? 'inbox';
     const id = parts[2];
     if (id && (page === 'tasks' || page === 'issues'))
       return {

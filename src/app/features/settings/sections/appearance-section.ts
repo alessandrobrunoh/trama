@@ -107,13 +107,13 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
             type="button"
             role="radio"
             [attr.aria-checked]="branches.format() === f.id"
-            class="focus-visible:ring-ring/50 flex items-start gap-3 rounded-lg border p-3 text-left outline-none transition-colors focus-visible:ring-3"
-            [class]="branches.format() === f.id ? 'border-primary bg-accent/50' : 'border-border hover:border-border-strong hover:bg-hover'"
+            class="focus-visible:ring-ring/50 flex items-start gap-3 rounded-lg p-3 text-left outline-none transition-colors focus-visible:ring-3"
+            [class]="branches.format() === f.id ? 'bg-selected' : 'bg-secondary hover:bg-hover'"
             (click)="branches.setFormat(f.id)"
           >
             <span
               class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border"
-              [class]="branches.format() === f.id ? 'bg-primary border-primary text-primary-foreground' : 'border-border-strong'"
+              [class]="branches.format() === f.id ? 'bg-primary border-primary text-primary-foreground' : 'border-input'"
               aria-hidden="true"
             >
               @if (branches.format() === f.id) {
@@ -127,7 +127,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
           </button>
         }
       </div>
-      <div class="bg-muted/30 flex items-center gap-2 px-4 py-2.5 text-xs">
+      <div class="flex items-center gap-2 px-4 pb-3 text-xs">
         <svg [lucideIcon]="branchIcon" [size]="13" class="text-muted-foreground shrink-0"></svg>
         <span class="text-muted-foreground shrink-0">Preview</span>
         <code class="min-w-0 truncate font-mono">{{ branches.name(sample.key, sample.title) }}</code>

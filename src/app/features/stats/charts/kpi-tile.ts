@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, input } from '@angular/core';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { Sparkline } from './sparkline';
 
 export interface KpiDelta {
@@ -15,8 +16,8 @@ export interface KpiDelta {
 @Component({
   selector: 'app-kpi-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [Sparkline],
-  host: { class: 'bg-card flex min-w-0 flex-col gap-1 rounded-lg border px-4 py-3' },
+  imports: [HlmTooltip, Sparkline],
+  host: { class: 'bg-card flex min-w-0 flex-col gap-1 rounded-lg px-4 py-3' },
   template: `
     <div class="text-muted-foreground truncate text-xs">{{ label() }}</div>
     <div class="flex items-baseline gap-2">
@@ -27,7 +28,8 @@ export interface KpiDelta {
           [class.text-tone-green]="d.tone === 'good'"
           [class.text-tone-red]="d.tone === 'bad'"
           [class.text-muted-foreground]="d.tone === 'neutral'"
-          [attr.title]="d.title ?? null"
+          [hlmTooltip]="d.title ?? ''"
+          position="bottom"
         >
           <span aria-hidden="true" class="text-[9px]">{{ d.direction === 'up' ? '▲' : d.direction === 'down' ? '▼' : '–' }}</span>
           {{ d.text }}

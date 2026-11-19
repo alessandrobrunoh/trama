@@ -48,6 +48,20 @@ export function quietToggleStatus(
   const type: IssueStatus = quiet ? 'todo' : 'done';
   return entries?.find((entry) => entry.type === type)?.id ?? type;
 }
+/**
+ * Status a new subtask starts in: its parent's, unless the parent is finished or in review (then the
+ * subtask is open work: the catalog's "todo").
+ */
+export function subtaskStatus(
+  parent: { status: string },
+  entries: readonly StatusEntry<IssueStatus>[] | null | undefined,
+): string {
+  const type = statusTypeOf(entries ?? defaultStatusCatalog().issue, parent.status);
+  return type === 'done' || type === 'canceled' || type === 'in_review'
+    ? quietToggleStatus(entries, true)
+    : parent.status;
+}
+
 // ───────────────────────── picker options ─────────────────────────
 
 export const issueStatusOptions = (entries = defaultStatusCatalog().issue): PickOption[] =>

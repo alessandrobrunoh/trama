@@ -23,7 +23,6 @@ import {
   LucideCopy,
   LucideDynamicIcon,
   LucideGitBranch,
-  LucideGitPullRequest,
   LucideHash,
   LucideInbox,
   LucideListChecks,
@@ -36,8 +35,6 @@ import {
   LucideMoon,
   LucidePanelLeft,
   LucidePlug,
-  LucideFilePlus,
-  LucideFileText,
   LucidePlus,
   LucideBell,
   LucideSearch,
@@ -56,7 +53,6 @@ import {
 import { BrnCommand, BrnCommandInput } from '@spartan-ng/brain/command';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import type {
-  ArtifactKind,
   IssueStatus,
   Project,
 } from '../../core/contracts/domain';
@@ -67,7 +63,6 @@ import {
 import { BranchNames } from '../../core/branch-prefs';
 import { Clipboard } from '../../core/notify/notifier';
 import { AiActions } from '../ai-actions/ai-actions.service';
-import { Documents } from '../documents/documents.service';
 import { AssistantStore } from '../../core/ai/assistant.store';
 import { SessionStore } from '../../core/session/session.store';
 import { FavoritesStore } from '../../core/stores/favorites.store';
@@ -77,7 +72,6 @@ import { ThemeService } from '../../core/theme';
 import { ALL_NAV } from '../../layout/nav';
 import { OnboardingStore } from '../../core/stores/onboarding.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
-import { ArtifactIcon } from '../../shared/artifact';
 import { Kbd } from '../../shared/kbd';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
@@ -124,11 +118,10 @@ interface ItemGroup {
 }
 
 interface Visual {
-  kind: 'status' | 'artifact' | 'avatar' | 'project' | 'icon';
+  kind: 'status' | 'avatar' | 'project' | 'icon';
   status?: any;
   project?: Project;
   entity?: StatusEntity;
-  artifactKind?: ArtifactKind;
   color?: string;
   provider?: string;
 }
@@ -161,7 +154,6 @@ const PREFIXES: Record<string, Scope> = {
 const HIT_ICON: Record<ItemType, LucideIcon> = {
   project: LucideBox,
   issue: LucideInbox,
-  artifact: LucideGitPullRequest,
   person: LucideUserRound,
 };
 
@@ -202,7 +194,7 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
  */
 export const COMMAND_DIALOG_CLASS =
   // Widths use viewport units: the CDK pane shrink-wraps its content, so a `%` width collapses to the content width.
-  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-md border border-border-strong p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
+  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.
@@ -220,7 +212,6 @@ export const COMMAND_DIALOG_CLASS =
     LucideDynamicIcon,
     NgTemplateOutlet,
     StatusIcon,
-    ArtifactIcon,
     ActorAvatar,
     Kbd,
     BrnCommandInput,
@@ -233,9 +224,6 @@ export const COMMAND_DIALOG_CLASS =
       @switch (v.kind) {
         @case ('status') {
           <app-status-icon [status]="v.status" [entity]="v.entity ?? 'auto'" />
-        }
-        @case ('artifact') {
-          <app-artifact-icon [kind]="v.artifactKind!" [state]="v.status" />
         }
         @case ('avatar') {
           <app-actor-avatar [actor]="{ type: 'user', id: h.id }" [size]="16" />
@@ -275,12 +263,12 @@ export const COMMAND_DIALOG_CLASS =
       [filter]="filter"
       [(search)]="query"
     >
-      <div class="border-border shrink-0 border-b">
+      <div class="shrink-0">
         <div class="flex h-12 items-center gap-2.5 px-4 max-md:h-14">
           @if (mode() === 'palette' && context(); as ctx) {
             <button
               type="button"
-              class="border-border-strong bg-muted text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md border px-2 font-mono text-xs transition-colors"
+              class="bg-secondary text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 font-mono text-xs transition-colors"
               [attr.aria-label]="page() === 'status' ? 'Back to ' + ctx.key + ' actions' : ctx.key"
               [disabled]="page() === 'root'"
               (mousedown)="$event.preventDefault()"
@@ -523,7 +511,7 @@ export const COMMAND_DIALOG_CLASS =
               class="text-muted-foreground flex flex-col items-center gap-2 px-6 py-12 text-center text-sm"
             >
               <svg [lucideIcon]="searchIcon" [size]="18" [strokeWidth]="1.5"></svg>
-              <p>Search tasks, projects, artifacts and people.</p>
+              <p>Search tasks, projects and people.</p>
               <p class="text-xs">
                 Tip: type <span class="font-mono">task:</span>,
                 <span class="font-mono">ws:</span> or <span class="font-mono">&#64;</span> to
@@ -535,7 +523,7 @@ export const COMMAND_DIALOG_CLASS =
       </hlm-command-list>
 
       <div
-        class="border-border text-muted-foreground flex h-9 shrink-0 items-center gap-4 border-t px-4 text-[11px] max-sm:hidden"
+        class="text-muted-foreground flex h-9 shrink-0 items-center gap-4 px-4 text-[11px] max-sm:hidden"
       >
         <span class="flex items-center gap-1.5"><app-kbd keys="up down" /> navigate</span>
         <span class="flex items-center gap-1.5"><app-kbd keys="enter" /> select</span>
@@ -559,7 +547,6 @@ export class CommandPanel {
   private readonly favorites = inject(FavoritesStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
-  private readonly documents = inject(Documents);
   private readonly theme = inject(ThemeService);
   private readonly searchSvc = inject(SearchService);
   private readonly recents = inject(RecentItems);
@@ -904,21 +891,6 @@ export class CommandPanel {
         icon: LucidePlus,
         run: create('project'),
       });
-    if (this.store.can('member'))
-      out.push({
-        id: 'new:document',
-        label: 'Create document',
-        keywords: 'new doc write note spec plan markdown page',
-        icon: LucideFilePlus,
-        run: () => void this.documents.createAndOpen(),
-      });
-    out.push({
-      id: 'docs:search',
-      label: 'Search documents',
-      keywords: 'find docs notes specs plans text',
-      icon: LucideFileText,
-      run: () => void this.router.navigate(['/', this.slug(), 'documents'], { queryParams: { focus: 'search' } }),
-    });
     const page = this.favorites.current();
     if (page) {
       const pinned = this.favorites.has(page.type, page.id);
@@ -1008,7 +980,7 @@ export class CommandPanel {
         icon: LucideListChecks,
         run: () => {
           this.onboarding.restore();
-          void this.router.navigate(['/', this.slug(), 'overview']);
+          void this.router.navigate(['/', this.slug(), 'inbox']);
         },
       },
       {
@@ -1167,11 +1139,6 @@ export class CommandPanel {
       case 'issue': {
         const i = s.issueById().get(h.id);
         if (i) return { kind: 'status', status: i.status, entity: 'issue' };
-        break;
-      }
-      case 'artifact': {
-        const a = s.artifactById().get(h.id);
-        if (a) return { kind: 'artifact', status: a.state, artifactKind: a.kind };
         break;
       }
       case 'person':

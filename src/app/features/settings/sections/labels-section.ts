@@ -91,7 +91,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
           (input)="query.set($any($event.target).value)"
         />
       </div>
-      <div class="bg-muted/50 inline-flex rounded-md border p-0.5" role="group" aria-label="Which records">
+      <div class="bg-muted inline-flex rounded-md p-0.5" role="group" aria-label="Which records">
         @for (s of scopeFilters; track s.id) {
           <button
             type="button"
@@ -104,7 +104,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
           </button>
         }
       </div>
-      <div class="bg-muted/50 inline-flex rounded-md border p-0.5" role="group" aria-label="Sort labels">
+      <div class="bg-muted inline-flex rounded-md p-0.5" role="group" aria-label="Sort labels">
         @for (s of sorts; track s.id) {
           <button
             type="button"
@@ -223,7 +223,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                 </div>
                 <div class="grid gap-2">
                   <span class="text-muted-foreground text-xs font-medium" id="label-scope-label">Applies to</span>
-                  <div class="bg-muted/50 inline-flex w-fit rounded-md border p-0.5" role="radiogroup" aria-labelledby="label-scope-label">
+                  <div class="bg-muted inline-flex w-fit rounded-md p-0.5" role="radiogroup" aria-labelledby="label-scope-label">
                     @if (editing()?.scope === 'workstream') {
                       <button
                         type="button"
@@ -288,7 +288,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     />
                   </div>
                 </div>
-                <div class="bg-muted/40 flex items-center gap-2 rounded-md border px-3 py-2">
+                <div class="bg-muted flex items-center gap-2 rounded-md px-3 py-2">
                   <span class="text-muted-foreground text-xs">Preview</span>
                   <app-label-chip [name]="formName().trim() || 'Label name'" [color]="colorValid() ? formColor() : '#64748b'" size="md" />
                 </div>
@@ -317,7 +317,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     (valueChange)="mergeInto.set($event[0] ?? '')"
                   />
                 </div>
-                <div class="bg-muted/40 rounded-md border px-3 py-2 text-xs leading-relaxed">
+                <div class="bg-muted rounded-md px-3 py-2 text-xs leading-relaxed">
                   @if (mergeTarget(); as t) {
                     <p>
                       {{ impact(l.id) }} will be relabeled “{{ t.name }}”. Items that already have both keep one.
@@ -344,7 +344,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                 <p hlmDialogDescription>The label is removed from the workspace and from everything that carries it.</p>
               </hlm-dialog-header>
               <div class="flex flex-col gap-3 text-[13px]">
-                <div class="bg-muted/40 rounded-md border px-3 py-2 text-xs leading-relaxed">
+                <div class="bg-muted rounded-md px-3 py-2 text-xs leading-relaxed">
                   <div class="flex items-center gap-2"><app-label-chip [labelId]="l.id" /></div>
                   @if (catalog.usageOf(l.id).total) {
                     <p class="mt-2 flex items-start gap-1.5">

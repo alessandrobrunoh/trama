@@ -22,7 +22,7 @@ import { PageChrome, type PageTitle } from '../layout/page-chrome';
   template: `
     <h1 class="sr-only">{{ title() }}</h1>
     <div
-      class="hidden min-h-10 flex-wrap items-center gap-x-3 gap-y-2 border-b px-4 py-1.5 sm:px-6 [&:has(>:not(.spacer))]:flex"
+      class="hidden min-h-10 flex-wrap items-center gap-x-3 gap-y-2 px-4 py-1.5 sm:px-6 [&:has(>:not(.spacer))]:flex"
     >
       <ng-content select="[leading]" />
       <ng-content select="[meta]" />

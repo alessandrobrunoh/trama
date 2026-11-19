@@ -37,10 +37,10 @@ import { CommentInput } from './comment-input';
   imports: [HlmButtonImports, Kbd, CommentInput, UploadFile],
   host: {
     class:
-      'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:border-t max-md:px-4 max-md:py-2',
+      'block min-w-0 max-md:bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:-mx-4 max-md:px-4 max-md:py-2',
   },
   template: `
-    <div class="bg-card overflow-hidden rounded-lg border">
+    <div class="bg-card focus-within:ring-ring/40 overflow-hidden rounded-lg focus-within:ring-2">
       <app-comment-input
         #composer
         class="[&_textarea]:rounded-none [&_textarea]:border-0 [&_textarea]:bg-transparent [&_textarea]:px-3 [&_textarea]:py-2.5 [&_textarea]:shadow-none [&_textarea]:focus-visible:ring-0"
@@ -48,7 +48,7 @@ import { CommentInput } from './comment-input';
         [(value)]="draft"
         (keyed)="onKeydown($event)"
       />
-      <div class="flex items-center justify-between gap-2 border-t px-3 py-2 max-md:justify-end">
+      <div class="flex items-center justify-between gap-2 px-3 py-2 max-md:justify-end">
         <span class="text-meta max-md:hidden"
           >Markdown · @ to mention, # to link{{
             prefs.sendsOnEnter() ? ' · Shift + Enter for a new line' : ''

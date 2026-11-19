@@ -192,7 +192,7 @@ interface Seg {
             }
           </ul>
           @if (t.total) {
-            <div class="border-border mt-1.5 flex items-center justify-between gap-2 border-t pt-1.5">
+            <div class="mt-1.5 flex items-center justify-between gap-2 pt-1.5">
               <span class="text-muted-foreground">Total</span>
               <span class="text-foreground font-medium tabular-nums">{{ t.total }}</span>
             </div>

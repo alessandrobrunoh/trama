@@ -7,8 +7,7 @@ import { TramaStore, UiStore, usePageShortcuts } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { StatsBoard } from '../stats/stats-board';
-import { issuesStrip } from '../stats/stats-model';
+import { StatsStrip } from '../stats/stats-strip';
 import { IssueBoard } from './issue-board';
 import { ISSUE_TABS, asViewTab, tabStatuses, type IssueViewTab } from './issue-model';
 import { IssueCommandDialog } from './issue-prop';
@@ -48,7 +47,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
     Kbd,
     TopBarActions,
     IssueBoard,
-    StatsBoard,
+    StatsStrip,
     IssueCommandDialog,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
@@ -89,7 +88,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
         }
       </nav>
     </app-page-header>
-    <app-stats-board variant="strip" [model]="stats()" [moreLink]="['/', slug(), 'stats']" />
+    <app-stats-strip />
     <app-issue-board
       [issues]="store.issues()"
       [scope]="scope()"
@@ -117,7 +116,6 @@ export class IssuePage {
   protected readonly plus = LucidePlus;
   protected readonly tabs = ISSUE_TABS;
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
-  protected readonly stats = computed(() => issuesStrip(this.store));
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);

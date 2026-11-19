@@ -9,7 +9,6 @@ import {
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
-  PROJECT_HEALTH_META,
   PROJECT_STATUS_META,
   resolveStatusEntry,
   type ActorRef,
@@ -87,8 +86,6 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
     const t = entity === 'issue' ? ISSUE_STATUS_META : PROJECT_STATUS_META;
     return (t as Record<string, { label: string }>)[value]?.label;
   }
-  if (field === 'health')
-    return PROJECT_HEALTH_META[value as keyof typeof PROJECT_HEALTH_META]?.label;
   if (field === 'priority') return PRIORITY_META[value as keyof typeof PRIORITY_META]?.label;
   if (field === 'kind') return ISSUE_KIND_META[value as keyof typeof ISSUE_KIND_META]?.label;
   if (field === 'source') return SOURCE_LABEL[value];
@@ -96,10 +93,9 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
 }
 
 /** Human label of one field value ('' = "No …"). */
-/** Board columns for a status or health field: the workspace catalog, in catalog order. */
-export function statusColumnIds(store: TramaStore, entity: ViewEntity, field: string): string[] {
+/** Board columns for a status field: the workspace catalog, in catalog order. */
+export function statusColumnIds(store: TramaStore, entity: ViewEntity, _field: string): string[] {
   const catalog = store.settings().statuses;
-  if (field === 'health') return catalog.projectHealth.map((entry) => entry.id);
   if (entity === 'issue') return catalog.issue.map((entry) => entry.id);
   return catalog.project.map((entry) => entry.id);
 }
@@ -108,14 +104,9 @@ export function valueLabel(store: TramaStore, entity: ViewEntity, field: string,
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
   if (value === '') return `No ${(def?.label ?? field).toLowerCase()}`;
   if (field === 'labels') return store.settings().labels.find((l) => l.id === value)?.name ?? value;
-  if (field === 'status' || field === 'health') {
+  if (field === 'status') {
     const catalog = store.settings().statuses;
-    const entries =
-      field === 'health'
-        ? catalog.projectHealth
-        : entity === 'issue'
-          ? catalog.issue
-          : catalog.project;
+    const entries = entity === 'issue' ? catalog.issue : catalog.project;
     const named = resolveStatusEntry(entries, value)?.name;
     if (named) return named;
   }
@@ -158,17 +149,10 @@ const PROJECT_STATUS_COLOR: Record<string, string> = {
   completed: 'var(--status-shipped)',
   canceled: 'var(--status-draft)',
 };
-const PROJECT_HEALTH_COLOR: Record<string, string> = {
-  on_track: 'var(--status-shipped)',
-  at_risk: 'var(--status-needs-input)',
-  off_track: 'var(--status-blocked)',
-};
-
-/** CSS colour of the dot that marks a project status / health value (undefined for every other field). */
+/** CSS colour of the dot that marks a project status value (undefined for every other field). */
 export function valueColor(entity: ViewEntity, field: string, value: string): string | undefined {
   if (!value || entity !== 'project') return undefined;
   if (field === 'status') return PROJECT_STATUS_COLOR[value];
-  if (field === 'health') return PROJECT_HEALTH_COLOR[value];
   return undefined;
 }
 
@@ -183,14 +167,9 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
     color: valueColor(entity, field, value),
     ...extra,
   });
-  if (def.kind === 'enum' && (field === 'status' || field === 'health')) {
+  if (def.kind === 'enum' && field === 'status') {
     const catalog = store.settings().statuses;
-    const entries =
-      field === 'health'
-        ? catalog.projectHealth
-        : entity === 'issue'
-          ? catalog.issue
-          : catalog.project;
+    const entries = entity === 'issue' ? catalog.issue : catalog.project;
     return entries.map((entry) => opt(entry.id));
   }
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));

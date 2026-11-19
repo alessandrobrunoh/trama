@@ -275,7 +275,7 @@ export class StatusIcon {
   imports: [StatusIcon],
   host: {
     class:
-      'border-border-strong text-foreground/85 inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-1.5 text-xs font-medium',
+      'bg-foreground/[0.06] text-foreground/85 inline-flex h-5 w-fit shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-1.5 text-xs font-medium',
   },
   template: `
     <app-status-icon [status]="status()" [entity]="entity()" [subject]="subject()" [size]="12" />

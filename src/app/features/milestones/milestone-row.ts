@@ -129,7 +129,7 @@ import { ProgressChart } from './progress-chart';
     </div>
 
     @if (open()) {
-      <div class="bg-muted/30 flex flex-col gap-3 border-t px-4 py-3 pl-10">
+      <div class="bg-muted flex flex-col gap-3 rounded-md px-4 py-3 pl-10">
         <app-editable-markdown
           class="text-[13px]"
           label="milestone description"
@@ -161,9 +161,9 @@ import { ProgressChart } from './progress-chart';
             }
           </div>
           @if (issues().length) {
-            <ul class="bg-card overflow-hidden rounded-md border border-border-strong">
+            <ul class="bg-background overflow-hidden rounded-md">
               @for (i of issues(); track i.id) {
-                <li class="group/mi hover:bg-hover flex min-h-8 items-center gap-2 border-b px-2 text-[13px] last:border-b-0">
+                <li class="group/mi hover:bg-hover flex min-h-8 items-center gap-2 px-2 text-[13px]">
                   <app-status-icon entity="issue" [status]="i.status" />
                   <a [routerLink]="['/', slug(), 'tasks', i.key]" class="flex min-w-0 flex-1 items-center gap-2 outline-none focus-visible:underline">
                     <app-key-chip [value]="i.key" class="w-[4.25rem]" />

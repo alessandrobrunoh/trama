@@ -124,7 +124,7 @@ abstract class IssueItemBase {
           <span>{{ quiet() ? 'Reopen' : 'Done' }}</span>
         </button>
         <div
-          class="issue-m relative flex items-center gap-1 border-b border-border/60 pl-1 pr-3"
+          class="issue-m relative flex items-center gap-1 pl-1 pr-3"
           [class.bg-selected]="selected()"
           [attr.data-row-id]="i.id"
           (pointerdown)="pressStart($event)"
@@ -148,7 +148,7 @@ abstract class IssueItemBase {
               (click)="onCheck($event)"
             >
               <span
-                class="border-border-strong flex size-5 items-center justify-center rounded-full border"
+                class="border-input flex size-5 items-center justify-center rounded-full border"
                 [class]="selected() ? 'bg-primary border-primary text-primary-foreground' : 'bg-background'"
               >
                 @if (selected()) {
@@ -176,7 +176,7 @@ abstract class IssueItemBase {
     } @else {
     <div
       [attr.data-row-id]="i.id"
-      class="group/row relative flex items-center gap-2 border-b border-border/60 pr-3 pl-1.5 text-[13px] sm:pr-5 sm:pl-2.5"
+      class="group/row relative flex items-center gap-2 pr-3 pl-1.5 text-[13px] sm:pr-5 sm:pl-2.5"
       [class]="rowState()"
     >
       <a
@@ -193,7 +193,7 @@ abstract class IssueItemBase {
             role="checkbox"
             [attr.aria-checked]="selected()"
             [attr.aria-label]="'Select ' + i.key"
-            class="border-border-strong flex size-3.5 items-center justify-center rounded-[4px] border transition-opacity focus-visible:opacity-100"
+            class="border-input flex size-3.5 items-center justify-center rounded-[4px] border transition-opacity focus-visible:opacity-100"
             [class]="selected() ? 'bg-primary border-primary text-primary-foreground opacity-100' : selecting() ? 'bg-background opacity-100' : 'bg-background opacity-0 group-hover/row:opacity-100'"
             (click)="onCheck($event)"
           >
@@ -328,8 +328,8 @@ export class IssueRow extends IssueItemBase {
     @let s = show();
     <div
       [attr.data-row-id]="i.id"
-      class="group/card relative rounded-lg border px-3 py-2.5 shadow-xs transition-colors"
-      [class]="selected() ? 'border-primary/60 bg-selected' : focused() ? 'bg-card border-border-strong' : 'bg-card border-border hover:border-border-strong'"
+      class="group/card relative rounded-lg px-3 py-2.5 transition-colors"
+      [class]="selected() ? 'bg-selected' : focused() ? 'bg-secondary ring-1 ring-ring/40' : 'bg-secondary hover:bg-accent'"
     >
       <a
         [routerLink]="['/', slug(), 'tasks', i.key]"
@@ -344,7 +344,7 @@ export class IssueRow extends IssueItemBase {
             role="checkbox"
             [attr.aria-checked]="selected()"
             [attr.aria-label]="'Select ' + i.key"
-            class="border-border-strong relative flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border focus-visible:opacity-100"
+            class="border-input relative flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border focus-visible:opacity-100"
             [class]="selected() ? 'bg-primary border-primary text-primary-foreground opacity-100' : selecting() ? 'bg-background opacity-100' : 'bg-background opacity-0 group-hover/card:opacity-100'"
             (click)="onCheck($event)"
           >
@@ -369,7 +369,7 @@ export class IssueRow extends IssueItemBase {
         <span class="line-clamp-2 text-[13px] leading-snug font-medium" [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
       </div>
       <div class="mt-2 flex flex-wrap items-center gap-1.5">
-        <app-issue-prop class="border-border relative -ml-0.5 rounded-md border" [issue]="i" field="priority" />
+        <app-issue-prop class="relative -ml-0.5 rounded-md" [issue]="i" field="priority" />
         @if (s.project && projectId(); as pid) {
           <app-project-chip [projectId]="pid" />
         }
@@ -377,7 +377,7 @@ export class IssueRow extends IssueItemBase {
           <app-label-chips class="relative" [ids]="i.labels" [max]="2" />
         }
         @if (hasEstimate()) {
-          <app-estimate class="border-border relative inline-flex h-6 items-center rounded-md border px-1.5 text-[11px]" [value]="i.estimate" />
+          <app-estimate class="bg-secondary relative inline-flex h-6 items-center rounded-md px-1.5 text-[11px]" [value]="i.estimate" />
         }
         @if (s.date) {
           <span class="text-muted-foreground ml-auto text-[11px] tabular-nums" [attr.aria-label]="dateTitle()">{{ date() }}</span>

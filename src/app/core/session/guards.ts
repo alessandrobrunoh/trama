@@ -49,22 +49,30 @@ export const workspaceGuard: CanActivateFn = async (route, state) => {
   });
 };
 
-/** Only allow the route when the active role is at least `minRole`; else → workspace overview. */
+/** Only allow the route when the active role is at least `minRole`; else → the workspace inbox. */
 export function roleGuard(minRole: import('../contracts/domain').Role): CanActivateFn {
   return (route) => {
     const session = inject(SessionStore);
     const router = inject(Router);
     if (session.can(minRole)) return true;
     const slug = route.paramMap.get('workspaceSlug') ?? session.workspace()?.slug ?? '';
-    return router.createUrlTree(['/', slug, 'overview']);
+    return router.createUrlTree(['/', slug, 'inbox']);
   };
 }
 
 /** Where an installed app opens (`start_url`) and where its home-screen shortcuts point. */
-const LAUNCH_SECTIONS = new Set(['inbox', 'my-work', 'tasks', 'projects', 'overview']);
+const LAUNCH_SECTIONS = new Set(['inbox', 'tasks', 'projects']);
+
+/** `my-work` and `overview` were merged into the Inbox; installed home-screen shortcuts may still use them. */
+const LAUNCH_ALIASES: Record<string, string> = {
+  'my-tasks': 'inbox?tab=tasks',
+  'my-work': 'inbox?tab=tasks',
+  overview: 'inbox',
+  issues: 'tasks',
+};
 
 /**
- * `/a/launch?go=inbox|my-work|issues|new-issue|search`: the PWA entry point. Signed in, it opens the last
+ * `/a/launch?go=inbox|my-tasks|tasks|projects|new-issue|search`: the PWA entry point. Signed in, it opens the last
  * workspace (on `go`, when given); signed out, it asks to sign in first. The landing page at `/` is for the
  * web, not for the installed app. (`a` is too short to be a workspace slug, so this path cannot collide.)
  */
@@ -82,5 +90,6 @@ export const launchGuard: CanActivateFn = async (route, state) => {
   const slug = base.split('/')[1];
   if (go === 'new-issue') ui.openCreate('issue');
   else if (go === 'search') ui.openModal('search');
-  return router.parseUrl(LAUNCH_SECTIONS.has(go) ? `/${slug}/${go}` : base);
+  const target = LAUNCH_ALIASES[go] ?? go;
+  return router.parseUrl(LAUNCH_SECTIONS.has(target.split('?')[0]) ? `/${slug}/${target}` : base);
 };

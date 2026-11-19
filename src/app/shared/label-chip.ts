@@ -18,12 +18,10 @@ export const labelEdge = (color: string): string => `color-mix(in srgb, ${color}
   template: `
     @if (view(); as v) {
       <span
-        class="text-foreground inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full border leading-none"
+        class="text-foreground inline-flex max-w-full min-w-0 items-center gap-1.5 rounded-full leading-none"
         [class]="size() === 'md' ? 'h-6 px-2.5 text-xs' : 'h-5 px-2 text-[11px]'"
-        [class.border-dashed]="v.archived"
         [class.opacity-70]="v.archived"
         [style.background]="tint(v.color)"
-        [style.border-color]="edge(v.color)"
         [attr.title]="v.archived ? v.name + ' (archived)' : v.name"
       >
         <span class="size-1.5 shrink-0 rounded-full" [style.background]="v.color"></span>
@@ -64,7 +62,7 @@ export class LabelChip {
     }
     @if (rest().length) {
       <span
-        class="text-muted-foreground border-border-strong inline-flex h-5 shrink-0 items-center rounded-full border px-1.5 text-[11px] leading-none"
+        class="text-muted-foreground bg-foreground/[0.06] inline-flex h-5 shrink-0 items-center rounded-full px-1.5 text-[11px] leading-none"
         [attr.title]="restNames()"
       >+{{ rest().length }}</span>
     }

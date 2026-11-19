@@ -30,14 +30,14 @@ import { AuthShell } from './auth-shell';
           @if (error(); as e) {
             <div
               role="alert"
-              class="border-destructive/30 bg-destructive/5 text-destructive flex items-start gap-2 rounded-md border px-2.5 py-2 text-sm"
+              class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
             >
               <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
               <span>{{ e }}</span>
             </div>
           }
 
-          <dl class="bg-muted/40 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg border px-3.5 py-3 text-[13px]">
+          <dl class="bg-muted grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg px-3.5 py-3 text-[13px]">
             <dt class="text-muted-foreground">Invited email</dt>
             <dd class="min-w-0 truncate font-medium">{{ inv.email }}</dd>
             <dt class="text-muted-foreground">Role</dt>

@@ -10,14 +10,12 @@ the route table is in `app.routes.ts`.
 - A **Task** is the unit of work. The TypeScript type, the wire type and internal discriminators stay `Issue` /
   `issue`; the UI route is `/:workspace/tasks` and the HTTP resource is `/w/:slug/tasks`. Keep Tasks granular;
   one Task should describe one problem or request.
-- `Issue.goal` is optional outcome context: the desired result, not a technical plan. The Task body describes
-  the problem and relevant context.
-- A Plan is optional. It is represented by a Plan-titled Document/artifact attached to a Task. There is no
-  separate Plan entity.
+- The Task body describes the problem and relevant context. There is no separate goal field.
 - A **Project** groups planned Tasks and milestones. It has one optional `repository` string (`owner/name` or a
   URL); there is no repository registry.
-- Tasks have no team and no release. Teams, releases, customers, decisions, input requests and the
-  repository registry no longer exist.
+- Tasks have no team and no release. Teams, releases, customers, decisions, input requests, the
+  repository registry, project updates and health, project-level context and artifacts, and Documents no longer
+  exist. A Task still shows the pull requests, builds and attachments linked to it.
 - Full transcripts, prompts, tool calls, and file-edit history belong in the execution tool. Trama keeps the
   durable context needed to understand and continue the work.
 - Workstreams are not an active entity, route, API resource, status, or Task association.
@@ -46,17 +44,18 @@ feature directory.
 
 ## Routes and API
 
-The authenticated workspace shell is `/:workspaceSlug`. Current work surfaces include Overview, Inbox
-(attention and updates), Tasks and Task detail, Projects, Milestones, Documents, Views, Activity, and
-Settings. Old `/issues` links redirect to `/tasks`. `src/app/app.routes.ts` is authoritative; removed routes
+The authenticated workspace shell is `/:workspaceSlug`. Current work surfaces include Inbox
+(needs you, your tasks, updates, snoozed), Tasks and Task detail, Projects, Milestones, Views, Statistics, Timer, Activity,
+and Settings. Old `/issues` links redirect to `/tasks`. `src/app/app.routes.ts` is authoritative; removed routes
 must not be reintroduced by links, chips, favorites, or shortcuts.
 
 `ApiClient` is promise-based and uses `/api`. Prefer `TramaStore` for snapshot-backed reads and writes; use
-the client directly for on-demand endpoints such as Task/Project context, search, filtered event history,
-and the full Attention list. Important current resources:
+the client directly for on-demand endpoints such as search, filtered event history, time entries, and the full
+Attention list. Important current resources:
 
-- Tasks: list/get/create/update/delete, bulk operations, and `GET tasks/:idOrKey/context`.
-- Artifacts and Documents: attach to a Task or Project; Plans are ordinary Task-owned Documents/artifacts.
+- Tasks: list/get/create/update/delete and bulk operations.
+- Artifacts: pull requests, builds and attachments linked to a Task.
+- Time entries: the signed-in person's tracked time (`GET time-entries`), used by Statistics.
 - Attention: review requests, failing checks, conflicts, and triage; state is per user.
 - Projects, milestones, comments, activity, notifications, integrations, and saved views.
 
@@ -75,13 +74,13 @@ Saved-view entities are Task and Project. Layouts are List, Board, and Project T
 definitions are in `core/query/fields.ts`; filtering/sorting/grouping logic is pure and shared by list,
 board, and saved-view pages. Task project and milestone filters use direct Task ownership.
 
-The live event stream invalidates the snapshot and on-demand Project contexts. Comment bodies are loaded by
+The live event stream invalidates the snapshot. Comment bodies are loaded by
 subject on demand; the snapshot may carry a compact comment index instead.
 
 ## Forms and validation
 
 The global create dialog presents Task as its primary composer, plus compact Project and View forms. Task
-creation includes an optional Goal, described as the desired result rather than a technical plan.
+creation takes a title, a description and the usual properties.
 
 Validate external/user input at the API boundary and use explicit domain types. Do not infer or silently
 assign legacy records to Tasks.

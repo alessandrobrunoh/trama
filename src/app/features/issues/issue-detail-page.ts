@@ -6,39 +6,26 @@ import {
   effect,
   inject,
   input,
-  signal,
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
-  LucideActivity,
-  LucideBox,
   LucideChevronDown,
   LucideChevronUp,
   LucideCopy,
   LucideDynamicIcon,
-  LucideCircleDot,
   LucideEllipsis,
   LucideExternalLink,
-  LucideFlag,
-  LucideGauge,
   LucideGitBranch,
   LucideLink,
-  LucideLink2,
-  LucideMegaphone,
-  LucideRadio,
   LucideSparkles,
-  LucideTag,
   LucideTrash2,
-  LucideUserRound,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, fullDate, isTypingTarget, usePageShortcuts } from '../../core';
-import { ApiClient } from '../../core/api/api-client';
-import type { IssueContext } from '../../core/contracts/domain';
 import { UiStore } from '../../core/stores/ui.store';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
@@ -48,20 +35,20 @@ import { Kbd } from '../../shared/kbd';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
 import { IssueMilestoneProp } from '../milestones/milestone-chips';
-import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
 import { projectOptions } from '../../shared/picker-options';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueExternalRef } from './issue-external-ref';
-import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle } from './issue-detail-parts';
-import { IssueGoal } from './issue-goal';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AiIssueSection } from '../ai-actions/ai-issue-cards';
 import { IssueLunagest } from './issue-lunagest';
+import { IssueSection } from './issue-section';
 import { IssueTimeCard } from './issue-sidebar';
+import { IssueSubtasks } from './issue-subtasks';
+import { IssueThreadLink } from './issue-thread-link';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 import { LabelPicker } from '../../shared/label-picker';
 
@@ -89,12 +76,13 @@ import { LabelPicker } from '../../shared/label-picker';
     IssueProp,
     IssueTitle,
     IssueDescription,
-    IssueGoal,
-    IssueArtifacts,
     IssueActivity,
     IssueCommandDialog,
     IssueTimeCard,
     IssueLunagest,
+    IssueSection,
+    IssueSubtasks,
+    IssueThreadLink,
     AiIssueSection,
   ],
   host: { class: 'flex min-h-full flex-col' },
@@ -224,7 +212,7 @@ import { LabelPicker } from '../../shared/label-picker';
         </ng-template>
       </ng-template>
 
-      <div class="grid min-h-full flex-1 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div class="grid min-h-full flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
         <!-- Main column -->
         <main class="min-w-0 px-4 py-6 sm:px-8 lg:px-12">
           <div class="mx-auto flex max-w-3xl flex-col gap-8">
@@ -239,10 +227,15 @@ import { LabelPicker } from '../../shared/label-picker';
                   <span aria-hidden="true">·</span>
                   <span>via {{ sourceLabel() }}</span>
                 }
+                @if (parentIssue(); as parent) {
+                  <span aria-hidden="true">·</span>
+                  <span>Subtask of</span>
+                  <app-entity-chip type="issue" [ref]="parent.id" compact />
+                }
               </div>
               @if (duplicate(); as dup) {
                 <div
-                  class="bg-muted/50 border-border mb-3 flex flex-wrap items-center gap-2 rounded-lg border px-3 py-2 text-[13px]"
+                  class="bg-muted mb-3 flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-[13px]"
                 >
                   <span class="text-muted-foreground">Duplicate of</span>
                   <app-entity-chip type="issue" [ref]="dup.id" />
@@ -265,6 +258,7 @@ import { LabelPicker } from '../../shared/label-picker';
                 [canEdit]="canEdit()"
                 (save)="store.updateIssue(i.id, { title: $event })"
               />
+              <app-issue-thread-link [issue]="i" [canEdit]="canEdit()" />
               <div class="mt-3">
                 <app-issue-description
                   #desc
@@ -285,113 +279,25 @@ import { LabelPicker } from '../../shared/label-picker';
               </div>
             </div>
 
-            <app-issue-goal [issue]="i" [canEdit]="canEdit()" />
-            @if (parentIssue() || subIssues().length || store.allowed('createIssues')) {
-              <section
-                aria-labelledby="issue-subtasks-heading"
-                class="border-border min-w-0 rounded-lg border px-4 py-3"
-              >
-                <div class="flex flex-wrap items-start justify-between gap-3">
-                  <h2 id="issue-subtasks-heading" class="text-sm font-semibold">Subtasks</h2>
-                  @if (store.allowed('createIssues')) {
-                    <button
-                      hlmBtn
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      class="shrink-0"
-                      [attr.aria-label]="'Create subtask of ' + i.key"
-                      (click)="ui.openCreate('issue', { parentId: i.id })"
-                    >
-                      Add subtask
-                    </button>
-                  }
-                </div>
-                @if (parentIssue(); as parent) {
-                  <div class="mt-3 min-w-0">
-                    <h3 class="text-muted-foreground mb-1 text-xs font-medium">Parent task</h3>
-                    <app-entity-chip class="max-w-full" type="issue" [ref]="parent.id" />
-                  </div>
-                }
-                <div class="mt-3 min-w-0">
-                  <h3 class="text-muted-foreground mb-1 text-xs font-medium">Direct subtasks</h3>
-                  @if (subIssues().length) {
-                    <ul role="list" class="flex min-w-0 flex-col gap-1">
-                      @for (child of subIssues(); track child.id) {
-                        <li class="min-w-0">
-                          <app-entity-chip class="max-w-full" type="issue" [ref]="child.id" />
-                        </li>
-                      }
-                    </ul>
-                  } @else {
-                    <p class="text-muted-foreground text-xs">No direct subtasks.</p>
-                  }
-                </div>
-              </section>
-            }
-            @if (planSummary(); as plan) {
-              <section
-                aria-labelledby="issue-plan-heading"
-                class="border-border rounded-lg border px-4 py-3"
-              >
-                <h2 id="issue-plan-heading" class="mb-2 text-sm font-semibold">Plan summary</h2>
-                @if (plan.artifactCount) {
-                  <p class="text-muted-foreground text-xs">
-                    {{ plan.artifactCount }} Plan artifact{{ plan.artifactCount === 1 ? '' : 's' }}
-                  </p>
-                }
-                @if (plan.latestArtifact; as artifact) {
-                  <div class="mt-2">
-                    @if (artifact.documentId) {
-                      <a
-                        class="inline-flex items-center gap-1 text-sm underline underline-offset-2"
-                        [routerLink]="['/', slug(), 'documents', artifact.documentId]"
-                      >
-                        {{ artifact.title }}
-                      </a>
-                    } @else if (artifact.url) {
-                      <a
-                        class="inline-flex items-center gap-1 text-sm underline underline-offset-2"
-                        [href]="artifact.url"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        {{ artifact.title }}
-                        <svg [lucideIcon]="extIcon" [size]="12" aria-hidden="true"></svg>
-                      </a>
-                    } @else {
-                      <span class="text-sm">{{ artifact.title }}</span>
-                    }
-                  </div>
-                }
-              </section>
-            }
-
-            <app-issue-artifacts [issue]="i" />
-
-            <div class="border-t pt-6">
+            <app-ai-issue-section [issue]="i" [showActions]="false" />
+            <app-issue-subtasks [issue]="i" />
+            <div class="pt-2">
               <app-issue-activity [issue]="i" />
             </div>
           </div>
         </main>
 
         <!-- Properties -->
-        <aside
-          class="bg-sidebar/40 border-border flex flex-col gap-4 border-t px-4 py-5 lg:border-t-0 lg:border-l"
-          aria-label="Properties"
-        >
-          <app-ai-issue-section [issue]="i" />
-
-          <section class="bg-card border-border rounded-lg border">
-            <h3 class="text-muted-foreground px-3 pt-2.5 pb-1 text-xs font-medium">Properties</h3>
-            <div class="flex flex-col px-2.5 pb-2">
-              <app-property-row label="Status" [icon]="statusGlyph">
+        <aside class="bg-sidebar/50 flex min-w-0 flex-col gap-1 px-2 py-3" aria-label="Properties">
+          <section class="flex flex-col">
+            <div class="flex flex-col">
+              <app-property-row label="Status" compact>
                 <app-issue-prop [issue]="i" field="status" showLabel />
               </app-property-row>
-              <app-property-row label="Priority" [icon]="flagGlyph">
+              <app-property-row label="Priority" compact>
                 <app-issue-prop [issue]="i" field="priority" showLabel />
               </app-property-row>
-              <app-property-row label="Assignee" [icon]="userGlyph">
+              <app-property-row label="Assignee" compact>
                 <app-issue-prop [issue]="i" field="assignee" showLabel />
                 @if (canEdit() && store.me(); as me) {
                   @if (i.assigneeId !== me.id) {
@@ -406,9 +312,10 @@ import { LabelPicker } from '../../shared/label-picker';
                   }
                 }
               </app-property-row>
-              <app-property-row label="Project" [icon]="projectGlyph">
+              <app-property-row label="Project" compact>
                 <app-picker
                   variant="field"
+                  triggerClass="min-h-7 py-0.5"
                   label="Project"
                   placeholder="No project"
                   [clearable]="true"
@@ -420,9 +327,10 @@ import { LabelPicker } from '../../shared/label-picker';
                 />
               </app-property-row>
               @if (showEstimate()) {
-                <app-property-row label="Estimate" [icon]="gaugeGlyph">
+                <app-property-row label="Estimate" compact>
                   <app-picker
                     variant="field"
+                    triggerClass="min-h-7 py-0.5"
                     label="Estimate"
                     placeholder="No estimate"
                     [clearable]="true"
@@ -439,16 +347,17 @@ import { LabelPicker } from '../../shared/label-picker';
                 </app-property-row>
               }
               <app-issue-milestone-prop [issue]="i" />
-              <app-property-row label="Labels" [icon]="tagGlyph">
+              <app-property-row label="Labels" compact>
                 <app-label-picker
                   #labelPicker
                   scope="issue"
+                  triggerClass="min-h-7 py-0.5"
                   [disabled]="!canEdit()"
                   [value]="i.labels"
                   (valueChange)="store.updateIssue(i.id, { labels: $event })"
                 />
               </app-property-row>
-              <app-property-row label="Type" [icon]="tagGlyph">
+              <app-property-row label="Type" compact>
                 <app-picker
                   variant="bare"
                   label="Type"
@@ -465,17 +374,12 @@ import { LabelPicker } from '../../shared/label-picker';
             </div>
           </section>
 
-          <app-issue-time-card [issue]="i" />
-
-          <app-issue-lunagest [issueId]="i.id" />
-
-          <section class="bg-card border-border rounded-lg border">
-            <h3 class="text-muted-foreground px-3 pt-2.5 pb-1 text-xs font-medium">Details</h3>
-            <div class="flex flex-col px-2.5 pb-2">
-              <app-property-row label="Source" [icon]="sourceGlyph">
+          <app-issue-section label="Details" [summary]="'Updated ' + (i.updatedAt | relativeTime)">
+            <div class="flex flex-col">
+              <app-property-row label="Source" compact>
                 <span class="px-1.5 text-[13px]">{{ sourceLabel() }}</span>
               </app-property-row>
-              <app-property-row label="Reporter" [icon]="reporterGlyph">
+              <app-property-row label="Reporter" compact>
                 <app-inline-text
                   class="min-w-0 flex-1"
                   label="reporter"
@@ -487,7 +391,7 @@ import { LabelPicker } from '../../shared/label-picker';
                   (save)="store.updateIssue(i.id, { reporterName: $event || null })"
                 />
               </app-property-row>
-              <app-property-row label="External link" [icon]="linkGlyph">
+              <app-property-row label="Link" compact>
                 <app-inline-text
                   class="min-w-0 flex-1"
                   label="external link"
@@ -512,7 +416,7 @@ import { LabelPicker } from '../../shared/label-picker';
                 }
               </app-property-row>
               <app-issue-external-ref [issue]="i" [canEdit]="canEdit()" />
-              <app-property-row label="Duplicate of" [icon]="copyIcon">
+              <app-property-row label="Duplicate" compact>
                 @if (duplicate(); as dup) {
                   <app-entity-chip type="issue" [ref]="dup.id" compact />
                   @if (canEdit()) {
@@ -539,7 +443,7 @@ import { LabelPicker } from '../../shared/label-picker';
                 }
               </app-property-row>
               @if (duplicates().length) {
-                <app-property-row label="Duplicates" [icon]="copyIcon">
+                <app-property-row label="Duplicates" compact>
                   <span class="flex flex-wrap gap-1">
                     @for (d of duplicates(); track d.id) {
                       <app-entity-chip type="issue" [ref]="d.id" compact />
@@ -548,29 +452,11 @@ import { LabelPicker } from '../../shared/label-picker';
                 </app-property-row>
               }
             </div>
-          </section>
+          </app-issue-section>
 
-          <section class="px-0.5">
-            <h3 class="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs font-medium">
-              <svg [lucideIcon]="activityGlyph" [size]="13" [strokeWidth]="1.75"></svg> Activity
-            </h3>
-            <dl class="text-muted-foreground flex flex-col gap-1.5 text-xs">
-              <div class="flex justify-between gap-3">
-                <dt>Updated</dt>
-                <dd class="text-foreground" [hlmTooltip]="full(i.updatedAt)">
-                  {{ i.updatedAt | relativeTime }}
-                </dd>
-              </div>
-              @for (f of facts(); track f.label) {
-                @if (f.label !== 'Last update') {
-                  <div class="flex justify-between gap-3">
-                    <dt>{{ f.label }}</dt>
-                    <dd class="text-foreground tabular-nums">{{ f.value }}</dd>
-                  </div>
-                }
-              }
-            </dl>
-          </section>
+          <app-issue-time-card [issue]="i" />
+
+          <app-issue-lunagest [issueId]="i.id" />
         </aside>
       </div>
 
@@ -590,12 +476,10 @@ import { LabelPicker } from '../../shared/label-picker';
 export class IssueDetailPage {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
-  private readonly api = inject(ApiClient);
   protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
-  protected readonly planSummary = signal<IssueContext['planSummary']>(undefined);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
@@ -612,14 +496,6 @@ export class IssueDetailPage {
   protected readonly parentIssue = computed(() => {
     const parentId = this.issue()?.parentId;
     return parentId ? this.store.issueById().get(parentId) : undefined;
-  });
-  protected readonly subIssues = computed(() => {
-    const issueId = this.issue()?.id;
-    return issueId ? this.store.issues().filter((issue) => issue.parentId === issueId) : [];
-  });
-  protected readonly facts = computed(() => {
-    const issue = this.issue();
-    return issue ? issueFacts(this.store, issue.id) : [];
   });
   protected readonly duplicate = computed(() => {
     const id = this.issue()?.duplicateOfId;
@@ -648,26 +524,6 @@ export class IssueDetailPage {
     issueEstimateOptions(this.issue()?.estimate, this.store.estimateScale()),
   );
 
-  private readonly _context = effect((onCleanup) => {
-    const issue = this.issue();
-    const slug = this.slug();
-    let current = true;
-    onCleanup(() => {
-      current = false;
-    });
-    this.planSummary.set(undefined);
-    if (!issue || !slug) return;
-    void this.api.issues
-      .context(slug, issue.key)
-      .then((context) => {
-        if (!current) return;
-        this.planSummary.set(context.planSummary);
-      })
-      .catch(() => {
-        if (current) this.planSummary.set(undefined);
-      });
-  });
-
   /** Prev / next in the order the issue list last showed (falls back to most recently updated). */
   protected readonly nav = computed(() => {
     const id = this.issue()?.id;
@@ -691,16 +547,6 @@ export class IssueDetailPage {
   protected readonly xIcon = LucideX;
   protected readonly extIcon = LucideExternalLink;
   protected readonly branchIcon = LucideGitBranch;
-  protected readonly statusGlyph = LucideCircleDot;
-  protected readonly flagGlyph = LucideFlag;
-  protected readonly userGlyph = LucideUserRound;
-  protected readonly projectGlyph = LucideBox;
-  protected readonly gaugeGlyph = LucideGauge;
-  protected readonly tagGlyph = LucideTag;
-  protected readonly sourceGlyph = LucideRadio;
-  protected readonly reporterGlyph = LucideMegaphone;
-  protected readonly linkGlyph = LucideLink2;
-  protected readonly activityGlyph = LucideActivity;
   protected readonly upIcon = LucideChevronUp;
   protected readonly downIcon = LucideChevronDown;
 

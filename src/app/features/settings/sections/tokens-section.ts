@@ -75,8 +75,8 @@ const EXPIRY: Option[] = [
                   <button
                     type="button"
                     role="radio"
-                    class="hover:bg-accent rounded-md border px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                    [class.border-primary]="scope() === sc.id"
+                    class="hover:bg-hover rounded-md px-3 py-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                    [class.bg-secondary]="scope() !== sc.id"
                     [class.bg-selected]="scope() === sc.id"
                     [attr.aria-checked]="scope() === sc.id"
                     [disabled]="!scopeAllowed(sc.id)"

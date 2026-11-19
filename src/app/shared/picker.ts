@@ -177,6 +177,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             type="button"
             variant="ghost"
             class="h-auto min-h-8 w-full min-w-0 justify-start gap-1.5 px-1.5 py-1 text-left font-normal"
+            [class]="triggerClass()"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
@@ -300,7 +301,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             }
           </hlm-command-list>
           @if (create()) {
-            <div class="border-t p-1">
+            <div class="p-1">
               <button
                 hlmBtn
                 variant="ghost"

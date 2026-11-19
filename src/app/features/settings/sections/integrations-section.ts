@@ -22,6 +22,7 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { RelativeTimePipe } from '../../../shared/pipes';
+import { LunagestIntegration } from './lunagest-integration';
 import { SECTION_KIT } from './section-kit';
 import { OutgoingWebhooks } from './outgoing-webhooks';
 import { WebhookSetupDialog } from './webhook-setup-dialog';
@@ -97,6 +98,7 @@ type Row = IntegrationDetail & { detailed: boolean };
     LucideDynamicIcon,
     ProviderIcon,
     RelativeTimePipe,
+    LunagestIntegration,
     OutgoingWebhooks,
     WebhookSetupDialog,
     ...SECTION_KIT,
@@ -106,7 +108,7 @@ type Row = IntegrationDetail & { detailed: boolean };
     <div>
       <app-section-header
         title="Integrations"
-        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
+        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects, link projects to LunaGest, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
       >
         @if (canAdmin() && !connecting()) {
           <button actions hlmBtn size="sm" (click)="openConnect()">
@@ -128,8 +130,8 @@ type Row = IntegrationDetail & { detailed: boolean };
                   type="button"
                   role="radio"
                   [attr.aria-checked]="choice().id === p.id"
-                  class="hover:bg-accent flex items-center gap-2.5 rounded-md border px-3 py-2.5 text-left transition-colors"
-                  [class.border-primary]="choice().id === p.id"
+                  class="hover:bg-hover flex items-center gap-2.5 rounded-md px-3 py-2.5 text-left transition-colors"
+                  [class.bg-secondary]="choice().id !== p.id"
                   [class.bg-selected]="choice().id === p.id"
                   (click)="choose(p)"
                 >
@@ -178,7 +180,7 @@ type Row = IntegrationDetail & { detailed: boolean };
       }
 
       @if (!rows().length && !connecting()) {
-        <div class="flex flex-col items-center gap-3 rounded-lg border border-dashed px-6 py-12 text-center">
+        <div class="flex flex-col items-center gap-3 rounded-lg bg-muted px-6 py-12 text-center">
           <span class="bg-muted text-muted-foreground flex size-10 items-center justify-center rounded-lg">
             <svg [lucideIcon]="plug" [size]="18" [strokeWidth]="1.5"></svg>
           </span>
@@ -282,6 +284,11 @@ type Row = IntegrationDetail & { detailed: boolean };
           </app-settings-group>
         }
       </div>
+    </div>
+
+    <div>
+      <h3 class="mb-3 text-[13px] font-medium">Project tools</h3>
+      <app-lunagest-integration />
     </div>
 
     <app-outgoing-webhooks />

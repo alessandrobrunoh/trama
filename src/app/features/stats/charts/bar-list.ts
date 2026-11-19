@@ -1,4 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 
 export interface BarRow {
   key?: string;
@@ -17,6 +18,7 @@ export interface BarRow {
 @Component({
   selector: 'app-bar-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [HlmTooltip],
   host: { class: 'block' },
   template: `
     @if (rows().length) {
@@ -24,7 +26,8 @@ export interface BarRow {
         @for (row of rows(); track row.key ?? row.label) {
           <li
             class="hover:bg-hover focus-within:bg-hover -mx-2 grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_3rem] items-center gap-3 rounded-md px-2 py-1.5 text-xs transition-colors"
-            [attr.title]="row.detail ?? row.label + ': ' + (row.valueLabel ?? row.value)"
+            [hlmTooltip]="row.detail ?? row.label + ': ' + (row.valueLabel ?? row.value)"
+            position="top"
             tabindex="0"
             [class.cursor-pointer]="interactive()"
             [attr.role]="interactive() ? 'link' : null"

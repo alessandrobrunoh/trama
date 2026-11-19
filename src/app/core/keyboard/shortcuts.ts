@@ -3,15 +3,13 @@
 
 /** `G` then <key> → route segment under /:workspaceSlug (within GO_CHORD_TIMEOUT ms). */
 export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = {
-  o: { segment: 'overview', label: 'Overview' },
   y: { segment: 'stats', label: 'Statistics' },
   a: { segment: 'inbox?tab=needs-you', label: 'Inbox' },
-  m: { segment: 'my-work', label: 'My work' },
+  m: { segment: 'inbox?tab=tasks', label: 'Inbox: my tasks' },
   n: { segment: 'inbox?tab=updates', label: 'Inbox: updates' },
   i: { segment: 'tasks', label: 'Tasks' },
   p: { segment: 'projects', label: 'Projects' },
   h: { segment: 'timer', label: 'Timer' },
-  u: { segment: 'documents', label: 'Documents' },
   x: { segment: 'graph', label: 'Graph' },
   s: { segment: 'settings/profile', label: 'Settings' },
   v: { segment: 'views', label: 'Views' },

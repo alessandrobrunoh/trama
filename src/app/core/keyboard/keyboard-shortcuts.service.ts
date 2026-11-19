@@ -148,7 +148,6 @@ export class KeyboardShortcuts {
     const key = id ? decodeURIComponent(id) : undefined;
     switch (area) {
       case 'inbox':
-      case 'my-work':
         return { kind: 'issue', defaults: {} };
       case 'tasks':
       case 'issues':

@@ -6,7 +6,7 @@ import { RouterLink } from '@angular/router';
   selector: 'app-site-footer',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [RouterLink],
-  host: { class: 'border-border/60 block border-t' },
+  host: { class: 'bg-muted/50 block' },
   template: `
     <div
       class="mx-auto grid max-w-6xl gap-8 px-4 py-10 text-[13px] sm:grid-cols-[1.5fr_1fr_1fr] sm:px-6"
@@ -46,7 +46,7 @@ import { RouterLink } from '@angular/router';
         >
       </nav>
     </div>
-    <div class="border-border/60 border-t">
+    <div>
       <p class="text-muted-foreground mx-auto max-w-6xl px-4 py-5 text-xs sm:px-6">
         © {{ year }} Trama · Source-available under PolyForm Shield 1.0.0
       </p>

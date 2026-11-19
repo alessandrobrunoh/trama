@@ -98,7 +98,7 @@ interface TriageRow {
         <p class="text-muted-foreground mb-1 text-[11px] leading-snug">A starting point based on this text and similar finished tasks, not a verdict.</p>
         <ul class="flex flex-col">
           @for (r of rows(); track r.id) {
-            <li class="border-border flex flex-col gap-0.5 border-t py-1.5 first:border-t-0">
+            <li class="flex flex-col gap-0.5 py-1.5">
               <div class="flex items-center gap-1.5">
                 <span class="text-muted-foreground w-[3.75rem] shrink-0 text-[11px]">{{ r.label }}</span>
                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1 gap-y-0.5 text-[13px]">
@@ -368,6 +368,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
   template: `
     @if (ai.available()) {
       <section aria-label="AI" class="flex flex-col gap-2">
+        @if (showActions()) {
         <div class="flex items-center gap-1.5 px-0.5">
           <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="text-primary"></svg>
           <h3 class="text-muted-foreground text-xs font-medium">AI</h3>
@@ -405,6 +406,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
         @if (!ai.noted()) {
           <p class="text-muted-foreground px-0.5 text-[11px] leading-snug">Sends this item's text to your configured AI provider.</p>
         }
+        }
         @if (open().summarize) {
           <app-ai-summary-card [issue]="issue()" (closed)="hide('summarize')" />
         }
@@ -415,7 +417,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
           <app-ai-improve-card [issue]="issue()" (closed)="hide('improve')" />
         }
       </section>
-    } @else if (ai.checked()) {
+    } @else if (ai.checked() && showActions()) {
       <p class="text-muted-foreground flex items-center gap-1.5 px-0.5 text-xs">
         <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="opacity-60"></svg>
         <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="ai.settingsLink()">Enable AI</a>
@@ -427,6 +429,8 @@ type CardKind = 'summarize' | 'triage' | 'improve';
 export class AiIssueSection {
   protected readonly ai = inject(AiActions);
   readonly issue = input.required<Issue>();
+  /** False: only the result cards; the actions live in the page's "more" menu and the command palette. */
+  readonly showActions = input(true);
   protected readonly sparkles = LucideSparkles;
   protected readonly info = LucideInfo;
   protected readonly canEdit = computed(() => this.ai.canEditIssue(this.issue()));

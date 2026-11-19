@@ -10,6 +10,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { LucideDynamicIcon, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { LiveSync } from '../../../core/sync/live-sync.service';
 import { InvitesStore } from '../../../core/stores/invites.store';
@@ -43,6 +44,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     HlmButtonImports,
+    HlmCheckbox,
     HlmInputImports,
     LucideDynamicIcon,
     ActorAvatar,
@@ -85,12 +87,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             @if (roleValue() !== 'owner') {
               <div class="px-4 pt-2 pb-3">
                 <label class="flex items-start gap-2 text-[13px]">
-                  <input
-                    type="checkbox"
-                    class="accent-primary mt-0.5 size-4 cursor-pointer"
-                    [checked]="custom()"
-                    (change)="setCustom($any($event.target).checked)"
-                  />
+                  <hlm-checkbox class="mt-0.5" [checked]="custom()" (checkedChange)="setCustom($event)" />
                   <span>
                     <span class="font-medium">Adjust this invitation</span>
                     <span class="text-muted-foreground block text-xs leading-snug">They start from the {{ roleName(roleValue()) }} role. You can hide projects, and add actions that role does not include.</span>
@@ -247,14 +244,9 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           }
         </div>
         @if (editingId() === m.membership.id) {
-          <div class="bg-muted/20 border-t px-4 py-3">
+          <div class="bg-muted px-4 py-3">
             <label class="flex items-start gap-2 text-[13px]">
-              <input
-                type="checkbox"
-                class="accent-primary mt-0.5 size-4 cursor-pointer"
-                [checked]="draftCustom()"
-                (change)="setDraftCustom(m.membership, $any($event.target).checked)"
-              />
+              <hlm-checkbox class="mt-0.5" [checked]="draftCustom()" (checkedChange)="setDraftCustom(m.membership, $event)" />
               <span>
                 <span class="font-medium">Adjust {{ m.user.name }}</span>
                 <span class="text-muted-foreground block text-xs leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you hide projects or add actions.</span>

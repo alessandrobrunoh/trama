@@ -67,7 +67,7 @@ export function timeAgo(time: number): string {
                   @for (prompt of prompts; track prompt) {
                     <button
                       type="button"
-                      class="hover:bg-accent rounded-md border px-3 py-2 text-left text-xs"
+                      class="bg-secondary hover:bg-hover rounded-md px-3 py-2 text-left text-xs"
                       (click)="ai.draft.set(prompt); focusComposer()"
                     >
                       {{ prompt }}

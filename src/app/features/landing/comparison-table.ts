@@ -15,14 +15,14 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trello: 'A card on a board',
     jira: 'An issue in an epic → story → sub-task tree',
     linear: 'An issue, grouped into projects and cycles',
-    trama: 'Issues are the unit of work; add a Goal for the desired outcome',
+    trama: 'Tasks are the unit of work',
   },
   {
     topic: 'Many issues, one fix',
     trello: 'Labels or a dedicated list',
     jira: 'Epics and issue links',
     linear: 'Projects and issue relations',
-    trama: 'Keep related issues linked; an optional Goal describes the outcome',
+    trama: 'Keep related tasks linked and group them under a project',
   },
   {
     topic: 'Why it was done this way',
@@ -36,7 +36,7 @@ export const COMPARISON: readonly ComparisonRow[] = [
     trello: 'Power-Ups',
     jira: 'Development panel per issue',
     linear: 'Linked pull requests per issue',
-    trama: 'Documents and artifacts are optional, linked to the issues they support',
+    trama: 'Pull requests and builds are linked to the task they address, with CI and review state',
   },
   {
     topic: 'Progress',
@@ -66,10 +66,10 @@ export const COMPARISON: readonly ComparisonRow[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { class: 'block' },
   template: `
-    <div class="border-border bg-card overflow-x-auto rounded-xl border">
+    <div class="bg-card overflow-x-auto rounded-xl">
       <table class="w-full min-w-[46rem] border-collapse text-left text-[13px]">
         <thead>
-          <tr class="border-border border-b">
+          <tr>
             <th scope="col" class="text-muted-foreground w-[17%] px-4 py-3 font-normal"></th>
             <th scope="col" class="w-[19%] px-4 py-3 font-medium">Trello</th>
             <th scope="col" class="w-[19%] px-4 py-3 font-medium">Jira</th>
@@ -81,7 +81,7 @@ export const COMPARISON: readonly ComparisonRow[] = [
         </thead>
         <tbody>
           @for (row of rows; track row.topic) {
-            <tr class="border-border/70 border-b last:border-b-0">
+            <tr class="hover:bg-hover">
               <th scope="row" class="px-4 py-3 align-top font-medium">{{ row.topic }}</th>
               <td class="text-muted-foreground px-4 py-3 align-top">{{ row.trello }}</td>
               <td class="text-muted-foreground px-4 py-3 align-top">{{ row.jira }}</td>

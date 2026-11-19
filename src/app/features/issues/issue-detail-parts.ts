@@ -137,8 +137,8 @@ export class IssueTitle {
   host: { class: 'block' },
   template: `
     @if (editing()) {
-      <div class="border-border-strong rounded-lg border">
-        <div class="flex items-center gap-0.5 border-b px-1.5 py-1">
+      <div class="border-input rounded-lg border">
+        <div class="flex items-center gap-0.5 px-1.5 py-1">
           <button
             type="button"
             class="h-6 rounded-md px-2 text-xs"
@@ -194,7 +194,7 @@ export class IssueTitle {
             }
           </div>
         }
-        <div class="flex items-center justify-end gap-2 border-t px-2 py-1.5">
+        <div class="flex items-center justify-end gap-2 px-2 py-1.5">
           <button hlmBtn size="sm" variant="ghost" type="button" (click)="cancel()">
             Cancel
           </button>
@@ -326,6 +326,12 @@ const FIELD_VERB: Record<string, string> = {
   priority: 'changed the priority',
   reporterName: 'updated the reporter',
   externalUrl: 'updated the external link',
+  threadUrl: 'updated the thread link',
+  projectId: 'changed the project',
+  estimate: 'changed the estimate',
+  labels: 'changed the labels',
+  milestoneIds: 'changed the milestone',
+  kind: 'changed the type',
   duplicateOfId: 'changed the duplicate relation',
 };
 

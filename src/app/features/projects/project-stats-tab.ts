@@ -1,27 +1,27 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideChartBar } from '@lucide/angular';
 import { format } from 'date-fns';
-import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, type Project } from '../../core';
+import { TramaStore, type Project } from '../../core';
 import { EmptyState } from '../../shared/empty-state';
 import { BarList, type BarRow } from '../stats/charts/bar-list';
 import { ChartCard } from '../stats/charts/chart-card';
-import type { ChartSeries, ChartSlice } from '../stats/charts/chart-utils';
+import type { ChartSeries } from '../stats/charts/chart-utils';
 import { ColumnChart, type ColumnSeries } from '../stats/charts/column-chart';
-import { DonutChart } from '../stats/charts/donut-chart';
 import { KpiTile } from '../stats/charts/kpi-tile';
 import { TimeChart } from '../stats/charts/time-chart';
-import { ISSUE_COLOR, PRIORITY_COLOR } from '../stats/stats-colors';
+import { ISSUE_COLOR } from '../stats/stats-colors';
 import { isClosed } from './project-model';
 import { projectStats, type ProjectStats } from './project-stats-model';
 
 /**
- * Insights of a project, Linear-style: KPIs, burn-up, velocity, breakdowns and milestone progress.
- * Everything is derived from the project's issues and milestones.
+ * Progress of a project in four plain panels: key numbers, burn-up, tasks completed per week with a finish
+ * estimate, and milestones and open work per person. Everything is counted from the project's tasks and
+ * milestones; no time is measured here (tracked time and estimates live on the Statistics page).
  */
 @Component({
   selector: 'app-project-stats-tab',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [EmptyState, KpiTile, ChartCard, TimeChart, ColumnChart, DonutChart, BarList],
+  imports: [EmptyState, KpiTile, ChartCard, TimeChart, ColumnChart, BarList],
   host: { class: 'block' },
   template: `
     <div class="flex flex-col gap-4 px-4 py-5 sm:px-6">
@@ -49,21 +49,15 @@ import { projectStats, type ProjectStats } from './project-stats-model';
             />
             <app-kpi-tile label="Target date" [value]="targetValue()" [hint]="targetHint()" />
             <app-kpi-tile
-              label="Unassigned"
-              [value]="'' + s.kpis.unassigned"
-              hint="Open tasks without an assignee"
-            />
-            <app-kpi-tile
-              label="Velocity"
+              label="Pace"
               [value]="s.forecast.perWeek + '/wk'"
-              hint="Closed per week, last 4 weeks"
+              hint="Tasks completed per week, last 4 weeks"
             />
-            <app-kpi-tile label="Estimate" [value]="etaValue()" [hint]="etaHint()" />
+            <app-kpi-tile label="Finish estimate" [value]="etaValue()" [hint]="etaHint()" />
           </section>
 
-          <div class="grid gap-4 lg:grid-cols-3">
+          <div class="grid gap-4">
             <app-chart-card
-              class="lg:col-span-2"
               title="Burn-up"
               subtitle="Scope, started and completed tasks over time; canceled tasks are not counted"
               [empty]="burnSeries().length ? undefined : 'Not enough history yet.'"
@@ -77,13 +71,6 @@ import { projectStats, type ProjectStats } from './project-stats-model';
               />
             </app-chart-card>
 
-            <app-chart-card
-              title="Status"
-              subtitle="Tasks by status now"
-              [empty]="statusSlices().length ? undefined : 'No tasks yet.'"
-            >
-              <app-donut-chart [slices]="statusSlices()" centerLabel="issues" />
-            </app-chart-card>
           </div>
 
           <div class="grid gap-4 lg:grid-cols-3">
@@ -116,14 +103,6 @@ import { projectStats, type ProjectStats } from './project-stats-model';
           </div>
 
           <div class="grid gap-4 md:grid-cols-2">
-            <app-chart-card
-              title="Priority"
-              subtitle="Tasks in scope"
-              [empty]="priorityRows().length ? undefined : 'No tasks yet.'"
-            >
-              <app-bar-list [rows]="priorityRows()" ariaLabel="Tasks by priority" />
-            </app-chart-card>
-
             <app-chart-card
               title="Open by assignee"
               subtitle="Workload on the open tasks"
@@ -220,18 +199,6 @@ export class ProjectStatsTab {
     ];
   });
 
-  protected readonly statusSlices = computed<ChartSlice[]>(() =>
-    this.stats()
-      .statusCounts.filter((c) => c.status !== 'canceled')
-      .sort((a, b) => ISSUE_STATUS_META[a.status].order - ISSUE_STATUS_META[b.status].order)
-      .map((c) => ({
-        key: c.status,
-        label: ISSUE_STATUS_META[c.status].label,
-        value: c.count,
-        color: ISSUE_COLOR[c.status],
-      })),
-  );
-
   protected readonly velocityLabels = computed(() => this.stats().velocity.map((w) => w.label));
   protected readonly velocityTitles = computed(() => this.stats().velocity.map((w) => w.title));
   protected readonly velocitySeries = computed<ColumnSeries[]>(() => {
@@ -262,17 +229,6 @@ export class ProjectStatsTab {
           ? ISSUE_COLOR.done
           : 'var(--chart-1)',
     })),
-  );
-
-  protected readonly priorityRows = computed<BarRow[]>(() =>
-    [...this.stats().priorityCounts]
-      .sort((a, b) => PRIORITY_META[a.priority].order - PRIORITY_META[b.priority].order)
-      .map((c) => ({
-        key: c.priority,
-        label: PRIORITY_META[c.priority].label,
-        value: c.count,
-        color: PRIORITY_COLOR[c.priority],
-      })),
   );
 
   protected readonly assigneeRows = computed<BarRow[]>(() =>

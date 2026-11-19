@@ -62,7 +62,7 @@ import { BLOG_POSTS, findPost } from './blog-posts';
             @if (p.slug === 'introducing-trama') {
               <p class="bg-muted text-muted-foreground mt-5 rounded-md px-3 py-2 text-[13px] leading-relaxed">
                 Historical launch announcement (October 2026). This article describes Trama at launch;
-                today, Tasks are granular units of work, with optional Goals, Plans and Documents.
+                today, Tasks are granular units of work.
               </p>
             }
             <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">
@@ -72,7 +72,7 @@ import { BLOG_POSTS, findPost } from './blog-posts';
             </p>
           </header>
 
-          <div class="border-border mt-10 border-t pt-4 text-[16px] leading-[1.75]">
+          <div class="mt-10 pt-4 text-[16px] leading-[1.75]">
             @for (block of p.blocks; track $index) {
               @switch (block.type) {
                 @case ('p') {
@@ -102,7 +102,7 @@ import { BLOG_POSTS, findPost } from './blog-posts';
                 }
                 @case ('code') {
                   <pre
-                    class="border-border bg-muted mt-6 overflow-x-auto rounded-lg border px-4 py-3.5 font-mono text-[13px] leading-relaxed"
+                    class="bg-muted mt-6 overflow-x-auto rounded-lg px-4 py-3.5 font-mono text-[13px] leading-relaxed"
                   ><code>{{ block.text }}</code></pre>
                 }
                 @case ('comparison') {
@@ -113,11 +113,10 @@ import { BLOG_POSTS, findPost } from './blog-posts';
           </div>
         </article>
 
-        <aside class="border-border bg-card mt-16 rounded-2xl border p-6 text-center sm:p-8">
+        <aside class="bg-card mt-16 rounded-2xl p-6 text-center sm:p-8">
           <h2 class="text-xl font-semibold tracking-tight">Try Trama with your team</h2>
           <p class="text-muted-foreground mx-auto mt-2 max-w-md text-[14px]">
-            Create a workspace, start with an issue, and invite an agent. Add a Goal or supporting
-            Plan or Document only when useful.
+            Create a workspace, start with a task, and invite an agent.
           </p>
           <div class="mt-5 flex flex-wrap justify-center gap-2">
             <a hlmBtn routerLink="/register">Get started</a>
@@ -131,7 +130,7 @@ import { BLOG_POSTS, findPost } from './blog-posts';
             @for (o of others(); track o.slug) {
               <a
                 [routerLink]="['/blog', o.slug]"
-                class="group border-border mt-3 block rounded-xl border p-5 transition-colors hover:border-border-strong"
+                class="group bg-muted hover:bg-secondary mt-3 block rounded-xl p-5 transition-colors"
               >
                 <span class="group-hover:text-primary font-medium transition-colors">{{
                   o.title

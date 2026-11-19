@@ -4,7 +4,7 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 @Component({
   selector: 'app-chart-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'bg-card flex min-w-0 flex-col rounded-lg border p-4' },
+  host: { class: 'bg-card flex min-w-0 flex-col rounded-lg p-4' },
   template: `
     <header class="mb-3">
       <h3 class="text-sm font-medium">{{ title() }}</h3>
