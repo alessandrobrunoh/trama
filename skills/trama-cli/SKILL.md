@@ -1,11 +1,11 @@
 ---
 name: trama-cli
-description: Work with Trama issues and their context from the `trama` CLI when MCP is unavailable, when the user requests the shell interface, or when a CLI workflow is otherwise appropriate.
+description: Work with Trama tasks and their context from the `trama` CLI when MCP is unavailable, when the user requests the shell interface, or when a CLI workflow is otherwise appropriate.
 ---
 
 # Trama through the `trama` CLI
 
-Use the CLI for the same Issue-first workflow described in `trama`: an Issue is the unit of work; a Goal is optional context; Plans are optional; and Human input on an Issue has Question and Decision modes with distinct lifecycles. Agents can work across multiple issues directly. Keep full transcripts in execution tools, not Trama.
+Use the CLI for the same task-first workflow described in `trama`: a Task is the unit of work, with an optional goal, sub-tasks, comments and artifacts, and it can belong to a Project. Agents can work across multiple tasks directly. Keep full transcripts in execution tools, not Trama.
 
 ## Connect and discover
 
@@ -13,27 +13,20 @@ Use the CLI for the same Issue-first workflow described in `trama`: an Issue is 
 trama whoami
 trama doctor
 trama commands
-trama schema issue create
-trama issue list --open --project-id prj_1 --priority urgent,high --fields key,title,status
-trama issue context BUG-142
-trama issue get BUG-142
-trama issue create --kind bug --title "Login timeout" --goal "Login eventually succeeds"
-trama issue update BUG-142 --priority high
-trama input-request list --issue-id BUG-142
-trama input-request create --issue-id in_1 --question "Should this behavior remain?"
-trama input-request answer ir_1 --answer "Keep the current behavior"
-trama decision list --issue-id BUG-142
-trama decision create --origin-issue-id in_1 --title "Keep login policy" --statement "Use the current policy" --status proposed
-trama decision get ADR-21
+trama schema task create
+trama task list --open --project-id prj_1 --priority urgent,high --fields key,title,status
+trama task context BUG-142
+trama task get BUG-142
+trama task create --kind bug --title "Login timeout" --goal "Login eventually succeeds"
+trama task update BUG-142 --priority high
+trama comment list --subject-type issue --subject-id in_1
 trama artifact list
 trama artifact create --issue-id in_1 --kind pull_request --title "Fix login" --url https://example.test/pr/1
 trama attention list --scope mine
-trama search --q "login timeout" --types issue,decision
+trama search --q "login timeout" --types issue,project
 trama project list --q billing
 trama project context prj_1
 trama project artifacts prj_1
-trama repository list
-trama team list
 trama view list
 trama milestone list --project-id prj_1
 trama snapshot get
@@ -45,7 +38,7 @@ If not signed in, ask the user to authenticate. Never print, log, or commit cred
 
 ## Read before writing
 
-At the Git repository root, read `.trama` before looking up issues. It is TOML. If it matches the current checkout, use its `workspace` and `project_id` rather than searching every project. Scope CLI issue lists with `--project-id` (and `--workspace` when needed), for example `trama issue list --project-id prj_1 --q "login timeout"`. If `.trama` is missing or incomplete, ask the user for the workspace, project ID, and confirmation of the repository remote before creating it; include an optional Goal only when one applies. After they reply, create `.trama` using this format:
+At the Git repository root, read `.trama` before looking up tasks. It is TOML. If it matches the current checkout, use its `workspace` and `project_id` rather than searching every project. Scope CLI task lists with `--project-id` (and `--workspace` when needed), for example `trama task list --project-id prj_1 --q "login timeout"`. If `.trama` is missing or incomplete, ask the user for the workspace, project ID, and confirmation of the repository remote before creating it (`trama project list --repository owner/name` finds the project whose repository matches). After they reply, create `.trama` using this format:
 
 ```toml
 schema_version = 1
@@ -53,24 +46,22 @@ workspace = "workspace-slug"
 repository = "github.com/owner/repository"
 project_id = "prj_project-id"
 project_name = "Project name"
-goal_id = ""
-goal_name = ""
 ```
 
 Use the `trama-project-context` skill when available. Never save credentials in `.trama`, and do not silently replace a stale mapping.
 
-Find matching issues within the saved project scope and read their context before creating or updating anything. When the user names multiple issues, read each one and update the ones affected. Resolve an optional Goal only when the repository mapping or user makes it clear; ask when there are multiple plausible choices.
+Find matching tasks within the saved project scope and read their context before creating or updating anything. When the user names multiple tasks, read each one and update the ones affected.
 
-Use the CLI's current search, issue context, and Goal context operations as exposed by `trama commands`. Do not assume that a command exists just because an older skill or client named it.
+Use the CLI's current search and task context operations as exposed by `trama commands`. Do not assume that a command exists just because an older skill or client named it.
 
 ## Write carefully
 
-Use the discovered issue create/update operations. Include clear issue context, valid catalog values, and only justified optional fields. Attach artifacts to the relevant issue(s), and record concise factual progress. The Issue's Human input feature is the supported location for person-dependent input: use Question mode for an answer and Decision mode for a durable conclusion. A Decision has one primary Issue and may reference related Issues.
+Use the discovered task create/update operations. Include clear task context, valid catalog values, and only justified optional fields. Attach artifacts to the relevant task(s), and record concise factual progress as comments. If a person's input is needed, say so in a comment on the task. Set `in_review` while a PR is open and `done` only once the change is merged and verified.
 
-Preview writes with `--dry-run` when the command supports it. Confirm the result with a read. Do not delete issues or silently overwrite another person's assignment or input.
+Preview writes with `--dry-run` when the command supports it. Confirm the result with a read. Do not delete tasks or silently overwrite another person's assignment.
 
 ## Errors and limits
 
 Read structured error details. On authentication or permission failure, tell the user rather than seeking a workaround. On rate limiting, stop and tell the user; never retry in a loop. For validation errors, inspect the current schema and correct only the rejected input.
 
-For exact issue, artifact, Goal, Plan, Question, and Decision operations, rely on the installed CLI command catalog and schemas. This skill intentionally does not prescribe API parameter names that may not exist in the deployed version.
+For exact task, artifact, comment and project operations, rely on the installed CLI command catalog and schemas. This skill intentionally does not prescribe API parameter names that may not exist in the deployed version.
