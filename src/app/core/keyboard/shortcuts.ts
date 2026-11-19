@@ -9,6 +9,8 @@ export const GO_TO_ROUTES: Record<string, { segment: string; label: string }> = 
   n: { segment: 'inbox?tab=updates', label: 'Inbox: updates' },
   i: { segment: 'tasks', label: 'Tasks' },
   p: { segment: 'projects', label: 'Projects' },
+  o: { segment: 'overview', label: 'Overview' },
+  t: { segment: 'timeline', label: 'Timeline' },
   h: { segment: 'timer', label: 'Timer' },
   x: { segment: 'graph', label: 'Graph' },
   s: { segment: 'settings/profile', label: 'Settings' },

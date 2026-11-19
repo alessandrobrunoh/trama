@@ -110,8 +110,13 @@ export const routes: Routes = [
     canActivate: [authGuard, workspaceGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'inbox' },
-      // Overview was removed; the Inbox is home.
-      { path: 'overview', pathMatch: 'full', redirectTo: 'inbox' },
+      // The Inbox is home; the Overview is the briefing about the whole workspace.
+      {
+        path: 'overview',
+        title: 'Overview · Trama',
+        loadComponent: () =>
+          import('./features/overview/overview-page').then((m) => m.OverviewPage),
+      },
       {
         path: 'assistant',
         title: 'Assistant · Trama',
@@ -157,8 +162,13 @@ export const routes: Routes = [
       // Old shared links: /issues and /issues/:key keep working.
       { path: 'issues', pathMatch: 'full', redirectTo: 'tasks' },
       { path: 'issues/:key', redirectTo: 'tasks/:key' },
-      // The timeline is a layout of saved views now (views/:id with layout "timeline"); keep old links working.
-      { path: 'timeline', pathMatch: 'full', redirectTo: 'views' },
+      { path: 'roadmap', pathMatch: 'full', redirectTo: 'timeline' },
+      {
+        path: 'timeline',
+        title: 'Timeline · Trama',
+        loadComponent: () =>
+          import('./features/timeline/timeline-page').then((m) => m.TimelinePage),
+      },
       {
         path: 'timer',
         title: 'Timer · Trama',
