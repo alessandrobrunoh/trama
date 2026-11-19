@@ -21,7 +21,7 @@ import {
 } from '../../core';
 
 /** What the keyboard / bulk command dialog edits. */
-export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'project' | 'label' | 'duplicate';
+export type IssuePromptField = 'status' | 'priority' | 'assignee' | 'project' | 'label' | 'duplicate' | 'estimate';
 
 export interface IssuePrompt {
   field: IssuePromptField;
@@ -186,10 +186,25 @@ export class IssueActions {
   }
 
   /**
-   * Delete right away from the UI and on the server after a short grace period, with an Undo toast
-   * (one atomic request for the whole selection). `after` runs once the issues are gone from the UI.
+   * Ask for confirmation in the global dialog, then delete: gone from the UI right away and on the server
+   * after a short grace period, with an Undo toast (one atomic request for the whole selection).
+   * `after` runs once the issues are gone from the UI.
    */
   remove(ids: readonly string[], after?: () => void): void {
+    const list = this.issues(ids);
+    if (!list.length || !this.store.allowed('deleteIssues')) return;
+    const one = list.length === 1 ? list[0] : null;
+    this.ui.setConfirmDelete({
+      title: one ? `Delete ${one.key}?` : `Delete ${list.length} tasks?`,
+      description: one
+        ? `“${one.title}” and its comments will be deleted. Canceling it instead keeps the history.`
+        : `These ${list.length} tasks and their comments will be deleted. Canceling them instead keeps the history.`,
+      confirmLabel: one ? 'Delete task' : `Delete ${list.length} tasks`,
+      onConfirm: () => this.stageRemove(list.map((i) => i.id), after),
+    });
+  }
+
+  private stageRemove(ids: readonly string[], after?: () => void): void {
     const list = this.issues(ids);
     if (!list.length || !this.store.allowed('deleteIssues')) return;
     const staged = this.store.stageIssueDelete(list.map((i) => i.id));

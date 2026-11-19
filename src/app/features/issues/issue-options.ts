@@ -9,6 +9,9 @@ import {
 import {
   ISSUE_STATUSES,
   ISSUE_STATUS_META,
+  estimateFraction,
+  estimateOptions,
+  formatEstimateLong,
   PRIORITIES,
   PRIORITY_META,
   type Issue,
@@ -18,6 +21,7 @@ import {
   type WorkspaceLabel,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
+import { EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon, type AnyStatus } from '../../shared/status';
 import type { IssueActions, IssuePromptField } from './issue-actions';
@@ -26,9 +30,11 @@ export interface IssueOption {
   /** '' = none (unassign, no project). */
   value: string;
   label: string;
-  glyph: 'status' | 'priority' | 'user' | 'issue' | 'project' | 'label' | 'none';
+  glyph: 'status' | 'priority' | 'user' | 'issue' | 'project' | 'label' | 'estimate' | 'none';
   /** Swatch of a label. */
   color?: string;
+  /** 0..1 position on the estimate scale (glyph `estimate`). */
+  fraction?: number;
   status?: string;
   hint?: string;
   search: string;
@@ -41,6 +47,7 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
   project: 'Move to project…',
   label: 'Toggle label…',
   duplicate: 'Mark as duplicate of…',
+  estimate: 'Set estimate…',
 };
 
 /** `labels` is the already ordered label list (see `LabelCatalog.arrange`); without it the catalog order is used. */
@@ -92,6 +99,29 @@ export function promptOptions(
         color: l.color,
         search: l.name,
       }));
+    case 'estimate': {
+      const scale = store.estimateScale();
+      const opts: IssueOption[] = estimateOptions(scale).map((o) => ({
+        value: String(o.value),
+        label: formatEstimateLong(o.value, scale),
+        glyph: 'estimate' as const,
+        fraction: estimateFraction(o.value, scale),
+        search: `${o.label} ${o.value}`,
+      }));
+      // A value outside the current scale stays selectable, so nothing is lost silently.
+      for (const issue of issues) {
+        const v = issue.estimate;
+        if (v === undefined || v === null || opts.some((o) => o.value === String(v))) continue;
+        opts.push({
+          value: String(v),
+          label: formatEstimateLong(v, scale),
+          glyph: 'estimate',
+          fraction: estimateFraction(v, scale),
+          search: String(v),
+        });
+      }
+      return [{ value: '', label: 'No estimate', glyph: 'none', search: 'no estimate none clear' }, ...opts];
+    }
     case 'duplicate': {
       const self = new Set(issues.map((i) => i.id));
       return store
@@ -128,6 +158,8 @@ export function currentValues(field: IssuePromptField, issues: readonly Issue[])
         return i.labels;
       case 'duplicate':
         return i.duplicateOfId ? [i.duplicateOfId] : [];
+      case 'estimate':
+        return [i.estimate === undefined || i.estimate === null ? '' : String(i.estimate)];
     }
   };
   const [first, ...rest] = issues.map(pick);
@@ -161,6 +193,9 @@ export function applyOption(
     case 'duplicate':
       if (ids.length === 1) actions.markDuplicate(ids[0], value);
       return true;
+    case 'estimate':
+      actions.setEstimate(ids, value === '' ? null : Number(value));
+      return true;
   }
 }
 
@@ -168,7 +203,7 @@ export function applyOption(
 @Component({
   selector: 'app-issue-option-glyph',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [StatusIcon, PriorityIcon, ActorAvatar, LucideDynamicIcon],
+  imports: [StatusIcon, PriorityIcon, ActorAvatar, LucideDynamicIcon, EstimateGlyph],
   host: { class: 'inline-flex size-4 shrink-0 items-center justify-center' },
   template: `
     @let o = option();
@@ -190,6 +225,9 @@ export function applyOption(
       }
       @case ('label') {
         <span class="size-2.5 rounded-full" [style.background]="o.color"></span>
+      }
+      @case ('estimate') {
+        <app-estimate-glyph class="text-muted-foreground" [fraction]="o.fraction ?? 0" [size]="14" />
       }
       @default {
         <svg

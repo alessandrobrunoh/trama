@@ -184,16 +184,19 @@ export type IssueGroup =
   | 'priority'
   | 'assigneeId'
   | 'projectId'
+  | 'source'
   | 'none';
+/** Any sortable field of a task (see `FIELD_DEFS.issue`). */
 export type IssueSort =
   | 'updatedAt'
   | 'createdAt'
   | 'priority'
   | 'status'
-  | 'key'
+  | 'kind'
+  | 'assigneeId'
   | 'title';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'project' | 'labels' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'project' | 'labels' | 'estimate' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -203,6 +206,8 @@ export interface IssueDisplay {
   showEmptyGroups: boolean;
   density: IssueDensity;
   hidden: IssueProp[];
+  /** List layout: show sub-tasks nested under their parent (a collapsible tree). */
+  nested: boolean;
 }
 
 export const GROUPS: readonly IssueGroup[] = [
@@ -211,6 +216,7 @@ export const GROUPS: readonly IssueGroup[] = [
   'priority',
   'assigneeId',
   'projectId',
+  'source',
   'none',
 ];
 export const SORTS: readonly IssueSort[] = [
@@ -218,10 +224,11 @@ export const SORTS: readonly IssueSort[] = [
   'createdAt',
   'priority',
   'status',
-  'key',
+  'kind',
+  'assigneeId',
   'title',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'estimate', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
@@ -229,6 +236,7 @@ export const GROUP_LABEL: Record<IssueGroup, string> = {
   priority: 'Priority',
   assigneeId: 'Assignee',
   projectId: 'Project',
+  source: 'Source',
   none: 'No grouping',
 };
 export const SORT_LABEL: Record<IssueSort, string> = {
@@ -236,13 +244,15 @@ export const SORT_LABEL: Record<IssueSort, string> = {
   createdAt: 'Created',
   priority: 'Priority',
   status: 'Status',
-  key: 'Key',
+  kind: 'Type',
+  assigneeId: 'Assignee',
   title: 'Title',
 };
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
   project: 'Project',
   labels: 'Labels',
+  estimate: 'Estimate',
   assignee: 'Assignee',
   date: 'Date',
 };
@@ -255,6 +265,7 @@ export const DEFAULT_DISPLAY: IssueDisplay = {
   showEmptyGroups: false,
   density: 'comfortable',
   hidden: [],
+  nested: true,
 };
 
 export function readDisplay(key: string): IssueDisplay {
@@ -272,6 +283,7 @@ export function readDisplay(key: string): IssueDisplay {
     hidden: Array.isArray(raw.hidden)
       ? raw.hidden.filter((p): p is IssueProp => (PROPS as readonly string[]).includes(p))
       : [],
+    nested: typeof raw.nested === 'boolean' ? raw.nested : DEFAULT_DISPLAY.nested,
   };
 }
 
@@ -312,6 +324,8 @@ export function groupLabel(store: TramaStore, group: IssueGroup, key: string): s
       return key ? (store.getUser(key)?.name ?? 'Unknown') : 'Unassigned';
     case 'projectId':
       return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
+    case 'source':
+      return key ? (SOURCE_LABEL[key] ?? key) : 'No source';
     default:
       return 'Tasks';
   }

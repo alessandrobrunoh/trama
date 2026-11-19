@@ -7,6 +7,8 @@ import { LucideChevronDown, LucideChevronRight, LucideDynamicIcon, LucidePlus } 
 export interface KanbanColumn<T> {
   key: string;
   items: readonly T[];
+  /** Number shown in the group header when it differs from the items (context rows are not counted). */
+  count?: number;
 }
 
 export interface KanbanMove<T> {
@@ -61,7 +63,7 @@ export class KanbanLabelDirective {
               >
                 <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="13" class="text-muted-foreground shrink-0"></svg>
                 <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
-                <span class="text-muted-foreground text-xs tabular-nums">{{ g.items.length }}</span>
+                <span class="text-muted-foreground text-xs tabular-nums">{{ g.count ?? g.items.length }}</span>
               </button>
               @if (addable()) {
                 <button
@@ -103,7 +105,7 @@ export class KanbanLabelDirective {
             <section class="board-column group/col bg-muted flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
               <header class="text-muted-foreground flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
-                <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.items.length }}</span>
+                <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.count ?? g.items.length }}</span>
                 @if (addable()) {
                   <button
                     type="button"

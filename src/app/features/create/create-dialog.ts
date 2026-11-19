@@ -16,8 +16,10 @@ import {
   LucideCircleUser,
   LucideDynamicIcon,
   LucideBox,
+  LucideGauge,
   LucideLayers,
   LucideMessageSquare,
+  LucideTag,
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
@@ -52,6 +54,8 @@ import { Notifier } from '../../core/notify/notifier';
 import { DraftStore } from '../../core/stores/draft.store';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
+import { Kbd } from '../../shared/kbd';
+import { LabelCatalog } from '../../shared/label-catalog';
 import { StatusIcon } from '../../shared/status';
 import { issueEstimateOptions } from '../issues/issue-model';
 import { isValidThreadUrl, toThreadUrl } from '../issues/issue-thread-link';
@@ -127,6 +131,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     FormRow,
     DraftSuggestions,
     EntityChip,
+    Kbd,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
@@ -143,11 +148,15 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           <p hlmDialogDescription class="sr-only">
             Create a new {{ kindLabel().toLowerCase() }} in this workspace.
           </p>
-          <div class="flex items-center gap-2 max-sm:flex-wrap">
+          <div class="flex items-center gap-2">
             @if (composer(); as c) {
-              <div class="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+              <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
                 <app-status-icon entity="issue" status="todo" [size]="13" />
-                New {{ c.label.toLowerCase() }}
+                <span>New {{ c.label.toLowerCase() }}</span>
+                @if (projectName(); as pn) {
+                  <span aria-hidden="true">›</span>
+                  <span class="text-foreground truncate">{{ pn }}</span>
+                }
               </div>
             } @else {
               <div class="flex flex-1 items-center gap-2 py-1 text-sm font-medium">
@@ -155,25 +164,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 New {{ kindLabel().toLowerCase() }}
               </div>
             }
-            @if (composer()) {
-              <button
-                hlmBtn
-                type="button"
-                variant="outline"
-                size="sm"
-                class="h-7 px-2.5 text-xs max-sm:order-3 max-sm:ml-auto max-sm:h-9"
-                [disabled]="busy()"
-                (click)="saveDraft($event)"
-              >
-                Save as draft
-              </button>
-            }
             <button
               hlmBtn
               type="button"
               variant="ghost"
               size="icon-sm"
-              class="max-sm:order-1 max-sm:size-9"
+              class="text-muted-foreground"
               hlmDialogClose
               aria-label="Close"
             >
@@ -265,7 +261,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             </div>
 
             <!-- property chips -->
-            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-4">
+            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-3" role="group" aria-label="Task properties">
               @switch (kind()) {
                 @case ('issue') {
                   <app-picker
@@ -286,26 +282,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   />
                   <app-picker
                     variant="pill"
-                    label="Type"
-                    [searchable]="false"
-                    [options]="issueKindOptions"
-                    [value]="[issueKind()]"
-                    (valueChange)="setOne(issueKind, $event)"
-                  />
-                  @if (showEstimate()) {
-                    <app-picker
-                      variant="pill"
-                      label="Estimate"
-                      [searchable]="false"
-                      [options]="issueEstimateChoices()"
-                      [value]="opt(issueEstimate())"
-                      [clearable]="true"
-                      clearLabel="No estimate"
-                      (valueChange)="issueEstimate.set($event[0] ?? '')"
-                    />
-                  }
-                  <app-picker
-                    variant="pill"
                     label="Assignee"
                     [icon]="userIcon"
                     [options]="userOptions()"
@@ -318,6 +294,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     <app-picker
                       variant="pill"
                       label="Project"
+                      [icon]="projectIcon"
                       [options]="projectOptions()"
                       [value]="opt(projectId())"
                       [clearable]="true"
@@ -325,6 +302,38 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       (valueChange)="projectId.set($event[0] ?? '')"
                     />
                   }
+                  @if (showEstimate()) {
+                    <app-picker
+                      variant="pill"
+                      label="Estimate"
+                      [icon]="estimateIcon"
+                      [searchable]="false"
+                      [options]="issueEstimateChoices()"
+                      [value]="opt(issueEstimate())"
+                      [clearable]="true"
+                      clearLabel="No estimate"
+                      (valueChange)="issueEstimate.set($event[0] ?? '')"
+                    />
+                  }
+                  @if (labelOptions().length) {
+                    <app-picker
+                      variant="pill"
+                      label="Labels"
+                      [icon]="labelIcon"
+                      [multiple]="true"
+                      [options]="labelOptions()"
+                      [value]="labelIds()"
+                      (valueChange)="setLabels($event)"
+                    />
+                  }
+                  <app-picker
+                    variant="pill"
+                    label="Type"
+                    [searchable]="false"
+                    [options]="issueKindOptions"
+                    [value]="[issueKind()]"
+                    (valueChange)="setOne(issueKind, $event)"
+                  />
                 }
               }
             </div>
@@ -436,7 +445,18 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             class="mx-0 mb-0 flex-row items-center justify-end gap-3 rounded-b-xl px-4 py-3"
           >
             @if (composer()) {
-              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs max-sm:mr-auto">
+              <button
+                hlmBtn
+                type="button"
+                variant="ghost"
+                size="sm"
+                class="text-muted-foreground mr-auto h-8 px-2 text-xs max-sm:h-10"
+                [disabled]="busy()"
+                (click)="saveDraft($event)"
+              >
+                Save as draft
+              </button>
+              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
                 <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
                 Create more
               </label>
@@ -444,11 +464,14 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             @if (!composer()) {
               <button hlmBtn type="button" variant="ghost" size="sm" class="max-sm:h-10" hlmDialogClose>Cancel</button>
             }
-            <button hlmBtn type="submit" size="sm" class="max-sm:h-10 max-sm:flex-1" [disabled]="busy()">
+            <button hlmBtn type="submit" size="sm" class="max-sm:h-10" [disabled]="busy()">
               @if (busy()) {
                 <hlm-spinner />
               }
               Create {{ kindLabel().toLowerCase() }}
+              @if (composer()) {
+                <app-kbd keys="mod+enter" class="opacity-70 max-sm:hidden" />
+              }
             </button>
           </hlm-dialog-footer>
         </form>
@@ -466,7 +489,12 @@ export class CreateDialog {
 
   private readonly titleEl = viewChild<ElementRef<HTMLInputElement>>('titleEl');
 
+  private readonly labelCatalog = inject(LabelCatalog);
+
   protected readonly userIcon = LucideCircleUser;
+  protected readonly projectIcon = LucideBox;
+  protected readonly estimateIcon = LucideGauge;
+  protected readonly labelIcon = LucideTag;
   protected readonly threadIcon = LucideMessageSquare;
   protected readonly closeIcon = LucideX;
 
@@ -495,6 +523,17 @@ export class CreateDialog {
     issueEstimateOptions(undefined, this.store.estimateScale()),
   );
   protected readonly assigneeId = signal('');
+  /** Workspace label ids. */
+  protected readonly labelIds = signal<string[]>([]);
+  protected readonly labelOptions = computed<PickOption[]>(() => {
+    const { suggested, rest } = this.labelCatalog.arrange(new Set(this.labelIds()), false, 'issue');
+    return [...suggested, ...rest].map((l) => ({
+      value: l.id,
+      label: l.name,
+      kind: 'label' as const,
+      color: l.color,
+    }));
+  });
   /** Optional git repository: a URL or `owner/name`, not a registry id. */
   protected readonly repositoryText = signal('');
   protected readonly projectId = signal('');
@@ -568,6 +607,10 @@ export class CreateDialog {
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
       .map((p) => ({ value: p.id, label: p.name, hint: p.key, kind: 'plain' })),
   );
+  /** Name of the chosen project, shown next to "New task" in the header. */
+  protected readonly projectName = computed(
+    () => this.store.getProject(this.projectId())?.name ?? '',
+  );
   protected readonly titlePlaceholder = computed(() => 'Task title');
   protected readonly bodyPlaceholder = computed(
     () => 'Add a description, steps to reproduce, links… Markdown supported.',
@@ -585,6 +628,8 @@ export class CreateDialog {
       untracked(() => {
         this.reset(kind, defaults);
         this.restoreDraft(kind, defaults);
+        // The dialog portal focuses its first control (the close button): start in the title.
+        this.focusTitle(80);
       });
     });
     // Keep what is typed, so closing the dialog or navigating away does not lose it.
@@ -658,6 +703,11 @@ export class CreateDialog {
       this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '',
     );
     this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
+    this.labelIds.set(
+      asArr(d['labels'])
+        .filter((id) => this.labelCatalog.byId().has(id))
+        .slice(0, this.labelCatalog.maxPerRecord),
+    );
     this.parentId.set(asStr(d['parentId']));
     this.repositoryText.set(asStr(d['repository']));
 
@@ -724,6 +774,10 @@ export class CreateDialog {
     return v ? [v] : [];
   }
 
+  protected setLabels(ids: string[]): void {
+    this.labelIds.set(ids.slice(0, this.labelCatalog.maxPerRecord));
+  }
+
   protected setOne(sig: { set: (v: string) => void }, values: string[]): void {
     if (values[0]) sig.set(values[0]);
   }
@@ -779,8 +833,8 @@ export class CreateDialog {
     return (['title', 'key', 'thread'] as const).every((f) => !this.err(f));
   }
 
-  private focusTitle(): void {
-    setTimeout(() => this.titleEl()?.nativeElement.focus());
+  private focusTitle(delay = 0): void {
+    setTimeout(() => this.titleEl()?.nativeElement.focus(), delay);
   }
 
   protected applyIssueSuggestion(suggestion: AiIssueDraftSuggestion): void {
@@ -837,6 +891,7 @@ export class CreateDialog {
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
+            labels: this.labelIds().length ? this.labelIds() : undefined,
             parentId: this.parentId() || undefined,
             threadUrl: this.threadUrl().trim() ? toThreadUrl(this.threadUrl()) : undefined,
           });

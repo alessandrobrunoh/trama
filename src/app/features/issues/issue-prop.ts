@@ -5,22 +5,40 @@ import { LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { ISSUE_STATUS_META, TramaStore, PRIORITY_META, resolveStatusEntry, type Issue } from '../../core';
+import {
+  ISSUE_STATUS_META,
+  TramaStore,
+  PRIORITY_META,
+  formatEstimateLong,
+  resolveStatusEntry,
+  type Issue,
+} from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
+import { Estimate, EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { IssueActions } from './issue-actions';
 import { PROMPT_TITLE } from './issue-options';
 import { IssueOptionList } from './issue-option-list';
 
-type PropField = 'status' | 'priority' | 'assignee';
-const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: 'A' };
+type PropField = 'status' | 'priority' | 'assignee' | 'estimate';
+const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: 'A', estimate: 'E' };
 
 /** `<app-issue-prop [issue]="i" field="status" />` — click the glyph to change it in place. */
 @Component({
   selector: 'app-issue-prop',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmPopoverImports, HlmTooltip, IssueOptionList, StatusIcon, PriorityIcon, ActorAvatar, LucideDynamicIcon],
+  imports: [
+    HlmPopoverImports,
+    HlmTooltip,
+    IssueOptionList,
+    StatusIcon,
+    PriorityIcon,
+    ActorAvatar,
+    LucideDynamicIcon,
+    Estimate,
+    EstimateGlyph,
+  ],
   host: { class: 'inline-flex shrink-0' },
   template: `
     @let i = issue();
@@ -29,7 +47,13 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
         hlmPopoverTrigger
         type="button"
         class="hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
-        [class]="showLabel() ? 'h-7 px-1.5 text-[13px]' : 'size-6 justify-center'"
+        [class]="
+          showLabel()
+            ? 'h-7 px-1.5 text-[13px]'
+            : field() === 'estimate'
+              ? 'text-muted-foreground h-6 min-w-6 justify-center px-1 text-xs tabular-nums'
+              : 'size-6 justify-center'
+        "
         [disabled]="!canEdit()"
         [hlmTooltip]="tip()"
         [tooltipDisabled]="showLabel() || !canEdit()"
@@ -47,6 +71,12 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
             <app-priority-icon [priority]="i.priority" />
             @if (showLabel()) {
               <span>{{ priorityLabel() }}</span>
+            }
+          }
+          @case ('estimate') {
+            <app-estimate [value]="i.estimate" [tooltip]="false" />
+            @if (i.estimate === undefined || i.estimate === null) {
+              <app-estimate-glyph [fraction]="0" [size]="13" class="text-muted-foreground/70" />
             }
           }
           @default {
@@ -93,7 +123,11 @@ export class IssueProp {
         ? `Status: ${this.statusLabel()}`
         : this.field() === 'priority'
           ? `Priority: ${this.priorityLabel()}`
-          : i.assigneeId
+          : this.field() === 'estimate'
+            ? i.estimate === undefined || i.estimate === null
+              ? 'Set estimate'
+              : `Estimate: ${formatEstimateLong(i.estimate, this.store.estimateScale())}`
+            : i.assigneeId
             ? `Assignee: ${this.store.getUser(i.assigneeId)?.name ?? 'Unknown'}`
             : 'Assign';
     return `${what}  ·  ${KEY[this.field()]}`;

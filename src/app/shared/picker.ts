@@ -147,11 +147,10 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             hlmBtn
             hlmPopoverTrigger
             type="button"
-            variant="outline"
+            variant="ghost"
             size="sm"
-            class="h-7 max-w-full gap-1.5 px-2 text-xs font-normal"
-            [class.border-dashed]="selected().length === 0"
-            [class.bg-accent]="selected().length > 0"
+            class="bg-muted/60 hover:bg-muted h-7 max-w-full gap-1.5 rounded-md px-2 text-xs font-normal"
+            [class.text-muted-foreground]="selected().length === 0"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >

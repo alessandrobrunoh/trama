@@ -16,6 +16,7 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideChevronDown,
+  LucideChevronRight,
   LucideChevronUp,
   LucideCopy,
   LucideDynamicIcon,
@@ -36,6 +37,7 @@ import {
   isTypingTarget,
   usePageShortcuts,
   type ActorRef,
+  type Issue,
 } from '../../core';
 import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { StatusBar } from '../../layout/status-bar';
@@ -52,7 +54,11 @@ import { IssueStream, IssueTitle } from './issue-detail-parts';
 import { SOURCE_LABEL, isClosedIssue } from './issue-model';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 import { IssueThreadLink } from './issue-thread-link';
+import { ProjectGlyph } from '../projects/project-glyph';
 import { TaskPageContext } from './task-inspector';
+import { TaskChildren } from './task-children';
+import { TaskStatusWizard } from './task-status-wizard';
+import { buildSubtree, percent } from './task-subtree-model';
 
 @Component({
   selector: 'app-issue-detail-page',
@@ -76,6 +82,8 @@ import { TaskPageContext } from './task-inspector';
     IssueStream,
     IssueCommandDialog,
     IssueThreadLink,
+    ProjectGlyph,
+    TaskStatusWizard,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -110,9 +118,6 @@ import { TaskPageContext } from './task-inspector';
             <svg [lucideIcon]="downIcon" [size]="15"></svg>
           </button>
         }
-        <!-- Phones get status and thread link under the title instead. -->
-        <app-issue-prop class="max-md:hidden" [issue]="i" field="status" showLabel />
-        <app-issue-thread-link class="max-md:hidden" variant="action" [issue]="i" [canEdit]="canEdit()" />
         <button
           hlmBtn
           variant="ghost"
@@ -211,8 +216,22 @@ import { TaskPageContext } from './task-inspector';
       </ng-template>
 
       <app-issue-stream #stream [issue]="i" (quote)="composer()?.quote($event)">
-        <header class="flex flex-col gap-1.5">
-          <div class="text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+        <header class="flex flex-col gap-2">
+          <!-- Where it sits: the chain of parents (any depth), then this task's type and key. -->
+          <nav class="text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1 text-xs" aria-label="Task path">
+            @if (ancestors().hidden) {
+              <span aria-hidden="true">…</span>
+              <svg [lucideIcon]="crumbIcon" [size]="12" aria-hidden="true"></svg>
+            }
+            @for (a of ancestors().shown; track a.id) {
+              <a
+                class="hover:text-foreground focus-visible:ring-ring max-w-[14rem] truncate rounded-sm font-mono outline-none hover:underline focus-visible:ring-2"
+                [routerLink]="['/', slug(), 'tasks', a.key]"
+                [attr.title]="a.title"
+                >{{ a.key }}</a
+              >
+              <svg [lucideIcon]="crumbIcon" [size]="12" aria-hidden="true"></svg>
+            }
             <app-issue-kind [kind]="i.kind" showLabel />
             <span aria-hidden="true">·</span>
             <span class="font-mono">{{ i.key }}</span>
@@ -220,12 +239,7 @@ import { TaskPageContext } from './task-inspector';
               <span aria-hidden="true">·</span>
               <span>via {{ sourceLabel() }}</span>
             }
-            @if (parentIssue(); as parent) {
-              <span aria-hidden="true">·</span>
-              <span>Subtask of</span>
-              <app-entity-chip type="issue" [ref]="parent.id" compact />
-            }
-          </div>
+          </nav>
           @if (duplicate(); as dup) {
             <div class="bg-muted flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-[13px]">
               <span class="text-muted-foreground">Duplicate of</span>
@@ -249,16 +263,37 @@ import { TaskPageContext } from './task-inspector';
             [canEdit]="canEdit()"
             (save)="store.updateIssue(i.id, { title: $event })"
           />
-          <!-- Phones: the top bar has no room, so the main properties sit under the title. -->
-          <div class="-ml-1.5 flex flex-wrap items-center gap-1 md:hidden" role="group" aria-label="Properties">
+          <!-- The key properties, editable in place; everything else is in the right pane. -->
+          <div class="-ml-1.5 flex flex-wrap items-center gap-x-0.5 gap-y-1" role="group" aria-label="Properties">
             <app-issue-prop [issue]="i" field="status" showLabel />
             <app-issue-prop [issue]="i" field="priority" showLabel />
             <app-issue-prop [issue]="i" field="assignee" showLabel />
+            @if (project(); as p) {
+              <a
+                class="hover:bg-accent focus-visible:ring-ring inline-flex h-7 max-w-[12rem] min-w-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
+                [routerLink]="['/', slug(), 'projects', p.id]"
+                [attr.title]="'Project · ' + p.name"
+              >
+                <app-project-glyph [project]="p" [size]="13" />
+                <span class="truncate">{{ p.name }}</span>
+              </a>
+            }
+            @if (canEdit()) {
+              <app-task-status-wizard [issue]="i" />
+            }
             <app-issue-thread-link variant="action" [issue]="i" [canEdit]="canEdit()" />
-            <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground" (click)="openInspector(i.id)">
+            <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground md:hidden" (click)="openInspector(i.id)">
               <svg [lucideIcon]="panelIcon" [size]="14"></svg> All details
             </button>
           </div>
+          @if (subtasks().total) {
+            <div class="flex max-w-xs items-center gap-2 text-xs">
+              <span class="text-muted-foreground tabular-nums">{{ subtasks().done }}/{{ subtasks().total }} subtasks</span>
+              <span class="bg-foreground/10 h-1 flex-1 overflow-hidden rounded-full" aria-hidden="true">
+                <span class="bg-status-shipped block h-full rounded-full" [style.width.%]="subtasks().percent"></span>
+              </span>
+            </div>
+          }
         </header>
       </app-issue-stream>
 
@@ -315,6 +350,7 @@ export class IssueDetailPage {
   protected readonly store = inject(TramaStore);
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
+  private readonly children = inject(TaskChildren);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
@@ -328,10 +364,21 @@ export class IssueDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly issue = computed(() => this.store.getIssue(this.key()));
-  protected readonly parentIssue = computed(() => {
-    const parentId = this.issue()?.parentId;
-    return parentId ? this.store.issueById().get(parentId) : undefined;
+  /** The parents of the task, oldest first (a subtask can sit under a subtask to any depth); long chains keep the nearest. */
+  protected readonly ancestors = computed(() => {
+    const chain: Issue[] = [];
+    const seen = new Set<string>();
+    let at = this.issue();
+    while (at?.parentId && !seen.has(at.parentId)) {
+      seen.add(at.parentId);
+      const parent = this.store.issueById().get(at.parentId);
+      if (!parent) break;
+      chain.unshift(parent);
+      at = parent;
+    }
+    return { shown: chain.slice(-3), hidden: chain.length > 3 };
   });
+  protected readonly project = computed(() => this.store.getProject(this.issue()?.projectId));
   protected readonly duplicate = computed(() => {
     const id = this.issue()?.duplicateOfId;
     return id ? this.store.issueById().get(id) : undefined;
@@ -342,11 +389,13 @@ export class IssueDetailPage {
     const id = this.issue()?.id;
     return id ? this.store.commentCountFor({ type: 'issue', id }) : 0;
   });
+  /** Everything below the task, at any depth. */
   protected readonly subtasks = computed(() => {
     const id = this.issue()?.id;
+    if (!id) return { total: 0, done: 0, percent: 0 };
     const entries = this.store.settings().statuses.issue;
-    const children = id ? this.store.issues().filter((i) => i.parentId === id) : [];
-    return { total: children.length, done: children.filter((i) => isClosedIssue(i, entries)).length };
+    const tree = buildSubtree(id, this.children.byParent(), (t) => isClosedIssue(t, entries));
+    return { total: tree.total, done: tree.done, percent: percent(tree.done, tree.total) };
   });
 
   /** Assignee, reporter and everyone who commented: the avatar group of the top bar. */
@@ -383,6 +432,7 @@ export class IssueDetailPage {
     return { index, total: order.length, prev: keyOf(index - 1), next: keyOf(index + 1) };
   });
 
+  protected readonly crumbIcon = LucideChevronRight;
   protected readonly panelIcon = LucidePanelRight;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;

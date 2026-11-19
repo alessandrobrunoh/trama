@@ -15,6 +15,9 @@ import {
 import { RouterLink } from '@angular/router';
 import {
   LucideCheck,
+  LucideChevronDown,
+  LucideChevronRight,
+  LucideCornerDownRight,
   LucideDynamicIcon,
   LucideFlag,
   LucideRotateCcw,
@@ -42,6 +45,7 @@ abstract class IssueItemBase {
   private readonly ui = inject(UiStore);
   private readonly pane = inject(RightPaneStore);
   private readonly needs = inject(NeedsYou);
+  protected readonly actions = inject(IssueActions);
   /** The right pane shows this task. */
   protected readonly previewed = computed(() => isTaskPreviewed(this.pane, this.issue()));
   /** An open attention item is waiting on the current user. */
@@ -66,11 +70,24 @@ abstract class IssueItemBase {
   protected readonly quiet = computed(() => isClosedIssue(this.issue(), this.store.settings().statuses.issue));
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
-    return { kind: !h.has('kind'), project: !h.has('project'), labels: !h.has('labels'), assignee: !h.has('assignee'), date: !h.has('date') };
+    return {
+      kind: !h.has('kind'),
+      project: !h.has('project'),
+      labels: !h.has('labels'),
+      estimate: !h.has('estimate'),
+      assignee: !h.has('assignee'),
+      date: !h.has('date'),
+    };
   });
   protected readonly projectId = computed(() => this.issue().projectId);
   /** Shown when the issue is estimated and the workspace still uses estimates (or the value is kept anyway). */
   protected readonly hasEstimate = computed(() => this.issue().estimate !== undefined && this.issue().estimate !== null);
+  /** The estimate cell: an estimated task keeps it; others get an empty cell people can click while estimates are on. */
+  protected readonly showEstimate = computed(
+    () =>
+      this.show().estimate &&
+      (this.hasEstimate() || (this.store.estimateScale() !== 'none' && this.store.can('member'))),
+  );
   protected readonly date = computed(() => shortDate(this.issue()[this.dateField()]));
   protected readonly dateTitle = computed(
     () => `${this.dateField() === 'createdAt' ? 'Created' : 'Updated'} ${fullDate(this.issue()[this.dateField()])}`,
@@ -95,6 +112,16 @@ abstract class IssueItemBase {
     }
   }
 
+  /**
+   * Double click opens the task page. The row link handles its own clicks; this covers the parts of the
+   * row that sit above it (chips, estimate, spacing). Pickers and buttons keep their own double clicks.
+   */
+  protected onDblClick(e: MouseEvent): void {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    if ((e.target as HTMLElement | null)?.closest('a, button, input, textarea, [role="checkbox"]')) return;
+    this.actions.open(this.issue());
+  }
+
   /** A single click shows the task in the right pane. */
   protected preview(): void {
     const issue = this.issue();
@@ -113,7 +140,7 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PreviewLink, LucideDynamicIcon, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
+  imports: [RouterLink, PreviewLink, LucideDynamicIcon, IssueProp, ProjectChip, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -142,7 +169,9 @@ abstract class IssueItemBase {
         <div
           class="issue-m relative flex items-center gap-1 pl-1 pr-3"
           [class.bg-selected]="selected()"
-          [attr.data-row-id]="i.id"
+          [class.opacity-55]="ghost()"
+          [style.padding-left.px]="tree() ? 4 + depth() * 16 : null"
+          [attr.data-row-id]="ghost() ? null : i.id"
           (pointerdown)="pressStart($event)"
           (pointermove)="pressMove($event)"
           (pointerup)="pressEnd()"
@@ -173,6 +202,17 @@ abstract class IssueItemBase {
               </span>
             </button>
           }
+          @if (tree() && childCount() > 0) {
+            <button
+              type="button"
+              class="text-muted-foreground issue-m__tap relative flex items-center justify-center"
+              [attr.aria-expanded]="expanded()"
+              [attr.aria-label]="(expanded() ? 'Collapse' : 'Expand') + ' sub-tasks of ' + i.key"
+              (click)="onToggle($event)"
+            >
+              <svg [lucideIcon]="expanded() ? chevronDown : chevronRight" [size]="16"></svg>
+            </button>
+          }
           <app-issue-prop class="issue-m__tap relative" [issue]="i" field="status" [size]="20" />
           <span class="pointer-events-none flex min-w-0 flex-1 flex-col gap-0.5 py-2.5">
             <span class="line-clamp-2 text-[15px] leading-snug" [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
@@ -191,9 +231,12 @@ abstract class IssueItemBase {
       </app-swipe-row>
     } @else {
     <div
-      [attr.data-row-id]="i.id"
+      [attr.data-row-id]="ghost() ? null : i.id"
       class="group/row relative flex items-center gap-2.5 pr-3 pl-3 text-[13px] sm:pr-5 sm:pl-5"
       [class]="rowState()"
+      [class.opacity-55]="ghost()"
+      [attr.data-depth]="tree() ? depth() : null"
+      (dblclick)="onDblClick($event)"
     >
       <a
         [appPreviewLink]="['/', slug(), 'tasks', i.key]"
@@ -222,6 +265,23 @@ abstract class IssueItemBase {
         </span>
       }
 
+      @if (tree()) {
+        <span class="pointer-events-none shrink-0" [style.width.px]="depth() * 20" aria-hidden="true"></span>
+        <span class="relative -mr-1 flex size-5 shrink-0 items-center justify-center">
+          @if (childCount() > 0) {
+            <button
+              type="button"
+              class="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring flex size-5 items-center justify-center rounded outline-none focus-visible:ring-2"
+              [attr.aria-expanded]="expanded()"
+              [attr.aria-label]="(expanded() ? 'Collapse' : 'Expand') + ' sub-tasks of ' + i.key"
+              (click)="onToggle($event)"
+              (dblclick)="$event.stopPropagation()"
+            >
+              <svg [lucideIcon]="expanded() ? chevronDown : chevronRight" [size]="13"></svg>
+            </button>
+          }
+        </span>
+      }
       <app-issue-prop class="relative" [issue]="i" field="status" />
       <span class="text-muted-foreground w-[4.5rem] shrink-0 truncate font-mono text-xs max-sm:hidden">{{ i.key }}</span>
       <span class="min-w-0 flex-1 truncate" [class.text-muted-foreground]="quiet()">
@@ -230,11 +290,25 @@ abstract class IssueItemBase {
           <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
         }
       </span>
+      @if (childCount() > 0) {
+        <span
+          class="text-muted-foreground relative flex shrink-0 items-center gap-0.5 text-xs tabular-nums"
+          [attr.aria-label]="childCount() + (childCount() === 1 ? ' sub-task' : ' sub-tasks')"
+          title="Sub-tasks"
+        >
+          <svg [lucideIcon]="subtaskIcon" [size]="11" aria-hidden="true"></svg>{{ childCount() }}
+        </span>
+      }
       @if (s.labels && i.labels.length) {
         <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
       }
-      @if (hasEstimate()) {
-        <app-estimate class="relative text-xs max-sm:hidden" [value]="i.estimate" />
+      @if (showEstimate()) {
+        <app-issue-prop
+          class="relative max-sm:hidden"
+          [class]="hasEstimate() ? '' : 'opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100'"
+          [issue]="i"
+          field="estimate"
+        />
       }
       @if (s.project && projectId(); as pid) {
         <span class="relative flex min-w-0 shrink-0 items-center gap-1 max-lg:hidden">
@@ -264,8 +338,27 @@ abstract class IssueItemBase {
 })
 export class IssueRow extends IssueItemBase {
   readonly compact = input(false);
+  /** The list shows sub-tasks as a tree: reserve the indent and the expand control. */
+  readonly tree = input(false);
+  /** Nesting level (0 = top level). */
+  readonly depth = input(0);
+  /** Sub-tasks shown under this row. */
+  readonly childCount = input(0);
+  readonly expanded = input(false);
+  /** Context row for a matching sub-task (its parent did not match the filters): dimmed. */
+  readonly ghost = input(false);
+  /** The expand / collapse control was used. */
+  readonly toggleExpand = output<void>();
+  protected readonly chevronDown = LucideChevronDown;
+  protected readonly chevronRight = LucideChevronRight;
+  protected readonly subtaskIcon = LucideCornerDownRight;
+
+  protected onToggle(e: MouseEvent): void {
+    e.preventDefault();
+    e.stopPropagation();
+    this.toggleExpand.emit();
+  }
   protected readonly vp = inject(Viewport);
-  protected readonly actions = inject(IssueActions);
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly mine = computed(() => this.issue().assigneeId === this.store.me()?.id);
   protected readonly assignIcon = LucideUserPlus;
@@ -357,6 +450,7 @@ export class IssueRow extends IssueItemBase {
       [attr.data-row-id]="i.id"
       class="group/card relative rounded-lg px-3 py-2.5 transition-colors"
       [class]="selected() || previewed() ? 'bg-selected' : focused() ? 'bg-background ring-1 ring-ring/40' : 'bg-background hover:bg-hover'"
+      (dblclick)="onDblClick($event)"
     >
       <a
         [appPreviewLink]="['/', slug(), 'tasks', i.key]"
@@ -410,7 +504,7 @@ export class IssueRow extends IssueItemBase {
         @if (s.labels && i.labels.length) {
           <app-label-chips class="relative" [ids]="i.labels" [max]="2" />
         }
-        @if (hasEstimate()) {
+        @if (hasEstimate() && s.estimate) {
           <app-estimate class="bg-secondary relative inline-flex h-6 items-center rounded-md px-1.5 text-[11px]" [value]="i.estimate" />
         }
         @if (s.date) {
