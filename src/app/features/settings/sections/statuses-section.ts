@@ -245,8 +245,6 @@ export class StatusesSection {
         return store.issues().filter((issue) => has(issue.status)).length;
       case 'project':
         return store.projects().filter((project) => has(project.status)).length;
-      case 'decision':
-        return store.decisions().filter((decision) => has(decision.status)).length;
       case 'project_health':
         return store.projects().filter((project) => has(project.health)).length;
       default:

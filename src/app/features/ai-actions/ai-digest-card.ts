@@ -64,7 +64,7 @@ export class AiDigestCard implements OnDestroy {
   protected readonly job = this.ai.job<string>((signal) => this.ai.standupDigest(signal));
   protected readonly scope = computed(() => {
     const i = this.store.issues().filter((x) => x.status !== 'done' && x.status !== 'canceled').length;
-    return `${i} open issue${i === 1 ? '' : 's'}`;
+    return `${i} open task${i === 1 ? '' : 's'}`;
   });
 
   constructor() {

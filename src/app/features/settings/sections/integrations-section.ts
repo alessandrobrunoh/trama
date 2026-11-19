@@ -1,8 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
-  LucideChevronDown,
-  LucideChevronUp,
   LucideDynamicIcon,
   LucideEllipsis,
   LucideEye,
@@ -13,7 +10,6 @@ import {
   LucideRefreshCw,
   LucideRotateCw,
   LucideTrash2,
-  LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
@@ -26,10 +22,10 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { RelativeTimePipe } from '../../../shared/pipes';
-import { RemoteRepoBrowser } from '../../repositories/remote-repo-browser';
 import { SECTION_KIT } from './section-kit';
 import { OutgoingWebhooks } from './outgoing-webhooks';
 import { WebhookSetupDialog } from './webhook-setup-dialog';
+
 
 type ConnProvider = IntegrationConnection['provider'];
 
@@ -89,12 +85,11 @@ const CHOICES: Choice[] = [
 
 type Row = IntegrationDetail & { detailed: boolean };
 
-/** GitHub / GitLab / Bitbucket / Delta connections: connect, re-validate, webhook setup, linked repositories. */
+/** GitHub / GitLab / Bitbucket / Delta connections: connect, re-validate, webhook setup. */
 @Component({
   selector: 'app-integrations-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     HlmButtonImports,
     HlmDropdownMenuImports,
     HlmInputImports,
@@ -102,7 +97,6 @@ type Row = IntegrationDetail & { detailed: boolean };
     LucideDynamicIcon,
     ProviderIcon,
     RelativeTimePipe,
-    RemoteRepoBrowser,
     OutgoingWebhooks,
     WebhookSetupDialog,
     ...SECTION_KIT,
@@ -112,7 +106,7 @@ type Row = IntegrationDetail & { detailed: boolean };
     <div>
       <app-section-header
         title="Integrations"
-        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on issues and projects, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
+        description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects, or send events to your own systems with custom webhooks. Secrets are encrypted and never shown again."
       >
         @if (canAdmin() && !connecting()) {
           <button actions hlmBtn size="sm" (click)="openConnect()">
@@ -190,7 +184,7 @@ type Row = IntegrationDetail & { detailed: boolean };
           </span>
           <div>
             <p class="text-[13px] font-medium">Nothing connected yet</p>
-            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to import repositories and see pull requests and CI on issues and projects.</p>
+            <p class="text-muted-foreground mt-1 max-w-sm text-xs">Connect GitHub, GitLab or Bitbucket to see pull requests and CI on tasks and projects.</p>
           </div>
           @if (canAdmin()) {
             <button hlmBtn size="sm" (click)="openConnect()"><svg [lucideIcon]="plus" [size]="14"></svg> Connect</button>
@@ -284,45 +278,6 @@ type Row = IntegrationDetail & { detailed: boolean };
                   <span class="text-muted-foreground text-xs">{{ c.webhookConfigured ? 'Configured' : 'Not configured' }}</span>
                 }
               </app-settings-row>
-
-              <div class="px-4 py-3">
-                <div class="flex items-center justify-between gap-3">
-                  <div class="min-w-0">
-                    <div class="text-[13px] font-medium">Repositories</div>
-                    <div class="text-muted-foreground text-xs">
-                      {{ c.repositoryIds.length ? c.repositoryIds.length + ' linked. Events from other repositories are ignored.' : 'Link repositories to receive their events and import them as repositories.' }}
-                    </div>
-                  </div>
-                  @if (canAdmin()) {
-                    <button hlmBtn size="sm" variant="outline" class="h-7 shrink-0" (click)="toggleBrowse(c.id)">
-                      {{ browsing() === c.id ? 'Done' : 'Browse repositories' }}
-                      <svg [lucideIcon]="browsing() === c.id ? up : down" [size]="13"></svg>
-                    </button>
-                  }
-                </div>
-                @if (c.repositoryIds.length) {
-                  <ul class="mt-2 divide-y rounded-md border">
-                    @for (id of c.repositoryIds; track id) {
-                      <li class="flex items-center gap-2 px-2.5 py-1.5">
-                        <app-provider-icon [provider]="c.provider" [size]="13" />
-                        @if (repo(id); as r) {
-                          <a class="min-w-0 flex-1 truncate font-mono text-xs hover:underline" [routerLink]="['/', slug(), 'repositories', r.id]">{{ r.fullName }}</a>
-                        } @else {
-                          <span class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-xs">{{ id }}</span>
-                        }
-                        @if (canAdmin()) {
-                          <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Unlink ' + (repo(id)?.fullName ?? id)" title="Unlink (the repository stays)" (click)="unlink(c, id)">
-                            <svg [lucideIcon]="xIcon" [size]="13"></svg>
-                          </button>
-                        }
-                      </li>
-                    }
-                  </ul>
-                }
-                @if (browsing() === c.id) {
-                  <app-remote-repo-browser class="mt-3" [connectionId]="c.id" (linked)="onLinked($event.fullName)" />
-                }
-              </div>
             }
           </app-settings-group>
         }
@@ -348,14 +303,10 @@ export class IntegrationsSection {
   protected readonly keyIcon = LucideKeyRound;
   protected readonly rotateIcon = LucideRotateCw;
   protected readonly trash = LucideTrash2;
-  protected readonly xIcon = LucideX;
   protected readonly eye = LucideEye;
   protected readonly eyeOff = LucideEyeOff;
-  protected readonly up = LucideChevronUp;
-  protected readonly down = LucideChevronDown;
 
   protected readonly canAdmin = computed(() => this.store.allowed('manageIntegrations'));
-  protected readonly slug = computed(() => this.store.slug() ?? '');
 
   // connect form
   protected readonly connecting = signal(false);
@@ -392,19 +343,18 @@ export class IntegrationsSection {
   protected readonly editing = signal<string | null>(null);
   protected readonly editToken = signal('');
   protected readonly editBase = signal('');
-  protected readonly browsing = signal<string | null>(null);
 
   // one-time webhook setup
   protected readonly webhook = signal<WebhookSetup | null>(null);
   protected readonly webhookProvider = signal<string>('github');
   protected readonly webhookRotated = signal(false);
 
-  /** Snapshot connections enriched with admin-only details (webhook URL, linked repos, last delivery). */
+  /** Snapshot connections enriched with admin-only details (webhook URL, last delivery). */
   protected readonly rows = computed<Row[]>(() => {
     const details = new Map(this.store.integrationDetails().map((d) => [d.id, d]));
     return this.store.integrations().map((c) => {
       const d = details.get(c.id);
-      return d ? { ...c, ...d, detailed: true } : { ...c, repositoryIds: [], detailed: false };
+      return d ? { ...c, ...d, detailed: true } : { ...c, detailed: false };
     });
   });
 
@@ -416,9 +366,6 @@ export class IntegrationsSection {
     });
   }
 
-  protected repo(id: string) {
-    return this.store.repositoryById().get(id);
-  }
   protected host(url: string): string {
     try {
       return new URL(url).host;
@@ -460,7 +407,6 @@ export class IntegrationsSection {
     this.closeConnect();
     this.notify.success(`${PROVIDER_INFO[provider].label} connected`, { description: res.connection.account });
     if (res.webhook) this.showWebhook(res.webhook, provider, false);
-    if (provider !== 'delta') this.browsing.set(res.connection.id);
   }
 
   protected async revalidate(c: Row): Promise<void> {
@@ -502,26 +448,11 @@ export class IntegrationsSection {
   protected disconnect(c: Row): void {
     this.ui.setConfirmDelete({
       title: `Disconnect ${c.account || PROVIDER_INFO[c.provider].label}?`,
-      description: 'Repositories and artifacts stay. Webhook deliveries for this connection start failing.',
+      description: 'Artifacts stay. Webhook deliveries for this connection start failing.',
       confirmLabel: 'Disconnect',
       onConfirm: async () => {
         await this.store.deleteIntegration(c.id);
       },
-    });
-  }
-
-  protected toggleBrowse(id: string): void {
-    this.browsing.update((cur) => (cur === id ? null : id));
-  }
-
-  protected onLinked(fullName: string): void {
-    this.notify.success('Repository linked', { description: `${fullName} is now a repository.` });
-  }
-
-  protected unlink(c: Row, repositoryId: string): void {
-    const name = this.repo(repositoryId)?.fullName ?? 'this repository';
-    void this.store.unlinkRepository(c.id, repositoryId).then((ok) => {
-      if (ok) this.notify.success(`Unlinked ${name}`, { description: 'The repository stays; its events are now ignored.' });
     });
   }
 

@@ -10,14 +10,14 @@ import { oneOf, readJson, writeJson } from './stores/storage';
 export const PREFERENCES_STORAGE_KEY = 'trama.preferences.v1';
 
 /** Page opened after signing in and from "/". */
-export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'issues'] as const;
+export const HOME_VIEWS = ['overview', 'inbox', 'my-work', 'tasks'] as const;
 export type HomeView = (typeof HOME_VIEWS)[number];
 
 export const HOME_VIEW_LABELS: Record<HomeView, string> = {
   overview: 'Overview',
   inbox: 'Inbox',
   'my-work': 'My work',
-  issues: 'Issues',
+  tasks: 'Tasks',
 };
 
 /** Key that posts a comment. With `mod-enter`, plain Enter adds a new line. */
@@ -56,7 +56,11 @@ export class Preferences {
 
   readonly homeView = signal<HomeView>(oneOf(
       // "My Attention" became the Inbox.
-      (this.saved?.homeView as string | undefined) === 'attention' ? 'inbox' : this.saved?.homeView,
+      (this.saved?.homeView as string | undefined) === 'attention'
+        ? 'inbox'
+        : (this.saved?.homeView as string | undefined) === 'issues'
+          ? 'tasks'
+          : this.saved?.homeView,
       HOME_VIEWS,
       'overview',
     ));

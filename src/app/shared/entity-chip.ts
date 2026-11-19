@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { TramaStore } from '../core/stores/trama.store';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 
-export type EntityChipType = 'issue' | 'decision';
+export type EntityChipType = 'issue';
 
 /**
  * Compact, linkable reference to another entity: status glyph · key · title.
@@ -44,19 +44,9 @@ export class EntityChip {
   protected readonly resolved = computed(() => {
     const slug = this.store.slug() ?? '';
     const ref = this.ref();
-    switch (this.type()) {
-      case 'issue': {
-        const i = this.store.getIssue(ref);
-        return i
-          ? { key: i.key, title: i.title, status: i.status as AnyStatus, entity: 'issue' as StatusEntity, link: ['/', slug, 'issues', i.key] }
-          : null;
-      }
-      case 'decision': {
-        const d = this.store.getDecision(ref);
-        return d
-          ? { key: d.key, title: d.title, status: d.status as AnyStatus, entity: 'other' as StatusEntity, link: ['/', slug, 'decisions', d.key] }
-          : null;
-      }
-    }
+    const i = this.store.getIssue(ref);
+    return i
+      ? { key: i.key, title: i.title, status: i.status as AnyStatus, entity: 'issue' as StatusEntity, link: ['/', slug, 'tasks', i.key] }
+      : null;
   });
 }

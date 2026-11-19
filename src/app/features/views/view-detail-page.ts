@@ -41,7 +41,6 @@ import {
   groupItems,
   queryItems,
   setFilter,
-  type Decision,
   type Issue,
   type Priority,
   type Project,
@@ -53,9 +52,7 @@ import {
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
-import { KeyChip } from '../../shared/key-chip';
 import { PageHeader } from '../../shared/page-header';
-import { RelativeTimePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { IssueCard, IssueRow } from '../issues/issue-items';
@@ -103,11 +100,9 @@ type PageLayout = 'list' | 'board' | 'timeline';
     LucideDynamicIcon,
     PageHeader,
     EmptyState,
-    KeyChip,
     StatusIcon,
     PriorityIcon,
     ActorAvatar,
-    RelativeTimePipe,
     InlineText,
     OptionMenu,
     ViewShare,
@@ -464,23 +459,6 @@ type PageLayout = 'list' | 'board' | 'timeline';
                         [focused]="ui.focusedRowId() === item.id"
                       />
                     }
-                    @default {
-                      @let d = asDecision(item);
-                      <a
-                        [routerLink]="['/', slug(), 'decisions', d.key]"
-                        [attr.data-row-id]="d.id"
-                        class="bg-card hover:border-foreground/25 block rounded-lg border p-2.5 transition-colors"
-                        [class.border-primary]="ui.focusedRowId() === d.id"
-                      >
-                        <span class="flex items-center gap-1.5">
-                          <app-status-icon [status]="d.status" entity="other" />
-                          <app-key-chip [value]="d.key" />
-                        </span>
-                        <span class="mt-1.5 line-clamp-2 text-sm leading-snug font-medium">{{
-                          d.title
-                        }}</span>
-                      </a>
-                    }
                   }
                 } @empty {
                   <p class="text-meta px-1 py-2">Empty</p>
@@ -516,29 +494,6 @@ type PageLayout = 'list' | 'board' | 'timeline';
                     [project]="asProject(item)"
                     [focused]="ui.focusedRowId() === item.id"
                   />
-                }
-                @default {
-                  @let d = asDecision(item);
-                  <a
-                    [routerLink]="['/', slug(), 'decisions', d.key]"
-                    [attr.data-row-id]="d.id"
-                    class="hover:bg-hover flex min-h-9 items-center gap-3 border-b px-4 py-1.5 sm:px-6"
-                    [class.bg-selected]="ui.focusedRowId() === d.id"
-                  >
-                    <app-status-icon [status]="d.status" entity="other" />
-                    <app-key-chip [value]="d.key" class="w-14" />
-                    <span class="min-w-0 flex-1 truncate text-sm">{{ d.title }}</span>
-                    @for (t of d.tags.slice(0, 2); track t) {
-                      <span
-                        class="border-border-strong text-muted-foreground hidden h-5 items-center rounded-full border px-1.5 text-[11px] md:inline-flex"
-                        >{{ t }}</span
-                      >
-                    }
-                    <span
-                      class="text-meta w-24 text-end whitespace-nowrap tabular-nums max-sm:hidden"
-                      >{{ d.updatedAt | relativeTime }}</span
-                    >
-                  </a>
                 }
               }
             }
@@ -632,9 +587,7 @@ export class ViewDetailPage {
   private readonly pending = signal<string[]>([]);
 
   // ── query ──
-  private readonly queryCtx = computed(() => ({
-    demand: this.store.demand(),
-  }));
+  private readonly queryCtx = computed(() => ({}));
   protected readonly rows = computed<Queryable[]>(() => {
     const v = this.view();
     if (!v) return [];
@@ -646,9 +599,8 @@ export class ViewDetailPage {
         : undefined);
     const spec = { filters: v.filters, sort };
     const ctx = this.queryCtx();
-    if (v.entity === 'issue') return queryItems('issue', this.store.issues(), spec, ctx);
     if (v.entity === 'project') return queryItems('project', this.store.projects(), spec, ctx);
-    return queryItems('decision', this.store.decisions(), spec, ctx);
+    return queryItems('issue', this.store.issues(), spec, ctx);
   });
 
   /** Board always groups (default status); list groups only when `groupBy` is set. */
@@ -679,9 +631,10 @@ export class ViewDetailPage {
         label: valueLabel(this.store, v.entity, field, g.key),
         status: glyph.status,
         priority: field === 'priority' && g.key ? (g.key as Priority) : undefined,
-        actor: glyph.actor?.id
-          ? { type: glyph.actor.type as 'team' | 'user', id: glyph.actor.id }
-          : undefined,
+        actor:
+          glyph.actor?.type === 'user' && glyph.actor.id
+            ? { type: 'user' as const, id: glyph.actor.id }
+            : undefined,
         color: valueColor(v.entity, field, g.key),
         items: g.items,
       };
@@ -762,9 +715,6 @@ export class ViewDetailPage {
   protected asIssue(item: Queryable): Issue {
     return item as Issue;
   }
-  protected asDecision(item: Queryable): Decision {
-    return item as Decision;
-  }
   protected asProject(item: Queryable): Project {
     return item as Project;
   }
@@ -817,7 +767,7 @@ export class ViewDetailPage {
     this.patch({ filters: setFilter(v.filters, field, 'in', values) });
     if (!values.length) this.pending.update((p) => p.filter((x) => x !== field));
   }
-  /** "At least N" on a numeric (customer demand) field; empty or invalid removes the filter. */
+  /** "At least N" on a numeric field; empty or invalid removes the filter. */
   protected setMin(field: string, raw: string): void {
     const v = this.view();
     if (!v) return;

@@ -2,11 +2,9 @@
 import {
   LucideBox,
   LucideCircle,
-  LucideScale,
   type LucideIcon,
 } from '@lucide/angular';
 import {
-  DECISION_STATUS_META,
   FIELD_DEFS,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
@@ -32,28 +30,25 @@ export interface ViewGroup {
   label: string;
   status?: AnyStatus;
   priority?: Priority;
-  actor?: { type: 'team' | 'user'; id: string };
+  actor?: { type: 'user'; id: string };
   /** CSS colour of a leading dot (project status / health). */
   color?: string;
   items: Queryable[];
 }
 
 export const ENTITY_LABEL: Record<ViewEntity, string> = {
-  issue: 'Issues',
-  decision: 'Decisions',
+  issue: 'Tasks',
   project: 'Projects',
 };
 
-/** Circle = issues, scale = decisions, box = projects. */
+/** Circle = tasks, box = projects. */
 export const ENTITY_ICON: Record<ViewEntity, LucideIcon> = {
   issue: LucideCircle,
-  decision: LucideScale,
   project: LucideBox,
 };
 
 export const STATUS_ENTITY: Record<ViewEntity, StatusEntity> = {
   issue: 'issue',
-  decision: 'other',
   project: 'other',
 };
 
@@ -66,7 +61,7 @@ const SOURCE_LABEL: Record<string, string> = {
   agent: 'Agent',
 };
 
-/** Fields offered as filter chips: value sets, and numbers (customer demand) as "at least N". */
+/** Fields offered as filter chips: value sets, and numbers as "at least N". */
 export function filterableFields(entity: ViewEntity): FieldDef[] {
   return FIELD_DEFS[entity].filter(
     (f) =>
@@ -89,12 +84,7 @@ export function fieldLabel(entity: ViewEntity, field: string): string {
 
 function enumLabel(entity: ViewEntity, field: string, value: string): string | undefined {
   if (field === 'status') {
-    const t =
-      entity === 'issue'
-        ? ISSUE_STATUS_META
-        : entity === 'project'
-          ? PROJECT_STATUS_META
-          : DECISION_STATUS_META;
+    const t = entity === 'issue' ? ISSUE_STATUS_META : PROJECT_STATUS_META;
     return (t as Record<string, { label: string }>)[value]?.label;
   }
   if (field === 'health')
@@ -111,8 +101,7 @@ export function statusColumnIds(store: TramaStore, entity: ViewEntity, field: st
   const catalog = store.settings().statuses;
   if (field === 'health') return catalog.projectHealth.map((entry) => entry.id);
   if (entity === 'issue') return catalog.issue.map((entry) => entry.id);
-  if (entity === 'project') return catalog.project.map((entry) => entry.id);
-  return catalog.decision.map((entry) => entry.id);
+  return catalog.project.map((entry) => entry.id);
 }
 
 export function valueLabel(store: TramaStore, entity: ViewEntity, field: string, value: string): string {
@@ -126,36 +115,20 @@ export function valueLabel(store: TramaStore, entity: ViewEntity, field: string,
         ? catalog.projectHealth
         : entity === 'issue'
           ? catalog.issue
-          : entity === 'project'
-            ? catalog.project
-            : catalog.decision;
+          : catalog.project;
     const named = resolveStatusEntry(entries, value)?.name;
     if (named) return named;
   }
   if (def?.kind === 'enum') return enumLabel(entity, field, value) ?? value;
   switch (def?.refersTo) {
-    case 'team':
-      return store.getTeam(value)?.name ?? value;
     case 'user':
       return store.getUser(value)?.name ?? value;
-    case 'repository':
-      return store.getRepository(value)?.fullName ?? value;
     case 'project':
       return store.getProject(value)?.name ?? value;
-    case 'release': {
-      const r = store.getRelease(value);
-      if (!r) return value;
-      const pipeline = store.getReleasePipeline(r.pipelineId);
-      return pipeline ? `${pipeline.name} · ${r.name}` : r.name;
-    }
     case 'milestone': {
       const m = store.getMilestone(value);
       return m ? m.name : value;
     }
-    case 'customer':
-      return store.getCustomer(value)?.name ?? value;
-    case 'customerTier':
-      return store.settings().customerTiers.find((t) => t.id === value)?.name ?? value;
   }
   return value;
 }
@@ -173,7 +146,6 @@ export function valueGlyph(
   if (field === 'status')
     return { status: value as AnyStatus, statusEntity: STATUS_ENTITY[entity] };
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
-  if (def?.refersTo === 'team') return { actor: { type: 'team', id: value } };
   if (def?.refersTo === 'user') return { actor: { type: 'user', id: value } };
   return {};
 }
@@ -218,9 +190,7 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
         ? catalog.projectHealth
         : entity === 'issue'
           ? catalog.issue
-          : entity === 'project'
-            ? catalog.project
-            : catalog.decision;
+          : catalog.project;
     return entries.map((entry) => opt(entry.id));
   }
   if (def.kind === 'enum') return (def.values ?? []).map((v) => opt(v));
@@ -231,40 +201,17 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
       .labels.filter((l) => !l.archived && (scope === null || l.scope === scope))
       .map((l) => opt(l.id, { color: l.color }));
   }
-  if (def.kind === 'tags') {
-    const set = new Set<string>();
-    if (entity === 'decision')
-      for (const d of store.decisions()) for (const t of d.tags) set.add(t);
-    return [...set].sort().map((v) => opt(v));
-  }
+  if (def.kind === 'tags') return [];
   const none = def.kind === 'id' ? [opt('')] : [];
   switch (def.refersTo) {
-    case 'team':
-      return [...none, ...store.teams().map((t) => opt(t.id, { hint: t.key }))];
     case 'user':
       return [...none, ...store.users().map((u) => opt(u.id))];
-    case 'repository':
-      return [...none, ...store.repositories().map((r) => opt(r.id))];
     case 'project':
       return [...none, ...store.projects().map((p) => opt(p.id))];
-    case 'release':
-      return [
-        ...none,
-        ...store.releases().map((r) =>
-          opt(r.id, { hint: store.getReleasePipeline(r.pipelineId)?.name }),
-        ),
-      ];
     case 'milestone':
       return store
         .milestones()
         .map((m) => opt(m.id, { hint: store.getProject(m.projectId)?.name }));
-    case 'customer':
-      return store
-        .customers()
-        .filter((c) => !c.archivedAt)
-        .map((c) => opt(c.id, { hint: c.domain }));
-    case 'customerTier':
-      return store.settings().customerTiers.map((t) => opt(t.id));
   }
   return none;
 }

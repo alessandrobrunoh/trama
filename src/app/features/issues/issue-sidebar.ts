@@ -78,7 +78,7 @@ const BAR: Record<CostVerdict, string> = {
           }
         </div>
         @if (cmp.typicalMs; as typical) {
-          <p class="text-muted-foreground -mt-1.5 text-[11px]">{{ cmp.personalized ? 'Personal median' : 'Workspace median' }} · {{ cmp.n }} finished {{ cmp.n === 1 ? 'issue' : 'issues' }}</p>
+          <p class="text-muted-foreground -mt-1.5 text-[11px]">{{ cmp.personalized ? 'Personal median' : 'Workspace median' }} · {{ cmp.n }} finished {{ cmp.n === 1 ? 'task' : 'tasks' }}</p>
           <div class="flex flex-col gap-1.5" aria-hidden="true">
             <span class="flex items-center gap-2">
               <span class="text-muted-foreground w-12 shrink-0 text-[11px]">Typical</span>
@@ -102,11 +102,11 @@ const BAR: Record<CostVerdict, string> = {
           }
         } @else {
           <p class="text-muted-foreground text-xs">Not enough history yet</p>
-          <p class="text-muted-foreground -mt-1.5 text-[11px]">Needs {{ min }} finished issues at this estimate · {{ cmp.n }} so far</p>
+          <p class="text-muted-foreground -mt-1.5 text-[11px]">Needs {{ min }} finished tasks at this estimate · {{ cmp.n }} so far</p>
         }
       </div>
     } @else if (showNudge()) {
-      <div class="border-border text-muted-foreground border-t px-3 py-2.5 text-xs">Add an estimate to compare against similar issues</div>
+      <div class="border-border text-muted-foreground border-t px-3 py-2.5 text-xs">Add an estimate to compare against similar tasks</div>
     }
   `,
 })

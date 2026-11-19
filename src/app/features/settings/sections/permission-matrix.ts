@@ -13,7 +13,6 @@ const COLUMNS: { id: ApiAction; label: string }[] = [
   { id: 'read', label: 'Read' },
   { id: 'write', label: 'Write' },
   { id: 'delete', label: 'Delete' },
-  { id: 'accept', label: 'Accept' },
 ];
 
 /** Grants that let a key reshape who can access the workspace; worth a second look. */

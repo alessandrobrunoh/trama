@@ -7,9 +7,8 @@ import {
   input,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucideGitBranch } from '@lucide/angular';
 import { HlmHoverCardImports } from '@spartan-ng/helm/hover-card';
-import type { Decision, Issue, Repository } from '../core/contracts/domain';
+import type { Issue } from '../core/contracts/domain';
 import { TramaStore } from '../core/stores/trama.store';
 import { ActorAvatar, ActorLabel } from './actor-avatar';
 import { IssueKindLabel } from './issue';
@@ -18,10 +17,13 @@ import { PriorityIcon } from './priority-icon';
 import { StatusIcon, StatusLabel, type AnyStatus } from './status';
 
 /** A record the assistant (or any text) mentioned, resolved against the loaded workspace. */
-export type ResolvedRef =
-  | { type: 'issue'; key: string; title: string; link: string[]; issue: Issue }
-  | { type: 'decision'; key: string; title: string; link: string[]; decision: Decision }
-  | { type: 'repository'; key: string; title: string; link: string[]; repository: Repository };
+export type ResolvedRef = {
+  type: 'issue';
+  key: string;
+  title: string;
+  link: string[];
+  issue: Issue;
+};
 
 const KEY_PATTERN = '\\b[A-Z][A-Z0-9]{1,7}-\\d+\\b';
 
@@ -30,9 +32,8 @@ function escapeRegExp(s: string): string {
 }
 
 /**
- * Finds mentions of workspace records in plain text: issue / decision keys
- * (`CORA-142`, `ADR-21`) and repository names (`owner/name`). Only mentions that resolve to a
- * loaded record become interactive; everything else stays text.
+ * Finds mentions of workspace records in plain text: issue keys (`CORA-142`) and people.
+ * Only mentions that resolve to a loaded record become interactive; everything else stays text.
  */
 @Injectable({ providedIn: 'root' })
 export class EntityRefs {
@@ -46,37 +47,15 @@ export class EntityRefs {
         type: 'issue',
         key: issue.key,
         title: issue.title,
-        link: ['/', slug, 'issues', issue.key],
+        link: ['/', slug, 'tasks', issue.key],
         issue,
-      };
-    const decision = this.store.getDecision(token);
-    if (decision)
-      return {
-        type: 'decision',
-        key: decision.key,
-        title: decision.title,
-        link: ['/', slug, 'decisions', decision.key],
-        decision,
-      };
-    const repository = this.store.repositories().find((r) => r.fullName === token);
-    if (repository)
-      return {
-        type: 'repository',
-        key: repository.fullName,
-        title: repository.fullName,
-        link: ['/', slug, 'repositories', repository.id],
-        repository,
       };
     return null;
   }
 
-  /** Markdown text → text, `ref` and `mention` nodes. Rebuilt when repositories, members or agents change. */
+  /** Markdown text → text, `ref` and `mention` nodes. Rebuilt when members or agents change. */
   readonly linker = computed<TextLinker>(() => {
-    const names = this.store
-      .repositories()
-      .map((r) => r.fullName)
-      .filter((n) => n.length >= 3)
-      .map(escapeRegExp);
+    const names: string[] = [];
     const people = [...this.store.users().map((u) => u.name), ...this.store.agents().map((a) => a.name)]
       .filter((n) => n.trim())
       .sort((a, b) => b.length - a.length)
@@ -109,28 +88,17 @@ export class EntityRefs {
   imports: [
     ActorLabel,
     IssueKindLabel,
-    LucideDynamicIcon,
     PriorityIcon,
-    StatusIcon,
     StatusLabel,
   ],
   host: { class: 'flex flex-col gap-2' },
   template: `
     @if (ref(); as r) {
       <div class="text-muted-foreground flex items-center gap-1.5 font-mono text-[11px]">
-        @switch (r.type) {
-          @case ('issue') {
-            <app-issue-kind [kind]="r.issue.kind" [size]="13" />
-          }
-          @case ('repository') {
-            <svg [lucideIcon]="gitIcon" [size]="13"></svg>
-          }
-        }
+        <app-issue-kind [kind]="r.issue.kind" [size]="13" />
         {{ r.key }}
       </div>
-      @if (r.type !== 'repository') {
-        <div class="text-[13px] leading-snug font-medium">{{ r.title }}</div>
-      }
+      <div class="text-[13px] leading-snug font-medium">{{ r.title }}</div>
       <div class="border-t pt-2 text-xs">
         @switch (r.type) {
           @case ('issue') {
@@ -142,30 +110,11 @@ export class EntityRefs {
               }
             </div>
             <div class="text-muted-foreground mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-              @if (team(); as t) {
-                <span>{{ t }}</span>
-              }
               @if (r.issue.assigneeId) {
                 <app-actor [actor]="{ type: 'user', id: r.issue.assigneeId }" [size]="16" />
               } @else {
                 <span>Unassigned</span>
               }
-            </div>
-          }
-          @case ('decision') {
-            <app-status-label [status]="r.decision.status" entity="other" />
-            @if (r.decision.statement) {
-              <p class="text-muted-foreground mt-1.5 line-clamp-3 leading-snug">
-                {{ r.decision.statement }}
-              </p>
-            }
-          }
-          @case ('repository') {
-            <div class="text-muted-foreground">
-              {{ r.repository.provider }} · default branch
-              <span class="text-foreground font-mono">{{
-                r.repository.defaultBranch ?? 'main'
-              }}</span>
             </div>
           }
         }
@@ -174,14 +123,7 @@ export class EntityRefs {
   `,
 })
 export class EntityPreview {
-  private readonly store = inject(TramaStore);
   readonly ref = input.required<ResolvedRef>();
-  protected readonly gitIcon = LucideGitBranch;
-  protected readonly team = computed(() => {
-    const r = this.ref();
-    const id = r.type === 'issue' ? r.issue.teamId : undefined;
-    return id ? this.store.getTeam(id)?.name : undefined;
-  });
 }
 
 function statusOf(
@@ -190,8 +132,6 @@ function statusOf(
   switch (r.type) {
     case 'issue':
       return { status: r.issue.status, entity: 'issue' };
-    case 'decision':
-      return { status: r.decision.status, entity: 'other' };
     default:
       return null;
   }
@@ -201,7 +141,7 @@ function statusOf(
 @Component({
   selector: 'app-entity-ref',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmHoverCardImports, StatusIcon, LucideDynamicIcon, EntityPreview],
+  imports: [RouterLink, HlmHoverCardImports, StatusIcon, EntityPreview],
   host: { class: 'inline' },
   template: `
     @if (resolved(); as r) {
@@ -213,8 +153,6 @@ function statusOf(
         >
           @if (visual(); as v) {
             <app-status-icon [status]="v.status" [entity]="v.entity" [size]="12" />
-          } @else {
-            <svg [lucideIcon]="gitIcon" [size]="12"></svg>
           }
           {{ r.key }}
         </a>
@@ -230,7 +168,6 @@ function statusOf(
 export class EntityRefChip {
   private readonly refs = inject(EntityRefs);
   readonly token = input.required<string>();
-  protected readonly gitIcon = LucideGitBranch;
   protected readonly resolved = computed(() => this.refs.resolve(this.token()));
   protected readonly visual = computed(() => {
     const r = this.resolved();
@@ -254,7 +191,6 @@ const norm = (s: string) =>
     StatusIcon,
     PriorityIcon,
     ActorAvatar,
-    LucideDynamicIcon,
     EntityPreview,
   ],
   host: { class: 'block' },
@@ -272,10 +208,8 @@ const norm = (s: string) =>
           <span class="text-muted-foreground shrink-0 font-mono text-xs">{{ r.key }}</span>
           @if (visual(); as v) {
             <app-status-icon [status]="v.status" [entity]="v.entity" [size]="14" />
-          } @else {
-            <svg [lucideIcon]="gitIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
           }
-          <span class="min-w-0 flex-1 truncate">{{ r.type === 'repository' ? '' : r.title }}</span>
+          <span class="min-w-0 flex-1 truncate">{{ r.title }}</span>
           @if (assignee(); as a) {
             <app-actor-avatar [actor]="{ type: 'user', id: a }" [size]="18" />
           }
@@ -301,7 +235,6 @@ export class EntityRow {
   readonly token = input.required<string>();
   /** Plain text of the commentary after the key, used to hide it when it only repeats the title. */
   readonly trailText = input('');
-  protected readonly gitIcon = LucideGitBranch;
   protected readonly resolved = computed(() => this.refs.resolve(this.token()));
   protected readonly visual = computed(() => {
     const r = this.resolved();

@@ -183,7 +183,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               }
             </div>
             <div class="text-muted-foreground truncate text-xs">
-              {{ m.user.email }}{{ teamsOf(m.user.id) ? ' · ' + teamsOf(m.user.id) : '' }}{{ m.membership.access ? ' · Limited' : '' }}
+              {{ m.user.email }}{{ m.membership.access ? ' · Limited' : '' }}
             </div>
           </div>
           @if (canAdmin()) {
@@ -345,14 +345,6 @@ export class MembersSection {
       ? rows.filter((m) => `${m.user.name} ${m.user.email}`.toLowerCase().includes(q))
       : rows;
   });
-  private readonly teamNamesByUser = computed(() => {
-    const map = new Map<string, string[]>();
-    for (const t of this.store.teams())
-      for (const id of t.memberIds)
-        map.set(id, [...(map.get(id) ?? []), t.leadIds.includes(id) ? `${t.key} (lead)` : t.key]);
-    return map;
-  });
-
   constructor() {
     effect(() => {
       if (this.canInvite() && this.store.slug()) untracked(() => void this.invites.load());
@@ -388,9 +380,6 @@ export class MembersSection {
     return days === 1 ? 'expires tomorrow' : `expires in ${days} days`;
   }
 
-  protected teamsOf(userId: string): string {
-    return (this.teamNamesByUser().get(userId) ?? []).join(', ');
-  }
   protected roleName(role: Role): string {
     return workspaceRoleName(this.workspaceRoles(), role);
   }
@@ -488,7 +477,7 @@ export class MembersSection {
   protected remove(id: string, name: string): void {
     this.ui.setConfirmDelete({
       title: `Remove ${name}?`,
-      description: 'They lose access to this workspace and leave its teams. Their account stays.',
+      description: 'They lose access to this workspace. Their account stays.',
       confirmLabel: 'Remove',
       onConfirm: async () => {
         await this.store.removeMember(id);

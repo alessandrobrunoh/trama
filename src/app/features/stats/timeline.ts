@@ -14,8 +14,6 @@ export interface IssueRec {
   status: IssueStatus;
   priority: Priority;
   kind: IssueKind;
-  team: string;
-  teamId?: string;
   assignee: string;
   assigneeId?: string;
   changes: Change[];
@@ -64,8 +62,6 @@ export function buildTimeline(store: TramaStore, issues: readonly Issue[], now: 
         status: i.status,
         priority: i.priority,
         kind: i.kind,
-        team: i.teamId ? (store.getTeam(i.teamId)?.name ?? 'Unknown team') : 'No team',
-        teamId: i.teamId,
         assignee: i.assigneeId ? (store.getUser(i.assigneeId)?.name ?? 'Unknown') : 'Unassigned',
         assigneeId: i.assigneeId,
         changes: changesOf(store, `issue:${i.id}`),

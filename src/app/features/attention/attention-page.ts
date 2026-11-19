@@ -36,8 +36,7 @@ type Tab = 'open' | 'archived';
 /**
  * The attention queue inside the Inbox ("Needs you" and "Snoozed & dismissed" tabs): "where is my attention
  * actually required?" Grouped by kind in a fixed order,
- * severity-sorted, with inline actions. Keyboard: J/K move, Enter open, E dismiss, H snooze, A answer,
- * Shift+E dismiss the question itself (input requests).
+ * severity-sorted, with inline actions. Keyboard: J/K move, Enter open, E dismiss, H snooze.
  */
 @Component({
   selector: 'app-attention-page',
@@ -89,8 +88,6 @@ type Tab = 'open' | 'archived';
               [item]="it"
               [slug]="slug()"
               [focused]="ui.focusedRowId() === it.id"
-              [answering]="answeringId() === it.id"
-              (answeringChange)="answeringId.set($event ? it.id : null)"
               (rowClicked)="ui.setFocusedRow(it.id)"
               (dismiss)="dismiss(it)"
               (snooze)="snooze(it, $event)"
@@ -103,10 +100,10 @@ type Tab = 'open' | 'archived';
           class="m-auto"
           [icon]="checkIcon"
           title="Nothing needs you"
-          description="No questions, reviews, blockers or deadlines are waiting on you. Agents keep working, and anything that needs a human will show up here."
+          description="No reviews, failing checks, conflicts, or triage items are waiting on you. Anything that needs a human will show up here."
         >
           <div class="flex flex-wrap justify-center gap-2">
-            <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'issues']">Issues</a>
+            <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'tasks']">Tasks</a>
             @if (!store.agents().length) {
               <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'connect']"
                 >Connect your agent</a
@@ -121,11 +118,8 @@ type Tab = 'open' | 'archived';
         >
           <span class="flex items-center gap-1"><app-kbd keys="j" /><app-kbd keys="k" /> move</span>
           <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
-          <span class="flex items-center gap-1"><app-kbd keys="a" /> answer</span>
           <span class="flex items-center gap-1"><app-kbd keys="e" /> dismiss</span>
-          <span class="flex items-center gap-1"><app-kbd keys="h" /> snooze</span>
-          <span class="flex items-center gap-1"><app-kbd keys="shift+e" /> dismiss question</span>
-        </p>
+          <span class="flex items-center gap-1"><app-kbd keys="h" /> snooze</span>        </p>
       }
     } @else {
       @for (it of archived(); track it.id) {
@@ -197,7 +191,6 @@ export class AttentionPage {
   // Scope survives navigation inside the app (see ListStateStore).
   protected readonly scope = this.listState.remember<Scope>('attention.scope', 'mine');
   protected readonly canSeeAll = computed(() => this.store.can('admin'));
-  protected readonly answeringId = signal<string | null>(null);
 
   // "Everyone" scope: fetched separately (the snapshot only carries my items).
   private readonly allItems = signal<AttentionItem[] | null>(null);
@@ -246,13 +239,6 @@ export class AttentionPage {
     return id ? this.flat().find((a) => a.id === id) : undefined;
   });
 
-  private readonly focusedQuestion = computed(() => {
-    const it = this.focusedItem();
-    const id = it?.kind === 'input_requested' ? it.inputRequestId : undefined;
-    const r = id ? this.store.inputRequestById().get(id) : undefined;
-    return r?.state === 'open' ? r : undefined;
-  });
-
   protected readonly description = computed(() => {
     const open = this.open();
     if (!open.length)
@@ -269,12 +255,10 @@ export class AttentionPage {
 
   constructor() {
     this.ui.setFocusedRow(null);
-    // Switching tab starts with no row focused and no answer box open.
     effect(() => {
       this.tab();
       untracked(() => {
         this.ui.setFocusedRow(null);
-        this.answeringId.set(null);
       });
     });
     usePageShortcuts([
@@ -295,18 +279,6 @@ export class AttentionPage {
         label: 'Snooze item… (alias of H)',
         when: () => this.tab() === 'open' && !!this.focusedItem(),
         run: () => this.openSnooze(this.focusedItem()!),
-      },
-      {
-        keys: 'shift+e',
-        label: 'Dismiss the question for everyone',
-        when: () => this.tab() === 'open' && !!this.focusedQuestion(),
-        run: () => this.dismissQuestion(this.focusedItem()!),
-      },
-      {
-        keys: 'a',
-        label: 'Answer input request',
-        when: () => this.tab() === 'open' && this.focusedItem()?.kind === 'input_requested',
-        run: () => this.answeringId.set(this.focusedItem()!.id),
       },
       {
         keys: 'r',
@@ -383,15 +355,6 @@ export class AttentionPage {
           description: item.title,
           action: { label: 'Undo', onClick: () => void this.store.restoreAttention(item.id) },
         });
-    });
-  }
-
-  protected dismissQuestion(item: AttentionItem): void {
-    const r = this.focusedQuestion();
-    if (!r) return;
-    this.advanceFocus(item.id);
-    void this.store.dismissInput(r.id).then((ok) => {
-      if (ok) toast('Question dismissed', { description: r.question });
     });
   }
 

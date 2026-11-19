@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router } from '@angular/router';
 import { ISSUE_KIND_META, TramaStore, PRIORITIES, PRIORITY_META, type EstimateScale, type IssueKind } from '../../core';
 import { BarList, type BarRow } from './charts/bar-list';
@@ -12,7 +12,7 @@ import type { WorkRec } from './work';
 
 const AGING_ROWS = 12;
 
-/** Issues scope additions that need start dates: aging work in progress, and throughput by kind or team. */
+/** Issues scope additions that need start dates: aging work in progress, and throughput by type. */
 @Component({
   selector: 'app-issue-extras',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -38,29 +38,16 @@ const AGING_ROWS = 12;
     <app-chart-card
       class="lg:col-span-2"
       title="Throughput"
-      [subtitle]="'Issues completed per week, by ' + (by() === 'kind' ? 'type' : 'team')"
+      subtitle="Tasks completed per week, by type"
       [empty]="block().total ? undefined : 'Nothing completed in these weeks.'"
       note="Weeks are rolling 7-day windows ending today. The four largest groups get a colour; the rest are folded into Other."
     >
-      <div class="mb-2 inline-flex rounded-md border p-0.5" role="group" aria-label="Group throughput by">
-        @for (g of groups; track g.id) {
-          <button
-            type="button"
-            class="h-6 rounded px-2.5 text-xs transition-colors"
-            [class]="by() === g.id ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="by() === g.id"
-            (click)="by.set(g.id)"
-          >
-            {{ g.label }}
-          </button>
-        }
-      </div>
-      <app-column-chart [series]="block().series" [labels]="block().labels" [tooltipTitles]="block().titles" [stacked]="true" ariaLabel="Issues completed per week" />
+      <app-column-chart [series]="block().series" [labels]="block().labels" [tooltipTitles]="block().titles" [stacked]="true" ariaLabel="Tasks completed per week" />
     </app-chart-card>
   `,
 })
 export class IssueExtras {
-  /** Already filtered by person and team. */
+  /** Already filtered by person. */
   readonly work = input.required<readonly WorkRec[]>();
   readonly period = input.required<Period>();
   readonly now = input.required<number>();
@@ -68,16 +55,10 @@ export class IssueExtras {
 
   private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
-  protected readonly by = signal<'kind' | 'team'>('kind');
-  protected readonly groups = [
-    { id: 'kind', label: 'Type' },
-    { id: 'team', label: 'Team' },
-  ] as const;
   protected readonly priorities = PRIORITIES.map((id) => ({ id, label: PRIORITY_META[id].label, color: PRIORITY_COLOR[id] }));
 
   private readonly look: Lookup = {
     user: (id) => (id ? (this.store.getUser(id)?.name ?? 'Unknown') : 'Unassigned'),
-    team: (id) => (id ? (this.store.getTeam(id)?.name ?? 'Unknown team') : 'No team'),
   };
 
   protected readonly aging = computed(() => agingWip(this.work(), this.now(), this.scale(), this.look));
@@ -96,7 +77,7 @@ export class IssueExtras {
   );
   protected readonly agingEmpty = computed(() =>
     this.aging().noStart
-      ? `Nothing in progress has a start date yet (${this.aging().noStart} issue${this.aging().noStart === 1 ? '' : 's'} predate start tracking).`
+      ? `Nothing in progress has a start date yet (${this.aging().noStart} task${this.aging().noStart === 1 ? '' : 's'} predate start tracking).`
       : 'Nothing is in progress.',
   );
   protected readonly agingNote = computed(() => {
@@ -111,8 +92,7 @@ export class IssueExtras {
       this.work(),
       this.period(),
       this.now(),
-      this.by(),
-      (k) => (this.by() === 'kind' ? (ISSUE_KIND_META[k as IssueKind]?.label ?? k) : this.look.team(k === 'none' ? undefined : k)),
+      (k) => ISSUE_KIND_META[k as IssueKind]?.label ?? k,
       SERIES_COLORS.slice(0, 4),
       'var(--tone-neutral)',
     ),
@@ -120,6 +100,6 @@ export class IssueExtras {
 
   protected open(row: BarRow): void {
     const key = row.hint;
-    if (key) void this.router.navigate(['/', this.store.slug() ?? '', 'issues', key]);
+    if (key) void this.router.navigate(['/', this.store.slug() ?? '', 'tasks', key]);
   }
 }

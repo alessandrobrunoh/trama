@@ -15,7 +15,6 @@ import { ApiClient } from '../../core/api/api-client';
 import type { PublicView as PublicViewDto, ViewEntity } from '../../core/contracts/domain';
 import { shortDate } from '../../core/format';
 import {
-  DECISION_STATUS_META,
   ISSUE_KIND_META,
   ISSUE_STATUS_META,
   PRIORITY_META,
@@ -156,9 +155,6 @@ type Labels = Record<string, { label: string }>;
                     >{{ l }}</span
                   >
                 }
-                @if (item.team) {
-                  <span class="text-meta hidden max-w-32 truncate md:inline">{{ item.team }}</span>
-                }
                 @if (item.assignee) {
                   <span class="text-meta hidden max-w-32 truncate sm:inline">{{
                     item.assignee
@@ -265,8 +261,7 @@ export class PublicView implements OnInit {
     if (field === 'health') return PROJECT_HEALTH_META;
     if (field !== 'status') return null;
     if (entity === 'issue') return ISSUE_STATUS_META;
-    if (entity === 'project') return PROJECT_STATUS_META;
-    return DECISION_STATUS_META;
+    return PROJECT_STATUS_META;
   }
 }
 

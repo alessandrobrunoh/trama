@@ -13,7 +13,7 @@ const TABS: readonly InboxTab[] = ['needs-you', 'updates', 'later'];
 
 /**
  * `/:workspace/inbox`: one place for everything addressed to you. It replaces My Attention and Notifications.
- *   Needs you   questions, decisions, reviews, blockers and deadlines waiting on a human (attention queue)
+ *   Needs you   reviews, failing checks, conflicts and triage waiting on a human (attention queue)
  *   Updates     assignments, comments and status changes that concern you (notifications)
  *   Snoozed & dismissed   what you set aside, one click from coming back
  * The tab lives in `?tab=`, so every state has a link; `/attention` and `/notifications` redirect here.

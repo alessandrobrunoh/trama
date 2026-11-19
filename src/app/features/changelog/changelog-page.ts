@@ -29,8 +29,7 @@ import { SiteHeader } from '../landing/site-header';
       </h1>
       <p class="text-muted-foreground mt-4 max-w-xl text-[15px] leading-relaxed">
         Release history, newest first; each entry describes Trama as it was when that change shipped.
-        Today, Issues are granular units of work, with optional Goals, Plans and Documents. Human
-        input requests use Question or Decision mode.
+        Today, Tasks are granular units of work, with optional Goals, Plans and Documents.
       </p>
       <a
         routerLink="/roadmap"
@@ -68,9 +67,9 @@ import { SiteHeader } from '../landing/site-header';
       </ol>
 
       <section class="border-border mt-12 border-t pt-8">
-        <h2 class="text-2xl font-semibold tracking-[-0.02em]">Completed issues</h2>
+        <h2 class="text-2xl font-semibold tracking-[-0.02em]">Completed tasks</h2>
         <p class="text-muted-foreground mt-2 text-[14px] leading-relaxed">
-          Issues currently marked done in the Trama project.
+          Tasks currently marked done in the Trama project.
         </p>
         <app-public-view class="mt-5 block w-full" [embedded]="true" [viewSource]="'changelog'" />
       </section>

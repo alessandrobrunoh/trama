@@ -129,7 +129,7 @@ Light is `:root`, dark is `:root.dark` (class set by `ThemeService`). All are us
 - Tones (palette behind statuses): `tone-neutral|slate|blue|amber|orange|violet|red|teal|green`
 - **Status colors** (muted, same meaning in both modes: neutral = not started, blue = active, amber = waiting on a human, violet = review, red = broken, teal = ready, green = done):
   - ExecutionState extras: `status-queued|running|failed|completed`
-  - IssueStatus: `status-backlog|todo|in-progress|in-review|done|canceled`; DecisionStatus: `status-proposed|accepted|superseded|rejected`
+  - IssueStatus (tasks): `status-backlog|todo|in-progress|in-review|done|canceled`
   - Artifact/CI: `status-passing|failing|pending|healthy|degraded`
   - Priority: `priority-urgent|high|medium|low|none`
   - Usage: `text-status-blocked`, `bg-status-working/10`, `border-status-shipped/25`, or in CSS `var(--status-needs-input)` (matches core `statusVar()`).
@@ -142,12 +142,12 @@ All standalone, OnPush, signal inputs, no raw HTML.
 
 | selector | class | inputs |
 |---|---|---|
-| `<app-status-icon>` | `StatusIcon` | `status` (any Issue/Decision/Artifact/CI state), `size=14` |
+| `<app-status-icon>` | `StatusIcon` | `status` (any Task/Artifact/CI state), `size=14` |
 | `<app-status-badge>` | `StatusBadge` | `status`, `label?`, `iconOnly?` — tinted pill |
 | `<app-status-label>` | `StatusLabel` | `status`, `label?` — icon + text, no pill |
 | `<app-priority-icon>` | `PriorityIcon` | `priority`, `showLabel?` |
 | `<app-provider-icon>` | `ProviderIcon` | `provider` (human/delta/claude_code/codex/cursor/other/github/gitlab/…), `size`, `showLabel?` |
-| `<app-actor-avatar>` | `ActorAvatar` | `actor` (`ActorRef` or `ResolvedActor`), `size=20`. user = round initials, **agent = rounded square + provider glyph + blue pip**, team = colored square with key |
+| `<app-actor-avatar>` | `ActorAvatar` | `actor` (`ActorRef` or `ResolvedActor`), `size=20`. user = round initials, **agent = rounded square + provider glyph + blue pip** |
 | `<app-actor>` | `ActorLabel` | `actor`, `size` — avatar + name |
 | `<app-avatar-stack>` | `AvatarStack` | `actors[]`, `max=3`, `size` |
 | `<app-key-chip>` | `KeyChip` | `value` or projected text — mono `AUTH-42` |

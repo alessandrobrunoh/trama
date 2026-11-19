@@ -19,31 +19,15 @@ import type {
   CreateOwnedArtifactInput,
   CreateProjectUpdateInput,
   UpdateProjectUpdateInput,
-  CreateDecisionInput,
-  CreateInputRequestInput,
-  CreateCustomerInput,
   BulkIssuePatch,
   CreateIssueInput,
-  CreateCustomerRequestInput,
-  CreateCustomerTierInput,
-  UpdateCustomerRequestInput,
-  UpdateCustomerTierInput,
   CreateMilestoneInput,
   UpdateMilestoneInput,
-  CompleteReleaseInput,
-  CreateReleaseInput,
-  CreateReleasePipelineInput,
-  UpdateReleaseInput,
-  UpdateReleasePipelineInput,
   CreateIntegrationInput,
   IntegrationDetail,
   IntegrationWithWebhook,
-  LinkRepositoryInput,
-  RemoteRepositoryPage,
   UpdateIntegrationInput,
   CreateProjectInput,
-  CreateRepositoryInput,
-  CreateTeamInput,
   CreateTokenInput,
   CreatedToken,
   CreateLabelInput,
@@ -61,13 +45,8 @@ import type {
   EventsQuery,
   UpdateAgentInput,
   UpdateArtifactInput,
-  UpdateDecisionInput,
-  UpdateInputRequestInput,
-  UpdateCustomerInput,
   UpdateIssueInput,
   UpdateProjectInput,
-  UpdateRepositoryInput,
-  UpdateTeamInput,
   UpdateViewInput,
 } from '../api/api.types';
 import type {
@@ -81,13 +60,9 @@ import type {
   Comment,
   CommentIndexEntry,
   CommentPage,
-  Customer,
-  CustomerRequest,
-  Decision,
   DomainEvent,
   ExecutionProvider,
   ID,
-  InputRequest,
   Issue,
   IssueKind,
   LiveEvent,
@@ -101,13 +76,9 @@ import type {
   ProjectContext,
   ProjectContextArtifact,
   ProjectUpdate,
-  Release,
-  ReleasePipeline,
-  Repository,
   Role,
   SavedView,
   SubjectRef,
-  Team,
   User,
   WebhookDeliveryLog,
   Workspace,
@@ -116,9 +87,8 @@ import type {
   WorkspaceSnapshot,
 } from '../contracts/domain';
 import type { Capability, ShareLevel } from '../contracts/domain';
-import { buildDemandIndex, mergeDemand, resolveWorkspaceSettings, roleHasCapability } from '../contracts/domain';
+import { resolveWorkspaceSettings, roleHasCapability } from '../contracts/domain';
 import { uploadIdsIn } from '../upload-url';
-import type { Demand } from '../contracts/domain';
 import { setDisplayTimeZone } from '../format';
 import { ATTENTION_KINDS, SEVERITY_ORDER } from '../meta';
 import { Notifier } from '../notify/notifier';
@@ -131,17 +101,13 @@ type Rec = Record<string, unknown>;
 export type LoadResult = 'ok' | 'not-found' | 'error';
 export type StoreStatus = 'idle' | 'loading' | 'ready' | 'error';
 
-/** An actor (user / agent / team / system) resolved to display data. */
+/** An actor (user / agent / system) resolved to display data. */
 export interface ResolvedActor {
   type: ActorType;
   id?: ID;
   name: string;
   /** Users: avatar hue. */
   hue?: number;
-  /** Teams: team colour. */
-  color?: string;
-  /** Teams: key (AUTH). Agents: provider. */
-  key?: string;
   provider?: Exclude<ExecutionProvider, 'human'>;
   known: boolean;
 }
@@ -221,8 +187,6 @@ const PROJECT_CONTEXT_ENTITIES: ReadonlySet<string> = new Set([
   'issue',
   'artifact',
   'milestone',
-  'decision',
-  'input_request',
 ]);
 
 /** A shallow copy without `undefined` values (so spreading a PATCH body does not wipe fields). */
@@ -256,18 +220,10 @@ export class TramaStore {
   private readonly _users = signal<readonly User[]>([]);
   private readonly _memberships = signal<readonly Membership[]>([]);
   private readonly _agents = signal<readonly Agent[]>([]);
-  private readonly _teams = signal<readonly Team[]>([]);
-  private readonly _repositories = signal<readonly Repository[]>([]);
   private readonly _projects = signal<readonly Project[]>([]);
   private readonly _milestones = signal<readonly Milestone[]>([]);
-  private readonly _releasePipelines = signal<readonly ReleasePipeline[]>([]);
-  private readonly _releases = signal<readonly Release[]>([]);
-  private readonly _inputRequests = signal<readonly InputRequest[]>([]);
   private readonly _issues = signal<readonly Issue[]>([]);
-  private readonly _customers = signal<readonly Customer[]>([]);
-  private readonly _customerRequests = signal<readonly CustomerRequest[]>([]);
   private readonly _artifacts = signal<readonly Artifact[]>([]);
-  private readonly _decisions = signal<readonly Decision[]>([]);
   private readonly _comments = signal<readonly Comment[]>([]);
   private readonly _commentIndex = signal<readonly CommentIndexEntry[]>([]);
   private readonly _commentThreads = signal<ReadonlyMap<string, CommentThreadInfo>>(new Map());
@@ -280,19 +236,11 @@ export class TramaStore {
   readonly users = this._users.asReadonly();
   readonly memberships = this._memberships.asReadonly();
   readonly agents = this._agents.asReadonly();
-  readonly teams = this._teams.asReadonly();
-  readonly repositories = this._repositories.asReadonly();
   readonly projects = this._projects.asReadonly();
   /** All milestones, ordered by project then `sortOrder`. */
   readonly milestones = this._milestones.asReadonly();
-  readonly releasePipelines = this._releasePipelines.asReadonly();
-  readonly releases = this._releases.asReadonly();
-  readonly inputRequests = this._inputRequests.asReadonly();
   readonly issues = this._issues.asReadonly();
-  readonly customers = this._customers.asReadonly();
-  readonly customerRequests = this._customerRequests.asReadonly();
   readonly artifacts = this._artifacts.asReadonly();
-  readonly decisions = this._decisions.asReadonly();
   /** Comments loaded so far (the threads opened on demand), not every comment of the workspace. */
   readonly comments = this._comments.asReadonly();
   /** Who commented how often on what, for the whole workspace (comes with the snapshot). */
@@ -310,13 +258,8 @@ export class TramaStore {
 
   readonly userById = computed(() => indexById(this._users()));
   readonly agentById = computed(() => indexById(this._agents()));
-  readonly teamById = computed(() => indexById(this._teams()));
-  readonly teamByKey = computed(() => new Map(this._teams().map((t) => [t.key.toUpperCase(), t])));
-  readonly repositoryById = computed(() => indexById(this._repositories()));
   readonly projectById = computed(() => indexById(this._projects()));
-  readonly inputRequestById = computed(() => indexById(this._inputRequests()));
   readonly issueById = computed(() => indexById(this._issues()));
-  readonly customerById = computed(() => indexById(this._customers()));
   /** Uppercase current project key (`AUTH-142`) or an older project-key alias → issue. */
   readonly issueByKey = computed(() => {
     const map = new Map<string, Issue>();
@@ -325,13 +268,7 @@ export class TramaStore {
     return map;
   });
   readonly milestoneById = computed(() => indexById(this._milestones()));
-  readonly releasePipelineById = computed(() => indexById(this._releasePipelines()));
-  readonly releaseById = computed(() => indexById(this._releases()));
   readonly artifactById = computed(() => indexById(this._artifacts()));
-  readonly decisionById = computed(() => indexById(this._decisions()));
-  readonly decisionByKey = computed(
-    () => new Map(this._decisions().map((d) => [d.key.toUpperCase(), d])),
-  );
   readonly viewById = computed(() => indexById(this._views()));
   readonly integrationById = computed(() => indexById(this._integrations()));
   readonly membershipByUserId = computed(
@@ -349,19 +286,10 @@ export class TramaStore {
     return rows.sort((a, b) => a.user.name.localeCompare(b.user.name));
   });
 
-  /** Open input requests, newest first. */
-  readonly openInputRequests = computed(() =>
-    this._inputRequests()
-      .filter((r) => r.state === 'open')
-      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1)),
-  );
   /** Artifacts attached directly to a project (by project id). */
   readonly artifactsByProject = computed(() => groupBy(this._artifacts(), (a) => a.projectId));
   /** Artifacts attached directly to an issue (by issue id). */
   readonly artifactsByIssue = computed(() => groupBy(this._artifacts(), (a) => a.issueId));
-  readonly artifactsByRepository = computed(() =>
-    groupBy(this._artifacts(), (a) => a.repositoryId),
-  );
   /** Milestones of a project (by project id), ordered by `sortOrder`. */
   readonly milestonesByProject = computed(() => {
     const map = groupBy(this._milestones(), (m) => m.projectId);
@@ -372,32 +300,10 @@ export class TramaStore {
   readonly issuesByProject = computed(() => {
     return groupBy(this._issues(), (i) => i.projectId);
   });
-  /**
-   * Customer demand by issue and project id. A project includes its own requests and those on its issues.
-   * Rows nobody asked for are absent.
-   */
-  readonly demand = computed<ReadonlyMap<string, Demand>>(() => {
-    const customers = this.customerById();
-    const own = buildDemandIndex(this._customerRequests(), customers);
-    const out = new Map(own);
-    const issuesByProject = this.issuesByProject();
-    for (const project of this._projects()) {
-      const parts = [own.get(project.id), ...(issuesByProject.get(project.id) ?? []).map((i) => own.get(i.id))].filter(
-        (d): d is Demand => !!d,
-      );
-      if (parts.length) out.set(project.id, mergeDemand(parts, customers));
-    }
-    return out;
-  });
   /** Issues in a milestone (by milestone id). */
   readonly issuesByMilestone = computed(() =>
     groupBy(this._issues(), (i) => (i.milestoneIds?.length ? i.milestoneIds : undefined)),
   );
-  /** Releases of a pipeline (by pipeline id). */
-  readonly releasesByPipeline = computed(() => groupBy(this._releases(), (r) => r.pipelineId));
-  /** Issues assigned to a release (by release id). */
-  readonly issuesByRelease = computed(() => groupBy(this._issues(), (i) => i.releaseId));
-  readonly issuesByTeam = computed(() => groupBy(this._issues(), (i) => i.teamId));
   /** Each project with its directly planned issues and attached artifacts. */
   readonly projectArtifactTree = computed(() => {
     const byIssue = this.artifactsByIssue();
@@ -455,15 +361,6 @@ export class TramaStore {
     return map;
   });
 
-  // ─────────────────────────── me / attention ───────────────────────────
-
-  /** Teams I'm a member of. */
-  readonly myTeams = computed(() => {
-    const id = this._me()?.id;
-    return id ? this._teams().filter((t) => t.memberIds.includes(id)) : [];
-  });
-  readonly myTeamIds = computed(() => new Set(this.myTeams().map((t) => t.id)));
-
   /** Open attention items, severity then newest first. */
   readonly openAttention = computed(() =>
     this._attention()
@@ -497,11 +394,10 @@ export class TramaStore {
 
   // ─────────────────────────── actor resolution ───────────────────────────
 
-  /** Everything that can perform work or be assigned: users, agents, teams. */
+  /** Everything that can perform work or be assigned: users and agents. */
   readonly actors = computed<ResolvedActor[]>(() => [
     ...this._users().map((u) => this.resolveActor({ type: 'user', id: u.id })),
     ...this._agents().map((a) => this.resolveActor({ type: 'agent', id: a.id })),
-    ...this._teams().map((t) => this.resolveActor({ type: 'team', id: t.id })),
   ]);
 
   resolveActor(ref: ActorRef | null | undefined): ResolvedActor {
@@ -514,10 +410,6 @@ export class TramaStore {
       case 'agent': {
         const a = ref.id ? this.agentById().get(ref.id) : undefined;
         return { type: 'agent', id: ref.id, name: a?.name ?? 'Unknown agent', provider: a?.provider, known: !!a };
-      }
-      case 'team': {
-        const t = ref.id ? this.teamById().get(ref.id) : undefined;
-        return { type: 'team', id: ref.id, name: t?.name ?? 'Unknown team', color: t?.color, key: t?.key, known: !!t };
       }
       default:
         return { type: 'system', name: 'Trama', known: true };
@@ -540,35 +432,13 @@ export class TramaStore {
     if (!ref) return undefined;
     return this.issueById().get(ref) ?? this.issueByKey().get(ref.toUpperCase());
   }
-  getCustomer(id: string | null | undefined): Customer | undefined {
-    return id ? this.customerById().get(id) : undefined;
-  }
   getMilestone(id: string | null | undefined): Milestone | undefined {
     return id ? this.milestoneById().get(id) : undefined;
-  }
-  getReleasePipeline(id: string | null | undefined): ReleasePipeline | undefined {
-    return id ? this.releasePipelineById().get(id) : undefined;
-  }
-  getRelease(id: string | null | undefined): Release | undefined {
-    return id ? this.releaseById().get(id) : undefined;
-  }
-  /** By id or key (`ADR-7`). */
-  getDecision(ref: string | null | undefined): Decision | undefined {
-    if (!ref) return undefined;
-    return this.decisionById().get(ref) ?? this.decisionByKey().get(ref.toUpperCase());
-  }
-  /** By id or key (`AUTH`). */
-  getTeam(ref: string | null | undefined): Team | undefined {
-    if (!ref) return undefined;
-    return this.teamById().get(ref) ?? this.teamByKey().get(ref.toUpperCase());
   }
   getProject(id: string | null | undefined): Project | undefined {
     return id ? this.projectById().get(id) : undefined;
   }
 
-  getRepository(id: string | null | undefined): Repository | undefined {
-    return id ? this.repositoryById().get(id) : undefined;
-  }
   getUser(id: string | null | undefined): User | undefined {
     return id ? this.userById().get(id) : undefined;
   }
@@ -637,25 +507,6 @@ export class TramaStore {
     return !!mine && roleHasCapability(this.settings().roles, mine, capability);
   }
 
-  /** Am I a lead of this team? */
-  isTeamLead(teamId: ID | null | undefined): boolean {
-    const me = this._me()?.id;
-    const team = teamId ? this.teamById().get(teamId) : undefined;
-    return !!me && !!team && team.leadIds.includes(me);
-  }
-
-  /**
-   * May I edit issues owned by this team? Workspace role first (member+), then the team's
-   * edit policy: with `members`, only team members, leads and admins. No team = no restriction.
-   */
-  canEditTeamWork(teamId: ID | null | undefined): boolean {
-    if (!this.can('member')) return false;
-    const team = teamId ? this.teamById().get(teamId) : undefined;
-    if (!team || team.editPolicy !== 'members' || this.can('admin')) return true;
-    const me = this._me()?.id;
-    return !!me && (team.memberIds.includes(me) || team.leadIds.includes(me));
-  }
-
   // ─────────────────────────── loading ───────────────────────────
 
   private loading: { slug: string; promise: Promise<LoadResult> } | null = null;
@@ -719,11 +570,9 @@ export class TramaStore {
     this._me.set(null);
     this._myRole.set(null);
     for (const c of [
-      this._users, this._memberships, this._agents, this._teams, this._repositories, this._projects,
-      this._milestones, this._releasePipelines, this._releases, this._inputRequests, this._issues,
-      this._customers,
-      this._customerRequests, this._artifacts,
-      this._decisions, this._comments, this._events, this._attention,
+      this._users, this._memberships, this._agents, this._projects,
+      this._milestones, this._issues, this._artifacts,
+      this._comments, this._events, this._attention,
       this._views, this._integrations, this._tokens,
     ] as WritableSignal<readonly Row[]>[]) {
       c.set([]);
@@ -782,19 +631,11 @@ export class TramaStore {
     list(this._users, s.users);
     list(this._memberships, s.memberships);
     list(this._agents, s.agents);
-    list(this._teams, s.teams);
-    list(this._repositories, s.repositories);
     list(this._projects, s.projects ?? []);
     list(this._milestones, s.milestones ?? []);
-    list(this._releasePipelines, s.releasePipelines ?? []);
-    list(this._releases, s.releases ?? []);
-    list(this._inputRequests, s.inputRequests);
     // Issues waiting for their delayed delete stay hidden even if a refetch still lists them.
     list(this._issues, this.stagedDeletes.size ? s.issues.filter((i) => !this.stagedDeletes.has(i.id)) : s.issues);
-    list(this._customers, s.customers ?? []);
-    list(this._customerRequests, s.customerRequests ?? []);
     list(this._artifacts, s.artifacts);
-    list(this._decisions, s.decisions);
     if (s.commentIndex) {
       // Slim snapshot: the comments themselves load per subject (`loadComments`); only the summary arrives here.
       const index = s.commentIndex;
@@ -967,61 +808,7 @@ export class TramaStore {
     return new Date().toISOString();
   }
 
-  // ─────────────────────────── input requests ───────────────────────────
 
-  async createInputRequest(input: CreateInputRequestInput): Promise<InputRequest | undefined> {
-    return this.write('request input', (s) => this.api.inputRequests.create(s, input), {
-      onResult: (r) => this.upsert(this._inputRequests, r),
-    });
-  }
-
-  /** Answer an open input request (also clears its attention item). */
-  async answerInput(id: ID, answer: string): Promise<boolean> {
-    if (!this.inputRequestById().has(id)) return false;
-    const tx = this.tx();
-    const now = this.nowIso();
-    tx.patch(this._inputRequests, id, {
-      state: 'answered',
-      answer,
-      answeredById: this._me()?.id,
-      answeredAt: now,
-    });
-    this.hideAttentionWhere(tx, (a) => a.inputRequestId === id);
-    return this.writeOk('answer', (s) => this.api.inputRequests.answer(s, id, answer), {
-      tx,
-      onResult: (r) => r && this.upsert(this._inputRequests, r),
-    });
-  }
-
-  async dismissInput(id: ID): Promise<boolean> {
-    if (!this.inputRequestById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._inputRequests, id, { state: 'dismissed' });
-    this.hideAttentionWhere(tx, (a) => a.inputRequestId === id);
-    return this.writeOk('dismiss request', (s) => this.api.inputRequests.dismiss(s, id), {
-      tx,
-      onResult: (r) => r && this.upsert(this._inputRequests, r),
-    });
-  }
-
-  /** Edit an open input request (question / options / assignee). Optimistic. */
-  async updateInputRequest(id: ID, patch: UpdateInputRequestInput): Promise<boolean> {
-    if (!this.inputRequestById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._inputRequests, id, patch);
-    return this.writeOk('update request', (s) => this.api.inputRequests.update(s, id, patch), {
-      tx,
-      onResult: (r) => r && this.upsert(this._inputRequests, r),
-    });
-  }
-
-  async deleteInputRequest(id: ID): Promise<boolean> {
-    if (!this.inputRequestById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._inputRequests, id);
-    this.hideAttentionWhere(tx, (a) => a.inputRequestId === id);
-    return this.ok('delete request', (s) => this.api.inputRequests.remove(s, id), { tx });
-  }
 
   private hideAttentionWhere(tx: ReturnType<TramaStore['tx']>, test: (a: AttentionItem) => boolean): void {
     for (const a of this._attention().filter(test)) tx.patch(this._attention, a.id, { state: 'dismissed' });
@@ -1030,7 +817,7 @@ export class TramaStore {
   // ─────────────────────────── issues ───────────────────────────
 
   async createIssue(input: CreateIssueInput): Promise<Issue | undefined> {
-    return this.write('create issue', (s) => this.api.issues.create(s, input), {
+    return this.write('create task', (s) => this.api.issues.create(s, input), {
       onResult: (i) => this.upsert(this._issues, i),
     });
   }
@@ -1055,7 +842,7 @@ export class TramaStore {
     if (!current) return undefined;
     const tx = this.tx();
     tx.patch(this._issues, id, this.issueOptimistic(current, patch));
-    return this.write('update issue', (s) => this.api.issues.update(s, id, patch), {
+    return this.write('update task', (s) => this.api.issues.update(s, id, patch), {
       tx,
       refetch: false,
       onResult: (i) => this.upsert(this._issues, i),
@@ -1090,14 +877,13 @@ export class TramaStore {
       if (patch.status !== undefined) local.status = patch.status;
       if (patch.priority !== undefined) local.priority = patch.priority;
       if (patch.assigneeId !== undefined) local.assigneeId = patch.assigneeId;
-      if (patch.teamId !== undefined) local.teamId = patch.teamId;
       if (patch.projectId !== undefined) local.projectId = patch.projectId;
       if (patch.addLabels?.length || patch.removeLabels?.length)
         local.labels = [...new Set([...current.labels, ...(patch.addLabels ?? [])])].filter((l) => !(patch.removeLabels ?? []).includes(l));
       tx.patch(this._issues, current.id, this.issueOptimistic(current, local));
     }
     return this.writeOk(
-      'update issues',
+      'update tasks',
       (s) => this.api.issues.bulkUpdate(s, targets.map((t) => t.id), patch),
       {
         tx,
@@ -1112,8 +898,7 @@ export class TramaStore {
     const tx = this.tx();
     tx.remove(this._issues, id);
     for (const a of this._artifacts().filter((x) => x.issueId === id && !x.projectId)) tx.remove(this._artifacts, a.id);
-    for (const link of this._customerRequests().filter((r) => r.issueId === id)) tx.remove(this._customerRequests, link.id);
-    return this.ok('delete issue', (s) => this.api.issues.remove(s, id), { tx });
+    return this.ok('delete task', (s) => this.api.issues.remove(s, id), { tx });
   }
 
   /**
@@ -1132,7 +917,6 @@ export class TramaStore {
     const tx = this.tx();
     for (const id of targets) tx.remove(this._issues, id);
     for (const a of this._artifacts().filter((x) => !!x.issueId && gone.has(x.issueId) && !x.projectId)) tx.remove(this._artifacts, a.id);
-    for (const link of this._customerRequests().filter((r) => !!r.issueId && gone.has(r.issueId))) tx.remove(this._customerRequests, link.id);
     for (const id of targets) this.stagedDeletes.add(id);
     const release = () => targets.forEach((id) => this.stagedDeletes.delete(id));
     let state: 'pending' | 'committed' | 'canceled' = 'pending';
@@ -1152,7 +936,7 @@ export class TramaStore {
       if (state === 'committed') return result!;
       state = 'committed';
       cleanup();
-      result = this.ok('delete issues', (s) => this.api.issues.bulkRemove(s, targets), { tx }).finally(release);
+      result = this.ok('delete tasks', (s) => this.api.issues.bulkRemove(s, targets), { tx }).finally(release);
       return result;
     };
     const cancel = () => {
@@ -1165,64 +949,7 @@ export class TramaStore {
     return { cancel, commit };
   }
 
-  // ─────────────────────────── customers ───────────────────────────
 
-  async createCustomer(input: CreateCustomerInput): Promise<Customer | undefined> {
-    return this.write('create customer', (s) => this.api.customers.create(s, input), {
-      onResult: (c) => this.upsert(this._customers, c),
-    });
-  }
-
-  async updateCustomer(id: ID, patch: UpdateCustomerInput): Promise<boolean> {
-    if (!this.customerById().has(id)) return false;
-    const tx = this.tx();
-    const optimistic: Record<string, unknown> = { ...patch, updatedAt: this.nowIso() };
-    if (patch.archived === true) optimistic['archivedAt'] = this.nowIso();
-    if (patch.archived === false) optimistic['archivedAt'] = null;
-    delete optimistic['archived'];
-    tx.patch(this._customers, id, optimistic);
-    return this.write('update customer', (s) => this.api.customers.update(s, id, patch), {
-      tx,
-      onResult: (c) => this.upsert(this._customers, c),
-    }).then((r) => !!r);
-  }
-
-  /** Deletes the customer and its links. Issues stay. */
-  async deleteCustomer(id: ID): Promise<boolean> {
-    if (!this.customerById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._customers, id);
-    for (const link of this._customerRequests().filter((r) => r.customerId === id)) tx.remove(this._customerRequests, link.id);
-    return this.ok('delete customer', (s) => this.api.customers.remove(s, id), { tx });
-  }
-
-  /** Records what a customer asked for, on one issue or one project. */
-  async createCustomerRequest(customerId: ID, input: CreateCustomerRequestInput): Promise<CustomerRequest | undefined> {
-    if (!this.customerById().has(customerId)) return undefined;
-    return this.write('add customer request', (s) => this.api.customers.createRequest(s, customerId, input), {
-      onResult: (r) => this.upsert(this._customerRequests, r),
-    });
-  }
-
-  /** Edits the body / source or toggles `important`; the change shows at once and rolls back on failure. */
-  async updateCustomerRequest(customerId: ID, requestId: ID, patch: UpdateCustomerRequestInput): Promise<boolean> {
-    const current = this._customerRequests().find((r) => r.id === requestId);
-    if (!current) return false;
-    const tx = this.tx();
-    tx.patch(this._customerRequests, requestId, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update customer request', (s) => this.api.customers.updateRequest(s, customerId, requestId, patch), {
-      tx,
-      onResult: (r) => this.upsert(this._customerRequests, r),
-    }).then((r) => !!r);
-  }
-
-  async deleteCustomerRequest(customerId: ID, requestId: ID): Promise<boolean> {
-    const tx = this.tx();
-    tx.remove(this._customerRequests, requestId);
-    return this.ok('delete customer request', (s) => this.api.customers.removeRequest(s, customerId, requestId), { tx });
-  }
-
-  // ─────────────────────────── milestones ───────────────────────────
 
   /** Waits for the server (`ms_…` id). `sortOrder` defaults to last in the project. */
   async createMilestone(input: CreateMilestoneInput): Promise<Milestone | undefined> {
@@ -1278,85 +1005,12 @@ export class TramaStore {
     for (const id of ids) tx.remove(this._milestones, id);
   }
 
-  // ─────────────────────────── releases ───────────────────────────
 
-  async createReleasePipeline(
-    input: CreateReleasePipelineInput,
-  ): Promise<ReleasePipeline | undefined> {
-    return this.write('create release pipeline', (s) => this.api.releasePipelines.create(s, input), {
-      onResult: (p) => this.upsert(this._releasePipelines, p),
-    });
-  }
 
-  async updateReleasePipeline(id: ID, patch: UpdateReleasePipelineInput): Promise<boolean> {
-    if (!this.releasePipelineById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._releasePipelines, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write(
-      'update release pipeline',
-      (s) => this.api.releasePipelines.update(s, id, patch),
-      { tx, onResult: (p) => this.upsert(this._releasePipelines, p) },
-    ).then((r) => !!r);
-  }
 
-  async deleteReleasePipeline(id: ID): Promise<boolean> {
-    if (!this.releasePipelineById().has(id)) return false;
-    const tx = this.tx();
-    this.dropReleases(
-      tx,
-      this._releases().filter((r) => r.pipelineId === id).map((r) => r.id),
-    );
-    tx.remove(this._releasePipelines, id);
-    return this.ok('delete release pipeline', (s) => this.api.releasePipelines.remove(s, id), {
-      tx,
-    });
-  }
 
-  async createRelease(input: CreateReleaseInput): Promise<Release | undefined> {
-    return this.write('create release', (s) => this.api.releases.create(s, input), {
-      onResult: (r) => this.upsert(this._releases, r),
-    });
-  }
 
-  async updateRelease(id: ID, patch: UpdateReleaseInput): Promise<boolean> {
-    if (!this.releaseById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._releases, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update release', (s) => this.api.releases.update(s, id, patch), {
-      tx,
-      onResult: (r) => this.upsert(this._releases, r),
-    }).then((r) => !!r);
-  }
 
-  async completeRelease(id: ID, input: CompleteReleaseInput = {}): Promise<Release | undefined> {
-    if (!this.releaseById().has(id)) return undefined;
-    return this.write('complete release', (s) => this.api.releases.complete(s, id, input), {
-      onResult: (r) => this.upsert(this._releases, r),
-    });
-  }
-
-  async deleteRelease(id: ID): Promise<boolean> {
-    if (!this.releaseById().has(id)) return false;
-    const tx = this.tx();
-    this.dropReleases(tx, [id]);
-    return this.ok('delete release', (s) => this.api.releases.remove(s, id), { tx });
-  }
-
-  /** Assign or clear `issue.releaseId`. */
-  async setIssueRelease(issueId: ID, releaseId: ID | null): Promise<boolean> {
-    return this.updateIssue(issueId, { releaseId });
-  }
-
-  private dropReleases(tx: ReturnType<TramaStore['tx']>, ids: readonly ID[]): void {
-    if (!ids.length) return;
-    const gone = new Set(ids);
-    for (const i of this._issues().filter((x) => x.releaseId && gone.has(x.releaseId))) {
-      tx.patch(this._issues, i.id, { releaseId: null });
-    }
-    for (const id of ids) tx.remove(this._releases, id);
-  }
-
-  // ─────────────────────────── artifacts ───────────────────────────
 
   /** Attach an artifact to a project itself (a link, a spec, a design...). Waits for the server. */
   async attachProjectArtifact(projectId: ID, input: CreateOwnedArtifactInput): Promise<Artifact | undefined> {
@@ -1391,66 +1045,9 @@ export class TramaStore {
     return this.ok('remove artifact', (s) => this.api.artifacts.remove(s, id), { tx });
   }
 
-  // ─────────────────────────── decisions ───────────────────────────
 
-  /** Propose (default) or directly record (`status: 'accepted'`) a decision. */
-  async proposeDecision(input: CreateDecisionInput): Promise<Decision | undefined> {
-    return this.write('propose decision', (s) => this.api.decisions.create(s, input), {
-      onResult: (d) => this.upsert(this._decisions, d),
-    });
-  }
 
-  async updateDecision(id: ID, patch: UpdateDecisionInput): Promise<boolean> {
-    if (!this.decisionById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._decisions, id, { ...patch, updatedAt: this.nowIso() });
-    return this.write('update decision', (s) => this.api.decisions.update(s, id, patch), {
-      tx,
-      onResult: (d) => this.upsert(this._decisions, d),
-    }).then((r) => !!r);
-  }
 
-  async acceptDecision(id: ID): Promise<boolean> {
-    if (!this.decisionById().has(id)) return false;
-    const now = this.nowIso();
-    const tx = this.tx();
-    tx.patch(this._decisions, id, { status: 'accepted', decidedById: this._me()?.id, decidedAt: now, updatedAt: now });
-    this.hideAttentionWhere(tx, (a) => a.decisionId === id);
-    return this.writeOk('accept decision', (s) => this.api.decisions.accept(s, id), {
-      tx,
-      onResult: (d) => d && this.upsert(this._decisions, d),
-    });
-  }
-
-  async rejectDecision(id: ID): Promise<boolean> {
-    if (!this.decisionById().has(id)) return false;
-    const now = this.nowIso();
-    const tx = this.tx();
-    tx.patch(this._decisions, id, { status: 'rejected', decidedById: this._me()?.id, decidedAt: now, updatedAt: now });
-    this.hideAttentionWhere(tx, (a) => a.decisionId === id);
-    return this.writeOk('reject decision', (s) => this.api.decisions.reject(s, id), {
-      tx,
-      onResult: (d) => d && this.upsert(this._decisions, d),
-    });
-  }
-
-  /** Mark `id` superseded by decision `byId`. */
-  async supersedeDecision(id: ID, byId: ID): Promise<boolean> {
-    if (!this.decisionById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._decisions, id, { status: 'superseded', supersededById: byId, updatedAt: this.nowIso() });
-    return this.writeOk('supersede decision', (s) => this.api.decisions.supersede(s, id, byId), {
-      tx,
-      onResult: (d) => d && this.upsert(this._decisions, d),
-    });
-  }
-
-  async deleteDecision(id: ID): Promise<boolean> {
-    if (!this.decisionById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._decisions, id);
-    return this.ok('delete decision', (s) => this.api.decisions.remove(s, id), { tx });
-  }
 
   // ─────────────────────────── comments ───────────────────────────
 
@@ -1570,7 +1167,7 @@ export class TramaStore {
 
   // ─────────────────────────── attention ───────────────────────────
 
-  /** `id` is `AttentionItem.id` (e.g. `input_requested:ir_1`). */
+  /** `id` is `AttentionItem.id` (e.g. `review_requested:art_1`). */
   async dismissAttention(id: string): Promise<boolean> {
     const tx = this.tx();
     tx.patch(this._attention, id, { state: 'dismissed' });
@@ -1640,53 +1237,10 @@ export class TramaStore {
     return this.ok('delete view', (s) => this.api.views.remove(s, id), { tx });
   }
 
-  // ─────────────────────────── admin: teams, repositories ───────────────────────────
 
-  async createTeam(input: CreateTeamInput): Promise<Team | undefined> {
-    return this.write('create team', (s) => this.api.teams.create(s, input), {
-      onResult: (t) => this.upsert(this._teams, t),
-    });
-  }
 
-  async updateTeam(id: ID, patch: UpdateTeamInput): Promise<boolean> {
-    if (!this.teamById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._teams, id, patch);
-    return this.write('update team', (s) => this.api.teams.update(s, id, patch), {
-      tx,
-      onResult: (t) => this.upsert(this._teams, t),
-    }).then((r) => !!r);
-  }
 
-  async deleteTeam(id: ID): Promise<boolean> {
-    if (!this.teamById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._teams, id);
-    return this.ok('delete team', (s) => this.api.teams.remove(s, id), { tx });
-  }
 
-  async createRepository(input: CreateRepositoryInput): Promise<Repository | undefined> {
-    return this.write('add repository', (s) => this.api.repositories.create(s, input), {
-      onResult: (r) => this.upsert(this._repositories, r),
-    });
-  }
-
-  async updateRepository(id: ID, patch: UpdateRepositoryInput): Promise<boolean> {
-    if (!this.repositoryById().has(id)) return false;
-    const tx = this.tx();
-    tx.patch(this._repositories, id, patch);
-    return this.write('update repository', (s) => this.api.repositories.update(s, id, patch), {
-      tx,
-      onResult: (r) => this.upsert(this._repositories, r),
-    }).then((r) => !!r);
-  }
-
-  async deleteRepository(id: ID): Promise<boolean> {
-    if (!this.repositoryById().has(id)) return false;
-    const tx = this.tx();
-    tx.remove(this._repositories, id);
-    return this.ok('remove repository', (s) => this.api.repositories.remove(s, id), { tx });
-  }
 
   // ─────────────────────────── projects ───────────────────────────
 
@@ -1711,7 +1265,6 @@ export class TramaStore {
     const tx = this.tx();
     tx.remove(this._projects, id);
     for (const a of this._artifacts().filter((x) => x.projectId === id && !x.issueId)) tx.remove(this._artifacts, a.id);
-    for (const r of this._customerRequests().filter((x) => x.projectId === id)) tx.remove(this._customerRequests, r.id);
     this.dropProjectData(id);
     // its milestones go with it
     this.dropMilestones(tx, this._milestones().filter((m) => m.projectId === id).map((m) => m.id));
@@ -2182,30 +1735,6 @@ export class TramaStore {
     }).then((r) => !!r);
   }
 
-  /** Add a customer tier (admin). */
-  async createCustomerTier(input: CreateCustomerTierInput): Promise<boolean> {
-    return this.write('add customer tier', (s) => this.api.workspaces.createCustomerTier(s, input), {
-      onResult: (ws) => this.applyWorkspace(ws),
-    }).then((r) => !!r);
-  }
-
-  /** Rename or recolor a customer tier (admin). */
-  async updateCustomerTier(id: ID, input: UpdateCustomerTierInput): Promise<boolean> {
-    return this.write('update customer tier', (s) => this.api.workspaces.updateCustomerTier(s, id, input), {
-      onResult: (ws) => this.applyWorkspace(ws),
-    }).then((r) => !!r);
-  }
-
-  /** Remove a customer tier; customers that had it are left without one (admin). */
-  async deleteCustomerTier(id: ID): Promise<boolean> {
-    const tx = this.tx();
-    for (const c of this._customers().filter((x) => x.tierId === id)) tx.patch(this._customers, c.id, { tierId: undefined });
-    return this.write('remove customer tier', (s) => this.api.workspaces.deleteCustomerTier(s, id), {
-      tx,
-      onResult: (ws) => this.applyWorkspace(ws),
-    }).then((r) => !!r);
-  }
-
   // ───── outgoing webhooks (custom integrations); loaded on demand, admin only ─────
 
   private readonly _outgoingWebhooks = signal<readonly OutgoingWebhook[]>([]);
@@ -2334,7 +1863,7 @@ export class TramaStore {
   // integration details (admin; not part of the snapshot) ---------------------
 
   private readonly _integrationDetails = signal<readonly IntegrationDetail[]>([]);
-  /** `GET /integrations` (webhookUrl, linked repository ids, lastWebhookAt). Loaded by `loadIntegrationDetails()`. */
+  /** `GET /integrations` (webhookUrl, lastWebhookAt). Loaded by `loadIntegrationDetails()`. */
   readonly integrationDetails = this._integrationDetails.asReadonly();
 
   /** Fetch integration details (admin only; silently empty otherwise). */
@@ -2367,33 +1896,5 @@ export class TramaStore {
       onResult: (r) => this.upsertIntegration(r.connection),
     });
   }
-
-  /** Repositories visible to a connection's token (read; rejects with ApiError). */
-  async remoteRepositories(id: ID, page = 1, perPage = 30): Promise<RemoteRepositoryPage> {
-    return this.api.integrations.remoteRepositories(this.requireSlug(), id, page, perPage);
-  }
-
-  /** Link a remote repository: creates (or adopts) the repository and attaches it to the connection. */
-  async linkRepository(id: ID, input: LinkRepositoryInput): Promise<Repository | undefined> {
-    return this.write('link repository', (s) => this.api.integrations.linkRepository(s, id, input), {
-      onResult: (r) => {
-        this.upsert(this._repositories, r);
-        this._integrationDetails.update((list) =>
-          list.map((c) => (c.id === id && !c.repositoryIds.includes(r.id) ? { ...c, repositoryIds: [...c.repositoryIds, r.id] } : c)),
-        );
-      },
-    });
-  }
-
-  /** Detach a repository from a connection (the repository stays). Optimistic. */
-  async unlinkRepository(id: ID, repositoryId: ID): Promise<boolean> {
-    const prev = this._integrationDetails();
-    this._integrationDetails.update((list) =>
-      list.map((c) => (c.id === id ? { ...c, repositoryIds: c.repositoryIds.filter((r) => r !== repositoryId) } : c)),
-    );
-    return this.ok('unlink repository', (s) => this.api.integrations.unlinkRepository(s, id, repositoryId), {
-      tx: { rollback: () => this._integrationDetails.set(prev) },
-    });
-  }
-
 }
+

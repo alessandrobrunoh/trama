@@ -252,7 +252,7 @@ export function timeAgo(time: number): string {
             ? ai.context().kind === 'page'
               ? ai.status()?.assistantTools?.enabled
                 ? 'Shares the page name. The assistant can look up and change records in this workspace for you, within your permissions and usage caps.'
-                : 'Shares the page name and your open issues (titles only).'
+                : 'Shares the page name and your open tasks (titles only).'
               : 'Shares this item’s details with the AI provider.'
             : 'No current page data will be added.'
         }}

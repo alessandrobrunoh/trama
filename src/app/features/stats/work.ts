@@ -9,7 +9,6 @@ export interface WorkRec {
   kind: IssueKind;
   priority: Priority;
   status: IssueStatus;
-  teamId?: string;
   assigneeId?: string;
   /** Story points; undefined = not estimated. */
   estimate?: number;
@@ -63,7 +62,6 @@ export function buildWork(store: TramaStore, issues: readonly Issue[]): WorkData
       kind: i.kind,
       priority: i.priority,
       status: i.status,
-      teamId: i.teamId,
       assigneeId: i.assigneeId,
       estimate: typeof i.estimate === 'number' && Number.isFinite(i.estimate) ? i.estimate : undefined,
       created,

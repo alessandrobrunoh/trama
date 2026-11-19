@@ -34,13 +34,6 @@ export const ARTIFACT_COLOR: Record<string, string> = {
   published: 'var(--status-shipped)',
 };
 
-export const DECISION_COLOR = {
-  proposed: 'var(--status-needs-input)',
-  accepted: 'var(--status-shipped)',
-  superseded: 'var(--status-draft)',
-  rejected: 'var(--status-blocked)',
-} as const;
-
 export const KIND_FALLBACK: Record<IssueKind, string> = {
   incident: 'var(--status-blocked)',
   security: 'var(--status-needs-input)',

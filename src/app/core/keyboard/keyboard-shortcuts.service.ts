@@ -85,7 +85,7 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
 const INTERACTIVE = 'button, a[href], [role="button"], [role="menuitem"], [role="option"], summary, [role="tab"]';
 
 /** Detail routes where Esc goes back to the list: /:slug/<area>/:id. */
-const ESC_UP = /^\/([^/]+)\/(issues|decisions|projects|repositories|teams|views)\/[^/?#]+/;
+const ESC_UP = /^\/([^/]+)\/(tasks|issues|projects|views)\/[^/?#]+/;
 
 @Injectable({ providedIn: 'root' })
 export class KeyboardShortcuts {
@@ -150,31 +150,16 @@ export class KeyboardShortcuts {
       case 'inbox':
       case 'my-work':
         return { kind: 'issue', defaults: {} };
+      case 'tasks':
       case 'issues':
-        return { kind: 'issue', defaults: key ? {} : this.teamDefault() };
-      case 'decisions':
-        return { kind: 'decision', defaults: {} };
+        return { kind: 'issue', defaults: {} };
       case 'views':
         return { kind: 'view', defaults: {} };
-      case 'teams':
-        return key
-          ? { kind: 'issue', defaults: { teamId: this.trama.getTeam(key)?.id } }
-          : { kind: 'team', defaults: {} };
       case 'projects':
         return key ? { kind: 'issue', defaults: { projectId: key } } : { kind: 'project', defaults: {} };
-      case 'repositories':
-        return key
-          ? { kind: 'issue', defaults: {} }
-          : { kind: 'repository', defaults: {} };
       default:
         return { kind: 'issue', defaults: {} };
     }
-  }
-
-  /** `?team=` of the current list → prefill the team of new items. */
-  private teamDefault(): Record<string, unknown> {
-    const team = new URLSearchParams(this.router.url.split('?')[1] ?? '').get('team');
-    return team ? { teamId: team, ownerTeamId: team } : {};
   }
 
   private goTo(segment: string): void {

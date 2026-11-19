@@ -7,7 +7,6 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
@@ -26,7 +25,7 @@ import { UiStore } from '../../../core/stores/ui.store';
 import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT } from './section-kit';
 
-const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access & automation'];
+const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
 
 /**
  * Workspace roles. Each role has its own capabilities and work grants. Owner cannot be deleted
@@ -35,7 +34,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access 
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -209,35 +208,8 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Organization', 'Access 
       />
       <app-settings-row
         label="Agents act as members"
-        description="An agent uses the historical member permissions and can never accept or reject a decision."
+        description="An agent uses the historical member permissions."
       />
-    </app-settings-group>
-
-    <app-settings-group
-      title="Team roles"
-      description="On top of the workspace role, each team has its own roles and a policy."
-    >
-      <app-settings-row
-        label="Team member"
-        description="Listed on the team. Sees the team's attention items and can be assigned its work."
-      />
-      <app-settings-row
-        label="Team lead"
-        description="A member who can also edit the team itself without holding a workspace role that manages teams."
-      />
-      <div class="bg-muted/30 flex items-center justify-between gap-3 px-4 py-2 text-xs">
-        <span class="text-muted-foreground"
-          >Set leads and the edit policy in each team's Members tab.</span
-        >
-        <a
-          hlmBtn
-          variant="outline"
-          size="sm"
-          class="h-7 shrink-0"
-          [routerLink]="['/', slug(), 'settings', 'teams']"
-          >Teams</a
-        >
-      </div>
     </app-settings-group>
   `,
 })
@@ -252,7 +224,6 @@ export class RolesSection {
   protected readonly selectedId = signal<string | null>(null);
   protected readonly grantDraft = signal<MemberAccess>({ ...emptyMemberAccess(), grants: [] });
   protected readonly isOwner = computed(() => this.store.can('owner'));
-  protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly roles = computed(() => this.store.settings().roles);
   protected readonly selected = computed(
     () => this.roles().find((role) => role.id === this.selectedId()) ?? this.roles()[0],

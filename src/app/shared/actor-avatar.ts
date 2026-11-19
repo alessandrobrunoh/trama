@@ -13,10 +13,9 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
 }
 
 /**
- * Avatar for a user, agent or team. The shapes differ on purpose:
+ * Avatar for a user or agent. The shapes differ on purpose:
  *   user  → round, initials on a hue-derived tint
  *   agent → rounded SQUARE with the provider mark + a small "bot" corner pip (never mistaken for a person)
- *   team  → rounded square in the team colour with the team key
  *   system→ Trama symbol
  *   <app-actor-avatar [actor]="ws.accountable" [size]="20" />   (ActorRef or ResolvedActor)
  */
@@ -57,17 +56,6 @@ function isResolved(a: ActorRef | ResolvedActor): a is ResolvedActor {
           class="bg-primary ring-background absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full ring-2"
           aria-hidden="true"
         ></span>
-      }
-      @case ('team') {
-        <span
-          class="inline-flex items-center justify-center rounded-[5px] font-mono font-semibold text-white"
-          [style.width.px]="size()"
-          [style.height.px]="size()"
-          [style.font-size.px]="fontSize() - 1"
-          [style.background]="r.color || 'var(--tone-slate)'"
-        >
-          {{ (r.key || r.name).slice(0, 2) }}
-        </span>
       }
       @default {
         <span

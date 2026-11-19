@@ -3,7 +3,7 @@ import { ChangeDetectionStrategy, Component, computed, input, output } from '@an
 export interface BarRow {
   key?: string;
   label: string;
-  /** Small mono suffix, e.g. a team key. */
+  /** Small mono suffix, e.g. a task key. */
   hint?: string;
   value: number;
   /** Text shown at the bar tip; defaults to the value. */

@@ -188,7 +188,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
             <p class="text-muted-foreground text-[12px]">Keys, code and identifiers</p>
             <p class="mt-3 font-mono text-5xl tracking-tight">Geist Mono</p>
             <p class="text-muted-foreground mt-4 text-[14px] leading-relaxed">
-              For issue keys like <span class="text-foreground font-mono">AUTH-12</span>, shortcuts
+              For task keys like <span class="text-foreground font-mono">AUTH-12</span>, shortcuts
               and code samples.
             </p>
           </div>
@@ -278,7 +278,6 @@ export class BrandPage {
     { name: 'Graphite', hex: '#1B1C1F', role: 'Body text on light' },
     { name: 'Mist', hex: '#F4F4F6', role: 'Light surfaces and sidebar' },
     { name: 'Violet', hex: '#7C5CC4', role: 'Secondary accent' },
-    { name: 'Decision Amber', hex: '#B7791F', role: 'Decisions' },
   ];
 
   protected readonly names = [

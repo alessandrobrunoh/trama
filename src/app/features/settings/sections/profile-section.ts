@@ -33,7 +33,7 @@ import { SECTION_KIT } from './section-kit';
         </div>
       </div>
 
-      <app-settings-group title="Account" description="Your name and email come from sign-up and identify you on comments, decisions and assignments.">
+      <app-settings-group title="Account" description="Your name and email come from sign-up and identify you on comments and assignments.">
         <app-settings-row label="Full name">
           <span class="text-[13px]">{{ user()?.name }}</span>
         </app-settings-row>

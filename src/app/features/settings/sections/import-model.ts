@@ -31,7 +31,7 @@ export interface MappingDraft {
 
 export function draftFromPreview(p: ImportPreview): MappingDraft {
   return {
-    teams: Object.fromEntries(p.teams.map((t) => [t.id, encodeTarget(t.suggested)])),
+    teams: Object.fromEntries(p.teams.map((t) => [t.id, 'skip'])),
     projects: Object.fromEntries(p.projects.map((x) => [x.id, encodeTarget(x.suggested)])),
     labels: Object.fromEntries(p.labels.map((l) => [l.id, encodeTarget(l.suggested)])),
     users: Object.fromEntries(p.users.map((u) => [u.id, u.suggestedUserId ?? ''])),

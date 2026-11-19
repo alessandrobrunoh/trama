@@ -309,7 +309,6 @@ export class DraftSuggestions {
       priority: 'Priority',
       kind: 'Type',
       estimate: 'Estimate',
-      teamId: 'Team',
       assigneeId: 'Assignee',
     }[field];
   }
@@ -385,10 +384,6 @@ export class DraftSuggestions {
 
   private issueOptions(): AiIssueDraftOptions {
     const query = `${this.title()}\n${this.description()}`;
-    const teams = this.store
-      .teams()
-      .slice(0, 50)
-      .map((team) => ({ id: team.id, label: `${team.name} (${team.key})` }));
     const assignees = this.store
       .users()
       .slice(0, 100)
@@ -427,7 +422,6 @@ export class DraftSuggestions {
         this.store.estimateScale() === 'none'
           ? []
           : estimateOptions(this.store.estimateScale()).map((option) => option.value),
-      teams,
       assignees,
       similar,
     };

@@ -28,18 +28,16 @@ export const SLOW_FACTOR = 2;
 export interface WorkFilter {
   /** Resolved user id; null = everyone. */
   person: string | null;
-  team: string | null;
 }
 
 export interface Lookup {
   user(id: string | undefined): string;
-  team(id: string | undefined): string;
 }
 
 // ───────────────────────────── basics ─────────────────────────────
 
 export function filterWork(recs: readonly WorkRec[], f: WorkFilter): WorkRec[] {
-  return recs.filter((r) => (!f.person || r.assigneeId === f.person) && (!f.team || r.teamId === f.team));
+  return recs.filter((r) => !f.person || r.assigneeId === f.person);
 }
 
 export function quantile(sorted: readonly number[], q: number): number {
@@ -203,7 +201,7 @@ export interface EstimateInsights {
   slow: SlowRow[];
   dragging: DragRow[];
   draggingSkipped: number;
-  unestimated: { share?: number; missing: number; total: number; byTeam: BarRow[]; byPerson: BarRow[]; nudge?: string };
+  unestimated: { share?: number; missing: number; total: number; byPerson: BarRow[]; nudge?: string };
   velocity: {
     labels: string[];
     titles: string[];
@@ -342,16 +340,16 @@ export function estimateInsights(
         hint: `${g.missing}/${g.total}`,
         value: g.pct,
         valueLabel: `${g.pct}%`,
-        detail: `${name(g.k || undefined)}: ${g.missing} of ${g.total} completed issues had no estimate`,
+        detail: `${name(g.k || undefined)}: ${g.missing} of ${g.total} completed tasks had no estimate`,
         color: g.pct >= 50 ? 'var(--chart-3)' : 'var(--chart-1)',
       }));
   };
   const worstPerson = group((r) => r.assigneeId, (id) => look.user(id))[0];
   const nudge =
     share !== undefined && share >= 0.25
-      ? `${missingRecs.length} of ${doneCur.length} completed issues had no estimate, so they cannot be checked for accuracy.${
+      ? `${missingRecs.length} of ${doneCur.length} completed tasks had no estimate, so they cannot be checked for accuracy.${
           worstPerson && worstPerson.value >= 50 ? ` Most gaps: ${worstPerson.label} (${worstPerson.valueLabel}).` : ''
-        } Estimate issues before moving them to In progress.`
+        } Estimate tasks before moving them to In progress.`
       : undefined;
 
   // ── weekly series
@@ -393,7 +391,7 @@ export function estimateInsights(
     count: sl(extCount),
     avgPoints: idx.map((i) => avg(extPoints, i)),
     avgCount: idx.map((i) => avg(extCount, i)),
-    notes: idx.map((i) => `${extCount[i]} issue${extCount[i] === 1 ? '' : 's'} completed`),
+    notes: idx.map((i) => `${extCount[i]} task${extCount[i] === 1 ? '' : 's'} completed`),
     unestimated: unestimatedInWeeks,
   };
   const lead = {
@@ -401,7 +399,7 @@ export function estimateInsights(
     titles: axis.titles,
     wait: idx.map((i) => median(extWait[i]) ?? null),
     work: idx.map((i) => median(extWork[i]) ?? null),
-    notes: idx.map((i) => (extWork[i].length ? `${extWork[i].length} issue${extWork[i].length === 1 ? '' : 's'} with start and finish dates` : 'no completed issues with both dates')),
+    notes: idx.map((i) => (extWork[i].length ? `${extWork[i].length} task${extWork[i].length === 1 ? '' : 's'} with start and finish dates` : 'no completed tasks with both dates')),
     medWait: undefined as number | undefined,
     medWork: undefined as number | undefined,
     medLead: undefined as number | undefined,
@@ -449,7 +447,7 @@ export function estimateInsights(
       label: 'Median cycle time',
       value: cycNow === undefined ? '—' : formatDuration(cycNow),
       delta: cycNow !== undefined && cycPrev !== undefined ? pctDelta(cycNow, cycPrev, 'down', against) : undefined,
-      hint: cycNow === undefined ? 'no completed issues with a start date' : `${withCycle.length} issue${withCycle.length === 1 ? '' : 's'}, started to done`,
+      hint: cycNow === undefined ? 'no completed tasks with a start date' : `${withCycle.length} task${withCycle.length === 1 ? '' : 's'}, started to done`,
       spark: spark(lead.work),
       sparkColor: 'var(--chart-1)',
     },
@@ -457,7 +455,7 @@ export function estimateInsights(
       label: 'Estimate accuracy',
       value: accNow ? `${accNow.pct}%` : '—',
       delta: accNow && accPrev ? absDelta(accNow.pct - accPrev.pct, 'up', `${against}: ${accPrev.pct}%`) : undefined,
-      hint: accNow ? `${accNow.n} issues within ½×–2× of typical` : 'needs estimated issues with 3+ finished per size',
+      hint: accNow ? `${accNow.n} tasks within ½×–2× of typical` : 'needs estimated tasks with 3+ finished per size',
       spark: [],
       sparkColor: 'var(--chart-2)',
     },
@@ -465,7 +463,7 @@ export function estimateInsights(
       label: 'Throughput (pts/week)',
       value: String(+ptsNow.toFixed(1)),
       delta: ptsPrev !== undefined ? pctDelta(ptsNow, ptsPrev, 'up', against) : undefined,
-      hint: `${doneCur.length} issue${doneCur.length === 1 ? '' : 's'} done${missingRecs.length ? `, ${missingRecs.length} unestimated` : ''}`,
+      hint: `${doneCur.length} task${doneCur.length === 1 ? '' : 's'} done${missingRecs.length ? `, ${missingRecs.length} unestimated` : ''}`,
       spark: velocity.points,
       sparkColor: 'var(--chart-2)',
     },
@@ -497,7 +495,6 @@ export function estimateInsights(
       share,
       missing: missingRecs.length,
       total: doneCur.length,
-      byTeam: group((r) => r.teamId, (id) => look.team(id)),
       byPerson: group((r) => r.assigneeId, (id) => look.user(id)),
       nudge,
     },
@@ -652,14 +649,13 @@ export function throughput(
   recs: readonly WorkRec[],
   period: Period,
   now: number,
-  by: 'kind' | 'team',
   groupLabel: (key: string) => string,
   palette: readonly string[],
   otherColor: string,
 ): ThroughputBlock {
   const ax = weekAxis(now, weeksFor(period, recs, now));
   const done = recs.filter(isDone);
-  const keyOf = (r: WorkRec): string => (by === 'kind' ? (r.kind as IssueKind) : (r.teamId ?? 'none'));
+  const keyOf = (r: WorkRec): string => r.kind as IssueKind;
   const inRange = done.filter((r) => bucketOf(r.completed!, ax) >= 0);
   const totals = new Map<string, number>();
   for (const r of inRange) totals.set(keyOf(r), (totals.get(keyOf(r)) ?? 0) + 1);
@@ -723,12 +719,12 @@ function milestoneRow(m: MilestoneRec, issues: readonly WorkRec[], rate: number,
   const remaining = live.length - done.length;
   const projected = remaining > 0 && rate > 0 ? now + (remaining / rate) * DAY : undefined;
   const base = { id: m.id, name: m.name, projectId: m.projectId, projectName: m.projectName, target: m.target, total, done: doneSize, pct, basis, projected };
-  if (!live.length) return { ...base, state: 'empty', detail: 'No issues in this milestone yet.' };
-  if (remaining === 0) return { ...base, state: 'done', detail: 'All issues are done.' };
-  const rateText = rate > 0 ? `${+(rate * 7).toFixed(1)} issues/week lately` : 'no issues completed recently';
-  if (m.target !== undefined && now > m.target) return { ...base, state: 'overdue', detail: `Target date passed with ${remaining} issue${remaining === 1 ? '' : 's'} open.` };
+  if (!live.length) return { ...base, state: 'empty', detail: 'No tasks in this milestone yet.' };
+  if (remaining === 0) return { ...base, state: 'done', detail: 'All tasks are done.' };
+  const rateText = rate > 0 ? `${+(rate * 7).toFixed(1)} tasks/week lately` : 'no tasks completed recently';
+  if (m.target !== undefined && now > m.target) return { ...base, state: 'overdue', detail: `Target date passed with ${remaining} task${remaining === 1 ? '' : 's'} open.` };
   if (m.target === undefined)
-    return { ...base, state: 'no_date', detail: projected ? `At ${rateText}, ${remaining} open issue${remaining === 1 ? '' : 's'} take until ${format(projected, 'MMM d')}.` : `No target date; ${rateText}.` };
+    return { ...base, state: 'no_date', detail: projected ? `At ${rateText}, ${remaining} open task${remaining === 1 ? '' : 's'} take until ${format(projected, 'MMM d')}.` : `No target date; ${rateText}.` };
   if (projected === undefined) return { ...base, state: 'at_risk', detail: `${remaining} open and ${rateText}.` };
   if (projected > m.target) return { ...base, state: 'at_risk', detail: `At ${rateText}, projected ${format(projected, 'MMM d')}, after the ${format(m.target, 'MMM d')} target.` };
   return { ...base, state: 'on_track', detail: `At ${rateText}, projected ${format(projected, 'MMM d')}, before the ${format(m.target, 'MMM d')} target.` };

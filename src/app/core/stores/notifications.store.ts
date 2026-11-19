@@ -21,8 +21,6 @@ const PAGE = 100;
 
 /** Notification kinds that the attention queue already surfaces. */
 const NEEDS_YOU_KINDS: ReadonlySet<NotificationRecordKind> = new Set([
-  'input_requested',
-  'decision_proposed',
   'review_requested',
   'ci_failed',
 ]);

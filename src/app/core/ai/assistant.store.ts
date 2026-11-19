@@ -109,23 +109,17 @@ export class AssistantStore {
       this.router.parseUrl(this.url()).root.children['primary']?.segments.map((s) => s.path) ?? [];
     const page = parts[1] ?? 'overview';
     const id = parts[2];
-    if (id && page === 'issues')
+    if (id && (page === 'tasks' || page === 'issues'))
       return {
         kind: 'issue',
         id,
         label: this.store.issues().find((i) => i.key === id || i.id === id)?.key ?? id,
       };
-    if (id && page === 'repositories')
+    if (id && page === 'projects')
       return {
         kind: 'project',
         id,
-        label: this.store.repositories().find((p) => p.id === id)?.fullName ?? 'Repository',
-      };
-    if (id && page === 'decisions')
-      return {
-        kind: 'decision',
-        id,
-        label: this.store.decisions().find((d) => d.key === id || d.id === id)?.title ?? id,
+        label: this.store.getProject(id)?.name ?? id,
       };
     return {
       kind: 'page',

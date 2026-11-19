@@ -31,7 +31,6 @@ import {
   LucideTag,
   LucideTrash2,
   LucideUserRound,
-  LucideUsers,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -49,23 +48,18 @@ import { Kbd } from '../../shared/kbd';
 import { RelativeTimePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
 import { IssueMilestoneProp } from '../milestones/milestone-chips';
-import { IssueReleaseProp } from '../releases/issue-release-prop';
 import { issueFacts } from '../stats/stats-model';
 import { InlineText } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
-import { projectOptions, teamOptions } from '../../shared/picker-options';
+import { projectOptions } from '../../shared/picker-options';
 import { IssueActions, type IssuePromptField } from './issue-actions';
 import { IssueExternalRef } from './issue-external-ref';
 import { IssueArtifacts } from './issue-artifacts';
 import { IssueActivity, IssueDescription, IssueTitle } from './issue-detail-parts';
 import { IssueGoal } from './issue-goal';
-import { IssueHumanInput } from './issue-human-input';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { AiIssueSection } from '../ai-actions/ai-issue-cards';
-import { issueWorkState } from '../customers/customer-model';
-import { CustomerRequests } from '../customers/customer-requests';
-import { DemandSummary } from '../customers/demand-summary';
 import { IssueLunagest } from './issue-lunagest';
 import { IssueTimeCard } from './issue-sidebar';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
@@ -89,7 +83,6 @@ import { LabelPicker } from '../../shared/label-picker';
     RelativeTimePipe,
     PropertyRow,
     IssueMilestoneProp,
-    IssueReleaseProp,
     IssueExternalRef,
     Picker,
     InlineText,
@@ -97,12 +90,9 @@ import { LabelPicker } from '../../shared/label-picker';
     IssueTitle,
     IssueDescription,
     IssueGoal,
-    IssueHumanInput,
     IssueArtifacts,
     IssueActivity,
     IssueCommandDialog,
-    CustomerRequests,
-    DemandSummary,
     IssueTimeCard,
     IssueLunagest,
     AiIssueSection,
@@ -120,8 +110,8 @@ import { LabelPicker } from '../../shared/label-picker';
             variant="ghost"
             size="icon-sm"
             class="text-muted-foreground"
-            aria-label="Previous issue"
-            hlmTooltip="Previous issue · K"
+            aria-label="Previous task"
+            hlmTooltip="Previous task · K"
             [disabled]="!nav().prev"
             (click)="go(nav().prev)"
           >
@@ -132,8 +122,8 @@ import { LabelPicker } from '../../shared/label-picker';
             variant="ghost"
             size="icon-sm"
             class="text-muted-foreground"
-            aria-label="Next issue"
-            hlmTooltip="Next issue · J"
+            aria-label="Next task"
+            hlmTooltip="Next task · J"
             [disabled]="!nav().next"
             (click)="go(nav().next)"
           >
@@ -157,7 +147,7 @@ import { LabelPicker } from '../../shared/label-picker';
           size="icon-sm"
           class="text-muted-foreground"
           [hlmDropdownMenuTrigger]="more"
-          aria-label="Issue actions"
+          aria-label="Task actions"
           hlmTooltip="More actions"
         >
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
@@ -223,7 +213,7 @@ import { LabelPicker } from '../../shared/label-picker';
               @if (store.allowed('deleteIssues')) {
                 <hlm-dropdown-menu-separator />
                 <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
-                  <svg [lucideIcon]="trash" [size]="14"></svg> Delete issue…
+                  <svg [lucideIcon]="trash" [size]="14"></svg> Delete task…
                   <hlm-dropdown-menu-shortcut
                     ><app-kbd keys="mod+backspace"
                   /></hlm-dropdown-menu-shortcut>
@@ -298,11 +288,11 @@ import { LabelPicker } from '../../shared/label-picker';
             <app-issue-goal [issue]="i" [canEdit]="canEdit()" />
             @if (parentIssue() || subIssues().length || store.allowed('createIssues')) {
               <section
-                aria-labelledby="issue-sub-issues-heading"
+                aria-labelledby="issue-subtasks-heading"
                 class="border-border min-w-0 rounded-lg border px-4 py-3"
               >
                 <div class="flex flex-wrap items-start justify-between gap-3">
-                  <h2 id="issue-sub-issues-heading" class="text-sm font-semibold">Sub-issues</h2>
+                  <h2 id="issue-subtasks-heading" class="text-sm font-semibold">Subtasks</h2>
                   @if (store.allowed('createIssues')) {
                     <button
                       hlmBtn
@@ -310,21 +300,21 @@ import { LabelPicker } from '../../shared/label-picker';
                       variant="outline"
                       size="sm"
                       class="shrink-0"
-                      [attr.aria-label]="'Create sub-issue of ' + i.key"
+                      [attr.aria-label]="'Create subtask of ' + i.key"
                       (click)="ui.openCreate('issue', { parentId: i.id })"
                     >
-                      Add sub-issue
+                      Add subtask
                     </button>
                   }
                 </div>
                 @if (parentIssue(); as parent) {
                   <div class="mt-3 min-w-0">
-                    <h3 class="text-muted-foreground mb-1 text-xs font-medium">Parent issue</h3>
+                    <h3 class="text-muted-foreground mb-1 text-xs font-medium">Parent task</h3>
                     <app-entity-chip class="max-w-full" type="issue" [ref]="parent.id" />
                   </div>
                 }
                 <div class="mt-3 min-w-0">
-                  <h3 class="text-muted-foreground mb-1 text-xs font-medium">Direct sub-issues</h3>
+                  <h3 class="text-muted-foreground mb-1 text-xs font-medium">Direct subtasks</h3>
                   @if (subIssues().length) {
                     <ul role="list" class="flex min-w-0 flex-col gap-1">
                       @for (child of subIssues(); track child.id) {
@@ -334,7 +324,7 @@ import { LabelPicker } from '../../shared/label-picker';
                       }
                     </ul>
                   } @else {
-                    <p class="text-muted-foreground text-xs">No direct sub-issues.</p>
+                    <p class="text-muted-foreground text-xs">No direct subtasks.</p>
                   }
                 </div>
               </section>
@@ -374,26 +364,8 @@ import { LabelPicker } from '../../shared/label-picker';
                     }
                   </div>
                 }
-                @if (plan.decisions.length) {
-                  <ul class="mt-2 flex flex-col gap-1">
-                    @for (decision of plan.decisions; track decision.id) {
-                      <li>
-                        <a
-                          class="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
-                          [routerLink]="['/', slug(), 'decisions', decision.key]"
-                        >
-                          {{ decision.key }} · {{ decision.title }}
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                }
               </section>
             }
-            <app-issue-human-input [issue]="i" [disabled]="!canEdit() || !!i.duplicateOfId" />
-
-            <app-demand-summary [demand]="store.demand().get(i.id)" [state]="workState(i.status)" />
-            <app-customer-requests [issueId]="i.id" [readonly]="!!i.duplicateOfId" />
 
             <app-issue-artifacts [issue]="i" />
 
@@ -434,19 +406,6 @@ import { LabelPicker } from '../../shared/label-picker';
                   }
                 }
               </app-property-row>
-              <app-property-row label="Team" [icon]="teamGlyph">
-                <app-picker
-                  variant="field"
-                  label="Team"
-                  placeholder="No team"
-                  [clearable]="true"
-                  clearLabel="No team"
-                  [disabled]="!canEdit()"
-                  [options]="teams()"
-                  [value]="i.teamId ? [i.teamId] : []"
-                  (valueChange)="store.updateIssue(i.id, { teamId: $event[0] ?? null })"
-                />
-              </app-property-row>
               <app-property-row label="Project" [icon]="projectGlyph">
                 <app-picker
                   variant="field"
@@ -480,7 +439,6 @@ import { LabelPicker } from '../../shared/label-picker';
                 </app-property-row>
               }
               <app-issue-milestone-prop [issue]="i" />
-              <app-issue-release-prop [issue]="i" />
               <app-property-row label="Labels" [icon]="tagGlyph">
                 <app-label-picker
                   #labelPicker
@@ -619,14 +577,12 @@ import { LabelPicker } from '../../shared/label-picker';
       <app-issue-command-dialog />
     } @else if (store.ready()) {
       <app-empty-state
-        title="Issue not found"
+        title="Task not found"
         [description]="
-          'There is no issue ' + (key() ?? '') + '. It may have been deleted, or the link is wrong.'
+          'There is no task ' + (key() ?? '') + '. It may have been deleted, or the link is wrong.'
         "
       >
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'issues']"
-          >Back to issues</a
-        >
+        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'tasks']">Back to tasks</a>
       </app-empty-state>
     }
   `,
@@ -637,7 +593,6 @@ export class IssueDetailPage {
   private readonly api = inject(ApiClient);
   protected readonly store = inject(TramaStore);
   protected readonly ui = inject(UiStore);
-  protected readonly workState = issueWorkState;
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
   protected readonly planSummary = signal<IssueContext['planSummary']>(undefined);
@@ -683,7 +638,6 @@ export class IssueDetailPage {
       ? (this.store.getUser(i.reporterId)?.name ?? i.reporterName ?? '')
       : (i.reporterName ?? '');
   });
-  protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly projects = computed(() => projectOptions(this.store, this.issue()?.projectId));
   protected readonly kindOpts = issueKindOptions();
   /** Estimates are off in this workspace, but an issue that still has one keeps showing it. */
@@ -740,7 +694,6 @@ export class IssueDetailPage {
   protected readonly statusGlyph = LucideCircleDot;
   protected readonly flagGlyph = LucideFlag;
   protected readonly userGlyph = LucideUserRound;
-  protected readonly teamGlyph = LucideUsers;
   protected readonly projectGlyph = LucideBox;
   protected readonly gaugeGlyph = LucideGauge;
   protected readonly tagGlyph = LucideTag;
@@ -756,11 +709,11 @@ export class IssueDetailPage {
     const issue = this.issue();
     const ref = this.key();
     if (!issue || !ref || ref === issue.key || ref === issue.id) return;
-    void this.router.navigate(['/', this.slug(), 'issues', issue.key], { replaceUrl: true });
+    void this.router.navigate(['/', this.slug(), 'tasks', issue.key], { replaceUrl: true });
   });
 
   private readonly _crumbs = usePageCrumbs(() => [
-    { label: 'Issues', link: ['/', this.slug(), 'issues'] },
+    { label: 'Tasks', link: ['/', this.slug(), 'tasks'] },
     { label: this.issue()?.key ?? this.key() ?? '', mono: true },
   ]);
 
@@ -768,130 +721,130 @@ export class IssueDetailPage {
     {
       keys: 's',
       label: 'Change status',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.prompt('status'),
     },
     {
       keys: 'p',
       label: 'Set priority',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.prompt('priority'),
     },
     {
       keys: 'shift+p',
       label: 'Move to project…',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.prompt('project'),
     },
     {
       keys: 'a',
       label: 'Assign to…',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.prompt('assignee'),
     },
     {
       keys: 'i',
       label: 'Assign to me',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.ids().length && this.actions.toggleAssignMe(this.ids()),
     },
     {
       keys: 'l',
       label: 'Add labels',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.labelPicker()?.open(),
     },
     {
       keys: 'shift+d',
       label: 'Mark as duplicate',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable() && !this.issue()?.duplicateOfId,
       run: () => this.prompt('duplicate'),
     },
     {
       keys: 'r',
       label: 'Rename',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.titleEditor()?.start(),
     },
     {
       keys: 'e',
       label: 'Edit description',
-      group: 'Issue',
+      group: 'Task',
       when: () => this.editable(),
       run: () => this.descEditor()?.start(),
     },
     {
       keys: 'mod+.',
-      label: 'Copy issue key',
-      group: 'Issue',
+      label: 'Copy task key',
+      group: 'Task',
       run: () => this.actions.copyKeys(this.ids()),
     },
     {
       keys: 'mod+shift+l',
-      label: 'Copy issue link',
-      group: 'Issue',
+      label: 'Copy task link',
+      group: 'Task',
       run: () => this.actions.copyLinks(this.ids()),
     },
     {
       keys: 'mod+shift+g',
       label: 'Copy git branch name',
-      group: 'Issue',
+      group: 'Task',
       run: () => this.copyBranch(),
     },
     {
       keys: 'mod+shift+.',
       label: 'Copy git branch name',
-      group: 'Issue',
+      group: 'Task',
       hidden: true,
       run: () => this.copyBranch(),
     },
     {
       keys: 'mod+shift+>',
       label: 'Copy git branch name',
-      group: 'Issue',
+      group: 'Task',
       hidden: true,
       run: () => this.copyBranch(),
     },
     {
       keys: 'mod+backspace',
-      label: 'Delete issue',
-      group: 'Issue',
+      label: 'Delete task',
+      group: 'Task',
       when: () => this.editable() && !this.typing(),
       run: () => this.remove(),
     },
     {
       keys: 'j',
-      label: 'Next issue',
-      group: 'Issue',
+      label: 'Next task',
+      group: 'Task',
       when: () => !!this.nav().next,
       run: () => this.go(this.nav().next),
     },
     {
       keys: 'k',
-      label: 'Previous issue',
-      group: 'Issue',
+      label: 'Previous task',
+      group: 'Task',
       when: () => !!this.nav().prev,
       run: () => this.go(this.nav().prev),
     },
     {
       keys: 'alt+down',
-      label: 'Next issue',
-      group: 'Issue',
+      label: 'Next task',
+      group: 'Task',
       when: () => !!this.nav().next,
       run: () => this.go(this.nav().next),
     },
     {
       keys: 'alt+up',
-      label: 'Previous issue',
-      group: 'Issue',
+      label: 'Previous task',
+      group: 'Task',
       when: () => !!this.nav().prev,
       run: () => this.go(this.nav().prev),
     },
@@ -920,7 +873,7 @@ export class IssueDetailPage {
   }
 
   protected go(key: string | undefined): void {
-    if (key) void this.router.navigate(['/', this.slug(), 'issues', key]);
+    if (key) void this.router.navigate(['/', this.slug(), 'tasks', key]);
   }
 
   protected setEstimate(id: string, value: string | undefined): void {
@@ -943,6 +896,6 @@ export class IssueDetailPage {
   protected remove(): void {
     const issue = this.issue();
     if (!issue) return;
-    this.actions.remove([issue.id], () => void this.router.navigate(['/', this.slug(), 'issues']));
+    this.actions.remove([issue.id], () => void this.router.navigate(['/', this.slug(), 'tasks']));
   }
 }

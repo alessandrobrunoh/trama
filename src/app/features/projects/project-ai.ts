@@ -293,8 +293,8 @@ export class ProjectAiCard {
   host: { class: 'block' },
   template: `
     <app-project-ai-card
-      title="Suggested issues"
-      busyLabel="Finding issues"
+      title="Suggested tasks"
+      busyLabel="Finding tasks"
       [busy]="busy()"
       [open]="open()"
       (openChange)="toggle($event)"
@@ -321,10 +321,10 @@ export class ProjectAiCard {
           </button>
         </div>
       } @else if (busy() && !loaded()) {
-        <p class="text-meta">Looking through open issues that are not in this project…</p>
+        <p class="text-meta">Looking through open tasks that are not in this project…</p>
       } @else if (loaded()) {
         @if (rows().length) {
-          <ul class="flex flex-col divide-y" aria-label="Suggested issues">
+          <ul class="flex flex-col divide-y" aria-label="Suggested tasks">
             @for (r of rows(); track r.issueId) {
               <li class="flex flex-wrap items-start gap-x-3 gap-y-1.5 py-2 first:pt-0 last:pb-0">
                 <div class="flex min-w-0 flex-1 basis-60 flex-col gap-1">
@@ -365,11 +365,11 @@ export class ProjectAiCard {
             }
           </ul>
         } @else {
-          <p class="text-meta">No more suggestions. Issues in this project are already counted.</p>
+          <p class="text-meta">No more suggestions. Tasks in this project are already counted.</p>
         }
       } @else {
         <p class="text-meta">
-          Open this card to ask the assistant which existing issues belong here.
+          Open this card to ask the assistant which existing tasks belong here.
         </p>
       }
     </app-project-ai-card>
@@ -419,7 +419,7 @@ export class ProjectIssueSuggestions {
     try {
       const result = await this.store.aiProject(id, 'issues');
       if (this.project().id !== id) return;
-      if (result) {
+      if (result?.kind === 'issues') {
         this.result.set({ projectId: id, items: result.suggestions });
         this.dismissed.set(new Set());
         this.added.set(new Set());

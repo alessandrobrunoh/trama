@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import type { AgentFailureRow, InsightContributor, InsightsReport } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { BarList, type BarRow } from './charts/bar-list';
@@ -15,7 +14,7 @@ import { actorRef } from './insights-model';
 @Component({
   selector: 'app-contributors-view',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, ActorAvatar, BarList, ChartCard, StackBar],
+  imports: [ActorAvatar, BarList, ChartCard, StackBar],
   host: { class: 'flex flex-col gap-6' },
   template: `
     <app-chart-card
@@ -39,7 +38,7 @@ import { actorRef } from './insights-model';
     <app-chart-card
       title="Agent failure signals"
       subtitle="Where agents get stuck or produce work that does not stick"
-      [empty]="failures().length ? undefined : 'No agent has raised questions or opened pull requests in this range.'"
+      [empty]="failures().length ? undefined : 'No agent has opened pull requests in this range.'"
     >
       <div class="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <table class="w-full min-w-[40rem] text-xs">
@@ -47,9 +46,6 @@ import { actorRef } from './insights-model';
           <thead>
             <tr class="text-muted-foreground border-b text-start">
               <th scope="col" class="py-2 pe-3 text-start font-normal">Agent</th>
-              <th scope="col" class="px-3 py-2 text-end font-normal">Questions raised</th>
-              <th scope="col" class="px-3 py-2 text-end font-normal">Still open</th>
-              <th scope="col" class="px-3 py-2 text-end font-normal">Median answer</th>
               <th scope="col" class="px-3 py-2 text-end font-normal">PRs</th>
               <th scope="col" class="px-3 py-2 text-end font-normal">Abandoned</th>
               <th scope="col" class="px-3 py-2 text-end font-normal">CI failing</th>
@@ -67,9 +63,6 @@ import { actorRef } from './insights-model';
                     <span class="font-medium">{{ f.agent.name }}</span>
                   </span>
                 </th>
-                <td class="px-3 py-2 text-end tabular-nums">{{ f.inputRequestsRaised }}</td>
-                <td class="px-3 py-2 text-end tabular-nums" [class.text-tone-amber]="f.inputRequestsOpen > 0" [class.font-medium]="f.inputRequestsOpen > 0">{{ f.inputRequestsOpen }}</td>
-                <td class="px-3 py-2 text-end tabular-nums">{{ f.medianAnswerHours === undefined ? '—' : hours(f.medianAnswerHours) }}</td>
                 <td class="px-3 py-2 text-end tabular-nums">{{ f.pullRequests }}</td>
                 <td class="px-3 py-2 text-end tabular-nums" [class.text-tone-red]="f.pullRequestsAbandoned > 0" [class.font-medium]="f.pullRequestsAbandoned > 0">{{ f.pullRequestsAbandoned }}</td>
                 <td class="px-3 py-2 text-end tabular-nums" [class.text-tone-red]="f.pullRequestsCiFailing > 0" [class.font-medium]="f.pullRequestsCiFailing > 0">{{ f.pullRequestsCiFailing }}</td>
@@ -80,10 +73,9 @@ import { actorRef } from './insights-model';
         </table>
       </div>
       <ul class="text-meta mt-3 flex flex-col gap-1 text-[11px]">
-        <li><strong class="text-muted-foreground font-medium">Questions raised / still open:</strong> input requests the agent asked; open ones wait for a person. See them under <a class="underline underline-offset-2" [routerLink]="healthLink()" [queryParams]="{ scope: 'health', signal: 'needs_input' }">Waiting for input</a>.</li>
         <li><strong class="text-muted-foreground font-medium">Abandoned:</strong> pull requests it opened in the range that were closed without merging.</li>
         <li><strong class="text-muted-foreground font-medium">CI failing:</strong> its open pull requests whose latest CI is failing.</li>
-        <li><strong class="text-muted-foreground font-medium">Reopened:</strong> issues it moved to Done that someone later moved out of Done.</li>
+        <li><strong class="text-muted-foreground font-medium">Reopened:</strong> tasks it moved to Done that someone later moved out of Done.</li>
       </ul>
     </app-chart-card>
   `,
@@ -92,7 +84,6 @@ export class ContributorsView {
   readonly report = input.required<InsightsReport>();
   readonly slug = input.required<string>();
 
-  protected readonly healthLink = computed(() => ['/', this.slug(), 'stats']);
   protected readonly slices = computed<ChartSlice[]>(() => {
     const a = this.report().actors;
     const people = a.people.reduce((n, c) => n + c.events, 0);
@@ -110,16 +101,12 @@ export class ContributorsView {
     return actorRef(f.agent);
   }
 
-  protected hours(h: number): string {
-    return h < 48 ? `${Math.round(h)}h` : `${Math.round(h / 24)}d`;
-  }
-
   private rows(list: readonly InsightContributor[]): BarRow[] {
     return list.slice(0, 10).map((c) => ({
       key: c.actor.id,
       label: c.actor.name,
       value: c.events,
-      detail: `${c.actor.name}: ${c.events} changes, ${c.issuesDone} issues done, ${c.comments} comments, ${c.pullRequests} pull requests`,
+      detail: `${c.actor.name}: ${c.events} changes, ${c.issuesDone} tasks done, ${c.comments} comments, ${c.pullRequests} pull requests`,
       hint: c.issuesDone ? `${c.issuesDone} done` : undefined,
     }));
   }

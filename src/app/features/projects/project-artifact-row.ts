@@ -64,7 +64,7 @@ export function resolveSubject(store: TramaStore, ref: SubjectRef): SubjectView 
             label: i.key,
             mono: true,
             title: i.title,
-            link: ['/', slug, 'issues', i.key],
+            link: ['/', slug, 'tasks', i.key],
           }
         : null;
     }

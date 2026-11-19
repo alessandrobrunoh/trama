@@ -48,7 +48,6 @@ export interface IssueInsights {
   stockUnavailable?: string;
   age: SeriesBlock;
   openedByKind: BarRow[];
-  openedByTeam: BarRow[];
   openByAssignee: BarRow[];
 }
 
@@ -273,7 +272,7 @@ export function issueInsights(tl: Timeline, period: Period): IssueInsights {
       label: 'Median time to close',
       value: ttcCur === undefined ? '—' : formatDuration(ttcCur),
       delta: ttcCur !== undefined && ttcPrev !== undefined ? pctDelta(ttcCur, ttcPrev, 'down', against) : undefined,
-      hint: ttcCur === undefined ? 'no closed issues in range' : 'created to done',
+      hint: ttcCur === undefined ? 'no closed tasks in range' : 'created to done',
       spark: [],
       sparkColor: 'var(--chart-2)',
     },
@@ -290,7 +289,7 @@ export function issueInsights(tl: Timeline, period: Period): IssueInsights {
       ? Number.isFinite(cov)
         ? `Closed counts come from status changes in the loaded activity (from ${format(cov, 'MMM d')}); earlier buckets show no data.`
         : 'Closed counts need status changes from the activity log, and none are loaded.'
-      : 'Closed counts issues moved to Done.',
+      : 'Closed counts tasks moved to Done.',
   };
 
   const stack = stackFrom(
@@ -314,10 +313,9 @@ export function issueInsights(tl: Timeline, period: Period): IssueInsights {
     age: {
       labels: ageLabels,
       titles: ageLabels.map((l) => `Open for ${l}`),
-      series: [{ key: 'age', label: 'Open issues', color: 'var(--chart-1)', values: ageCounts }],
+      series: [{ key: 'age', label: 'Open tasks', color: 'var(--chart-1)', values: ageCounts }],
     },
     openedByKind: tally(openedIssues.map((i) => ISSUE_KIND_META[i.kind].label)),
-    openedByTeam: tally(openedIssues.map((i) => i.team)),
     openByAssignee: tally(openNow.map((i) => i.assignee)),
   };
 }

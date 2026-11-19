@@ -1,49 +1,38 @@
 import {
   ChangeDetectionStrategy,
   Component,
-  ElementRef,
   computed,
-  effect,
   inject,
   input,
-  model,
   output,
-  signal,
-  untracked,
-  viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
-  LucideCheck,
   LucideClock,
   LucideDynamicIcon,
   LucideArrowRight,
   LucideExternalLink,
   LucideEllipsis,
-  LucideMessageSquareReply,
   LucideRotateCcw,
   LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { toast } from '@spartan-ng/brain/sonner';
 import {
   ATTENTION_KIND_META,
   TramaStore,
-  Notifier,
   shortDate,
   type AttentionItem,
 } from '../../core';
-import { ActorAvatar, EntityChip, Kbd, RelativeTimePipe, type EntityChipType } from '../../shared';
+import { EntityChip, Kbd, type EntityChipType } from '../../shared';
 import { AgoPipe } from '../overview/ago';
 import { ATTENTION_KIND_HELP, ATTENTION_KIND_VIEW, SEVERITY_VIEW } from './attention-kinds';
 import { snoozePresets, type SnoozePreset } from './snooze';
 
 /**
  * One My Attention row: icon, title, detail, entity context, since, and the inline actions that
- * resolve it (answer an input request, accept/reject a decision, open the PR, snooze, dismiss).
+ * resolve it (open the task or pull request, snooze, dismiss).
  */
 @Component({
   selector: 'app-attention-row',
@@ -53,13 +42,10 @@ import { snoozePresets, type SnoozePreset } from './snooze';
     LucideDynamicIcon,
     HlmButtonImports,
     HlmDropdownMenuImports,
-    HlmTextareaImports,
     HlmTooltip,
     Kbd,
     EntityChip,
-    ActorAvatar,
     AgoPipe,
-    RelativeTimePipe,
   ],
   host: {
     class: 'group/row relative block border-b outline-none',
@@ -108,95 +94,7 @@ import { snoozePresets, type SnoozePreset } from './snooze';
           <p class="text-meta mt-0.5 line-clamp-2 sm:truncate">{{ item().detail }}</p>
         }
 
-        @if (mode() === 'open') {
-          @if (item().kind === 'input_requested' && request(); as ir) {
-            <p class="text-meta mt-1 flex items-center gap-1.5">
-              <app-actor-avatar [actor]="ir.requestedBy" [size]="14" />
-              Asked by {{ requesterName() }} · {{ ir.createdAt | relativeTime }}
-            </p>
-            @if (!answering()) {
-              <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                @for (o of ir.options ?? []; track o) {
-                  <button hlmBtn variant="outline" size="sm" class="max-sm:h-9" (click)="answer(o)">
-                    {{ o }}
-                  </button>
-                }
-                <button
-                  hlmBtn
-                  variant="ghost"
-                  size="sm"
-                  class="max-sm:h-9"
-                  (click)="answering.set(true)"
-                >
-                  <svg [lucideIcon]="reply" [size]="14"></svg>
-                  {{ (ir.options?.length ?? 0) > 0 ? 'Other answer' : 'Answer' }}
-                  <app-kbd keys="a" class="max-sm:hidden" />
-                </button>
-                <button
-                  hlmBtn
-                  variant="ghost"
-                  size="sm"
-                  class="text-muted-foreground max-sm:h-9"
-                  hlmTooltip="Close the question without answering (for everyone)"
-                  position="bottom"
-                  (click)="dismissQuestion()"
-                >
-                  Dismiss question
-                </button>
-              </div>
-            } @else {
-              <div class="mt-2 flex flex-col gap-2">
-                <textarea
-                  #answerBox
-                  hlmTextarea
-                  rows="2"
-                  class="min-h-16 max-w-xl"
-                  placeholder="Write an answer for {{ requesterName() }}…"
-                  aria-label="Answer"
-                  [value]="draft()"
-                  (input)="draft.set($any($event.target).value)"
-                  (keydown.meta.enter)="send()"
-                  (keydown.control.enter)="send()"
-                  (keydown.escape)="cancelAnswer($event)"
-                ></textarea>
-                <div class="flex flex-wrap items-center gap-1.5">
-                  <button
-                    hlmBtn
-                    size="sm"
-                    class="max-sm:h-9"
-                    [disabled]="!draft().trim()"
-                    (click)="send()"
-                  >
-                    Send answer
-                    <app-kbd keys="mod+enter" class="max-sm:hidden" />
-                  </button>
-                  <button
-                    hlmBtn
-                    variant="ghost"
-                    size="sm"
-                    class="max-sm:h-9"
-                    (click)="cancelAnswer()"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            }
-          }
 
-          @if (item().kind === 'needs_decision' && decisionId()) {
-            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-              <button hlmBtn variant="outline" size="sm" class="max-sm:h-9" (click)="accept()">
-                <svg [lucideIcon]="check" [size]="14" class="text-status-shipped"></svg>
-                Accept
-              </button>
-              <button hlmBtn variant="ghost" size="sm" class="max-sm:h-9" (click)="reject()">
-                <svg [lucideIcon]="x" [size]="14"></svg>
-                Reject
-              </button>
-            </div>
-          }
-        }
       </div>
 
       <div class="col-span-full flex items-center gap-2 max-sm:ps-7 sm:col-span-1 sm:justify-end">
@@ -316,13 +214,8 @@ import { snoozePresets, type SnoozePreset } from './snooze';
       <hlm-dropdown-menu class="w-52">
         @if (artifactUrl(); as url) {
           <button hlmDropdownMenuItem (triggered)="openExternal(url)">Open pull request</button>
+          <hlm-dropdown-menu-separator />
         }
-        @if (request()?.state === 'open') {
-          <button hlmDropdownMenuItem (triggered)="dismissQuestion()">
-            Dismiss question for everyone
-          </button>
-        }
-        <hlm-dropdown-menu-separator />
         <button hlmDropdownMenuItem (triggered)="dismiss.emit()">
           Dismiss
           <hlm-dropdown-menu-shortcut><app-kbd keys="e" /></hlm-dropdown-menu-shortcut>
@@ -338,8 +231,6 @@ export class AttentionRow {
   readonly slug = input.required<string>();
   readonly mode = input<'open' | 'archived'>('open');
   readonly focused = input(false);
-  /** Two-way: the inline answer editor is open (the page opens it for the `A` shortcut). */
-  readonly answering = model(false);
 
   readonly dismiss = output<void>();
   readonly snooze = output<string>();
@@ -347,18 +238,12 @@ export class AttentionRow {
   readonly restore = output<void>();
   readonly rowClicked = output<void>();
 
-  private readonly box = viewChild<ElementRef<HTMLTextAreaElement>>('answerBox');
-  protected readonly draft = signal('');
-
   protected readonly clock = LucideClock;
   protected readonly x = LucideX;
-  protected readonly check = LucideCheck;
   protected readonly external = LucideExternalLink;
   protected readonly more = LucideEllipsis;
   protected readonly undo = LucideRotateCcw;
-  protected readonly reply = LucideMessageSquareReply;
   protected readonly openIcon = LucideArrowRight;
-  private readonly notifier = inject(Notifier);
 
   protected readonly kind = computed(() => ATTENTION_KIND_VIEW[this.item().kind]);
   protected readonly kindLabel = computed(() => ATTENTION_KIND_META[this.item().kind].label);
@@ -366,8 +251,6 @@ export class AttentionRow {
   /** The entity the item is about, as a compact chip. */
   protected readonly subjectChip = computed<{ type: EntityChipType; ref: string } | null>(() => {
     const it = this.item();
-    if (it.decisionId && this.store.decisionById().has(it.decisionId))
-      return { type: 'decision', ref: it.decisionId };
     if (it.issueId && this.store.issueById().has(it.issueId))
       return { type: 'issue', ref: it.issueId };
     return null;
@@ -375,15 +258,6 @@ export class AttentionRow {
   protected readonly severityBar = computed(() =>
     this.mode() === 'open' ? SEVERITY_VIEW[this.item().severity].bar : 'bg-transparent',
   );
-  protected readonly request = computed(() => {
-    const id = this.item().inputRequestId;
-    return id ? this.store.inputRequestById().get(id) : undefined;
-  });
-  protected readonly requesterName = computed(() => {
-    const r = this.request();
-    return r ? this.store.actorName(r.requestedBy) : 'the agent';
-  });
-  protected readonly decisionId = computed(() => this.item().decisionId);
   protected readonly artifactUrl = computed(() => {
     const id = this.item().artifactId;
     return id ? this.store.artifactById().get(id)?.url : undefined;
@@ -396,23 +270,11 @@ export class AttentionRow {
   }>(() => {
     const it = this.item();
     const slug = this.slug();
-    switch (it.kind) {
-      case 'needs_decision': {
-        const d = it.decisionId ? this.store.decisionById().get(it.decisionId) : undefined;
-        if (d) return { commands: ['/', slug, 'decisions', d.key] };
-        break;
-      }
-      case 'triage': {
-        const i = it.issueId ? this.store.issueById().get(it.issueId) : undefined;
-        const q: Record<string, string> = { status: 'backlog' };
-        if (i?.teamId) q['team'] = i.teamId;
-        return { commands: ['/', slug, 'issues'], query: q };
-      }
-      case 'input_requested':
-        break;
+    if (it.kind === 'triage') {
+      return { commands: ['/', slug, 'tasks'], query: { status: 'backlog' } };
     }
     const issue = it.issueId ? this.store.issueById().get(it.issueId) : undefined;
-    return { commands: issue ? ['/', slug, 'issues', issue.key] : ['/', slug, 'attention'] };
+    return { commands: issue ? ['/', slug, 'tasks', issue.key] : ['/', slug, 'attention'] };
   });
 
   protected readonly archivedLabel = computed(() => {
@@ -421,50 +283,6 @@ export class AttentionRow {
       return it.snoozedUntil ? `Snoozed until ${shortDate(it.snoozedUntil)}` : 'Snoozed';
     return 'Dismissed';
   });
-
-  constructor() {
-    effect(() => {
-      const el = this.box();
-      if (el) untracked(() => el.nativeElement.focus());
-    });
-  }
-
-  protected async answer(text: string): Promise<void> {
-    const id = this.item().inputRequestId;
-    if (!id || !text.trim()) return;
-    const ok = await this.store.answerInput(id, text.trim());
-    if (ok) toast.success('Answer sent', { description: `${this.requesterName()} can continue.` });
-    this.draft.set('');
-    this.answering.set(false);
-  }
-
-  protected send(): void {
-    void this.answer(this.draft());
-  }
-
-  protected cancelAnswer(ev?: Event): void {
-    ev?.stopPropagation();
-    this.answering.set(false);
-  }
-
-  /** Close the input request itself (for everyone), not just this attention item. */
-  protected async dismissQuestion(): Promise<void> {
-    const r = this.request();
-    if (!r) return;
-    if (await this.store.dismissInput(r.id)) {
-      this.notifier.success('Question dismissed', { description: r.question });
-    }
-  }
-
-  protected async accept(): Promise<void> {
-    const id = this.decisionId();
-    if (id && (await this.store.acceptDecision(id))) toast.success('Decision accepted');
-  }
-
-  protected async reject(): Promise<void> {
-    const id = this.decisionId();
-    if (id && (await this.store.rejectDecision(id))) toast.success('Decision rejected');
-  }
 
   private readonly router = inject(Router);
 

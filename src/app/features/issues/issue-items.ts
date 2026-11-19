@@ -14,7 +14,6 @@ import {
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
-  LucideBuilding2,
   LucideCheck,
   LucideDynamicIcon,
   LucideFlag,
@@ -22,7 +21,6 @@ import {
   LucideUserPlus,
   LucideUserRoundX,
 } from '@lucide/angular';
-import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
@@ -32,7 +30,6 @@ import { SwipeRow } from '../../shared/swipe-row';
 import { LabelChips } from '../../shared/label-chip';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue, quietToggleStatus } from './issue-model';
-import { describeDemand } from '../customers/customer-model';
 import { IssueActions } from './issue-actions';
 import { IssueProp } from './issue-prop';
 
@@ -57,22 +54,11 @@ abstract class IssueItemBase {
   readonly toggleSelect = output<MouseEvent>();
 
   protected readonly check = LucideCheck;
-  protected readonly buildingIcon = LucideBuilding2;
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly quiet = computed(() => isClosedIssue(this.issue(), this.store.settings().statuses.issue));
-  protected readonly demand = computed(() => this.store.demand().get(this.issue().id));
-  protected readonly customerCount = computed(() => this.demand()?.customerCount ?? 0);
-  protected readonly demandText = computed(() => {
-    const d = this.demand();
-    return d ? describeDemand(d) : '';
-  });
   protected readonly show = computed(() => {
     const h = new Set(this.hidden());
-    return { kind: !h.has('kind'), project: !h.has('project'), labels: !h.has('labels'), team: !h.has('team'), assignee: !h.has('assignee'), date: !h.has('date') };
-  });
-  protected readonly team = computed(() => {
-    const id = this.issue().teamId;
-    return id ? this.store.getTeam(id) : undefined;
+    return { kind: !h.has('kind'), project: !h.has('project'), labels: !h.has('labels'), assignee: !h.has('assignee'), date: !h.has('date') };
   });
   protected readonly projectId = computed(() => this.issue().projectId);
   /** Shown when the issue is estimated and the workspace still uses estimates (or the value is kept anyway). */
@@ -107,11 +93,11 @@ abstract class IssueItemBase {
   }
 }
 
-/** One dense list row: ☐ · priority · type · key · status · title · project · team · assignee · date. */
+/** One dense list row: ☐ · priority · type · key · status · title · project · assignee · date. */
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
+  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -147,7 +133,7 @@ abstract class IssueItemBase {
           (pointercancel)="pressEnd()"
         >
           <a
-            [routerLink]="['/', slug(), 'issues', i.key]"
+            [routerLink]="['/', slug(), 'tasks', i.key]"
             class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
             [attr.aria-label]="i.key + ' ' + i.title"
             (click)="onPressedLinkClick($event)"
@@ -194,7 +180,7 @@ abstract class IssueItemBase {
       [class]="rowState()"
     >
       <a
-        [routerLink]="['/', slug(), 'issues', i.key]"
+        [routerLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
         [attr.aria-label]="i.key + ' ' + i.title"
         (click)="onLinkClick($event)"
@@ -232,15 +218,6 @@ abstract class IssueItemBase {
           <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
         }
       </span>
-      @if (customerCount()) {
-        <span
-          class="relative hidden shrink-0 items-center gap-0.5 text-xs tabular-nums sm:inline-flex"
-          [class]="demand()?.importantCount ? 'text-tone-amber' : 'text-muted-foreground'"
-          [hlmTooltip]="demandText()"
-          [attr.aria-label]="demandText()"
-        ><svg [lucideIcon]="buildingIcon" [size]="11"></svg>{{ customerCount() }}</span>
-      }
-
       @if (hasEstimate()) {
         <app-estimate class="relative text-xs max-sm:hidden" [value]="i.estimate" />
       }
@@ -251,9 +228,6 @@ abstract class IssueItemBase {
       }
       @if (s.labels && i.labels.length) {
         <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
-      }
-      @if (s.team && team(); as t) {
-        <span class="text-muted-foreground w-12 shrink-0 truncate text-right font-mono text-[11px] max-md:hidden">{{ t.key }}</span>
       }
       @if (s.assignee) {
         <app-issue-prop class="relative" [issue]="i" field="assignee" />
@@ -347,7 +321,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, HlmTooltip, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
+  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -358,7 +332,7 @@ export class IssueRow extends IssueItemBase {
       [class]="selected() ? 'border-primary/60 bg-selected' : focused() ? 'bg-card border-border-strong' : 'bg-card border-border hover:border-border-strong'"
     >
       <a
-        [routerLink]="['/', slug(), 'issues', i.key]"
+        [routerLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 rounded-lg outline-none focus-visible:ring-2"
         [attr.aria-label]="i.key + ' ' + i.title"
         (click)="onLinkClick($event)"
@@ -404,9 +378,6 @@ export class IssueRow extends IssueItemBase {
         }
         @if (hasEstimate()) {
           <app-estimate class="border-border relative inline-flex h-6 items-center rounded-md border px-1.5 text-[11px]" [value]="i.estimate" />
-        }
-        @if (s.team && team(); as t) {
-          <span class="text-muted-foreground border-border inline-flex h-6 items-center rounded-md border px-1.5 font-mono text-[11px]">{{ t.key }}</span>
         }
         @if (s.date) {
           <span class="text-muted-foreground ml-auto text-[11px] tabular-nums" [attr.aria-label]="dateTitle()">{{ date() }}</span>

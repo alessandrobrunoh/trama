@@ -7,10 +7,8 @@ import {
   TramaStore,
   PRIORITY_META,
   type AttentionItem,
-  type Decision,
   type Issue,
 } from '../../core';
-import type { BarRow } from '../stats/charts/bar-list';
 import type { ChartSeries } from '../stats/charts/chart-utils';
 import type { KpiDelta } from '../stats/charts/kpi-tile';
 import { absDelta, formatDuration, pctDelta } from '../stats/insights';
@@ -41,7 +39,7 @@ export interface AttentionRow {
   item: AttentionItem;
   commands: string[];
   query?: Record<string, string>;
-  chip: { type: 'issue' | 'decision'; ref: string } | null;
+  chip: { type: 'issue'; ref: string } | null;
 }
 
 @Injectable()
@@ -55,19 +53,10 @@ export class OverviewModel {
     const store = this.store;
     const slug = this.slug();
     return store.openAttention().slice(0, 5).map((item) => {
-      const commands = ['/', slug, 'issues'];
-      let query: Record<string, string> | undefined;
-      if (item.kind === 'needs_decision' && item.decisionId) {
-        const decision = store.decisionById().get(item.decisionId);
-        if (decision) commands.splice(2, 1, 'decisions', decision.key);
-      } else if (item.kind === 'triage') {
-        query = { status: 'backlog', ...(item.issueId && store.issueById().get(item.issueId)?.teamId ? { team: store.issueById().get(item.issueId)!.teamId! } : {}) };
-      }
-      const chip: AttentionRow['chip'] = item.decisionId && store.decisionById().has(item.decisionId)
-        ? { type: 'decision', ref: item.decisionId }
-        : item.issueId && store.issueById().has(item.issueId)
-          ? { type: 'issue', ref: item.issueId }
-          : null;
+      const issue = item.issueId ? store.issueById().get(item.issueId) : undefined;
+      const commands = issue ? ['/', slug, 'tasks', issue.key] : ['/', slug, 'tasks'];
+      const query = item.kind === 'triage' ? { status: 'backlog' } : undefined;
+      const chip: AttentionRow['chip'] = issue ? { type: 'issue', ref: issue.id } : null;
       return { item, commands, query, chip };
     });
   });
@@ -93,9 +82,9 @@ export class OverviewModel {
   readonly openIssueCount = computed(() => this.store.issues().filter(isOpenIssue).length);
   readonly statusLine = computed(() => {
     const count = this.attentionCount();
-    return count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention` : 'No issues need your attention right now.';
+    return count ? `${count} ${count === 1 ? 'thing needs' : 'things need'} your attention` : 'No tasks need your attention right now.';
   });
-  readonly subtitle = computed(() => `${plural(this.openIssueCount(), 'open issue')}`);
+  readonly subtitle = computed(() => `${plural(this.openIssueCount(), 'open task')}`);
 
   private readonly issueTimes = computed(() => {
     const recs: { created: number; started?: number; done?: number; closed?: number }[] = [];
@@ -154,11 +143,11 @@ export class OverviewModel {
       series,
       labels: ax.starts.map((s) => format(s, 'MMM d')),
       titles: ax.starts.map((s) => format(s, 'EEE, MMM d')),
-      empty: openedTotal + closedTotal === 0 ? 'No issues were opened or closed in the last 30 days.' : undefined,
+      empty: openedTotal + closedTotal === 0 ? 'No tasks were opened or closed in the last 30 days.' : undefined,
       subtitle: `${openedTotal} opened · ${closedTotal} closed in 30 days`,
       note: missing
-        ? `${plural(missing, 'done issue')} ${missing === 1 ? 'has' : 'have'} no completion time and ${missing === 1 ? 'is' : 'are'} not counted as closed.`
-        : 'Closed counts issues moved to Done.',
+        ? `${plural(missing, 'done task')} ${missing === 1 ? 'has' : 'have'} no completion time and ${missing === 1 ? 'is' : 'are'} not counted as closed.`
+        : 'Closed counts tasks moved to Done.',
     };
   });
 
@@ -170,13 +159,13 @@ export class OverviewModel {
     const openNow = this.openIssueCount();
     const open: OverviewKpi = {
       key: 'open',
-      label: 'Open issues',
+      label: 'Open tasks',
       value: String(openNow),
       delta: absDelta(openNow - f.openThen, 'down', `vs ${f.openThen} thirty days ago`),
       hint: `${this.store.backlogIssueCount()} in backlog`,
       spark: f.openSpark,
       sparkColor: 'var(--chart-1)',
-      link: ['issues'],
+      link: ['tasks'],
     };
     const inRange = (t: number | undefined, from: number, to: number): boolean => t !== undefined && t >= from && t < to;
     const closed7 = recs.filter((r) => inRange(r.done, now - 7 * DAY, now + 1)).length;
@@ -186,10 +175,10 @@ export class OverviewModel {
       label: 'Closed this week',
       value: String(closed7),
       delta: pctDelta(closed7, closedPrev7, 'up', 'vs the previous 7 days'),
-      hint: 'issues done, last 7 days',
+      hint: 'tasks done, last 7 days',
       spark: f.closed,
       sparkColor: 'var(--chart-2)',
-      link: ['issues'],
+      link: ['tasks'],
       query: { view: 'done' },
     };
     const cycle = (from: number, to: number): number[] => recs
@@ -207,7 +196,7 @@ export class OverviewModel {
       label: 'Median cycle time',
       value: currentMedian === undefined ? '—' : formatDuration(currentMedian),
       delta: currentMedian !== undefined && previousMedian !== undefined ? pctDelta(currentMedian, previousMedian, 'down', `vs the previous 30 days (${formatDuration(previousMedian)})`) : undefined,
-      hint: currentMedian === undefined ? 'no finished issues with a start time' : `started to done · ${plural(durations.length, 'issue')}`,
+      hint: currentMedian === undefined ? 'no finished tasks with a start time' : `started to done · ${plural(durations.length, 'task')}`,
       spark: [],
       sparkColor: 'var(--chart-3)',
       link: ['stats'],
@@ -215,24 +204,6 @@ export class OverviewModel {
     return [open, closed, cycleKpi];
   });
 
-  readonly teamBars = computed<BarRow[]>(() => {
-    const out: BarRow[] = [];
-    for (const [teamId, issues] of this.store.issuesByTeam()) {
-      const team = teamId ? this.store.teamById().get(teamId) : undefined;
-      if (!team) continue;
-      const value = issues.filter(isOpenIssue).length;
-      if (value) out.push({ key: team.id, label: team.name, hint: team.key, value, detail: `${team.name}: ${value} open` });
-    }
-    return out.sort((a, b) => b.value - a.value || a.label.localeCompare(b.label)).slice(0, 8);
-  });
-
-  readonly decisions = computed<Decision[]>(() => {
-    const all = this.store.decisions();
-    const proposed = all.filter((d) => d.status === 'proposed').sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-    const rest = all.filter((d) => d.status === 'accepted').sort((a, b) => (b.decidedAt ?? b.updatedAt).localeCompare(a.decidedAt ?? a.updatedAt));
-    return [...proposed, ...rest].slice(0, 5);
-  });
-  readonly proposedCount = computed(() => this.store.decisions().filter((d) => d.status === 'proposed').length);
   readonly backlogCount = this.store.backlogIssueCount;
   readonly triage = computed(() => [...this.store.backlogIssues()].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 4));
   readonly events = computed(() => this.store.events().slice(0, 8));

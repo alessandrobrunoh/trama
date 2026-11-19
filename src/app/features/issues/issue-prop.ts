@@ -130,7 +130,7 @@ export class IssueCommandDialog {
   protected readonly prompt = this.actions.prompt;
   protected readonly title = computed(() => {
     const p = this.prompt();
-    return p ? PROMPT_TITLE[p.field] : 'Issue';
+    return p ? PROMPT_TITLE[p.field] : 'Task';
   });
   protected readonly firstTitle = computed(() => {
     const p = this.prompt();

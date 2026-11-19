@@ -62,8 +62,7 @@ import { BLOG_POSTS, findPost } from './blog-posts';
             @if (p.slug === 'introducing-trama') {
               <p class="bg-muted text-muted-foreground mt-5 rounded-md px-3 py-2 text-[13px] leading-relaxed">
                 Historical launch announcement (October 2026). This article describes Trama at launch;
-                today, Issues are granular units of work, with optional Goals, Plans and Documents.
-                Human input requests use Question or Decision mode.
+                today, Tasks are granular units of work, with optional Goals, Plans and Documents.
               </p>
             }
             <p class="text-muted-foreground mt-6 flex items-center gap-2 text-[13px]">

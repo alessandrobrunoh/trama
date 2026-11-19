@@ -8,7 +8,6 @@ import {
   LucideDynamicIcon,
   LucideInbox,
   LucidePlus,
-  LucideScale,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -22,7 +21,6 @@ import {
   UiStore,
   usePageShortcuts,
   type AttentionKind,
-  type Decision,
   type Issue,
   type IssueStatus,
 } from '../../core';
@@ -30,8 +28,7 @@ import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { RelativeTimePipe } from '../../shared/pipes';
-import { StatusIcon, statusLabel, type AnyStatus } from '../../shared/status';
+import { StatusIcon } from '../../shared/status';
 import { ATTENTION_KIND_VIEW } from '../attention/attention-kinds';
 import { formatDuration } from '../stats/insights';
 import { weekSummary, type Lookup } from '../stats/perf';
@@ -70,7 +67,6 @@ interface Group<T> {
     EmptyState,
     Kbd,
     StatusIcon,
-    RelativeTimePipe,
     MyIssueRow,
   ],
   host: { class: 'flex min-h-full flex-col' },
@@ -79,7 +75,7 @@ interface Group<T> {
       @if (canEdit()) {
         <button hlmBtn size="sm" variant="outline" (click)="newIssue()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span>New issue</span>
+          <span>New task</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
@@ -162,7 +158,7 @@ interface Group<T> {
         </div>
         <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5">
-            <p class="text-muted-foreground text-xs">Issues completed</p>
+            <p class="text-muted-foreground text-xs">Tasks completed</p>
             <div class="mt-1 flex items-baseline gap-2">
               <span class="text-lg font-semibold tabular-nums">{{ w.doneThis }}</span>
               <span class="text-muted-foreground text-xs tabular-nums" [class.text-tone-green]="w.doneThis > w.doneLast" [class.text-tone-red]="w.doneThis < w.doneLast">
@@ -177,16 +173,16 @@ interface Group<T> {
               <span class="text-muted-foreground text-xs tabular-nums">{{ w.pointsLast }} last week</span>
             </div>
           </div>
-          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5" title="Median time from issue start to completion">
+          <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5" title="Median time from task start to completion">
             <p class="text-muted-foreground text-xs">Typical time to finish</p>
             <p class="mt-1 text-lg font-semibold tabular-nums">{{ w.medianCycle === undefined ? '—' : fmtDays(w.medianCycle) }}</p>
-            <p class="text-muted-foreground text-[11px]">Completed issues this week</p>
+            <p class="text-muted-foreground text-[11px]">Completed tasks this week</p>
           </div>
           <div class="bg-card min-h-20 rounded-lg border px-3 py-2.5" [attr.title]="w.draggingTitle">
-            <p class="text-muted-foreground text-xs">Issues past typical time</p>
+            <p class="text-muted-foreground text-xs">Tasks past typical time</p>
             <div class="mt-1 flex items-baseline gap-2">
               <span class="text-lg font-semibold tabular-nums" [class.text-tone-amber]="w.dragging > 0">{{ w.dragging }}</span>
-              <span class="text-muted-foreground text-xs">active issues</span>
+              <span class="text-muted-foreground text-xs">active tasks</span>
             </div>
           </div>
         </div>
@@ -208,13 +204,13 @@ interface Group<T> {
           <app-empty-state
             class="m-auto"
             [icon]="inbox"
-            title="No issues assigned to you"
-            description="Issues are demand: a bug, request or incident. Pick something up from the backlog, or report what you have noticed."
+            title="No tasks assigned to you"
+            description="Tasks are demand: a bug, request or incident. Pick something up from the backlog, or report what you have noticed."
           >
             <div class="flex flex-wrap justify-center gap-2">
-              <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'issues']" [queryParams]="{ status: 'backlog' }">Browse backlog</a>
+              <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'tasks']" [queryParams]="{ status: 'backlog' }">Browse backlog</a>
               @if (canEdit()) {
-                <button hlmBtn size="sm" variant="ghost" (click)="newIssue()">New issue</button>
+                <button hlmBtn size="sm" variant="ghost" (click)="newIssue()">New task</button>
               }
             </div>
           </app-empty-state>
@@ -222,40 +218,19 @@ interface Group<T> {
       }
 
       @case ('created') {
-        @if (created().issues.length || created().decisions.length) {
-          @if (created().issues.length) {
-            <ng-container *ngTemplateOutlet="sectionHeader; context: { $implicit: 'Issues', count: created().issues.length, key: 'ci' }" />
-            @if (!isFolded('ci')) {
-              @for (i of created().issues; track i.id) {
-                <app-my-issue-row [issue]="i" [focused]="ui.focusedRowId() === i.id" />
-              }
-            }
-          }
-          @if (created().decisions.length) {
-            <ng-container *ngTemplateOutlet="sectionHeader; context: { $implicit: 'Decisions', count: created().decisions.length, key: 'cd' }" />
-            @if (!isFolded('cd')) {
-              @for (d of created().decisions; track d.id) {
-                <a
-                  [routerLink]="['/', slug(), 'decisions', d.key]"
-                  [attr.data-row-id]="d.id"
-                  [attr.data-focused]="ui.focusedRowId() === d.id ? '' : null"
-                  class="hover:bg-hover data-[focused]:bg-accent/70 border-border/60 flex h-9 items-center gap-2.5 border-b px-4 outline-none sm:px-6"
-                >
-                  <span class="inline-flex size-4 items-center justify-center"><app-status-icon entity="other" [status]="d.status" /></span>
-                  <span class="text-muted-foreground w-[4.25rem] shrink-0 truncate font-mono text-[11px]">{{ d.key }}</span>
-                  <span class="min-w-0 flex-1 truncate text-sm">{{ d.title }}</span>
-                  <span class="text-meta">{{ label(d.status) }}</span>
-                  <span class="text-meta w-24 text-end whitespace-nowrap">{{ d.updatedAt | relativeTime }}</span>
-                </a>
-              }
+        @if (created().length) {
+          <ng-container *ngTemplateOutlet="sectionHeader; context: { $implicit: 'Tasks', count: created().length, key: 'ci' }" />
+          @if (!isFolded('ci')) {
+            @for (i of created(); track i.id) {
+              <app-my-issue-row [issue]="i" [focused]="ui.focusedRowId() === i.id" />
             }
           }
         } @else {
           <app-empty-state
             class="m-auto"
-            [icon]="scale"
+            [icon]="inbox"
             title="You have not created anything yet"
-            description="Issues you report and decisions you propose are collected here."
+            description="Tasks you report are collected here."
           />
         }
       }
@@ -303,11 +278,9 @@ export class MyWorkPage {
   protected readonly plus = LucidePlus;
   protected readonly arrow = LucideArrowRight;
   protected readonly inbox = LucideInbox;
-  protected readonly scale = LucideScale;
   protected readonly check = LucideCheckCheck;
   protected readonly chevron = LucideChevronRight;
   protected readonly tabs = TABS;
-  protected readonly label = (s: AnyStatus) => statusLabel(s);
 
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
@@ -345,17 +318,11 @@ export class MyWorkPage {
     const me = this.meId();
     const closed = !this.showClosed();
     const newest = <T extends { createdAt: string }>(a: T, b: T) => b.createdAt.localeCompare(a.createdAt);
-    if (!me) return { issues: [] as Issue[], decisions: [] as Decision[] };
-    return {
-      issues: this.store
-        .issues()
-        .filter((i) => i.reporterId === me && !(closed && CLOSED.has(i.status)))
-        .sort(newest),
-      decisions: this.store
-        .decisions()
-        .filter((d) => d.proposedBy.type === 'user' && d.proposedBy.id === me)
-        .sort(newest),
-    };
+    if (!me) return [] as Issue[];
+    return this.store
+      .issues()
+      .filter((i) => i.reporterId === me && !(closed && CLOSED.has(i.status)))
+      .sort(newest);
   });
 
   protected readonly counts = computed<Record<Tab, number>>(() => {
@@ -363,9 +330,7 @@ export class MyWorkPage {
     const c = this.created();
     return {
       assigned: this.assigned().filter((i) => open(i.status)).length,
-      created:
-        c.issues.filter((i) => open(i.status)).length +
-        c.decisions.filter((d) => d.status === 'proposed').length,
+      created: c.filter((i) => open(i.status)).length,
     };
   });
 
@@ -389,7 +354,7 @@ export class MyWorkPage {
   protected readonly week = computed(() => {
     const me = this.meId();
     if (!me) return null;
-    const look: Lookup = { user: (id) => this.store.getUser(id)?.name ?? 'Unknown', team: (id) => this.store.getTeam(id)?.name ?? 'No team' };
+    const look: Lookup = { user: (id) => this.store.getUser(id)?.name ?? 'Unknown' };
     const w = weekSummary(buildWork(this.store, this.store.issues()).issues, me, Date.now(), this.store.estimateScale(), look);
     const running = this.assigned().some((i) => i.status === 'in_progress' || i.status === 'in_review');
     if (!w.doneThis && !w.doneLast && !running) return null;
@@ -404,7 +369,7 @@ export class MyWorkPage {
 
   protected readonly description = computed(() => {
     const c = this.counts();
-    return `${c.assigned} open issue${c.assigned === 1 ? '' : 's'} assigned to you`;
+    return `${c.assigned} open task${c.assigned === 1 ? '' : 's'} assigned to you`;
   });
 
   // ── helpers ──
@@ -440,7 +405,7 @@ export class MyWorkPage {
   protected tabLabel(t: Tab): string {
     switch (t) {
       case 'assigned':
-        return 'Assigned issues';
+        return 'Assigned tasks';
       case 'created':
         return 'Created by you';
     }
@@ -456,9 +421,9 @@ export class MyWorkPage {
   protected tabHint(t: Tab): string {
     switch (t) {
       case 'assigned':
-        return 'Open issues assigned to you';
+        return 'Open tasks assigned to you';
       case 'created':
-        return 'Issues and decisions you created';
+        return 'Tasks you created';
     }
   }
 

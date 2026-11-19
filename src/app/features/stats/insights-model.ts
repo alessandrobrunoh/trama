@@ -30,9 +30,7 @@ export const SEVERITY_RANK: Record<InsightSeverity, number> = { critical: 0, war
 export function itemLink(slug: string, item: InsightItem): string[] | null {
   switch (item.type) {
     case 'issue':
-      return item.key ? ['/', slug, 'issues', item.key] : null;
-    case 'decision':
-      return item.key ? ['/', slug, 'decisions', item.key] : null;
+      return item.key ? ['/', slug, 'tasks', item.key] : null;
     case 'milestone':
     case 'project':
       return item.projectId ? ['/', slug, 'projects', item.projectId] : null;
@@ -47,8 +45,7 @@ export function actorRef(a: InsightActor | undefined): ActorRef | null {
 }
 
 const TYPE_LABEL: Record<InsightItem['type'], string> = {
-  issue: 'Issue',
-  decision: 'Decision',
+  issue: 'Task',
   milestone: 'Milestone',
   artifact: 'Pull request',
   project: 'Project',

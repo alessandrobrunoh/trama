@@ -26,7 +26,7 @@ import { OverviewModel } from './overview-model';
     <div class="flex flex-wrap items-center gap-2">
       @if (store.allowed('createIssues')) {
         <button hlmBtn size="sm" (click)="ui.openCreate('issue')">
-          <svg [lucideIcon]="plus" [size]="14"></svg> New issue <app-kbd keys="c" class="max-sm:hidden" />
+          <svg [lucideIcon]="plus" [size]="14"></svg> New task <app-kbd keys="c" class="max-sm:hidden" />
         </button>
       }
       <a hlmBtn size="sm" variant="ghost" [routerLink]="timelineLink()">

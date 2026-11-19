@@ -44,7 +44,7 @@ const EDITABLE_STATES: ArtifactState[] = ['draft', 'published'];
 
 const TARGET_LABEL: Record<ArtifactTarget['type'], string> = {
   project: 'this project',
-  issue: 'this issue',
+  issue: 'this task',
 };
 
 /** Returns an error message when `value` is not a valid http(s) URL; `null` otherwise (an empty value is valid here). */
@@ -207,7 +207,7 @@ function guessProvider(kind: ArtifactKind, url: string): ArtifactProvider {
               hlmTextarea
               id="pad-desc"
               rows="4"
-              placeholder="What is this and why does it matter for the project or issue?"
+              placeholder="What is this and why does it matter for the project or task?"
               [value]="description()"
               (input)="description.set($any($event.target).value)"
             ></textarea>

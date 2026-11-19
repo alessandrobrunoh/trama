@@ -173,7 +173,7 @@ export class MobileNav {
   /** The first three primary places live in the bar; Projects opens from More. */
   protected readonly tabs = PRIMARY_NAV.slice(0, 3);
   /** Tabs live in the bar; the sheet lists everything else. */
-  private static readonly IN_BAR = new Set(['inbox', 'my-work', 'issues', 'assistant', 'settings']);
+  private static readonly IN_BAR = new Set(['inbox', 'my-work', 'tasks', 'assistant', 'settings']);
   protected readonly groups = computed<SheetGroup[]>(() => {
     const rest = (items: NavItem[]) => items.filter((n) => !MobileNav.IN_BAR.has(n.segment));
     return [

@@ -30,7 +30,7 @@ const ACCESS: { id: Access; label: string; description: string }[] = [
   {
     id: 'contributor',
     label: 'Contributor (recommended)',
-    description: 'Read everything and create or update work: issues, comments, documents, artifacts and human input requests. Cannot delete, accept decisions, or touch members, tokens and integrations.',
+    description: 'Read everything and create or update work: tasks, comments, documents and artifacts. Cannot delete, or touch members, tokens and integrations.',
   },
   { id: 'read-only', label: 'Read-only', description: 'Read every resource. The agent can look but never change anything.' },
 ];
@@ -156,13 +156,13 @@ const EXPIRY: Option[] = [
               <svg [lucideIcon]="check" [size]="15" [strokeWidth]="2.5"></svg>
               Connected. Your agent just called Trama.
             </p>
-            <p class="text-muted-foreground text-xs">Next, give it something to do: <a class="underline underline-offset-2" [routerLink]="['/', slug(), 'issues']">open an issue</a> and ask it to pick up the context. It can request human input with a question or decision when needed.</p>
+            <p class="text-muted-foreground text-xs">Next, give it something to do: <a class="underline underline-offset-2" [routerLink]="['/', slug(), 'tasks']">open a task</a> and ask it to pick up the context.</p>
           } @else if (createdId()) {
             <p class="text-muted-foreground flex items-center gap-2">
               <svg [lucideIcon]="spinner" [size]="14" class="animate-spin"></svg>
               Waiting for the first call from your agent…
             </p>
-            <p class="text-muted-foreground text-xs">Ask it something like “list my open Trama issues”. This page updates by itself.</p>
+            <p class="text-muted-foreground text-xs">Ask it something like “list my open Trama tasks”. This page updates by itself.</p>
           } @else {
             <p class="text-muted-foreground">Create a token and add it to your client. When the first call arrives, it shows up here.</p>
           }

@@ -15,24 +15,24 @@ import { IssueCommandDialog } from './issue-prop';
 
 const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   all: {
-    title: 'No issues yet',
+    title: 'No tasks yet',
     description: 'Track bugs, requests and incidents from triage through completion.',
   },
   active: {
-    title: 'No active issues',
-    description: 'Nothing is scheduled. Move issues out of the backlog to start resolving them.',
+    title: 'No active tasks',
+    description: 'Nothing is scheduled. Move tasks out of the backlog to start resolving them.',
   },
   backlog: {
     title: 'Backlog is clear',
-    description: 'New issues land here until someone triages them: set a priority or assign them.',
+    description: 'New tasks land here until someone triages them: set a priority or assign them.',
   },
   done: {
     title: 'Nothing done yet',
-    description: 'Done and canceled issues land here.',
+    description: 'Done and canceled tasks land here.',
   },
   draft: {
-    title: 'No saved issue drafts',
-    description: 'Save an issue to finish writing or triaging it later.',
+    title: 'No saved task drafts',
+    description: 'Save a task to finish writing or triaging it later.',
   },
 };
 
@@ -57,7 +57,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       @if (store.allowed('createIssues')) {
         <button hlmBtn size="sm" hlmTooltip="Report a bug, request or incident" (click)="create()">
           <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span>New issue</span>
+          <span>New task</span>
           <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
         </button>
       }
@@ -67,7 +67,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       <nav
         leading
         class="scrollbar-none -mx-1 flex items-center gap-0.5 overflow-x-auto"
-        aria-label="Issue views"
+        aria-label="Task views"
       >
         @for (t of tabs; track t.id) {
           <a
@@ -90,17 +90,10 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       </nav>
     </app-page-header>
     <app-stats-board variant="strip" [model]="stats()" [moreLink]="['/', slug(), 'stats']" />
-    @if (customerRef(); as c) {
-      <p class="text-muted-foreground border-b px-4 py-2 text-xs sm:px-6">
-        Showing issues linked to <a class="text-foreground font-medium" [routerLink]="['/', slug(), 'customers', c.id]">{{ c.name }}</a>.
-        <a class="hover:text-foreground underline" [routerLink]="[]" [queryParams]="{ customer: null }" queryParamsHandling="merge">Clear</a>
-      </p>
-    }
     <app-issue-board
-      [issues]="visibleIssues()"
+      [issues]="store.issues()"
       [scope]="scope()"
       [status]="status()"
-      [team]="teamRef()?.id ?? team()"
       [project]="project()"
       [emptyTitle]="empty().title"
       [emptyDescription]="empty().description"
@@ -116,14 +109,10 @@ export class IssuePage {
   readonly workspaceSlug = input<string>();
   /** Query `?status=backlog` from attention and saved links. */
   readonly status = input<string>();
-  /** Query `?team=<teamId>` (sidebar team links). */
-  readonly team = input<string>();
-  /** Query `?project=<projectId>`: only issues planned under that project. */
+  /** Query `?project=<projectId>`: only tasks planned under that project. */
   readonly project = input<string>();
   /** Query `?view=active|backlog|done` (view tabs). */
   readonly view = input<string>();
-  /** Query `?customer=<customerId>`: only issues linked to that customer. */
-  readonly customer = input<string>();
 
   protected readonly plus = LucidePlus;
   protected readonly tabs = ISSUE_TABS;
@@ -132,29 +121,12 @@ export class IssuePage {
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
-  protected readonly teamRef = computed(() => this.store.getTeam(this.team()));
-  protected readonly customerRef = computed(() => this.store.getCustomer(this.customer()));
-  protected readonly visibleIssues = computed(() => {
-    const id = this.customerRef()?.id;
-    if (!this.customer()) return this.store.issues();
-    if (!id) return [];
-    const ids = new Set(this.store.customerRequests().filter((r) => r.customerId === id && r.issueId).map((r) => r.issueId));
-    return this.store.issues().filter((i) => ids.has(i.id));
-  });
-  protected readonly title = computed(() =>
-    this.teamRef() ? `${this.teamRef()!.name} issues` : 'Issues',
+  protected readonly title = computed(() => 'Tasks');
+  protected readonly description = computed(
+    () => 'Track bugs, requests and incidents from triage through completion.',
   );
-  protected readonly description = computed(() =>
-    this.teamRef()
-      ? `Issues reported to ${this.teamRef()!.name}.`
-      : 'Track bugs, requests and incidents from triage through completion.',
-  );
-  /** Issue count per tab (within the team, when scoped to one). */
   protected readonly counts = computed(() => {
-    const teamId = this.teamRef()?.id;
-    const list = teamId
-      ? this.store.issues().filter((i) => i.teamId === teamId)
-      : this.store.issues();
+    const list = this.store.issues();
     const out = {} as Record<IssueViewTab, number>;
     for (const t of ISSUE_TABS)
       out[t.id] = t.statuses
@@ -166,17 +138,15 @@ export class IssuePage {
   private readonly _keys = usePageShortcuts([
     {
       keys: 'c',
-      label: 'New issue',
-      group: 'Issues',
+      label: 'New task',
+      group: 'Tasks',
       run: () => this.store.allowed('createIssues') && this.create(),
     },
   ]);
 
   protected create(): void {
-    const teamId = this.teamRef()?.id;
     const status = this.scope()?.[0];
     this.ui.openCreate('issue', {
-      ...(teamId ? { teamId } : {}),
       ...(status && status !== 'done' ? { status } : {}),
     });
   }

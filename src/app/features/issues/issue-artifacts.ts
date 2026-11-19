@@ -54,7 +54,7 @@ import { ProjectArtifactRow } from '../projects/project-artifact-row';
         <svg [lucideIcon]="pkg" [size]="16" class="text-muted-foreground shrink-0"></svg>
         <p class="text-muted-foreground min-w-0 flex-1 text-xs">
           No artifacts yet. Attach a spec, design, link or release artifact to keep useful context
-          with this issue.
+          with this task.
         </p>
       </div>
     }

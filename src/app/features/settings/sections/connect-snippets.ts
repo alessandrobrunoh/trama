@@ -124,13 +124,13 @@ export class ConnectSnippets {
       case 'env':
         return { label: 'Environment', hint: 'Read by the trama CLI and by `trama mcp`. Put these in the environment of your script, CI job or agent runtime. Never commit the token.' };
       case 'read':
-        return { label: 'curl command', hint: 'Lists workspace issues. Any GET route works with every scope.' };
+        return { label: 'curl command', hint: 'Lists workspace tasks. Any GET route works with every scope.' };
       case 'write':
-        return { label: 'curl command', hint: 'Files an issue. Needs a write (or admin) token; a read token gets 403.' };
+        return { label: 'curl command', hint: 'Files a task. Needs a write (or admin) token; a read token gets 403.' };
       case 'context':
         return {
           label: 'curl command',
-          hint: 'Returns the issue and its plan, if present, so an agent can pick up the context.',
+          hint: 'Returns the task and its plan, if present, so an agent can pick up the context.',
         };
     }
   });
@@ -152,7 +152,7 @@ export class ConnectSnippets {
           ``,
           `trama login --api-url ${url}   # paste the token when asked`,
           `trama whoami`,
-          `trama issue list --open --limit 5`,
+          `trama task list --open --limit 5`,
           `trama skill install            # teach Claude Code / agents the commands`,
         ].join('\n');
       case 'env':

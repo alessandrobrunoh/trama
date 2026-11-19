@@ -33,7 +33,6 @@ import {
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { UploadFile } from '../../shared/upload-file';
-import { EntityChip } from '../../shared/entity-chip';
 import { Kbd } from '../../shared/kbd';
 import { Markdown } from '../../shared/markdown';
 import { RelativeTimePipe } from '../../shared/pipes';
@@ -53,7 +52,7 @@ import { CommentComposer, CommentItem, CommentsLoader } from '../../shared/comme
         #ta
         rows="1"
         class="bg-transparent w-full resize-none overflow-hidden rounded-md text-2xl leading-tight font-semibold tracking-tight outline-none"
-        aria-label="Issue title"
+        aria-label="Task title"
         [value]="draft()"
         (input)="onInput($event)"
         (keydown.enter)="$event.preventDefault(); commit()"
@@ -321,10 +320,9 @@ interface EventView {
 }
 
 const FIELD_VERB: Record<string, string> = {
-  title: 'renamed the issue',
+  title: 'renamed the task',
   body: 'edited the description',
   assigneeId: 'changed the assignee',
-  teamId: 'moved the issue to another team',
   priority: 'changed the priority',
   reporterName: 'updated the reporter',
   externalUrl: 'updated the external link',
@@ -337,7 +335,7 @@ function describe(ev: DomainEvent): EventView | null {
     typeof v === 'string' && v in ISSUE_STATUS_META;
   switch (ev.type) {
     case 'issue.created':
-      return { icon: LucideCircleDot, verb: 'created the issue' };
+      return { icon: LucideCircleDot, verb: 'created the task' };
     case 'issue.status_changed':
       return {
         icon: null,
@@ -348,10 +346,10 @@ function describe(ev: DomainEvent): EventView | null {
     case 'issue.updated': {
       const fields = Array.isArray(d['fields']) ? (d['fields'] as string[]) : [];
       const verbs = fields.map((f) => FIELD_VERB[f] ?? `updated ${f}`);
-      return { icon: LucidePencil, verb: verbs.length ? verbs.join(', ') : 'updated the issue' };
+      return { icon: LucidePencil, verb: verbs.length ? verbs.join(', ') : 'updated the task' };
     }
     case 'issue.linked':
-      return { icon: LucideCircleDot, verb: 'recorded a legacy issue link' };
+      return { icon: LucideCircleDot, verb: 'recorded a legacy task link' };
     case 'comment.created':
       return null; // the comment itself is in the feed
     default:
@@ -371,7 +369,6 @@ type FeedItem =
     ActorAvatar,
     LucideDynamicIcon,
     StatusIcon,
-    EntityChip,
     RelativeTimePipe,
     CommentItem,
     CommentComposer,

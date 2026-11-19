@@ -23,7 +23,7 @@ import { ProgressChart } from './progress-chart';
       <header class="mb-2 flex items-center gap-2">
         <app-milestone-icon [size]="15" state="idle" />
         <h2 id="project-milestones-title" class="text-sm font-semibold">Milestones</h2>
-        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this project, each with its own issues and date</span>
+        <span class="text-muted-foreground text-xs">{{ milestones().length }} · stages of this project, each with its own tasks and date</span>
         @if (canEdit()) {
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground hover:text-foreground ml-auto" aria-label="Add milestone" (click)="startAdd()">
             <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -64,7 +64,7 @@ import { ProgressChart } from './progress-chart';
           </div>
         } @else if (!milestones().length) {
           <p class="text-muted-foreground px-3 py-3 text-sm">
-            Break this project into milestones. Each groups some of its issues and has its own target date.
+            Break this project into milestones. Each groups some of its tasks and has its own target date.
             @if (canEdit()) {
               <button type="button" class="text-foreground underline-offset-2 hover:underline" (click)="startAdd()">Add the first milestone</button>
             }

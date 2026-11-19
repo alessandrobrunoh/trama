@@ -41,7 +41,7 @@ const STALE_CHOICES = [3, 7, 14, 30] as const;
 const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
   health: { label: 'Health', blurb: 'Where the problems are right now: stuck, stale and overdue work, and who everything waits on.' },
   contributors: { label: 'People & agents', blurb: 'Who changes things, and where agents get stuck. Agents are actors, never assignees.' },
-  issues: { label: 'Issues', blurb: 'Demand: what comes in, how fast it clears, and what is waiting.' },
+  issues: { label: 'Tasks', blurb: 'What comes in, how fast it clears, and what is waiting.' },
   estimates: { label: 'Estimates & time', blurb: 'How long work really takes, and how well estimates predict it.' },
 };
 
@@ -56,7 +56,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
   host: { class: 'block' },
   template: `
     @if (variant() === 'strip') {
-      <section class="border-b px-4 py-2.5 sm:px-6" aria-label="Issue summary">
+      <section class="border-b px-4 py-2.5 sm:px-6" aria-label="Task summary">
         <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
           @for (c of model().cards; track c.label) {
             <span class="inline-flex items-baseline gap-1 text-xs">
@@ -65,7 +65,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
             </span>
           }
           @if (stripSpark().length > 1) {
-            <span class="text-meta inline-flex items-center gap-2 text-[11px]" title="Open issues over the last 30 days">
+            <span class="text-meta inline-flex items-center gap-2 text-[11px]" title="Open tasks over the last 30 days">
               <app-sparkline class="w-20" [values]="stripSpark()" />
               <span>30d</span>
             </span>
@@ -115,18 +115,6 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
                   <option [value]="m.user.id" [selected]="person() === m.user.id">{{ m.user.name }}</option>
                 }
               </select>
-              }
-              @if (store.teams().length) {
-                <select
-                  class="border-input bg-background h-7 max-w-40 rounded-md border px-1.5 text-xs"
-                  aria-label="Team"
-                  (change)="setTeam($any($event.target).value)"
-                >
-                  <option value="all" [selected]="team() === 'all'">All teams</option>
-                  @for (t of store.teams(); track t.id) {
-                    <option [value]="t.id" [selected]="team() === t.id">{{ t.name }}</option>
-                  }
-                </select>
               }
               @if (insightScope() && store.projects().length) {
                 <select
@@ -210,18 +198,18 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
               title="Opened vs closed"
               [subtitle]="periodLong()"
               [note]="v.flow.note"
-              [empty]="flowEmpty(v.flow) ? 'No issues opened or closed in this period.' : undefined"
+              [empty]="flowEmpty(v.flow) ? 'No tasks opened or closed in this period.' : undefined"
             >
               <app-time-chart
                 mode="line"
                 [series]="v.flow.series"
                 [labels]="v.flow.labels"
                 [tooltipTitles]="v.flow.titles"
-                ariaLabel="Issues opened and closed over time"
+                ariaLabel="Tasks opened and closed over time"
               />
             </app-chart-card>
 
-            <app-chart-card title="Status now" subtitle="All issues, current state" [empty]="issueStatus().length ? undefined : 'No issues yet.'">
+            <app-chart-card title="Status now" subtitle="All tasks, current state" [empty]="issueStatus().length ? undefined : 'No tasks yet.'">
               <app-donut-chart [slices]="issueStatus()" centerLabel="issues" />
               @if (issuePriority().length) {
                 <h4 class="text-muted-foreground mt-5 mb-2 text-xs">By priority</h4>
@@ -234,7 +222,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
             <app-chart-card
               class="lg:col-span-2"
               title="Backlog flow"
-              subtitle="Issues by status over time, canceled excluded"
+              subtitle="Tasks by status over time, canceled excluded"
               [note]="v.stock?.note"
               [empty]="v.stock ? undefined : v.stockUnavailable"
             >
@@ -244,32 +232,29 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
                   [series]="st.series"
                   [labels]="st.labels"
                   [tooltipTitles]="st.titles"
-                  ariaLabel="Issues by status over time"
+                  ariaLabel="Tasks by status over time"
                 />
               }
             </app-chart-card>
 
-            <app-chart-card title="Open backlog age" subtitle="How long open issues have been waiting" [empty]="ageEmpty(v.age) ? 'No open issues.' : undefined">
+            <app-chart-card title="Open backlog age" subtitle="How long open tasks have been waiting" [empty]="ageEmpty(v.age) ? 'No open tasks.' : undefined">
               <app-time-chart
                 mode="bars"
                 [series]="v.age.series"
                 [labels]="v.age.labels"
                 [tooltipTitles]="v.age.titles"
                 [height]="170"
-                ariaLabel="Open issues by age"
+                ariaLabel="Open tasks by age"
               />
             </app-chart-card>
           </div>
 
-          <div class="grid gap-4 lg:grid-cols-3">
-            <app-chart-card title="Opened by type" [subtitle]="periodLong()" [empty]="v.openedByKind.length ? undefined : 'No issues opened in this period.'">
-              <app-bar-list [rows]="v.openedByKind" ariaLabel="Issues opened by type" />
+          <div class="grid gap-4 lg:grid-cols-2">
+            <app-chart-card title="Opened by type" [subtitle]="periodLong()" [empty]="v.openedByKind.length ? undefined : 'No tasks opened in this period.'">
+              <app-bar-list [rows]="v.openedByKind" ariaLabel="Tasks opened by type" />
             </app-chart-card>
-            <app-chart-card title="Opened by team" [subtitle]="periodLong()" [empty]="v.openedByTeam.length ? undefined : 'No issues opened in this period.'">
-              <app-bar-list [rows]="v.openedByTeam" defaultColor="var(--chart-2)" ariaLabel="Issues opened by team" />
-            </app-chart-card>
-            <app-chart-card title="Open by assignee" subtitle="Current backlog" [empty]="v.openByAssignee.length ? undefined : 'No open issues.'">
-              <app-bar-list [rows]="v.openByAssignee" defaultColor="var(--chart-3)" ariaLabel="Open issues by assignee" />
+            <app-chart-card title="Open by assignee" subtitle="Current backlog" [empty]="v.openByAssignee.length ? undefined : 'No open tasks.'">
+              <app-bar-list [rows]="v.openByAssignee" defaultColor="var(--chart-3)" ariaLabel="Open tasks by assignee" />
             </app-chart-card>
           </div>
 
@@ -291,7 +276,7 @@ const SCOPE_META: Record<StatsScope, { label: string; blurb: string }> = {
         }
 
         @if (!scopes().length && !deliveryDists().length) {
-          <p class="text-meta rounded-lg border border-dashed py-12 text-center">Nothing to chart yet. Statistics appear once issues exist.</p>
+          <p class="text-meta rounded-lg border border-dashed py-12 text-center">Nothing to chart yet. Statistics appear once tasks exist.</p>
         }
 
         @if (model().cards.length && !filtered() && !insightScope() && scope() !== 'estimates') {
@@ -339,7 +324,7 @@ export class StatsBoard {
   readonly moreLink = input<readonly string[]>([]);
   /** Limit the available views for embedding contexts. */
   readonly onlyScopes = input<readonly StatsScope[] | undefined>(undefined, { alias: 'scopes' });
-  /** Keep scope, period, person and team in the URL query (the statistics page). */
+  /** Keep scope, period, person and project in the URL query (the statistics page). */
   readonly syncUrl = input(false);
   /** Offer the Health, Flow and People & agents scopes (the workspace statistics page). */
   readonly insights = input(false);
@@ -356,8 +341,6 @@ export class StatsBoard {
   protected readonly picked = signal<StatsScope | null>(null);
   /** `all` | `me` | a user id. */
   protected readonly person = signal<string>('all');
-  /** `all` | a team id. */
-  protected readonly team = signal<string>('all');
   /** `all` | a project id (insight scopes). */
   protected readonly project = signal<string>('all');
   protected readonly stale = signal<number>(7);
@@ -375,7 +358,6 @@ export class StatsBoard {
         this.picked.set(SCOPES.includes(scope as StatsScope) ? (scope as StatsScope) : null);
         this.period.set(PERIODS.some((p) => p.id === period) ? (period as Period) : '30d');
         this.person.set(q.get('person') || 'all');
-        this.team.set(q.get('team') || 'all');
         this.project.set(q.get('project') || 'all');
         const stale = Number(q.get('stale'));
         this.stale.set((STALE_CHOICES as readonly number[]).includes(stale) ? stale : 7);
@@ -390,25 +372,23 @@ export class StatsBoard {
   protected readonly nowMs = computed(() => this.rawTimeline().now || Date.now());
   protected readonly scale = computed(() => this.store.estimateScale());
 
-  // ── person and team filters, applied to every scope
+  // ── person filter, applied to every scope
   private readonly personId = computed(() => {
     const p = this.person();
     return p === 'all' ? null : p === 'me' ? (this.store.me()?.id ?? null) : p;
   });
-  private readonly teamId = computed(() => (this.team() === 'all' ? null : this.team()));
-  protected readonly filtered = computed(() => this.personId() !== null || this.teamId() !== null);
+  protected readonly filtered = computed(() => this.personId() !== null);
 
   private readonly timeline = computed<Timeline>(() => {
     const tl = this.rawTimeline();
     const p = this.personId();
-    const t = this.teamId();
-    if (!p && !t) return tl;
+    if (!p) return tl;
     return {
       ...tl,
-      issues: tl.issues.filter((i) => (!p || i.assigneeId === p) && (!t || i.teamId === t)),
+      issues: tl.issues.filter((i) => i.assigneeId === p),
     };
   });
-  protected readonly filteredWork = computed(() => filterWork(this.work().issues, { person: this.personId(), team: this.teamId() }));
+  protected readonly filteredWork = computed(() => filterWork(this.work().issues, { person: this.personId() }));
   protected readonly scopes = computed<StatsScope[]>(() => {
     const raw = this.rawTimeline();
     const out: StatsScope[] = this.insights() && this.variant() === 'full' ? [...INSIGHT_SCOPES] : [];
@@ -428,7 +408,6 @@ export class StatsBoard {
   protected readonly insightQuery = computed<InsightsQuery>(() => ({
     days: this.insightDays(),
     staleDays: this.stale(),
-    ...(this.teamId() ? { teamId: this.teamId()! } : {}),
     ...(this.project() !== 'all' ? { projectId: this.project() } : {}),
   }));
   /** Health signals, flow metrics and contributors: one request, only while an insight scope is open. */
@@ -462,19 +441,19 @@ export class StatsBoard {
   protected readonly issueStatus = computed<ChartSlice[]>(() =>
     this.filtered()
       ? ISSUE_STATUSES.map((s) => ({ key: s, label: ISSUE_STATUS_META[s].label, value: this.timeline().issues.filter((i) => i.status === s).length, color: ISSUE_COLOR[s] })).filter((x) => x.value > 0)
-      : this.slicesOf('Issue status'),
+      : this.slicesOf('Task status'),
   );
   protected readonly issuePriority = computed<ChartSlice[]>(() =>
     this.filtered()
       ? PRIORITIES.map((p) => ({ key: p, label: PRIORITY_META[p].label, value: this.timeline().issues.filter((i) => i.priority === p).length, color: PRIORITY_COLOR[p] })).filter((x) => x.value > 0)
-      : this.slicesOf('Issue priority'),
+      : this.slicesOf('Task priority'),
   );
   protected readonly deliveryDists = computed(() =>
     this.filtered()
       ? []
-      : this.model().distributions.filter((d) => d.title === 'Artifacts' || d.title === 'Decisions'),
+      : this.model().distributions.filter((d) => d.title === 'Artifacts'),
   );
-  /** Artifacts and decisions are useful delivery context alongside issue statistics. */
+  /** Artifacts are useful delivery context alongside issue statistics. */
   protected readonly showDelivery = computed(
     () => this.variant() === 'full' && !this.insightScope() && this.deliveryDists().length > 0,
   );
@@ -491,10 +470,6 @@ export class StatsBoard {
     this.person.set(v);
     this.sync({ person: v === 'all' ? null : v });
   }
-  protected setTeam(v: string): void {
-    this.team.set(v);
-    this.sync({ team: v === 'all' ? null : v });
-  }
   protected setProject(v: string): void {
     this.project.set(v);
     this.sync({ project: v === 'all' ? null : v, signal: null });
@@ -509,9 +484,8 @@ export class StatsBoard {
   }
   protected clearFilters(): void {
     this.person.set('all');
-    this.team.set('all');
     this.project.set('all');
-    this.sync({ person: null, team: null, project: null });
+    this.sync({ person: null, project: null });
   }
 
   private sync(params: Record<string, string | null>): void {

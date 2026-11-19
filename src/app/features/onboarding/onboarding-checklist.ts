@@ -8,7 +8,7 @@ import { UiStore } from '../../core/stores/ui.store';
 import { Viewport } from '../../core/viewport';
 
 /**
- * "Get started" card for workspaces that are still being set up: six steps from the first team to a connected
+ * "Get started" card for workspaces that are still being set up: five steps from the first invite to a connected
  * agent. Done steps come from real data (see OnboardingStore). Dismissible; the help menu brings it back.
  */
 @Component({

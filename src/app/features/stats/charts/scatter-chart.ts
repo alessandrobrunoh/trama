@@ -127,7 +127,7 @@ export interface ScatterColumn {
       <table class="sr-only">
         <caption>{{ ariaLabel() }}</caption>
         <thead>
-          <tr><th scope="col">Issue</th><th scope="col">Estimate</th><th scope="col">Detail</th></tr>
+          <tr><th scope="col">Task</th><th scope="col">Estimate</th><th scope="col">Detail</th></tr>
         </thead>
         <tbody>
           @for (p of points(); track p.id) {

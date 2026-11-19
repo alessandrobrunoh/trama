@@ -17,18 +17,16 @@ export interface FavoriteEntry {
   favorite: Favorite;
   type: FavoriteType;
   subjectId: ID;
-  /** Main text: an issue / decision title, a team, repository or view name. */
+  /** Main text: a task title, or a project or view name. */
   label: string;
-  /** Key such as `CORA-142` or `ADR-12`, when the entity has one. */
+  /** Key such as `CORA-142`, when the entity has one. */
   key?: string;
   /** Router commands below `/:workspaceSlug`. */
   link: string[];
   /** Status to draw next to the label. */
   status?: string;
-  /** Team color. */
+  /** Project color. */
   color?: string;
-  /** Customer logo URL. */
-  logoUrl?: string;
 }
 
 const keyOf = (type: FavoriteType, id: ID): string => `${type}:${id}`;
@@ -59,13 +57,10 @@ export class FavoritesStore {
     const n = this.trama;
     const found = (type: FavoriteType, id: ID | undefined) => (id ? { type, id } : null);
     switch (section) {
+      case 'tasks':
       case 'issues': return found('issue', n.getIssue(key)?.id);
       case 'projects': return found('project', n.getProject(key)?.id);
-      case 'decisions': return found('decision', n.getDecision(key)?.id);
-      case 'teams': return found('team', n.getTeam(key)?.id);
-      case 'repositories': return found('repository', n.getRepository(key)?.id);
       case 'views': return found('view', n.getView(key)?.id);
-      case 'customers': return found('customer', n.getCustomer(key)?.id);
       default: return null;
     }
   });
@@ -177,31 +172,15 @@ export class FavoritesStore {
     switch (favorite.type) {
       case 'issue': {
         const i = this.trama.getIssue(favorite.subjectId);
-        return i ? { ...base, label: i.title, key: i.key, link: ['issues', i.key], status: i.status } : null;
-      }
-      case 'decision': {
-        const d = this.trama.getDecision(favorite.subjectId);
-        return d ? { ...base, label: d.title, key: d.key, link: ['decisions', d.key] } : null;
-      }
-      case 'team': {
-        const t = this.trama.getTeam(favorite.subjectId);
-        return t ? { ...base, label: t.name, key: t.key, link: ['teams', t.key], color: t.color } : null;
+        return i ? { ...base, label: i.title, key: i.key, link: ['tasks', i.key], status: i.status } : null;
       }
       case 'project': {
         const p = this.trama.getProject(favorite.subjectId);
         return p ? { ...base, label: p.name, link: ['projects', p.id], color: p.color } : null;
       }
-      case 'repository': {
-        const r = this.trama.getRepository(favorite.subjectId);
-        return r ? { ...base, label: r.fullName, link: ['repositories', r.id] } : null;
-      }
       case 'view': {
         const v = this.trama.getView(favorite.subjectId);
         return v ? { ...base, label: v.name, link: ['views', v.id] } : null;
-      }
-      case 'customer': {
-        const c = this.trama.getCustomer(favorite.subjectId);
-        return c ? { ...base, label: c.name, link: ['customers', c.id], ...(c.logoUrl ? { logoUrl: c.logoUrl } : {}) } : null;
       }
     }
     return null;

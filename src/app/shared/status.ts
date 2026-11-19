@@ -11,7 +11,6 @@ import {
   LucideCircleAlert,
   LucideCircleCheck,
   LucideCircleDashed,
-  LucideCircleMinus,
   LucideCircleX,
   LucideGitMerge,
   LucideRocket,
@@ -23,7 +22,6 @@ import {
   resolveStatusEntry,
   type ArtifactState,
   type CiState,
-  type DecisionStatus,
   type IssueStatus,
   type StatusEntry,
   type StatusSubject,
@@ -32,7 +30,7 @@ import { TramaStore } from '../core/stores/trama.store';
 import { LucideNames, isLucideName } from './lucide-names';
 
 /** Every enum value that has a status visual. */
-export type AnyStatus = IssueStatus | DecisionStatus | ArtifactState | CiState;
+export type AnyStatus = IssueStatus | ArtifactState | CiState;
 
 type Glyph =
   | { kind: 'icon'; icon: LucideIcon }
@@ -86,11 +84,6 @@ export const STATUS_VISUALS: Record<AnyStatus, StatusVisual> = {
   in_review: v('In review', 'review', { kind: 'pie', fraction: 0.75 }),
   done: v('Done', 'done', icon(LucideCircleCheck)),
   canceled: v('Canceled', 'neutral', icon(LucideCircleX)),
-  // DecisionStatus
-  accepted: v('Accepted', 'done', icon(LucideCircleCheck)),
-  proposed: v('Proposed', 'input', { kind: 'dashed' }),
-  superseded: v('Superseded', 'neutral', icon(LucideCircleMinus)),
-  rejected: v('Rejected', 'danger', icon(LucideCircleX)),
   // ArtifactState / CI
   open: v('Open', 'active', icon(LucideCircle)),
   merged: v('Merged', 'review', icon(LucideGitMerge)),
@@ -253,8 +246,8 @@ export class StatusIcon {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status);
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status);
-    if (entity === 'other') return resolveStatusEntry(catalog.decision, status);
-    const lists = [catalog.issue, catalog.decision];
+    if (entity === 'other') return undefined;
+    const lists = [catalog.issue, catalog.project];
     const hits = lists.filter((entries) => entries.some((entry) => entry.id === status || entry.type === status));
     if (hits.length !== 1) return undefined;
     return resolveStatusEntry(hits[0], status);
@@ -310,7 +303,6 @@ export class StatusBadge {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status)?.name;
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status)?.name;
-    if (entity === 'other') return resolveStatusEntry(catalog.decision, status)?.name;
     return undefined;
   }
 }

@@ -30,11 +30,11 @@ import { projectStats, type ProjectStats } from './project-stats-model';
           <app-empty-state
             [icon]="chartIcon"
             title="No data to chart yet"
-            description="Insights appear once issues are planned under this project."
+            description="Insights appear once tasks are planned under this project."
           />
         } @else {
           <section aria-label="Key numbers" class="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <app-kpi-tile label="Issues" [value]="'' + s.kpis.total" [hint]="issuesHint()" />
+            <app-kpi-tile label="Tasks" [value]="'' + s.kpis.total" [hint]="issuesHint()" />
             <app-kpi-tile
               label="Completed"
               [value]="'' + s.kpis.done"
@@ -51,7 +51,7 @@ import { projectStats, type ProjectStats } from './project-stats-model';
             <app-kpi-tile
               label="Unassigned"
               [value]="'' + s.kpis.unassigned"
-              hint="Open issues without an assignee"
+              hint="Open tasks without an assignee"
             />
             <app-kpi-tile
               label="Velocity"
@@ -65,7 +65,7 @@ import { projectStats, type ProjectStats } from './project-stats-model';
             <app-chart-card
               class="lg:col-span-2"
               title="Burn-up"
-              subtitle="Scope, started and completed issues over time; canceled issues are not counted"
+              subtitle="Scope, started and completed tasks over time; canceled tasks are not counted"
               [empty]="burnSeries().length ? undefined : 'Not enough history yet.'"
             >
               <app-time-chart
@@ -73,14 +73,14 @@ import { projectStats, type ProjectStats } from './project-stats-model';
                 [series]="burnSeries()"
                 [labels]="s.burnUp?.labels ?? []"
                 [tooltipTitles]="s.burnUp?.titles"
-                ariaLabel="Project burn-up: scope, started and completed issues over time"
+                ariaLabel="Project burn-up: scope, started and completed tasks over time"
               />
             </app-chart-card>
 
             <app-chart-card
               title="Status"
-              subtitle="Issues by status now"
-              [empty]="statusSlices().length ? undefined : 'No issues yet.'"
+              subtitle="Tasks by status now"
+              [empty]="statusSlices().length ? undefined : 'No tasks yet.'"
             >
               <app-donut-chart [slices]="statusSlices()" centerLabel="issues" />
             </app-chart-card>
@@ -90,15 +90,15 @@ import { projectStats, type ProjectStats } from './project-stats-model';
             <app-chart-card
               class="lg:col-span-2"
               title="Weekly velocity"
-              subtitle="Issues closed per week, with a 3-week average"
+              subtitle="Tasks closed per week, with a 3-week average"
               [note]="forecastNote()"
-              [empty]="s.velocity.length ? undefined : 'No issue has been completed yet.'"
+              [empty]="s.velocity.length ? undefined : 'No task has been completed yet.'"
             >
               <app-column-chart
                 [series]="velocitySeries()"
                 [labels]="velocityLabels()"
                 [tooltipTitles]="velocityTitles()"
-                ariaLabel="Issues closed per week"
+                ariaLabel="Tasks closed per week"
               />
             </app-chart-card>
 
@@ -118,21 +118,21 @@ import { projectStats, type ProjectStats } from './project-stats-model';
           <div class="grid gap-4 md:grid-cols-2">
             <app-chart-card
               title="Priority"
-              subtitle="Issues in scope"
-              [empty]="priorityRows().length ? undefined : 'No issues yet.'"
+              subtitle="Tasks in scope"
+              [empty]="priorityRows().length ? undefined : 'No tasks yet.'"
             >
-              <app-bar-list [rows]="priorityRows()" ariaLabel="Issues by priority" />
+              <app-bar-list [rows]="priorityRows()" ariaLabel="Tasks by priority" />
             </app-chart-card>
 
             <app-chart-card
               title="Open by assignee"
-              subtitle="Workload on the open issues"
-              [empty]="assigneeRows().length ? undefined : 'No open issues.'"
+              subtitle="Workload on the open tasks"
+              [empty]="assigneeRows().length ? undefined : 'No open tasks.'"
             >
               <app-bar-list
                 [rows]="assigneeRows()"
                 defaultColor="var(--chart-3)"
-                ariaLabel="Open issues by assignee"
+                ariaLabel="Open tasks by assignee"
               />
             </app-chart-card>
           </div>
@@ -202,12 +202,12 @@ export class ProjectStatsTab {
 
   protected readonly forecastNote = computed(() => {
     const f = this.stats().forecast;
-    if (f.kind === 'done') return 'Every issue in scope is closed.';
+    if (f.kind === 'done') return 'Every task in scope is closed.';
     if (f.kind === 'no_pace')
-      return `${f.remaining} issues are open, but none were closed in the last 4 weeks, so there is no pace to estimate from.`;
+      return `${f.remaining} tasks are open, but none were closed in the last 4 weeks, so there is no pace to estimate from.`;
     const eta = f.etaAt === undefined ? '' : format(new Date(f.etaAt), 'MMM d, yyyy');
     const vs = this.versusTarget(f.daysVsTarget);
-    return `At ${f.perWeek} issues per week, the ${f.remaining} open issues would be closed around ${eta}${vs ? ` (${vs})` : ''}. A straight-line estimate, not a commitment.`;
+    return `At ${f.perWeek} tasks per week, the ${f.remaining} open tasks would be closed around ${eta}${vs ? ` (${vs})` : ''}. A straight-line estimate, not a commitment.`;
   });
 
   protected readonly burnSeries = computed<ChartSeries[]>(() => {
@@ -255,7 +255,7 @@ export class ProjectStatsTab {
       hint: m.targetDate ? format(new Date(m.targetDate), 'MMM d') : undefined,
       value: m.percent,
       valueLabel: `${m.percent}%`,
-      detail: `${m.name}: ${m.done} of ${m.total} issues done${m.late ? ', past its target date' : ''}`,
+      detail: `${m.name}: ${m.done} of ${m.total} tasks done${m.late ? ', past its target date' : ''}`,
       color: m.late
         ? 'var(--status-blocked)'
         : m.percent === 100

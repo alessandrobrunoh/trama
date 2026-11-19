@@ -658,7 +658,7 @@ html[data-keyboard='open'] .mobile-fab {
    the same meaning in both modes. Use the semantic Tailwind colors (bg-background,
    text-muted-foreground, text-status-working, …) — never raw hex / palette colors in feature code.
 
-   Entity accents: issues are demand (circle glyphs), decisions are knowledge (--entity-decision). */
+   Entity accents: tasks are demand (circle glyphs). */
 :root {
   color-scheme: light;
   --radius: 0.375rem; /* 6px: controls, menus, popovers */
@@ -795,7 +795,7 @@ html[data-keyboard='open'] .mobile-fab {
   --status-ready-to-land: var(--tone-teal);
   --status-shipped: var(--tone-green);
   --status-canceled: var(--tone-neutral);
-  /* Extra execution / intake / decision / artifact / CI states reuse the same tones */
+  /* Extra execution / artifact / CI states reuse the same tones */
   --status-queued: var(--tone-neutral);
   --status-running: var(--tone-blue);
   --status-failed: var(--tone-red);

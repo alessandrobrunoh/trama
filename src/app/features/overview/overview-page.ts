@@ -11,7 +11,7 @@ import { OverviewRail } from './overview-rail';
 
 /**
  * Workspace at a glance. Top to bottom: greeting, 30-day KPIs, then a main column (what needs me,
- * what needs attention and issue flow beside a quiet rail (triage, decisions, activity).
+ * what needs attention and task flow beside a quiet rail (triage, activity).
  */
 @Component({
   selector: 'app-overview-page',
@@ -60,6 +60,6 @@ export class OverviewPage {
   protected readonly subtitle = computed(() => this.model.subtitle());
 
   private readonly _keys = usePageShortcuts([
-    { keys: 'c', label: 'New issue', group: 'Overview', run: () => this.store.allowed('createIssues') && this.ui.openCreate('issue') },
+    { keys: 'c', label: 'New task', group: 'Overview', run: () => this.store.allowed('createIssues') && this.ui.openCreate('issue') },
   ]);
 }

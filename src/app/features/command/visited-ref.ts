@@ -1,13 +1,11 @@
 // Which record a detail-page URL shows (feeds "recently viewed"). Pure, so it can be unit tested.
-export type VisitType = 'issue' | 'decision' | 'project' | 'repository' | 'team';
+export type VisitType = 'issue' | 'project';
 
-/** Detail routes `/:slug/<area>/:ref` that count as a visit. */
+/** Detail routes `/:slug/<area>/:ref` that count as a visit. `issues` is the old tasks path. */
 const VISIT_AREAS: Record<string, VisitType> = {
+  tasks: 'issue',
   issues: 'issue',
-  decisions: 'decision',
   projects: 'project',
-  repositories: 'repository',
-  teams: 'team',
 };
 
 /** `/acme/issues/BUG-1?x=1` → the record that page shows (also on its tabs), or null for lists and other pages. */

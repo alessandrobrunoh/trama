@@ -202,7 +202,7 @@ const SORT_LABEL: Record<Sort, string> = {
           <app-empty-state
             [icon]="fileIcon"
             title="No documents yet"
-            description="Write the spec, the plan or the notes that do not belong in a repository. Paste Markdown to start, then attach the document to the project or issue it explains."
+            description="Write the spec, the plan or the notes that do not belong in a repository. Paste Markdown to start, then attach the document to the project or task it explains."
           >
             @if (canCreate()) {
               <button hlmBtn size="sm" (click)="create()">

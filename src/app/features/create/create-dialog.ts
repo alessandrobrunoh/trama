@@ -16,11 +16,7 @@ import {
   LucideCircleUser,
   LucideDynamicIcon,
   LucideBox,
-  LucideFolderGit2,
   LucideLayers,
-  LucideScale,
-  LucideTag,
-  LucideUsers,
   LucideX,
   type LucideIcon,
 } from '@lucide/angular';
@@ -31,14 +27,11 @@ import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
 import {
-  GIT_PROVIDERS,
-  GIT_PROVIDER_META,
   isProjectKey,
   isReservedProjectKey,
   PROJECT_KEY_MAX,
   uniqueProjectKey,
   UNASSIGNED_ISSUE_KEY_PREFIX,
-  type GitProvider,
   type IssueKind,
   type IssueStatus,
   type Priority,
@@ -68,7 +61,7 @@ import { DraftSuggestions } from '../ai/draft-suggestions';
 import type { AiIssueDraftSuggestion } from '../../core/ai/ai-api';
 import { EntityChip } from '../../shared/entity-chip';
 
-type ComposerKind = 'issue' | 'decision';
+type ComposerKind = 'issue';
 
 /** Kinds whose records can own file/image artifacts, so the dialog accepts attachments for them. */
 const ATTACHABLE = new Set<CreateKind>(['issue', 'project']);
@@ -81,30 +74,22 @@ interface KindDef {
   example: string;
 }
 
-/** The composer kinds, most common first. Other kinds (team, view, …) open in single-form mode. */
+/** Composer kinds. Project and view open in single-form mode. */
 const SWITCHER: KindDef[] = [
   {
     kind: 'issue',
-    label: 'Issue',
+    label: 'Task',
     blurb: "A problem or request: what's wrong or needed.",
     example: 'CORA-142',
   },
-  {
-    kind: 'decision',
-    label: 'Decision',
-    blurb: 'Durable knowledge: what was decided and why.',
-    example: 'ADR-7',
-  },
 ];
 const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = {
-  team: { label: 'Team', icon: LucideUsers },
-  repository: { label: 'Repository', icon: LucideFolderGit2 },
   project: { label: 'Project', icon: LucideBox },
   view: { label: 'View', icon: LucideLayers },
 };
 
 const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'timeline'];
-const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'decision', 'project'];
+const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'project'];
 
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] =>
@@ -116,13 +101,12 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 
 /**
  * Global create dialog (`ui.modal() === 'create'`): a Linear-style composer for issues
- * and decisions (title · description · property chips), plus compact forms for
- * team / repository / view.
+ * (title · description · property chips), plus compact forms for project and view.
  *
  * Context defaults (`ui.openCreate(kind, defaults)`):
- *   issue:      status, priority, teamId, kind, assigneeId, projectId, parentId, title, body,
+ *   issue:      status, priority, kind, assigneeId, projectId, parentId, title, body,
  *               and optional goal
- *   decision:   title, statement, rationale, required primary issue, tags (string[] or "a, b")
+ *   project:    name, key, summary, optional repository string (URL or owner/name)
  *   view:       name, entity, filters, sort, groupBy, layout, shared ("Save as view")
  *
  * After create we close and toast with an "Open" action instead of navigating away (Linear
@@ -166,49 +150,9 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
           </p>
           <div class="flex items-center gap-2 max-sm:flex-wrap">
             @if (composer(); as c) {
-              <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5 max-sm:contents">
-                @if (kind() !== 'decision') {
-                  <app-picker
-                    class="max-sm:order-2"
-                    variant="pill"
-                    label="Team"
-                    [icon]="teamIcon"
-                    [options]="teamOptions()"
-                    [value]="opt(headerTeamId())"
-                    [clearable]="kind() === 'issue'"
-                    clearLabel="No team"
-                    (valueChange)="setHeaderTeam($event[0] ?? '')"
-                  />
-                }
-                <div
-                  role="tablist"
-                  aria-label="What to create"
-                  class="bg-muted inline-flex rounded-md p-0.5 max-sm:order-1 max-sm:min-w-0 max-sm:flex-1 max-sm:basis-[calc(100%-3.5rem)]"
-                >
-                  @for (k of switcher; track k.kind) {
-                    <button
-                      type="button"
-                      role="tab"
-                      [attr.aria-selected]="kind() === k.kind"
-                      [title]="k.blurb"
-                      class="text-muted-foreground hover:text-foreground flex h-7 items-center gap-1.5 rounded-[5px] px-2.5 text-[13px] font-medium transition-colors max-sm:h-9 max-sm:min-w-0 max-sm:flex-1 max-sm:justify-center max-sm:px-1.5"
-                      [class.bg-background]="kind() === k.kind"
-                      [class.text-foreground]="kind() === k.kind"
-                      [class.shadow-panel]="kind() === k.kind"
-                      (click)="onSwitch(k.kind)"
-                    >
-                      @switch (k.kind) {
-                        @case ('issue') {
-                          <app-status-icon entity="issue" status="todo" [size]="13" />
-                        }
-                        @default {
-                          <svg [lucideIcon]="scale" [size]="13" class="text-entity-decision"></svg>
-                        }
-                      }
-                      {{ k.label }}
-                    </button>
-                  }
-                </div>
+              <div class="flex min-w-0 flex-1 items-center gap-1.5 text-sm font-medium">
+                <app-status-icon entity="issue" status="todo" [size]="13" />
+                New {{ c.label.toLowerCase() }}
               </div>
             } @else {
               <div class="flex flex-1 items-center gap-2 py-1 text-sm font-medium">
@@ -280,7 +224,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 <p
                   class="bg-muted/50 text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 rounded-md px-3 py-2 text-xs"
                 >
-                  This issue will be a sub-issue of
+                  This task will be a subtask of
                   <app-entity-chip class="max-w-full" type="issue" [ref]="parentId()" />.
                 </p>
               }
@@ -297,19 +241,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     aria-label="Goal"
                   ></textarea>
                 </div>
-              }
-              @if (err('statement'); as e) {
-                <p class="text-destructive text-xs" role="alert">{{ e }}</p>
-              }
-              @if (kind() === 'decision') {
-                <textarea
-                  class="placeholder:text-muted-foreground/60 field-sizing-content max-h-48 min-h-12 w-full resize-none border-t bg-transparent py-2 text-sm leading-relaxed outline-none"
-                  rows="2"
-                  placeholder="Rationale: why this, and not the alternative? (optional)"
-                  [(ngModel)]="text2"
-                  name="rationale"
-                  aria-label="Rationale"
-                ></textarea>
               }
               @if (canAttach()) {
                 <div
@@ -422,123 +353,11 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     />
                   }
                 }
-                @case ('decision') {
-                  <app-picker
-                    variant="pill"
-                    label="Status"
-                    [searchable]="false"
-                    [options]="decisionStatusOptions"
-                    [value]="[decisionStatus()]"
-                    (valueChange)="setOne(decisionStatus, $event)"
-                  />
-                  <app-picker
-                    variant="pill"
-                    label="Primary issue (required)"
-                    [options]="issueOptions()"
-                    [value]="opt(originIssueId())"
-                    (valueChange)="originIssueId.set($event[0] ?? '')"
-                  />
-                  <label
-                    class="border-border-strong focus-within:border-ring/60 flex h-7 items-center gap-1.5 rounded-md border border-dashed px-2 text-xs"
-                  >
-                    <svg
-                      [lucideIcon]="tagIcon"
-                      [size]="13"
-                      class="text-muted-foreground shrink-0"
-                    ></svg>
-                    <input
-                      class="placeholder:text-muted-foreground w-36 bg-transparent outline-none"
-                      placeholder="Tags, comma separated"
-                      [(ngModel)]="tags"
-                      name="tags"
-                      autocomplete="off"
-                      aria-label="Tags"
-                    />
-                  </label>
-                }
               }
             </div>
-            @if (err('issue'); as e) {
-              <p class="text-destructive px-5 pb-2 text-xs" role="alert">{{ e }}</p>
-            }
           } @else {
             <div class="flex flex-col gap-3 px-4 pt-2 pb-4">
               @switch (kind()) {
-                @case ('team') {
-                  <div class="grid gap-3 sm:grid-cols-[1fr_8rem]">
-                    <app-form-row label="Name" [error]="err('title')">
-                      <input
-                        hlmInput
-                        placeholder="Platform"
-                        [ngModel]="title()"
-                        (ngModelChange)="onTeamName($event)"
-                        name="name"
-                        autocomplete="off"
-                        autofocus
-                        aria-label="Team name"
-                      />
-                    </app-form-row>
-                    <app-form-row label="Key" [error]="err('key')">
-                      <input
-                        hlmInput
-                        class="font-mono uppercase"
-                        placeholder="PLAT"
-                        [ngModel]="teamKey()"
-                        (ngModelChange)="onTeamKey($event)"
-                        name="key"
-                        maxlength="8"
-                        autocomplete="off"
-                        aria-label="Team key"
-                      />
-                    </app-form-row>
-                  </div>
-                  <app-form-row label="Description" [optional]="true">
-                    <textarea
-                      hlmTextarea
-                      rows="2"
-                      [(ngModel)]="text"
-                      name="description"
-                      placeholder="What does this team own?"
-                    ></textarea>
-                  </app-form-row>
-                  <p class="text-muted-foreground text-xs">
-                    The key prefixes issue ids (PLAT-12) and cannot be changed later.
-                  </p>
-                }
-                @case ('repository') {
-                  <div class="grid gap-3 sm:grid-cols-[9rem_1fr]">
-                    <app-form-row label="Provider">
-                      <app-select
-                        [options]="gitProviderOptions"
-                        [(value)]="gitProvider"
-                        label="Provider"
-                      />
-                    </app-form-row>
-                    <app-form-row label="Repository" [error]="err('title')">
-                      <input
-                        hlmInput
-                        class="font-mono"
-                        placeholder="acme/api"
-                        [(ngModel)]="title"
-                        name="fullName"
-                        autocomplete="off"
-                        autofocus
-                        aria-label="Repository name"
-                      />
-                    </app-form-row>
-                  </div>
-                  <app-form-row label="Default branch" [optional]="true">
-                    <input
-                      hlmInput
-                      class="font-mono"
-                      placeholder="main"
-                      [(ngModel)]="text"
-                      name="branch"
-                      autocomplete="off"
-                      aria-label="Default branch"
-                    />
-                  </app-form-row>
-                }
                 @case ('project') {
                   <app-form-row label="Name" [error]="err('title')">
                     <input
@@ -568,7 +387,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                     />
                   </app-form-row>
                   <p class="text-muted-foreground -mt-1 text-xs">
-                    Prefixes issue keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
+                    Prefixes task keys in this project, e.g. CORA-12. Up to 4 characters; editable later.
                   </p>
                   <app-form-row label="Summary" [optional]="true">
                     <input
@@ -580,19 +399,17 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                       aria-label="Project summary"
                     />
                   </app-form-row>
-                  @if (repoOptions().length) {
-                    <app-form-row label="Repositories" [optional]="true">
-                      <app-picker
-                        variant="field"
-                        label="Repositories"
-                        placeholder="None"
-                        [multiple]="true"
-                        [options]="repoOptions()"
-                        [value]="repositoryIds()"
-                        (valueChange)="repositoryIds.set($event)"
-                      />
-                    </app-form-row>
-                  }
+                  <app-form-row label="Repository" [optional]="true">
+                    <input
+                      hlmInput
+                      class="font-mono"
+                      placeholder="owner/name or https://github.com/owner/name"
+                      [(ngModel)]="repositoryText"
+                      name="repository"
+                      autocomplete="off"
+                      aria-label="Repository"
+                    />
+                  </app-form-row>
                   <div class="flex flex-wrap items-center gap-1.5" data-testid="create-attachments">
                     <app-upload-file
                       label="Attach files"
@@ -695,11 +512,6 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
 export class CreateDialog {
   protected readonly ui = inject(UiStore);
   private readonly store = inject(TramaStore);
-  /** Workspace default team (Settings → General), if it still exists. */
-  private defaultTeam(): string {
-    const id = this.store.settings().defaultTeamId;
-    return id && this.store.teamById().has(id) ? id : '';
-  }
   protected readonly canShare = computed(() => this.store.allowed('manageSharedViews'));
   private readonly router = inject(Router);
   private readonly notifier = inject(Notifier);
@@ -707,11 +519,7 @@ export class CreateDialog {
 
   private readonly titleEl = viewChild<ElementRef<HTMLInputElement>>('titleEl');
 
-  protected readonly switcher = SWITCHER;
-  protected readonly scale = LucideScale;
-  protected readonly tagIcon = LucideTag;
   protected readonly userIcon = LucideCircleUser;
-  protected readonly teamIcon = LucideUsers;
   protected readonly closeIcon = LucideX;
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
@@ -740,8 +548,8 @@ export class CreateDialog {
     issueEstimateOptions(undefined, this.store.estimateScale()),
   );
   protected readonly assigneeId = signal('');
-  protected readonly teamId = signal('');
-  protected readonly repositoryIds = signal<string[]>([]);
+  /** Optional git repository: a URL or `owner/name`, not a registry id. */
+  protected readonly repositoryText = signal('');
   protected readonly projectId = signal('');
   protected readonly projectKey = signal('');
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
@@ -750,14 +558,7 @@ export class CreateDialog {
   /** Files to upload as artifacts of the record once it exists. Not part of saved drafts. */
   protected readonly attachments = signal<File[]>([]);
   protected readonly canAttach = computed(() => ATTACHABLE.has(this.kind()));
-  // decision
-  protected readonly originIssueId = signal('');
-  protected readonly decisionStatus = signal<string>('proposed');
-  // team / repository / view
-  protected readonly teamKey = signal('');
-  private teamKeyTouched = false;
   private projectKeyTouched = false;
-  protected readonly gitProvider = signal<string>('github');
   protected readonly viewEntity = signal<string>('issue');
   protected readonly viewLayout = signal<string>('list');
   protected readonly shared = signal(true);
@@ -793,14 +594,8 @@ export class CreateDialog {
     value: k,
     label: ISSUE_KIND_META[k].label,
   }));
-  protected readonly decisionStatusOptions: PickOption[] = [
-    { value: 'proposed', label: 'Proposed', kind: 'status' },
-    { value: 'accepted', label: 'Accepted', kind: 'status' },
-  ];
-  protected readonly gitProviderOptions: Option[] = GIT_PROVIDERS.map((p) => ({ value: p, label: GIT_PROVIDER_META[p].label }));
   protected readonly viewEntityOptions: Option[] = [
-    { value: 'issue', label: 'Issues' },
-    { value: 'decision', label: 'Decisions' },
+    { value: 'issue', label: 'Tasks' },
     { value: 'project', label: 'Projects' },
   ];
   /** Timeline views use project dates. */
@@ -816,57 +611,21 @@ export class CreateDialog {
     this.viewLayoutOptions().some((o) => o.value === this.viewLayout()) ? this.viewLayout() : 'list',
   );
 
-  protected readonly teamOptions = computed<PickOption[]>(() =>
-    this.store.teams().map((t) => ({ value: t.id, label: t.name, kind: 'team', hint: t.key })),
-  );
   protected readonly userOptions = computed<PickOption[]>(() =>
     this.store
       .users()
       .map((u) => ({ value: u.id, label: u.name, kind: 'user', search: `${u.name} ${u.email}` })),
   );
-  /** The repositories offered: the chosen project's own, or all of them. */
-  protected readonly repoOptions = computed<PickOption[]>(() => {
-    const project = this.store.getProject(this.projectId());
-    return this.store
-      .repositories()
-      .filter((r) => !project || project.repositoryIds.includes(r.id))
-      .map((r) => ({ value: r.id, label: r.fullName, kind: 'repo', provider: r.provider }));
-  });
   protected readonly projectOptions = computed<PickOption[]>(() =>
     this.store
       .projects()
       .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
       .map((p) => ({ value: p.id, label: p.name, hint: p.key, kind: 'plain' })),
   );
-  /** Issues offered as decision origins; closed issues remain selectable. */
-  protected readonly issueOptions = computed<PickOption[]>(() => {
-    return this.store.issues().map((i) => ({
-        value: i.id,
-        label: i.title,
-        hint: i.key,
-        search: `${i.key} ${i.title}`,
-        kind: 'status' as const,
-        status: i.status,
-        statusEntity: 'issue' as const,
-      }));
-  });
-
-  protected readonly titlePlaceholder = computed(() => {
-    switch (this.kind()) {
-      case 'decision':
-        return 'Decision, e.g. Use opaque session tokens';
-      default:
-        return 'Issue title';
-    }
-  });
-  protected readonly bodyPlaceholder = computed(() => {
-    switch (this.kind()) {
-      case 'decision':
-        return 'What was decided?';
-      default:
-        return 'Add a description, steps to reproduce, links… Markdown supported.';
-    }
-  });
+  protected readonly titlePlaceholder = computed(() => 'Task title');
+  protected readonly bodyPlaceholder = computed(
+    () => 'Add a description, steps to reproduce, links… Markdown supported.',
+  );
 
   /** True while the form shows text restored from an unsent draft. */
   protected readonly restored = signal(false);
@@ -892,7 +651,6 @@ export class CreateDialog {
         text2: this.text2(),
         priority: this.priority(),
         issueKind: this.issueKind(),
-        teamId: this.teamId(),
         assigneeId: this.assigneeId(),
         projectId: this.projectId(),
         tags: this.tags(),
@@ -923,7 +681,6 @@ export class CreateDialog {
     this.text2.set(asStr(draft['text2']));
     this.priority.set(oneOf(PRIORITIES, draft['priority']) ?? this.priority());
     this.issueKind.set(oneOf(ISSUE_KINDS, draft['issueKind']) ?? this.issueKind());
-    if (this.store.teamById().has(asStr(draft['teamId']))) this.teamId.set(asStr(draft['teamId']));
     if (this.store.userById().has(asStr(draft['assigneeId']))) this.assigneeId.set(asStr(draft['assigneeId']));
     if (this.store.getProject(asStr(draft['projectId']))) this.projectId.set(asStr(draft['projectId']));
     this.tags.set(asStr(draft['tags']));
@@ -955,19 +712,10 @@ export class CreateDialog {
     this.assigneeId.set(
       this.store.userById().has(asStr(d['assigneeId'])) ? asStr(d['assigneeId']) : '',
     );
-    this.teamId.set(asStr(d['teamId']) || this.defaultTeam());
     this.projectId.set(this.store.getProject(asStr(d['projectId']))?.id ?? '');
     this.parentId.set(asStr(d['parentId']));
-    this.repositoryIds.set(
-      asArr(d['repositoryIds']).filter((id) => this.store.repositoryById().has(id)),
-    );
-    this.originIssueId.set(this.store.getIssue(asStr(d['originIssueId']))?.id ?? '');
-    this.decisionStatus.set(
-      d['status'] === 'accepted' && kind === 'decision' ? 'accepted' : 'proposed',
-    );
+    this.repositoryText.set(asStr(d['repository']));
 
-    this.teamKey.set('');
-    this.teamKeyTouched = false;
     this.projectKeyTouched = false;
     this.projectKey.set(
       kind === 'project'
@@ -977,7 +725,6 @@ export class CreateDialog {
           )
         : '',
     );
-    this.gitProvider.set('github');
     this.attachments.set([]);
     const entity = oneOf(VIEW_ENTITIES, d['entity']);
     this.viewEntity.set(entity ?? 'issue');
@@ -1016,25 +763,16 @@ export class CreateDialog {
     return bits.join(' · ');
   }
 
-  /** The team preselected for a new issue. */
-  protected readonly headerTeamId = computed(() => this.teamId());
-
   /** What the draft already has, so quick suggestions skip no-ops. */
   protected readonly suggestionCurrent = computed(() => ({
     priority: this.priority(),
     kind: this.issueKind(),
     estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
-    teamId: this.teamId(),
     assigneeId: this.assigneeId(),
   }));
 
   protected addQuestion(question: string): void {
     this.text.update((t) => `${t.trimEnd()}${t.trim() ? '\n\n' : ''}${question}\n`);
-  }
-
-  protected setHeaderTeam(id: string): void {
-    // Keep both in step so switching kind carries the team over.
-    if (id || this.kind() === 'issue') this.teamId.set(id);
   }
 
   protected opt(v: string): string[] {
@@ -1065,49 +803,8 @@ export class CreateDialog {
       await this.store.uploadArtifactFile(target, file);
   }
 
-  protected onSwitch(next: ComposerKind): void {
-    if (next === this.kind()) return;
-    // Title / description / priority carry over; kind-specific properties keep their own state.
-    // The text moves to the new kind's draft, so the old one is not left behind.
-    this.drafts.set(this.draftKey(this.kind()), null);
-    this.restored.set(false);
-    this.attachments.set([]);
-    this.kind.set(next);
-    this.submitted.set(false);
-    this.ui.createKind.set(next);
-    this.focusTitle();
-  }
-
   protected onClosed(): void {
     if (this.ui.modal() === 'create') this.ui.closeModal();
-  }
-
-  /** Picking a project narrows the repositories to its own (all of them when none were chosen yet). */
-  protected onProject(id: string | undefined): void {
-    this.projectId.set(id ?? '');
-    const project = this.store.getProject(id);
-    if (!project) return;
-    const own = this.repositoryIds().filter((r) => project.repositoryIds.includes(r));
-    this.repositoryIds.set(own.length ? own : [...project.repositoryIds]);
-  }
-
-  protected onTeamName(v: string): void {
-    this.title.set(v);
-    if (!this.teamKeyTouched) {
-      const words = v.trim().split(/\s+/);
-      const initials = words.map((w) => w[0] ?? '').join('');
-      this.teamKey.set(
-        (words.length > 1 ? initials : v.trim().slice(0, 4))
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, '')
-          .slice(0, 8),
-      );
-    }
-  }
-
-  protected onTeamKey(v: string): void {
-    this.teamKeyTouched = true;
-    this.teamKey.set(v);
   }
 
   protected onProjectName(v: string): void {
@@ -1126,35 +823,20 @@ export class CreateDialog {
     this.projectKey.set(v.toUpperCase());
   }
 
-  protected err(field: 'title' | 'statement' | 'key' | 'issue'): string | null {
+  protected err(field: 'title' | 'key'): string | null {
     if (!this.submitted()) return null;
-    if (this.draftAttempt() && field === 'statement') return null;
     const k = this.kind();
     switch (field) {
       case 'title':
-        return this.title().trim()
-          ? null
-          : k === 'issue' || k === 'decision'
-            ? 'Give it a title.'
-            : 'Required.';
-      case 'statement':
-        if (k !== 'decision') return null;
-        return this.text().trim() ? null : 'Say what was decided.';
-      case 'issue':
-        if (k !== 'decision') return null;
-        return this.originIssueId() ? null : 'Choose the primary issue for this decision.';
+        return this.title().trim() ? null : k === 'issue' ? 'Give it a title.' : 'Required.';
       case 'key':
-        if (k === 'team')
-          return /^[A-Z][A-Z0-9]{1,7}$/.test(this.teamKey().toUpperCase())
-            ? null
-            : '2 to 8 letters or digits, starting with a letter.';
         if (k === 'project') {
           const key = this.projectKey().trim().toUpperCase();
           if (!isProjectKey(key)) return 'Use 1 to 4 letters or digits, starting with a letter.';
           if (isReservedProjectKey(key))
             return key === UNASSIGNED_ISSUE_KEY_PREFIX
-              ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for issues without a project.`
-              : `${key} is reserved for decision identifiers.`;
+              ? `${UNASSIGNED_ISSUE_KEY_PREFIX} is reserved for tasks without a project.`
+              : `${key} is reserved.`;
           if (this.store.projects().some((project) => project.key === key))
             return `The tag ${key} is already used.`;
         }
@@ -1163,9 +845,7 @@ export class CreateDialog {
   }
 
   private valid(): boolean {
-    return (['title', 'statement', 'key', 'issue'] as const).every(
-      (f) => !this.err(f),
-    );
+    return (['title', 'key'] as const).every((f) => !this.err(f));
   }
 
   private focusTitle(): void {
@@ -1183,9 +863,6 @@ export class CreateDialog {
       case 'estimate':
         this.issueEstimate.set(String(suggestion.value));
         break;
-      case 'teamId':
-        this.teamId.set(suggestion.value);
-        break;
       case 'assigneeId':
         this.assigneeId.set(suggestion.value);
         break;
@@ -1202,7 +879,7 @@ export class CreateDialog {
     ev.stopPropagation();
     if (this.busy()) return;
     if (asDraft) {
-      if (!this.title().trim() || (this.kind() === 'decision' && !this.originIssueId())) {
+      if (!this.title().trim()) {
         this.submitted.set(true);
         return;
       }
@@ -1227,7 +904,6 @@ export class CreateDialog {
             goal: this.goal().trim() || undefined,
             priority: this.priority() as Priority,
             status,
-            teamId: this.teamId() || undefined,
             assigneeId: this.assigneeId() || undefined,
             estimate: this.issueEstimate() === '' ? undefined : Number(this.issueEstimate()),
             projectId: this.projectId() || undefined,
@@ -1235,42 +911,8 @@ export class CreateDialog {
           });
           if (i) {
             await this.uploadAttachments({ type: 'issue', id: i.id });
-            done = { label: `${i.key} created`, path: ['issues', i.key] };
+            done = { label: `${i.key} created`, path: ['tasks', i.key] };
           }
-          break;
-        }
-        case 'decision': {
-          const d = await this.store.proposeDecision({
-            title,
-            statement: this.text().trim(),
-            rationale: this.text2().trim() || undefined,
-            status: asDraft ? 'draft' : (this.decisionStatus() as 'proposed' | 'accepted'),
-            originIssueId: this.originIssueId(),
-            tags: asTags(this.tags()),
-          });
-          if (d)
-            done = {
-              label: asDraft ? `${d.key} saved as draft` : `${d.key} created`,
-              path: ['decisions', d.key],
-            };
-          break;
-        }
-        case 'team': {
-          const t = await this.store.createTeam({
-            name: title,
-            key: this.teamKey().toUpperCase(),
-            description: this.text().trim() || undefined,
-          });
-          if (t) done = { label: `Team ${t.name} created`, path: ['teams', t.key] };
-          break;
-        }
-        case 'repository': {
-          const r = await this.store.createRepository({
-            provider: this.gitProvider() as GitProvider,
-            fullName: title,
-            defaultBranch: this.text().trim() || undefined,
-          });
-          if (r) done = { label: `${r.fullName} added`, path: ['repositories', r.id] };
           break;
         }
         case 'project': {
@@ -1278,7 +920,7 @@ export class CreateDialog {
             name: title,
             key: this.projectKey().trim().toUpperCase(),
             summary: this.text().trim() || undefined,
-            repositoryIds: this.repositoryIds().length ? this.repositoryIds() : undefined,
+            repository: this.repositoryText().trim() || undefined,
           });
           if (p) {
             await this.uploadAttachments({ type: 'project', id: p.id });
@@ -1304,9 +946,8 @@ export class CreateDialog {
       if (asDraft && this.kind() === 'issue') done.label = `${done.path[1]} saved as draft`;
       const commands = ['/', slug, ...done.path];
       // Linear behaviour: stay where you are, offer "Open" in the toast.
-      // Views and teams are destinations of their own, so those still navigate.
-      const navigate =
-        this.kind() === 'view' || this.kind() === 'team' || this.kind() === 'repository' || this.kind() === 'project';
+      // Views and projects are destinations of their own, so those still navigate.
+      const navigate = this.kind() === 'view' || this.kind() === 'project';
       this.notifier.success(done.label, {
         description: navigate ? undefined : title,
         action: navigate

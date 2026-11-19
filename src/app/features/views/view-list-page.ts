@@ -41,7 +41,7 @@ interface ViewSection {
       <app-empty-state
         [icon]="layers"
         title="No saved views"
-        description="A view is a saved filter over issues, projects or decisions, shown as a list, a board or timeline. Private views stay yours; shared ones show up for everyone."
+        description="A view is a saved filter over tasks or projects, shown as a list, a board or timeline. Private views stay yours; shared ones show up for everyone."
       >
         @if (canEdit()) {
           <button hlmBtn size="sm" (click)="create()"><svg [lucideIcon]="plus" [size]="14"></svg>New view</button>
@@ -65,7 +65,7 @@ interface ViewSection {
               <svg
                 [lucideIcon]="entityIcon(v)"
                 [size]="14"
-                [class]="v.entity === 'decision' ? 'text-entity-decision' : v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
+                [class]="v.entity === 'project' ? 'text-muted-foreground' : 'text-entity-issue'"
                 class="shrink-0"
               ></svg>
               <span class="min-w-0 shrink truncate text-sm">{{ v.name }}</span>

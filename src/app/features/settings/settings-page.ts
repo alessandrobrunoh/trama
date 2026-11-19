@@ -3,7 +3,6 @@ import { RouterLink } from '@angular/router';
 import {
   LucideBot,
   LucideBuilding2,
-  LucideInbox,
   LucideDynamicIcon,
   LucideKeyRound,
   LucideBell,
@@ -19,7 +18,6 @@ import {
   LucideTriangleAlert,
   LucideUserRound,
   LucideUsers,
-  LucideUsersRound,
   type LucideIcon,
 } from '@lucide/angular';
 import { TramaStore } from '../../core/stores/trama.store';
@@ -28,7 +26,6 @@ import { PageHeader } from '../../shared/page-header';
 import { AgentsSection } from './sections/agents-section';
 import { AiSection } from './sections/ai-section';
 import { AppearanceSection } from './sections/appearance-section';
-import { CustomerRequestsSection } from './sections/customer-requests-section';
 import { ImportSection } from './sections/import-section';
 import { LunagestSection } from './sections/lunagest-section';
 import { IntegrationsSection } from './sections/integrations-section';
@@ -40,7 +37,6 @@ import { PreferencesSection } from './sections/preferences-section';
 import { ProfileSection } from './sections/profile-section';
 import { RolesSection } from './sections/roles-section';
 import { ShortcutsSection } from './sections/shortcuts-section';
-import { TeamsSection } from './sections/teams-section';
 import { TokensSection } from './sections/tokens-section';
 import { WorkspaceSection } from './sections/workspace-section';
 
@@ -71,13 +67,11 @@ const GROUPS: { title: string; sections: Section[] }[] = [
       { id: 'workspace', label: 'General', title: 'Workspace', icon: LucideBuilding2 },
       { id: 'members', label: 'Members', icon: LucideUsers },
       { id: 'roles', label: 'Roles & permissions', icon: LucideShieldCheck },
-      { id: 'teams', label: 'Teams', icon: LucideUsersRound },
       { id: 'labels', label: 'Labels', icon: LucideTag },
       { id: 'statuses', label: 'Statuses', icon: LucideCircleDot },
       { id: 'agents', label: 'Agents', icon: LucideBot },
       { id: 'tokens', label: 'API tokens', icon: LucideKeyRound },
       { id: 'integrations', label: 'Integrations', icon: LucidePlug },
-      { id: 'customer-requests', label: 'Customer requests', icon: LucideInbox },
       { id: 'import', label: 'Import', icon: LucideDownload },
       { id: 'lunagest', label: 'LunaGest', icon: LucideMoon },
     ],
@@ -85,7 +79,12 @@ const GROUPS: { title: string; sections: Section[] }[] = [
 ];
 const ALL = GROUPS.flatMap((g) => g.sections);
 /** Old / alternative section ids. */
-const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspace', account: 'profile', theme: 'appearance' };
+const ALIASES: Record<string, string> = {
+  danger: 'workspace',
+  general: 'workspace',
+  account: 'profile',
+  theme: 'appearance',
+};
 
 /**
  * Linear-style settings: grouped section nav on the left, centered content column on the right.
@@ -107,14 +106,12 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
     WorkspaceSection,
     MembersSection,
     RolesSection,
-    TeamsSection,
     AgentsSection,
     AiSection,
     TokensSection,
     IntegrationsSection,
     LabelsSection,
     StatusesSection,
-    CustomerRequestsSection,
     ImportSection,
     LunagestSection,
   ],
@@ -172,9 +169,6 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             @case ('roles') {
               <app-roles-section />
             }
-            @case ('teams') {
-              <app-teams-section />
-            }
             @case ('agents') {
               <app-agents-section [agentId]="agent()" />
             }
@@ -189,9 +183,6 @@ const ALIASES: Record<string, string> = { danger: 'workspace', general: 'workspa
             }
             @case ('statuses') {
               <app-statuses-section />
-            }
-            @case ('customer-requests') {
-              <app-customer-requests-section />
             }
             @case ('import') {
               <app-import-section />

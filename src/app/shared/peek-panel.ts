@@ -65,10 +65,6 @@ const OWNS_SPACE = 'button, input, textarea, select, summary, [role="button"], [
                   <span class="text-muted-foreground">Unassigned</span>
                 }
               </dd>
-              @if (teamName(i.teamId); as t) {
-                <dt class="text-muted-foreground">Team</dt>
-                <dd>{{ t }}</dd>
-              }
               @if (projectName(i.projectId); as p) {
                 <dt class="text-muted-foreground">Project</dt>
                 <dd class="truncate">{{ p }}</dd>
@@ -158,9 +154,6 @@ export class PeekPanel {
     inject(DestroyRef).onDestroy(() => this.peek.close());
   }
 
-  protected teamName(id: string | undefined | null): string | undefined {
-    return id ? this.store.getTeam(id)?.name : undefined;
-  }
   protected projectName(id: string | undefined | null): string | undefined {
     return id ? this.store.getProject(id)?.name : undefined;
   }
@@ -174,7 +167,7 @@ export class PeekPanel {
   protected open(): void {
     const slug = this.store.slug() ?? '';
     const i = this.issue();
-    if (i) void this.router.navigate(['/', slug, 'issues', i.key]);
+    if (i) void this.router.navigate(['/', slug, 'tasks', i.key]);
   }
 
   protected copyLink(): void {

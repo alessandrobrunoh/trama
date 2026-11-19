@@ -386,7 +386,7 @@ interface Conflict {
                     (click)="ownerOpen.set(true)"
                   >
                     <svg [lucideIcon]="attachIcon" [size]="11"></svg
-                    >{{ links().length ? 'Attach' : 'Attach to a project or issue' }}
+                    >{{ links().length ? 'Attach' : 'Attach to a project or task' }}
                   </button>
                 }
               </span>

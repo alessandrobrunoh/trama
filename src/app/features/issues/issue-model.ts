@@ -107,7 +107,7 @@ export const ISSUE_TABS: {
   statuses: readonly IssueStatus[] | null;
   hint: string;
 }[] = [
-  { id: 'all', label: 'All issues', statuses: null, hint: 'Every issue' },
+  { id: 'all', label: 'All tasks', statuses: null, hint: 'Every task' },
   {
     id: 'active',
     label: 'Active',
@@ -137,11 +137,8 @@ export type IssueGroup =
   | 'status'
   | 'kind'
   | 'priority'
-  | 'teamId'
   | 'assigneeId'
   | 'projectId'
-  | 'customerId'
-  | 'customerTierId'
   | 'none';
 export type IssueSort =
   | 'updatedAt'
@@ -149,12 +146,9 @@ export type IssueSort =
   | 'priority'
   | 'status'
   | 'key'
-  | 'title'
-  | 'customerCount'
-  | 'requestCount'
-  | 'customerRevenue';
+  | 'title';
 export type IssueDensity = 'comfortable' | 'compact';
-export type IssueProp = 'kind' | 'project' | 'labels' | 'team' | 'assignee' | 'date';
+export type IssueProp = 'kind' | 'project' | 'labels' | 'assignee' | 'date';
 
 export interface IssueDisplay {
   layout: IssueLayout;
@@ -170,11 +164,8 @@ export const GROUPS: readonly IssueGroup[] = [
   'status',
   'kind',
   'priority',
-  'teamId',
   'assigneeId',
   'projectId',
-  'customerId',
-  'customerTierId',
   'none',
 ];
 export const SORTS: readonly IssueSort[] = [
@@ -184,21 +175,15 @@ export const SORTS: readonly IssueSort[] = [
   'status',
   'key',
   'title',
-  'customerCount',
-  'requestCount',
-  'customerRevenue',
 ];
-export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'team', 'assignee', 'date'];
+export const PROPS: readonly IssueProp[] = ['kind', 'project', 'labels', 'assignee', 'date'];
 
 export const GROUP_LABEL: Record<IssueGroup, string> = {
   status: 'Status',
   kind: 'Type',
   priority: 'Priority',
-  teamId: 'Team',
   assigneeId: 'Assignee',
   projectId: 'Project',
-  customerId: 'Customer',
-  customerTierId: 'Customer tier',
   none: 'No grouping',
 };
 export const SORT_LABEL: Record<IssueSort, string> = {
@@ -208,15 +193,11 @@ export const SORT_LABEL: Record<IssueSort, string> = {
   status: 'Status',
   key: 'Key',
   title: 'Title',
-  customerCount: 'Customers',
-  requestCount: 'Requests',
-  customerRevenue: 'Customer revenue',
 };
 export const PROP_LABEL: Record<IssueProp, string> = {
   kind: 'Type',
   project: 'Project',
   labels: 'Labels',
-  team: 'Team',
   assignee: 'Assignee',
   date: 'Date',
 };
@@ -262,8 +243,6 @@ export function groupUniverse(store: TramaStore, group: IssueGroup): string[] | 
       return [...PRIORITIES];
     case 'kind':
       return [...ISSUE_KINDS];
-    case 'teamId':
-      return store.teams().map((t) => t.id);
     case 'assigneeId':
       return store.users().map((u) => u.id);
     case 'projectId':
@@ -284,18 +263,12 @@ export function groupLabel(store: TramaStore, group: IssueGroup, key: string): s
       return PRIORITY_META[key as keyof typeof PRIORITY_META]?.label ?? key;
     case 'kind':
       return ISSUE_KIND_META[key as keyof typeof ISSUE_KIND_META]?.label ?? key;
-    case 'teamId':
-      return key ? (store.getTeam(key)?.name ?? 'Unknown team') : 'No team';
     case 'assigneeId':
       return key ? (store.getUser(key)?.name ?? 'Unknown') : 'Unassigned';
     case 'projectId':
       return key ? (store.getProject(key)?.name ?? 'Unknown project') : 'No project';
-    case 'customerId':
-      return key ? (store.getCustomer(key)?.name ?? 'Unknown customer') : 'No customer';
-    case 'customerTierId':
-      return key ? (store.settings().customerTiers.find((t) => t.id === key)?.name ?? 'Unknown tier') : 'No tier';
     default:
-      return 'Issues';
+      return 'Tasks';
   }
 }
 

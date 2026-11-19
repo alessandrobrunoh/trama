@@ -28,8 +28,8 @@ import { SiteHeader } from '../landing/site-header';
             Where Trama is going
           </h1>
           <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-            We're building an issue-first workspace where plans, decisions and human input stay
-            attached to the work they concern. Dates are deliberately absent: we would rather ship
+            We're building a task-first workspace where plans and context stay attached to the
+            work they concern. Dates are deliberately absent: we would rather ship
             when it's right than hit a number we made up.
           </p>
           <a

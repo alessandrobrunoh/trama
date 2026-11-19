@@ -4,7 +4,6 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   signal,
@@ -17,10 +16,8 @@ import {
   LucideCopy,
   LucideDynamicIcon,
   LucideFileText,
-  LucideMessageCircleQuestion,
   LucidePackage,
   LucidePlus,
-  LucideScale,
   LucideSearch,
   LucideX,
 } from '@lucide/angular';
@@ -36,14 +33,11 @@ import {
   type Artifact,
   type ArtifactKind,
   type ArtifactTreeNode,
-  type Decision,
-  type InputRequest,
   type Project,
   type SubjectRef,
 } from '../../core';
 import { EmptyState } from '../../shared/empty-state';
 import { Markdown } from '../../shared/markdown';
-import { StatusIcon } from '../../shared/status';
 import { ArtifactIcon } from '../../shared/artifact';
 import { DocumentActions } from '../documents/document-attach';
 import { ProjectArtifactDialog } from './project-artifact-dialog';
@@ -55,8 +49,6 @@ import {
   type SubjectView,
 } from './project-artifact-row';
 
-/** Rows shown per "other context" list before the "more" hint. */
-const OTHER_LIMIT = 6;
 const INDENT_BASE = 16;
 const INDENT_STEP = 20;
 
@@ -102,7 +94,6 @@ type TreeRow =
     ArtifactIcon,
     EmptyState,
     Markdown,
-    StatusIcon,
     ProjectArtifactDialog,
     DocumentActions,
     ProjectArtifactRow,
@@ -210,7 +201,7 @@ type TreeRow =
         <app-empty-state
           [icon]="pkgIcon"
           title="No context yet"
-          description="Documents, links and release artifacts attached to the project, along with the pull requests, builds and docs of its issues, show up here."
+          description="Documents and links attached to the project, along with the pull requests, builds and docs of its tasks, show up here."
         >
           @if (canEdit()) {
             <button hlmBtn size="sm" (click)="openAdd()">Add artifact</button>
@@ -300,7 +291,7 @@ type TreeRow =
                 Nothing attached to the project itself yet.
                 @if (canEdit()) {
                   <button type="button" class="text-primary hover:underline" (click)="openAdd()">
-                    Add a document, link or release
+                    Add a document or link
                   </button>
                 }
               </div>
@@ -308,125 +299,6 @@ type TreeRow =
           }
         }
       }
-
-      <!-- Decisions and open questions are shown with their direct Issue context. -->
-      <section class="px-4 py-5 sm:px-6" aria-labelledby="pc-other">
-        <h2 id="pc-other" class="mb-1 text-sm font-medium">Other context</h2>
-        <p class="text-muted-foreground mb-3 text-xs">
-          Decisions in play and questions waiting for an answer on this project's issues.
-        </p>
-        @if (ctxState() === 'error' && !ctx()) {
-          <div
-            class="border-border flex items-center gap-2 rounded-lg border border-dashed px-3 py-3 text-xs"
-          >
-            <svg [lucideIcon]="alertIcon" [size]="14" class="text-status-blocked shrink-0"></svg>
-            <span class="text-muted-foreground">Could not load decisions and questions.</span>
-            <button
-              hlmBtn
-              size="sm"
-              variant="outline"
-              class="ml-auto h-7"
-              (click)="reloadContext()"
-            >
-              Retry
-            </button>
-          </div>
-        } @else if (!ctx()) {
-          <div
-            class="flex flex-col gap-2"
-            aria-busy="true"
-            aria-label="Loading decisions and questions"
-          >
-            <div hlmSkeleton class="h-9"></div>
-            <div hlmSkeleton class="h-9"></div>
-          </div>
-        } @else if (decisions().length === 0 && requests().length === 0) {
-          <p class="text-muted-foreground text-xs">No open decisions or questions.</p>
-        } @else {
-          <div class="grid gap-4 lg:grid-cols-2">
-            @if (decisions().length) {
-              <div class="min-w-0">
-                <h3
-                  class="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs font-medium"
-                >
-                  <svg [lucideIcon]="scaleIcon" [size]="13" class="text-entity-decision"></svg>
-                  Decisions
-                  <span class="font-normal tabular-nums">{{ decisions().length }}</span>
-                </h3>
-                <ul class="border-border overflow-hidden rounded-lg border">
-                  @for (d of decisionsShown(); track d.id) {
-                    <li
-                      class="hover:bg-hover relative flex min-h-9 items-center gap-2 border-b px-3 text-[13px] last:border-b-0"
-                    >
-                      <a
-                        class="absolute inset-0"
-                        [routerLink]="['/', slug(), 'decisions', d.key]"
-                        [attr.aria-label]="d.key + ' ' + d.title"
-                      ></a>
-                      <app-status-icon [status]="d.status" entity="other" />
-                      <span class="text-muted-foreground shrink-0 font-mono text-xs">{{
-                        d.key
-                      }}</span>
-                      <span class="min-w-0 flex-1 truncate">{{ d.title }}</span>
-                      @if (issueOf(d.originIssueId ?? d.relatedIssueIds[0]); as o) {
-                        <a
-                          [routerLink]="o.link"
-                          class="text-muted-foreground hover:text-foreground relative shrink-0 font-mono text-[11px] hover:underline"
-                          >{{ o.label }}</a
-                        >
-                      }
-                    </li>
-                  }
-                </ul>
-                @if (decisions().length > decisionsShown().length) {
-                  <p class="text-muted-foreground mt-1 text-xs">
-                    +{{ decisions().length - decisionsShown().length }} more
-                  </p>
-                }
-              </div>
-            }
-            @if (requests().length) {
-              <div class="min-w-0">
-                <h3
-                  class="text-muted-foreground mb-1.5 flex items-center gap-1.5 text-xs font-medium"
-                >
-                  <svg
-                    [lucideIcon]="questionIcon"
-                    [size]="13"
-                    class="text-status-needs-input"
-                  ></svg>
-                  Open questions
-                  <span class="font-normal tabular-nums">{{ requests().length }}</span>
-                </h3>
-                <ul class="border-border overflow-hidden rounded-lg border">
-                  @for (q of requestsShown(); track q.id) {
-                    <li
-                      class="hover:bg-hover relative flex min-h-9 items-center gap-2 border-b px-3 text-[13px] last:border-b-0"
-                    >
-                      @if (issueOf(q.issueId); as o) {
-                        <a
-                          class="absolute inset-0"
-                          [routerLink]="o.link"
-                          [attr.aria-label]="'Open ' + o.label + ': ' + q.question"
-                        ></a>
-                        <span class="text-muted-foreground shrink-0 font-mono text-xs">{{
-                          o.label
-                        }}</span>
-                      }
-                      <span class="min-w-0 flex-1 truncate">{{ q.question }}</span>
-                    </li>
-                  }
-                </ul>
-                @if (requests().length > requestsShown().length) {
-                  <p class="text-muted-foreground mt-1 text-xs">
-                    +{{ requests().length - requestsShown().length }} more
-                  </p>
-                }
-              </div>
-            }
-          </div>
-        }
-      </section>
     }
 
     <app-project-artifact-dialog [(open)]="dialogOpen" [target]="target()" [artifact]="editing()" />
@@ -439,7 +311,7 @@ type TreeRow =
         <hlm-dialog-header>
           <h2 hlmDialogTitle>Project context</h2>
           <p hlmDialogDescription>
-            The briefing handed to agents: the project, its issues, artifacts and decisions.
+            The briefing handed to agents: the project, its tasks and artifacts.
           </p>
         </hlm-dialog-header>
         <div class="flex items-center gap-1.5">
@@ -501,8 +373,6 @@ export class ProjectContextTab {
   protected readonly pkgIcon = LucidePackage;
   protected readonly chevRight = LucideChevronRight;
   protected readonly chevDown = LucideChevronDown;
-  protected readonly scaleIcon = LucideScale;
-  protected readonly questionIcon = LucideMessageCircleQuestion;
   protected readonly subjectIcon = SUBJECT_ICON;
   protected readonly subjectTone = SUBJECT_TONE;
 
@@ -644,40 +514,10 @@ export class ProjectContextTab {
     return rows;
   });
 
-  // other context (from the server's authoritative /context)
-  protected readonly ctx = computed(() => this.store.projectContextOf(this.project().id)());
-  protected readonly ctxState = computed(() => this.store.projectContextState(this.project().id)());
-  protected readonly decisions = computed<Decision[]>(() =>
-    (this.ctx()?.decisions ?? []).filter(
-      (d) => d.status === 'proposed' || d.status === 'accepted' || d.status === 'draft',
-    ),
-  );
-  protected readonly decisionsShown = computed(() => this.decisions().slice(0, OTHER_LIMIT));
-  protected readonly requests = computed<InputRequest[]>(() =>
-    (this.ctx()?.inputRequests ?? []).filter((q) => q.state === 'open'),
-  );
-  protected readonly requestsShown = computed(() => this.requests().slice(0, OTHER_LIMIT));
-
-  constructor() {
-    effect(() => {
-      const id = this.project().id;
-      void this.store.projectContext(id);
-    });
-  }
-
   // ───────────── actions ─────────────
 
   protected indent(depth: number): number {
     return INDENT_BASE + depth * INDENT_STEP;
-  }
-
-  protected issueOf(issueId: string | undefined): { label: string; link: string[] } | null {
-    const issue = issueId ? this.store.issueById().get(issueId) : undefined;
-    if (!issue) return null;
-    return {
-      label: issue.key,
-      link: ['/', this.slug(), 'issues', issue.key],
-    };
   }
 
   protected toggleKind(kind: ArtifactKind): void {
@@ -715,10 +555,6 @@ export class ProjectContextTab {
 
   protected retry(): void {
     void this.store.refetch();
-  }
-
-  protected reloadContext(): void {
-    void this.store.projectContext(this.project().id, { force: true });
   }
 
   protected async copyContext(): Promise<void> {

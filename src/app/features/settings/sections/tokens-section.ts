@@ -64,7 +64,7 @@ const EXPIRY: Option[] = [
             <app-settings-row label="Name" description="Something that tells you where it is used, like “CI” or “Claude on my laptop”." wide>
               <input hlmInput class="h-8 w-full text-[13px]" placeholder="CI" autofocus [value]="name()" (input)="name.set($any($event.target).value)" aria-label="Token name" />
             </app-settings-row>
-            <app-settings-row label="Acts as" [description]="canAgents() ? 'You, or an agent. An agent token acts with the member role and cannot accept decisions.' : 'The token acts as you. Only people allowed to manage agents can mint tokens for agents.'" wide>
+            <app-settings-row label="Acts as" [description]="canAgents() ? 'You, or an agent. An agent token acts with the member role.' : 'The token acts as you. Only people allowed to manage agents can mint tokens for agents.'" wide>
               <app-select size="sm" [options]="actorOptions()" [(value)]="actsAs" [disabled]="!canAgents()" label="Acts as" />
             </app-settings-row>
             <div class="px-4 py-3">

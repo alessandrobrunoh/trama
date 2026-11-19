@@ -16,7 +16,7 @@ import { InsightItems } from './insight-items';
 import { SEVERITY_RANK, SEVERITY_VIEW, formatAge } from './insights-model';
 
 /** Signals whose items name somebody who has to act: the "waiting on X" drill-down reads these. */
-const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_decisions', 'prs_stuck_in_review'];
+const WAITING_SIGNALS: readonly InsightSignalId[] = ['prs_stuck_in_review'];
 
 /**
  * Where are the problems? One tile per health signal, worst first. A tile opens the list of items that
@@ -70,7 +70,7 @@ const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_d
             <svg [lucideIcon]="check" [size]="20" class="text-tone-green shrink-0" aria-hidden="true"></svg>
             <div>
               <p class="text-sm font-medium">No problems found</p>
-              <p class="text-meta">Every health signal is clear for this scope. Issue statistics show how demand is changing.</p>
+              <p class="text-meta">Every health signal is clear for this scope. Task statistics show how demand is changing.</p>
             </div>
           </div>
         }
@@ -117,7 +117,7 @@ const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_d
       <div class="grid gap-4 lg:grid-cols-2">
         <app-chart-card
           title="Who everything waits on"
-          subtitle="Days spent waiting, summed over open questions, undecided decisions and PRs without review"
+          subtitle="Days spent waiting on pull requests without review"
           [empty]="bottleneckRows().length ? undefined : 'Nobody is waiting on anyone.'"
           note="Pick a person to see what is waiting on them. Review activity is counted against its recorded owner."
         >
@@ -132,7 +132,7 @@ const WAITING_SIGNALS: readonly InsightSignalId[] = ['needs_input', 'undecided_d
 
         <app-chart-card
           [title]="who() ? 'Waiting on ' + whoName() : 'Waiting on'"
-          [subtitle]="who() ? whoItems().length + ' items across questions, decisions and reviews' : 'Pick a person in the chart'"
+          [subtitle]="who() ? whoItems().length + ' pull requests waiting for review' : 'Pick a person in the chart'"
           [empty]="who() ? undefined : 'Select a person to see their queue.'"
         >
           <app-insight-items [items]="whoItems()" [slug]="slug()" [showWaiting]="false" empty="Nothing is waiting on this person." />
@@ -245,11 +245,7 @@ export class HealthView {
   }
 
   private bottleneckDetail(b: InsightBottleneck): string {
-    const parts = [
-      b.inputRequests ? `${b.inputRequests} open question${b.inputRequests === 1 ? '' : 's'}` : '',
-      b.decisions ? `${b.decisions} undecided decision${b.decisions === 1 ? '' : 's'}` : '',
-      b.reviews ? `${b.reviews} PR${b.reviews === 1 ? '' : 's'} waiting for review` : '',
-    ].filter(Boolean);
-    return `${b.actor.name}: ${parts.join(', ')}; oldest ${formatAge(b.oldestDays)}`;
+    const reviews = b.reviews ? `${b.reviews} PR${b.reviews === 1 ? '' : 's'} waiting for review` : 'no PRs waiting';
+    return `${b.actor.name}: ${reviews}; oldest ${formatAge(b.oldestDays)}`;
   }
 }

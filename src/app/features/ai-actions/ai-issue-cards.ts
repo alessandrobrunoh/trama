@@ -95,7 +95,7 @@ interface TriageRow {
   template: `
     <app-ai-result title="Suggested properties" [state]="job.state()" [error]="job.error()" (cancel)="job.cancel()" (retry)="run()" (regenerate)="run()" (closed)="closed.emit()">
       @if (rows().length) {
-        <p class="text-muted-foreground mb-1 text-[11px] leading-snug">A starting point based on this text and similar finished issues, not a verdict.</p>
+        <p class="text-muted-foreground mb-1 text-[11px] leading-snug">A starting point based on this text and similar finished tasks, not a verdict.</p>
         <ul class="flex flex-col">
           @for (r of rows(); track r.id) {
             <li class="border-border flex flex-col gap-0.5 border-t py-1.5 first:border-t-0">
@@ -123,7 +123,7 @@ interface TriageRow {
                 @if (applied().has(r.id)) {
                   <span class="text-status-shipped inline-flex items-center gap-1 text-[11px]"><svg [lucideIcon]="check" [size]="12"></svg>Applied</span>
                 } @else {
-                  <button hlmBtn variant="outline" size="xs" type="button" [disabled]="!canEdit() || busy()" [hlmTooltip]="canEdit() ? 'Apply this suggestion' : 'You cannot edit this issue'" (click)="apply([r])">Apply</button>
+                  <button hlmBtn variant="outline" size="xs" type="button" [disabled]="!canEdit() || busy()" [hlmTooltip]="canEdit() ? 'Apply this suggestion' : 'You cannot edit this task'" (click)="apply([r])">Apply</button>
                 }
               </div>
               @if (r.wsTitle) {
@@ -142,7 +142,7 @@ interface TriageRow {
           <p class="text-muted-foreground mt-2 text-[11px] leading-snug">
             Compared with
             @for (x of s; track x.key; let last = $last) {
-              <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="['/', slug(), 'issues', x.key]">{{ x.key }}</a>
+              <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="['/', slug(), 'tasks', x.key]">{{ x.key }}</a>
               <span>{{ x.note }}{{ last ? '' : ', ' }}</span>
             }
           </p>
@@ -389,7 +389,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
             size="xs"
             tooltip="Priority, estimate and type"
             [disabled]="!canEdit()"
-            disabledReason="You cannot edit this issue"
+            disabledReason="You cannot edit this task"
             (pressed)="show('triage')"
           />
           <app-ai-button
@@ -398,7 +398,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
             size="xs"
             tooltip="A clearer title and description"
             [disabled]="!canEdit()"
-            disabledReason="You cannot edit this issue"
+            disabledReason="You cannot edit this task"
             (pressed)="show('improve')"
           />
         </div>
@@ -419,7 +419,7 @@ type CardKind = 'summarize' | 'triage' | 'improve';
       <p class="text-muted-foreground flex items-center gap-1.5 px-0.5 text-xs">
         <svg [lucideIcon]="sparkles" [size]="13" [strokeWidth]="1.75" class="opacity-60"></svg>
         <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="ai.settingsLink()">Enable AI</a>
-        <span>to summarize and triage issues.</span>
+        <span>to summarize and triage tasks.</span>
       </p>
     }
   `,

@@ -10,11 +10,8 @@ import {
   LucideCircleDot,
   LucideEllipsis,
   LucideBox,
-  LucideFolderGit2,
   LucideLayers,
   LucideLock,
-  LucideScale,
-  LucideUsers,
   LucideBookOpen,
   LucideCircleHelp,
   LucideExternalLink,
@@ -51,12 +48,11 @@ import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
-import { CustomerAvatar } from '../features/customers/customer-avatar';
 import { ProjectGlyph } from '../features/projects/project-glyph';
 import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
 /**
- * Sidebar content (workspace switcher, search, navigation, teams, views, user menu).
+ * Sidebar content (workspace switcher, search, navigation, views, user menu).
  * Rendered inside <hlm-sidebar> by AppShell — which also turns it into a sheet on mobile.
  */
 @Component({
@@ -75,7 +71,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     ActorAvatar,
     StatusIcon,
     ProjectGlyph,
-    CustomerAvatar,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -217,21 +212,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                       @case ('issue') {
                         <app-status-icon entity="issue" [status]="$any(e.status)" />
                       }
-                      @case ('decision') {
-                        <svg
-                          [lucideIcon]="decisionIcon"
-                          [size]="14"
-                          class="text-entity-decision shrink-0"
-                        ></svg>
-                      }
-                      @case ('team') {
-                        <span
-                          class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white"
-                          [style.background]="e.color"
-                          aria-hidden="true"
-                          >{{ e.label.slice(0, 1) }}</span
-                        >
-                      }
                       @case ('project') {
                         @if (store.getProject(e.subjectId); as pj) {
                           <app-project-glyph [project]="pj" [size]="14" />
@@ -243,24 +223,12 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                           ></svg>
                         }
                       }
-                      @case ('repository') {
-                        <svg
-                          [lucideIcon]="repoIcon"
-                          [size]="14"
-                          class="text-muted-foreground shrink-0"
-                        ></svg>
-                      }
                       @case ('view') {
                         <svg
                           [lucideIcon]="layers"
                           [size]="14"
                           class="text-muted-foreground shrink-0"
                         ></svg>
-                      }
-                      @case ('customer') {
-                        @if (store.getCustomer(e.subjectId); as cu) {
-                          <app-customer-avatar [customer]="cu" [size]="14" />
-                        }
                       }
                     }
                     <span class="flex-1 truncate">{{ e.label }}</span>
@@ -280,107 +248,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           }
         </div>
       }
-
-      <!-- Teams -->
-      <div class="mt-4 max-md:mt-3">
-        <div class="group/sec flex items-center">
-          <button
-            type="button"
-            class="text-muted-foreground hover:text-foreground flex h-6 flex-1 items-center gap-1 rounded-md px-2 text-xs font-medium"
-            (click)="ui.toggleFolded('teams')"
-            [attr.aria-expanded]="!ui.isFolded('teams')"
-          >
-            Your teams
-            <span
-              class="text-muted-foreground inline-flex shrink-0 transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
-              [class.-rotate-90]="ui.isFolded('teams')"
-              [class.opacity-0]="!ui.isFolded('teams')"
-              aria-hidden="true"
-              ><svg [lucideIcon]="chevronDown" [size]="12"></svg
-            ></span>
-          </button>
-          <a
-            [routerLink]="['/', slug(), 'teams']"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-            hlmTooltip="All teams"
-            aria-label="All teams"
-            closeMobileSidebarOnClick
-            ><svg [lucideIcon]="more" [size]="13"></svg
-          ></a>
-          @if (canAdmin()) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-md opacity-0 group-hover/sec:opacity-100 focus-visible:opacity-100"
-              aria-label="Create team"
-              hlmTooltip="Create team"
-              (click)="ui.openCreate('team')"
-            >
-              <svg [lucideIcon]="plus" [size]="13"></svg>
-            </button>
-          }
-        </div>
-        @if (!ui.isFolded('teams')) {
-          <ul hlmSidebarMenu class="gap-px">
-            @for (t of sidebarTeams(); track t.id) {
-              @let open = ui.isFolded('open:team:' + t.id);
-              <li hlmSidebarMenuItem>
-                <button
-                  type="button"
-                  hlmSidebarMenuButton
-                  (click)="ui.toggleFolded('open:team:' + t.id)"
-                  [attr.aria-expanded]="open"
-                >
-                  <span
-                    class="flex size-4 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-semibold text-white"
-                    [style.background]="t.color"
-                    aria-hidden="true"
-                    >{{ t.key.slice(0, 1) }}</span
-                  >
-                  <span class="truncate">{{ t.name }}</span>
-                  <span class="inline-flex shrink-0 transition-transform" [class.-rotate-90]="!open"
-                    ><svg
-                      [lucideIcon]="chevronDown"
-                      [size]="12"
-                      class="text-muted-foreground shrink-0"
-                    ></svg
-                  ></span>
-                </button>
-                @if (open) {
-                  <ul class="mt-px flex flex-col gap-px pl-[18px]">
-                    @for (sub of teamLinks; track sub.label) {
-                      <li>
-                        <a
-                          hlmSidebarMenuButton
-                          [routerLink]="
-                            sub.segment ? ['/', slug(), sub.segment] : ['/', slug(), 'teams', t.key]
-                          "
-                          [queryParams]="sub.segment ? { team: t.id } : null"
-                          [isActive]="isTeamLinkActive(t.id, t.key, sub.segment)"
-                          closeMobileSidebarOnClick
-                        >
-                          <svg
-                            [lucideIcon]="sub.icon"
-                            [size]="14"
-                            class="text-muted-foreground"
-                          ></svg>
-                          <span class="flex-1 truncate">{{ sub.label }}</span>
-                          @if (sub.segment === 'issues' && openIssuesByTeam().get(t.id); as n) {
-                            <span class="text-muted-foreground text-[11px] tabular-nums">{{
-                              n
-                            }}</span>
-                          }
-                        </a>
-                      </li>
-                    }
-                  </ul>
-                }
-              </li>
-            } @empty {
-              <li class="text-muted-foreground px-2 py-1 text-xs">No teams yet</li>
-            }
-          </ul>
-        }
-      </div>
 
       <!-- Views -->
       <div class="mt-4 max-md:mt-3">
@@ -518,7 +385,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             fragment: 'ignored',
             matrixParams: 'ignored',
           }"
-          [isActive]="rla.isActive && !teamScoped()"
+          [isActive]="rla.isActive"
           [tooltip]="item.label"
           [attr.title]="item.hint ?? null"
           closeMobileSidebarOnClick
@@ -590,13 +457,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           <button hlmDropdownMenuItem (triggered)="ui.openCreate('issue')">
             <svg [lucideIcon]="issueIcon" [size]="14"></svg>
             <span class="flex flex-1 flex-col">
-              <span>New issue</span>
+              <span>New task</span>
               <span class="text-muted-foreground text-[11px]">A bug, request or incident</span>
             </span>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('decision')">
-            <svg [lucideIcon]="decisionIcon" [size]="14" class="text-entity-decision"></svg>
-            <span class="flex-1">New decision</span>
           </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
@@ -609,16 +472,6 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             <svg [lucideIcon]="projectIcon" [size]="14"></svg>
             <span class="flex-1">New project</span>
           </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('repository')">
-            <svg [lucideIcon]="repoIcon" [size]="14"></svg>
-            <span class="flex-1">New repository</span>
-          </button>
-          @if (canAdmin()) {
-            <button hlmDropdownMenuItem (triggered)="ui.openCreate('team')">
-              <svg [lucideIcon]="usersIcon" [size]="14"></svg>
-              <span class="flex-1">New team</span>
-            </button>
-          }
         </hlm-dropdown-menu-group>
       </hlm-dropdown-menu>
     </ng-template>
@@ -778,16 +631,9 @@ export class AppSidebar {
   protected readonly more = LucideEllipsis;
   protected readonly lock = LucideLock;
   protected readonly issueIcon = LucideCircleDot;
-  protected readonly decisionIcon = LucideScale;
   protected readonly layers = LucideLayers;
   protected readonly closeIcon = LucideX;
-  protected readonly repoIcon = LucideFolderGit2;
   protected readonly projectIcon = LucideBox;
-  protected readonly usersIcon = LucideUsers;
-  protected readonly teamLinks = [
-    { label: 'Issues', segment: 'issues', icon: LucideCircleDot },
-    { label: 'Team page', segment: '', icon: LucideUsers },
-  ] as const;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -797,39 +643,8 @@ export class AppSidebar {
     ),
     { initialValue: this.router.url },
   );
-  /** `?team=` of the current list page (team sub-links light up instead of the main item). */
-  protected readonly teamScoped = computed(() => /[?&]team=/.test(this.url()));
-
-  /** My teams first, then the rest. */
-  protected readonly sidebarTeams = computed(() => {
-    const mine = this.store.myTeamIds();
-    return [...this.store.teams()].sort((a, b) => Number(mine.has(b.id)) - Number(mine.has(a.id)));
-  });
-  protected readonly openIssuesByTeam = computed(() => {
-    const m = new Map<string, number>();
-    for (const i of this.store.issues()) {
-      if (!i.teamId || i.status === 'done' || i.status === 'canceled') continue;
-      m.set(i.teamId, (m.get(i.teamId) ?? 0) + 1);
-    }
-    return m;
-  });
-
-  protected isTeamLinkActive(teamId: string, teamKey: string, segment: string): boolean {
-    const [path, query = ''] = this.url().split('?');
-    const segs = path.split('/').filter(Boolean);
-    if (!segment)
-      return (
-        segs[1] === 'teams' &&
-        decodeURIComponent(segs[2] ?? '').toUpperCase() === teamKey.toUpperCase()
-      );
-    return (
-      segs[1] === segment && segs.length === 2 && new URLSearchParams(query).get('team') === teamId
-    );
-  }
-
   protected viewIcon(entity: string): LucideIcon {
     if (entity === 'issue') return LucideCircleDot;
-    if (entity === 'decision') return LucideScale;
     return entity === 'project' ? LucideBox : LucideLayers;
   }
   protected readonly chevrons = LucideChevronsUpDown;
@@ -861,7 +676,6 @@ export class AppSidebar {
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
-  protected readonly canAdmin = computed(() => this.store.allowed('createTeams'));
   protected readonly meRef = computed(() => {
     const u = this.session.user();
     return u ? ({ type: 'user', id: u.id } as const) : null;

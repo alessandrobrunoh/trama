@@ -40,7 +40,7 @@ import { OverviewModel } from './overview-model';
             <svg [lucideIcon]="check" [size]="18"></svg>
           </span>
           <p class="text-sm font-medium">You're clear</p>
-          <p class="text-meta max-w-sm">No questions, reviews or decisions are waiting on you. New ones show up here the moment they appear.</p>
+          <p class="text-meta max-w-sm">No reviews, failing checks or triage are waiting on you. New ones show up here the moment they appear.</p>
         </div>
       } @else {
         <ul>
@@ -96,7 +96,7 @@ import { OverviewModel } from './overview-model';
         <ul>
           @for (i of m.assignedTop(); track i.id) {
             <li>
-              <a [routerLink]="['/', m.slug(), 'issues', i.key]" class="hover:bg-hover -mx-2 flex h-8 items-center gap-2.5 rounded-md px-2">
+              <a [routerLink]="['/', m.slug(), 'tasks', i.key]" class="hover:bg-hover -mx-2 flex h-8 items-center gap-2.5 rounded-md px-2">
                 <app-status-icon entity="issue" [status]="i.status" />
                 <app-key-chip [value]="i.key" class="w-[4.5rem] shrink-0 max-sm:w-auto" />
                 <span class="min-w-0 flex-1 truncate text-[13px]">{{ i.title }}</span>

@@ -23,10 +23,10 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
         </svg>
         <span [class.text-muted-foreground]="done() < total()">{{ done() }}/{{ total() }}</span>
         @if (!compact()) {
-          <span class="text-muted-foreground">issues</span>
+          <span class="text-muted-foreground">tasks</span>
         }
       } @else if (!compact()) {
-        <span class="text-muted-foreground/60">No issues</span>
+        <span class="text-muted-foreground/60">No tasks</span>
       }
     </span>
   `,
@@ -44,7 +44,7 @@ export class IssueProgress {
 
   protected readonly tip = computed(() =>
     this.total()
-      ? `${this.done()} of ${this.total()} issues done${this.active() ? `, ${this.active()} in progress` : ''}`
-      : 'No issues',
+      ? `${this.done()} of ${this.total()} tasks done${this.active() ? `, ${this.active()} in progress` : ''}`
+      : 'No tasks',
   );
 }

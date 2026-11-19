@@ -77,7 +77,7 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
               [value]="projectId()" (valueChange)="selectProject($event)" />
           </div>
           <div class="grid min-w-0 gap-1.5">
-            <label for="timer-issue" class="text-sm font-medium">Issue</label>
+            <label for="timer-issue" class="text-sm font-medium">Task</label>
             <app-select controlId="timer-issue" [options]="issueChoices()" [(value)]="issueId" />
           </div>
         </div>
@@ -85,7 +85,7 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
 
       <section class="bg-card rounded-xl border p-5 sm:p-7" aria-labelledby="manual-entry">
         <h2 id="manual-entry" class="font-semibold">Log time manually</h2>
-        <p class="text-muted-foreground mt-1 text-sm">Add a past session using the description, project, and issue above.</p>
+        <p class="text-muted-foreground mt-1 text-sm">Add a past session using the description, project, and task above.</p>
       <form class="mt-4 grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]" (submit)="addManual($event)">
         <label class="flex flex-col gap-1 text-[13px]">
           Start
@@ -136,7 +136,7 @@ function formatSpan(startedAt: string, endedAt: string | null, now: number): str
               @if (entry.issueId) {
                 <a
                   class="text-primary hover:underline"
-                  [routerLink]="['/', slug(), 'issues', issueKey(entry.issueId)]"
+                  [routerLink]="['/', slug(), 'tasks', issueKey(entry.issueId)]"
                   >{{ issueKey(entry.issueId) }}</a
                 >
               }
@@ -186,7 +186,7 @@ export class TimerPage {
   protected readonly issueChoices = computed<Option[]>(() => {
     const projectId = this.projectId();
     return [
-      { value: '', label: 'No issue' },
+      { value: '', label: 'No task' },
       ...this.store.issues()
         .filter((issue) => !projectId || issue.projectId === projectId)
         .map((issue) => ({ value: issue.id, label: issue.title, hint: issue.key })),

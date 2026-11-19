@@ -14,7 +14,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Set Content type to application/json.',
       'Paste the secret.',
       'Choose “Let me select individual events” and tick the events listed below.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
   gitlab: {
@@ -23,7 +23,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Paste the URL below.',
       'Paste the secret into “Secret token”.',
       'Tick the triggers listed below and keep SSL verification on.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
   bitbucket: {
@@ -32,7 +32,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
       'Give it a title and paste the URL below.',
       'Tick “Use a secret” and paste the secret.',
       'Under Triggers choose “Choose from a full list of triggers” and tick the ones listed below: Pull request created, updated, approved, approval removed, merged and declined; and Repository → Build status created and updated.',
-      'Link the repositories here: events for unlinked repositories are ignored.',
+      'Events are applied to tasks and projects that name that repository.',
     ],
   },
 };
@@ -52,7 +52,7 @@ const STEPS: Record<string, { where: string; steps: string[] }> = {
           <hlm-dialog-header>
             <h2 hlmDialogTitle>{{ rotated() ? 'New webhook secret' : 'Set up the webhook' }}</h2>
             <p hlmDialogDescription>
-              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on issues and projects.' }}
+              {{ rotated() ? 'The previous secret stopped working. Update it in ' + providerLabel() + '.' : 'Trama turns ' + providerLabel() + ' pull request and CI events into artifacts on tasks and projects.' }}
             </p>
           </hlm-dialog-header>
 

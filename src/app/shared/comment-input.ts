@@ -149,16 +149,6 @@ export class CommentInput {
         ? { id: issue.id, insert: issue.key, label: issue.title, hint: issue.key }
         : null,
     );
-    take(this.store.decisions(), (decision) =>
-      match(decision.key, decision.title)
-        ? { id: decision.id, insert: decision.key, label: decision.title, hint: decision.key }
-        : null,
-    );
-    take(this.store.repositories(), (repository) =>
-      match(repository.fullName)
-        ? { id: repository.id, insert: repository.fullName, label: repository.fullName, hint: 'repo' }
-        : null,
-    );
     return out.slice(0, MAX_SUGGESTIONS);
   });
 

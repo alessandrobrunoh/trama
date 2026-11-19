@@ -31,8 +31,8 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
       title="Create a workspace"
       [subtitle]="
         hasWorkspaces()
-          ? 'A workspace holds your team, issues, plans and agents.'
-          : 'Welcome' + (firstName() ? ', ' + firstName() : '') + '. A workspace holds your team, issues, plans and agents.'
+          ? 'A workspace holds your team, tasks, plans and agents.'
+          : 'Welcome' + (firstName() ? ', ' + firstName() : '') + '. A workspace holds your team, tasks, plans and agents.'
       "
     >
       <form (submit)="submit($event)" novalidate class="flex flex-col gap-4">

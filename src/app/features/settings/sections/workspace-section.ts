@@ -3,7 +3,7 @@ import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { ESTIMATE_SCALES, LABEL_SWATCHES, WEEK_STARTS, type EstimateScale, type WeekStart, type CustomerTier } from '../../../core/contracts/domain';
+import { ESTIMATE_SCALES, WEEK_STARTS, type EstimateScale, type WeekStart } from '../../../core/contracts/domain';
 import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
@@ -98,9 +98,6 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
             </div>
           </div>
         </app-settings-row>
-        <app-settings-row label="Default team" description="Preselected when someone files an issue." wide>
-          <app-select size="sm" [options]="teamOptions()" [value]="prefs().defaultTeamId" (valueChange)="patchPrefs({ defaultTeamId: $event })" [disabled]="!canAdmin()" label="Default team" />
-        </app-settings-row>
         <app-settings-row label="Week starts on" description="Used by calendars, date pickers and cycles." wide>
           <app-select size="sm" [options]="weekOptions" [value]="prefs().weekStart" (valueChange)="patchPrefs({ weekStart: $any($event) })" [disabled]="!canAdmin()" label="Week starts on" />
         </app-settings-row>
@@ -136,7 +133,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       </app-settings-group>
     </form>
 
-    <app-settings-group title="Estimates" description="How issues are sized. Estimates are stored as numbers, so switching scale never rewrites an issue: a value that is not on the new scale stays visible and selectable.">
+    <app-settings-group title="Estimates" description="How tasks are sized. Estimates are stored as numbers, so switching scale never rewrites a task: a value that is not on the new scale stays visible and selectable.">
       <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2" role="radiogroup" aria-label="Estimate scale">
         @for (d of scaleDefs; track d.id) {
           <button
@@ -186,51 +183,9 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       <app-settings-row label="Contents" description="What this workspace holds right now.">
         <span class="text-muted-foreground text-[13px] tabular-nums">{{ counts() }}</span>
       </app-settings-row>
-      <app-settings-row label="Labels" description="One catalog shared by issues, projects and repositories.">
+      <app-settings-row label="Labels" description="One catalog shared by tasks and projects.">
         <a hlmBtn variant="outline" size="sm" [routerLink]="['/', store.slug(), 'settings', 'labels']">Manage labels</a>
       </app-settings-row>
-    </app-settings-group>
-
-    <app-settings-group title="Customer tiers" description="Tiers you use to rank customers, for example Enterprise, Growth or Free. Assign one on each customer. Removing a tier leaves its customers without one.">
-      @for (tier of tiers(); track tier.id) {
-        <div class="flex items-center gap-2 border-t px-4 py-2 first:border-t-0">
-          <span class="flex items-center gap-1" role="radiogroup" [attr.aria-label]="tier.name + ' color'">
-            @for (swatch of swatchList; track swatch) {
-              <button
-                type="button"
-                role="radio"
-                class="size-4 rounded-full border-2 disabled:opacity-50"
-                [style.background]="swatch"
-                [class]="tier.color === swatch ? 'border-foreground' : 'border-transparent'"
-                [attr.aria-checked]="tier.color === swatch"
-                [attr.aria-label]="swatch"
-                [disabled]="!canAdmin() || savingTier()"
-                (click)="recolorTier(tier, swatch)"
-              ></button>
-            }
-          </span>
-          <input
-            hlmInput
-            class="h-8 min-w-0 flex-1 text-[13px]"
-            maxlength="40"
-            [value]="tier.name"
-            [disabled]="!canAdmin() || savingTier()"
-            [attr.aria-label]="'Rename ' + tier.name"
-            (change)="renameTier(tier, $any($event.target).value)"
-          />
-          <button type="button" class="text-muted-foreground hover:text-destructive text-xs" [disabled]="!canAdmin() || savingTier()" (click)="removeTier(tier)">Remove</button>
-        </div>
-      } @empty {
-        <div class="text-muted-foreground px-4 py-2 text-xs">No tiers yet.</div>
-      }
-      @if (canAdmin()) {
-        <form class="flex items-center gap-2 border-t px-4 py-2" (submit)="addTier($event)">
-          <input hlmInput class="h-8 min-w-0 flex-1 text-[13px]" maxlength="40" placeholder="New tier" aria-label="New customer tier" [value]="newTier()" [disabled]="savingTier()" (input)="newTier.set($any($event.target).value)" />
-          <button hlmBtn type="submit" size="sm" [disabled]="!newTier().trim() || savingTier()">Add</button>
-        </form>
-      } @else {
-        <div class="text-muted-foreground border-t px-4 py-2 text-xs">Only admins and owners can change customer tiers.</div>
-      }
     </app-settings-group>
 
     <app-settings-group title="Danger zone">
@@ -268,10 +223,6 @@ export class WorkspaceSection {
   protected readonly swatches = ['#5e6ad2', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#64748b'];
   protected readonly checkIcon = LucideCheck;
   protected readonly savingScale = signal(false);
-  protected readonly savingTier = signal(false);
-  protected readonly newTier = signal('');
-  protected readonly tiers = computed(() => this.store.settings().customerTiers);
-  protected readonly swatchList = LABEL_SWATCHES;
   protected readonly scale = computed(() => this.store.estimateScale());
   protected readonly scaleDefs = ESTIMATE_SCALE_ORDER.filter((s) => ESTIMATE_SCALES.includes(s)).map((id) => {
     const def = ESTIMATE_SCALE_DEFS[id];
@@ -291,10 +242,6 @@ export class WorkspaceSection {
     ? (Intl as unknown as { supportedValuesOf(k: string): string[] }).supportedValuesOf('timeZone')
     : []);
   protected readonly prefs = signal(this.storedPrefs());
-  protected readonly teamOptions = computed<Option[]>(() => [
-    { value: '', label: 'No default' },
-    ...this.store.teams().map((t) => ({ value: t.id, label: t.name, hint: t.key })),
-  ]);
   protected readonly zoneError = computed(() => {
     const z = this.prefs().timeZone.trim();
     if (!z || z === 'auto') return null;
@@ -309,11 +256,7 @@ export class WorkspaceSection {
 
   protected readonly counts = computed(() => {
     const s = this.store;
-    return [
-      `${s.issues().length} issues`,
-      `${s.decisions().length} decisions`,
-      `${s.memberships().length} members`,
-    ].join(' · ');
+    return [`${s.issues().length} tasks`, `${s.projects().length} projects`, `${s.memberships().length} members`].join(' · ');
   });
 
   constructor() {
@@ -339,7 +282,6 @@ export class WorkspaceSection {
     return {
       iconColor: s.iconColor ?? '',
       iconInitial: s.iconInitial ?? '',
-      defaultTeamId: s.defaultTeamId ?? '',
       weekStart: s.weekStart as WeekStart,
       timeZone: s.timeZone,
     };
@@ -366,7 +308,6 @@ export class WorkspaceSection {
     const ok = await this.store.updateSettings({
       iconColor: p.iconColor || null,
       iconInitial: p.iconInitial.trim() || null,
-      defaultTeamId: p.defaultTeamId || null,
       weekStart: p.weekStart,
       timeZone: p.timeZone.trim() || 'auto',
     });
@@ -388,44 +329,6 @@ export class WorkspaceSection {
     const ok = await this.session.updateWorkspace({ name: this.name().trim(), slug: this.slugValue().trim() });
     this.busy.set(false);
     if (ok) this.notify.success('Workspace updated');
-  }
-
-  protected async recolorTier(tier: CustomerTier, color: string): Promise<void> {
-    if (!this.canAdmin() || tier.color === color || this.savingTier()) return;
-    this.savingTier.set(true);
-    const ok = await this.store.updateCustomerTier(tier.id, { color });
-    this.savingTier.set(false);
-    if (ok) this.notify.success('Tier updated');
-  }
-
-  protected async renameTier(tier: CustomerTier, value: string): Promise<void> {
-    const name = value.trim();
-    if (!this.canAdmin() || !name || name === tier.name || this.savingTier()) return;
-    this.savingTier.set(true);
-    const ok = await this.store.updateCustomerTier(tier.id, { name });
-    this.savingTier.set(false);
-    if (ok) this.notify.success('Tier updated');
-  }
-
-  protected async removeTier(tier: CustomerTier): Promise<void> {
-    if (!this.canAdmin() || this.savingTier()) return;
-    this.savingTier.set(true);
-    const ok = await this.store.deleteCustomerTier(tier.id);
-    this.savingTier.set(false);
-    if (ok) this.notify.success('Tier removed');
-  }
-
-  protected async addTier(event: Event): Promise<void> {
-    event.preventDefault();
-    const name = this.newTier().trim();
-    if (!this.canAdmin() || !name || this.savingTier()) return;
-    this.savingTier.set(true);
-    const ok = await this.store.createCustomerTier({ name });
-    this.savingTier.set(false);
-    if (ok) {
-      this.newTier.set('');
-      this.notify.success('Tier added');
-    }
   }
 
   protected deleteWorkspace(): void {

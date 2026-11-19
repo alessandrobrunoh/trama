@@ -34,6 +34,7 @@ import {
   type Issue,
   type IssueStatus,
   type Priority,
+  type Project,
   type ProjectStatus,
 } from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
@@ -45,19 +46,15 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Markdown } from '../../shared/markdown';
 import { StatusLabel } from '../../shared/status';
 import { IssueRow } from '../issues/issue-items';
-import { ProviderIcon } from '../../shared/provider-icon';
 import { ProjectMilestones } from '../milestones/project-milestones';
 import { EventLine } from '../overview/event-line';
 import { CommentThread } from '../../shared/comments';
 import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
-import { priorityOptions, repoOptions, teamOptions, userOptions } from '../../shared/picker-options';
+import { priorityOptions, userOptions } from '../../shared/picker-options';
 import { DatePicker } from '../../shared/date-picker';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
-import { projectWorkState } from '../customers/customer-model';
-import { CustomerRequests } from '../customers/customer-requests';
-import { DemandSummary } from '../customers/demand-summary';
 import { ProjectDocumentsTab } from '../documents/project-documents-tab';
 import { ProjectContextTab } from './project-context-tab';
 import { ProjectGlyphPicker } from './project-glyph';
@@ -68,12 +65,12 @@ import { ProjectStatsTab } from './project-stats-tab';
 import { ProjectUpdatesTab } from './project-updates-tab';
 import { LabelPicker } from '../../shared/label-picker';
 
-const TABS = ['overview', 'updates', 'issues', 'documents', 'context', 'stats'] as const;
+const TABS = ['overview', 'updates', 'tasks', 'documents', 'context', 'stats'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
   updates: 'Updates',
-  issues: 'Issues',
+  tasks: 'Tasks',
   documents: 'Documents',
   context: 'Context',
   stats: 'Stats',
@@ -93,13 +90,10 @@ const ACTIVITY_CAP = 20;
     TopBarActions,
     EmptyState,
     PropertyRow,
-    ProviderIcon,
     FullDatePipe,
     RelativeTimePipe,
     CommentThread,
     EditableMarkdown,
-    CustomerRequests,
-    DemandSummary,
     InlineText,
     Picker,
     DatePicker,
@@ -169,7 +163,7 @@ const ACTIVITY_CAP = 20;
             [canEdit]="canManage()"
             [maxLength]="projectKeyMax"
             [mono]="true"
-            hlmTooltip="Project tag; changing it updates this project's issue keys"
+            hlmTooltip="Project tag; changing it updates this project's task keys"
             (save)="update({ key: $event })"
           />
           <app-project-health class="shrink-0" [health]="p.health" />
@@ -228,11 +222,11 @@ const ACTIVITY_CAP = 20;
         @case ('updates') {
           <app-project-updates-tab [project]="p" />
         }
-        @case ('issues') {
+        @case ('tasks') {
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2 border-b px-4 py-2 sm:px-6">
               <span class="text-muted-foreground text-xs tabular-nums"
-                >{{ issues().length }} {{ issues().length === 1 ? 'issue' : 'issues' }}</span
+                >{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }}</span
               >
               @if (canCreateIssue()) {
                 <button
@@ -242,7 +236,7 @@ const ACTIVITY_CAP = 20;
                   class="ml-auto gap-1"
                   (click)="newIssue()"
                 >
-                  <svg [lucideIcon]="plus" [size]="14"></svg>Add issue
+                  <svg [lucideIcon]="plus" [size]="14"></svg>Add task
                 </button>
               }
             </div>
@@ -265,12 +259,12 @@ const ACTIVITY_CAP = 20;
             } @else {
               <app-empty-state
                 [icon]="issueIcon"
-                title="No issues in this project"
-                description="Issues planned under this project show up here."
+                title="No tasks in this project"
+                description="Tasks planned under this project show up here."
               >
                 @if (canCreateIssue()) {
                   <button hlmBtn size="sm" (click)="newIssue()">
-                    <svg [lucideIcon]="plus" [size]="14"></svg>Add issue
+                    <svg [lucideIcon]="plus" [size]="14"></svg>Add task
                   </button>
                 }
               </app-empty-state>
@@ -371,45 +365,7 @@ const ACTIVITY_CAP = 20;
                 <app-project-issue-suggestions [project]="p" />
               }
 
-              <app-demand-summary
-                [demand]="store.demand().get(p.id)"
-                [state]="workState(p.status)"
-              />
-              <app-customer-requests [projectId]="p.id" />
-
               <app-project-milestones [project]="p" />
-
-              <section>
-                <h2 class="mb-1 flex items-center gap-2 text-[13px] font-semibold">
-                  Repositories
-                  <span class="text-muted-foreground font-normal tabular-nums">{{
-                    repos().length
-                  }}</span>
-                </h2>
-                @if (repos().length) {
-                  <div class="border-t">
-                    @for (r of repos(); track r.id) {
-                      <a
-                        class="hover:bg-muted/60 flex min-w-0 items-center gap-2.5 border-b px-1 py-2 text-sm"
-                        [routerLink]="['/', slug(), 'repositories', r.id]"
-                      >
-                        <app-provider-icon [provider]="r.provider" [size]="16" />
-                        <span class="min-w-0 flex-1 truncate font-mono text-[13px]">{{
-                          r.fullName
-                        }}</span>
-                        <span
-                          class="text-muted-foreground shrink-0 font-mono text-xs max-sm:hidden"
-                          >{{ r.defaultBranch }}</span
-                        >
-                      </a>
-                    }
-                  </div>
-                } @else {
-                  <p class="text-muted-foreground text-[13px]">
-                    No repository yet. Link the repositories used by this project.
-                  </p>
-                }
-              </section>
 
               <section>
                 <h2 class="mb-1 text-[13px] font-semibold">Activity</h2>
@@ -492,18 +448,6 @@ const ACTIVITY_CAP = 20;
                   (valueChange)="update({ leadId: $event[0] ?? null })"
                 />
               </app-property-row>
-              <app-property-row label="Teams">
-                <app-picker
-                  variant="field"
-                  label="Teams"
-                  placeholder="None"
-                  [multiple]="true"
-                  [disabled]="!canManage()"
-                  [options]="teams()"
-                  [value]="p.teamIds"
-                  (valueChange)="update({ teamIds: $event })"
-                />
-              </app-property-row>
               <app-property-row label="Labels">
                 <app-label-picker
                   scope="project"
@@ -512,16 +456,14 @@ const ACTIVITY_CAP = 20;
                   (valueChange)="update({ labels: $event })"
                 />
               </app-property-row>
-              <app-property-row label="Repositories">
-                <app-picker
-                  variant="field"
-                  label="Repositories"
-                  placeholder="None"
-                  [multiple]="true"
+              <app-property-row label="Repository">
+                <input
+                  class="border-input bg-background h-8 w-full rounded-md border px-2 font-mono text-xs"
+                  [value]="p.repository ?? ''"
                   [disabled]="!canManage()"
-                  [options]="repoChoices()"
-                  [value]="p.repositoryIds"
-                  (valueChange)="update({ repositoryIds: $event })"
+                  placeholder="owner/name or URL"
+                  aria-label="Repository"
+                  (change)="update({ repository: $any($event.target).value.trim() || null })"
                 />
               </app-property-row>
               <app-property-row label="Start date">
@@ -591,7 +533,6 @@ export class ProjectDetailPage {
   readonly tab = input<string>();
 
   protected readonly store = inject(TramaStore);
-  protected readonly workState = projectWorkState;
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);
@@ -618,18 +559,11 @@ export class ProjectDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly project = computed(() => this.store.getProject(this.id()));
-  protected readonly teams = computed(() => teamOptions(this.store));
   protected readonly users = computed(() => userOptions(this.store));
-  protected readonly repoChoices = computed(() => repoOptions(this.store));
   protected readonly overdue = computed(() => {
     const p = this.project();
     return !!p && isOverdue(p);
   });
-  protected readonly repos = computed(() =>
-    (this.project()?.repositoryIds ?? [])
-      .map((id) => this.store.getRepository(id))
-      .filter((r) => !!r),
-  );
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
   protected readonly canPost = computed(() => {
     const p = this.project();
@@ -741,7 +675,7 @@ export class ProjectDetailPage {
     if (!p) return;
     this.ui.setConfirmDelete({
       title: `Delete ${p.name}?`,
-      description: 'The project is removed. Repositories are not affected.',
+      description: 'The project is removed.',
       onConfirm: async () => {
         const ok = await this.store.deleteProject(p.id);
         if (ok) await this.router.navigate(['/', this.slug(), 'projects']);

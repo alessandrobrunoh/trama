@@ -10,26 +10,19 @@ import { RouterLink } from '@angular/router';
 import {
   LucideActivity,
   LucideBot,
-  LucideBuilding2,
-  LucideCircleCheck,
-  LucideCircleHelp,
-  LucideCircleX,
   LucideDynamicIcon,
   LucideFileText,
   LucideFlag,
   LucideBox,
   LucideDiamond,
-  LucideFolderGit2,
   LucideGitPullRequest,
   LucideInbox,
   LucideLink2,
   LucideListChecks,
   LucideMessageSquare,
   LucideRocket,
-  LucideScale,
   LucideSquarePen,
   LucideTrash2,
-  LucideUsers,
   type LucideIcon,
 } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
@@ -47,14 +40,12 @@ import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/stat
 import { AgoPipe } from './ago';
 
 /** Coarse event family, used by the Activity page filters. */
-export type EventCategory = 'issue' | 'decision' | 'artifact' | 'comment' | 'input' | 'other';
+export type EventCategory = 'issue' | 'artifact' | 'comment' | 'other';
 
 export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
-  issue: 'Issues',
-  decision: 'Decisions',
+  issue: 'Tasks',
   artifact: 'Artifacts',
   comment: 'Comments',
-  input: 'Questions',
   other: 'Other',
 };
 
@@ -63,16 +54,12 @@ export function eventCategory(e: DomainEvent): EventCategory {
   switch (prefix) {
     case 'issue':
       return 'issue';
-    case 'decision':
-      return 'decision';
     case 'artifact':
     case 'document':
     case 'review':
       return 'artifact';
     case 'comment':
       return 'comment';
-    case 'input':
-      return 'input';
     default:
       return 'other';
   }
@@ -85,11 +72,11 @@ export interface EntityRef {
 
 export interface EventView {
   icon: LucideIcon;
-  /** Past-tense verb phrase, e.g. "answered", "attached a pull request". */
+  /** Past-tense verb phrase, e.g. "moved to done", "attached a pull request". */
   verb: string;
   /** Main subject, rendered as an entity chip (status glyph · key · title). */
   subject?: EntityRef;
-  /** Text subject when there is no entity to link (artifact title, question…). */
+  /** Text subject when there is no entity to link (artifact title…). */
   text?: string;
   /** Link for a text subject. */
   link?: readonly unknown[];
@@ -99,7 +86,7 @@ export interface EventView {
   target?: EntityRef;
   /** Status transition, rendered as glyph → glyph. */
   transition?: { from?: AnyStatus; to: AnyStatus; entity: StatusEntity };
-  /** Secondary line (comment excerpt, answer…). */
+  /** Secondary line (comment excerpt…). */
   detail?: string;
 }
 
@@ -136,10 +123,6 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
     type: 'issue',
     ref: store.issueById().has(e.subject.id) ? e.subject.id : (str(d['key']) ?? e.subject.id),
   });
-  const decisionRef = (): EntityRef => ({
-    type: 'decision',
-    ref: store.decisionById().has(e.subject.id) ? e.subject.id : (str(d['key']) ?? e.subject.id),
-  });
 
   switch (e.type) {
     case 'workstream.created':
@@ -165,27 +148,6 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         icon: LucideListChecks,
         verb: d['state'] === 'met' ? 'met a legacy criterion' : 'updated a legacy criterion',
         text: str(d['key']) ?? str(d['text']),
-      };
-    case 'input.requested':
-      return {
-        icon: LucideCircleHelp,
-        verb: 'asked a legacy workstream question',
-        text: legacyText(),
-        detail: str(d['question']),
-      };
-    case 'input.answered':
-      return {
-        icon: LucideCircleCheck,
-        verb: 'answered a legacy workstream question',
-        text: legacyText(),
-        detail: [str(d['question']), str(d['answer'])].filter(Boolean).join(' → ') || undefined,
-      };
-    case 'input.dismissed':
-      return {
-        icon: LucideCircleX,
-        verb: 'dismissed a legacy workstream question',
-        text: legacyText(),
-        detail: str(d['question']),
       };
     case 'artifact.attached': {
       const kind = str(d['kind']) as keyof typeof ARTIFACT_KIND_META | undefined;
@@ -218,19 +180,6 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         verb: 'requested review on',
         text: [str(d['externalId']), str(d['title'])].filter(Boolean).join(' ') || 'a pull request',
       };
-    case 'decision.proposed':
-    case 'decision.accepted':
-    case 'decision.rejected':
-    case 'decision.superseded':
-    case 'decision.updated': {
-      const verb = e.type.split('.')[1];
-      return {
-        icon: LucideScale,
-        verb: verb === 'updated' ? 'updated decision' : `${verb} decision`,
-        subject: decisionRef(),
-        detail: verb === 'updated' ? fieldsText(d) : undefined,
-      };
-    }
     case 'document.created':
     case 'document.updated':
     case 'document.archived':
@@ -250,41 +199,12 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         link: e.type !== 'document.deleted' ? ['/', slug, 'documents', e.subject.id] : undefined,
       };
     }
-    case 'customer.created':
-    case 'customer.updated':
-    case 'customer.archived':
-    case 'customer.restored':
-    case 'customer.deleted': {
-      const verb =
-        e.type === 'customer.archived'
-          ? 'archived'
-          : e.type === 'customer.restored'
-            ? 'restored'
-            : e.type.split('.')[1];
-      return {
-        icon: LucideBuilding2,
-        verb: `${verb} customer`,
-        text: str(d['name']) ?? store.getCustomer(e.subject.id)?.name,
-        link: e.type !== 'customer.deleted' ? ['/', slug, 'customers', e.subject.id] : undefined,
-      };
-    }
-    case 'customer_request.linked':
-    case 'customer_request.unlinked':
-      return {
-        icon: LucideLink2,
-        verb:
-          e.type === 'customer_request.linked'
-            ? 'linked customer feedback to'
-            : 'unlinked customer feedback from',
-        subject: str(d['issueId']) ? { type: 'issue', ref: str(d['issueId'])! } : undefined,
-        detail: str(d['customer']),
-      };
     case 'issue.created':
       return { icon: LucideInbox, verb: 'reported', subject: issueRef() };
     case 'issue.updated':
       return { icon: LucideSquarePen, verb: 'updated', subject: issueRef(), detail: fieldsText(d) };
     case 'issue.deleted':
-      return { icon: LucideTrash2, verb: 'deleted issue', text: str(d['key']) };
+      return { icon: LucideTrash2, verb: 'deleted task', text: str(d['key']) };
     case 'issue.status_changed': {
       const to = str(d['to']) as IssueStatus | undefined;
       const from = str(d['from']) as IssueStatus | undefined;
@@ -301,7 +221,7 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
       const ids = strs(d['workstreamIds']);
       return {
         icon: LucideLink2,
-        verb: 'updated legacy issue associations',
+        verb: 'updated legacy task associations',
         subject: issueRef(),
         detail: ids.length
           ? `${ids.length} legacy workstream link${ids.length === 1 ? '' : 's'}`
@@ -319,41 +239,15 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
       };
     case 'comment.created': {
       const target: EntityRef | undefined =
-        e.subject.type === 'issue'
-          ? { type: 'issue', ref: e.subject.id }
-          : e.subject.type === 'decision'
-            ? { type: 'decision', ref: e.subject.id }
-            : undefined;
+        e.subject.type === 'issue' ? { type: 'issue', ref: e.subject.id } : undefined;
       return {
         icon: LucideMessageSquare,
         verb: 'commented on',
         subject: target,
-        text: e.subject.type === 'workstream' ? legacyText() : undefined,
+        text: e.subject.type === 'issue' ? undefined : (legacyText() ?? str(d['key'])),
         detail: str(d['excerpt']),
       };
     }
-    case 'team.created':
-    case 'team.updated':
-    case 'team.deleted':
-      return {
-        icon: LucideUsers,
-        verb: `${e.type.split('.')[1]} team`,
-        text: store.getTeam(e.subject.id)?.name ?? str(d['key']),
-        link:
-          e.type !== 'team.deleted' && str(d['key'])
-            ? ['/', slug, 'teams', str(d['key'])]
-            : undefined,
-      };
-    case 'repository.created':
-    case 'repository.updated':
-    case 'repository.deleted':
-      return {
-        icon: LucideFolderGit2,
-        verb: `${e.type.split('.')[1]} repository`,
-        text: str(d['fullName']) ?? store.getRepository(e.subject.id)?.fullName,
-        link:
-          e.type !== 'repository.deleted' ? ['/', slug, 'repositories', e.subject.id] : undefined,
-      };
     case 'milestone.created':
     case 'milestone.updated':
     case 'milestone.deleted': {

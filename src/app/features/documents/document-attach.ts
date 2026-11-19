@@ -60,7 +60,7 @@ export function describeLink(store: TramaStore, link: DocumentLink) {
   if (link.issueId) {
     const i = store.getIssue(link.issueId);
     return i
-      ? { type: 'issue' as const, label: i.key, mono: true, route: ['/', slug, 'issues', i.key] }
+      ? { type: 'issue' as const, label: i.key, mono: true, route: ['/', slug, 'tasks', i.key] }
       : null;
   }
   return null;
@@ -168,7 +168,7 @@ export class DocumentOwnerDialog {
   protected readonly searchIcon = LucideSearch;
   protected readonly types: { type: OwnerType; label: string; icon: LucideIcon }[] = [
     { type: 'project', label: 'Project', icon: LucideBox },
-    { type: 'issue', label: 'Issue', icon: LucideCircleDot },
+    { type: 'issue', label: 'Task', icon: LucideCircleDot },
   ];
   protected readonly type = signal<OwnerType>('project');
   protected readonly query = signal('');

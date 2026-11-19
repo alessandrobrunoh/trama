@@ -110,7 +110,7 @@ export interface BoxStat {
 
       @if (tip(); as t) {
         <app-chart-tip [x]="t.x" [y]="mt" [bounds]="width()">
-          <div class="text-foreground mb-1 font-medium">Estimate {{ t.b.label }} <span class="text-muted-foreground font-normal">· {{ t.b.n }} issue{{ t.b.n === 1 ? '' : 's' }}</span></div>
+          <div class="text-foreground mb-1 font-medium">Estimate {{ t.b.label }} <span class="text-muted-foreground font-normal">· {{ t.b.n }} task{{ t.b.n === 1 ? '' : 's' }}</span></div>
           @if (t.b.n >= 3) {
             <dl class="grid grid-cols-[auto_auto] gap-x-4 gap-y-0.5 tabular-nums">
               <dt class="text-muted-foreground">Slowest</dt><dd class="text-end">{{ day(t.b.max) }}</dd>
@@ -120,7 +120,7 @@ export interface BoxStat {
               <dt class="text-muted-foreground">Fastest</dt><dd class="text-end">{{ day(t.b.min) }}</dd>
             </dl>
           } @else {
-            <p class="text-muted-foreground">Too few issues for a box (needs 3). Dots show each one.</p>
+            <p class="text-muted-foreground">Too few tasks for a box (needs 3). Dots show each one.</p>
           }
           @if (t.b.overlaps) {
             <p class="mt-1.5" style="color: var(--tone-amber)">Overlaps a neighbouring estimate</p>
@@ -131,7 +131,7 @@ export interface BoxStat {
       <table class="sr-only">
         <caption>{{ ariaLabel() }}</caption>
         <thead>
-          <tr><th scope="col">Estimate</th><th scope="col">Issues</th><th scope="col">Min</th><th scope="col">p25</th><th scope="col">Median</th><th scope="col">p75</th><th scope="col">Max</th></tr>
+          <tr><th scope="col">Estimate</th><th scope="col">Tasks</th><th scope="col">Min</th><th scope="col">p25</th><th scope="col">Median</th><th scope="col">p75</th><th scope="col">Max</th></tr>
         </thead>
         <tbody>
           @for (b of boxes(); track $index) {

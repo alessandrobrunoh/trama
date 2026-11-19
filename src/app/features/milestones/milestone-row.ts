@@ -143,20 +143,20 @@ import { ProgressChart } from './progress-chart';
         }
         <div>
           <div class="mb-1 flex items-center gap-2">
-            <h3 class="text-muted-foreground text-xs font-medium">Issues <span class="tabular-nums">{{ issues().length }}</span></h3>
+            <h3 class="text-muted-foreground text-xs font-medium">Tasks <span class="tabular-nums">{{ issues().length }}</span></h3>
             @if (canEdit() && addable().length) {
               <app-picker
                 class="ml-auto"
                 variant="bare"
-                label="Add issues to milestone"
-                searchPlaceholder="Search project issues…"
+                label="Add tasks to milestone"
+                searchPlaceholder="Search project tasks…"
                 triggerClass="text-muted-foreground hover:text-foreground h-6 gap-1 px-1.5 text-xs"
                 align="end"
                 [options]="addOptions()"
                 [value]="[]"
                 (valueChange)="addIssue($event[0])"
               >
-                <svg [lucideIcon]="plus" [size]="12"></svg>Add issue
+                <svg [lucideIcon]="plus" [size]="12"></svg>Add task
               </app-picker>
             }
           </div>
@@ -165,7 +165,7 @@ import { ProgressChart } from './progress-chart';
               @for (i of issues(); track i.id) {
                 <li class="group/mi hover:bg-hover flex min-h-8 items-center gap-2 border-b px-2 text-[13px] last:border-b-0">
                   <app-status-icon entity="issue" [status]="i.status" />
-                  <a [routerLink]="['/', slug(), 'issues', i.key]" class="flex min-w-0 flex-1 items-center gap-2 outline-none focus-visible:underline">
+                  <a [routerLink]="['/', slug(), 'tasks', i.key]" class="flex min-w-0 flex-1 items-center gap-2 outline-none focus-visible:underline">
                     <app-key-chip [value]="i.key" class="w-[4.25rem]" />
                     <span class="truncate" [class.text-muted-foreground]="i.status === 'done' || i.status === 'canceled'">{{ i.title }}</span>
                   </a>
@@ -184,7 +184,7 @@ import { ProgressChart } from './progress-chart';
               }
             </ul>
           } @else {
-            <p class="text-muted-foreground text-xs">No issues in this milestone. Add some, or set a milestone on an issue row.</p>
+            <p class="text-muted-foreground text-xs">No tasks in this milestone. Add some, or set a milestone on a task row.</p>
           }
         </div>
       </div>
@@ -275,8 +275,8 @@ export class MilestoneRow {
   protected readonly tip = computed(() => {
     const s = this.stats();
     return s.issues
-      ? `${s.doneIssues} of ${s.issues} issues done${s.points ? ` · ◬ ${fmtNum(s.completed)} of ${fmtNum(s.scope)} points` : ''}`
-      : 'No issues in this milestone';
+      ? `${s.doneIssues} of ${s.issues} tasks done${s.points ? ` · ◬ ${fmtNum(s.completed)} of ${fmtNum(s.scope)} points` : ''}`
+      : 'No tasks in this milestone';
   });
   protected readonly addable = computed(() => (this.store.issuesByProject().get(this.project().id) ?? []).filter((i) => i.status !== 'canceled' && !i.milestoneIds?.includes(this.ms().id)));
   protected readonly addOptions = computed(() => issueOptions(this.addable()));

@@ -42,7 +42,7 @@ type ScopeFilter = 'all' | LabelScope;
 type ActiveLabelScope = LabelScope;
 
 const SCOPE_NOUN: Record<ActiveLabelScope, string> = {
-  issue: 'Issue',
+  issue: 'Task',
   project: 'Project',
 };
 
@@ -63,7 +63,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
   imports: [NgTemplateOutlet, HlmButtonImports, HlmDialogImports, HlmDropdownMenuImports, HlmInputImports, LucideDynamicIcon, LabelChip, EmptyState, Picker, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-6' },
   template: `
-    <app-section-header title="Labels" description="Each label applies to issues or projects. Templates are issue labels; their name and scope stay fixed.">
+    <app-section-header title="Labels" description="Each label applies to tasks or projects. Templates are task labels; their name and scope stay fixed.">
       <div actions>
         @if (catalog.canCreate()) {
           <button hlmBtn size="sm" (click)="openForm(null)">
@@ -199,7 +199,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
               <hlm-dialog-header>
                 <h2 hlmDialogTitle>{{ editing() ? 'Edit label' : 'New label' }}</h2>
                 <p hlmDialogDescription>
-                  {{ editing()?.template ? 'Templates stay issue labels; you can change the color.' : 'A short name, and which records it can be added to.' }}
+                  {{ editing()?.template ? 'Templates stay task labels; you can change the color.' : 'A short name, and which records it can be added to.' }}
                 </p>
               </hlm-dialog-header>
               <div class="flex flex-col gap-4 text-[13px]">
@@ -388,11 +388,11 @@ export class LabelsSection {
   protected readonly scopeFilter = signal<'all' | ActiveLabelScope>('all');
   protected readonly scopeFilters: { id: 'all' | ActiveLabelScope; label: string }[] = [
     { id: 'all', label: 'All' },
-    { id: 'issue', label: 'Issues' },
+    { id: 'issue', label: 'Tasks' },
     { id: 'project', label: 'Projects' },
   ];
   protected readonly scopes: { id: ActiveLabelScope; label: string }[] = [
-    { id: 'issue', label: 'Issues' },
+    { id: 'issue', label: 'Tasks' },
     { id: 'project', label: 'Projects' },
   ];
 

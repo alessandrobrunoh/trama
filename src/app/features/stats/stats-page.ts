@@ -13,7 +13,7 @@ import { workspaceStats } from './stats-model';
   template: `
     <app-page-header
       title="Statistics"
-      description="Issue demand, workspace health, and contributor activity. Health signals are computed from the complete activity log."
+      description="Task demand, workspace health, and contributor activity. Health signals are computed from the complete activity log."
     />
     <div class="mx-auto w-full max-w-[1320px] px-4 py-4 sm:px-6">
       <app-stats-board [model]="model()" [syncUrl]="true" [insights]="true" />

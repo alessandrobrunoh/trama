@@ -49,7 +49,7 @@ let seq = 0;
 
     @if (m.totals.scope === 0) {
       <div class="text-muted-foreground border-border-strong flex items-center justify-center rounded-md border border-dashed px-4 text-center text-xs" [style.height.px]="height()">
-        {{ milestone() ? 'No issues in this milestone yet.' : 'Link issues to see progress over time.' }}
+        {{ milestone() ? 'No tasks in this milestone yet.' : 'Link tasks to see progress over time.' }}
       </div>
     } @else {
       <div class="relative outline-none" tabindex="0" [attr.aria-label]="summary()" (keydown)="onKey($event)" (blur)="hover.set(null)">
@@ -138,7 +138,7 @@ let seq = 0;
         }
       </div>
       @if (!compactMode() && m.totals.defaulted > 0) {
-        <p class="text-muted-foreground mt-1.5 text-[11px]">{{ m.totals.defaulted }} {{ m.totals.defaulted === 1 ? 'issue has' : 'issues have' }} no estimate and {{ m.totals.defaulted === 1 ? 'counts' : 'count' }} as 1 point.</p>
+        <p class="text-muted-foreground mt-1.5 text-[11px]">{{ m.totals.defaulted }} {{ m.totals.defaulted === 1 ? 'task has' : 'tasks have' }} no estimate and {{ m.totals.defaulted === 1 ? 'counts' : 'count' }} as 1 point.</p>
       }
     }
   `,

@@ -54,7 +54,7 @@ export class MilestoneActions {
     const issueIds = (this.store.issuesByMilestone().get(ms.id) ?? []).map((i) => i.id);
     if (!(await this.store.deleteMilestone(ms.id))) return;
     this.notify.success(`Deleted milestone “${ms.name}”`, {
-      description: issueIds.length ? `${issueIds.length} issue${issueIds.length === 1 ? '' : 's'} no longer in a milestone.` : undefined,
+      description: issueIds.length ? `${issueIds.length} task${issueIds.length === 1 ? '' : 's'} no longer in a milestone.` : undefined,
       action: {
         label: 'Undo',
         run: async () => {

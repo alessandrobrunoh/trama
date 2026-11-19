@@ -7,14 +7,13 @@ import {
   PRIORITIES,
   PRIORITY_META,
   type Artifact,
-  type Decision,
   type DomainEvent,
   type Issue,
   type IssueStatus,
   type TramaStore,
   type Priority,
 } from '../../core';
-import { ARTIFACT_COLOR, DECISION_COLOR, ISSUE_COLOR, KIND_FALLBACK, PRIORITY_COLOR } from './stats-colors';
+import { ARTIFACT_COLOR, ISSUE_COLOR, KIND_FALLBACK, PRIORITY_COLOR } from './stats-colors';
 import { buildTimeline, type Timeline } from './timeline';
 import { buildWork, type WorkData } from './work';
 
@@ -58,29 +57,11 @@ const isOpenPr = (a: Artifact): boolean => isPr(a) && (a.state === 'open' || a.s
 export function workspaceStats(store: TramaStore, now = new Date()): StatsModel {
   const issues = store.issues();
   const artifacts = store.artifacts();
-  const decisions = store.decisions();
-  return assemble(store, issues, artifacts, decisions, [
-    { label: 'Open issues', value: String(issues.filter(isOpenIssue).length), hint: ageHint(issues.filter(isOpenIssue), now) },
-    { label: 'Done issues', value: String(issues.filter((i) => i.status === 'done').length) },
+  return assemble(store, issues, artifacts, [
+    { label: 'Open tasks', value: String(issues.filter(isOpenIssue).length), hint: ageHint(issues.filter(isOpenIssue), now) },
+    { label: 'Done tasks', value: String(issues.filter((i) => i.status === 'done').length) },
     { label: 'Backlog', value: String(issues.filter((i) => i.status === 'backlog').length) },
     { label: 'Open PRs', value: String(artifacts.filter(isOpenPr).length) },
-  ], now);
-}
-
-export function repositoryStats(store: TramaStore, repositoryId: string, now = new Date()): StatsModel {
-  const repository = store.getRepository(repositoryId);
-  const projectIds = new Set(store.projects().filter((p) => p.repositoryIds.includes(repositoryId)).map((p) => p.id));
-  const issues = store.issues().filter((i) => i.projectId && projectIds.has(i.projectId));
-  const issueIds = new Set(issues.map((i) => i.id));
-  const artifacts = store.artifactsByRepository().get(repositoryId) ?? [];
-  const decisions = store.decisions().filter(
-    (d) => (d.originIssueId != null && issueIds.has(d.originIssueId)) || d.relatedIssueIds.some((id) => issueIds.has(id)),
-  );
-  return assemble(store, issues, artifacts, decisions, [
-    { label: 'Open issues', value: String(issues.filter(isOpenIssue).length), hint: ageHint(issues.filter(isOpenIssue), now) },
-    { label: 'Done issues', value: String(issues.filter((i) => i.status === 'done').length) },
-    { label: 'Open PRs', value: String(artifacts.filter(isOpenPr).length) },
-    { label: 'Repository', value: repository?.fullName ?? '—' },
   ], now);
 }
 
@@ -127,7 +108,6 @@ function assemble(
   store: TramaStore,
   issues: readonly Issue[],
   artifacts: readonly Artifact[],
-  decisions: readonly Decision[],
   cards: StatCard[],
   now: Date,
 ): StatsModel {
@@ -136,9 +116,8 @@ function assemble(
     distributions: [
       issueStatusDist(issues),
       issueKindDist(issues),
-      priorityDist(issues.map((i) => i.priority), 'Issue priority'),
+      priorityDist(issues.map((i) => i.priority), 'Task priority'),
       artifactDist(artifacts),
-      decisionDist(decisions),
     ].filter((d): d is Distribution => !!d),
     timeline: buildTimeline(store, issues, now),
     work: buildWork(store, issues),
@@ -146,11 +125,11 @@ function assemble(
 }
 
 function issueStatusDist(issues: readonly Issue[]): Distribution | undefined {
-  return dist('Issue status', countBy(issues.map((i) => i.status)), ISSUE_STATUSES, (s) => ISSUE_STATUS_META[s].label, (s) => ISSUE_COLOR[s]);
+  return dist('Task status', countBy(issues.map((i) => i.status)), ISSUE_STATUSES, (s) => ISSUE_STATUS_META[s].label, (s) => ISSUE_COLOR[s]);
 }
 
 function issueKindDist(issues: readonly Issue[]): Distribution | undefined {
-  return dist('Issue type', countBy(issues.map((i) => i.kind)), ISSUE_KINDS, (s) => ISSUE_KIND_META[s].label, (s) => KIND_FALLBACK[s]);
+  return dist('Task type', countBy(issues.map((i) => i.kind)), ISSUE_KINDS, (s) => ISSUE_KIND_META[s].label, (s) => KIND_FALLBACK[s]);
 }
 
 function priorityDist(values: readonly Priority[], title: string): Distribution | undefined {
@@ -160,17 +139,6 @@ function priorityDist(values: readonly Priority[], title: string): Distribution 
 function artifactDist(artifacts: readonly Artifact[]): Distribution | undefined {
   const order = [...new Set(artifacts.map((a) => a.state))];
   return dist('Artifacts', countBy(artifacts.map((a) => a.state)), order, (s) => s.replace(/_/g, ' '), (s) => ARTIFACT_COLOR[s] ?? 'var(--status-draft)');
-}
-
-function decisionDist(decisions: readonly Decision[]): Distribution | undefined {
-  const order = ['proposed', 'accepted', 'superseded', 'rejected'] as const;
-  const labels: Record<(typeof order)[number], string> = {
-    proposed: 'Proposed',
-    accepted: 'Accepted',
-    superseded: 'Superseded',
-    rejected: 'Rejected',
-  };
-  return dist('Decisions', countBy(decisions.map((d) => d.status)), order, (s) => labels[s], (s) => DECISION_COLOR[s]);
 }
 
 function dist<T extends string>(

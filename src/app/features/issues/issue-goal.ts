@@ -22,7 +22,7 @@ type IssueWithGoal = Issue & { goal?: string };
       </div>
       @if (editing()) {
         <form (submit)="save($event)">
-          <label for="issue-goal" class="sr-only">Issue goal</label>
+          <label for="issue-goal" class="sr-only">Task goal</label>
           <textarea
             id="issue-goal"
             name="goal"
@@ -44,7 +44,7 @@ type IssueWithGoal = Issue & { goal?: string };
         <p class="text-muted-foreground whitespace-pre-wrap text-sm">
           {{
             goal() ||
-              (canEdit() ? 'Describe the outcome this issue should achieve.' : 'No goal set.')
+              (canEdit() ? 'Describe the outcome this task should achieve.' : 'No goal set.')
           }}
         </p>
       }

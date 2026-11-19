@@ -23,11 +23,10 @@ import { StatusIcon, type AnyStatus } from '../../shared/status';
 import type { IssueActions, IssuePromptField } from './issue-actions';
 
 export interface IssueOption {
-  /** '' = none (unassign, no team). */
+  /** '' = none (unassign, no project). */
   value: string;
   label: string;
-  glyph:
-    'status' | 'priority' | 'user' | 'team' | 'issue' | 'project' | 'label' | 'none';
+  glyph: 'status' | 'priority' | 'user' | 'issue' | 'project' | 'label' | 'none';
   /** Swatch of a label. */
   color?: string;
   status?: string;
@@ -39,7 +38,6 @@ export const PROMPT_TITLE: Record<IssuePromptField, string> = {
   status: 'Change status…',
   priority: 'Set priority…',
   assignee: 'Assign to…',
-  team: 'Move to team…',
   project: 'Move to project…',
   label: 'Toggle label…',
   duplicate: 'Mark as duplicate of…',
@@ -77,19 +75,6 @@ export function promptOptions(
         })),
       ];
     }
-    case 'team':
-      return [
-        { value: '', label: 'No team', glyph: 'none', search: 'no team' },
-        ...store
-          .teams()
-          .map((t) => ({
-            value: t.id,
-            label: t.name,
-            glyph: 'team' as const,
-            hint: t.key,
-            search: `${t.name} ${t.key}`,
-          })),
-      ];
     case 'project':
       return [
         { value: '', label: 'No project', glyph: 'none', search: 'no project' },
@@ -137,8 +122,6 @@ export function currentValues(field: IssuePromptField, issues: readonly Issue[])
         return [i.priority];
       case 'assignee':
         return [i.assigneeId ?? ''];
-      case 'team':
-        return [i.teamId ?? ''];
       case 'project':
         return [i.projectId ?? ''];
       case 'label':
@@ -167,9 +150,6 @@ export function applyOption(
       return true;
     case 'assignee':
       actions.setAssignee(ids, value || null);
-      return true;
-    case 'team':
-      actions.setTeam(ids, value || null);
       return true;
     case 'project':
       actions.setProject(ids, value || null);
@@ -210,9 +190,6 @@ export function applyOption(
       }
       @case ('label') {
         <span class="size-2.5 rounded-full" [style.background]="o.color"></span>
-      }
-      @case ('team') {
-        <app-actor-avatar [actor]="{ type: 'team', id: o.value }" [size]="16" />
       }
       @default {
         <svg

@@ -235,39 +235,16 @@ const POLL_MS = 2000;
           </app-settings-group>
 
           @if (p.provider === 'linear') {
-            <app-settings-group title="Teams" description="Choose the teams to read, then map each to a Trama team.">
+            <app-settings-group title="Teams" description="Choose which Linear teams to read. Issues are imported as tasks and are not assigned to a team.">
               @for (t of p.teams; track t.id) {
                 <app-settings-row [label]="t.name + (t.key ? ' (' + t.key + ')' : '')" [description]="t.count !== undefined ? t.count + ' issues' : ''" wide>
-                  <div class="flex items-center gap-2">
-                    <input type="checkbox" class="size-4" [checked]="!excludedTeams().has(t.id)" [attr.aria-label]="'Include ' + t.name" (change)="toggleTeam(t.id, $any($event.target).checked)" />
-                    <select [class]="select" [attr.aria-label]="'Trama team for ' + t.name" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                      <option value="create" [selected]="draft().teams[t.id] === 'create'">Create team “{{ t.key ?? t.name }}”</option>
-                      <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
-                      @for (x of teams(); track x.id) {
-                        <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
-                      }
-                    </select>
-                  </div>
+                  <input type="checkbox" class="size-4" [checked]="!excludedTeams().has(t.id)" [attr.aria-label]="'Include ' + t.name" (change)="toggleTeam(t.id, $any($event.target).checked)" />
                 </app-settings-row>
               }
               @if (teamsChanged()) {
                 <div class="bg-muted/30 flex justify-end px-4 py-2">
                   <button hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="runPreview(true)">Refresh preview with these teams</button>
                 </div>
-              }
-            </app-settings-group>
-          } @else {
-            <app-settings-group title="Team" description="The tracker has no teams: choose where its issues belong in Trama.">
-              @for (t of p.teams; track t.id) {
-                <app-settings-row [label]="t.name" wide>
-                  <select [class]="select" aria-label="Trama team" [value]="draft().teams[t.id]" (change)="setTarget('teams', t.id, $any($event.target).value)">
-                    <option value="skip" [selected]="draft().teams[t.id] === 'skip'">No team</option>
-                    <option value="create" [selected]="draft().teams[t.id] === 'create'">Create a team</option>
-                    @for (x of teams(); track x.id) {
-                      <option [value]="'map:' + x.id" [selected]="draft().teams[t.id] === ('map:' + x.id)">{{ x.name }}</option>
-                    }
-                  </select>
-                </app-settings-row>
               }
             </app-settings-group>
           }
@@ -431,7 +408,6 @@ export class ImportSection {
   protected readonly retryIcon = LucideRotateCw;
 
   protected readonly canManage = computed(() => this.store.allowed('manageIntegrations'));
-  protected readonly teams = computed(() => this.store.teams());
   protected readonly projects = computed(() => this.store.projects().slice().sort((a, b) => a.name.localeCompare(b.name)));
   protected readonly labels = computed(() => this.store.settings().labels.filter((l) => l.scope === 'issue' && !l.archived));
   protected readonly members = computed(() => this.store.members().map((m) => ({ id: m.user.id, name: m.user.name })));
