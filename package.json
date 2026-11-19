@@ -30,7 +30,6 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "geist": "^1.7.2",
     "luxon": "^3.7.2",
     "ngx-scrollbar": "^19.1.5",
     "postcss": "^8.5.29",
