@@ -24,6 +24,8 @@ class CreateProjectDto {
   @IsOptional() @Matches(COLOR) color?: string;
   @IsOptional() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string;
   @IsOptional() @IsString() @MaxLength(80) status?: string;
+  /** Project health: a health catalog id or one of on_track, at_risk, off_track. */
+  @IsOptional() @IsString() @MaxLength(80) health?: string;
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @IsString() leadId?: string;
   @Clearable() @IsString() @MaxLength(PROJECT_REPOSITORY_MAX) repository?: string | null;
@@ -41,6 +43,8 @@ class UpdateProjectDto {
   @OptionalNotNull() @Matches(COLOR) color?: string;
   @Clearable() @IsString() @MaxLength(PROJECT_ICON_MAX) @Matches(PROJECT_ICON_PATTERN) icon?: string | null;
   @OptionalNotNull() @IsString() @MaxLength(80) status?: string;
+  /** Project health. `null` clears it. */
+  @Clearable() @IsString() @MaxLength(80) health?: string | null;
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @Clearable() @IsString() leadId?: string | null;
   @Clearable() @IsString() @MaxLength(PROJECT_REPOSITORY_MAX) repository?: string | null;
@@ -52,6 +56,7 @@ class UpdateProjectDto {
 
 class ListProjectsQuery {
   @IsOptional() @IsString() @MaxLength(80) status?: string;
+  @IsOptional() @IsString() @MaxLength(80) health?: string;
   @IsOptional() @IsString() leadId?: string;
   @IsOptional() @IsString() q?: string;
 }

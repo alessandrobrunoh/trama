@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  ForbiddenException,
   Get,
   HttpCode,
   Param,
@@ -10,6 +11,8 @@ import {
 } from '@nestjs/common';
 import { Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
+  ArrayMinSize,
   IsArray,
   IsIn,
   IsOptional,
@@ -21,10 +24,15 @@ import {
 import {
   Actor,
   Can,
+  canDo,
   Ctx,
   type WorkspaceContext,
 } from '../auth/request-context.js';
 import type { ActorRef } from '../contracts/domain.js';
+import {
+  LUNAGEST_IMPORT_MAX_PROJECTS,
+  LunaGestImportService,
+} from './lunagest-import.service.js';
 import { LunagestService } from './lunagest.service.js';
 
 class SaveLunaGestConnectionDto {
@@ -40,6 +48,17 @@ class BindLunaGestProjectDto {
 
 class LinkLunaGestTaskDto {
   @IsString() @MinLength(1) @MaxLength(200) remoteTaskId: string;
+}
+
+class ImportLunaGestDto {
+  /** Remote LunaGest project ids to import (1 to 25). */
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(LUNAGEST_IMPORT_MAX_PROJECTS)
+  @IsString({ each: true })
+  @MinLength(1, { each: true })
+  @MaxLength(200, { each: true })
+  remoteProjectIds: string[];
 }
 
 class RealignChoiceDto {
@@ -59,7 +78,33 @@ class RealignDto {
 /** One LunaGest login for the workspace. Reading the account is open to members; writing it is `manageIntegrations`. The secret is never returned. */
 @Controller('w/:slug/lunagest')
 export class LunaGestConnectionController {
-  constructor(private readonly service: LunagestService) {}
+  constructor(
+    private readonly service: LunagestService,
+    private readonly importer: LunaGestImportService,
+  ) {}
+
+  /** Remote projects with their task count and whether each is already bound to a Trama project. */
+  @Get('import/projects')
+  @Can('manageProjects')
+  importable(@Ctx() ctx: WorkspaceContext) {
+    return this.importer.listImportable(ctx.workspace.id);
+  }
+
+  /**
+   * Imports the chosen remote projects and their tasks. Idempotent: bound projects and tasks are reused.
+   * Needs `manageProjects` (it creates projects) and `createIssues` (it creates tasks).
+   */
+  @Post('import')
+  @Can('manageProjects')
+  runImport(
+    @Ctx() ctx: WorkspaceContext,
+    @Actor() actor: ActorRef,
+    @Body() dto: ImportLunaGestDto,
+  ) {
+    if (!canDo(ctx, 'createIssues'))
+      throw new ForbiddenException('You are not allowed to create issues');
+    return this.importer.importProjects(ctx.workspace.id, actor, dto.remoteProjectIds);
+  }
 
   @Get('connection')
   get(@Ctx() ctx: WorkspaceContext) {

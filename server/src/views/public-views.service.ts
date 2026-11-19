@@ -285,6 +285,7 @@ export class PublicViewsService {
           title: str(r['name']) ?? '',
           status: str(r['status']),
           priority: str(r['priority']) as PublicViewItem['priority'],
+          health: str(r['health']),
           assignee: name('user', r['leadId']),
           labels: labels(r['labels']),
           startDate: iso(r['startDate']),

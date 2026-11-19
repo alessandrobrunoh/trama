@@ -48,7 +48,7 @@ import type {
   IssueSource,
   Priority,
 } from '../contracts/domain.js';
-import { Clearable, OptionalNotNull } from '../common/validation.js';
+import { Clearable, IsThreadUrl, OptionalNotNull } from '../common/validation.js';
 import { ArtifactsService } from '../artifacts/artifacts.service.js';
 import { renderIssueBriefing } from './issue-briefing.js';
 import { IssuesService } from './issues.service.js';
@@ -98,6 +98,8 @@ class CreateIssueDto {
   @IsOptional() @IsIn(PRIORITIES) priority?: Priority;
   @IsOptional() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @IsOptional() @IsString() @MaxLength(500) externalUrl?: string;
+  /** Link to the Delta thread worked on for this task (http/https, at most 2048 characters). */
+  @IsOptional() @IsString() @IsThreadUrl() threadUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
   /** Workspace label ids. */
   @IsOptional()
@@ -123,6 +125,8 @@ class UpdateIssueDto {
   @OptionalNotNull() @IsIn(PRIORITIES) priority?: Priority;
   @OptionalNotNull() @Matches(ISSUE_STATUS_INPUT) status?: string;
   @Clearable() @IsString() @MaxLength(500) externalUrl?: string | null;
+  /** Link to the Delta thread worked on for this task. `null` clears it. */
+  @Clearable() @IsString() @IsThreadUrl() threadUrl?: string | null;
   /** At most one milestone per project, from the issue's project. */
   @OptionalNotNull()
   @IsArray()

@@ -552,6 +552,7 @@ async fn create_task(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         "priority",
         "status",
         "externalUrl",
+        "threadUrl",
         "estimate",
         "kind",
         "source",

@@ -57,11 +57,11 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   // ───────── projects (planning level; workstreams below carry them out)
   const pAuth = b.project({
     name: 'Auth hardening', summary: 'Safer sessions and key management across api, web and auth-service.',
-    color: '#8b5cf6', status: 'in_progress', priority: 'high', lead: maya, teams: [AUTH, SEC], start: 25, target: 20, created: 26, createdBy: maya,
+    color: '#8b5cf6', status: 'in_progress', health: 'at_risk', priority: 'high', lead: maya, teams: [AUTH, SEC], start: 25, target: 20, created: 26, createdBy: maya,
   });
   const pCheckout = b.project({
     name: 'Checkout v2', summary: 'A faster, server-driven checkout that matches the new brand.',
-    color: '#f59e0b', status: 'in_progress', priority: 'high', lead: priya, teams: [WEB, PAY, PLAT], start: 40, target: 30, created: 41, createdBy: priya,
+    color: '#f59e0b', status: 'in_progress', health: 'on_track', priority: 'high', lead: priya, teams: [WEB, PAY, PLAT], start: 40, target: 30, created: 41, createdBy: priya,
   });
 
   // ═══════════════════════════ AUTH-42 — needs_input ═══════════════════════════
@@ -288,7 +288,7 @@ export function createSeed(now: number, passwordHash: string, opts: { mockHistor
   const ms42Rollout = b.milestone(pAuth, { name: 'Rollout and metrics', description: 'Gradual rollout with rotation metrics in place.', target: 6, sort: 1, created: 20 });
 
   // ───────── issues
-  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, created: 24, moved: 21, movedBy: maya });
+  const bug142 = b.issue({ kind: 'bug', number: 142, title: 'Users occasionally get redirected back to login', body: 'Several customers report being logged out after a few hours of normal use, with no error shown.', source: 'email', reporterName: 'Customer: Northwind', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 5, thread: S('login-redirect-5d2e'), created: 24, moved: 21, movedBy: maya });
   b.issue({ kind: 'bug', number: 139, title: 'Session lost after Safari ITP cookie expiry', source: 'api', reporterName: 'Support: Zendesk #4412', team: AUTH, priority: 'medium', status: 'in_progress', workstreams: [auth42], milestones: [ms42Replay], estimate: 3, created: 27, moved: 21, movedBy: maya });
   b.issue({ kind: 'bug', number: 145, title: 'Refresh endpoint returns 500 under load', body: 'Seen during the load test on staging: bursts of 500s from /auth/refresh.', source: 'agent', team: AUTH, priority: 'high', status: 'in_progress', workstreams: [auth42], milestones: [ms42Rollout], estimate: 8, created: 8, moved: 7, movedBy: maya });
   b.issue({ kind: 'bug', number: 150, title: 'Checkout button misaligned on Safari 17', source: 'github', team: WEB, priority: 'medium', status: 'in_progress', workstreams: [web81], created: 16, moved: 15, movedBy: priya, url: 'https://github.com/acme/web/issues/1150' });

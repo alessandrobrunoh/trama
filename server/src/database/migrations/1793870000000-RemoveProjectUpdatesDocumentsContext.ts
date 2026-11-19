@@ -2,6 +2,7 @@ import type { MigrationInterface, QueryRunner } from 'typeorm';
 
 /**
  * Removes project updates, documents, project-level artifacts (project context) and the task goal.
+ * `projects.health` is kept (now a manual field); `projects.lastUpdateAt` goes.
  * Data for these features is purged, not exported. Issue rows, ids and keys stay. Artifacts attached to a
  * task (PRs, CI, commits, links) stay; artifacts owned only by a project, and artifacts that point at a
  * Trama document, are deleted. `artifacts.projectId` goes away: an artifact is owned by a task.
@@ -36,23 +37,6 @@ export class RemoveProjectUpdatesDocumentsContext1793870000000 implements Migrat
     );
     await q(
       `DELETE FROM "attention_state" WHERE split_part("itemId", ':', 2) IN (${removedIds})`,
-    );
-
-    // Saved views: project health no longer exists.
-    await q(`
-      UPDATE "saved_views"
-      SET filters = COALESCE((
-        SELECT jsonb_agg(f)
-        FROM jsonb_array_elements(filters) f
-        WHERE f->>'field' <> 'health'
-      ), '[]'::jsonb)
-      WHERE entity = 'project' AND filters @> '[{"field":"health"}]'::jsonb
-    `);
-    await q(
-      `UPDATE "saved_views" SET sort = NULL WHERE entity = 'project' AND sort->>'field' = 'health'`,
-    );
-    await q(
-      `UPDATE "saved_views" SET "groupBy" = NULL WHERE entity = 'project' AND "groupBy" = 'health'`,
     );
 
     // Upload references of removed records, then files nothing mentions any more.
@@ -117,7 +101,7 @@ export class RemoveProjectUpdatesDocumentsContext1793870000000 implements Migrat
     await q(`DROP TABLE IF EXISTS "documents" CASCADE`);
     await q(`DROP TABLE IF EXISTS "project_updates" CASCADE`);
     await q(`ALTER TABLE "issues" DROP COLUMN IF EXISTS "goal"`);
-    await q(`ALTER TABLE "projects" DROP COLUMN IF EXISTS "health"`);
+    // `projects.health` stays: it is now set by hand (the last value a project update wrote is kept).
     await q(`ALTER TABLE "projects" DROP COLUMN IF EXISTS "lastUpdateAt"`);
 
     // Permissions and subscriptions for the removed resources and events.

@@ -60,6 +60,8 @@ export interface IssueInput {
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
   externalUrl?: string | null;
+  /** Delta thread link (http/https). `null` clears it. */
+  threadUrl?: string | null;
   milestoneIds?: string[];
   labels?: string[];
   /** Id or key. `null` clears the relation. Setting it cancels the issue. */
@@ -489,6 +491,7 @@ export class IssuesService {
           startedAt: facts.startedAt,
           completedAt: facts.completedAt,
           externalUrl: input.externalUrl ?? null,
+          threadUrl: input.threadUrl ?? null,
           labels:
             (await this.labels.assign(workspaceId, input.labels, 'issue')) ??
             [],
@@ -905,6 +908,7 @@ export class IssuesService {
     if (patch.parentId !== undefined) row.parentId = patch.parentId;
     if (patch.priority !== undefined) row.priority = patch.priority;
     if (patch.externalUrl !== undefined) row.externalUrl = patch.externalUrl;
+    if (patch.threadUrl !== undefined) row.threadUrl = patch.threadUrl;
     if (patch.labels !== undefined)
       row.labels =
         (await this.labels.assign(

@@ -15,6 +15,7 @@ import type {
   IssueSource,
   IssueStatus,
   Priority,
+  ProjectHealth,
   ProjectStatus,
   ReviewState,
   Role,
@@ -164,6 +165,7 @@ export class SeedBuilder {
     description?: string;
     color?: string;
     status: ProjectStatus;
+    health?: ProjectHealth;
     priority?: Priority;
     lead?: string;
     teams: string[];
@@ -180,7 +182,7 @@ export class SeedBuilder {
     );
     this.data.projects.push({
       id, workspaceId: this.workspaceId, name: o.name, key, summary: o.summary ?? null, description: o.description ?? null,
-      color: o.color ?? '#6b7280', status: o.status, priority: o.priority ?? 'medium', leadId: o.lead ?? null, repository: null,
+      color: o.color ?? '#6b7280', status: o.status, health: o.health ?? null, priority: o.priority ?? 'medium', leadId: o.lead ?? null, repository: null,
       startDate: o.start !== undefined ? this.at(o.start) : null, targetDate: o.target !== undefined ? this.at(-o.target) : null,
       createdAt, updatedAt: createdAt, completedAt: o.status === 'completed' || o.status === 'canceled' ? createdAt : null,
     });
@@ -302,6 +304,8 @@ export class SeedBuilder {
     estimate?: number;
     duplicateOf?: string;
     url?: string;
+    /** Delta thread the task is worked on in. */
+    thread?: string;
     created: number;
     /** When the status left `backlog`. */
     moved?: number;
@@ -326,7 +330,7 @@ export class SeedBuilder {
       projectId, milestoneIds: o.milestones ?? [], labels: [], aliases: [], estimate: o.estimate ?? null,
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
-      duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
+      duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null, threadUrl: o.thread ?? null,
       createdAt: this.at(o.created), updatedAt: this.at(o.moved ?? o.created),
     });
     for (const streamId of o.workstreams ?? []) {

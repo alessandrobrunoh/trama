@@ -23,6 +23,7 @@ import type {
   NotificationChannels,
   NotificationRecordKind,
   Priority,
+  ProjectHealth,
   ProjectStatus,
   ReviewState,
   Role,
@@ -200,6 +201,8 @@ export class ProjectEntity extends Wire {
   /** Lucide icon name (kebab-case) or an emoji; null = default glyph. */
   @Column({ type: 'varchar', nullable: true }) icon: string | null;
   @Column({ type: 'varchar', default: 'backlog' }) status: ProjectStatus;
+  /** Set by hand: a project health catalog id (the seeded ids equal the semantic types). Null = not set. */
+  @Column({ type: 'varchar', nullable: true }) health: ProjectHealth | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', nullable: true }) leadId: string | null;
   @Column({ type: 'varchar', length: 2048, nullable: true }) repository: string | null;
@@ -272,6 +275,8 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) parentId: string | null;
   @Column({ type: 'varchar', nullable: true }) duplicateOfId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalUrl: string | null;
+  /** Link to the Delta thread the user works on for this task (http/https, at most 2048 characters). */
+  @Column({ type: 'varchar', length: 2048, nullable: true }) threadUrl: string | null;
   /** Pointer to the issue in an external tracker (see importers). Unique per workspace through a partial index on provider + id. */
   @Column({ type: 'jsonb', nullable: true }) externalRef: ExternalRef | null;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;

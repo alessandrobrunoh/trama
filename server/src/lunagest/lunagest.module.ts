@@ -14,6 +14,7 @@ import {
   LunaGestProjectController,
 } from './lunagest.controller.js';
 import { LunagestService } from './lunagest.service.js';
+import { LunaGestImportService } from './lunagest-import.service.js';
 
 @Module({
   imports: [
@@ -31,7 +32,7 @@ import { LunagestService } from './lunagest.service.js';
     LunaGestProjectController,
     LunaGestIssueController,
   ],
-  providers: [LunagestService],
+  providers: [LunagestService, LunaGestImportService],
   exports: [LunagestService],
 })
 export class LunagestModule {}

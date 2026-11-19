@@ -71,6 +71,7 @@ export const VIEW_FIELDS: Partial<
       'canceled',
     ]),
     priority: enumOf(PRIORITIES),
+    health: enumOf(['on_track', 'at_risk', 'off_track']),
     leadId: ref('user'),
     repository: text,
     labels: tags,

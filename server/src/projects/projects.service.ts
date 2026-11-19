@@ -16,6 +16,7 @@ import {
   UNASSIGNED_ISSUE_KEY_PREFIX,
   type ActorRef,
   type Priority,
+  type ProjectHealth,
   type ProjectStatus,
 } from '../contracts/domain.js';
 import {
@@ -49,6 +50,8 @@ export interface ProjectInput {
   icon?: string | null;
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
+  /** Project health catalog id, or a legacy enum (the seeded health of that type). `null` clears it. */
+  health?: string | null;
   priority?: Priority;
   leadId?: string | null;
   repository?: string | null;
@@ -60,6 +63,8 @@ export interface ProjectInput {
 export interface ProjectFilter {
   /** Catalog id, or a legacy enum (the seeded status of that type). */
   status?: string;
+  /** Project health catalog id, or a legacy enum. */
+  health?: string;
   leadId?: string;
   q?: string;
 }
@@ -89,6 +94,14 @@ export class ProjectsService {
     );
   }
 
+  private async projectHealth(workspaceId: string, stored: string) {
+    return requireStatus(
+      (await loadStatusCatalog(this.ds, workspaceId)).projectHealth,
+      stored,
+      'health',
+    );
+  }
+
   async list(workspaceId: string, f: ProjectFilter = {}) {
     const qb = this.repo
       .createQueryBuilder('p')
@@ -98,6 +111,12 @@ export class ProjectsService {
       const catalog = (await loadStatusCatalog(this.ds, workspaceId)).project;
       qb.andWhere('p.status IN (:...st)', {
         st: statusFilterIds(catalog, f.status),
+      });
+    }
+    if (f.health) {
+      const catalog = (await loadStatusCatalog(this.ds, workspaceId)).projectHealth;
+      qb.andWhere('p.health IN (:...hl)', {
+        hl: statusFilterIds(catalog, f.health),
       });
     }
     if (f.leadId) qb.andWhere('p.leadId = :leadId', { leadId: f.leadId });
@@ -130,6 +149,9 @@ export class ProjectsService {
       input.status ?? 'backlog',
     );
     const status = entry.id as ProjectStatus;
+    const health = input.health
+      ? ((await this.projectHealth(workspaceId, input.health)).id as ProjectHealth)
+      : null;
     let row: ProjectEntity;
     try {
       row = await this.repo.save(
@@ -143,6 +165,7 @@ export class ProjectsService {
           color: input.color ?? '#6b7280',
           icon: input.icon ?? null,
           status,
+          health,
           priority: input.priority ?? 'none',
           leadId: input.leadId ?? null,
           repository: input.repository?.trim() || null,
@@ -184,6 +207,7 @@ export class ProjectsService {
     const row = await this.get(workspaceId, id);
     await this.validate(workspaceId, patch);
     const before = row.status;
+    const healthBefore = row.health;
     const previousKey = row.key;
     const nextKey =
       patch.key === undefined
@@ -222,6 +246,10 @@ export class ProjectsService {
         ? (row.completedAt ?? new Date())
         : null;
     }
+    if (patch.health !== undefined)
+      row.health = patch.health
+        ? ((await this.projectHealth(workspaceId, patch.health)).id as ProjectHealth)
+        : null;
     row.updatedAt = new Date();
     let issueKeyChanges: IssueKeyChange[] = [];
     try {
@@ -293,6 +321,14 @@ export class ProjectsService {
         type: 'project.status_changed',
         subject: { type: 'project', id },
         data: { from: before, to: row.status },
+      });
+    if (row.health !== healthBefore)
+      await this.events.record({
+        workspaceId,
+        actor,
+        type: 'project.health_changed',
+        subject: { type: 'project', id },
+        data: { from: healthBefore, to: row.health },
       });
     return row;
   }

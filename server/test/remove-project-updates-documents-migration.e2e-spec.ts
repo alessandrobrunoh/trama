@@ -383,7 +383,7 @@ describe('RemoveProjectUpdatesDocumentsContext migration', () => {
       await count(
         `SELECT count(*)::int AS count FROM information_schema.columns
          WHERE (table_name = 'issues' AND column_name = 'goal')
-            OR (table_name = 'projects' AND column_name IN ('health', 'lastUpdateAt'))
+            OR (table_name = 'projects' AND column_name = 'lastUpdateAt')
             OR (table_name = 'artifacts' AND column_name IN ('projectId', 'documentId'))`,
       ),
     ).toBe(0);
@@ -439,11 +439,18 @@ describe('RemoveProjectUpdatesDocumentsContext migration', () => {
       ),
     ).toEqual([
       {
-        filters: [{ field: 'status', op: 'is', value: 'in_progress' }],
-        sort: null,
-        groupBy: null,
+        filters: [
+          { field: 'health', op: 'is', value: 'at_risk' },
+          { field: 'status', op: 'is', value: 'in_progress' },
+        ],
+        sort: { field: 'health', direction: 'asc' },
+        groupBy: 'health',
       },
     ]);
+    // Health is a manual field now: the column and its value stay.
+    expect(
+      await ds.query(`SELECT health FROM projects WHERE id = 'pj_1'`),
+    ).toEqual([{ health: 'at_risk' }]);
     expect(
       await ds.query(`SELECT permissions FROM api_tokens WHERE id = 'tk_1'`),
     ).toEqual([{ permissions: ['tasks:read', 'artifacts:read'] }]);

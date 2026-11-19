@@ -545,6 +545,11 @@ export interface Project {
   /** Lucide icon name (kebab-case, e.g. `rocket`) or a single emoji. Absent = the default project glyph. */
   icon?: string;
   status: ProjectStatus;
+  /**
+   * Health, set by hand (project create / PATCH; `null` in PATCH clears it). Absent until set.
+   * Stored as a project health catalog id (the seeded ids equal the {@link ProjectHealth} types).
+   */
+  health?: ProjectHealth;
   priority: Priority;
   leadId?: ID;
   /**
@@ -563,7 +568,7 @@ export interface Project {
   completedAt?: ISODate;
 }
 
-/** Health the AI risk assessment derives from a project's signals. Not stored on the project. */
+/** Linear-style project health: set by hand on a project, and also what the AI risk assessment reports. */
 export type ProjectHealth = 'on_track' | 'at_risk' | 'off_track';
 export const PROJECT_HEALTHS: ProjectHealth[] = ['on_track', 'at_risk', 'off_track'];
 
@@ -729,6 +734,11 @@ export interface Issue {
   /** Set when this issue duplicates another. Status is `canceled`. */
   duplicateOfId?: ID;
   externalUrl?: string;
+  /**
+   * Link to the Delta thread (delta.dev) the user is working on for this task. Optional, http/https only,
+   * at most {@link ISSUE_THREAD_URL_MAX} characters. `null` in PATCH clears it.
+   */
+  threadUrl?: string;
   /** The issue this one was imported from or is linked to in an external tracker (read-only mirror of its status). */
   externalRef?: ExternalRef;
   /**
@@ -765,6 +775,22 @@ export function normalizeHttpUrl(input: string): string | null {
     return (url.protocol === 'http:' || url.protocol === 'https:') && url.hostname ? raw : null;
   } catch {
     return null;
+  }
+}
+
+/** Longest `Issue.threadUrl`, in characters. */
+export const ISSUE_THREAD_URL_MAX = 2048;
+
+/** True when the value is a plain `http(s)` URL with a host of at most {@link ISSUE_THREAD_URL_MAX} characters. */
+export function isThreadUrl(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const raw = value.trim();
+  if (!raw || raw !== value || raw.length > ISSUE_THREAD_URL_MAX) return false;
+  try {
+    const url = new URL(raw);
+    return (url.protocol === 'http:' || url.protocol === 'https:') && !!url.hostname;
+  } catch {
+    return false;
   }
 }
 
@@ -1231,6 +1257,8 @@ export interface PublicViewItem {
   kind?: string;
   status?: string;
   priority?: Priority;
+  /** Projects only. */
+  health?: string;
   assignee?: string;
   project?: string;
   labels?: string[];
@@ -2189,7 +2217,13 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
   {
     entity: 'project',
     label: 'Projects',
-    events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'],
+    events: [
+      'project.created',
+      'project.updated',
+      'project.status_changed',
+      'project.health_changed',
+      'project.deleted',
+    ],
   },
   {
     entity: 'issue',

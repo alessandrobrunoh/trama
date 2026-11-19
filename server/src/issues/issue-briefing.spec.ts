@@ -19,6 +19,15 @@ describe('renderIssueBriefing', () => {
     );
   });
 
+  it('names the Delta thread when the task has one', () => {
+    const md = renderIssueBriefing({
+      ...base,
+      issue: { ...base.issue, threadUrl: 'https://delta.dev/t/login-loop-1f2e' },
+    });
+    expect(md).toContain('Thread: https://delta.dev/t/login-loop-1f2e');
+    expect(renderIssueBriefing(base)).not.toContain('Thread');
+  });
+
   it('keeps the description and artifacts', () => {
     const md = renderIssueBriefing({
       ...base,

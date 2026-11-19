@@ -214,6 +214,10 @@
         "externalUrl": {
           "type": "string"
         },
+        "threadUrl": {
+          "type": "string",
+          "description": "Link to the Delta thread working on this task (http or https)."
+        },
         "reporterName": {
           "type": "string"
         },
