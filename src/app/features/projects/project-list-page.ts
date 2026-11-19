@@ -15,13 +15,9 @@ import { PreviewLink, useKeyboardPreview } from '../issues/list-preview';
 import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
 import { ProjectGlyph } from './project-glyph';
-import {
-  isClosed,
-  isOverdue,
-  projectHealthView,
-  projectStatusOptions,
-  projectStatusView,
-} from './project-model';
+import { isClosed, isOverdue, projectStatusOptions } from './project-model';
+import { PriorityIcon } from '../../shared/priority-icon';
+import { StatusIcon } from '../../shared/status';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
@@ -45,6 +41,8 @@ import { SearchInput } from '../../shared/search-input';
     StatusBar,
     FullDatePipe,
     ProjectGlyph,
+    PriorityIcon,
+    StatusIcon,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
@@ -135,12 +133,22 @@ import { SearchInput } from '../../shared/search-input';
         <button hlmBtn size="sm" variant="outline" (click)="clearFilters()">Clear filters</button>
       </app-empty-state>
     } @else {
-      <div class="min-h-0 flex-1 overflow-y-auto" role="list">
+      <div class="min-h-0 flex-1 overflow-y-auto pb-4" role="list">
+        <div
+          class="text-muted-foreground flex items-center gap-3 px-4 pt-1 text-xs max-md:hidden sm:px-5"
+          aria-hidden="true"
+        >
+          <span class="min-w-0 flex-1"></span>
+          <span class="w-5"></span>
+          <span class="w-28">Progress</span>
+          <span class="w-32">Lead</span>
+          <span class="w-24">Target date</span>
+        </div>
         @for (g of groups(); track g.id) {
           <section [attr.aria-label]="g.label">
             <h2 class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] font-normal sm:px-5">
-              <span class="size-2 shrink-0 rounded-full" [style.background]="g.color"></span>
-              {{ g.label }}
+              <app-status-icon [status]="g.id" entity="project" [size]="14" />
+              <span class="text-foreground">{{ g.label }}</span>
               <span class="tabular-nums">{{ g.rows.length }}</span>
             </h2>
             @for (row of g.rows; track row.project.id) {
@@ -171,13 +179,8 @@ import { SearchInput } from '../../shared/search-input';
                 <span
                   class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] max-md:text-[13px] md:contents"
                 >
-                  <span class="flex w-24 items-center gap-1.5 max-md:w-auto">
-                    @if (row.health; as h) {
-                      <span class="size-2 shrink-0 rounded-full" [style.background]="h.color"></span>
-                      {{ h.label }}
-                    } @else {
-                      <span class="max-md:hidden">—</span>
-                    }
+                  <span class="flex w-5 items-center justify-center max-md:w-auto">
+                    <app-priority-icon [priority]="p.priority" />
                   </span>
                   <span
                     class="flex w-28 items-center gap-2 max-md:w-auto"
@@ -268,8 +271,6 @@ export class ProjectListPage {
         const issues = this.store.issuesByProject().get(project.id) ?? [];
         return {
           project,
-          status: projectStatusView(project.status, this.store.settings().statuses.project),
-          health: projectHealthView(project.health, this.store.settings().statuses.projectHealth),
           lead: project.leadId ? users.get(project.leadId)?.name : undefined,
           overdue: isOverdue(project),
           percent: milestoneStats(issues, usesPoints(issues, this.store.estimateScale())).percent,

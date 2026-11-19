@@ -104,7 +104,7 @@ export function statusLabel(status: AnyStatus): string {
 }
 
 /** Which glyph family to draw. Issues use circles; other resources use their catalog icon. */
-export type StatusEntity = 'auto' | 'issue' | 'other';
+export type StatusEntity = 'auto' | 'issue' | 'project' | 'other';
 
 const ISSUE_ONLY = new Set<string>(['backlog', 'todo', 'in_progress', 'done']);
 
@@ -232,7 +232,7 @@ export class StatusIcon {
     const s = this.status();
     const e = this.entity();
     if (e === 'issue' && CIRCLE[s]) return 'circle';
-    if (e === 'other') return 'icon';
+    if (e === 'other' || e === 'project') return 'icon';
     if (ISSUE_ONLY.has(s) || (e === 'auto' && CIRCLE[s] && s !== 'canceled')) return 'circle';
     return 'icon';
   });
@@ -246,6 +246,7 @@ export class StatusIcon {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status);
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status);
+    if (entity === 'project') return resolveStatusEntry(catalog.project, status);
     if (entity === 'other') return undefined;
     const lists = [catalog.issue, catalog.project];
     const hits = lists.filter((entries) => entries.some((entry) => entry.id === status || entry.type === status));
@@ -303,6 +304,7 @@ export class StatusBadge {
     if (subject) return resolveStatusEntry(catalog[STATUS_CATALOG_KEY[subject]], status)?.name;
     const entity = this.entity();
     if (entity === 'issue') return resolveStatusEntry(catalog.issue, status)?.name;
+    if (entity === 'project') return resolveStatusEntry(catalog.project, status)?.name;
     return undefined;
   }
 }
@@ -333,7 +335,9 @@ export class StatusLabel {
       ? catalog[STATUS_CATALOG_KEY[subject]]
       : this.entity() === 'issue'
         ? catalog.issue
-        : null;
+        : this.entity() === 'project'
+          ? catalog.project
+          : null;
     return (entries ? resolveStatusEntry(entries, this.status())?.name : undefined) ?? this.visual().label;
   });
 }

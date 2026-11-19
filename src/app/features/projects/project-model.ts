@@ -26,24 +26,16 @@ export const PROJECT_STATUS_META: Record<ProjectStatus, ProjectStatusMeta> = {
   canceled: { label: 'Canceled', text: 'text-status-draft', dot: 'bg-status-draft' },
 };
 
+/** Status choices for a picker: the workspace catalog, each with its status glyph. */
 export const projectStatusOptions = (entries = defaultStatusCatalog().project): PickOption[] =>
-  entries.map((s) => ({ value: s.id, label: s.name }));
+  entries.map((s) => ({
+    value: s.id,
+    label: s.name,
+    kind: 'status' as const,
+    statusEntity: 'project' as const,
+  }));
 
-/** Health choices for a picker: the workspace catalog, each with its colour dot. */
-export const projectHealthOptions = (entries = defaultStatusCatalog().projectHealth): PickOption[] =>
-  entries.map((h) => ({ value: h.id, label: h.name, kind: 'label' as const, color: h.color }));
-
-/** Name and colour of a project's health, or `undefined` while none is set. */
-export const projectHealthView = (
-  health: string | null | undefined,
-  entries = defaultStatusCatalog().projectHealth,
-): { label: string; color: string } | undefined => {
-  if (!health) return undefined;
-  const entry = resolveStatusEntry(entries, health);
-  return { label: entry?.name ?? health, color: entry?.color ?? '#747780' };
-};
-
-export const isClosed =(p: Pick<Project, 'status'>, entries?: readonly StatusEntry<ProjectStatus>[]): boolean => {
+export const isClosed = (p: Pick<Project, 'status'>, entries?: readonly StatusEntry<ProjectStatus>[]): boolean => {
   const type = statusTypeOf(entries ?? defaultStatusCatalog().project, p.status);
   return type === 'completed' || type === 'canceled';
 };

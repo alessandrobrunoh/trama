@@ -2,7 +2,6 @@
 // description, the milestone's own progress chart and its issues (assign / remove inline).
 import { CdkDragHandle } from '@angular/cdk/drag-drop';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
 import {
   LucideCalendar,
   LucideChevronRight,
@@ -15,7 +14,6 @@ import {
   LucidePlus,
   LucideText,
   LucideTrash2,
-  LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
@@ -23,10 +21,8 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, isOverdue, shortDate, type Milestone, type Project } from '../../core';
-import { ActorAvatar } from '../../shared/actor-avatar';
-import { Estimate } from '../../shared/estimate';
-import { KeyChip } from '../../shared/key-chip';
-import { StatusIcon } from '../../shared/status';
+import { IssueBoard } from '../issues/issue-board';
+import type { IssueProp } from '../issues/issue-model';
 import { EditableMarkdown } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
 import { DATE_PRESETS, DatePicker } from '../../shared/date-picker';
@@ -41,7 +37,6 @@ import { ProgressChart } from './progress-chart';
   selector: 'app-milestone-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     CdkDragHandle,
     HlmButtonImports,
     HlmContextMenuImports,
@@ -49,10 +44,7 @@ import { ProgressChart } from './progress-chart';
     HlmInputImports,
     HlmTooltip,
     LucideDynamicIcon,
-    ActorAvatar,
-    KeyChip,
-    Estimate,
-    StatusIcon,
+    IssueBoard,
     EditableMarkdown,
     Picker,
     DatePicker,
@@ -161,28 +153,21 @@ import { ProgressChart } from './progress-chart';
             }
           </div>
           @if (issues().length) {
-            <ul class="bg-background overflow-hidden rounded-md">
-              @for (i of issues(); track i.id) {
-                <li class="group/mi hover:bg-hover flex min-h-8 items-center gap-2 px-2 text-[13px]">
-                  <app-status-icon entity="issue" [status]="i.status" />
-                  <a [routerLink]="['/', slug(), 'tasks', i.key]" class="flex min-w-0 flex-1 items-center gap-2 outline-none focus-visible:underline">
-                    <app-key-chip [value]="i.key" class="w-[4.25rem]" />
-                    <span class="truncate" [class.text-muted-foreground]="i.status === 'done' || i.status === 'canceled'">{{ i.title }}</span>
-                  </a>
-                  @if (i.estimate !== undefined) {
-                    <app-estimate class="text-xs" [value]="i.estimate" />
-                  }
-                  @if (i.assigneeId) {
-                    <app-actor-avatar [actor]="{ type: 'user', id: i.assigneeId }" [size]="18" />
-                  }
-                  @if (canEdit()) {
-                    <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground opacity-0 group-hover/mi:opacity-100 focus-visible:opacity-100 max-md:opacity-100" [attr.aria-label]="'Remove ' + i.key + ' from milestone'" hlmTooltip="Remove from milestone" (click)="removeIssue(i.id)">
-                      <svg [lucideIcon]="x" [size]="13"></svg>
-                    </button>
-                  }
-                </li>
-              }
-            </ul>
+            <!-- the one task table of the app, scoped to this milestone -->
+            <div class="bg-background flex max-h-[26rem] flex-col overflow-hidden rounded-md">
+              <app-issue-board
+                [issues]="allIssues()"
+                [baseFilters]="milestoneFilter()"
+                [toolbar]="false"
+                [statusBar]="false"
+                [showCreate]="false"
+                [hideProps]="hiddenProps"
+                forceLayout="list"
+                forceGroup="none"
+                [stateKey]="'milestone.' + m.id"
+                [dropPrefix]="'milestone-issue-col-' + m.id"
+              />
+            </div>
           } @else {
             <p class="text-muted-foreground text-xs">No tasks in this milestone. Add some, or set a milestone on a task row.</p>
           }
@@ -261,10 +246,15 @@ export class MilestoneRow {
   protected readonly down = LucideMoveDown;
   protected readonly trash = LucideTrash2;
   protected readonly plus = LucidePlus;
-  protected readonly x = LucideX;
   protected readonly fmtNum = fmtNum;
 
-  protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly allIssues = computed(() => this.store.issues());
+  /** The shared task table lists this milestone's tasks only. */
+  protected readonly milestoneFilter = computed(() => [
+    { field: 'milestoneIds', op: 'in' as const, value: [this.ms().id] },
+  ]);
+  /** Rows inside a milestone do not repeat the project. */
+  protected readonly hiddenProps: readonly IssueProp[] = ['project'];
   protected readonly canEdit = computed(() => !this.readonly() && this.store.allowed('manageProjects'));
   protected readonly stats = computed(() => this.info.stats().get(this.ms().id)!);
   protected readonly state = computed(() => this.info.states().get(this.ms().id) ?? 'idle');
@@ -320,8 +310,4 @@ export class MilestoneRow {
     if (issue) this.actions.assign(issue, this.project().id, this.ms().id);
   }
 
-  protected removeIssue(id: string): void {
-    const issue = this.store.getIssue(id);
-    if (issue) this.actions.assign(issue, this.project().id, null);
-  }
 }

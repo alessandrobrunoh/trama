@@ -1,19 +1,8 @@
 import { NgTemplateOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  effect,
-  inject,
-  input,
-  signal,
-} from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
-  LucideArrowDownWideNarrow,
-  LucideArrowUpNarrowWide,
   LucideChartGantt,
-  LucideCheck,
   LucideCopy,
   LucideDynamicIcon,
   LucideEllipsis,
@@ -21,11 +10,7 @@ import {
   LucideLayers,
   LucideLink2,
   LucideList,
-  LucideListFilter,
-  LucidePlus,
-  LucideRows3,
   LucideTrash2,
-  LucideX,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
@@ -37,28 +22,26 @@ import {
   TramaStore,
   Notifier,
   UiStore,
-  filterValues,
   groupItems,
   queryItems,
-  setFilter,
-  type Issue,
   type Priority,
   type Project,
   type Queryable,
-  type SavedView,
   type ViewFilter,
   type ViewLayout,
 } from '../../core';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
+import { FilterBar, type FilterBarSort } from '../../shared/filter-bar/filter-bar';
 import { PageHeader } from '../../shared/page-header';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
-import { IssueCard, IssueRow } from '../issues/issue-items';
+import { IssueBoard } from '../issues/issue-board';
+import type { IssueGroup, IssueSort } from '../issues/issue-model';
+import { IssueCommandDialog } from '../issues/issue-prop';
 import { TimelineView } from '../timeline/timeline-view';
 import { InlineText } from '../../shared/inline-edit';
-import { OptionMenu } from './option-controls';
 import { canEditSavedView, canManageViewSharing } from './view-access';
 import { ViewShare } from './view-share';
 import { ViewProjectCard, ViewProjectRow } from './view-project-items';
@@ -66,12 +49,6 @@ import {
   ENTITY_ICON,
   ENTITY_LABEL,
   STATUS_ENTITY,
-  describeFilter,
-  fieldLabel,
-  fieldOptions,
-  filterableFields,
-  isEditableFilter,
-  isNumberField,
   valueColor,
   valueGlyph,
   statusColumnIds,
@@ -104,10 +81,10 @@ type PageLayout = 'list' | 'board' | 'timeline';
     PriorityIcon,
     ActorAvatar,
     InlineText,
-    OptionMenu,
+    FilterBar,
     ViewShare,
-    IssueRow,
-    IssueCard,
+    IssueBoard,
+    IssueCommandDialog,
     ViewProjectRow,
     ViewProjectCard,
     TimelineView,
@@ -222,204 +199,19 @@ type PageLayout = 'list' | 'board' | 'timeline';
           </hlm-toggle-group>
         </span>
 
-        <!-- filter / sort / group row -->
-        <div class="flex flex-wrap items-center gap-1.5 px-4 py-2 sm:px-6">
-          @for (f of activeFilters(); track f.field) {
-            @if (f.numeric) {
-              <span
-                class="bg-secondary inline-flex h-7 items-stretch gap-0.5 overflow-hidden rounded-md text-xs"
-              >
-                <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
-                <span class="text-muted-foreground flex items-center px-2">at least</span>
-                <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  class="bg-transparent w-20 px-2 text-xs tabular-nums outline-none"
-                  [attr.aria-label]="f.label + ' minimum'"
-                  [value]="f.min"
-                  [disabled]="!canEdit()"
-                  (change)="setMin(f.field, $any($event.target).value)"
-                />
-                @if (canEdit()) {
-                  <button
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex w-7 items-center justify-center"
-                    [attr.aria-label]="'Remove ' + f.label + ' filter'"
-                    (click)="removeFilter(f.field)"
-                  >
-                    <svg [lucideIcon]="xIcon" [size]="12"></svg>
-                  </button>
-                }
-              </span>
-            } @else if (f.editable) {
-              <!-- Linear-style chip: field · operator · value · × -->
-              <span
-                class="bg-secondary inline-flex h-7 items-stretch gap-0.5 overflow-hidden rounded-md text-xs"
-              >
-                <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
-                <span class="text-muted-foreground flex items-center px-2">{{
-                  f.values.length > 1 ? 'is any of' : 'is'
-                }}</span>
-                <app-option-menu
-                  variant="segment"
-                  [label]="f.label"
-                  [options]="f.options"
-                  [selected]="f.values"
-                  (selectedChange)="setValues(f.field, $event)"
-                  [multi]="true"
-                  [class.pointer-events-none]="!canEdit()"
-                />
-                @if (canEdit()) {
-                  <button
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex w-7 items-center justify-center"
-                    [attr.aria-label]="'Remove ' + f.label + ' filter'"
-                    (click)="removeFilter(f.field)"
-                  >
-                    <svg [lucideIcon]="xIcon" [size]="12"></svg>
-                  </button>
-                }
-              </span>
-            } @else {
-              <span
-                class="bg-secondary inline-flex h-7 items-center gap-1 rounded-md ps-2 pe-1 text-xs"
-              >
-                {{ f.text }}
-                @if (canEdit()) {
-                  <button
-                    type="button"
-                    class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded"
-                    [attr.aria-label]="'Remove ' + f.label + ' filter'"
-                    (click)="removeFilter(f.field)"
-                  >
-                    <svg [lucideIcon]="xIcon" [size]="11"></svg>
-                  </button>
-                }
-              </span>
-            }
-          }
-          @if (canEdit() && addableFields().length) {
-            <button
-              hlmBtn
-              variant="ghost"
-              size="sm"
-              class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
-              [hlmDropdownMenuTrigger]="addFilter"
-            >
-              <svg [lucideIcon]="activeFilters().length ? plusIcon : filterIcon" [size]="13"></svg>
-              {{ activeFilters().length ? 'Filter' : 'Add filter' }}
-            </button>
-            <ng-template #addFilter>
-              <hlm-dropdown-menu class="w-56">
-                <hlm-dropdown-menu-label>Filter by</hlm-dropdown-menu-label>
-                @for (fd of addableFields(); track fd.field) {
-                  <button hlmDropdownMenuItem (triggered)="addPending(fd.field)">
-                    {{ fd.label }}
-                  </button>
-                }
-              </hlm-dropdown-menu>
-            </ng-template>
-          }
-          @if (!activeFilters().length && !canEdit()) {
-            <span class="text-meta">No filters</span>
-          }
-
-          <span class="flex-1"></span>
-
-          <button
-            hlmBtn
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
-            [disabled]="!canEdit()"
-            [hlmDropdownMenuTrigger]="groupMenu"
-          >
-            <svg [lucideIcon]="groupIcon" [size]="13"></svg>
-            <span class="max-sm:hidden">{{ layout() === 'board' ? 'Columns' : 'Group' }}:</span>
-            <span class="text-foreground">{{ groupLabel() }}</span>
-          </button>
-          <ng-template #groupMenu>
-            <hlm-dropdown-menu class="w-52">
-              <hlm-dropdown-menu-label>{{
-                layout() === 'board' ? 'Columns by' : 'Group by'
-              }}</hlm-dropdown-menu-label>
-              @if (layout() !== 'board') {
-                <button
-                  hlmDropdownMenuRadio
-                  [checked]="!v.groupBy"
-                  [keepOpen]="false"
-                  (triggered)="setGroup(null)"
-                >
-                  No grouping
-                  <hlm-dropdown-menu-radio-indicator />
-                </button>
-              }
-              @for (fd of groupableFields(); track fd.field) {
-                <button
-                  hlmDropdownMenuRadio
-                  [checked]="effectiveGroup() === fd.field"
-                  [keepOpen]="false"
-                  (triggered)="setGroup(fd.field)"
-                >
-                  {{ fd.label }}
-                  <hlm-dropdown-menu-radio-indicator />
-                </button>
-              }
-            </hlm-dropdown-menu>
-          </ng-template>
-
-          <button
-            hlmBtn
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
-            [disabled]="!canEdit()"
-            [hlmDropdownMenuTrigger]="sortMenu"
-          >
-            <svg
-              [lucideIcon]="v.sort?.direction === 'asc' ? sortAscIcon : sortDescIcon"
-              [size]="13"
-            ></svg>
-            <span class="max-sm:hidden">Sort:</span>
-            <span class="text-foreground">{{ sortLabel() }}</span>
-          </button>
-          <ng-template #sortMenu>
-            <hlm-dropdown-menu class="w-52">
-              <hlm-dropdown-menu-label>Order by</hlm-dropdown-menu-label>
-              <button
-                hlmDropdownMenuRadio
-                [checked]="!v.sort"
-                [keepOpen]="false"
-                (triggered)="setSort(null)"
-              >
-                Default
-                <hlm-dropdown-menu-radio-indicator />
-              </button>
-              @for (fd of sortableFields(); track fd.field) {
-                <button
-                  hlmDropdownMenuRadio
-                  [checked]="v.sort?.field === fd.field"
-                  [keepOpen]="false"
-                  (triggered)="setSort(fd.field)"
-                >
-                  {{ fd.label }}
-                  <hlm-dropdown-menu-radio-indicator />
-                </button>
-              }
-              @if (v.sort) {
-                <hlm-dropdown-menu-separator />
-                <button hlmDropdownMenuItem (triggered)="flipDirection()">
-                  <svg
-                    [lucideIcon]="v.sort.direction === 'asc' ? sortDescIcon : sortAscIcon"
-                    [size]="14"
-                  ></svg>
-                  {{ v.sort.direction === 'asc' ? 'Descending' : 'Ascending' }}
-                </button>
-              }
-            </hlm-dropdown-menu>
-          </ng-template>
-        </div>
+        <!-- filter / sort / group row: the shared filter bar -->
+        <app-filter-bar
+          class="px-4 py-2 sm:px-6"
+          [entity]="v.entity"
+          [filters]="v.filters"
+          [sort]="v.sort ?? null"
+          [groupBy]="effectiveGroup()"
+          [columns]="layout() === 'board'"
+          [canEdit]="canEdit()"
+          (filtersChange)="setFilters($event)"
+          (sortChange)="setSort($event)"
+          (groupByChange)="setGroup($event)"
+        />
       </app-page-header>
 
       @if (rows().length === 0) {
@@ -438,6 +230,23 @@ type PageLayout = 'list' | 'board' | 'timeline';
             </button>
           }
         </app-empty-state>
+      } @else if (v.entity === 'issue') {
+        <!-- the one task table of the app, told the view's query instead of letting the user pick -->
+        <div class="flex min-h-0 flex-1 flex-col">
+          <app-issue-board
+            [issues]="allIssues()"
+            [baseFilters]="v.filters"
+            [toolbar]="false"
+            [statusBar]="false"
+            [showCreate]="false"
+            [forceLayout]="layout() === 'board' ? 'board' : 'list'"
+            [forceGroup]="issueGroup()"
+            [forceSort]="issueSort()"
+            [stateKey]="'view.' + v.id"
+            [dropPrefix]="'view-issue-col'"
+          />
+          <app-issue-command-dialog />
+        </div>
       } @else if (layout() === 'board') {
         <div class="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 py-3 sm:px-5">
           @for (g of groups(); track g.key) {
@@ -449,17 +258,10 @@ type PageLayout = 'list' | 'board' | 'timeline';
               </header>
               <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
                 @for (item of g.items; track item.id) {
-                  @switch (v.entity) {
-                    @case ('issue') {
-                      <app-issue-card [issue]="asIssue(item)" />
-                    }
-                    @case ('project') {
-                      <app-view-project-card
-                        [project]="asProject(item)"
-                        [focused]="ui.focusedRowId() === item.id"
-                      />
-                    }
-                  }
+                  <app-view-project-card
+                    [project]="asProject(item)"
+                    [focused]="ui.focusedRowId() === item.id"
+                  />
                 } @empty {
                   <p class="text-meta px-1 py-2">Empty</p>
                 }
@@ -485,17 +287,10 @@ type PageLayout = 'list' | 'board' | 'timeline';
               </div>
             }
             @for (item of g.items; track item.id) {
-              @switch (v.entity) {
-                @case ('issue') {
-                  <app-issue-row [issue]="asIssue(item)" />
-                }
-                @case ('project') {
-                  <app-view-project-row
-                    [project]="asProject(item)"
-                    [focused]="ui.focusedRowId() === item.id"
-                  />
-                }
-              }
+              <app-view-project-row
+                [project]="asProject(item)"
+                [focused]="ui.focusedRowId() === item.id"
+              />
             }
           }
         </div>
@@ -543,13 +338,6 @@ export class ViewDetailPage {
   protected readonly listIcon = LucideList;
   protected readonly boardIcon = LucideKanban;
   protected readonly timelineIcon = LucideChartGantt;
-  protected readonly xIcon = LucideX;
-  protected readonly plusIcon = LucidePlus;
-  protected readonly filterIcon = LucideListFilter;
-  protected readonly groupIcon = LucideRows3;
-  protected readonly sortAscIcon = LucideArrowUpNarrowWide;
-  protected readonly sortDescIcon = LucideArrowDownWideNarrow;
-  protected readonly checkIcon = LucideCheck;
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly view = computed(() => this.store.getView(this.id()));
@@ -583,9 +371,6 @@ export class ViewDetailPage {
     return l === 'timeline' && this.supportsTimeline() ? 'timeline' : 'list';
   });
 
-  /** Fields a user added via "+ Filter" that have no values yet (not persisted). */
-  private readonly pending = signal<string[]>([]);
-
   // ── query ──
   private readonly queryCtx = computed(() => ({}));
   protected readonly rows = computed<Queryable[]>(() => {
@@ -610,6 +395,14 @@ export class ViewDetailPage {
     return v.groupBy ?? (this.layout() === 'board' ? 'status' : null);
   });
   protected readonly grouped = computed(() => !!this.effectiveGroup());
+
+  // ── what a task view tells the shared task table ──
+  protected readonly allIssues = computed(() => this.store.issues());
+  protected readonly issueGroup = computed<IssueGroup>(() => (this.effectiveGroup() ?? 'none') as IssueGroup);
+  protected readonly issueSort = computed<{ field: IssueSort; direction: 'asc' | 'desc' }>(() => {
+    const s = this.view()?.sort;
+    return s ? { field: s.field as IssueSort, direction: s.direction } : { field: 'updatedAt', direction: 'desc' };
+  });
 
   protected readonly groups = computed<ViewGroup[]>(() => {
     const v = this.view();
@@ -641,38 +434,6 @@ export class ViewDetailPage {
     });
   });
 
-  // ── toolbar state ──
-  protected readonly activeFilters = computed(() => {
-    const v = this.view();
-    if (!v) return [];
-    const fromView = v.filters.map((f) => this.chip(v, f.field, f));
-    const pending = this.pending()
-      .filter((field) => !v.filters.some((f) => f.field === field))
-      .map((field) => this.chip(v, field, undefined));
-    return [...fromView, ...pending];
-  });
-  protected readonly addableFields = computed(() => {
-    const v = this.view();
-    if (!v) return [];
-    const used = new Set(this.activeFilters().map((f) => f.field));
-    return filterableFields(v.entity).filter((f) => !used.has(f.field));
-  });
-  protected readonly groupableFields = computed(() =>
-    FIELD_DEFS[this.view()?.entity ?? 'issue'].filter((f) => f.groupable),
-  );
-  protected readonly sortableFields = computed(() =>
-    FIELD_DEFS[this.view()?.entity ?? 'issue'].filter((f) => f.sortable),
-  );
-  protected readonly groupLabel = computed(() => {
-    const v = this.view();
-    const g = this.effectiveGroup();
-    return v && g ? fieldLabel(v.entity, g) : 'None';
-  });
-  protected readonly sortLabel = computed(() => {
-    const v = this.view();
-    return v?.sort ? fieldLabel(v.entity, v.sort.field) : 'Default';
-  });
-
   protected readonly description = computed(() => {
     const v = this.view();
     if (!v) return '';
@@ -688,33 +449,7 @@ export class ViewDetailPage {
     { label: this.view()?.name ?? 'View' },
   ]);
 
-  constructor() {
-    // Forget half-added filter chips when switching views.
-    effect(() => {
-      this.id();
-      this.pending.set([]);
-    });
-  }
-
-  private chip(v: SavedView, field: string, f: ViewFilter | undefined) {
-    const numeric = isNumberField(v.entity, field);
-    const editable = !numeric && (!f || isEditableFilter(f));
-    return {
-      field,
-      label: fieldLabel(v.entity, field),
-      numeric,
-      min: numeric && f?.op === 'gte' ? String(f.value) : '',
-      editable,
-      options: editable ? fieldOptions(this.store, v.entity, field) : [],
-      values: f ? filterValues(v.filters, field) : [],
-      text: f ? describeFilter(this.store, v.entity, f) : '',
-    };
-  }
-
   // ── template casts ──
-  protected asIssue(item: Queryable): Issue {
-    return item as Issue;
-  }
   protected asProject(item: Queryable): Project {
     return item as Project;
   }
@@ -740,49 +475,13 @@ export class ViewDetailPage {
   protected setGroup(field: string | null): void {
     this.patch({ groupBy: field });
   }
-  protected setSort(field: string | null): void {
-    const v = this.view();
-    if (!v) return;
-    if (!field) return this.patch({ sort: null });
-    const def = FIELD_DEFS[v.entity].find((f) => f.field === field);
-    const direction =
-      v.sort?.field === field
-        ? v.sort.direction
-        : def?.kind === 'date' || def?.kind === 'number'
-          ? 'desc'
-          : 'asc';
-    this.patch({ sort: { field, direction } });
+  protected setSort(sort: FilterBarSort | null): void {
+    this.patch({ sort });
   }
-  protected flipDirection(): void {
-    const s = this.view()?.sort;
-    if (s)
-      this.patch({ sort: { field: s.field, direction: s.direction === 'asc' ? 'desc' : 'asc' } });
-  }
-  protected addPending(field: string): void {
-    this.pending.update((p) => (p.includes(field) ? p : [...p, field]));
-  }
-  protected setValues(field: string, values: string[]): void {
-    const v = this.view();
-    if (!v) return;
-    this.patch({ filters: setFilter(v.filters, field, 'in', values) });
-    if (!values.length) this.pending.update((p) => p.filter((x) => x !== field));
-  }
-  /** "At least N" on a numeric field; empty or invalid removes the filter. */
-  protected setMin(field: string, raw: string): void {
-    const v = this.view();
-    if (!v) return;
-    const n = Number(raw);
-    if (!raw.trim() || !Number.isFinite(n) || n < 0) return this.removeFilter(field);
-    this.patch({ filters: setFilter(v.filters, field, 'gte', String(Math.floor(n))) });
-  }
-  protected removeFilter(field: string): void {
-    const v = this.view();
-    this.pending.update((p) => p.filter((x) => x !== field));
-    if (v?.filters.some((f) => f.field === field))
-      this.patch({ filters: v.filters.filter((f) => f.field !== field) });
+  protected setFilters(filters: ViewFilter[]): void {
+    this.patch({ filters });
   }
   protected clearFilters(): void {
-    this.pending.set([]);
     this.patch({ filters: [] });
   }
 

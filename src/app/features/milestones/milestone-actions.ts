@@ -1,8 +1,8 @@
 // Milestone writes shared by the project page, issue rows, the issue property and the timeline:
-// create / rename / dates / delete (with Undo) / reorder and assigning issues. Milestones belong to a
+// create / rename / dates / delete (confirmed, with Undo) / reorder and assigning issues. Milestones belong to a
 // project, and an issue is in at most one milestone per project, so assigning replaces the previous one.
 import { Injectable, inject } from '@angular/core';
-import { TramaStore, Notifier, type Issue, type Milestone } from '../../core';
+import { TramaStore, Notifier, UiStore, type Issue, type Milestone } from '../../core';
 import type { PickOption } from '../../shared/picker';
 import { isoOfDay } from './milestone-model';
 
@@ -13,6 +13,7 @@ export const isoFromDate = (d: Date): string => new Date(d.getFullYear(), d.getM
 export class MilestoneActions {
   private readonly store = inject(TramaStore);
   private readonly notify = inject(Notifier);
+  private readonly ui = inject(UiStore);
 
   create(projectId: string, name: string, targetDate?: string): Promise<Milestone | undefined> {
     const n = name.trim();
@@ -50,7 +51,19 @@ export class MilestoneActions {
     void this.store.reorderMilestones(ms.projectId, ids);
   }
 
-  async remove(ms: Milestone): Promise<void> {
+  /** Asks first (global confirm dialog), then deletes with an Undo toast. */
+  remove(ms: Milestone): void {
+    const count = (this.store.issuesByMilestone().get(ms.id) ?? []).length;
+    this.ui.setConfirmDelete({
+      title: `Delete milestone “${ms.name}”?`,
+      description: count
+        ? `${count} task${count === 1 ? '' : 's'} will no longer be in a milestone. The tasks themselves stay.`
+        : 'The milestone is removed.',
+      onConfirm: () => this.performRemove(ms),
+    });
+  }
+
+  private async performRemove(ms: Milestone): Promise<void> {
     const issueIds = (this.store.issuesByMilestone().get(ms.id) ?? []).map((i) => i.id);
     if (!(await this.store.deleteMilestone(ms.id))) return;
     this.notify.success(`Deleted milestone “${ms.name}”`, {

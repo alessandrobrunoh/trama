@@ -4,6 +4,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import {
+  LucideArrowLeft,
   LucideDynamicIcon,
   LucideMousePointerClick,
   LucideMaximize2,
@@ -24,7 +25,15 @@ import { Kbd } from '../shared/kbd';
 import { PageChrome } from './page-chrome';
 
 /** Sections whose pages feed the pane (preview of the selected row); elsewhere the pane is not drawn. */
-export const PANE_SECTIONS: ReadonlySet<string> = new Set(['inbox', 'tasks', 'issues', 'projects', 'views']);
+export const PANE_SECTIONS: ReadonlySet<string> = new Set([
+  'inbox',
+  'overview',
+  'timeline',
+  'tasks',
+  'issues',
+  'projects',
+  'views',
+]);
 
 /**
  * The contextual right pane of the shell: an inspector for whatever `RightPaneStore.content()` holds
@@ -103,6 +112,17 @@ export const PANE_SECTIONS: ReadonlySet<string> = new Set(['inbox', 'tasks', 'is
           }
         </div>
         <div class="flex shrink-0 items-center gap-0.5 px-1.5">
+          @if (pane.overridesPage()) {
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground gap-1"
+              (click)="pane.clear()"
+            >
+              <svg [lucideIcon]="backIcon" [size]="13"></svg>Back
+            </button>
+          }
           @if (chrome.rightPaneActions(); as actions) {
             <ng-container *ngTemplateOutlet="actions" />
           }
@@ -144,7 +164,7 @@ export const PANE_SECTIONS: ReadonlySet<string> = new Set(['inbox', 'tasks', 'is
           }
           @case ('project') {
             @if (projectId(); as id) {
-              <app-project-preview [id]="id" />
+              <app-project-preview [id]="id" [page]="ownedByPage()" />
             }
           }
           @default {
@@ -171,6 +191,7 @@ export class RightPane {
   protected readonly closeIcon = LucideX;
   protected readonly expandIcon = LucideMaximize2;
   protected readonly pointerIcon = LucideMousePointerClick;
+  protected readonly backIcon = LucideArrowLeft;
 
   private readonly url = toSignal(
     this.router.events.pipe(
@@ -203,16 +224,21 @@ export class RightPane {
       case 'task':
         return 'Details';
       case 'project':
-        return 'Overview';
+        return 'Details';
       default:
         return 'Preview';
     }
+  });
+  /** The content is the open page's own (the project page's properties), not a selection. */
+  protected readonly ownedByPage = computed(() => {
+    const c = this.content();
+    return c !== null && c === this.pane.pageContent();
   });
   /** Router commands of the full page for the current content. */
   protected readonly fullLink = computed<readonly string[] | null>(() => {
     const c = this.content();
     const slug = this.store.slug();
-    if (!c || !slug) return null;
+    if (!c || !slug || this.ownedByPage()) return null;
     if (c.kind === 'task') return ['/', slug, 'tasks', this.store.getIssue(c.idOrKey)?.key ?? c.idOrKey];
     return ['/', slug, 'projects', c.id];
   });

@@ -1,5 +1,5 @@
 // Project rows and board cards for saved views over projects: glyph, name, priority, status,
-// health, lead and target date. The whole row/card is a link to the project page.
+// lead and target date. The whole row/card is a link to the project page.
 import { ChangeDetectionStrategy, Component, Directive, computed, inject, input } from '@angular/core';
 import { TramaStore, UiStore, type Project } from '../../core';
 import { RightPaneStore } from '../../core/stores/right-pane.store';
@@ -8,7 +8,8 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { PROJECT_STATUS_META, isOverdue } from '../projects/project-model';
+import { StatusLabel } from '../../shared/status';
+import { isOverdue } from '../projects/project-model';
 
 @Directive()
 abstract class ProjectItemBase {
@@ -17,7 +18,6 @@ abstract class ProjectItemBase {
   readonly focused = input(false);
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly status = computed(() => PROJECT_STATUS_META[this.project().status]);
   protected readonly overdue = computed(() => isOverdue(this.project()));
 
   private readonly pane = inject(RightPaneStore);
@@ -39,7 +39,7 @@ abstract class ProjectItemBase {
 @Component({
   selector: 'app-view-project-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph],
+  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
   host: { class: 'block' },
   template: `
     @let p = project();
@@ -53,9 +53,11 @@ abstract class ProjectItemBase {
       <app-project-glyph [project]="p" [size]="16" />
       <span class="min-w-0 flex-1 truncate" [class.text-muted-foreground]="p.status === 'canceled'">{{ p.name }}</span>
       <app-priority-icon [priority]="p.priority" class="max-md:hidden" />
-      <span class="flex w-28 shrink-0 items-center gap-1.5 text-xs max-sm:hidden" [class]="status().text">
-        <span class="size-2 shrink-0 rounded-full" [class]="status().dot"></span>{{ status().label }}
-      </span>
+      <app-status-label
+        class="text-muted-foreground w-28 shrink-0 text-xs max-sm:hidden"
+        [status]="p.status"
+        entity="project"
+      />
       <span class="flex w-6 shrink-0 justify-center max-sm:hidden">
         @if (p.leadId) {
           <app-actor-avatar [actor]="{ type: 'user', id: p.leadId }" [size]="20" />
@@ -73,7 +75,7 @@ export class ViewProjectRow extends ProjectItemBase {}
 @Component({
   selector: 'app-view-project-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph],
+  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
   host: { class: 'block' },
   template: `
     @let p = project();
@@ -96,9 +98,7 @@ export class ViewProjectRow extends ProjectItemBase {}
       }
       <span class="mt-2 flex flex-wrap items-center gap-x-2.5 gap-y-1">
         <app-priority-icon [priority]="p.priority" />
-        <span class="flex items-center gap-1.5 text-xs" [class]="status().text">
-          <span class="size-2 shrink-0 rounded-full" [class]="status().dot"></span>{{ status().label }}
-        </span>
+        <app-status-label class="text-muted-foreground text-xs" [status]="p.status" entity="project" />
         @if (p.targetDate) {
           <span class="text-muted-foreground ml-auto text-[11px] whitespace-nowrap" [class.text-status-blocked]="overdue()">{{ p.targetDate | fullDate }}</span>
         }

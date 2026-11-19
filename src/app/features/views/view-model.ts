@@ -30,7 +30,7 @@ export interface ViewGroup {
   status?: AnyStatus;
   priority?: Priority;
   actor?: { type: 'user'; id: string };
-  /** CSS colour of a leading dot (project status / health). */
+  /** CSS colour of a leading dot (fallback when there is no glyph). */
   color?: string;
   items: Queryable[];
 }
@@ -48,7 +48,7 @@ export const ENTITY_ICON: Record<ViewEntity, LucideIcon> = {
 
 export const STATUS_ENTITY: Record<ViewEntity, StatusEntity> = {
   issue: 'issue',
-  project: 'other',
+  project: 'project',
 };
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -132,8 +132,6 @@ export function valueGlyph(
   store: TramaStore,
 ): { status?: AnyStatus; statusEntity?: StatusEntity; actor?: ActorRef } {
   if (!value) return {};
-  // Project statuses have their own coloured dot (see valueDot), not a status glyph.
-  if (entity === 'project' && field === 'status') return {};
   if (field === 'status')
     return { status: value as AnyStatus, statusEntity: STATUS_ENTITY[entity] };
   const def = FIELD_DEFS[entity].find((f) => f.field === field);
