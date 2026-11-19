@@ -21,7 +21,6 @@ import {
   mergeRiskTexts,
   parseIssueSuggestions,
   parseSummary,
-  parseUpdateDraft,
   risksResult,
   signalsToRisks,
   systemPrompt,
@@ -30,7 +29,7 @@ import {
 } from './project-ai.logic.js';
 
 /**
- * AI proposals for a project (update draft, summary, issues to add, risks). Read-only: it returns
+ * AI proposals for a project (summary, issues to add, risks). Read-only: it returns
  * a proposal and changes nothing; the user applies it from the UI.
  */
 @Injectable()
@@ -72,11 +71,6 @@ export class ProjectAiService {
     switch (kind) {
       case 'risks':
         return this.risks(userId, facts, signals, health, enabled, signal);
-      case 'update_draft':
-        return parseUpdateDraft(
-          await this.ask(userId, kind, factsJson(facts, { suggestedHealth: health, signals }), signal),
-          health,
-        );
       case 'summary':
         return parseSummary(await this.ask(userId, kind, factsJson(facts), signal));
       case 'issues': {

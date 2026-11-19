@@ -23,7 +23,6 @@ import type {
   NotificationChannels,
   NotificationRecordKind,
   Priority,
-  ProjectHealth,
   ProjectStatus,
   ReviewState,
   Role,
@@ -201,9 +200,6 @@ export class ProjectEntity extends Wire {
   /** Lucide icon name (kebab-case) or an emoji; null = default glyph. */
   @Column({ type: 'varchar', nullable: true }) icon: string | null;
   @Column({ type: 'varchar', default: 'backlog' }) status: ProjectStatus;
-  /** Health of the latest project update (denormalized; see ProjectUpdatesService). */
-  @Column({ type: 'varchar', nullable: true }) health: ProjectHealth | null;
-  @Column({ type: 'timestamptz', nullable: true }) lastUpdateAt: Date | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', nullable: true }) leadId: string | null;
   @Column({ type: 'varchar', length: 2048, nullable: true }) repository: string | null;
@@ -213,77 +209,6 @@ export class ProjectEntity extends Wire {
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
   @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
-}
-
-@Entity('project_updates')
-@Index('IDX_project_updates_project', ['projectId', 'createdAt'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-export class ProjectUpdateEntity extends Wire {
-  @PrimaryColumn({ type: 'varchar' }) id: string;
-  @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) projectId: string;
-  @Column({ type: 'varchar' }) health: ProjectHealth;
-  @Column({ type: 'text' }) body: string;
-  @Column({ type: 'jsonb' }) author: ActorRef;
-  @Column({ type: 'boolean', default: false }) aiDrafted: boolean;
-  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
-  @Column({ type: 'timestamptz', nullable: true }) editedAt: Date | null;
-}
-
-// ───────────────────────────── documents ─────────────────────────────
-
-/** `searchVector` (generated, GIN-indexed) exists only in the database; queries reference it by name. */
-@Entity('documents')
-@Index('IDX_documents_workspace_updated', ['workspaceId', 'updatedAt'])
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-export class DocumentEntity extends Wire {
-  @PrimaryColumn({ type: 'varchar' }) id: string;
-  @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) title: string;
-  @Column({ type: 'text', default: '' }) body: string;
-  @Column({ type: 'varchar', nullable: true }) icon: string | null;
-  @Column({ type: 'integer', default: 1 }) version: number;
-  @Column({ type: 'jsonb' }) author: ActorRef;
-  @Column({ type: 'jsonb' }) lastEditor: ActorRef;
-  @Column({ type: 'timestamptz', nullable: true }) archivedAt: Date | null;
-  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
-  @Column({ type: 'timestamptz', default: NOW }) updatedAt: Date;
-
-  protected override hidden() {
-    return ['workspaceId'];
-  }
-}
-
-@Entity('document_revisions')
-@Index('UQ_document_revisions_version', ['documentId', 'version'], {
-  unique: true,
-})
-@ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-@ForeignKey(() => DocumentEntity, ['documentId'], ['id'], {
-  onDelete: 'CASCADE',
-})
-export class DocumentRevisionEntity extends Wire {
-  @PrimaryColumn({ type: 'varchar' }) id: string;
-  @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar' }) documentId: string;
-  @Column({ type: 'integer' }) version: number;
-  @Column({ type: 'varchar' }) title: string;
-  @Column({ type: 'text' }) body: string;
-  @Column({ type: 'jsonb' }) editor: ActorRef;
-  @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
-
-  protected override hidden() {
-    return ['workspaceId'];
-  }
 }
 
 @Entity('milestones')
@@ -337,7 +262,6 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'varchar', default: 'none' }) priority: Priority;
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
-  @Column({ type: 'text', nullable: true }) goal: string | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) milestoneIds: string[];
   @Column({ type: 'double precision', nullable: true }) estimate: number | null;
   @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
@@ -358,7 +282,6 @@ export class IssueEntity extends Wire {
 
 @Entity('artifacts')
 @Index('IDX_artifacts_workspace', ['workspaceId'])
-@Index('IDX_artifacts_project', ['projectId'])
 @Index('IDX_artifacts_issue', ['issueId'])
 @Index('IDX_artifacts_upload', ['uploadId'])
 @Index('IDX_artifacts_external', ['workspaceId', 'repository', 'externalId'])
@@ -366,16 +289,12 @@ export class IssueEntity extends Wire {
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
-// Issue/project owners are detached with SET NULL. Legacy provenance is not an active owner.
-@ForeignKey(() => ProjectEntity, ['projectId'], ['id'], {
-  onDelete: 'SET NULL',
-})
+// The task owner is detached with SET NULL. Legacy provenance is not an active owner.
 @ForeignKey(() => IssueEntity, ['issueId'], ['id'], { onDelete: 'SET NULL' })
 
 export class ArtifactEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
   @Column({ type: 'varchar' }) workspaceId: string;
-  @Column({ type: 'varchar', nullable: true }) projectId: string | null;
   @Column({ type: 'varchar', nullable: true }) issueId: string | null;
   /** Historical provenance for artifacts formerly owned only by a workstream. */
   @Column({ type: 'varchar', nullable: true }) legacyWorkstreamKey:
@@ -387,8 +306,6 @@ export class ArtifactEntity extends Wire {
   @Column({ type: 'varchar', default: 'other' }) provider: ArtifactProvider;
   @Column({ type: 'varchar' }) title: string;
   @Column({ type: 'varchar', nullable: true }) url: string | null;
-  /** A `document` artifact that points to a Trama document; deleting the document deletes the artifact. */
-  @Column({ type: 'varchar', nullable: true }) documentId: string | null;
   /** Set when the artifact is an uploaded file (`uploads.id`). Not part of the API contract; `url` is the workspace path. */
   @Column({ type: 'varchar', nullable: true }) uploadId: string | null;
   @Column({ type: 'varchar', nullable: true }) externalId: string | null;
@@ -407,9 +324,8 @@ export class ArtifactEntity extends Wire {
 }
 
 /**
- * A file uploaded into the workspace. Documents cannot hold one: they are versioned markdown with a
- * full-text index. The bytes stay here, in the same database, and are served only while some record
- * the caller can read still points at them.
+ * A file uploaded into the workspace. The bytes stay here, in the same database, and are served only
+ * while some record the caller can read still points at them.
  */
 @Entity('uploads')
 @Index('IDX_uploads_workspace', ['workspaceId', 'createdAt'])
@@ -448,7 +364,7 @@ export class UploadEntity extends Wire {
 export class UploadReferenceEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) workspaceId: string;
   @PrimaryColumn({ type: 'varchar' }) uploadId: string;
-  /** issue, project, document, document_revision, comment, or artifact. */
+  /** issue, project, comment, or artifact. */
   @PrimaryColumn({ type: 'varchar' }) subjectType: string;
   @PrimaryColumn({ type: 'varchar' }) subjectId: string;
   /** Denormalized. Visibility uses the live owner when the two can drift. */
@@ -769,9 +685,6 @@ export const ENTITIES = [
   PushSubscriptionEntity,
   AgentEntity,
   ProjectEntity,
-  ProjectUpdateEntity,
-  DocumentEntity,
-  DocumentRevisionEntity,
   MilestoneEntity,
   IssueEntity,
   ArtifactEntity,

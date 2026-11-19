@@ -19,7 +19,6 @@ const API_TO_MEMBER: Record<string, MemberResource | undefined> = {
   milestones: 'milestones',
   issues: 'issues',
   tasks: 'issues',
-  documents: 'documents',
   artifacts: 'artifacts',
   views: 'views',
   comments: 'comments',
@@ -158,7 +157,6 @@ export interface AccessSnapshot {
   }[];
   artifacts: {
     id: string;
-    projectId?: string | null;
     issueId?: string | null;
   }[];
   comments: { subject: Ref }[];
@@ -198,12 +196,9 @@ export function scopeSnapshot<T extends AccessSnapshot>(
   const projectIds = new Set(projects.map((row) => row.id));
   const milestoneIds = new Set(milestones.map((row) => row.id));
   const artifacts = allows(access, 'artifacts')
-    ? snapshot.artifacts.filter((row) => {
-        if (row.projectId && !projectOk(row.projectId)) return false;
-        if (row.issueId && !issueIds.has(row.issueId)) return false;
-        if (!row.projectId && !row.issueId) return access.includeUnassigned;
-        return true;
-      })
+    ? snapshot.artifacts.filter((row) =>
+        row.issueId ? issueIds.has(row.issueId) : access.includeUnassigned,
+      )
     : [];
   const artifactIds = new Set(artifacts.map((row) => row.id));
   const visible = new Map<string, Set<string>>([

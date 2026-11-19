@@ -38,9 +38,6 @@ describe('requiredMemberGrant', () => {
         '/api/w/:slug/issues/:idOrKey/artifacts/upload',
       ),
     ).toBe('artifacts:create');
-    expect(
-      requiredMemberGrant('POST', '/api/w/:slug/projects/:id/artifacts/upload'),
-    ).toBe('artifacts:create');
     expect(requiredMemberGrant('GET', '/api/w/:slug/uploads/:id')).toBeNull();
   });
 

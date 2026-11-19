@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Not, type Repository } from 'typeorm';
-import { PROJECT_HEALTHS, type ProjectHealth } from '../contracts/domain.js';
 import {
   DomainEventEntity,
   IssueEntity,
@@ -21,8 +20,6 @@ const MAX_CANDIDATES = 150;
 
 const iso = (value: Date | null | undefined): string | null =>
   value ? value.toISOString() : null;
-const isHealth = (value: unknown): value is ProjectHealth =>
-  typeof value === 'string' && (PROJECT_HEALTHS as string[]).includes(value);
 
 /** Reads everything the project AI needs straight from the repositories. Read-only. */
 @Injectable()
@@ -58,11 +55,10 @@ export class ProjectAiFactsService {
       }),
     ]);
     const issueIds = issues.map((i) => i.id);
-    const [events, updates, candidates] = await Promise.all([
-        this.recentEvents(workspaceId, project.id, issueIds),
-        this.recentUpdates(workspaceId, project.id),
-        withCandidates ? this.candidateIssues(workspaceId) : [],
-      ]);
+    const [events, candidates] = await Promise.all([
+      this.recentEvents(workspaceId, project.id, issueIds),
+      withCandidates ? this.candidateIssues(workspaceId) : [],
+    ]);
 
     const userIds = new Set<string>();
     if (project.leadId) userIds.add(project.leadId);
@@ -88,11 +84,6 @@ export class ProjectAiFactsService {
       updatedAt: i.updatedAt.toISOString(),
     });
 
-    // `health` / `lastUpdateAt` may live on the project row once project updates exist; the newest update wins.
-    const row = record(project) ?? {};
-    const latest = updates[0];
-    const rowHealth = row['health'];
-    const rowLast = row['lastUpdateAt'];
     return {
       project: {
         id: project.id,
@@ -101,22 +92,10 @@ export class ProjectAiFactsService {
         description: project.description,
         status: project.status,
         priority: project.priority,
-        health: isHealth(latest?.health)
-          ? latest.health
-          : isHealth(rowHealth)
-            ? rowHealth
-            : null,
         lead: project.leadId ? (names.get(project.leadId) ?? null) : null,
         startDate: iso(project.startDate),
         targetDate: iso(project.targetDate),
         createdAt: project.createdAt.toISOString(),
-        lastUpdateAt:
-          latest?.createdAt ??
-          (rowLast instanceof Date
-            ? rowLast.toISOString()
-            : typeof rowLast === 'string'
-              ? rowLast
-              : null),
       },
       milestones: milestones.map((m) => ({
         id: m.id,
@@ -124,11 +103,6 @@ export class ProjectAiFactsService {
         targetDate: iso(m.targetDate),
       })),
       issues: issues.map(toIssue),
-      updates: updates.map((u) => ({
-        health: u.health,
-        body: u.body,
-        createdAt: u.createdAt,
-      })),
       events: events.map((e) => ({
         at: e.at.toISOString(),
         type: e.type,
@@ -164,37 +138,6 @@ export class ProjectAiFactsService {
       );
     else query.andWhere(`e.subject ->> 'id' = :projectId`, { projectId });
     return query.orderBy('e.at', 'DESC').take(25).getMany();
-  }
-
-  /** `project_updates` is created by the project-updates feature; tolerate it not existing yet. */
-  private async recentUpdates(workspaceId: string, projectId: string) {
-    try {
-      const rows: unknown = await this.ds.query(
-        'SELECT * FROM "project_updates" WHERE "workspaceId" = $1 AND "projectId" = $2 ORDER BY "createdAt" DESC LIMIT 5',
-        [workspaceId, projectId],
-      );
-      if (!Array.isArray(rows)) return [];
-      const out: { health: string; body: string; createdAt: string }[] = [];
-      for (const entry of rows) {
-        const row = record(entry);
-        const at = row?.['createdAt'];
-        const date =
-          at instanceof Date
-            ? at
-            : typeof at === 'string'
-              ? new Date(at)
-              : null;
-        if (!row || !date || Number.isNaN(date.getTime())) continue;
-        out.push({
-          health: isHealth(row['health']) ? row['health'] : 'on_track',
-          body: typeof row['body'] === 'string' ? row['body'] : '',
-          createdAt: date.toISOString(),
-        });
-      }
-      return out;
-    } catch {
-      return [];
-    }
   }
 
   private eventSummary(event: DomainEventEntity): string {

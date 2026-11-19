@@ -74,15 +74,11 @@ const REVIEW: ReviewState[] = [
 ];
 
 class CreateArtifactDto {
-  /** At least one projectId / issueId (nested routes fill their owner). */
-  @IsOptional() @IsString() projectId?: string;
+  /** The task that owns it (the nested task route fills it). */
   @IsOptional() @IsString() issueId?: string;
   @IsOptional() @IsString() @MaxLength(10000) description?: string;
   @IsIn(KINDS) kind: ArtifactKind;
-  /** Required unless `documentId` is given (the artifact then takes the document's title). */
   @IsOptional() @IsString() @MinLength(1) @MaxLength(300) title?: string;
-  /** Kind `document` only: attach a Trama document (see POST /documents/:id/attach). */
-  @IsOptional() @IsString() @MaxLength(64) documentId?: string;
   @IsOptional() @IsString() repository?: string;
   @IsOptional() @IsIn(PROVIDERS) provider?: ArtifactProvider;
   @IsOptional() @IsString() @MaxLength(1000) url?: string;
@@ -95,7 +91,6 @@ class CreateArtifactDto {
 }
 
 class UpdateArtifactDto {
-  @Clearable() @IsString() projectId?: string | null;
   @Clearable() @IsString() issueId?: string | null;
   @Clearable() @IsString() @MaxLength(10000) description?: string | null;
   @OptionalNotNull() @IsString() @MinLength(1) @MaxLength(300) title?: string;
@@ -111,7 +106,6 @@ class UpdateArtifactDto {
 }
 
 class ListArtifactsQuery {
-  @IsOptional() @IsString() projectId?: string;
   @IsOptional() @IsString() issueId?: string;
   @IsOptional() @IsString() repository?: string;
   @IsOptional() @IsIn(KINDS) kind?: ArtifactKind;
@@ -168,35 +162,7 @@ export class ArtifactsController {
     return this.service.remove(ctx.workspace.id, actor, id);
   }
 
-  // ── artifacts attached to one owner (the owner comes from the route and wins over the body) ──
-
-  @Get('projects/:id/artifacts')
-  async listForProject(
-    @Ctx() ctx: WorkspaceContext,
-    @Param('id') projectId: string,
-    @Query() q: ListOwnedArtifactsQuery,
-  ) {
-    await this.service.assertProject(ctx.workspace.id, projectId);
-    return this.service.list(
-      ctx.workspace.id,
-      Object.assign({}, q, { projectId }),
-    );
-  }
-
-  @Post('projects/:id/artifacts')
-  async createForProject(
-    @Ctx() ctx: WorkspaceContext,
-    @Actor() actor: ActorRef,
-    @Param('id') projectId: string,
-    @Body() dto: CreateArtifactDto,
-  ) {
-    await this.service.assertProject(ctx.workspace.id, projectId);
-    return this.service.create(
-      ctx.workspace.id,
-      actor,
-      Object.assign({}, dto, { projectId }),
-    );
-  }
+  // ── artifacts attached to one task (the owner comes from the route and wins over the body) ──
 
   @Get('tasks/:idOrKey/artifacts')
   async listForIssue(

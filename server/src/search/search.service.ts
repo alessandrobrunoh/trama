@@ -3,7 +3,7 @@ import { DataSource } from 'typeorm';
 import type { MemberResource } from '../contracts/domain.js';
 import { canView, currentAccess, projectHidden } from '../auth/member-access.js';
 
-export const SEARCH_TYPES = ['project', 'issue', 'artifact', 'document'] as const;
+export const SEARCH_TYPES = ['project', 'issue', 'artifact'] as const;
 export type SearchType = (typeof SEARCH_TYPES)[number];
 
 export interface SearchResult {
@@ -45,15 +45,8 @@ const SPECS: Spec[] = [
   {
     type: 'artifact',
     from: `"artifacts" x LEFT JOIN "issues" i ON i."id" = x."issueId"`,
-    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, x."legacyWorkstreamKey" AS "legacyWorkstreamKey", COALESCE(x."url", x."description") AS body, COALESCE(x."projectId", i."projectId") AS "projectId"`,
+    select: `x."id", x."externalId" AS key, x."title", x."kind" || ' · ' || x."state" AS subtitle, x."legacyWorkstreamKey" AS "legacyWorkstreamKey", COALESCE(x."url", x."description") AS body, i."projectId" AS "projectId"`,
     fields: [['x."externalId"', 'key'], ['x."title"', 'title']],
-    rank: 4,
-  },
-  {
-    type: 'document',
-    from: `"documents" x`,
-    select: `x."id", NULL AS key, x."title", CASE WHEN x."archivedAt" IS NULL THEN 'document' ELSE 'document · archived' END AS subtitle, NULL AS "legacyWorkstreamKey", NULL AS body`,
-    fields: [['x."title"', 'title']],
     rank: 4,
   },
 ];
@@ -74,7 +67,6 @@ const RESOURCE: Partial<Record<SearchType, MemberResource>> = {
   project: 'projects',
   issue: 'issues',
   artifact: 'artifacts',
-  document: 'documents',
 };
 const PROJECT_SCOPED = new Set<SearchType>(['project', 'issue', 'artifact']);
 

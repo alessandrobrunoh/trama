@@ -30,10 +30,7 @@ const COLUMNS: Partial<
 > = {
   issue: [{ table: 'issues', column: 'status' }],
   project: [{ table: 'projects', column: 'status' }],
-  project_health: [
-    { table: 'projects', column: 'health' },
-    { table: 'project_updates', column: 'health' },
-  ],
+  // `project_health` labels the AI risk assessment; no row stores it.
 };
 
 export interface StatusInput {

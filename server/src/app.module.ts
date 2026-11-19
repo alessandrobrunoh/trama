@@ -6,7 +6,6 @@ import { AuthModule } from './auth/auth.module.js';
 import { CommentsModule } from './comments/comments.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
-import { DocumentsModule } from './documents/documents.module.js';
 import { EventsModule } from './events/events.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
@@ -22,7 +21,6 @@ import { MailModule } from './mail/mail.module.js';
 import { MilestonesModule } from './milestones/milestones.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
-import { ProjectUpdatesModule } from './project-updates/project-updates.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
 import { TimeEntriesModule } from './time-entries/time-entries.module.js';
@@ -45,12 +43,10 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     NotificationsModule,
     TimeEntriesModule,
     ProjectsModule,
-    ProjectUpdatesModule,
     IssuesModule,
     MilestonesModule,
     ArtifactsModule,
     UploadsModule,
-    DocumentsModule,
     CommentsModule,
     ViewsModule,
     AttentionModule,

@@ -74,7 +74,6 @@ export type MemberResource =
   | 'projects'
   | 'milestones'
   | 'issues'
-  | 'documents'
   | 'artifacts'
   | 'views'
   | 'comments';
@@ -135,12 +134,6 @@ export const MEMBER_RESOURCES: Record<MemberResource, MemberResourceMeta> = {
     description: 'File an issue without being able to edit or delete it, or the other way around.',
     actions: MEMBER_ACTIONS,
   },
-  documents: {
-    group: 'Work',
-    label: 'Documents',
-    description: 'Workspace documents.',
-    actions: MEMBER_ACTIONS,
-  },
   artifacts: {
     group: 'Work',
     label: 'Artifacts',
@@ -166,7 +159,6 @@ export const MEMBER_RESOURCE_ORDER: readonly MemberResource[] = [
   'projects',
   'milestones',
   'issues',
-  'documents',
   'artifacts',
   'views',
   'comments',
@@ -553,10 +545,6 @@ export interface Project {
   /** Lucide icon name (kebab-case, e.g. `rocket`) or a single emoji. Absent = the default project glyph. */
   icon?: string;
   status: ProjectStatus;
-  /** Health from the latest project update; absent until the first update is posted. */
-  health?: ProjectHealth;
-  /** When the latest update was posted (drives "updated 3d ago" and update reminders). */
-  lastUpdateAt?: ISODate;
   priority: Priority;
   leadId?: ID;
   /**
@@ -575,58 +563,15 @@ export interface Project {
   completedAt?: ISODate;
 }
 
-/** Linear-style project health, set by whoever posts a project update. */
+/** Health the AI risk assessment derives from a project's signals. Not stored on the project. */
 export type ProjectHealth = 'on_track' | 'at_risk' | 'off_track';
 export const PROJECT_HEALTHS: ProjectHealth[] = ['on_track', 'at_risk', 'off_track'];
 
-/**
- * A status post on a project (Linear "Project update"): a health value plus a markdown write-up, newest first
- * in the project's Updates feed. Discussed through comments (`SubjectRef` type `project_update`).
- * The newest update drives `Project.health` and `Project.lastUpdateAt`; deleting it falls back to the previous one.
- */
-export interface ProjectUpdate {
-  /** `pu_…` */
-  id: ID;
-  workspaceId: ID;
-  projectId: ID;
-  health: ProjectHealth;
-  /** Markdown body. */
-  body: string;
-  author: ActorRef;
-  /** True when the update was drafted by the AI assistant and posted from that draft (informational). */
-  aiDrafted?: boolean;
-  createdAt: ISODate;
-  /** Set once the body or health was edited after posting. */
-  editedAt?: ISODate;
-}
-
-/** An artifact reached from a project, with the chain that links it back to where it was attached. */
-export interface ProjectContextArtifact {
-  artifact: Artifact;
-  /** Chain from the project down to the artifact's owner. */
-  path: SubjectRef[];
-}
-
-/** GET /w/:slug/projects/:id/context — project-owned and issue-owned context. */
-export interface ProjectContext {
-  project: Project;
-  milestones: Milestone[];
-  updates: ProjectUpdate[];
-  /** Issues with `projectId` = project. */
-  issues: Issue[];
-  artifacts: ProjectContextArtifact[];
-}
-
 // ── AI suggestions for a project (POST /w/:slug/projects/:id/ai/:kind) ──
 
-export type ProjectAiKind = 'update_draft' | 'summary' | 'issues' | 'risks';
-export const PROJECT_AI_KINDS: ProjectAiKind[] = ['update_draft', 'summary', 'issues', 'risks'];
+export type ProjectAiKind = 'summary' | 'issues' | 'risks';
+export const PROJECT_AI_KINDS: ProjectAiKind[] = ['summary', 'issues', 'risks'];
 
-export interface ProjectAiUpdateDraft {
-  kind: 'update_draft';
-  health: ProjectHealth;
-  body: string;
-}
 export interface ProjectAiSummary {
   kind: 'summary';
   summary: string;
@@ -651,8 +596,7 @@ export interface ProjectAiRisks {
   health: ProjectHealth;
   risks: ProjectAiRisk[];
 }
-export type ProjectAiResult =
-  ProjectAiUpdateDraft | ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
+export type ProjectAiResult = ProjectAiSummary | ProjectAiIssues | ProjectAiRisks;
 
 export type Priority = 'none' | 'urgent' | 'high' | 'medium' | 'low';
 
@@ -764,8 +708,6 @@ export interface Issue {
   assigneeId?: ID;
   priority: Priority;
   status: IssueStatus;
-  /** Optional outcome or goal this issue contributes to. */
-  goal?: string;
   /** Project this issue is planned under; deleting the project clears it. */
   projectId?: ID;
   /**
@@ -860,11 +802,10 @@ export type ArtifactState =
 export type CiState = 'pending' | 'passing' | 'failing';
 export type ReviewState = 'none' | 'requested' | 'approved' | 'changes_requested';
 
-/** Something a project or issue produced or points to: a PR, a build, a document, a link. */
+/** Something a task produced or points to: a PR, a build, a link, a file. */
 export interface Artifact {
   id: ID;
-  /** At least one of `projectId` / `issueId` is always set. */
-  projectId?: ID;
+  /** The task that owns it. Absent only on artifacts retained from a retired Workstream owner. */
   issueId?: ID;
   /** Provenance for artifacts retained from a retired Workstream owner. */
   legacyWorkstreamKey?: string;
@@ -880,8 +821,6 @@ export interface Artifact {
   provider: ArtifactProvider;
   title: string;
   url?: string;
-  /** Set on a `document` artifact that points to a Trama document (`Document.id`); its title follows the document. */
-  documentId?: ID;
   /** e.g. "#182", a commit sha, "ADR-021", "staging/auth-2026-10-07". */
   externalId?: string;
   state: ArtifactState;
@@ -898,86 +837,12 @@ export interface Artifact {
   updatedAt: ISODate;
 }
 
-// ───────────────────────────── Documents ─────────────────────────────
-
-/** Hard limits of a document (also enforced by the API). */
-export const DOCUMENT_LIMITS = {
-  titleMax: 200,
-  /** Markdown characters. Also bounded by the 2 MB JSON body limit. */
-  bodyMax: 150_000,
-  /** Revisions kept per document; the oldest are dropped. */
-  revisionsKept: 50,
-  /** Edits by the same person within this window update the newest revision instead of adding one. */
-  revisionWindowMs: 5 * 60 * 1000,
-} as const;
-
-/**
- * A page of markdown that lives in Trama (specs, plans, notes that are not in a repository). It belongs to the
- * workspace; it is linked to projects and issues by `document` artifacts (`links`), so it shows up
- * in their Artifacts and there is no second "parent" to keep in sync. Edits are optimistic: every change names the
- * `version` it was based on and a stale write is refused with 409.
- */
-export interface Document {
-  id: ID;
-  workspaceId: ID;
-  title: string;
-  /** Markdown source. Only returned by the single-document endpoints. */
-  body: string;
-  /** One emoji or a Lucide icon name. */
-  icon?: string;
-  /** Starts at 1 and grows by one on every change to the title, body or icon. */
-  version: number;
-  author: ActorRef;
-  lastEditor: ActorRef;
-  /** Set while the document is archived (hidden from lists, still readable and restorable). */
-  archivedAt?: ISODate;
-  createdAt: ISODate;
-  updatedAt: ISODate;
-  /** The projects / issues the document is attached to. Set on single reads. */
-  links?: DocumentLink[];
-}
-
-/** One attachment of a document: the `document` artifact and its owner. */
-export interface DocumentLink {
-  artifactId: ID;
-  projectId?: ID;
-  issueId?: ID;
-}
-
-/** A document as listed: no body, but the start of it (and, for a search, the matching passage). */
-export type DocumentSummary = Omit<Document, 'body'> & {
-  excerpt: string;
-  /** Search only: passage around the match with `<mark>` around the terms (HTML-escaped otherwise). */
-  snippet?: string;
-};
-
-/** An earlier state of a document. The newest revision is the current state. */
-export interface DocumentRevision {
-  id: ID;
-  documentId: ID;
-  /** The document version this revision holds (the last one it covers when saves were merged). */
-  version: number;
-  title: string;
-  /** Left out of lists. */
-  body?: string;
-  editor: ActorRef;
-  createdAt: ISODate;
-}
-
-/** Body of a 409 on a stale write: the version in the database, so the client can merge or reload. */
-export interface DocumentConflict {
-  statusCode: 409;
-  code: 'document_conflict';
-  message: string;
-  current: Document;
-}
-
 // ───────────────────────────── Plans (a convention, not a gate) ─────────────────────────────
 
 /**
  * An Issue's optional implementation plan is a `document` artifact attached to it whose title starts with
- * "Plan": a Trama document (preferred; its `version` is the revision) or a repository file (the artifact's
- * `externalId` is the commit sha). Nothing is stored separately or blocks work.
+ * "Plan", for example a repository file (the artifact's `externalId` is the commit sha). Nothing is stored
+ * separately or blocks work.
  */
 export function isPlanArtifact(a: Pick<Artifact, 'kind' | 'title'>): boolean {
   return a.kind === 'document' && /^\s*plan\b/i.test(a.title);
@@ -990,10 +855,8 @@ export type SubjectType =
   | 'issue'
   | 'artifact'
   | 'project'
-  | 'project_update'
   | 'milestone'
-  | 'import'
-  | 'document';
+  | 'import';
 
 export interface SubjectRef {
   type: SubjectType;
@@ -1368,7 +1231,6 @@ export interface PublicViewItem {
   kind?: string;
   status?: string;
   priority?: Priority;
-  health?: string;
   assignee?: string;
   project?: string;
   labels?: string[];
@@ -1478,7 +1340,6 @@ export type ApiResource =
   | 'milestones'
   | 'comments'
   | 'artifacts'
-  | 'documents'
   | 'views'
   | 'attention'
   | 'search'
@@ -1505,7 +1366,6 @@ export const API_RESOURCES: Record<ApiResource, ApiResourceMeta> = {
   milestones: { label: 'Milestones', group: 'Work', actions: RWD },
   comments: { label: 'Comments', group: 'Work', actions: RWD },
   artifacts: { label: 'Artifacts', group: 'Work', actions: RWD },
-  documents: { label: 'Documents', group: 'Work', actions: RWD },
   views: { label: 'Views', group: 'Work', actions: RWD },
   attention: { label: 'Attention', group: 'Work', actions: ['read', 'write'] },
   search: { label: 'Search', group: 'Insight', actions: ['read'] },
@@ -1532,7 +1392,6 @@ const WORK: ApiResource[] = [
   'milestones',
   'comments',
   'artifacts',
-  'documents',
   'views',
   'attention',
 ];
@@ -2333,11 +2192,6 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
     events: ['project.created', 'project.updated', 'project.status_changed', 'project.deleted'],
   },
   {
-    entity: 'project_update',
-    label: 'Project updates',
-    events: ['project_update.created', 'project_update.updated', 'project_update.deleted'],
-  },
-  {
     entity: 'issue',
     label: 'Tasks',
     events: [
@@ -2351,17 +2205,6 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
     entity: 'artifact',
     label: 'Artifacts',
     events: ['artifact.attached', 'artifact.updated', 'artifact.deleted'],
-  },
-  {
-    entity: 'document',
-    label: 'Documents',
-    events: [
-      'document.created',
-      'document.updated',
-      'document.archived',
-      'document.restored',
-      'document.deleted',
-    ],
   },
   { entity: 'comment', label: 'Comments', events: ['comment.created'] },
   {

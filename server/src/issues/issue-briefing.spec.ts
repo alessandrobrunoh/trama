@@ -19,16 +19,16 @@ describe('renderIssueBriefing', () => {
     );
   });
 
-  it('keeps the goal, description, and artifacts', () => {
+  it('keeps the description and artifacts', () => {
     const md = renderIssueBriefing({
       ...base,
-      issue: { ...base.issue, goal: 'Users stay signed in.', body: 'Cookie is dropped.' },
+      issue: { ...base.issue, body: 'Cookie is dropped.' },
       artifacts: [
         { kind: 'pull_request', title: 'Fix loop', state: 'open', externalId: '#12', ci: 'failing', review: 'none', hasConflicts: true },
       ],
     });
 
-    expect(md).toContain('## Goal\n\nUsers stay signed in.');
+    expect(md).not.toContain('Goal');
     expect(md).toContain('## Description\n\nCookie is dropped.');
     expect(md).not.toContain('Decision');
     expect(md).not.toContain('input');

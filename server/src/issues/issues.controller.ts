@@ -91,7 +91,6 @@ class CreateIssueDto {
   @IsOptional() @IsString() @MaxLength(20000) body?: string;
   @IsOptional() @IsIn(SOURCES) source?: IssueSource;
   @IsOptional() @IsString() @MaxLength(200) reporterName?: string;
-  @IsOptional() @IsString() @MaxLength(2000) goal?: string;
   @IsOptional() @IsString() assigneeId?: string;
   @IsOptional() @IsString() projectId?: string;
   /** Id or key of the parent issue. */
@@ -116,7 +115,6 @@ class UpdateIssueDto {
   @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
-  @Clearable() @IsString() @MaxLength(2000) goal?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;
   /** Project the issue is planned under. `null` clears it and drops that project's milestone. */
   @Clearable() @IsString() projectId?: string | null;

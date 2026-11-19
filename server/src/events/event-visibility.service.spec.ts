@@ -10,7 +10,6 @@ import {
   IssueEntity,
   MilestoneEntity,
   ProjectEntity,
-  ProjectUpdateEntity,
 } from '../database/entities/index.js';
 import { EventVisibilityService } from './event-visibility.service.js';
 
@@ -39,11 +38,7 @@ const p1Rows = new Map<unknown, unknown[]>([
   [MilestoneEntity, [{ id: 'ms_1', workspaceId: 'ws_1', projectId: 'pr_1' }]],
   [
     ArtifactEntity,
-    [{ id: 'ar_1', workspaceId: 'ws_1', projectId: 'pr_1', issueId: 'iss_1' }],
-  ],
-  [
-    ProjectUpdateEntity,
-    [{ id: 'pu_1', workspaceId: 'ws_1', projectId: 'pr_1' }],
+    [{ id: 'ar_1', workspaceId: 'ws_1', issueId: 'iss_1' }],
   ],
   [
     CommentEntity,
@@ -76,7 +71,6 @@ const VIEW_GRANTS: MemberGrant[] = [
   'issues:view',
   'milestones:view',
   'artifacts:view',
-  'documents:view',
   'comments:view',
 ];
 
@@ -97,8 +91,6 @@ const refs: LegacySubjectRef[] = [
   { type: 'issue', id: 'iss_1' },
   { type: 'milestone', id: 'ms_1' },
   { type: 'artifact', id: 'ar_1' },
-  { type: 'project_update', id: 'pu_1' },
-  { type: 'document', id: 'doc_1' },
   { type: 'import', id: 'imp_1' },
 ];
 
@@ -116,7 +108,7 @@ describe('EventVisibilityService', () => {
 
     const withoutUnassigned = await service.filterEvents(
       'ws_1',
-      events.slice(-2),
+      events.slice(-1),
       access(['pr_1'], false),
     );
     expect(withoutUnassigned).toEqual([]);
@@ -140,7 +132,7 @@ describe('EventVisibilityService', () => {
     const events = [
       {
         subject: { type: 'artifact', id: 'ar_deleted' } as LegacySubjectRef,
-        data: { projectId: null, issueId: 'iss_missing' },
+        data: { issueId: 'iss_missing' },
       },
     ];
 
@@ -149,12 +141,12 @@ describe('EventVisibilityService', () => {
     ).toEqual([]);
   });
 
-  it('treats an issue-owned artifact with projectId null as scoped to its issue', async () => {
+  it('scopes a deleted artifact to the task its event names', async () => {
     const { service } = setup();
     const events = [
       {
         subject: { type: 'artifact', id: 'ar_deleted' } as LegacySubjectRef,
-        data: { projectId: null, issueId: 'iss_1' },
+        data: { issueId: 'iss_1' },
       },
     ];
     expect(

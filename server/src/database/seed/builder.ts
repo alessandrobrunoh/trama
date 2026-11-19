@@ -259,7 +259,7 @@ export class SeedBuilder {
     const legacyWorkstreamKey = this.streamKeys.get(workstreamId) ?? workstreamId;
     const isPr = o.kind === 'pull_request' || o.kind === 'merge_request';
     this.data.artifacts.push({
-      id, workspaceId: this.workspaceId, projectId: null, issueId: null, legacyWorkstreamKey, repository: null, description: null, kind: o.kind,
+      id, workspaceId: this.workspaceId, issueId: null, legacyWorkstreamKey, repository: null, description: null, kind: o.kind,
       provider: o.provider, title: o.title, url: o.url ?? null, externalId: o.externalId ?? null, state: o.state,
       ci: o.ci ?? null, review: o.review ?? (isPr ? 'none' : null), hasConflicts: o.conflicts ?? (isPr ? false : null), environment: o.env ?? null,
       authorRef: o.by, createdAt: this.at(o.created), updatedAt: this.at(o.updated ?? o.created),
@@ -323,7 +323,7 @@ export class SeedBuilder {
     this.data.issues.push({
       id, workspaceId: this.workspaceId, key, number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, priority: o.priority ?? 'none', status: o.status,
-      goal: null, projectId, milestoneIds: o.milestones ?? [], labels: [], aliases: [], estimate: o.estimate ?? null,
+      projectId, milestoneIds: o.milestones ?? [], labels: [], aliases: [], estimate: o.estimate ?? null,
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null,
@@ -369,11 +369,6 @@ export class SeedBuilder {
     for (const [streamId, issueIds] of this.issueLinks) {
       const key = this.streamKeys.get(streamId);
       if (key) issuesByKey.set(key, issueIds);
-      if (key && issueIds.length === 1) {
-        const issue = this.data.issues.find((row) => row.id === issueIds[0]);
-        const stream = this.data.legacyWorkstreams.find((row) => row.id === streamId);
-        if (issue && stream && !issue.goal) issue.goal = stream.objective || null;
-      }
     }
     const ownerIssue = (key?: string | null) => {
       const ids = key ? issuesByKey.get(key) ?? [] : [];

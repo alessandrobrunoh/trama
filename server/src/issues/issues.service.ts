@@ -23,7 +23,6 @@ import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
 import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
 import {
-  DocumentEntity,
   IssueEntity,
   MilestoneEntity,
 } from '../database/entities/index.js';
@@ -52,7 +51,6 @@ export interface IssueInput {
   body?: string | null;
   source?: IssueSource;
   reporterName?: string | null;
-  goal?: string | null;
   assigneeId?: string | null;
   /** Project the issue is planned under. `null` clears it (and drops that project's milestone). */
   projectId?: string | null;
@@ -228,19 +226,6 @@ export class IssuesService {
     // ListIssueQuery caps an explicit limit at 500; omitting it used to return the whole table.
     qb.take(Math.min(f.limit ?? 500, 500));
     return qb.getMany();
-  }
-
-  /** Current revision number of each Trama document, for plan approval checks. */
-  async documentVersions(
-    workspaceId: string,
-    ids: string[],
-  ): Promise<Map<string, number>> {
-    if (!ids.length) return new Map();
-    const rows = await this.ds.getRepository(DocumentEntity).find({
-      where: { workspaceId, id: In(ids) },
-      select: { id: true, version: true },
-    });
-    return new Map(rows.map((d) => [d.id, d.version]));
   }
 
   /** `idOrKey`: id (`in_…`), key (`AUTH-142`) or a previous project key alias. */
@@ -494,7 +479,6 @@ export class IssuesService {
           body: input.body ?? null,
           source: input.source ?? (actor.type === 'agent' ? 'agent' : 'manual'),
           reporterName: input.reporterName ?? null,
-          goal: input.goal ?? null,
           reporterId: actor.type === 'user' ? (actor.id ?? null) : null,
           assigneeId,
           projectId: input.projectId ?? null,
@@ -916,7 +900,6 @@ export class IssuesService {
     if (patch.estimate !== undefined) row.estimate = patch.estimate;
     if (patch.body !== undefined) row.body = patch.body;
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
-    if (patch.goal !== undefined) row.goal = patch.goal;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;
     if (patch.projectId !== undefined) row.projectId = patch.projectId;
     if (patch.parentId !== undefined) row.parentId = patch.parentId;

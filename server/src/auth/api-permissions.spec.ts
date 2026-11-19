@@ -96,8 +96,6 @@ describe('requiredPermission', () => {
     const table: [string, string, string][] = [
       ['GET', '/api/w/:slug/tasks/:idOrKey/artifacts', 'artifacts:read'],
       ['POST', '/api/w/:slug/tasks/:idOrKey/artifacts', 'artifacts:write'],
-      ['GET', '/api/w/:slug/projects/:id/artifacts', 'artifacts:read'],
-      ['POST', '/api/w/:slug/projects/:id/artifacts', 'artifacts:write'],
       ['GET', '/api/w/:slug/artifacts/:id', 'artifacts:read'],
       ['DELETE', '/api/w/:slug/artifacts/:id', 'artifacts:delete'],
       [
@@ -105,7 +103,6 @@ describe('requiredPermission', () => {
         '/api/w/:slug/tasks/:idOrKey/artifacts/upload',
         'artifacts:write',
       ],
-      ['POST', '/api/w/:slug/projects/:id/artifacts/upload', 'artifacts:write'],
     ];
     for (const [method, route, expected] of table)
       expect(requiredPermission(method, route), `${method} ${route}`).toBe(
@@ -118,40 +115,13 @@ describe('requiredPermission', () => {
     ).toBe(false);
   });
 
-  it('maps documents to documents:*, revisions included; attaching needs artifacts:write', () => {
-    const table: [string, string, string][] = [
-      ['GET', '/api/w/:slug/documents', 'documents:read'],
-      ['GET', '/api/w/:slug/documents/:id/revisions', 'documents:read'],
-      ['POST', '/api/w/:slug/documents', 'documents:write'],
-      ['PATCH', '/api/w/:slug/documents/:id', 'documents:write'],
-      ['POST', '/api/w/:slug/documents/:id/attach', 'artifacts:write'],
-      ['POST', '/api/w/:slug/documents/:id/detach', 'artifacts:write'],
-      [
-        'POST',
-        '/api/w/:slug/documents/:id/revisions/:version/restore',
-        'documents:write',
-      ],
-      ['DELETE', '/api/w/:slug/documents/:id', 'documents:delete'],
-    ];
-    for (const [method, route, expected] of table)
-      expect(requiredPermission(method, route), `${method} ${route}`).toBe(
-        expected,
-      );
-    expect(normalizePermissions(['documents:write'])).toEqual([
-      'documents:read',
-      'documents:write',
-    ]);
+  it('no longer knows the removed documents resource', () => {
+    expect(requiredPermission('GET', '/api/w/:slug/documents')).toBeNull();
+    expect(normalizePermissions(['documents:write'])).toEqual([]);
   });
 
   it('keeps the other nested routes under their parent resource', () => {
     const table: [string, string, string][] = [
-      ['POST', '/api/w/:slug/projects/:projectId/updates', 'projects:write'],
-      [
-        'DELETE',
-        '/api/w/:slug/projects/:projectId/updates/:id',
-        'projects:delete',
-      ],
-      ['GET', '/api/w/:slug/projects/:id/context', 'projects:read'],
       ['POST', '/api/w/:slug/tasks/:idOrKey/link', 'tasks:write'],
     ];
     for (const [method, route, expected] of table)
@@ -219,7 +189,7 @@ describe('MCP tool catalog', () => {
   }[];
 
   it("declares exactly the permission the API derives from each tool's route", () => {
-    expect(tools.length).toBeGreaterThan(80);
+    expect(tools.length).toBeGreaterThan(50);
     for (const t of tools) {
       const removed = /^\/(teams|customers|customer-|decisions|releases|input-requests|repositories|intake)/.test(t.path);
       if (removed) continue;

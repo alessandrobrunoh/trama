@@ -11,7 +11,6 @@ import {
   CommentEntity,
   IssueEntity,
   MilestoneEntity,
-  ProjectUpdateEntity,
 } from '../database/entities/index.js';
 
 interface ScopedEvent {
@@ -30,15 +29,12 @@ const SUBJECT_TYPES = new Set<SubjectType>([
   'issue',
   'artifact',
   'project',
-  'project_update',
   'milestone',
   'import',
-  'document',
 ]);
 
 /** Entities that are workspace-wide, rather than owned by a project. */
 const UNASSIGNED_SUBJECTS = new Set([
-  'document',
   'import',
   'workspace',
   'membership',
@@ -54,11 +50,9 @@ const UNASSIGNED_SUBJECTS = new Set([
 
 const MEMBER_VIEW_GRANT: Partial<Record<SubjectType, MemberGrant>> = {
   project: 'projects:view',
-  project_update: 'projects:view',
   issue: 'issues:view',
   milestone: 'milestones:view',
   artifact: 'artifacts:view',
-  document: 'documents:view',
 };
 
 const keyOf = (subject: { type: string; id: string }) =>
@@ -110,15 +104,20 @@ export class EventVisibilityService {
       }) as Promise<TEntity[]>;
     };
 
-    const [issuesById, milestones, artifacts, projectUpdates] = await Promise.all([
+    const [issuesById, milestones, artifacts] = await Promise.all([
       get(IssueEntity, idsOf(subjects, 'issue')),
       get(MilestoneEntity, idsOf(subjects, 'milestone')),
       get(ArtifactEntity, idsOf(subjects, 'artifact')),
-      get(ProjectUpdateEntity, idsOf(subjects, 'project_update')),
     ]);
 
+    // Artifacts that are gone (no row) are scoped by the task their event names.
     const issueIds = new Set<string>();
     for (const row of artifacts) if (row.issueId) issueIds.add(row.issueId);
+    for (const event of events) {
+      const named = event.data?.['issueId'];
+      if (event.subject.type === 'artifact' && typeof named === 'string')
+        issueIds.add(named);
+    }
     const relatedIssues = issueIds.size
       ? await this.ds.getRepository(IssueEntity).find({
           where: { workspaceId, id: In([...issueIds]) },
@@ -132,7 +131,6 @@ export class EventVisibilityService {
       issue: allIssues,
       milestone: new Map(milestones.map((row) => [row.id, row])),
       artifact: new Map(artifacts.map((row) => [row.id, row])),
-      project_update: new Map(projectUpdates.map((row) => [row.id, row])),
     };
     const scopes = new Map<string, TargetScope | null>();
 
@@ -187,44 +185,18 @@ export class EventVisibilityService {
         }
         case 'artifact': {
           const artifact = row as ArtifactEntity | undefined;
-          if (!artifact) {
-            const issueId =
-              typeof data?.['issueId'] === 'string'
-                ? data['issueId']
-                : undefined;
-            const targets: (string | null)[] = [];
-            if (issueId) {
-              const issue = allIssues.get(issueId);
-              if (!issue) {
-                scope = null;
-                break;
-              }
-              targets.push(issue.projectId);
-            }
-            if (dataProject !== undefined && (dataProject !== null || !issueId))
-              targets.push(dataProject);
-            scope = targets.length
-              ? { projectIds: targets, mode: 'all' }
+          // A deleted artifact is scoped by the task its event names.
+          const issueId = artifact
+            ? artifact.issueId
+            : typeof data?.['issueId'] === 'string'
+              ? data['issueId']
               : null;
+          if (!issueId) {
+            scope = artifact ? { projectIds: [], mode: 'all' } : null;
             break;
           }
-          const targets: (string | null)[] = [];
-          if (artifact.projectId) targets.push(artifact.projectId);
-          if (artifact.issueId) {
-            const issue = allIssues.get(artifact.issueId);
-            if (!issue) {
-              scope = null;
-              break;
-            }
-            targets.push(issue.projectId);
-          }
-          scope = { projectIds: targets, mode: 'all' };
-          break;
-        }
-        case 'project_update': {
-          const update = row as ProjectUpdateEntity | undefined;
-          const projectId = update?.projectId ?? dataProject;
-          scope = projectId ? { projectIds: [projectId], mode: 'all' } : null;
+          const issue = allIssues.get(issueId);
+          scope = issue ? { projectIds: [issue.projectId], mode: 'all' } : null;
           break;
         }
         default:

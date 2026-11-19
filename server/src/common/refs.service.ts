@@ -7,8 +7,6 @@ import {
   MembershipEntity,
   MilestoneEntity,
   ProjectEntity,
-  DocumentEntity,
-  ProjectUpdateEntity,
 } from '../database/entities/index.js';
 
 /** Validates cross-entity references inside one workspace (400 on unknown ids). */
@@ -81,10 +79,6 @@ export class RefsService {
         return {
           exists: await db.getRepository(ProjectEntity).existsBy(where),
         };
-      case 'project_update':
-        return {
-          exists: await db.getRepository(ProjectUpdateEntity).existsBy(where),
-        };
       case 'import':
         return {
           exists:
@@ -94,10 +88,6 @@ export class RefsService {
                 [subject.id, workspaceId],
               )
             ).length > 0,
-        };
-      case 'document':
-        return {
-          exists: await db.getRepository(DocumentEntity).existsBy(where),
         };
       default:
         return { exists: false };

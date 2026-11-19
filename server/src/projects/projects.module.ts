@@ -2,8 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectEntity } from '../database/entities/index.js';
 import { UploadsModule } from '../uploads/uploads.module.js';
-import { ProjectContextController } from './project-context.controller.js';
-import { ProjectContextService } from './project-context.service.js';
 import { ProjectsController } from './projects.controller.js';
 import { ProjectsService } from './projects.service.js';
 
@@ -12,8 +10,8 @@ import { ProjectsService } from './projects.service.js';
     TypeOrmModule.forFeature([ProjectEntity]),
     UploadsModule,
   ],
-  controllers: [ProjectsController, ProjectContextController],
-  providers: [ProjectsService, ProjectContextService],
-  exports: [ProjectsService, ProjectContextService],
+  controllers: [ProjectsController],
+  providers: [ProjectsService],
+  exports: [ProjectsService],
 })
 export class ProjectsModule {}

@@ -136,26 +136,6 @@ export class UploadsController {
     );
   }
 
-  @Post('projects/:id/artifacts/upload')
-  @Multipart()
-  @UseInterceptors(uploadFile)
-  uploadOnProject(
-    @Ctx() ctx: WorkspaceContext,
-    @Auth() auth: AuthInfo,
-    @Param('id') projectId: string,
-    @UploadedFile() file: IncomingUpload,
-  ) {
-    return this.uploads.attachArtifact(
-      ctx.workspace.id,
-      ctx.workspace.slug,
-      callerOf(ctx, auth),
-      asFile(file),
-      {
-        projectId,
-      },
-    );
-  }
-
   @Get('uploads/:id')
   async open(
     @Ctx() ctx: WorkspaceContext,

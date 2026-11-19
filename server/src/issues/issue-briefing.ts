@@ -5,7 +5,7 @@ type Nullable<T> = { [K in keyof T]?: T[K] | null };
 
 export interface IssueBriefingInput {
   issue: Pick<Issue, 'key' | 'title' | 'kind' | 'status' | 'priority'> &
-    Nullable<Pick<Issue, 'body' | 'goal'>> & {
+    Nullable<Pick<Issue, 'body'>> & {
       externalRef?: Pick<
         NonNullable<Issue['externalRef']>,
         'provider' | 'id' | 'url' | 'key' | 'state'
@@ -48,7 +48,6 @@ export function renderIssueBriefing(c: IssueBriefingInput): string {
     );
   }
 
-  section('Goal', issue.goal?.trim() ? [issue.goal.trim()] : []);
   section('Description', issue.body?.trim() ? [issue.body.trim()] : []);
   section(
     'Artifacts',

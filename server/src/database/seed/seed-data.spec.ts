@@ -8,12 +8,7 @@ describe('demo seed', () => {
       expect.arrayContaining(['AUTH-42', 'WEB-81', 'INF-31']),
     );
     expect(data.issues.every((issue) => !Object.hasOwn(issue, 'workstreamIds'))).toBe(true);
-    expect(
-      data.issues.find((issue) => issue.title === 'Outdated lodash in api (CVE-2026-1182)')?.goal,
-    ).toBeTruthy();
-    expect(
-      data.issues.find((issue) => issue.title === 'Users occasionally get redirected back to login')?.goal,
-    ).toBeNull();
+    expect(data.issues.every((issue) => !Object.hasOwn(issue, 'goal'))).toBe(true);
   });
 
   it('has realistic volume and unique keys', () => {

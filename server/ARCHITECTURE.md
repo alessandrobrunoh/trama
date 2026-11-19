@@ -12,7 +12,7 @@ src/
   auth/                           AuthService (users, sessions), TokensService, AuthController, request-context.ts (decorators)
   workspaces/                     AccessGuard (global), WorkspacesService + controllers (workspace, members, agents, tokens)
   events/                         EventsService (record + SSE), EventsController (list + stream), request-store
-  projects milestones project-updates issues (the /tasks routes) artifacts documents comments views labels
+  projects milestones issues (the /tasks routes) artifacts comments views labels
   notifications favorites snapshot/ health/
   status/ (status catalog) attention/ search/ insights/   (backend-intelligence)
 ```

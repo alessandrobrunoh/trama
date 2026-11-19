@@ -57,8 +57,6 @@ function setup() {
   const live = {
     issues: new Set<string>(),
     projects: new Set<string>(),
-    documents: new Set<string>(),
-    revisions: new Set<string>(),
     artifacts: new Map<string, string | null>(),
   };
   const uploads = {
@@ -225,14 +223,6 @@ function setup() {
         const [, ids] = params as [string, string[]];
         return ids.filter((id) => live.projects.has(id)).map((id) => ({ id }));
       }
-      if (sql.includes('FROM "documents"')) {
-        const [, ids] = params as [string, string[]];
-        return ids.filter((id) => live.documents.has(id)).map((id) => ({ id }));
-      }
-      if (sql.includes('FROM "document_revisions"')) {
-        const [, ids] = params as [string, string[]];
-        return ids.filter((id) => live.revisions.has(id)).map((id) => ({ id }));
-      }
       return [];
     },
     getRepository: () => ({
@@ -358,7 +348,6 @@ describe('UploadsService', () => {
       grants: [
         'issues:view',
         'projects:view',
-        'documents:view',
         'comments:view',
         'artifacts:view',
       ],
@@ -369,45 +358,5 @@ describe('UploadsService', () => {
       ).rejects.toBeInstanceOf(NotFoundException);
     });
     expect(rows).toHaveLength(1);
-  });
-
-  it('serves a file mentioned by a document revision after the current body drops it', async () => {
-    const { service, rows, live } = setup();
-    const staged = await service.stage(
-      'ws_1',
-      'acme',
-      member,
-      file('shot.png', PNG),
-    );
-
-    await expect(service.open('ws_1', staged.id, other)).rejects.toBeInstanceOf(
-      NotFoundException,
-    );
-
-    live.documents.add('doc_1');
-    live.revisions.add('rev_1');
-    await service.retained('ws_1', null, staged.markdown, {
-      type: 'document',
-      id: 'doc_1',
-    });
-    await service.retained('ws_1', null, staged.markdown, {
-      type: 'document_revision',
-      id: 'rev_1',
-    });
-    expect((await service.open('ws_1', staged.id, other)).id).toBe(staged.id);
-
-    await service.retained('ws_1', staged.markdown, 'no file', {
-      type: 'document',
-      id: 'doc_1',
-    });
-    expect((await service.open('ws_1', staged.id, other)).id).toBe(staged.id);
-
-    await service.forgetSubjects('ws_1', [
-      { type: 'document_revision', id: 'rev_1' },
-    ]);
-    await expect(
-      service.open('ws_1', staged.id, member),
-    ).rejects.toBeInstanceOf(NotFoundException);
-    expect(rows).toHaveLength(0);
   });
 });

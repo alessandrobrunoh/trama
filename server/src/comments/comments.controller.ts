@@ -30,10 +30,8 @@ const SUBJECTS: SubjectType[] = [
   'issue',
   'artifact',
   'project',
-  'project_update',
   'milestone',
   'import',
-  'document',
 ];
 
 class SubjectDto {

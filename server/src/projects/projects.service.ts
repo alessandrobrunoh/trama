@@ -309,12 +309,6 @@ export class ProjectsService {
         [id],
       )
     ).map((r) => r.id);
-    const updateIds = (
-      await this.ds.query<{ id: string }[]>(
-        `SELECT "id" FROM "project_updates" WHERE "projectId" = $1`,
-        [id],
-      )
-    ).map((r) => r.id);
     let issueKeyChanges: IssueKeyChange[] = [];
     await this.ds.transaction(async (m) => {
       const locked = (await m.query(
@@ -344,12 +338,6 @@ export class ProjectsService {
       );
       for (const issue of issues) issue.projectId = null;
       if (issues.length) await m.save(IssueEntity, issues);
-      // project updates cascade with the project: drop their comments
-      if (updateIds.length)
-        await m.query(
-          `DELETE FROM "comments" WHERE "workspaceId" = $1 AND "subject"->>'id' = ANY($2)`,
-          [workspaceId, updateIds],
-        );
       if (milestoneIds.length) {
         // milestones cascade with the project: drop their ids from issues, and their comments
         await m.query(

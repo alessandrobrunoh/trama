@@ -403,7 +403,7 @@ export class LunagestService {
   /**
    * One project, one pass. A field both sides changed is left alone unless `choices`
    * names it. Unlinked issues are not created on LunaGest, and unknown remote tasks
-   * are not turned into issues. Project name is pulled only; there is no project-update call.
+   * are not turned into issues. Project name is pulled only.
    */
   async realign(
     workspaceId: string,

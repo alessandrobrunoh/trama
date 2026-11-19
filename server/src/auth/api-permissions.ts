@@ -35,8 +35,6 @@ const ACTION_OVERRIDES: Record<
   string,
   Partial<Record<string, ApiPermission>>
 > = {
-  // an attachment is an artifact: linking or unlinking needs `artifacts:write`, not only the right to edit documents
-  documents: { attach: 'artifacts:write', detach: 'artifacts:write' },
   tasks: { 'bulk-delete': 'tasks:delete' },
 };
 
