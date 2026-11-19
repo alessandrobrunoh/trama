@@ -19,6 +19,7 @@ Use `report_progress` to record, in one call, any of: an `artifact` (PR, build, 
 - The actual task status when it changes: `in_progress` when you start, `in_review` while the PR is open, `done` only once the fix is merged.
 - Relevant PR, build, test, design, or deployment artifacts, with accurate observed state (`state`, `ci` as pending, passing or failing, `review`, `hasConflicts`).
 - A short verification note: what was tested, where, and the result.
+- The `estimate` (points) when the real size became clear, and the `threadUrl` of the thread the work happened in, through `update_task`.
 - Anything that needs a person's decision, stated plainly in the comment.
 
 Attach an artifact to the task or tasks it concerns. Repeating the same `externalId` or URL updates the artifact in place, so do not worry about duplicates, but do not attach the same artifact to unrelated tasks. Verify the result after writing.

@@ -19,12 +19,26 @@ trama task context BUG-142
 trama task get BUG-142
 trama task create --kind bug --title "Login timeout"
 trama task update BUG-142 --priority high
+trama task create --kind bug --title "Reproduce on Safari" --parent-id BUG-142 --estimate 2 --thread-url https://delta.example/thread/abc
+trama task update BUG-142 --estimate 5 --thread-url https://delta.example/thread/abc
+trama task update BUG-142 --unset estimate,threadUrl
+trama task subtasks BUG-142
+trama task list --parent BUG-142 --open
+trama timer start BUG-142
+trama timer status
+trama timer stop
+trama timer list BUG-142
+trama timer add BUG-142 --started-at 2026-05-01T09:00:00Z --ended-at 2026-05-01T10:15:00Z
+trama timer delete te_1
+trama lunagest projects
+trama lunagest import lg_1
 trama comment list --subject-type issue --subject-id in_1
 trama artifact list
 trama artifact create --issue-id in_1 --kind pull_request --title "Fix login" --url https://example.test/pr/1
 trama attention list --scope mine
 trama search --q "login timeout" --types issue,project
 trama project list --q billing
+trama project list --repository owner/name
 trama view list
 trama milestone list --project-id prj_1
 trama snapshot get
@@ -56,6 +70,13 @@ Use the CLI's current search and task context operations as exposed by `trama co
 Use the discovered task create/update operations. Include clear task context, valid catalog values, and only justified optional fields. Attach artifacts to the relevant task(s), and record concise factual progress as comments. If a person's input is needed, say so in a comment on the task. Set `in_review` while a PR is open and `done` only once the change is merged and verified.
 
 Preview writes with `--dry-run` when the command supports it. Confirm the result with a read. Do not delete tasks or silently overwrite another person's assignment.
+
+## Subtasks, estimates, thread link and time
+
+- A subtask is a task created with `--parent-id <key>`; subtasks nest to any depth and keep their own status. `trama task subtasks <key>` prints the whole tree (indented text in a terminal or with `-o table`, nested JSON when piped; `--depth 1` for direct children), and `trama task list --parent <key>` filters a normal list. The API has no parent filter, so both read the newest 500 tasks and warn when that limit is reached (narrow with `--project-id`).
+- `--estimate <points>` sets the estimate (use the scale from `trama workspace get`); `--thread-url <http(s) url>` links the thread working on the task. Both come back on `trama task get`; clear them with `--unset estimate,threadUrl`.
+- `trama timer` is the signed-in person's own timer: `start [KEY]` (stops a running one), `status`, `stop`, `list [KEY]`, `add [KEY] --started-at … --ended-at …` (ISO-8601 with a zone) and `delete <entry id>`. Start it only when the user asks to track time. Custom tokens are refused.
+- `trama lunagest projects` lists the importable LunaGest projects and `trama lunagest import <id>…` imports the chosen ones with their tasks (1 to 25, idempotent). Do it only when the user asks; it needs project-management rights and permission to create tasks.
 
 ## Errors and limits
 

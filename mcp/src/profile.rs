@@ -78,6 +78,9 @@ pub struct Entry {
     pub visible_if: Vec<String>,
     /// Catalog tools a composite may call.
     pub uses: Vec<String>,
+    /// Permissions a composite needs for writes that go through routes outside the catalog (the timer,
+    /// the LunaGest import), so the listing can say what to ask a workspace admin for.
+    pub writes: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +99,8 @@ struct RawEntry {
     visible_if: Vec<String>,
     #[serde(default)]
     uses: Vec<String>,
+    #[serde(default)]
+    writes: Vec<String>,
 }
 
 pub fn load(catalog: &[Tool]) -> Result<Vec<Entry>, String> {
@@ -129,7 +134,7 @@ pub fn parse(json: &str, catalog: &[Tool]) -> Result<Vec<Entry>, String> {
                 if by_name(&r.name).is_none() {
                     return Err(ctx("not in tools.json"));
                 }
-                if r.input_schema.is_some() || !r.uses.is_empty() || r.local {
+                if r.input_schema.is_some() || !r.uses.is_empty() || !r.writes.is_empty() || r.local {
                     return Err(ctx("a catalog entry only overrides the description"));
                 }
             }
@@ -157,6 +162,11 @@ pub fn parse(json: &str, catalog: &[Tool]) -> Result<Vec<Entry>, String> {
                         return Err(ctx(&format!("visibleIf names unknown permission {p}")));
                     }
                 }
+                for p in &r.writes {
+                    if !permissions.contains(p.as_str()) {
+                        return Err(ctx(&format!("writes names unknown permission {p}")));
+                    }
+                }
             }
         }
         out.push(Entry {
@@ -169,6 +179,7 @@ pub fn parse(json: &str, catalog: &[Tool]) -> Result<Vec<Entry>, String> {
             local: r.local,
             visible_if: r.visible_if,
             uses: r.uses,
+            writes: r.writes,
         });
     }
     for h in crate::composite::HANDLERS {
@@ -199,6 +210,7 @@ impl Entry {
             .filter_map(|u| catalog.iter().find(|t| &t.name == u))
             .filter(|t| t.method != Method::Get)
             .map(|t| t.permission.clone())
+            .chain(self.writes.iter().cloned())
             .collect();
         perms.sort();
         perms.dedup();

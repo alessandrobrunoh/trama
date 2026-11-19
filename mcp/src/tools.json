@@ -260,13 +260,11 @@
   "method": "GET",
   "path": "/projects",
   "permission": "projects:read",
-  "description": "Projects: planned outcomes. Filter by the repository string to find the project of a checkout.",
+  "description": "Projects: planned outcomes. The API filters by status, lead and name text; the repository string is matched client-side (`trama project list --repository`, or the list_projects tool of the default MCP profile).",
   "params": {
    "status": "query string(backlog|planned|in_progress|paused|completed|canceled) Status",
-   "health": "query string(on_track|at_risk|off_track) Health",
    "leadId": "query string Lead user",
-   "q": "query string Text filter",
-   "repository": "query string Match the project repository string (case-insensitive)"
+   "q": "query string Text filter"
   }
  },
  {
@@ -284,14 +282,14 @@
   "method": "POST",
   "path": "/projects",
   "permission": "projects:write",
-  "description": "Create a project (a planned outcome). Milestones belong to it. repository is one nullable owner/name or URL string.",
+  "description": "Create a project (a planned outcome). Milestones belong to it. key is the short tag that prefixes its task keys (CORA-12). repository is one nullable owner/name or URL string.",
   "params": {
    "name": "body string! Name",
+   "key": "body string Task key prefix: a letter, then up to 3 letters or digits (e.g. CORA); derived from the name when omitted",
    "summary": "body string One-line summary",
    "description": "body string Description (markdown)",
    "color": "body string Hex colour, e.g. #6b7280",
    "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status (default backlog)",
-   "health": "body string(on_track|at_risk|off_track) Health, set by hand",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "leadId": "body string Lead user id",
    "labels": "body string[] Workspace label ids",
@@ -309,12 +307,12 @@
   "params": {
    "id": "path string! Project id",
    "name": "body string Name",
+   "key": "body string Task key prefix (a letter, then up to 3 letters or digits); changing it re-keys the project's tasks",
    "summary": "body string Summary",
    "description": "body string Description",
    "color": "body string Hex colour",
    "icon": "body string Lucide icon name (kebab-case, e.g. rocket) or one emoji (null clears)",
    "status": "body string(backlog|planned|in_progress|paused|completed|canceled) Status",
-   "health": "body string(on_track|at_risk|off_track) Health, set by hand (null clears)",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "leadId": "body string Lead user id (null clears)",
    "labels": "body string[] Workspace label ids",
@@ -407,7 +405,7 @@
   "method": "GET",
   "path": "/tasks",
   "permission": "tasks:read",
-  "description": "List tasks (bugs, features, incidents, debt, feedback, ideas, security). Filter by assignee, project, milestone or text. Tasks are not assigned to a team.",
+  "description": "List tasks (bugs, features, incidents, debt, feedback, ideas, security). Filter by assignee, project, milestone or text. Subtasks are listed like any task (each has parentId); the API has no parent filter, so `trama task subtasks` and the find_work / get_context tools build the tree client-side. Tasks are not assigned to a team.",
   "params": {
    "kind": "query string(bug|feature|incident|tech_debt|feedback|idea|security) Kind",
    "status": "query string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
@@ -445,19 +443,19 @@
   "method": "POST",
   "path": "/tasks",
   "permission": "tasks:write",
-  "description": "Create a task; status defaults to backlog. Subject to per-token write caps. There is no team assignment.",
+  "description": "Create a task; status defaults to backlog. Pass parentId to create a subtask (subtasks nest to any depth). Subject to per-token write caps. There is no team assignment.",
   "params": {
    "title": "body string! Title",
    "body": "body string Markdown body",
    "reporterName": "body string Reporter name",
    "assigneeId": "body string Assignee user id",
    "projectId": "body string Project id",
-   "parentId": "body string Id or key of the parent task",
+   "parentId": "body string Id or key of the parent task (makes this a subtask)",
    "priority": "body string(none|urgent|high|medium|low) Priority",
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
    "threadUrl": "body string Link to the Delta thread working on this task (http/https, max 2048)",
-   "estimate": "body number Estimate in points (>=0, <=1000)",
+   "estimate": "body number Estimate in points (>=0, <=1000); use a value of the workspace estimate scale (get_workspace)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security)! Kind",
    "source": "body string(manual|github|gitlab|email|api|agent) Source",
    "labels": "body string[] Workspace label ids"
@@ -468,7 +466,7 @@
   "method": "PATCH",
   "path": "/tasks/{idOrKey}",
   "permission": "tasks:write",
-  "description": "Partially update a task. Changing project re-keys it and keeps the previous key as an alias; kind changes classification only. duplicateOfId marks it a duplicate; parentId sets its parent; null clears optional fields. There is no team assignment.",
+  "description": "Partially update a task. Changing project re-keys it and keeps the previous key as an alias; kind changes classification only. duplicateOfId marks it a duplicate; parentId makes it a subtask (null: a root task); null clears estimate and threadUrl. There is no team assignment.",
   "params": {
    "idOrKey": "path string! Task id or key (e.g. CORA-142)",
    "title": "body string Title",
@@ -481,9 +479,10 @@
    "status": "body string(draft|backlog|todo|in_progress|in_review|done|canceled) Status",
    "externalUrl": "body string External URL",
    "threadUrl": "body string Link to the Delta thread working on this task (http/https, max 2048; null clears)",
-   "estimate": "body number Estimate in points (>=0, <=1000)",
+   "estimate": "body number Estimate in points (>=0, <=1000; null clears)",
    "kind": "body string(bug|feature|incident|tech_debt|feedback|idea|security) Task classification; does not change the key",
    "duplicateOfId": "body string Id or key of the original (null clears)",
+   "milestoneIds": "body string[] Milestone ids; replaces the task's milestone (at most one per project, from its project; [] clears)",
    "labels": "body string[] Workspace label ids"
   }
  },

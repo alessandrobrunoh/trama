@@ -464,3 +464,246 @@ async fn tools_the_core_profile_does_not_list_still_answer_by_name() {
     assert!(!err, "{text}");
     assert!(!s.list_tools(&all()).iter().any(|t| t["name"] == "list_views"));
 }
+
+// ── the task and project fields the API has today ──
+
+#[test]
+fn schemas_cover_the_task_fields_and_no_longer_mention_project_health() {
+    let cat = catalog::load().unwrap();
+    let has = |tool: &str, p: &str| cat.iter().find(|t| t.name == tool).unwrap().params.iter().any(|x| x.name == p);
+    for tool in ["create_task", "update_task"] {
+        for p in ["parentId", "estimate", "threadUrl"] {
+            assert!(has(tool, p), "{tool} lacks {p}");
+        }
+    }
+    assert!(has("update_task", "milestoneIds"));
+    assert!(has("create_project", "key") && has("update_project", "key"));
+    assert!(!has("list_projects", "repository"), "the API does not filter by it; the tool does");
+    for t in cat.iter().filter(|t| t.name.ends_with("_project") || t.name == "list_projects") {
+        assert!(!t.params.iter().any(|p| p.name == "health"), "{} still has health", t.name);
+        let listing = t.listing().to_string();
+        assert!(!listing.contains("on_track") && !listing.contains("at_risk"), "{} still mentions health", t.name);
+    }
+    for e in crate::profile::load(&cat).unwrap() {
+        let listing = e.listing(&cat).to_string();
+        assert!(!listing.contains("on_track") && !listing.contains("off_track"), "{} still mentions project health", e.name);
+        if e.name == "create_task" {
+            for p in ["parentId", "estimate", "threadUrl"] {
+                assert!(listing.contains(p), "create_task lacks {p}");
+            }
+        }
+    }
+}
+
+// ── subtasks ──
+
+fn family() -> Value {
+    json!([
+        { "id": "in_3", "key": "BUG-3", "title": "Grandchild", "status": "todo", "parentId": "in_2", "createdAt": "2026-01-03T00:00:00.000Z" },
+        { "id": "in_2", "key": "BUG-2", "title": "Child", "status": "in_progress", "parentId": "in_1", "estimate": 2, "createdAt": "2026-01-02T00:00:00.000Z" },
+        { "id": "in_1", "key": "BUG-1", "title": "Parent", "status": "todo", "createdAt": "2026-01-01T00:00:00.000Z" },
+        { "id": "in_9", "key": "BUG-9", "title": "Other", "status": "todo", "createdAt": "2026-01-09T00:00:00.000Z" }
+    ])
+}
+
+#[tokio::test]
+async fn get_context_returns_the_subtask_tree_of_any_depth() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1/context") => j(json!({ "issue": { "id": "in_1", "key": "BUG-1", "threadUrl": "https://delta.example/t/1" } })),
+        ("GET", "/tasks/BUG-1/artifacts") => j(json!([])),
+        ("GET", "/tasks") => j(family()),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-1", "subtasks": true })).await;
+    assert!(!err, "{text}");
+    let out = parsed(&text);
+    assert_eq!(out["issue"]["issue"]["threadUrl"], "https://delta.example/t/1");
+    assert_eq!(out["subtaskCount"], 2);
+    assert_eq!(out["subtasks"][0]["key"], "BUG-2");
+    assert_eq!(out["subtasks"][0]["estimate"], 2);
+    assert_eq!(out["subtasks"][0]["subtasks"][0]["key"], "BUG-3");
+    let list = mock.calls().into_iter().find(|r| r.is("GET", "/tasks")).unwrap();
+    assert!(list.query.contains("limit=500"), "{}", list.query);
+
+    let (_, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-1", "subtasks": true, "depth": 1 })).await;
+    let out = parsed(&text);
+    assert_eq!(out["subtaskCount"], 1);
+    assert!(out["subtasks"][0].get("subtasks").is_none());
+
+    let (_, text) = call(&server(&mock), &all(), "get_context", json!({ "id": "BUG-1" })).await;
+    assert!(parsed(&text).get("subtasks").is_none(), "off unless asked for");
+}
+
+#[tokio::test]
+async fn find_work_filters_by_parent() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1") => j(json!({ "id": "in_1", "key": "BUG-1" })),
+        ("GET", "/tasks") => j(family()),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "find_work", json!({ "parentId": "BUG-1" })).await;
+    assert!(!err, "{text}");
+    let tasks = parsed(&text)["tasks"].as_array().unwrap().clone();
+    assert_eq!(tasks.len(), 1);
+    assert_eq!(tasks[0]["key"], "BUG-2");
+    assert_eq!(tasks[0]["estimate"], 2);
+    assert!(!mock.calls().iter().any(|r| r.query.contains("parentId")), "the API has no parent filter");
+}
+
+// ── projects ──
+
+#[tokio::test]
+async fn list_projects_matches_the_repository_here_and_never_sends_it_or_health() {
+    let mock = Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/projects") => j(json!([
+            { "id": "pj_1", "key": "CORA", "name": "Cora", "status": "in_progress", "health": "at_risk", "repository": "https://github.com/Acme/Cora.git" },
+            { "id": "pj_2", "key": "OTH", "name": "Other", "status": "backlog", "repository": "acme/other" }
+        ])),
+        _ => not_found(),
+    });
+    let (err, text) = call(&server(&mock), &all(), "list_projects", json!({ "repository": "acme/cora" })).await;
+    assert!(!err, "{text}");
+    let out = parsed(&text);
+    assert_eq!(out["projects"].as_array().unwrap().len(), 1);
+    assert_eq!(out["projects"][0]["key"], "CORA");
+    assert!(out["projects"][0].get("health").is_none());
+    assert!(!mock.calls()[0].query.contains("repository"), "{}", mock.calls()[0].query);
+    let (_, text) = call(&server(&mock), &all(), "list_projects", json!({})).await;
+    assert_eq!(parsed(&text)["projects"].as_array().unwrap().len(), 2);
+}
+
+// ── the timer ──
+
+fn timer_mock() -> Mock {
+    Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/tasks/BUG-1") | ("GET", "/tasks/in_1") => j(json!({ "id": "in_1", "key": "BUG-1", "title": "Login", "status": "todo" })),
+        ("GET", "/time-entries") => j(json!([
+            { "id": "te_2", "issueId": "in_1", "startedAt": "2026-05-01T10:00:00.000Z", "endedAt": null },
+            { "id": "te_1", "issueId": "in_1", "startedAt": "2026-05-01T08:00:00.000Z", "endedAt": "2026-05-01T09:30:00.000Z" },
+            { "id": "te_0", "issueId": "in_7", "startedAt": "2026-04-30T08:00:00.000Z", "endedAt": "2026-04-30T08:10:00.000Z" }
+        ])),
+        ("POST", "/time-entries/start") => j(json!({ "id": "te_3", "issueId": "in_1", "startedAt": "2026-05-01T11:00:00.000Z", "endedAt": null })),
+        ("POST", "/time-entries/stop") => j(json!({ "id": "te_2", "issueId": "in_1", "startedAt": "2026-05-01T10:00:00.000Z", "endedAt": "2026-05-01T10:20:00.000Z" })),
+        ("POST", "/time-entries") => (201, json!({ "id": "te_4", "startedAt": "2026-05-01T09:00:00.000Z", "endedAt": "2026-05-01T10:00:00.000Z" }).to_string()),
+        ("DELETE", "/time-entries/te_1") => (204, String::new()),
+        _ => not_found(),
+    })
+}
+
+#[tokio::test]
+async fn track_time_starts_on_a_task_key_with_its_id_and_reports_the_stopped_timer() {
+    let mock = timer_mock();
+    let (err, text) = call(&server(&mock), &all(), "track_time", json!({ "action": "start", "task": "BUG-1", "description": "login" })).await;
+    assert!(!err, "{text}");
+    let out = parsed(&text);
+    assert_eq!(out["started"], true);
+    assert_eq!(out["entry"]["running"], true);
+    assert_eq!(out["stopped"]["id"], "te_2", "the timer that was running");
+    let start = mock.calls().into_iter().find(|r| r.is("POST", "/time-entries/start")).unwrap();
+    assert_eq!(start.body, json!({ "issueId": "in_1", "description": "login" }), "the API wants the id, not the key");
+}
+
+#[tokio::test]
+async fn track_time_stops_shows_lists_adds_and_deletes() {
+    let mock = timer_mock();
+    let s = server(&mock);
+    let (err, text) = call(&s, &all(), "track_time", json!({ "action": "stop" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["entry"]["durationSeconds"], 1200);
+
+    let (_, text) = call(&s, &all(), "track_time", json!({ "action": "status" })).await;
+    let out = parsed(&text);
+    assert_eq!(out["running"]["id"], "te_2");
+    assert_eq!(out["task"]["key"], "BUG-1");
+
+    let (_, text) = call(&s, &all(), "track_time", json!({ "action": "list", "task": "in_1" })).await;
+    let out = parsed(&text);
+    assert_eq!(out["entries"].as_array().unwrap().len(), 2, "only the entries of that task");
+    assert_eq!(out["totalSeconds"], 5400);
+
+    let (err, text) = call(&s, &all(), "track_time", json!({ "action": "add", "task": "in_1", "startedAt": "2026-05-01T09:00:00Z", "endedAt": "2026-05-01T10:00:00Z" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["added"], true);
+    let add = mock.calls().into_iter().find(|r| r.is("POST", "/time-entries")).unwrap();
+    assert_eq!(add.body["issueId"], "in_1");
+
+    let (err, text) = call(&s, &all(), "track_time", json!({ "action": "delete", "entryId": "te_1" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["deleted"], "te_1");
+}
+
+#[tokio::test]
+async fn track_time_validates_before_calling_and_needs_a_user_key() {
+    let mock = timer_mock();
+    let s = server(&mock);
+    for args in [
+        json!({ "action": "add", "task": "in_1", "startedAt": "2026-05-01T10:00:00Z", "endedAt": "2026-05-01T09:00:00Z" }),
+        json!({ "action": "add", "task": "in_1", "startedAt": "2026-05-01 10:00", "endedAt": "2026-05-01T11:00:00Z" }),
+        json!({ "action": "add", "task": "in_1", "startedAt": "2026-05-01T10:00:00Z" }),
+        json!({ "action": "delete" }),
+        json!({ "action": "start", "description": "x".repeat(501) }),
+        json!({ "action": "fly" }),
+    ] {
+        let (err, text) = call(&s, &all(), "track_time", args.clone()).await;
+        assert!(err, "{args}: {text}");
+    }
+    assert!(mock.writes().is_empty(), "nothing reached the API");
+
+    let mut agent = account("acme", &all_permissions());
+    agent.who.raw = json!({ "workspace": { "slug": "acme" }, "actor": { "type": "agent", "id": "ag_1" } });
+    let (err, text) = call(&s, &[agent], "track_time", json!({ "action": "stop" })).await;
+    assert!(err && text.contains("does not act as a user"), "{text}");
+
+    let read_only: Vec<String> = all_permissions().into_iter().filter(|p| p.ends_with(":read")).collect();
+    let (err, text) = call(&s, &[account("acme", &read_only)], "track_time", json!({ "action": "stop" })).await;
+    assert!(err && text.contains("tasks:write"), "{text}");
+}
+
+// ── LunaGest import ──
+
+fn lunagest_mock() -> Mock {
+    Mock::spawn(|r| match (r.method.as_str(), r.path.as_str()) {
+        ("GET", "/lunagest/import/projects") => j(json!({ "projects": [{ "id": "lg_1", "name": "Alpha", "taskCount": 3, "imported": false }] })),
+        ("POST", "/lunagest/import") => j(json!({ "projects": [
+            { "remoteProjectId": "lg_1", "remoteProjectName": "Alpha", "project": "created", "projectId": "pj_1", "projectKey": "ALP", "tasks": { "created": 3, "linked": 0, "existing": 0 } },
+            { "remoteProjectId": "lg_2", "remoteProjectName": "Beta", "project": "failed", "projectId": null, "projectKey": null, "tasks": { "created": 0, "linked": 0, "existing": 0 }, "error": "boom" }
+        ] })),
+        _ => not_found(),
+    })
+}
+
+#[tokio::test]
+async fn import_lunagest_lists_then_imports_the_chosen_projects() {
+    let mock = lunagest_mock();
+    let s = server(&mock);
+    let (err, text) = call(&s, &all(), "import_lunagest", json!({ "action": "list" })).await;
+    assert!(!err, "{text}");
+    assert_eq!(parsed(&text)["projects"][0]["id"], "lg_1");
+
+    let (err, text) = call(&s, &all(), "import_lunagest", json!({ "action": "import", "projectIds": ["lg_1", "lg_2", "lg_1"] })).await;
+    assert!(err, "a project that failed makes the call an error so the model looks at it");
+    assert_eq!(parsed(&text)["projects"][0]["projectKey"], "ALP");
+    let post = mock.calls().into_iter().find(|r| r.is("POST", "/lunagest/import")).unwrap();
+    assert_eq!(post.body, json!({ "remoteProjectIds": ["lg_1", "lg_2"] }));
+}
+
+#[tokio::test]
+async fn import_lunagest_mirrors_the_server_limits_and_permissions() {
+    let mock = lunagest_mock();
+    let s = server(&mock);
+    let many: Vec<String> = (0..26).map(|i| format!("lg_{i}")).collect();
+    for args in [json!({ "action": "import" }), json!({ "action": "import", "projectIds": [] }), json!({ "action": "import", "projectIds": many }), json!({ "action": "import", "projectIds": ["x".repeat(201)] }), json!({ "action": "sync" })] {
+        let (err, text) = call(&s, &all(), "import_lunagest", args.clone()).await;
+        assert!(err, "{args}: {text}");
+    }
+    assert!(mock.calls().is_empty(), "refused before any API call");
+
+    // creating projects and tasks needs both permissions
+    let only_projects = [account("acme", &["projects:write".to_string(), "projects:read".to_string()])];
+    let (err, text) = call(&s, &only_projects, "import_lunagest", json!({ "action": "import", "projectIds": ["lg_1"] })).await;
+    assert!(err && text.contains("tasks:write"), "{text}");
+    let none = [account("acme", &["tasks:write".to_string()])];
+    let (err, text) = call(&s, &none, "import_lunagest", json!({ "action": "list" })).await;
+    assert!(err && text.contains("projects:write"), "{text}");
+    assert!(mock.calls().is_empty());
+}

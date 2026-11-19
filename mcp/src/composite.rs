@@ -10,14 +10,18 @@ use std::collections::HashSet;
 
 use serde_json::{Map, Value, json};
 
-use crate::catalog::Tool;
+use crate::catalog::{Call, Tool};
 use crate::protocol::Account;
 use crate::upstream::Upstream;
+use crate::work;
 
 /// Composite tools implemented here (the others are `local` to the protocol layer).
 pub const HANDLERS: &[&str] = &[
     "get_context",
     "find_work",
+    "list_projects",
+    "track_time",
+    "import_lunagest",
     "create_task",
     "start_work",
     "report_progress",
@@ -98,6 +102,20 @@ impl Exec<'_> {
         }
         let call = tool.build_call(&args).map_err(StepError::Invalid)?;
         let out = self.upstream.call(&self.account.key, &self.account.who.slug, &call).await;
+        if out.is_error {
+            return Err(StepError::from_text(out.text));
+        }
+        Ok(serde_json::from_str(&out.text).unwrap_or(Value::String(out.text)))
+    }
+
+    /// Runs a route that is not in the catalog (the timer, the LunaGest import) with the caller's key.
+    /// The key must hold every permission in `needs`; the API still has the last word (these routes are
+    /// closed to `custom` tokens and the timer to keys without a user).
+    pub async fn raw(&self, call: &Call, needs: &[&str]) -> Result<Value, StepError> {
+        if let Some(p) = needs.iter().find(|p| !self.account.who.permissions.contains(**p)) {
+            return Err(StepError::Denied((*p).to_string()));
+        }
+        let out = self.upstream.call(&self.account.key, &self.account.who.slug, call).await;
         if out.is_error {
             return Err(StepError::from_text(out.text));
         }
@@ -261,6 +279,8 @@ fn issue_summary(v: &Value) -> Value {
             "projectId",
             "parentId",
             "duplicateOfId",
+            "estimate",
+            "threadUrl",
         ],
     )
 }
@@ -390,6 +410,9 @@ pub async fn run(name: &str, args: &Value, ex: &Exec<'_>) -> Option<Res> {
     Some(match name {
         "get_context" => get_context(a, ex).await,
         "find_work" => find_work(a, ex).await,
+        "list_projects" => list_projects(a, ex).await,
+        "track_time" => track_time(a, ex).await,
+        "import_lunagest" => import_lunagest(a, ex).await,
         "create_task" => create_task(a, ex).await,
         "start_work" => start_work(a, ex).await,
         "report_progress" => report_progress(a, ex).await,
@@ -411,7 +434,12 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     }
     let mut missing = String::new();
     for kind in cands {
-        match context_of(kind, id, flag(a, "comments").unwrap_or(false), ex).await {
+        let opts = ContextOpts {
+            comments: flag(a, "comments").unwrap_or(false),
+            subtasks: flag(a, "subtasks").unwrap_or(false),
+            depth: a.get("depth").and_then(Value::as_u64).map(|d| d.clamp(1, 100) as usize),
+        };
+        match context_of(kind, id, opts, ex).await {
             Ok(out) => return Ok(out),
             Err(e) if e.not_found() => missing = format!("no {} '{id}' (or it is not visible to this key)", kind.label()),
             Err(e) => return Err(e.message()),
@@ -420,7 +448,37 @@ async fn get_context(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
     Err(missing)
 }
 
-async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Result<Outcome, StepError> {
+/// What `get_context` adds to a task's briefing.
+struct ContextOpts {
+    comments: bool,
+    subtasks: bool,
+    depth: Option<usize>,
+}
+
+/// The subtasks of `root_id` as a nested list, read from one task listing (the API has no parent
+/// filter). Returns the tree and a note when it may be incomplete.
+async fn subtask_tree(ex: &Exec<'_>, root_id: &str, project_hint: Option<&str>, depth: Option<usize>) -> Result<(Vec<Value>, Option<String>), StepError> {
+    let mut note = None;
+    let mut reply = ex.call("list_tasks", json!({ "limit": work::LIST_TASKS_MAX })).await?;
+    // A listing larger than the output cap arrives clipped, so it is not JSON any more: retry inside the task's project.
+    if reply.is_string()
+        && let Some(project) = project_hint
+    {
+        reply = ex.call("list_tasks", json!({ "limit": work::LIST_TASKS_MAX, "projectId": project })).await?;
+        note = Some("the workspace task list is too large to read at once, so only the project of this task was searched; subtasks in other projects are not shown".to_string());
+    }
+    if reply.is_string() {
+        return Err(StepError::Invalid("the task list is too large for one reply; raise MCP_MAX_OUTPUT_BYTES or read it with find_work {parentId}".into()));
+    }
+    let all = rows(&reply);
+    if all.len() >= work::LIST_TASKS_MAX {
+        note = Some(format!("only the newest {} tasks were read, so deeper subtasks may be missing", work::LIST_TASKS_MAX));
+    }
+    Ok((work::subtree(&all, root_id, depth), note))
+}
+
+async fn context_of(kind: Kind, id: &str, opts: ContextOpts, ex: &Exec<'_>) -> Result<Outcome, StepError> {
+    let ContextOpts { comments, subtasks, depth } = opts;
     match kind {
         Kind::Project => Err(StepError::Invalid("get_context reads tasks and artifacts; read a project with run_tool get_project".into())),
         Kind::Issue => {
@@ -443,6 +501,21 @@ async fn context_of(kind: Kind, id: &str, comments: bool, ex: &Exec<'_>) -> Resu
                         out["comments"] = Value::Array(all.into_iter().skip(skip).collect());
                     }
                     Err(e) => warnings.push(format!("comments: {}", e.message())),
+                }
+            }
+            if subtasks {
+                let task = if out["issue"]["issue"].is_object() { &out["issue"]["issue"] } else { &out["issue"] };
+                let root_id = task["id"].as_str().unwrap_or(id).to_string();
+                let project = task["projectId"].as_str().map(str::to_string);
+                match subtask_tree(ex, &root_id, project.as_deref(), depth).await {
+                    Ok((tree, note)) => {
+                        out["subtaskCount"] = json!(work::count_nodes(&tree));
+                        out["subtasks"] = Value::Array(tree);
+                        if let Some(note) = note {
+                            warnings.push(format!("subtasks: {note}"));
+                        }
+                    }
+                    Err(e) => warnings.push(format!("subtasks: {}", e.message())),
                 }
             }
             if !warnings.is_empty() {
@@ -488,10 +561,21 @@ async fn find_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         if open && status.is_none() {
             q.insert("open".into(), json!(true));
         }
-        q.insert("limit".into(), json!(limit));
+        // The API has no parent filter: read the whole page of matches, keep the children of the parent.
+        let parent = match text(a, "parentId") {
+            Some(p) => Some(resolve(ex, p, Some(Kind::Issue), false).await?.id),
+            None => None,
+        };
+        q.insert("limit".into(), json!(if parent.is_some() { work::LIST_TASKS_MAX } else { limit }));
         match ex.call("list_tasks", Value::Object(q)).await {
             Ok(v) => {
-                let list = rows(&v);
+                let mut list = rows(&v);
+                if let Some(parent) = &parent {
+                    if list.len() >= work::LIST_TASKS_MAX {
+                        hint.push("only the newest 500 matching tasks were read; narrow with projectId, q or status to be sure no subtask is missing".to_string());
+                    }
+                    list = work::children_of(&list, parent);
+                }
                 out.insert("tasks".into(), Value::Array(list.iter().take(limit).map(issue_summary).collect()));
                 if list.len() >= limit {
                     hint.push(format!("tasks capped at {limit}: narrow with q, status or projectId"));
@@ -507,6 +591,139 @@ async fn find_work(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
         out.insert("hint".into(), json!(hint));
     }
     Ok(Outcome::with(Value::Object(out), failed))
+}
+
+// ───────────────────────────── list_projects ─────────────────────────────
+
+const PROJECT_FIELDS: &[&str] = &["id", "key", "name", "summary", "status", "priority", "leadId", "repository", "startDate", "targetDate", "labels"];
+
+/// Projects, with the repository match the API does not do. Manual health is deliberately not returned.
+async fn list_projects(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let mut q = Map::new();
+    for k in ["q", "status", "leadId"] {
+        if let Some(v) = text(a, k) {
+            q.insert(k.into(), json!(v));
+        }
+    }
+    let listed = ex.call("list_projects", Value::Object(q)).await.map_err(|e| e.message())?;
+    let mut list = rows(&listed);
+    let wanted = text(a, "repository");
+    if let Some(repo) = wanted {
+        list = work::filter_by_repository(list, repo);
+    }
+    let mut out = Map::new();
+    out.insert("projects".into(), Value::Array(list.iter().map(|p| pick(p, PROJECT_FIELDS)).collect()));
+    if wanted.is_some() {
+        out.insert(
+            "hint".into(),
+            json!(match list.len() {
+                0 => "no project has this repository; ask which project to use or create one",
+                1 => "one match: this is the project of the checkout",
+                _ => "several projects match: ask which one",
+            }),
+        );
+    }
+    Ok(Outcome::ok(Value::Object(out)))
+}
+
+// ───────────────────────────── track_time ─────────────────────────────
+
+use work::now_ms;
+
+/// A task key or id as the id the timer routes want.
+async fn task_id_for_timer(ex: &Exec<'_>, a: &Map<String, Value>) -> Result<Option<String>, String> {
+    match text(a, "task") {
+        Some(t) => Ok(Some(resolve(ex, t, Some(Kind::Issue), false).await?.id)),
+        None => Ok(None),
+    }
+}
+
+/// The signed-in person's timer: start or stop it on a task, see what runs, list, add or delete entries.
+async fn track_time(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let action = text(a, "action").ok_or("action is required")?;
+    ex.me().map_err(|_| "the timer belongs to a person: this key does not act as a user".to_string())?;
+    let read = ["tasks:read"];
+    let write = ["tasks:write"];
+    let err = |e: StepError| e.message();
+    match action {
+        "start" => {
+            let issue = task_id_for_timer(ex, a).await?;
+            let before = ex.raw(&work::timer_list_call(), &read).await.map(|v| rows(&v)).unwrap_or_default();
+            let call = work::timer_start_call(issue.as_deref(), text(a, "projectId"), text(a, "description"))?;
+            let entry = ex.raw(&call, &write).await.map_err(err)?;
+            let mut out = json!({ "started": true, "entry": work::annotate_entry(&entry, now_ms()) });
+            if let Some(prev) = work::running_entry(&before) {
+                out["stopped"] = work::annotate_entry(prev, now_ms());
+                out["note"] = json!("a timer that was already running was stopped");
+            }
+            Ok(Outcome::ok(out))
+        }
+        "stop" => {
+            let entry = ex.raw(&work::timer_stop_call(), &write).await.map_err(err)?;
+            Ok(Outcome::ok(json!({ "stopped": true, "entry": work::annotate_entry(&entry, now_ms()) })))
+        }
+        "status" => {
+            let all = rows(&ex.raw(&work::timer_list_call(), &read).await.map_err(err)?);
+            let Some(running) = work::running_entry(&all) else {
+                return Ok(Outcome::ok(json!({ "running": null })));
+            };
+            let mut out = json!({ "running": work::annotate_entry(running, now_ms()) });
+            if let Some(id) = running["issueId"].as_str()
+                && let Ok(task) = ex.call("get_task", json!({ "idOrKey": id })).await
+            {
+                out["task"] = pick(&task, &["key", "id", "title", "status"]);
+            }
+            Ok(Outcome::ok(out))
+        }
+        "list" => {
+            let issue = task_id_for_timer(ex, a).await?;
+            let all = rows(&ex.raw(&work::timer_list_call(), &read).await.map_err(err)?);
+            let now = now_ms();
+            let entries: Vec<Value> = all.iter().filter(|e| issue.as_deref().is_none_or(|id| e["issueId"].as_str() == Some(id))).map(|e| work::annotate_entry(e, now)).collect();
+            Ok(Outcome::ok(json!({
+                "entries": entries,
+                "totalSeconds": work::total_seconds(&entries),
+                "total": work::format_duration(work::total_seconds(&entries)),
+                "note": "the API returns your 100 latest entries; a running timer is not counted in the total",
+            })))
+        }
+        "add" => {
+            let issue = task_id_for_timer(ex, a).await?;
+            let started = text(a, "startedAt").ok_or("startedAt is required to add an entry")?;
+            let ended = text(a, "endedAt").ok_or("endedAt is required to add an entry")?;
+            let call = work::timer_add_call(issue.as_deref(), text(a, "projectId"), text(a, "description"), started, ended)?;
+            let entry = ex.raw(&call, &write).await.map_err(err)?;
+            Ok(Outcome::ok(json!({ "added": true, "entry": work::annotate_entry(&entry, now_ms()) })))
+        }
+        "delete" => {
+            let id = text(a, "entryId").ok_or("entryId is required to delete an entry")?;
+            ex.raw(&work::timer_delete_call(id)?, &write).await.map_err(err)?;
+            Ok(Outcome::ok(json!({ "deleted": id })))
+        }
+        other => Err(format!("unknown action '{other}': use start, stop, status, list, add or delete")),
+    }
+}
+
+// ───────────────────────────── import_lunagest ─────────────────────────────
+
+/// Lists the LunaGest projects that can be imported, or imports the chosen ones with their tasks.
+async fn import_lunagest(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
+    let action = text(a, "action").ok_or("action is required")?;
+    match action {
+        "list" => {
+            let reply = ex.raw(&work::lunagest_list_call(), &["projects:write"]).await.map_err(|e| e.message())?;
+            Ok(Outcome::ok(reply))
+        }
+        "import" => {
+            let ids: Vec<String> = a.get("projectIds").and_then(Value::as_array).map(|v| v.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
+            let call = work::lunagest_import_call(&ids)?;
+            // It creates projects and tasks: both permissions, like the API's manageProjects + createIssues.
+            let reply = ex.raw(&call, &["projects:write", "tasks:write"]).await.map_err(|e| e.message())?;
+            let failed = reply["projects"].as_array().is_some_and(|p| p.iter().any(|r| r["project"] == "failed" || r.get("error").is_some()));
+            Ok(Outcome::with(reply, failed))
+        }
+        other => Err(format!("unknown action '{other}': use list or import")),
+    }
 }
 
 // ───────────────────────────── create_task ─────────────────────────────

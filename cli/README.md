@@ -104,8 +104,9 @@ trama <resource> <verb> [ID_OR_KEY] [--flag value …]
 
 Resources: `task` `artifact` `comment` `project`
 `milestone` `member` `agent` `token` `view` `attention` `event` `integration`
-`outgoing-webhook` `snapshot` `workspace`, and `search`. Verbs: `list` `get` `create` `update` `delete`
-plus actions (`task context`, `task artifacts`, …).
+`outgoing-webhook` `snapshot` `workspace`, and `search`; plus `timer` and `lunagest` (hand-written, see
+[Subtasks, timer and LunaGest](#subtasks-estimates-timer-and-lunagest)). Verbs: `list` `get` `create` `update` `delete`
+plus actions (`task context`, `task artifacts`, `task subtasks`, …).
 Aliases: `tasks`, `webhook`; `ls`, `show`, `rm`; `artifact add` (= `create`). Items are addressed by id or key (`CORA-142`, `AUTH`).
 
 ```bash
@@ -124,6 +125,56 @@ How flags are built from the catalog:
 - `--data '{…}'` / `@file.json` / `-` supplies a whole JSON body; explicit flags win over it;
 - `--file body=notes.md` (or `-` for stdin) reads long text, so nobody has to shell-escape a paragraph;
 - `--unset a,b` sends `null` for optional fields of an update (clears them).
+
+### Subtasks, estimates, timer and LunaGest
+
+Tasks nest to any depth through `parentId`, carry a story-point `estimate` and a `threadUrl` (the link to the
+thread that works on the task). These are plain flags of the generated commands:
+
+```bash
+trama task create --kind feature --title "Add SSO button" --parent-id AUTH-142 --estimate 3 \
+  --thread-url https://delta.example/thread/abc          # a subtask with an estimate and a thread link
+trama task update AUTH-143 --estimate 5 --milestone-ids ms_1
+trama task update AUTH-143 --unset estimate,threadUrl   # clear them
+trama task update AUTH-143 --parent-id AUTH-100         # move under another task (--unset parentId = a root task)
+trama task get AUTH-142 --fields key,status,estimate,threadUrl,parentId
+```
+
+The API has no parent filter, so these two read the newest 500 tasks once and filter here (a warning says when
+that limit was reached; narrow with `--project-id`):
+
+```bash
+trama task subtasks AUTH-142                  # the whole tree: indented text in a terminal or with -o table, nested JSON when piped
+trama task subtasks AUTH-142 --depth 1        # direct subtasks only
+trama task list --parent AUTH-142 --open      # direct subtasks as a normal list (newest first)
+trama project list --repository acme/web      # the API does not filter by repository; matched here (owner/name or URL, case-insensitive)
+```
+
+The timer is the signed-in person's own (other people's entries are never listed or changed). It needs a login that
+acts as a person; **custom** tokens are refused by the API for it. Instants are ISO-8601 **with a zone**
+(`2026-05-01T09:30:00Z`, `…+02:00`); a task key is resolved to its id for you.
+
+```bash
+trama timer start AUTH-142 --description "login fix"   # stops a timer that is already running (the output names it)
+trama timer status                                     # the running timer, elapsed time and its task
+trama timer stop
+trama timer list AUTH-142                              # that task's entries (of your 100 latest), with durations
+trama timer add AUTH-142 --started-at 2026-05-01T09:00:00Z --ended-at 2026-05-01T10:15:00Z
+trama timer delete te_123
+```
+
+LunaGest import lists the projects of the workspace's connected LunaGest account and imports the chosen ones with
+their tasks. It is idempotent (bound projects and tasks are reused), one failing project does not stop the others
+(the command then exits 8 after printing the result), and it needs project-management rights plus permission to create
+tasks. Custom tokens are refused.
+
+```bash
+trama lunagest projects                    # remote projects, task counts, whether each is already imported
+trama lunagest import lg_1 lg_2            # 1 to 25 project ids from the list
+```
+
+`trama commands` lists all of these next to the generated commands. Project `health` is not a flag: the API still
+stores it, but it duplicates the project status, so the CLI and MCP no longer expose it.
 
 ## Agent mode
 
@@ -168,8 +219,10 @@ cargo run -- --help
 
 - `src/cmdtree.rs` turns the catalog into the command tree; `src/auth.rs` is login/logout/profiles; `src/http.rs`,
   `src/output.rs`, `src/error.rs` are the client, formatting and exit codes. Hand-written commands live in
-  `src/builtin.rs`, `src/events.rs`, `src/mcp_cmd.rs`, `src/skill.rs`, `src/update.rs`.
-- **Shared with the MCP server, not copied:** `mcp/src/{catalog,composite,generic,profile,protocol,upstream}.rs`, `tools.json` and `curated.json`
+  `src/builtin.rs`, `src/events.rs`, `src/mcp_cmd.rs`, `src/skill.rs`, `src/update.rs`, and `src/workcmd.rs` (the
+  subtask tree, `timer`, `lunagest` and the `--parent` / `--repository` filters; their routes are outside the API
+  permission catalog, so they are not in `tools.json`).
+- **Shared with the MCP server, not copied:** `mcp/src/{catalog,composite,generic,profile,protocol,upstream,work}.rs`, `tools.json` and `curated.json`
   are compiled into this crate (`#[path]` in `src/main.rs`). Change them and both binaries move together.
 - `tests/cli.rs` also checks that **every example in `skills/trama-cli/SKILL.md` parses** as a real command.
   When you edit that skill, run the tests.

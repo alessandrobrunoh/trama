@@ -23,6 +23,9 @@ mod protocol;
 #[path = "../../mcp/src/upstream.rs"]
 #[allow(dead_code)]
 mod upstream;
+#[path = "../../mcp/src/work.rs"]
+#[allow(dead_code)]
+mod work;
 
 mod auth;
 mod builtin;
@@ -37,6 +40,7 @@ mod output;
 mod skill;
 mod update;
 mod util;
+mod workcmd;
 
 use std::process::ExitCode;
 use std::time::Duration;
@@ -131,11 +135,15 @@ fn build_cli(reg: &Registry) -> Command {
     for c in builtin::definitions() {
         root = root.subcommand(c);
     }
+    root = root
+        .subcommand(workcmd::timer_command())
+        .subcommand(workcmd::lunagest_command());
     for c in reg.commands() {
-        let c = if c.get_name() == "event" {
-            c.subcommand(events::command())
-        } else {
-            c
+        let c = match c.get_name() {
+            "event" => c.subcommand(events::command()),
+            "task" => workcmd::extend_task(c),
+            "project" => workcmd::extend_project(c),
+            _ => c,
         };
         root = root.subcommand(c);
     }
@@ -152,6 +160,9 @@ async fn run_tool(
         Some((verb, sub)) => (Some(verb), sub),
         None => (None, group_matches),
     };
+    if let Some(done) = workcmd::intercept(reg, group, verb, m, ctx).await {
+        return done;
+    }
     let entry = reg
         .find(group, verb)
         .ok_or_else(|| CliError::internal(format!("no handler for '{group}'")))?;
@@ -254,6 +265,8 @@ async fn run() -> Result<()> {
         },
         "skill" => skill::run(sub, &ctx),
         "update" => update::run(sub, &ctx).await,
+        "timer" => workcmd::timer(sub, &ctx).await,
+        "lunagest" => workcmd::lunagest(sub, &ctx).await,
         "version" => {
             builtin::version(&ctx);
             Ok(())

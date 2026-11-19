@@ -7,6 +7,9 @@ mod generic;
 mod profile;
 mod protocol;
 mod upstream;
+// Shared with the `trama` CLI, which uses the tree rendering the server does not.
+#[allow(dead_code)]
+mod work;
 
 use std::collections::HashMap;
 use std::net::SocketAddr;

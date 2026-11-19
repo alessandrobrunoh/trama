@@ -13,7 +13,7 @@ use crate::config::{self, Config, redact};
 use crate::error::{CliError, Result};
 use crate::http::{ACCEPT_JSON, Api, Request};
 use crate::output;
-use crate::{Ctx, TARGET, VERSION, exec, generic};
+use crate::{Ctx, TARGET, VERSION, exec, generic, workcmd};
 
 fn flag(id: &'static str, help: &'static str) -> Arg {
     Arg::new(id).long(id).action(ArgAction::SetTrue).help(help)
@@ -201,10 +201,14 @@ fn param_json(entry: &Entry, p: &crate::catalog::Param) -> Value {
 
 pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
     let group = m.get_one::<String>("group");
+    let extra = |g: &str| workcmd::EXTRA_ROWS.iter().any(|row| row.0 == g);
     if let Some(g) = group
         && !reg.is_group(g)
+        && !extra(g)
     {
         let mut groups: Vec<&str> = reg.entries.iter().map(|e| e.group.as_str()).collect();
+        groups.extend(workcmd::EXTRA_ROWS.iter().map(|row| row.0));
+        groups.sort_unstable();
         groups.dedup();
         return Err(CliError::usage(format!("no resource named '{g}'"))
             .hint(format!("Resources: {}", groups.join(", "))));
@@ -216,7 +220,7 @@ pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
         .filter(|e| group.is_none_or(|g| &e.group == g))
         .collect();
     entries.sort_by_key(|e| e.command_name());
-    let rows: Vec<Value> = entries
+    let mut rows: Vec<Value> = entries
         .into_iter()
         .map(|e| {
             let t = &e.tool;
@@ -227,6 +231,13 @@ pub fn commands(m: &ArgMatches, reg: &Registry, ctx: &Ctx) -> Result<()> {
             row
         })
         .collect();
+    // Commands that combine routes or are outside the permission catalog (`trama <command> --help` has the flags).
+    rows.extend(
+        workcmd::EXTRA_ROWS
+            .iter()
+            .filter(|row| group.is_none_or(|g| row.0 == g))
+            .map(|(_, command, method, path, permission, summary)| json!({ "command": command, "method": method, "path": path, "permission": permission, "summary": summary })),
+    );
     output::print(&Value::Array(rows), &ctx.fmt);
     Ok(())
 }

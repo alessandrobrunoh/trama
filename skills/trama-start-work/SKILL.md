@@ -9,7 +9,7 @@ Understand the task, read its context, and check its state before implementation
 
 ## 1. Load context
 
-Call `whoami`, then use `get_context` to read the task context before acting. Pass `comments: true` to include the thread. If the user provides multiple tasks, read each one. Check its sub-tasks, comments, related artifacts and the project it belongs to. The task title alone is not a sufficient briefing.
+Call `whoami`, then use `get_context` to read the task context before acting. Pass `comments: true` to include the thread. If the user provides multiple tasks, read each one. Pass `subtasks: true` to include its subtask tree (any depth), and check its comments, related artifacts, estimate, `threadUrl` and the project it belongs to. The task title alone is not a sufficient briefing.
 
 If the user only describes the work, use `find_work` or `search` for matching tasks and reuse them. If no task matches, use `create_task` through `trama-triage-tasks`. When several workspaces are connected, identify the workspace for each write.
 
@@ -23,7 +23,7 @@ If the work depends on an answer only a person can give, ask the user in your re
 
 Implement in the repository and keep full transcripts in execution tools, not Trama. Record concise, useful facts on the task: what changed, relevant artifact links, what remains, and what was verified.
 
-For non-trivial work (several areas, a design or data-model choice, a migration), split it into sub-tasks with `create_task` and `parentId` when that helps. Sub-tasks keep independent statuses.
+For non-trivial work (several areas, a design or data-model choice, a migration), split it into sub-tasks with `create_task` and `parentId` when that helps. Sub-tasks keep independent statuses and can nest further; `find_work` with `parentId` lists the direct subtasks of a task. If you work in a Delta thread, link it with `update_task` and `threadUrl` so the person can open it from the task. Start `track_time` only when the user asks you to track their time.
 
 ## Pitfalls
 

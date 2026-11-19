@@ -12,9 +12,10 @@
       "get_task_context",
       "get_artifact",
       "list_task_artifacts",
-      "list_comments"
+      "list_comments",
+      "list_tasks"
     ],
-    "description": "Read one task or artifact by key or id. Task context comes from the task context endpoint. Pass comments:true to include the task thread. The wire type stays issue. Example: {\"id\":\"CORA-142\"}.",
+    "description": "Read one task or artifact by key or id. Task context comes from the task context endpoint (it includes parentId, estimate and threadUrl, the link to the thread working on the task). Pass comments:true to include the task thread, subtasks:true to include its subtasks as a nested tree of any depth (subtasks), depth to stop at that many levels. The wire type stays issue. Example: {\"id\":\"CORA-142\",\"subtasks\":true}.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -33,6 +34,14 @@
         "comments": {
           "type": "boolean",
           "description": "Tasks only: include the comment thread (last 20)."
+        },
+        "subtasks": {
+          "type": "boolean",
+          "description": "Tasks only: include the subtasks as a nested tree (each node's subtasks hold its children, to any depth)."
+        },
+        "depth": {
+          "type": "integer",
+          "description": "With subtasks: levels to include, 1 = direct children only. Default: all."
         }
       },
       "required": [
@@ -50,9 +59,10 @@
       "tasks:read"
     ],
     "uses": [
-      "list_tasks"
+      "list_tasks",
+      "get_task"
     ],
-    "description": "Find tasks to work on. Filters: q, assignee ('me' or user id), status, priority, kind, projectId, open (default true), and limit. There is no team filter. Use get_context for detail.",
+    "description": "Find tasks to work on. Filters: q, assignee ('me' or user id), status, priority, kind, projectId, parentId (only the direct subtasks of that task, by key or id), open (default true), and limit. There is no team filter. Use get_context for detail, with subtasks:true for a task's whole subtask tree.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -94,6 +104,10 @@
         "projectId": {
           "type": "string"
         },
+        "parentId": {
+          "type": "string",
+          "description": "Key or id of a task: only its direct subtasks."
+        },
         "open": {
           "type": "boolean",
           "description": "Default true."
@@ -127,8 +141,44 @@
   {
     "name": "list_projects",
     "summary": "Projects; filter by repository string to find the project of a checkout",
-    "kind": "catalog",
-    "description": "Projects group related tasks. Filter by repository (owner/name or URL, case-insensitive) to find the project of this checkout, or by q, status, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its tasks."
+    "kind": "composite",
+    "readOnly": true,
+    "visibleIf": [
+      "projects:read"
+    ],
+    "uses": [
+      "list_projects"
+    ],
+    "description": "Projects group related tasks. Filter by repository (owner/name or URL, case-insensitive; matched here, not by the API) to find the project of this checkout, or by q, status, leadId. One match is 'this project'; several: ask which. Then find_work {projectId} lists its tasks. Returns id, key (the task key prefix), name, status, priority, lead, repository and dates; read one project fully with run_tool get_project.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "repository": {
+          "type": "string",
+          "description": "owner/name or a git URL of the checkout."
+        },
+        "q": {
+          "type": "string",
+          "description": "Text filter on the project name."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "backlog",
+            "planned",
+            "in_progress",
+            "paused",
+            "completed",
+            "canceled"
+          ]
+        },
+        "leadId": {
+          "type": "string",
+          "description": "Lead user id."
+        }
+      },
+      "additionalProperties": false
+    }
   },
   {
     "name": "create_task",
@@ -249,7 +299,7 @@
     "name": "update_task",
     "summary": "Change a task's status, priority, assignee, labels, parent, duplicate marker…",
     "kind": "catalog",
-    "description": "Update one task: status, priority, assignee, labels, estimate, title/body, project, parentId (sets or clears its parent), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another task). Changing project re-keys the task and keeps its old key as an alias. Sub-tasks keep independent statuses and can be nested. There is no team. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several tasks at once: triage_tasks. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
+    "description": "Update one task: status, priority, assignee, labels, estimate (points; null clears), title/body, project, milestoneIds, threadUrl (link to the thread working on it; null clears), parentId (moves it under another task as a subtask, or null for a root task), kind (classification only; it does not change the key), duplicateOfId (marks a duplicate of another task). Changing project re-keys the task and keeps its old key as an alias. Sub-tasks keep independent statuses and can be nested. There is no team. null clears an optional field. Set in_progress when you start (the server assigns you if you are a user and nobody is), in_review while the PR is open, done ONLY once the fix is merged. Never close what you did not verify. Several tasks at once: triage_tasks. Example: {\"idOrKey\":\"CORA-142\",\"status\":\"in_review\"}."
   },
   {
     "name": "start_work",
@@ -398,6 +448,66 @@
           "description": "One factual comment on the task."
         }
       },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "track_time",
+    "summary": "Your timer: start or stop it on a task, see what runs, list, add or delete entries",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": [
+      "tasks:read"
+    ],
+    "uses": [
+      "get_task"
+    ],
+    "writes": [
+      "tasks:write"
+    ],
+    "description": "The signed-in person's task timer (needs a key that acts as a user, not a custom token). action: start (task = key or id; stops a timer already running), stop, status (the running timer and its task), list (your 100 latest entries, optionally of one task, with durations and a total), add (a finished entry: task, startedAt and endedAt as ISO-8601 with a zone, e.g. 2026-05-01T09:00:00Z), delete (entryId). Entries are always your own. Example: {\"action\":\"start\",\"task\":\"CORA-142\"}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "start",
+            "stop",
+            "status",
+            "list",
+            "add",
+            "delete"
+          ]
+        },
+        "task": {
+          "type": "string",
+          "description": "Task key or id (start, add; filters list)."
+        },
+        "projectId": {
+          "type": "string",
+          "description": "Project to book the time on when there is no task."
+        },
+        "description": {
+          "type": "string",
+          "description": "What you work on (start, add), at most 500 characters."
+        },
+        "startedAt": {
+          "type": "string",
+          "description": "add: ISO-8601 start with a zone."
+        },
+        "endedAt": {
+          "type": "string",
+          "description": "add: ISO-8601 end with a zone, after startedAt."
+        },
+        "entryId": {
+          "type": "string",
+          "description": "delete: the time entry id (te_…) from list."
+        }
+      },
+      "required": [
+        "action"
+      ],
       "additionalProperties": false
     }
   },
@@ -628,6 +738,45 @@
       },
       "required": [
         "items"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "import_lunagest",
+    "summary": "Import LunaGest projects and their tasks (list, then import the chosen ones)",
+    "kind": "composite",
+    "readOnly": false,
+    "visibleIf": [
+      "projects:write"
+    ],
+    "uses": [],
+    "writes": [
+      "projects:write",
+      "tasks:write"
+    ],
+    "description": "Import projects and tasks from the workspace's connected LunaGest account. action:list shows the remote projects with their task count and whether each is already bound to a Trama project. action:import with projectIds (1 to 25 LunaGest project ids from the list) creates or reuses the Trama project of each and imports its tasks; it is idempotent (bound projects and tasks are reused) and one failing project does not stop the others. Needs project management rights and permission to create tasks (not available to custom tokens). Example: {\"action\":\"import\",\"projectIds\":[\"lg_1\"]}.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": [
+            "list",
+            "import"
+          ]
+        },
+        "projectIds": {
+          "type": "array",
+          "maxItems": 25,
+          "items": {
+            "type": "string"
+          },
+          "description": "import: LunaGest project ids (1-25, from action:list)."
+        }
+      },
+      "required": [
+        "action"
       ],
       "additionalProperties": false
     }

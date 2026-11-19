@@ -1,7 +1,7 @@
 # trama-mcp
 
 MCP server for Trama, written in Rust. It exposes the REST API to any MCP client (Claude, Cursor, VS Code, or the
-in-app Assistant) with <!-- mcp-tools-count:start -->17 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
+in-app Assistant) with <!-- mcp-tools-count:start -->19 task-oriented tools by default (the `core` profile; the whole catalog stays one switch away)<!-- mcp-tools-count:end -->. The whole catalog is still reachable: see [Tool profiles](#tool-profiles).
 
 **It holds no data and no secrets.** Each client connects with its own API key
 (Settings → API tokens → *Custom*). The server forwards that key to the API, which remains the only authority:
@@ -71,18 +71,44 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | `update_task` | Change a task's status, priority, assignee, labels, parent, duplicate marker… |
 | `start_work` | Pick up a task: context, safety checks, marks the start |
 | `report_progress` | Record artifacts, task status and a comment |
+| `track_time` | Your timer: start or stop it on a task, see what runs, list, add or delete entries |
 | `attach_artifact` | Attach or update a PR, build or link on a task |
 | `add_comment` | Comment on any object by key or id |
 | `triage_tasks` | Triage up to 25 tasks in one call (priority, duplicates, grouping) |
+| `import_lunagest` | Import LunaGest projects and their tasks (list, then import the chosen ones) |
 | `list_capabilities` | Discover the full catalog: search it, get a tool's schema and how to call it |
 | `run_tool` | Run any catalog operation by name, with the usual validation and permissions |
 | `api_request` | Escape hatch: call any workspace REST route that has no tool (path-restricted) |
 <!-- mcp-tools-table:end -->
 
-`list_accounts` is added when several keys are connected. The composite tools (`get_context`, `find_work`, `start_work`,
-`report_progress`, `attach_artifact`, `add_comment`, `triage_tasks`, `create_task`)
-orchestrate several API calls with the caller's own key, check each step's permission and validate every argument, so
-they can do nothing a plain tool could not. A tool whose permissions the key lacks is hidden.
+`list_accounts` is added when several keys are connected. The composite tools (`get_context`, `find_work`, `list_projects`,
+`start_work`, `report_progress`, `track_time`, `attach_artifact`, `add_comment`, `triage_tasks`, `import_lunagest`,
+`create_task`) orchestrate several API calls with the caller's own key, check each step's permission and validate every
+argument, so they can do nothing a plain tool could not. A tool whose permissions the key lacks is hidden.
+
+What the task-level tools cover beyond plain CRUD:
+
+- **Subtasks** nest to any depth (`parentId`). `get_context {id, subtasks:true}` returns the task's whole subtask tree
+  (`subtasks`, each node's `subtasks` holding its children; `depth` limits the levels) and `find_work {parentId}` lists
+  only its direct subtasks. The API has no parent filter, so both read the newest 500 tasks once and build the answer
+  here (a hint says when that limit was reached). `create_task {parentId}` creates a subtask; `update_task {parentId}` moves one.
+- **Estimates and thread link**: `create_task` / `update_task` take `estimate` (points) and `threadUrl` (the link to the
+  thread working on the task); `null` clears them on update. Both come back on every task read.
+- **`track_time`** is the signed-in person's timer: `action` `start` (on a task key or id; a running timer is stopped and
+  named), `stop`, `status` (running timer plus its task), `list` (your 100 latest entries, optionally of one task, with
+  durations and a total), `add` (`startedAt`/`endedAt` as ISO-8601 with a zone) and `delete` (`entryId`). It needs a key
+  that acts as a user; the API refuses these routes to `custom` tokens and the tool reports that.
+- **`import_lunagest`**: `action:list` shows the connected LunaGest account's projects (task count, already imported
+  or not); `action:import` with `projectIds` (1 to 25) imports them and their tasks. Idempotent; a failing project does
+  not stop the others and is reported in the result (the call is then flagged as an error). It needs `projects:write`
+  and `tasks:write` (the API additionally needs project-management rights) and is not available to custom tokens.
+- **`list_projects {repository}`** matches the repository string itself (owner/name or URL, any spelling of the same
+  repository), because the API does not filter by it. Project `health` is not exposed in any schema: it duplicates the
+  project status (the API still stores it).
+
+`track_time` and `import_lunagest` call routes outside the API permission catalog, so they are composites with their own
+code (`src/composite.rs`, request building in `src/work.rs`) rather than `tools.json` entries; the `full` profile, which is
+the plain catalog, does not list them (they stay callable by name, and `api_request` reaches the same routes).
 
 **The long tail stays reachable.** `list_capabilities` searches the whole catalog (`{"q":"milestone"}`, `{"group":"tasks"}`)
 and returns the exact schema of one tool (`{"tool":"create_milestone"}`); `run_tool` runs it by name with the same
@@ -98,7 +124,7 @@ profile does not list can also still be called by name, so existing prompts keep
 | Per connection, header | `--header "X-Trama-Profile: full"` |
 | Per connection, URL | `https://<host>/mcp?profile=full` |
 
-The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (92 catalog operations,
+The URL beats the header, the header beats the server default. `full` lists every `tools.json` entry (73 catalog operations,
 with a much larger context cost); `core` is the default. Neither changes what a key may do: the API enforces permissions.
 
 ## Catalog
