@@ -177,7 +177,11 @@ export function tabStatuses(tab: IssueViewTab): readonly IssueStatus[] | null {
 
 // ───────────────────────── display options ─────────────────────────
 
-export type IssueLayout = 'list' | 'board';
+/**
+ * `flow` (status tracks over time) is a client-side layout only: saved views keep the contract's
+ * `list | board | timeline` and never carry it (their boards force `list` or `board`).
+ */
+export type IssueLayout = 'list' | 'board' | 'flow';
 export type IssueGroup =
   | 'status'
   | 'kind'
@@ -271,7 +275,7 @@ export const DEFAULT_DISPLAY: IssueDisplay = {
 export function readDisplay(key: string): IssueDisplay {
   const raw = readJson<IssueDisplay>(key) ?? {};
   return {
-    layout: oneOf(raw.layout, ['list', 'board'], DEFAULT_DISPLAY.layout),
+    layout: oneOf(raw.layout, ['list', 'board', 'flow'], DEFAULT_DISPLAY.layout),
     groupBy: oneOf(raw.groupBy, GROUPS, DEFAULT_DISPLAY.groupBy),
     sortField: oneOf(raw.sortField, SORTS, DEFAULT_DISPLAY.sortField),
     sortDir: oneOf(raw.sortDir, ['asc', 'desc'], DEFAULT_DISPLAY.sortDir),
