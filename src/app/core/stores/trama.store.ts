@@ -594,6 +594,32 @@ export class TramaStore {
     }
   }
 
+  private statusHistoryLoaded: string | null = null;
+
+  /**
+   * Make sure the status changes of the workspace's tasks are in memory (the Flow layout draws them), beyond
+   * the recent window of the snapshot. Loaded once per workspace; a failure leaves the layout on the
+   * created / started / completed dates.
+   */
+  async loadStatusHistory(): Promise<void> {
+    const slug = this.slug();
+    if (!slug || this.statusHistoryLoaded === slug) return;
+    this.statusHistoryLoaded = slug;
+    try {
+      let before: string | undefined;
+      for (let page = 0; page < 4; page++) {
+        const batch = await this.api.events.list(slug, { type: 'issue.status_changed', limit: 500, before });
+        const known = new Set(this._events().map((e) => e.id));
+        const fresh = batch.filter((e) => !known.has(e.id));
+        if (fresh.length) this._events.set([...this._events(), ...fresh].sort(newest));
+        if (batch.length < 500) break;
+        before = batch[batch.length - 1].at;
+      }
+    } catch {
+      this.statusHistoryLoaded = null;
+    }
+  }
+
   // ─────────────────────────── write machinery ───────────────────────────
 
   private requireSlug(): string {

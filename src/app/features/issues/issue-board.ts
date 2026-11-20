@@ -1,6 +1,6 @@
-// Issue list and board: filters, display options (persisted), drag-and-drop between groups,
+// Issue list, board and flow: filters, display options (persisted), drag-and-drop between groups,
 // multi-select with a bulk action bar, right-click menu and keyboard actions on the focused row.
-import { DOCUMENT } from '@angular/common';
+import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -14,6 +14,7 @@ import {
   type WritableSignal,
 } from '@angular/core';
 import {
+  LucideChartNoAxesGantt,
   LucideCheck,
   LucideChevronsUpDown,
   LucideBox,
@@ -70,6 +71,7 @@ import { StatusIcon } from '../../shared/status';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { FilterBar } from '../../shared/filter-bar/filter-bar';
 import { IssueActions } from './issue-actions';
+import { IssueFlow } from './issue-flow';
 import { IssueCard, IssueRow } from './issue-items';
 import {
   DEFAULT_DISPLAY,
@@ -155,6 +157,8 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
     Kanban,
     KanbanItemDirective,
     KanbanLabelDirective,
+    IssueFlow,
+    NgTemplateOutlet,
     Kbd,
     StatusBar,
   ],
@@ -235,6 +239,21 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
             >
               <svg [lucideIcon]="boardIcon" [size]="14"></svg>
             </button>
+            <button
+              type="button"
+              class="flex h-6 items-center gap-1 rounded-[5px] px-1.5 text-xs"
+              [class]="
+                d().layout === 'flow'
+                  ? 'bg-background text-foreground shadow-xs'
+                  : 'text-muted-foreground hover:text-foreground'
+              "
+              [attr.aria-pressed]="d().layout === 'flow'"
+              aria-label="Flow"
+              hlmTooltip="Flow: tasks through the statuses over time"
+              (click)="patch({ layout: 'flow' })"
+            >
+              <svg [lucideIcon]="flowIcon" [size]="14"></svg>
+            </button>
           </div>
           }
 
@@ -261,7 +280,7 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
                     (checkedChange)="patch({ showEmptyGroups: $event })"
                   />
                 </label>
-                @if (d().layout === 'list') {
+                @if (d().layout !== 'board') {
                   <label class="flex cursor-pointer items-center justify-between gap-3">
                     <span class="text-muted-foreground">Nest sub-tasks</span>
                     <hlm-switch
@@ -271,6 +290,8 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
                       (checkedChange)="patch({ nested: $event })"
                     />
                   </label>
+                }
+                @if (d().layout === 'list') {
                   <div class="flex items-center justify-between gap-3">
                     <span class="text-muted-foreground">Density</span>
                     <span class="bg-muted/60 flex rounded-md p-0.5">
@@ -351,10 +372,25 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           </button>
         }
       </app-empty-state>
+    } @else if (d().layout === 'flow') {
+      <app-issue-flow
+        [groups]="rowColumns()"
+        [grouped]="effectiveGroup() !== 'none'"
+        [statuses]="store.settings().statuses.issue"
+        [nested]="nested()"
+        [selected]="selectedSet()"
+        [selectable]="canEdit()"
+        [selecting]="selection().length > 0"
+        [canEdit]="canEdit()"
+        [menu]="issueMenu"
+        [groupLabel]="groupLabel"
+        (toggleExpand)="toggleRow($event)"
+        (toggleSelect)="onSelect($event.issue, $event.event)"
+      />
     } @else {
       <app-kanban
         [columns]="rowColumns()"
-        [layout]="d().layout"
+        [layout]="d().layout === 'board' ? 'board' : 'list'"
         [disabled]="!draggable()"
         [prefix]="dropPrefix()"
         [addable]="canEdit() && showCreate()"
@@ -403,40 +439,45 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           </div>
         </ng-template>
         <ng-template kanbanLabel let-key>
-          @switch (effectiveGroup()) {
-            @case ('status') {
-              <app-status-icon entity="issue" [status]="$any(key)" />
-            }
-            @case ('kind') {
-              <app-issue-kind [kind]="$any(key)" />
-            }
-            @case ('priority') {
-              <app-priority-icon [priority]="$any(key)" />
-            }
-            @case ('assigneeId') {
-              @if (key) {
-                <app-actor-avatar [actor]="{ type: 'user', id: key }" [size]="16" />
-              } @else {
-                <svg
-                  [lucideIcon]="noUser"
-                  [size]="16"
-                  [strokeWidth]="1.5"
-                  class="text-muted-foreground"
-                ></svg>
-              }
-            }
-            @case ('projectId') {
-              @if (store.getProject(key); as p) {
-                <app-project-glyph [project]="p" [size]="14" />
-              } @else {
-                <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground"></svg>
-              }
-            }
-          }
-          <span class="truncate">{{ label(key) }}</span>
+          <ng-container *ngTemplateOutlet="groupLabel; context: { $implicit: key }" />
         </ng-template>
       </app-kanban>
     }
+
+    <!-- Group header label, shared by the list / board and the flow sections -->
+    <ng-template #groupLabel let-key>
+      @switch (effectiveGroup()) {
+        @case ('status') {
+          <app-status-icon entity="issue" [status]="$any(key)" />
+        }
+        @case ('kind') {
+          <app-issue-kind [kind]="$any(key)" />
+        }
+        @case ('priority') {
+          <app-priority-icon [priority]="$any(key)" />
+        }
+        @case ('assigneeId') {
+          @if (key) {
+            <app-actor-avatar [actor]="{ type: 'user', id: key }" [size]="16" />
+          } @else {
+            <svg
+              [lucideIcon]="noUser"
+              [size]="16"
+              [strokeWidth]="1.5"
+              class="text-muted-foreground"
+            ></svg>
+          }
+        }
+        @case ('projectId') {
+          @if (store.getProject(key); as p) {
+            <app-project-glyph [project]="p" [size]="14" />
+          } @else {
+            <svg [lucideIcon]="projectIcon" [size]="14" class="text-muted-foreground"></svg>
+          }
+        }
+      }
+      <span class="truncate">{{ label(key) }}</span>
+    </ng-template>
 
     <!-- Right-click menu (acts on the selection when the clicked issue is part of it) -->
     <ng-template #issueMenu let-i>
@@ -791,6 +832,7 @@ export class IssueBoard {
   protected readonly filterIcon = LucideListFilter;
   protected readonly listIcon = LucideList;
   protected readonly boardIcon = LucideColumns3;
+  protected readonly flowIcon = LucideChartNoAxesGantt;
   protected readonly displayIcon = LucideSlidersHorizontal;
   protected readonly noUser = LucideCircleUserRound;
   protected readonly projectIcon = LucideBox;
@@ -889,8 +931,8 @@ export class IssueBoard {
   );
   protected readonly shown = computed(() => this.matching().size);
 
-  /** Sub-tasks nest under their parent (list layout only). */
-  protected readonly nested = computed(() => this.d().layout === 'list' && this.d().nested);
+  /** Sub-tasks nest under their parent (list and flow layouts; the board shows them as cards). */
+  protected readonly nested = computed(() => this.d().layout !== 'board' && this.d().nested);
   /** The rows each group shows: the matching tasks, as a tree when nested. */
   protected readonly rowColumns = computed<RowColumn[]>(() => {
     if (!this.nested()) {
@@ -1080,6 +1122,10 @@ export class IssueBoard {
           return next;
         });
       });
+    });
+    // The Flow layout draws each task's status changes: make sure they are loaded, not just the recent ones.
+    effect(() => {
+      if (this.d().layout === 'flow') void this.store.loadStatusHistory();
     });
     // Prev / next on the detail page follow this order.
     effect(() => this.actions.navOrder.set(this.ordered()));
