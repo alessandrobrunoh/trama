@@ -21,6 +21,7 @@ import {
   IsBoolean,
   IsDefined,
   IsIn,
+  IsISO8601,
   IsInt,
   IsNumber,
   IsOptional,
@@ -101,6 +102,8 @@ class CreateIssueDto {
   /** Link to the Delta thread worked on for this task (http/https, at most 2048 characters). */
   @IsOptional() @IsString() @IsThreadUrl() threadUrl?: string;
   @IsOptional() @IsNumber() @Min(0) @Max(1000) estimate?: number;
+  /** The day the task should be done (ISO 8601). */
+  @IsOptional() @IsISO8601() dueDate?: string;
   /** Workspace label ids. */
   @IsOptional()
   @IsArray()
@@ -115,6 +118,8 @@ class UpdateIssueDto {
   @OptionalNotNull() @IsIn(KINDS) kind?: IssueKind;
   /** Story points: non-negative number, `null` clears. */
   @Clearable() @IsNumber() @Min(0) @Max(1000) estimate?: number | null;
+  /** The day the task should be done (ISO 8601). `null` clears it. */
+  @Clearable() @IsISO8601() dueDate?: string | null;
   @Clearable() @IsString() @MaxLength(20000) body?: string | null;
   @Clearable() @IsString() @MaxLength(200) reporterName?: string | null;
   @Clearable() @IsString() assigneeId?: string | null;

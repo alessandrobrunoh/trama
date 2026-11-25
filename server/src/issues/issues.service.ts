@@ -21,7 +21,7 @@ import {
 } from '../contracts/domain.js';
 import { CountersService } from '../common/counters.service.js';
 import { RefsService } from '../common/refs.service.js';
-import { isUniqueViolation, notFound, uid, unique } from '../common/util.js';
+import { isUniqueViolation, notFound, toDate, uid, unique } from '../common/util.js';
 import {
   IssueEntity,
   MilestoneEntity,
@@ -48,6 +48,8 @@ export interface IssueInput {
   /** Issue classification; it does not affect the issue key. */
   kind?: IssueKind;
   estimate?: number | null;
+  /** ISO date or datetime; `null` clears it. */
+  dueDate?: string | null;
   body?: string | null;
   source?: IssueSource;
   reporterName?: string | null;
@@ -488,6 +490,7 @@ export class IssuesService {
           priority: input.priority ?? 'none',
           status,
           estimate: input.estimate ?? null,
+          dueDate: toDate(input.dueDate) ?? null,
           startedAt: facts.startedAt,
           completedAt: facts.completedAt,
           externalUrl: input.externalUrl ?? null,
@@ -901,6 +904,7 @@ export class IssuesService {
     if (patch.title !== undefined) row.title = patch.title.trim();
     if (patch.kind !== undefined) row.kind = patch.kind;
     if (patch.estimate !== undefined) row.estimate = patch.estimate;
+    if (patch.dueDate !== undefined) row.dueDate = toDate(patch.dueDate) ?? null;
     if (patch.body !== undefined) row.body = patch.body;
     if (patch.reporterName !== undefined) row.reporterName = patch.reporterName;
     if (patch.assigneeId !== undefined) row.assigneeId = patch.assigneeId;

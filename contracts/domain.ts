@@ -720,6 +720,8 @@ export interface Issue {
   milestoneIds: ID[];
   /** Story-point estimate (non-negative). Scales live in src/app/core/estimates.ts. */
   estimate?: number;
+  /** When the task should be done (a calendar day, stored as midnight UTC). Drives "Up next" and due chips. */
+  dueDate?: ISODate;
   /** First time the status entered in_progress / in_review. Kept when moved back. */
   startedAt?: ISODate;
   /** Set when the status becomes done or canceled; cleared on reopen. */

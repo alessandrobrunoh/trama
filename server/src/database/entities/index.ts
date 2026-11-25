@@ -267,6 +267,8 @@ export class IssueEntity extends Wire {
   @Column({ type: 'varchar', default: 'backlog' }) status: IssueStatus;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) milestoneIds: string[];
   @Column({ type: 'double precision', nullable: true }) estimate: number | null;
+  /** When the task should be done (midnight UTC of that day). */
+  @Column({ type: 'timestamptz', nullable: true }) dueDate: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) startedAt: Date | null;
   @Column({ type: 'timestamptz', nullable: true }) completedAt: Date | null;
   @Column({ type: 'jsonb', default: EMPTY_ARRAY }) labels: string[];

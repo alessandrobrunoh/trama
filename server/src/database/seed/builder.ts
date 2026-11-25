@@ -302,6 +302,8 @@ export class SeedBuilder {
     workstreams?: string[];
     milestones?: string[];
     estimate?: number;
+    /** Due this many days from now (negative: overdue). */
+    due?: number;
     duplicateOf?: string;
     url?: string;
     /** Delta thread the task is worked on in. */
@@ -328,6 +330,7 @@ export class SeedBuilder {
       id, workspaceId: this.workspaceId, key, number, kind: o.kind, title: o.title, body: o.body ?? null, source: o.source ?? 'manual',
       reporterName: o.reporterName ?? null, reporterId: o.reporter ?? null, assigneeId: o.assignee ?? null, priority: o.priority ?? 'none', status: o.status,
       projectId, milestoneIds: o.milestones ?? [], labels: [], aliases: [], estimate: o.estimate ?? null,
+      dueDate: o.due === undefined ? null : this.at(-o.due),
       startedAt: STARTED.has(o.status) || FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       completedAt: FINISHED.has(o.status) ? this.at(o.moved ?? o.created) : null,
       duplicateOfId: o.duplicateOf ?? null, externalUrl: o.url ?? null, threadUrl: o.thread ?? null,

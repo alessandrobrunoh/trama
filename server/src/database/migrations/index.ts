@@ -45,6 +45,7 @@ import { ProjectRepository1793850000000 } from './1793850000000-ProjectRepositor
 import { RemoveObsoleteFeatures1793860000000 } from './1793860000000-RemoveObsoleteFeatures.js';
 import { RemoveProjectUpdatesDocumentsContext1793870000000 } from './1793870000000-RemoveProjectUpdatesDocumentsContext.js';
 import { IssueThreadUrl1793880000000 } from './1793880000000-IssueThreadUrl.js';
+import { IssueDueDate1793890000000 } from './1793890000000-IssueDueDate.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -95,4 +96,5 @@ export const MIGRATIONS = [
   RemoveObsoleteFeatures1793860000000,
   RemoveProjectUpdatesDocumentsContext1793870000000,
   IssueThreadUrl1793880000000,
+  IssueDueDate1793890000000,
 ];
