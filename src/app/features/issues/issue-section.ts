@@ -3,8 +3,8 @@ import { LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible';
 
 /**
- * A collapsed-by-default group of the task inspector: one 28px header row (chevron, label and an optional
- * one-line summary on the right) that reveals its content in place.
+ * A collapsed-by-default group of the task inspector: one 32px header row (mono 10 label in capitals, chevron and
+ * an optional one-line summary on the right) that reveals its content in place.
  */
 @Component({
   selector: 'app-issue-section',
@@ -16,21 +16,21 @@ import { HlmCollapsibleImports } from '@spartan-ng/helm/collapsible';
       <button
         hlmCollapsibleTrigger
         type="button"
-        class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring flex h-7 w-full items-center gap-1 rounded-md px-1 text-xs font-medium outline-none focus-visible:ring-2"
+        class="text-faint hover:text-muted-foreground focus-visible:ring-ring flex h-8 w-full items-center gap-1.5 px-[18px] font-mono text-[10px] outline-none focus-visible:ring-2"
       >
         <svg
           [lucideIcon]="chevron"
-          [size]="13"
+          [size]="12"
           class="shrink-0 transition-transform"
           [class.rotate-90]="open()"
           aria-hidden="true"
         ></svg>
         <span>{{ label() }}</span>
         @if (summary(); as s) {
-          <span class="ml-auto min-w-0 truncate pl-2 font-normal tabular-nums">{{ s }}</span>
+          <span class="ml-auto min-w-0 truncate pl-2 text-[10.5px] tabular-nums">{{ s }}</span>
         }
       </button>
-      <div hlmCollapsibleContent class="pt-0.5 pb-1">
+      <div hlmCollapsibleContent class="px-3 pt-0.5 pb-2">
         <ng-content />
       </div>
     </div>

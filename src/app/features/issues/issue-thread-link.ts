@@ -20,6 +20,7 @@ import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, type Issue } from '../../core';
 import { ISSUE_THREAD_URL_MAX, isThreadUrl } from '../../core/contracts/domain';
+import { threadId } from './task-record-model';
 
 /** What a person typed, as a full link: a bare `delta.dev/…` gets `https://`. */
 export function toThreadUrl(raw: string): string {
@@ -87,18 +88,20 @@ export function threadLabel(url: string): string {
         }
       </form>
     } @else if (url) {
-      <div class="group/thread flex min-w-0 items-center gap-0.5" [class.-ml-1.5]="variant() === 'row'">
+      <div class="group/thread flex min-w-0 items-center gap-1" [class.text-delta]="variant() === 'row'">
         <a
           [href]="url"
           target="_blank"
           rel="noopener noreferrer"
-          class="hover:bg-hover focus-visible:ring-ring flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
-          [class]="variant() === 'action' ? 'text-muted-foreground hover:text-foreground' : ''"
+          class="hover:text-foreground focus-visible:ring-ring flex min-w-0 items-center gap-1.5 font-mono text-[11px] leading-[14px] outline-none focus-visible:ring-2"
+          [class]="variant() === 'action' ? 'text-muted-foreground' : 'text-delta'"
           [hlmTooltip]="'Open thread · ' + url"
         >
-          <svg [lucideIcon]="threadIcon" [size]="14" class="shrink-0" [class.text-primary]="variant() === 'row'"></svg>
-          <span class="truncate">{{ variant() === 'action' ? 'Open thread' : label(url) }}</span>
-          <svg [lucideIcon]="openIcon" [size]="12" class="text-muted-foreground shrink-0"></svg>
+          @if (variant() === 'row') {
+            <span class="bg-delta-line size-1.5 shrink-0" aria-hidden="true"></span>
+          }
+          <span class="truncate">{{ variant() === 'action' ? 'Open thread' : id(url) }}</span>
+          <span aria-hidden="true">↗</span>
         </a>
         @if (canEdit()) {
           <span
@@ -106,7 +109,7 @@ export function threadLabel(url: string): string {
           >
             <button
               type="button"
-              class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring inline-flex size-6 items-center justify-center rounded-md outline-none focus-visible:ring-2"
+              class="text-faint hover:text-foreground focus-visible:ring-ring inline-flex size-5 items-center justify-center outline-none focus-visible:ring-2"
               aria-label="Edit thread link"
               hlmTooltip="Edit link"
               (click)="start()"
@@ -115,7 +118,7 @@ export function threadLabel(url: string): string {
             </button>
             <button
               type="button"
-              class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring inline-flex size-6 items-center justify-center rounded-md outline-none focus-visible:ring-2"
+              class="text-faint hover:text-foreground focus-visible:ring-ring inline-flex size-5 items-center justify-center outline-none focus-visible:ring-2"
               aria-label="Remove thread link"
               hlmTooltip="Remove link"
               (click)="clear()"
@@ -128,13 +131,17 @@ export function threadLabel(url: string): string {
     } @else if (canEdit()) {
       <button
         type="button"
-        class="text-muted-foreground hover:bg-hover hover:text-foreground focus-visible:ring-ring flex h-7 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
-        [class.-ml-1.5]="variant() === 'row'"
+        class="text-muted-foreground hover:text-foreground focus-visible:ring-ring flex items-center gap-1.5 font-mono outline-none focus-visible:ring-2"
+        [class]="variant() === 'action' ? 'h-[26px] px-2.5 text-xs' : 'text-[11px]'"
         (click)="start()"
       >
-        <svg [lucideIcon]="addIcon" [size]="14"></svg>
+        @if (variant() === 'action') {
+          <svg [lucideIcon]="addIcon" [size]="13"></svg>
+        }
         Add thread link
       </button>
+    } @else if (variant() === 'row') {
+      <span class="text-faint font-mono text-[11px]">No thread</span>
     }
   `,
 })
@@ -175,8 +182,8 @@ export class IssueThreadLink {
     });
   }
 
-  protected label(url: string): string {
-    return threadLabel(url);
+  protected id(url: string): string {
+    return threadId(url);
   }
 
   protected start(): void {

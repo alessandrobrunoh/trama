@@ -1,7 +1,7 @@
 // Inline property editors: a glyph button that opens a searchable popover (rows, cards, detail),
 // and the centered command dialog opened by s / p / a / w / bulk actions.
 import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input, signal } from '@angular/core';
-import { LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
+import { LucideChevronDown, LucideCircleUserRound, LucideDynamicIcon } from '@lucide/angular';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
@@ -17,6 +17,7 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { Estimate, EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
+import { V3Est, V3Priority, V3Status } from '../../shared/v3';
 import { IssueActions } from './issue-actions';
 import { PROMPT_TITLE } from './issue-options';
 import { IssueOptionList } from './issue-option-list';
@@ -38,6 +39,9 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
     LucideDynamicIcon,
     Estimate,
     EstimateGlyph,
+    V3Est,
+    V3Priority,
+    V3Status,
   ],
   host: { class: 'inline-flex shrink-0' },
   template: `
@@ -46,37 +50,55 @@ const KEY: Record<PropField, string> = { status: 'S', priority: 'P', assignee: '
       <button
         hlmPopoverTrigger
         type="button"
-        class="hover:bg-accent focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
+        class="focus-visible:ring-ring inline-flex items-center gap-1.5 rounded-md outline-none focus-visible:ring-2 disabled:pointer-events-none"
         [class]="
-          showLabel()
-            ? 'h-7 px-1.5 text-[13px]'
-            : field() === 'estimate'
-              ? 'text-muted-foreground h-6 min-w-6 justify-center px-1 text-xs tabular-nums'
-              : 'size-6 justify-center'
+          chip()
+            ? 'text-[12.5px]'
+            : 'hover:bg-accent ' +
+              (showLabel()
+                ? 'h-7 px-1.5 text-[13px]'
+                : field() === 'estimate'
+                  ? 'text-muted-foreground h-6 min-w-6 justify-center px-1 text-xs tabular-nums'
+                  : 'size-6 justify-center')
         "
         [disabled]="!canEdit()"
         [hlmTooltip]="tip()"
-        [tooltipDisabled]="showLabel() || !canEdit()"
+        [tooltipDisabled]="showLabel() || chip() || !canEdit()"
         [attr.aria-label]="tip()"
         (click)="$event.stopPropagation()"
       >
         @switch (field()) {
           @case ('status') {
-            <app-status-icon [status]="i.status" entity="issue" [size]="size()" />
-            @if (showLabel()) {
-              <span>{{ statusLabel() }}</span>
+            @if (chip()) {
+              <v3-status [status]="i.status" />
+              @if (canEdit()) {
+                <svg [lucideIcon]="chevron" [size]="14" class="text-faint" aria-hidden="true"></svg>
+              }
+            } @else {
+              <app-status-icon [status]="i.status" entity="issue" [size]="size()" />
+              @if (showLabel()) {
+                <span>{{ statusLabel() }}</span>
+              }
             }
           }
           @case ('priority') {
-            <app-priority-icon [priority]="i.priority" />
-            @if (showLabel()) {
-              <span>{{ priorityLabel() }}</span>
+            @if (chip()) {
+              <v3-priority [priority]="i.priority" />
+            } @else {
+              <app-priority-icon [priority]="i.priority" />
+              @if (showLabel()) {
+                <span>{{ priorityLabel() }}</span>
+              }
             }
           }
           @case ('estimate') {
-            <app-estimate [value]="i.estimate" [tooltip]="false" />
-            @if (i.estimate === undefined || i.estimate === null) {
-              <app-estimate-glyph [fraction]="0" [size]="13" class="text-muted-foreground/70" />
+            @if (chip()) {
+              <v3-est [value]="i.estimate" />
+            } @else {
+              <app-estimate [value]="i.estimate" [tooltip]="false" />
+              @if (i.estimate === undefined || i.estimate === null) {
+                <app-estimate-glyph [fraction]="0" [size]="13" class="text-muted-foreground/70" />
+              }
             }
           }
           @default {
@@ -105,11 +127,14 @@ export class IssueProp {
   readonly issue = input.required<Issue>();
   readonly field = input.required<PropField>();
   readonly showLabel = input(false, { transform: booleanAttribute });
+  /** v3 look for the property column: the status / priority atoms (hairline box, bars) instead of the glyph. */
+  readonly chip = input(false, { transform: booleanAttribute });
   readonly size = input(14);
   readonly avatarSize = input(18);
 
   protected readonly state = signal<'open' | 'closed'>('closed');
   protected readonly noUser = LucideCircleUserRound;
+  protected readonly chevron = LucideChevronDown;
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly statusLabel = computed(() => {
     const status = this.issue().status;

@@ -1,6 +1,7 @@
-// The task page: the task's story as a conversation (description, comments, events) with the composer docked
-// at the bottom, and the property column (`TaskInspector`) beside it; the people, the status, the thread link and
-// the actions sit in the top bar.
+// The task page (v3 "06 Task detail", "07 Subtask detail", "34 Task detail · Progress"): the title block with its
+// description, the Subtasks, the Delta thread record and the Activity in the main column (`IssueStream`), the
+// property column (`TaskInspector`) beside it. The timer, Share and Set status sit in the top bar; the crumbs read
+// "workspace / project / parent keys / key / title". A subtask opens on a banner that points to its parent.
 import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -16,14 +17,15 @@ import {
 import { Router, RouterLink } from '@angular/router';
 import {
   LucideChevronDown,
-  LucideChevronRight,
   LucideChevronUp,
   LucideCopy,
+  LucideCornerUpLeft,
   LucideDynamicIcon,
   LucideEllipsis,
   LucideGitBranch,
   LucideLink,
   LucidePanelRight,
+  LucidePlus,
   LucideSparkles,
   LucideTrash2,
   LucideX,
@@ -32,6 +34,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import {
+  Clipboard,
   TramaStore,
   Viewport,
   isTypingTarget,
@@ -39,25 +42,20 @@ import {
   type ActorRef,
   type Issue,
 } from '../../core';
-import { StatusBar } from '../../layout/status-bar';
-import { PageChrome, TopBarActions, usePageCrumbs, type PageTitle } from '../../layout/page-chrome';
+import { PageChrome, TopBarActions, usePageCrumbs, type Crumb, type PageTitle } from '../../layout/page-chrome';
+import { AgoPipe } from '../../shared/ago';
 import { CommentComposer } from '../../shared/comments';
 import { EmptyState } from '../../shared/empty-state';
 import { EntityChip } from '../../shared/entity-chip';
-import { IssueKindLabel } from '../../shared/issue';
 import { Kbd } from '../../shared/kbd';
-import { RelativeTimePipe } from '../../shared/pipes';
+import { V3Source } from '../../shared/v3';
 import { AiActions } from '../ai-actions/ai-actions.service';
 import { IssueActions, type IssuePromptField } from './issue-actions';
-import { IssueStream, IssueTitle } from './issue-detail-parts';
-import { SOURCE_LABEL, isClosedIssue } from './issue-model';
-import { IssueCommandDialog, IssueProp } from './issue-prop';
-import { IssueThreadLink } from './issue-thread-link';
-import { ProjectGlyph } from '../projects/project-glyph';
+import { IssueDescription, IssueTitle } from './issue-detail-parts';
+import { IssueStream } from './issue-stream';
+import { IssueCommandDialog } from './issue-prop';
 import { TaskInspector } from './task-inspector';
-import { TaskChildren } from './task-children';
-import { TaskStatusWizard } from './task-status-wizard';
-import { buildSubtree, percent } from './task-subtree-model';
+import { TaskTimerPill } from './task-timer-pill';
 
 @Component({
   selector: 'app-issue-detail-page',
@@ -69,69 +67,32 @@ import { buildSubtree, percent } from './task-subtree-model';
     HlmTooltip,
     LucideDynamicIcon,
     TopBarActions,
-    StatusBar,
+    AgoPipe,
     CommentComposer,
     EmptyState,
     EntityChip,
-    IssueKindLabel,
     Kbd,
-    RelativeTimePipe,
-    IssueProp,
+    V3Source,
     IssueTitle,
+    IssueDescription,
     IssueStream,
     IssueCommandDialog,
-    IssueThreadLink,
-    ProjectGlyph,
     TaskInspector,
-    TaskStatusWizard,
+    TaskTimerPill,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     @if (issue(); as i) {
       <ng-template appTopBarActions>
-        @if (nav().total > 1) {
-          <span class="text-muted-foreground mr-1 text-xs tabular-nums max-md:hidden"
-            >{{ nav().index + 1 }} / {{ nav().total }}</span
-          >
-          <button
-            hlmBtn
-            variant="ghost"
-            size="icon-sm"
-            class="text-muted-foreground max-md:hidden"
-            aria-label="Previous task"
-            hlmTooltip="Previous task · K"
-            [disabled]="!nav().prev"
-            (click)="go(nav().prev)"
-          >
-            <svg [lucideIcon]="upIcon" [size]="15"></svg>
-          </button>
-          <button
-            hlmBtn
-            variant="ghost"
-            size="icon-sm"
-            class="text-muted-foreground max-md:hidden"
-            aria-label="Next task"
-            hlmTooltip="Next task · J"
-            [disabled]="!nav().next"
-            (click)="go(nav().next)"
-          >
-            <svg [lucideIcon]="downIcon" [size]="15"></svg>
+        <app-task-timer-pill [issueId]="i.id" [taskKey]="i.key" />
+        <button hlmBtn variant="outline" type="button" (click)="share()">
+          Share <app-kbd keys="shift+s" />
+        </button>
+        @if (canEdit()) {
+          <button hlmBtn variant="outline" type="button" (click)="prompt('status')">
+            Set status <app-kbd keys="s" />
           </button>
         }
-        <button
-          hlmBtn
-          variant="ghost"
-          size="sm"
-          class="text-muted-foreground"
-          aria-label="Copy link"
-          hlmTooltip="Copy link · ⌘⇧L"
-          (click)="actions.copyLinks([i.id])"
-        >
-          <svg [lucideIcon]="linkIcon" [size]="14"></svg>
-          @if (!viewport.isMobile()) {
-            <span class="max-xl:hidden">Copy link</span>
-          }
-        </button>
         <button
           hlmBtn
           variant="ghost"
@@ -145,7 +106,25 @@ import { buildSubtree, percent } from './task-subtree-model';
         </button>
         <ng-template #more>
           <hlm-dropdown-menu class="w-60">
+            @if (nav().total > 1) {
+              <hlm-dropdown-menu-group>
+                <button hlmDropdownMenuItem [disabled]="!nav().prev" (triggered)="go(nav().prev)">
+                  <svg [lucideIcon]="upIcon" [size]="14"></svg> Previous task
+                  <hlm-dropdown-menu-shortcut><app-kbd keys="k" /></hlm-dropdown-menu-shortcut>
+                </button>
+                <button hlmDropdownMenuItem [disabled]="!nav().next" (triggered)="go(nav().next)">
+                  <svg [lucideIcon]="downIcon" [size]="14"></svg> Next task
+                  <hlm-dropdown-menu-shortcut><app-kbd keys="j" /></hlm-dropdown-menu-shortcut>
+                </button>
+              </hlm-dropdown-menu-group>
+              <hlm-dropdown-menu-separator />
+            }
             <hlm-dropdown-menu-group>
+              @if (store.allowed('createIssues')) {
+                <button hlmDropdownMenuItem (triggered)="stream()?.addSubtask()">
+                  <svg [lucideIcon]="plusIcon" [size]="14"></svg> Add subtask
+                </button>
+              }
               <button hlmDropdownMenuItem (triggered)="actions.copyKeys([i.id])">
                 <svg [lucideIcon]="copyIcon" [size]="14"></svg> Copy key
                 <hlm-dropdown-menu-shortcut><app-kbd keys="mod+shift+k" /></hlm-dropdown-menu-shortcut>
@@ -216,137 +195,109 @@ import { buildSubtree, percent } from './task-subtree-model';
       </ng-template>
 
       <div class="flex min-h-0 flex-1 max-md:flex-col">
-      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
-      <app-issue-stream #stream [issue]="i" (quote)="composer()?.quote($event)">
-        <header class="flex flex-col gap-2">
-          <!-- Where it sits: the chain of parents (any depth), then this task's type and key. -->
-          <nav class="text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1 text-xs" aria-label="Task path">
-            @if (ancestors().hidden) {
-              <span aria-hidden="true">…</span>
-              <svg [lucideIcon]="crumbIcon" [size]="12" aria-hidden="true"></svg>
+        <div class="flex min-h-0 min-w-0 flex-1 flex-col">
+          <app-issue-stream #feed [issue]="i" (quote)="composer()?.quote($event)">
+            <!-- A subtask: where it belongs, and whether the parent has a thread of its own. -->
+            @if (parent(); as p) {
+              <div class="bg-card border-border flex min-w-0 items-center gap-2.5 border px-3.5 py-2.5">
+                <svg [lucideIcon]="parentIcon" [size]="13" class="text-faint shrink-0" aria-hidden="true"></svg>
+                <span class="text-faint shrink-0 font-mono text-[10px] leading-[12px] max-sm:hidden">SUBTASK OF</span>
+                <a
+                  [routerLink]="['/', slug(), 'tasks', p.key]"
+                  class="flex min-w-0 items-center gap-2.5 outline-none hover:underline focus-visible:underline"
+                >
+                  <span class="text-muted-foreground shrink-0 font-mono text-[11px] leading-[14px]">{{ p.key }}</span>
+                  <span class="text-foreground truncate text-[13px] leading-4">{{ p.title }}</span>
+                </a>
+                <span class="flex-1"></span>
+                <span
+                  class="inline-flex shrink-0 items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px] leading-[14px] whitespace-nowrap max-sm:hidden"
+                  [class]="p.threadUrl ? 'border-delta-line/40 text-delta' : 'border-border text-faint'"
+                >
+                  <span class="size-1.5 shrink-0" [class]="p.threadUrl ? 'bg-delta-line' : 'bg-faint'" aria-hidden="true"></span>
+                  {{ p.threadUrl ? 'parent has its own thread' : 'parent has no thread' }}
+                </span>
+              </div>
             }
-            @for (a of ancestors().shown; track a.id) {
-              <a
-                class="hover:text-foreground focus-visible:ring-ring max-w-[14rem] truncate rounded-sm font-mono outline-none hover:underline focus-visible:ring-2"
-                [routerLink]="['/', slug(), 'tasks', a.key]"
-                [attr.title]="a.title"
-                >{{ a.key }}</a
-              >
-              <svg [lucideIcon]="crumbIcon" [size]="12" aria-hidden="true"></svg>
+            @if (duplicate(); as dup) {
+              <div class="bg-card border-border flex flex-wrap items-center gap-2 border px-3.5 py-2.5 text-[13px]">
+                <span class="text-muted-foreground">Duplicate of</span>
+                <app-entity-chip type="issue" [ref]="dup.id" />
+                @if (canEdit()) {
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    class="ml-auto"
+                    type="button"
+                    (click)="actions.clearDuplicate(i.id)"
+                  >
+                    Not a duplicate
+                  </button>
+                }
+              </div>
             }
-            <app-issue-kind [kind]="i.kind" showLabel />
-            <span aria-hidden="true">·</span>
-            <span class="font-mono">{{ i.key }}</span>
-            @if (i.source !== 'manual') {
-              <span aria-hidden="true">·</span>
-              <span>via {{ sourceLabel() }}</span>
-            }
-          </nav>
-          @if (duplicate(); as dup) {
-            <div class="bg-muted flex flex-wrap items-center gap-2 rounded-lg px-3 py-2 text-[13px]">
-              <span class="text-muted-foreground">Duplicate of</span>
-              <app-entity-chip type="issue" [ref]="dup.id" />
-              @if (canEdit()) {
+
+            <header class="flex flex-col gap-3">
+              <div class="flex flex-wrap items-center gap-2.5">
+                <span class="text-muted-foreground font-mono text-[11.5px] leading-[14px]">{{ i.key }}</span>
+                @if (parent() && i.source === 'manual' && !i.externalUrl) {
+                  <span class="bg-secondary text-muted-foreground px-[7px] py-0.5 font-mono text-[10.5px] leading-[14px]">Trama-only subtask</span>
+                } @else {
+                  <v3-source [issue]="i" />
+                }
+                @if (i.externalRef?.syncedAt; as at) {
+                  <span class="text-faint font-mono text-[10.5px] leading-[13px]">synced {{ at | ago }} ago</span>
+                }
                 <button
                   hlmBtn
                   variant="ghost"
-                  size="sm"
-                  class="text-muted-foreground ml-auto h-6 px-2 text-xs"
-                  (click)="actions.clearDuplicate(i.id)"
+                  type="button"
+                  class="-my-1 ml-auto md:hidden"
+                  aria-controls="task-details"
+                  [attr.aria-expanded]="details()"
+                  (click)="details.set(!details())"
                 >
-                  Not a duplicate
+                  <svg [lucideIcon]="panelIcon" [size]="14"></svg> All details
                 </button>
-              }
-            </div>
-          }
-          <app-issue-title
-            #title
-            [value]="i.title"
-            [canEdit]="canEdit()"
-            (save)="store.updateIssue(i.id, { title: $event })"
-          />
-          <!-- The key properties, editable in place; everything else is in the property column. -->
-          <div class="-ml-1.5 flex flex-wrap items-center gap-x-0.5 gap-y-1" role="group" aria-label="Properties">
-            <app-issue-prop [issue]="i" field="status" showLabel />
-            <app-issue-prop [issue]="i" field="priority" showLabel />
-            <app-issue-prop [issue]="i" field="assignee" showLabel />
-            @if (project(); as p) {
-              <a
-                class="hover:bg-accent focus-visible:ring-ring inline-flex h-7 max-w-[12rem] min-w-0 items-center gap-1.5 rounded-md px-1.5 text-[13px] outline-none focus-visible:ring-2"
-                [routerLink]="['/', slug(), 'projects', p.id]"
-                [attr.title]="'Project · ' + p.name"
-              >
-                <app-project-glyph [project]="p" [size]="13" />
-                <span class="truncate">{{ p.name }}</span>
-              </a>
-            }
+              </div>
+              <app-issue-title
+                #title
+                [value]="i.title"
+                [canEdit]="canEdit()"
+                (save)="store.updateIssue(i.id, { title: $event })"
+              />
+              <app-issue-description
+                #desc
+                [value]="i.body ?? ''"
+                [canEdit]="canEdit()"
+                (save)="store.updateIssue(i.id, { body: $event || null })"
+              />
+            </header>
+
             @if (canEdit()) {
-              <app-task-status-wizard [issue]="i" />
+              <!-- Phones scroll the whole page (see styles.css), so the composer sticks to the bottom instead. -->
+              <div composer class="bg-background max-md:sticky max-md:bottom-0 max-md:z-[5] max-md:pt-1 max-md:pb-3">
+                <app-comment-composer
+                  #composer
+                  dock
+                  placeholder="Leave a comment…"
+                  [draftKey]="'comment:issue:' + i.id"
+                  (submitted)="send($event, composer)"
+                />
+              </div>
             }
-            <app-issue-thread-link variant="action" [issue]="i" [canEdit]="canEdit()" />
-            <button
-              hlmBtn
-              variant="ghost"
-              size="sm"
-              class="text-muted-foreground md:hidden"
-              aria-controls="task-details"
-              [attr.aria-expanded]="details()"
-              (click)="details.set(!details())"
-            >
-              <svg [lucideIcon]="panelIcon" [size]="14"></svg> All details
-            </button>
-          </div>
-          @if (subtasks().total) {
-            <div class="flex max-w-xs items-center gap-2 text-xs">
-              <span class="text-muted-foreground tabular-nums">{{ subtasks().done }}/{{ subtasks().total }} subtasks</span>
-              <span class="bg-foreground/10 h-1 flex-1 overflow-hidden rounded-full" aria-hidden="true">
-                <span class="bg-status-shipped block h-full rounded-full" [style.width.%]="subtasks().percent"></span>
-              </span>
-            </div>
-          }
-        </header>
-      </app-issue-stream>
-
-      @if (canEdit()) {
-        <!-- Phones scroll the whole page (see styles.css), so the composer sticks to the bottom instead. -->
-        <div class="bg-background shrink-0 px-4 pt-1 pb-3 max-md:sticky max-md:bottom-0 max-md:z-[5] sm:px-8">
-          <app-comment-composer
-            #composer
-            dock
-            class="mx-auto max-w-3xl"
-            placeholder="Leave a comment…"
-            [draftKey]="'comment:issue:' + i.id"
-            (submitted)="send($event, composer)"
-          >
-            <app-issue-prop [issue]="i" field="status" />
-            <app-issue-prop [issue]="i" field="priority" />
-            <app-issue-prop [issue]="i" field="assignee" />
-          </app-comment-composer>
+          </app-issue-stream>
         </div>
-      }
-      </div>
-      @if (!viewport.isMobile() || details()) {
-        <aside
-          id="task-details"
-          class="border-border shrink-0 overflow-y-auto max-md:border-t md:w-[320px] md:border-l"
-          aria-label="Task details"
-        >
-          <app-task-inspector [idOrKey]="i.id" />
-        </aside>
-      }
-      </div>
-
-      <app-status-bar>
-        <span class="font-mono">{{ i.key }}</span>
-        @if (projectName(); as p) {
-          <span>{{ p }}</span>
+        @if (!viewport.isMobile() || details()) {
+          <aside
+            id="task-details"
+            class="border-border bg-card shrink-0 overflow-y-auto max-md:border-t md:w-[300px] md:border-l"
+            aria-label="Task details"
+          >
+            <app-task-inspector [idOrKey]="i.id" />
+          </aside>
         }
-        <span>{{ commentCount() }} {{ commentCount() === 1 ? 'comment' : 'comments' }}</span>
-        @if (subtasks().total) {
-          <span>Subtasks {{ subtasks().done }}/{{ subtasks().total }}</span>
-        }
-        <span end>Updated {{ i.updatedAt | relativeTime }}</span>
-      </app-status-bar>
+      </div>
 
       <app-issue-command-dialog />
     } @else if (store.ready()) {
@@ -356,7 +307,7 @@ import { buildSubtree, percent } from './task-subtree-model';
           'There is no task ' + (key() ?? '') + '. It may have been deleted, or the link is wrong.'
         "
       >
-        <a hlmBtn size="sm" variant="outline" [routerLink]="['/', slug(), 'tasks']">Back to tasks</a>
+        <a hlmBtn variant="outline" [routerLink]="['/', slug(), 'tasks']">Back to tasks</a>
       </app-empty-state>
     }
   `,
@@ -365,13 +316,13 @@ export class IssueDetailPage {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly chrome = inject(PageChrome);
+  private readonly clipboard = inject(Clipboard);
   protected readonly viewport = inject(Viewport);
   /** Phones: whether the property column is shown below the conversation. */
   protected readonly details = signal(false);
   protected readonly store = inject(TramaStore);
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
-  private readonly children = inject(TaskChildren);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
@@ -379,14 +330,15 @@ export class IssueDetailPage {
   readonly key = input<string>();
 
   private readonly titleEditor = viewChild<IssueTitle>('title');
-  private readonly stream = viewChild<IssueStream>('stream');
+  private readonly description = viewChild<IssueDescription>('desc');
+  protected readonly stream = viewChild<IssueStream>('feed');
   protected readonly composer = viewChild<CommentComposer>('composer');
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly canEdit = computed(() => this.store.can('member'));
   protected readonly issue = computed(() => this.store.getIssue(this.key()));
   /** The parents of the task, oldest first (a subtask can sit under a subtask to any depth); long chains keep the nearest. */
-  protected readonly ancestors = computed(() => {
+  private readonly ancestors = computed(() => {
     const chain: Issue[] = [];
     const seen = new Set<string>();
     let at = this.issue();
@@ -397,26 +349,14 @@ export class IssueDetailPage {
       chain.unshift(parent);
       at = parent;
     }
-    return { shown: chain.slice(-3), hidden: chain.length > 3 };
+    return chain;
   });
+  /** The direct parent: a task with one is a subtask. */
+  protected readonly parent = computed(() => this.ancestors().at(-1));
   protected readonly project = computed(() => this.store.getProject(this.issue()?.projectId));
   protected readonly duplicate = computed(() => {
     const id = this.issue()?.duplicateOfId;
     return id ? this.store.issueById().get(id) : undefined;
-  });
-  protected readonly sourceLabel = computed(() => SOURCE_LABEL[this.issue()?.source ?? ''] ?? '');
-  protected readonly projectName = computed(() => this.store.getProject(this.issue()?.projectId)?.name);
-  protected readonly commentCount = computed(() => {
-    const id = this.issue()?.id;
-    return id ? this.store.commentCountFor({ type: 'issue', id }) : 0;
-  });
-  /** Everything below the task, at any depth. */
-  protected readonly subtasks = computed(() => {
-    const id = this.issue()?.id;
-    if (!id) return { total: 0, done: 0, percent: 0 };
-    const entries = this.store.settings().statuses.issue;
-    const tree = buildSubtree(id, this.children.byParent(), (t) => isClosedIssue(t, entries));
-    return { total: tree.total, done: tree.done, percent: percent(tree.done, tree.total) };
   });
 
   /** Assignee, reporter and everyone who commented: the avatar group of the top bar. */
@@ -453,12 +393,13 @@ export class IssueDetailPage {
     return { index, total: order.length, prev: keyOf(index - 1), next: keyOf(index + 1) };
   });
 
-  protected readonly crumbIcon = LucideChevronRight;
+  protected readonly parentIcon = LucideCornerUpLeft;
   protected readonly panelIcon = LucidePanelRight;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
   protected readonly copyIcon = LucideCopy;
   protected readonly linkIcon = LucideLink;
+  protected readonly plusIcon = LucidePlus;
   protected readonly sparkles = LucideSparkles;
   protected readonly xIcon = LucideX;
   protected readonly branchIcon = LucideGitBranch;
@@ -473,10 +414,16 @@ export class IssueDetailPage {
     void this.router.navigate(['/', this.slug(), 'tasks', issue.key], { replaceUrl: true });
   });
 
-  private readonly _crumbs = usePageCrumbs(() => [
-    { label: 'Tasks', link: ['/', this.slug(), 'tasks'] },
-    { label: this.issue()?.key ?? this.key() ?? '', mono: true },
-  ]);
+  /** "workspace / Web app / TRM-128 / TRM-128.2 / Title": the project, the parents, the key, then the title. */
+  private readonly _crumbs = usePageCrumbs((): readonly Crumb[] => {
+    const i = this.issue();
+    const out: Crumb[] = [];
+    const p = this.project();
+    if (p) out.push({ label: p.name, link: ['/', this.slug(), 'projects', p.id] });
+    for (const a of this.ancestors().slice(-3)) out.push({ label: a.key, link: ['/', this.slug(), 'tasks', a.key] });
+    if (!i) return [...out, { label: this.key() ?? '', mono: true }];
+    return [...out, { label: i.key }, { label: i.title }];
+  });
 
   /** The people behind the task go to the top bar's avatar group (and the title to the phone header). */
   private readonly _page = (() => {
@@ -552,7 +499,35 @@ export class IssueDetailPage {
       label: 'Edit description',
       group: 'Task',
       when: () => this.editable(),
-      run: () => this.stream()?.editDescription(),
+      run: () => this.description()?.start(),
+    },
+    {
+      keys: 'shift+s',
+      label: 'Share (copy link)',
+      group: 'Task',
+      when: () => !!this.issue(),
+      run: () => this.share(),
+    },
+    {
+      keys: 'o',
+      label: 'Open the Delta thread',
+      group: 'Delta',
+      when: () => !!this.issue()?.threadUrl,
+      run: () => this.openThread(),
+    },
+    {
+      keys: 'shift+l',
+      label: 'Copy the Delta thread link',
+      group: 'Delta',
+      when: () => !!this.issue()?.threadUrl,
+      run: () => this.copyThread(),
+    },
+    {
+      keys: 'shift+c',
+      label: 'Copy the /trama command',
+      group: 'Delta',
+      when: () => !!this.issue(),
+      run: () => this.copyCommand(),
     },
     {
       keys: 'mod+shift+k',
@@ -641,10 +616,29 @@ export class IssueDetailPage {
     return isTypingTarget(this.document.activeElement);
   }
 
-  private prompt(field: IssuePromptField): void {
+  protected prompt(field: IssuePromptField): void {
     this.actions.openPrompt(field, this.ids());
   }
 
+  /** "Share": the link to this task goes to the clipboard. */
+  protected share(): void {
+    this.actions.copyLinks(this.ids());
+  }
+
+  private openThread(): void {
+    const url = this.issue()?.threadUrl;
+    if (url) this.document.defaultView?.open(url, '_blank', 'noopener,noreferrer');
+  }
+
+  private copyThread(): void {
+    const url = this.issue()?.threadUrl;
+    if (url) void this.clipboard.copy(url, 'Thread link copied');
+  }
+
+  private copyCommand(): void {
+    const key = this.issue()?.key;
+    if (key) void this.clipboard.copy(`/trama ${key}`, 'Command copied');
+  }
 
   protected go(key: string | undefined): void {
     if (key) void this.router.navigate(['/', this.slug(), 'tasks', key]);
