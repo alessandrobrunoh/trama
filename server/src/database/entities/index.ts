@@ -12,6 +12,8 @@ import type {
   ArtifactProvider,
   ArtifactState,
   CiState,
+  ConnectionOwnerType,
+  ConnectionStatus,
   ExecutionProvider,
   ExternalRef,
   FavoriteType,
@@ -598,24 +600,41 @@ export class WorkspaceCounterEntity {
   @Column({ type: 'integer', default: 0 }) value: number;
 }
 
-/** Owned by the integrations agent. `secret` / `webhookSecret` are never serialized. */
+/**
+ * A credential for a git host or Delta, owned by a workspace (`ownerType = 'workspace'`, managed by
+ * whoever has the integrations permission) or by one person (`'user'`, `workspaceId` null).
+ * Several connections per provider are allowed. `secret` / `webhookSecret` are never serialized.
+ *
+ * Constraints that live only in the migration (`ConnectionOwnership1794200000000`): the check that a
+ * workspace connection has a workspace and a personal one an owner, and the partial unique indexes
+ * on (owner, provider, host, account, baseUrl).
+ */
 @Entity('integration_connections')
 @Index('IDX_integrations_workspace', ['workspaceId'])
+@Index('IDX_integrations_owner_user', ['ownerUserId'])
 @ForeignKey(() => WorkspaceEntity, ['workspaceId'], ['id'], {
   onDelete: 'CASCADE',
 })
+@ForeignKey(() => UserEntity, ['ownerUserId'], ['id'], { onDelete: 'CASCADE' })
 export class IntegrationConnectionEntity extends Wire {
   @PrimaryColumn({ type: 'varchar' }) id: string;
-  @Column({ type: 'varchar' }) workspaceId: string;
+  @Column({ type: 'varchar', default: 'workspace' }) ownerType: ConnectionOwnerType;
+  /** Null for personal connections. */
+  @Column({ type: 'varchar', nullable: true }) workspaceId: string | null;
+  /** Set for personal connections: the only person who can see and use it. */
+  @Column({ type: 'varchar', nullable: true }) ownerUserId: string | null;
+  /** Display name, e.g. "GitHub · personal". */
+  @Column({ type: 'varchar' }) label: string;
   @Column({ type: 'varchar' }) provider: GitProvider | 'delta';
   @Column({ type: 'varchar' }) account: string;
+  /** Host of `baseUrl`, or the provider's public host (`connectionHost`). Part of the uniqueness key. */
+  @Column({ type: 'varchar' }) host: string;
   @Column({ type: 'varchar', nullable: true }) baseUrl: string | null;
   /** Encrypted token / app credential (see common/crypto.ts). */
   @Column({ type: 'text', nullable: true }) secret: string | null;
   /** Encrypted webhook secret. */
   @Column({ type: 'text', nullable: true }) webhookSecret: string | null;
-  @Column({ type: 'varchar', default: 'connected' }) status:
-    'connected' | 'error' | 'disconnected';
+  @Column({ type: 'varchar', default: 'connected' }) status: ConnectionStatus;
   @Column({ type: 'timestamptz', nullable: true }) lastSyncAt: Date | null;
   @Column({ type: 'text', nullable: true }) lastError: string | null;
   /** Provider-specific, non-secret settings. */

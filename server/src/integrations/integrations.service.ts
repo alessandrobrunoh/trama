@@ -1,17 +1,32 @@
 import { BadGatewayException, BadRequestException, ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
-import type { Repository } from 'typeorm';
-import { GIT_PROVIDER_META, type ActorRef, type GitProvider } from '../contracts/domain.js';
+import { In, type FindOptionsWhere, type Repository } from 'typeorm';
+import {
+  GIT_PROVIDER_META,
+  connectionHost,
+  type ActorRef,
+  type GitProvider,
+  type IntegrationConnection,
+} from '../contracts/domain.js';
 import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { notFound, uid } from '../common/util.js';
-import { IntegrationConnectionEntity } from '../database/entities/index.js';
+import { IntegrationConnectionEntity, UserEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
 import { HttpClient, ProviderHttpError } from './http-client.js';
 import { createGitClient, normalizeBaseUrl, type GitProviderClient } from './providers.js';
 import { SecretsService } from './secrets.service.js';
 
 export type ConnectionProvider = GitProvider | 'delta';
+
+/**
+ * Whose connections a call works on: a workspace's (managed by whoever has the integrations
+ * permission) or one person's (only that person). Every lookup is filtered by it, so a personal
+ * connection is simply "not found" for anyone else.
+ */
+export type ConnectionScope =
+  | { type: 'workspace'; workspaceId: string }
+  | { type: 'user'; userId: string };
 
 export interface WebhookSetup {
   url: string;
@@ -20,6 +35,12 @@ export interface WebhookSetup {
   contentType: 'application/json';
   events: string[];
 }
+
+/** Contract connection plus the webhook URL and last delivery time. Never secrets. */
+export type PresentedConnection = IntegrationConnection & {
+  webhookUrl?: string;
+  lastWebhookAt?: string;
+};
 
 export const WEBHOOK_EVENTS: Record<GitProvider, string[]> = {
   github: ['pull_request', 'check_suite', 'check_run', 'status'],
@@ -32,6 +53,11 @@ const label = (provider: ConnectionProvider) => (provider === 'delta' ? 'Delta' 
 const SECRET = (id: string) => `${id}:secret`;
 const WEBHOOK = (id: string) => `${id}:webhook`;
 
+const ownedBy = (scope: ConnectionScope): FindOptionsWhere<IntegrationConnectionEntity> =>
+  scope.type === 'workspace'
+    ? { ownerType: 'workspace', workspaceId: scope.workspaceId }
+    : { ownerType: 'user', ownerUserId: scope.userId };
+
 @Injectable()
 export class IntegrationsService {
   constructor(
@@ -39,6 +65,7 @@ export class IntegrationsService {
     private readonly secrets: SecretsService,
     private readonly events: EventsService,
     @InjectRepository(IntegrationConnectionEntity) private readonly repo: Repository<IntegrationConnectionEntity>,
+    @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
   ) {}
 
   /** Public base URL for webhook URLs: `PUBLIC_URL`, else derived from the request. */
@@ -53,33 +80,51 @@ export class IntegrationsService {
     return conn.provider === 'delta' ? undefined : `${origin}/api/webhooks/${conn.provider}/${conn.id}`;
   }
 
-  /** Contract IntegrationConnection plus webhookUrl, linked repository ids and the last webhook delivery time. Never secrets. */
-  present(conn: IntegrationConnectionEntity, origin: string) {
-    const config = conn.config as { lastWebhookAt?: string };
-    return {
-      ...conn.toJSON(),
-      webhookUrl: this.webhookUrl(conn, origin),
-      lastWebhookAt: config.lastWebhookAt,
-    };
+  /**
+   * The contract `IntegrationConnection` of each row, with the owner's display name for personal ones.
+   * Tokens and webhook secrets are never part of it (`secret` / `webhookSecret` are hidden on the entity).
+   */
+  async summarize(rows: IntegrationConnectionEntity[]): Promise<IntegrationConnection[]> {
+    const ids = [...new Set(rows.map((r) => r.ownerUserId).filter((id): id is string => !!id))];
+    const names = new Map<string, string>();
+    if (ids.length) for (const u of await this.users.find({ where: { id: In(ids) }, select: { id: true, name: true } })) names.set(u.id, u.name);
+    return rows.map((r) => ({
+      ...(r.toJSON() as unknown as IntegrationConnection),
+      ...(r.ownerUserId && names.has(r.ownerUserId) ? { ownerName: names.get(r.ownerUserId) } : {}),
+    }));
   }
 
-  private async getRow(workspaceId: string, id: string) {
-    const row = await this.repo.findOneBy({ workspaceId, id });
+  /** `summarize` plus the webhook URL and the last delivery time (for the people who manage the connection). */
+  async present(conn: IntegrationConnectionEntity, origin: string): Promise<PresentedConnection> {
+    const [base] = await this.summarize([conn]);
+    const config = conn.config as { lastWebhookAt?: string };
+    return { ...base, webhookUrl: this.webhookUrl(conn, origin), lastWebhookAt: config.lastWebhookAt };
+  }
+
+  private async getRow(scope: ConnectionScope, id: string) {
+    const row = await this.repo.findOneBy({ ...ownedBy(scope), id });
     if (!row) throw notFound('Integration', id);
     return row;
   }
 
-  async list(workspaceId: string, origin: string) {
-    const rows = await this.repo.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
-    return rows.map((r) => this.present(r, origin));
+  private publish(scope: ConnectionScope, type: 'created' | 'updated' | 'deleted', id: string) {
+    // Personal connections have no workspace stream; the owner's page refetches after its own calls.
+    if (scope.type === 'workspace') this.events.publish(scope.workspaceId, { type, entity: 'integration', id });
   }
 
-  async get(workspaceId: string, id: string, origin: string) {
-    return this.present(await this.getRow(workspaceId, id), origin);
+  async list(scope: ConnectionScope, origin: string) {
+    const rows = await this.repo.find({ where: ownedBy(scope), order: { createdAt: 'ASC' } });
+    return Promise.all(rows.map((r) => this.present(r, origin)));
+  }
+
+  async get(scope: ConnectionScope, id: string, origin: string) {
+    return this.present(await this.getRow(scope, id), origin);
   }
 
   private client(conn: IntegrationConnectionEntity, tokenOverride?: string): GitProviderClient {
     if (conn.provider === 'delta') throw new BadRequestException('Delta connections have no repository API yet');
+    if (conn.status === 'revoked' && tokenOverride === undefined)
+      throw new BadRequestException('This connection was revoked. Reconnect it with a new token.');
     const token = tokenOverride ?? this.secrets.decrypt(conn.secret ?? '', SECRET(conn.id));
     return createGitClient(conn.provider, this.http, token, conn.baseUrl);
   }
@@ -117,10 +162,15 @@ export class IntegrationsService {
     return normalized;
   }
 
+  /** Display name of a new connection when the caller gives none: "GitHub · octo". */
+  static defaultLabel(provider: ConnectionProvider, account: string): string {
+    return `${label(provider)} · ${account}`;
+  }
+
   async create(
-    workspaceId: string,
+    scope: ConnectionScope,
     _actor: ActorRef,
-    input: { provider: ConnectionProvider; token: string; baseUrl?: string },
+    input: { provider: ConnectionProvider; token: string; baseUrl?: string; label?: string },
     origin: string,
   ) {
     const baseUrl = await this.baseUrlOf(input.provider, input.baseUrl);
@@ -133,16 +183,22 @@ export class IntegrationsService {
     }
     const defaultBase = input.provider === 'delta' ? null : `https://${GIT_PROVIDER_META[input.provider].host}`;
     const stored = baseUrl && baseUrl !== defaultBase ? baseUrl : input.provider === 'delta' ? baseUrl : null;
-    const clash = (await this.repo.findBy({ workspaceId, provider: input.provider, account })).some((c) => (c.baseUrl ?? null) === stored);
+    const host = connectionHost(input.provider, stored);
+    // Several accounts per provider are fine; the same account on the same host twice for one owner is not.
+    const clash = (await this.repo.findBy({ ...ownedBy(scope), provider: input.provider, account })).some((c) => c.host === host);
     if (clash) throw new ConflictException(`A ${input.provider} connection for "${account}" already exists`);
 
     const webhookSecret = input.provider === 'delta' ? null : SecretsService.generateWebhookSecret();
     const row = await this.repo.save(
       this.repo.create({
         id,
-        workspaceId,
+        ownerType: scope.type === 'workspace' ? 'workspace' : 'user',
+        workspaceId: scope.type === 'workspace' ? scope.workspaceId : null,
+        ownerUserId: scope.type === 'user' ? scope.userId : null,
+        label: input.label?.trim() || IntegrationsService.defaultLabel(input.provider, account),
         provider: input.provider,
         account,
+        host,
         baseUrl: stored,
         secret: this.secrets.encrypt(input.token, SECRET(id)),
         webhookSecret: webhookSecret ? this.secrets.encrypt(webhookSecret, WEBHOOK(id)) : null,
@@ -150,9 +206,9 @@ export class IntegrationsService {
         config: {},
       }),
     );
-    this.events.publish(workspaceId, { type: 'created', entity: 'integration', id });
+    this.publish(scope, 'created', id);
     return {
-      connection: this.present(row, origin),
+      connection: await this.present(row, origin),
       webhook: webhookSecret ? this.webhookSetup(row, origin, webhookSecret) : undefined,
     };
   }
@@ -166,13 +222,17 @@ export class IntegrationsService {
     };
   }
 
+  /**
+   * Rename, and/or give a new token or base URL (which re-validates against the provider and brings a
+   * revoked or failing connection back to `connected`).
+   */
   async update(
-    workspaceId: string,
+    scope: ConnectionScope,
     id: string,
-    patch: { token?: string; baseUrl?: string | null },
+    patch: { token?: string; baseUrl?: string | null; label?: string },
     origin: string,
   ) {
-    const row = await this.getRow(workspaceId, id);
+    const row = await this.getRow(scope, id);
     if (patch.baseUrl !== undefined) {
       const base = await this.baseUrlOf(row.provider, patch.baseUrl);
       const next = row.provider !== 'delta' && !base ? null : base;
@@ -180,8 +240,11 @@ export class IntegrationsService {
       if (row.provider !== 'delta' && next !== (row.baseUrl ?? null) && patch.token === undefined)
         throw new BadRequestException('Enter the access token again when you change the base URL');
       row.baseUrl = next;
+      row.host = connectionHost(row.provider, next);
     }
-    if (patch.token !== undefined || patch.baseUrl !== undefined) {
+    // A revoked connection has no token left to re-check; only a new token brings it back.
+    const revalidate = patch.token !== undefined || (patch.baseUrl !== undefined && row.status !== 'revoked');
+    if (revalidate) {
       if (row.provider !== 'delta') {
         const token = patch.token ?? this.secrets.decrypt(row.secret ?? '', SECRET(id));
         const client = this.client(row, token);
@@ -189,31 +252,55 @@ export class IntegrationsService {
         row.status = 'connected';
         row.lastError = null;
       }
-      if (patch.token !== undefined) row.secret = this.secrets.encrypt(patch.token, SECRET(id));
+      if (patch.token !== undefined) {
+        row.secret = this.secrets.encrypt(patch.token, SECRET(id));
+        if (row.provider === 'delta') {
+          row.status = 'connected';
+          row.lastError = null;
+        }
+      }
     }
+    if (patch.label !== undefined) row.label = patch.label.trim();
     await this.repo.save(row);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'integration', id });
+    this.publish(scope, 'updated', id);
     return this.present(row, origin);
   }
 
-  async remove(workspaceId: string, id: string) {
-    await this.getRow(workspaceId, id);
-    await this.repo.delete({ id });
-    this.events.publish(workspaceId, { type: 'deleted', entity: 'integration', id });
+  /**
+   * Withdraws the credential on purpose: the token is wiped and the status becomes `revoked` with a
+   * reason in `lastError`. The row stays, so whatever reads through it (routing rules) can show
+   * "reconnect, or switch to another connection" instead of failing silently. A new token via
+   * `update` brings it back.
+   */
+  async revoke(scope: ConnectionScope, id: string, origin: string) {
+    const row = await this.getRow(scope, id);
+    row.status = 'revoked';
+    row.secret = null;
+    row.lastError = 'Revoked';
+    await this.repo.save(row);
+    this.publish(scope, 'updated', id);
+    return this.present(row, origin);
   }
 
-  async rotateWebhookSecret(workspaceId: string, id: string, origin: string) {
-    const row = await this.getRow(workspaceId, id);
+  async remove(scope: ConnectionScope, id: string) {
+    await this.getRow(scope, id);
+    await this.repo.delete({ id });
+    this.publish(scope, 'deleted', id);
+  }
+
+  async rotateWebhookSecret(scope: ConnectionScope, id: string, origin: string) {
+    const row = await this.getRow(scope, id);
     if (row.provider === 'delta') throw new BadRequestException('Delta connections have no webhook');
     const secret = SecretsService.generateWebhookSecret();
     row.webhookSecret = this.secrets.encrypt(secret, WEBHOOK(id));
     await this.repo.save(row);
-    this.events.publish(workspaceId, { type: 'updated', entity: 'integration', id });
-    return { connection: this.present(row, origin), webhook: this.webhookSetup(row, origin, secret) };
+    this.publish(scope, 'updated', id);
+    return { connection: await this.present(row, origin), webhook: this.webhookSetup(row, origin, secret) };
   }
 
-  async remoteRepositories(workspaceId: string, id: string, page: number, perPage: number) {
-    const row = await this.getRow(workspaceId, id);
-    return this.guard(label(row.provider), () => this.client(row).listRepositories(page, perPage));
+  async remoteRepositories(scope: ConnectionScope, id: string, page: number, perPage: number) {
+    const row = await this.getRow(scope, id);
+    const client = this.client(row); // a revoked or Delta connection is a 400 here, not a provider failure
+    return this.guard(label(row.provider), () => client.listRepositories(page, perPage));
   }
 }

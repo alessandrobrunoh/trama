@@ -1331,21 +1331,56 @@ export interface ApiToken {
 
 // ───────────────────────────── Integrations ─────────────────────────────
 
+/** Who owns a connection: a whole workspace (admins manage it) or one person. */
+export type ConnectionOwnerType = 'workspace' | 'user';
+
+/**
+ * `connected` (ok): usable. `error`: the provider rejected it; `lastError` says why. `revoked`: the
+ * credential was withdrawn on purpose (the token is wiped); rules that read through it show an error
+ * until someone reconnects or switches to another connection.
+ */
+export type ConnectionStatus = 'connected' | 'error' | 'revoked';
+
+/** Host a connection talks to: the host of its base URL, else the provider's public host. */
+export function connectionHost(provider: GitProvider | 'delta', baseUrl?: string | null): string {
+  if (baseUrl) {
+    try {
+      return new URL(baseUrl).host.toLowerCase();
+    } catch {
+      return baseUrl.toLowerCase();
+    }
+  }
+  return provider === 'delta' ? 'delta' : GIT_PROVIDER_META[provider].host;
+}
+
 export interface IntegrationConnection {
   id: ID;
-  workspaceId: ID;
+  ownerType: ConnectionOwnerType;
+  /** Set for workspace connections, absent for personal ones. */
+  workspaceId?: ID;
+  /** Set for personal connections: the only person who sees and manages it. */
+  ownerUserId?: ID;
+  /** Display name of the owner of a personal connection. */
+  ownerName?: string;
+  /** Display name, e.g. "GitHub · personal". Several connections per provider are allowed. */
+  label: string;
   provider: GitProvider | 'delta';
   /** Display account, e.g. GitHub org/user. */
   account: string;
   /** Base URL for self-hosted GitLab / GitHub Enterprise (not used by Bitbucket Cloud). */
   baseUrl?: string;
+  /** Host this connection talks to (`github.com`, `gitlab.example.com`). */
+  host: string;
   /** Whether a webhook secret is configured (secret itself never returned). */
   webhookConfigured: boolean;
-  status: 'connected' | 'error' | 'disconnected';
+  status: ConnectionStatus;
   lastSyncAt?: ISODate;
   lastError?: string;
   createdAt: ISODate;
 }
+
+/** A connection a person may pick for a project rule. `suggested` marks the one the UI preselects. */
+export type UsableConnection = IntegrationConnection & { suggested: boolean };
 
 // ───────────────────────────── Permissions & workspace settings ─────────────────────────────
 

@@ -50,7 +50,13 @@ export function createAdapter(
   return new LinearAdapter(http, cred.token, source.teamIds ?? []);
 }
 
-/** Tracker credentials of a workspace: encrypted at rest, scoped by workspace, never returned. */
+/**
+ * Tracker credentials of a workspace: encrypted at rest, scoped by workspace, never returned.
+ *
+ * TODO(connections): import credentials stay separate from `integration_connections` for now. They
+ * are meant to fold into connections (workspace or personal, with labels) so imports and sync share
+ * one credential list; until then `resolve` also accepts a workspace connection id.
+ */
 @Injectable()
 export class CredentialsService {
   constructor(

@@ -178,6 +178,20 @@ export class WebhooksService {
         body: { status: 'ignored', reason: parsed.reason },
       };
 
+    // A revoked connection no longer feeds anything. A personal connection has no workspace to link
+    // artifacts in: its events are for routing rules, which place them in a project.
+    if (conn.status === 'revoked' || !conn.workspaceId)
+      return {
+        httpStatus: 202,
+        body: {
+          status: 'ignored',
+          reason:
+            conn.status === 'revoked'
+              ? 'connection revoked'
+              : 'personal connection without a workspace',
+        },
+      };
+
     const repo = { id: parsed.repo.fullName };
 
     if (parsed.kind === 'ci') {
