@@ -18,10 +18,12 @@ import {
   type LucideIcon,
 } from '@lucide/angular';
 import { TramaLogo } from '../../shared/trama-logo';
+import { LandingPlot } from './landing-plot';
 import { LandingProductShot } from './landing-product-shot';
 import { SiteCta } from './site-cta';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
+import { SiteWeave } from './site-weave';
 
 interface Step {
   n: string;
@@ -54,10 +56,12 @@ const COMMAND = '/trama TRM-128';
     RouterLink,
     LucideDynamicIcon,
     TramaLogo,
+    LandingPlot,
     LandingProductShot,
     SiteCta,
     SiteFooter,
     SiteHeader,
+    SiteWeave,
   ],
   host: { class: 'bg-background text-foreground block min-h-svh overflow-x-clip leading-normal' },
   template: `
@@ -136,6 +140,8 @@ const COMMAND = '/trama TRM-128';
 
         <app-landing-product-shot />
       </section>
+
+      <app-site-weave />
 
       <!-- Sources -->
       <section class="border-border border-b">
@@ -250,14 +256,21 @@ const COMMAND = '/trama TRM-128';
         </div>
       </section>
 
-      <!-- 02 Inside Delta -->
+      <app-site-weave />
+
+      <!-- 02 Trama · the plot -->
+      <section id="plot" class="scroll-mt-16">
+        <app-landing-plot />
+      </section>
+
+      <!-- 03 Inside Delta -->
       <section id="delta" class="bg-card border-border scroll-mt-16 border-y">
         <div
           class="mx-auto flex w-full max-w-[1440px] flex-col gap-12 px-5 py-16 md:px-10 md:py-28 lg:flex-row lg:items-center lg:gap-20 xl:px-[120px]"
         >
           <div class="flex flex-col gap-5 lg:w-[440px] lg:shrink-0">
             <div class="flex items-center gap-2.5 font-mono text-[12px]">
-              <span class="text-primary">02</span>
+              <span class="text-primary">03</span>
               <span class="text-faint tracking-[1.2px]">INSIDE DELTA</span>
             </div>
             <h2
@@ -308,7 +321,7 @@ const COMMAND = '/trama TRM-128';
         <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
           <div class="flex flex-col gap-4">
             <div class="flex items-center gap-2.5 font-mono text-[12px]">
-              <span class="text-primary">03</span>
+              <span class="text-primary">04</span>
               <span class="text-faint tracking-[1.2px]">WHERE THINGS LIVE</span>
             </div>
             <h2
@@ -378,7 +391,7 @@ const COMMAND = '/trama TRM-128';
       >
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-2.5 font-mono text-[12px]">
-            <span class="text-primary">04</span>
+            <span class="text-primary">05</span>
             <span class="text-faint tracking-[1.2px]">EVERYTHING ELSE</span>
           </div>
           <h2

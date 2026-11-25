@@ -1,53 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { Notifier } from '../../core/notify/notifier';
+import { LOGOS, LOGO_VARIANTS, logoSvg, type LogoKind, type LogoVariant } from './brand-logo';
 import { createZip, type ZipEntry } from './zip';
 
-export type LogoKind = 'symbol' | 'horizontal' | 'stacked' | 'wordmark';
-export type LogoVariant = 'black' | 'white';
-
-export interface LogoAsset {
-  kind: LogoKind;
-  name: string;
-  description: string;
-  width: number;
-  height: number;
-}
-
-/** The logo files in `public/icons/trama-<kind>-<variant>.svg`. */
-export const LOGOS: readonly LogoAsset[] = [
-  {
-    kind: 'symbol',
-    name: 'Logomark',
-    description: 'Two interlocking square strands. Use it for avatars, app icons and anywhere space is tight.',
-    width: 512,
-    height: 512,
-  },
-  {
-    kind: 'horizontal',
-    name: 'Logo',
-    description: 'Logomark and wordmark side by side. The default choice for most placements.',
-    width: 920,
-    height: 228,
-  },
-  {
-    kind: 'stacked',
-    name: 'Stacked logo',
-    description: 'For square formats such as social cards and event badges.',
-    width: 510,
-    height: 520,
-  },
-  {
-    kind: 'wordmark',
-    name: 'Wordmark',
-    description: 'The name on its own, when the logomark already appears nearby.',
-    width: 645,
-    height: 205,
-  },
-];
-
-export function logoUrl(kind: LogoKind, variant: LogoVariant): string {
-  return `/icons/trama-${kind}-${variant}.svg`;
-}
+export type { LogoKind, LogoVariant } from './brand-logo';
 
 /** Copy / download the brand assets (used by the header logo menu and /brand). */
 @Injectable({ providedIn: 'root' })
@@ -56,8 +12,7 @@ export class BrandAssets {
 
   async copySvg(kind: LogoKind, variant: LogoVariant): Promise<void> {
     try {
-      const svg = await this.fetchText(logoUrl(kind, variant));
-      await navigator.clipboard.writeText(svg);
+      await navigator.clipboard.writeText(logoSvg(kind, variant));
       this.notifier.success(`${this.label(kind)} SVG copied`, { duration: 2000 });
     } catch {
       this.notifier.error('Could not copy the SVG');
@@ -73,13 +28,8 @@ export class BrandAssets {
     }
   }
 
-  async downloadSvg(kind: LogoKind, variant: LogoVariant): Promise<void> {
-    try {
-      const svg = await this.fetchText(logoUrl(kind, variant));
-      save(new Blob([svg], { type: 'image/svg+xml' }), `trama-${kind}-${variant}.svg`);
-    } catch {
-      this.notifier.error('Could not download the SVG');
-    }
+  downloadSvg(kind: LogoKind, variant: LogoVariant): void {
+    save(new Blob([logoSvg(kind, variant)], { type: 'image/svg+xml' }), `trama-${kind}-${variant}.svg`);
   }
 
   async downloadPng(kind: LogoKind, variant: LogoVariant): Promise<void> {
@@ -90,17 +40,16 @@ export class BrandAssets {
     }
   }
 
-  /** Every logo in both variants, as SVG and PNG, in one .zip. */
+  /** Every logo in every variant, as SVG and PNG, in one .zip. */
   async downloadAll(): Promise<void> {
     try {
       const entries: ZipEntry[] = [];
       const encoder = new TextEncoder();
       for (const logo of LOGOS) {
-        for (const variant of ['black', 'white'] as const) {
-          const svg = await this.fetchText(logoUrl(logo.kind, variant));
+        for (const { variant } of LOGO_VARIANTS) {
           entries.push({
             name: `svg/trama-${logo.kind}-${variant}.svg`,
-            data: encoder.encode(svg),
+            data: encoder.encode(logoSvg(logo.kind, variant)),
           });
           const png = await this.renderPng(logo.kind, variant);
           entries.push({
@@ -119,12 +68,6 @@ export class BrandAssets {
     return LOGOS.find((l) => l.kind === kind)?.name ?? 'Logo';
   }
 
-  private async fetchText(url: string): Promise<string> {
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`${res.status} ${url}`);
-    return res.text();
-  }
-
   /** Rasterises the SVG so its longest side is 2048px, on a transparent background. */
   private async renderPng(kind: LogoKind, variant: LogoVariant): Promise<Blob> {
     const logo = LOGOS.find((l) => l.kind === kind)!;
@@ -133,9 +76,13 @@ export class BrandAssets {
     canvas.width = Math.round(logo.width * scale);
     canvas.height = Math.round(logo.height * scale);
     const img = new Image();
-    img.src = logoUrl(kind, variant);
-    await img.decode();
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    img.src = URL.createObjectURL(new Blob([logoSvg(kind, variant)], { type: 'image/svg+xml' }));
+    try {
+      await img.decode();
+      canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    } finally {
+      URL.revokeObjectURL(img.src);
+    }
     return new Promise((resolve, reject) =>
       canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/png'),
     );

@@ -161,7 +161,7 @@ export class SiteHeader {
 
   /** Copies the variant that reads on the current theme. */
   protected copy(kind: LogoKind): void {
-    void this.brand.copySvg(kind, this.theme.resolved() === 'dark' ? 'white' : 'black');
+    void this.brand.copySvg(kind, this.theme.resolved() === 'dark' ? 'colour-dark' : 'colour-light');
   }
 
   protected themeIcon() {

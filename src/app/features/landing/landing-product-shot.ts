@@ -16,7 +16,10 @@ import {
   LucideSearch,
   LucideSettings,
   LucideSparkles,
-  LucideSquare,
+  LucideBraces,
+  LucideBell,
+  LucideGlobe,
+  LucideSmartphone,
   LucideSquareKanban,
   LucideTimer,
   LucideDynamicIcon,
@@ -64,21 +67,12 @@ interface ChangedFile {
   },
   template: `
     <div
-      class="bg-background text-foreground flex w-full select-none max-lg:min-h-full lg:h-[1400px] lg:w-[1440px]"
+      class="bg-background text-foreground flex w-full select-none max-lg:min-h-full lg:h-[820px]"
       aria-hidden="true"
     >
       <!-- Sidebar -->
       <aside class="bg-card border-border hidden w-[248px] shrink-0 flex-col border-r lg:flex">
-        <div class="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5">
-          <span class="flex gap-1.5">
-            <span class="bg-line size-[9px]"></span>
-            <span class="bg-line size-[9px]"></span>
-            <span class="bg-line size-[9px]"></span>
-          </span>
-          <span class="flex-1"></span>
-          <svg [lucideIcon]="panelIcon" [size]="14" class="text-faint"></svg>
-        </div>
-        <div class="flex items-center gap-2.5 px-3.5 pt-1 pb-3">
+        <div class="border-border flex h-[44px] items-center gap-2.5 border-b px-3.5">
           <app-trama-logo [size]="24" />
           <span class="flex flex-col gap-px">
             <span class="font-title text-foreground text-[18px] leading-tight">Trama</span>
@@ -86,6 +80,7 @@ interface ChangedFile {
           </span>
           <span class="flex-1"></span>
           <svg [lucideIcon]="chevronsIcon" [size]="13" class="text-faint"></svg>
+          <svg [lucideIcon]="panelIcon" [size]="14" class="text-faint"></svg>
         </div>
         <div class="px-3 pb-2.5">
           <div class="bg-background border-border flex h-[30px] items-center gap-2 border px-2">
@@ -120,7 +115,7 @@ interface ChangedFile {
           <span class="text-faint pb-0.5 font-mono text-[10px]">PROJECTS</span>
           @for (item of projects; track item.label) {
             <div class="flex h-[30px] items-center gap-2.5 px-2.5">
-              <svg [lucideIcon]="squareIcon" [size]="14" class="text-muted-foreground"></svg>
+              <svg [lucideIcon]="item.icon" [size]="15" [class]="item.tone"></svg>
               <span class="text-muted-foreground text-[13px]">{{ item.label }}</span>
               <span class="flex-1"></span>
               <span class="text-faint font-mono text-[11px]">{{ item.count }}</span>
@@ -148,6 +143,8 @@ interface ChangedFile {
             >AB</span
           >
           <span class="text-foreground text-[12.5px]">Alessandro Bruno</span>
+          <span class="flex-1"></span>
+          <svg [lucideIcon]="bellIcon" [size]="14" class="text-faint"></svg>
         </div>
       </aside>
 
@@ -189,7 +186,7 @@ interface ChangedFile {
           </div>
         </div>
 
-        <div class="flex min-h-0 flex-1">
+        <div class="flex min-h-0 flex-1 overflow-hidden">
           <div class="flex min-w-0 flex-1 flex-col gap-7 px-5 py-6 md:px-11 md:py-8">
             <!-- Title block -->
             <div class="flex flex-col gap-3">
@@ -411,7 +408,7 @@ interface ChangedFile {
           </div>
 
           <!-- Properties -->
-          <div class="bg-card border-border hidden w-[300px] shrink-0 flex-col border-l lg:flex">
+          <div class="bg-card border-border hidden w-[300px] shrink-0 flex-col border-l xl:flex">
             <div class="border-border flex flex-col gap-2 border-b px-[18px] py-3.5">
               <span class="text-foreground font-mono text-[10px]">WORK ON IT IN DELTA</span>
               <span
@@ -525,7 +522,35 @@ interface ChangedFile {
             </div>
           </div>
         </div>
+
+        <!-- Status bar -->
+        <div
+          class="border-border hidden h-7 shrink-0 items-center gap-4 border-t px-4 font-mono text-[10.5px] lg:flex"
+        >
+          <span class="text-faint flex items-center gap-1.5">
+            <span class="bg-green size-1.5"></span>Agent sync 4m ago
+          </span>
+          <span class="text-faint">GitHub · GitLab · Jira synced 1m ago</span>
+          <span class="flex-1"></span>
+          <span
+            class="bg-primary/10 border-primary/40 text-foreground flex items-center gap-1.5 border py-0.5 pr-1.5 pl-2"
+          >
+            <svg [lucideIcon]="sparklesIcon" [size]="11" class="text-primary"></svg>
+            Ask Trama
+            <span class="bg-secondary text-muted-foreground px-1 text-[10px]">⌘J</span>
+          </span>
+          <span class="text-faint">? shortcuts &nbsp; ⌘K command</span>
+          <span class="bg-red/12 border-red/40 flex items-center gap-2 border py-0.5 pr-1 pl-2">
+            <span class="bg-red size-1.5"></span>
+            <span class="text-muted-foreground">TRM-128</span>
+            <span class="text-foreground text-[11px]">00:42:13</span>
+            <span class="bg-red/20 flex size-[18px] items-center justify-center">
+              <span class="bg-foreground size-[7px]"></span>
+            </span>
+          </span>
+        </div>
       </div>
+    </div>
     </div>
     <div class="border-border pointer-events-none absolute inset-0 border"></div>
   `,
@@ -534,7 +559,8 @@ export class LandingProductShot {
   protected readonly panelIcon = LucidePanelLeft;
   protected readonly chevronsIcon = LucideChevronsUpDown;
   protected readonly searchIcon = LucideSearch;
-  protected readonly squareIcon = LucideSquare;
+  protected readonly bellIcon = LucideBell;
+  protected readonly sparklesIcon = LucideSparkles;
   protected readonly settingsIcon = LucideSettings;
   protected readonly plusIcon = LucidePlus;
   protected readonly cornerIcon = LucideCornerDownRight;
@@ -554,10 +580,15 @@ export class LandingProductShot {
     { label: 'Ask', icon: LucideSparkles },
   ];
 
-  protected readonly projects: readonly { label: string; count: string }[] = [
-    { label: 'Web app', count: '42' },
-    { label: 'API', count: '31' },
-    { label: 'Mobile', count: '18' },
+  protected readonly projects: readonly {
+    label: string;
+    count: string;
+    icon: LucideIcon;
+    tone: string;
+  }[] = [
+    { label: 'Web app', count: '42', icon: LucideGlobe, tone: 'text-red' },
+    { label: 'API', count: '31', icon: LucideBraces, tone: 'text-delta-line' },
+    { label: 'Mobile', count: '18', icon: LucideSmartphone, tone: 'text-green' },
   ];
 
   protected readonly subtasks: readonly SubtaskRow[] = [
