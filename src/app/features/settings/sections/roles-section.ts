@@ -23,6 +23,7 @@ import {
 } from '../../../core/contracts/domain';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
+import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
 import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT } from './section-kit';
 
@@ -35,7 +36,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmCheckbox, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmCheckbox, HlmInputImports, MemberAccessEditor, V3Segmented, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -75,21 +76,13 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
         </form>
       }
 
-      <div class="mb-4 flex flex-wrap gap-1.5">
-        @for (role of roles(); track role.id) {
-          <button
-            type="button"
-            hlmBtn
-            size="sm"
-            class="h-7"
-            [variant]="selectedId() === role.id ? 'default' : 'outline'"
-            (click)="select(role.id)"
-          >
-            {{ role.name }}
-            <span class="ml-1.5 tabular-nums opacity-70">{{ countFor(role.id) }}</span>
-          </button>
-        }
-      </div>
+      <v3-segmented
+        class="mb-6"
+        aria-label="Role"
+        [options]="roleOptions()"
+        [value]="selected()?.id ?? ''"
+        (valueChange)="select($event)"
+      />
 
       @if (selected(); as role) {
         <app-settings-group
@@ -101,7 +94,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
           "
         >
           @if (!role.owner && isOwner()) {
-            <div class="flex flex-wrap items-center gap-2 px-4 py-3">
+            <div class="border-border flex flex-wrap items-center gap-2 border-b px-1 py-3">
               <input
                 hlmInput
                 class="h-8 w-56 text-[13px]"
@@ -130,18 +123,18 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
           }
         </app-settings-group>
 
-        <div class="mt-8">
-          <h3 class="mb-1 text-[13px] font-medium">Capabilities</h3>
-          <p class="text-muted-foreground mb-3 text-xs leading-snug">
-            Checked means this role can do it. Unchecked means the request is refused.
-          </p>
+        <app-settings-section
+          class="mt-8"
+          title="Capabilities"
+          caption="checked means this role can do it; unchecked is refused"
+        >
           @for (group of groups; track group) {
-            <div class="mt-3">
-              <div class="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
+            <div class="mt-4">
+              <div class="text-faint font-mono text-[10px] tracking-[1px] uppercase">
                 {{ group }}
               </div>
               @for (cap of capsIn(group); track cap) {
-                <label class="flex items-start gap-2 py-1.5">
+                <label class="border-border hover:bg-secondary flex items-start gap-2 border-b px-1 py-2">
                   <hlm-checkbox
                     class="mt-0.5"
                     [checked]="hasCap(role, cap)"
@@ -150,8 +143,8 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
                     (checkedChange)="toggleCap(role, cap, $event)"
                   />
                   <span class="min-w-0">
-                    <span class="block text-[13px] font-medium">{{ meta(cap).label }}</span>
-                    <span class="text-muted-foreground block text-xs leading-snug">{{
+                    <span class="text-foreground block text-[13px]">{{ meta(cap).label }}</span>
+                    <span class="text-muted-foreground block text-[12px] leading-snug">{{
                       meta(cap).description
                     }}</span>
                   </span>
@@ -159,15 +152,16 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
               }
             </div>
           }
-        </div>
+        </app-settings-section>
 
         @if (!role.owner) {
-          <div class="mt-8">
-            <h3 class="mb-1 text-[13px] font-medium">Work this role starts with</h3>
-            <p class="text-muted-foreground mb-3 text-xs leading-snug">
-              View, create, edit and delete. An invitation can add actions, not remove these.
-            </p>
+          <app-settings-section
+            class="mt-8"
+            title="Work this role starts with"
+            caption="view, create, edit, delete · invitations can add, not remove"
+          >
             <app-member-access-editor
+              class="mt-3"
               [showProjects]="false"
               [role]="role.id"
               [disabled]="!isOwner() || busy()"
@@ -185,7 +179,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
                 Save work permissions
               </button>
             }
-          </div>
+          </app-settings-section>
         }
       }
     </div>
@@ -227,6 +221,12 @@ export class RolesSection {
   protected readonly roles = computed(() => this.store.settings().roles);
   protected readonly selected = computed(
     () => this.roles().find((role) => role.id === this.selectedId()) ?? this.roles()[0],
+  );
+  protected readonly roleOptions = computed<V3SegmentOption[]>(() =>
+    this.roles().map((role) => ({
+      value: role.id,
+      label: `${role.name} ${this.store.memberships().filter((m) => m.role === role.id).length}`,
+    })),
   );
 
   private readonly syncDraft = effect(() => {

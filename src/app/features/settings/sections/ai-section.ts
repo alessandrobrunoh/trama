@@ -15,7 +15,7 @@ import { SECTION_KIT } from './section-kit';
       description="Draft suggestions and a contextual assistant, available throughout your workspace."
     />
     @if (ai.statusError()) {
-      <p class="text-destructive text-sm" role="alert">{{ ai.statusError() }}</p>
+      <p class="text-red text-[13px]" role="alert">{{ ai.statusError() }}</p>
     }
     <app-settings-group
       title="Suggestions & chat"
@@ -25,7 +25,7 @@ import { SECTION_KIT } from './section-kit';
         label="Connection"
         description="Used for draft improvements and assistant conversations."
       >
-        <span class="text-sm">{{
+        <span class="text-muted-foreground font-mono text-[11.5px]">{{
           ai.loadingStatus()
             ? 'Checking…'
             : ai.status()?.supergrok?.connected
@@ -37,12 +37,12 @@ import { SECTION_KIT } from './section-kit';
       </app-settings-row>
       @if (ai.status()?.suggestions?.model; as model) {
         <app-settings-row label="Model"
-          ><span class="font-mono text-xs">{{ model }}</span></app-settings-row
+          ><span class="text-muted-foreground font-mono text-[11.5px]">{{ model }}</span></app-settings-row
         >
       }
-      <div class="space-y-3 px-4 py-3">
+      <div class="space-y-3 px-1 py-3">
         @if (!ai.ready()) {
-          <p class="text-muted-foreground text-sm">
+          <p class="text-muted-foreground text-[13px] leading-snug">
           Set <code>AI_API_URL</code>, <code>AI_API_KEY</code> and <code>AI_MODEL</code> in the
           server environment, or connect a SuperGrok account below.
           </p>
@@ -61,7 +61,7 @@ import { SECTION_KIT } from './section-kit';
             Open assistant
           </button>
         </div>
-        <p class="text-muted-foreground text-xs">
+        <p class="text-faint font-mono text-[10.5px] leading-snug">
           Configured means the server has credentials; the provider is contacted only when you
           request a suggestion or send a message.
         </p>
@@ -72,7 +72,7 @@ import { SECTION_KIT } from './section-kit';
       description="Connect with the official Grok Build device authorization flow."
     >
       <app-settings-row label="Connection">
-        <span class="text-sm">
+        <span class="text-muted-foreground font-mono text-[11.5px]">
           @if (!ai.status()?.supergrok?.available) {
             Not enabled by server
           } @else if (ai.status()?.supergrok?.connected) {
@@ -82,13 +82,13 @@ import { SECTION_KIT } from './section-kit';
           }
         </span>
       </app-settings-row>
-      <div class="space-y-3 px-4 py-3">
+      <div class="space-y-3 px-1 py-3">
         @if (ai.status()?.supergrok?.login; as login) {
           @if (login.error) {
-            <p class="text-destructive text-sm" role="alert">{{ login.error }}</p>
+            <p class="text-red text-[13px]" role="alert">{{ login.error }}</p>
           } @else if (login.code) {
-            <p class="text-sm">Enter this one-time code on Grok’s authorization page:</p>
-            <p class="font-mono text-lg font-semibold" aria-live="polite">{{ login.code }}</p>
+            <p class="text-[13px]">Enter this one-time code on Grok’s authorization page:</p>
+            <p class="border-border text-foreground w-fit border px-3 py-1.5 font-mono text-[18px]" aria-live="polite">{{ login.code }}</p>
             @if (login.url) {
               <a
                 [href]="login.url"
@@ -105,7 +105,7 @@ import { SECTION_KIT } from './section-kit';
           }
         }
         @if (!ai.status()?.supergrok?.available) {
-          <p class="text-muted-foreground text-sm">
+          <p class="text-muted-foreground text-[13px] leading-snug">
             Install the official <code>@xai-official/grok</code> CLI in the API container and set
             <code>GROK_HOME_DIR</code> to a persistent private volume.
           </p>
@@ -129,7 +129,7 @@ import { SECTION_KIT } from './section-kit';
             Refresh status
           </button>
         </div>
-        <p class="text-muted-foreground text-xs">
+        <p class="text-faint font-mono text-[10.5px] leading-snug">
           Each Trama account gets a separate Grok home directory. The official CLI stores its own
           credentials there; protect the configured volume and its backups.
         </p>
@@ -140,11 +140,11 @@ import { SECTION_KIT } from './section-kit';
       description="Use your own ChatGPT plan when this installation is eligible."
     >
       <app-settings-row label="Connection"
-        ><span class="text-muted-foreground text-sm"
+        ><span class="text-faint font-mono text-[11.5px]"
           >Requires OpenAI approval</span
         ></app-settings-row
       >
-      <div class="space-y-3 px-4 py-3">
+      <div class="space-y-3 px-1 py-3">
         <p id="chatgpt-availability" class="text-muted-foreground text-sm">
           Connecting a ChatGPT subscription to a remotely hosted app requires OpenAI approval. The
           public local-app login cannot be used on this server. No ChatGPT account is connected.
@@ -163,7 +163,7 @@ import { SECTION_KIT } from './section-kit';
         </p>
       </div>
     </app-settings-group>
-    <p class="text-muted-foreground text-sm">
+    <p class="text-muted-foreground text-[13px] leading-snug">
       Suggestions send your draft to your connected SuperGrok account, if available, or the server
       provider. Chat sends your messages and, when
       selected, details of the item you have open. Conversations are kept only in this browser tab

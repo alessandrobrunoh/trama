@@ -44,35 +44,35 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
   template: `
     @if (agent(); as a) {
       <div>
-        <button type="button" class="text-muted-foreground hover:text-foreground mb-4 inline-flex items-center gap-1.5 text-xs" (click)="back.emit()">
+        <button type="button" class="text-faint hover:text-foreground mb-4 inline-flex items-center gap-1.5 font-mono text-[10.5px]" (click)="back.emit()">
           <svg [lucideIcon]="backIcon" [size]="13"></svg> All agents
         </button>
         <div class="flex flex-wrap items-start gap-4">
-          <span class="bg-muted flex size-12 shrink-0 items-center justify-center rounded-xl">
+          <span class="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center">
             <app-provider-icon [provider]="a.provider" [size]="24" />
           </span>
           <div class="min-w-0 flex-1">
-            <h2 class="truncate text-xl font-semibold tracking-tight">{{ a.name }}</h2>
-            <p class="text-muted-foreground mt-0.5 text-[13px]">
+            <h2 class="font-title text-foreground truncate text-[28px] leading-[32px]">{{ a.name }}</h2>
+            <p class="text-faint mt-0.5 font-mono text-[10.5px]">
               {{ providerName(a.provider) }} agent{{ a.ownerUserId ? ' · owned by ' + userName(a.ownerUserId) : ' · no owner' }} · added {{ a.createdAt | relativeTime }}
             </p>
-            <p class="mt-2 max-w-prose text-[13px] leading-snug">{{ a.description || 'No description yet. Say what this agent works on so teammates know when to rely on it.' }}</p>
+            <p class="text-text-2 mt-2 max-w-[720px] text-[13px] leading-snug">{{ a.description || 'No description yet. Say what this agent works on so teammates know when to rely on it.' }}</p>
           </div>
           @if (canManage()) {
             <div class="flex shrink-0 items-center gap-1">
               <button hlmBtn variant="outline" size="sm" (click)="edit.emit(a)"><svg [lucideIcon]="pencil" [size]="13"></svg> Edit</button>
-              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" aria-label="Remove agent" title="Remove" (click)="remove(a)">
+              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-red" aria-label="Remove agent" title="Remove" (click)="remove(a)">
                 <svg [lucideIcon]="trash" [size]="14"></svg>
               </button>
             </div>
           }
         </div>
 
-        <dl class="mt-6 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <dl class="border-border mt-6 grid grid-cols-2 border sm:grid-cols-4">
           @for (s of stats(); track s.label) {
-            <div class="bg-card rounded-lg px-4 py-3">
-              <dt class="text-muted-foreground text-xs">{{ s.label }}</dt>
-              <dd class="mt-0.5 text-[15px] font-semibold tabular-nums">{{ s.value }}</dd>
+            <div class="border-border flex flex-col-reverse gap-1 px-[18px] py-3.5 not-first:border-l">
+              <dt class="text-faint font-mono text-[10.5px] leading-[13px]">{{ s.label }}</dt>
+              <dd class="font-title text-foreground text-[24px] leading-[28px] tabular-nums">{{ s.value }}</dd>
             </div>
           }
         </dl>
@@ -87,8 +87,8 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
             </button>
           }
           @if (secret(); as s) {
-            <div class="flex flex-col gap-3 px-4 py-4">
-              <p class="text-status-needs-input flex items-center gap-1.5 text-[13px] font-medium">
+            <div class="border-border flex flex-col gap-3 border-b px-1 py-4">
+              <p class="text-status-needs-input flex items-center gap-1.5 text-[13px]">
                 <svg [lucideIcon]="warn" [size]="14"></svg> Copy this token now. You will not be able to see it again.
               </p>
               <app-copy-field [value]="s" label="Token" />
@@ -105,24 +105,24 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
               <app-settings-row label="Expiration" description="Expired tokens stop working." wide>
                 <app-select size="sm" [options]="expiry" [(value)]="expiresIn" label="Expiration" />
               </app-settings-row>
-              <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
+              <div class="flex items-center justify-end gap-2 px-1 py-3">
                 <button hlmBtn type="button" variant="ghost" size="sm" (click)="creating.set(false)">Cancel</button>
                 <button hlmBtn type="submit" size="sm" [disabled]="!name().trim() || busy()">Create token</button>
               </div>
             </form>
           }
           @for (t of tokens(); track t.id) {
-            <div class="flex min-h-12 flex-wrap items-center gap-3 px-4 py-2.5">
-              <span class="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-md">
+            <div class="border-border hover:bg-secondary flex min-h-12 flex-wrap items-center gap-3 border-b px-1 py-2.5">
+              <span class="bg-secondary text-muted-foreground flex size-7 shrink-0 items-center justify-center">
                 <svg [lucideIcon]="keyIcon" [size]="14"></svg>
               </span>
               <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 text-[13px] font-medium">
-                  <span class="truncate">{{ t.name }}</span>
-                  <code class="text-muted-foreground font-mono text-[11px] font-normal">{{ t.prefix }}</code>
-                  <span class="bg-muted text-muted-foreground rounded px-1 py-px text-[10px] font-normal">{{ scopeLabel(t) }}</span>
+                <div class="flex items-center gap-2 text-[13px]">
+                  <span class="text-foreground truncate">{{ t.name }}</span>
+                  <code class="text-faint font-mono text-[11px]">{{ t.prefix }}</code>
+                  <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[14px]">{{ scopeLabel(t) }}</span>
                 </div>
-                <div class="text-muted-foreground text-xs">
+                <div class="text-faint font-mono text-[10.5px]">
                   Created {{ t.createdAt | relativeTime }} · {{ t.lastUsedAt ? 'used ' + (t.lastUsedAt | relativeTime) : 'never used' }}
                   @if (t.expiresAt) {
                     · <span [title]="t.expiresAt | fullDate">expires {{ t.expiresAt | relativeTime }}</span>
@@ -130,12 +130,12 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
                 </div>
               </div>
               @if (canManage()) {
-                <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground hover:text-destructive h-7" (click)="revoke(t)">Revoke</button>
+                <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground hover:text-red h-7" (click)="revoke(t)">Revoke</button>
               }
             </div>
           } @empty {
             @if (!creating() && !secret()) {
-              <div class="text-muted-foreground px-4 py-6 text-center text-[13px]">
+              <div class="text-muted-foreground border-border border-b px-4 py-6 text-center text-[13px]">
                 No token yet, so this agent cannot call Trama.{{ canTokens() ? ' Create one to connect it.' : '' }}
               </div>
             }
@@ -145,20 +145,20 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
 
       <!-- Connect -->
       <app-settings-group title="Connect" description="Give your agent runtime these and it reads and updates Trama over the REST API as {{ a.name }}.">
-        <div class="flex flex-col gap-3 p-4">
-          <ol class="text-muted-foreground list-decimal space-y-1 pl-5 text-xs leading-snug">
+        <div class="flex flex-col gap-3 py-4">
+          <ol class="text-muted-foreground list-decimal space-y-1 pl-5 text-[12px] leading-snug">
             <li>Create a token above (write scope lets the agent update work, read scope only lets it look).</li>
             <li>Put the three variables in the runtime’s environment, or call the API directly like in the examples.</li>
             <li>Actions show up in Trama with {{ a.name }}’s name and an agent badge.</li>
           </ol>
           <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
-          <p class="text-muted-foreground text-xs leading-snug">Agents connect through the Trama MCP server or the REST API with this token.</p>
+          <p class="text-faint font-mono text-[10.5px] leading-snug">Agents connect through the Trama MCP server or the REST API with this token.</p>
         </div>
       </app-settings-group>
 
       <!-- Activity -->
       <app-settings-group title="Recent activity" description="The latest events performed by this agent.">
-        <div class="px-4 py-1">
+        <div class="px-1 py-1">
           @for (e of activity(); track e.id) {
             <app-event-line [event]="e" [slug]="slug()" compact hideDetail />
           } @empty {

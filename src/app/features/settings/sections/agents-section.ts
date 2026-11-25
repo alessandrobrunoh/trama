@@ -47,15 +47,23 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
         <app-readonly-note>Your role cannot add or change agents. You can still open one to see what it did.</app-readonly-note>
       }
 
-      <div class="bg-muted mb-8 rounded-lg p-4">
-        <h3 class="text-[13px] font-medium">What is an agent?</h3>
-        <p class="text-muted-foreground mt-1 max-w-prose text-[13px] leading-snug">
+      <div class="border-border mb-8 border-b pb-5">
+        <p class="text-muted-foreground max-w-[720px] text-[13px] leading-[21px]">
           An agent is an identity for an AI agent (Claude Code, Codex, Delta…) that reads and updates Trama through the API. Everything it does shows up attributed to it, with an agent badge, so you always know what was done by a person and what by a machine.
         </p>
-        <ol class="text-muted-foreground mt-3 grid gap-2 text-xs leading-snug sm:grid-cols-3">
-          <li><strong class="text-foreground font-medium">1. Register it.</strong> Give it a name, its runtime and an owner who is accountable for it.</li>
-          <li><strong class="text-foreground font-medium">2. Give it a token.</strong> A token is its credential. Pick read-only or write; agents never go above member.</li>
-          <li><strong class="text-foreground font-medium">3. Follow its work.</strong> Open an agent to see its activity and how to connect it.</li>
+        <ol class="mt-4 grid gap-4 sm:grid-cols-3">
+          <li class="flex flex-col gap-1">
+            <span class="text-faint font-mono text-[10px] tracking-[1px] uppercase">1 · Register it</span>
+            <span class="text-muted-foreground text-[12.5px] leading-snug">Give it a name, its runtime and an owner who is accountable for it.</span>
+          </li>
+          <li class="flex flex-col gap-1">
+            <span class="text-faint font-mono text-[10px] tracking-[1px] uppercase">2 · Give it a token</span>
+            <span class="text-muted-foreground text-[12.5px] leading-snug">A token is its credential. Pick read-only or write; agents never go above member.</span>
+          </li>
+          <li class="flex flex-col gap-1">
+            <span class="text-faint font-mono text-[10px] tracking-[1px] uppercase">3 · Follow its work</span>
+            <span class="text-muted-foreground text-[12.5px] leading-snug">Open an agent to see its activity and how to connect it.</span>
+          </li>
         </ol>
       </div>
 
@@ -65,30 +73,30 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
         </app-settings-group>
       }
 
-      <app-settings-group [title]="'Agents · ' + store.agents().length">
+      <app-settings-group title="Agents" [caption]="store.agents().length + ' registered'">
         @for (a of store.agents(); track a.id) {
           @if (editing() === a.id) {
             <ng-container *ngTemplateOutlet="form; context: { $implicit: 'edit' }" />
           } @else {
-            <div class="group hover:bg-accent/50 flex min-h-13 items-center gap-1 pr-3 transition-colors">
-              <button type="button" class="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-4 text-left" [attr.aria-label]="'Open ' + a.name" (click)="openId.set(a.id)">
-                <span class="bg-muted flex size-7 shrink-0 items-center justify-center rounded-md">
+            <div class="group border-border hover:bg-secondary flex min-h-13 items-center gap-1 border-b pr-1 transition-colors">
+              <button type="button" class="flex min-w-0 flex-1 items-center gap-3 py-2.5 pl-1 text-left" [attr.aria-label]="'Open ' + a.name" (click)="openId.set(a.id)">
+                <span class="bg-secondary text-muted-foreground flex size-7 shrink-0 items-center justify-center">
                   <app-provider-icon [provider]="a.provider" [size]="15" />
                 </span>
                 <span class="min-w-0 flex-1">
-                  <span class="flex items-center gap-2 text-[13px] font-medium">
-                    <span class="truncate">{{ a.name }}</span>
-                    <span class="text-muted-foreground text-xs font-normal">{{ providerName(a.provider) }}</span>
+                  <span class="flex items-center gap-2 text-[13px]">
+                    <span class="text-foreground truncate">{{ a.name }}</span>
+                    <span class="text-faint font-mono text-[10.5px]">{{ providerName(a.provider) }}</span>
                   </span>
-                  <span class="text-muted-foreground block truncate text-xs">{{ a.description || 'No description' }}</span>
+                  <span class="text-faint block truncate font-mono text-[10.5px]">{{ a.description || 'No description' }}</span>
                 </span>
                 @if (a.ownerUserId) {
-                  <span class="text-muted-foreground hidden shrink-0 items-center gap-1.5 text-xs sm:flex" title="Owner">
+                  <span class="text-muted-foreground hidden shrink-0 items-center gap-1.5 font-mono text-[10.5px] sm:flex" title="Owner">
                     <app-actor-avatar [actor]="{ type: 'user', id: a.ownerUserId }" [size]="18" />
                     {{ userName(a.ownerUserId) }}
                   </span>
                 }
-                <span class="text-muted-foreground group-hover:text-foreground flex shrink-0 items-center text-xs">
+                <span class="text-faint group-hover:text-foreground flex shrink-0 items-center font-mono text-[10.5px]">
                   Open <svg [lucideIcon]="chevron" [size]="13"></svg>
                 </span>
               </button>
@@ -97,7 +105,7 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
                   <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [attr.aria-label]="'Edit ' + a.name" title="Edit" (click)="startEdit(a)">
                     <svg [lucideIcon]="pencil" [size]="14"></svg>
                   </button>
-                  <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" [attr.aria-label]="'Remove ' + a.name" title="Remove" (click)="remove(a)">
+                  <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-red" [attr.aria-label]="'Remove ' + a.name" title="Remove" (click)="remove(a)">
                     <svg [lucideIcon]="trash" [size]="14"></svg>
                   </button>
                 </span>
@@ -105,28 +113,28 @@ const emptyDraft = (): Draft => ({ name: '', provider: 'claude_code', descriptio
             </div>
           }
         } @empty {
-          <div class="text-muted-foreground px-4 py-8 text-center text-[13px]">No agents yet. Add one to give a coding agent its own identity and token.</div>
+          <div class="text-muted-foreground border-border border-b px-4 py-8 text-center text-[13px]">No agents yet. Add one to give a coding agent its own identity and token.</div>
         }
       </app-settings-group>
     </div>
     }
 
     <ng-template #form let-mode>
-      <form class="bg-muted/20 grid gap-3 px-4 py-3 sm:grid-cols-2" (submit)="submit($event, mode)">
-        <label class="grid gap-1 text-xs font-medium">
-          Name
-          <input hlmInput class="h-8 text-[13px] font-normal" placeholder="Claude (backend)" [value]="draft().name" (input)="patch({ name: $any($event.target).value })" />
+      <form class="border-border bg-secondary grid gap-3 border-b px-3.5 py-3 sm:grid-cols-2" (submit)="submit($event, mode)">
+        <label class="text-faint grid gap-1.5 font-mono text-[10.5px]">
+          NAME
+          <input hlmInput class="text-foreground h-8 font-sans text-[13px]" placeholder="Claude (backend)" [value]="draft().name" (input)="patch({ name: $any($event.target).value })" />
         </label>
-        <div class="grid gap-1 text-xs font-medium">
-          Provider
+        <div class="text-faint grid gap-1.5 font-mono text-[10.5px]">
+          PROVIDER
           <app-select size="sm" [options]="providers" [value]="draft().provider" (valueChange)="patch({ provider: $event })" label="Provider" />
         </div>
-        <label class="grid gap-1 text-xs font-medium sm:col-span-2">
-          Description
-          <input hlmInput class="h-8 text-[13px] font-normal" placeholder="What does this agent work on?" [value]="draft().description" (input)="patch({ description: $any($event.target).value })" />
+        <label class="text-faint grid gap-1.5 font-mono text-[10.5px] sm:col-span-2">
+          DESCRIPTION
+          <input hlmInput class="text-foreground h-8 font-sans text-[13px]" placeholder="What does this agent work on?" [value]="draft().description" (input)="patch({ description: $any($event.target).value })" />
         </label>
-        <div class="grid gap-1 text-xs font-medium">
-          Owner
+        <div class="text-faint grid gap-1.5 font-mono text-[10.5px]">
+          OWNER
           <app-select size="sm" [options]="owners()" [value]="draft().owner" (valueChange)="patch({ owner: $event })" label="Owner" placeholder="No owner" />
         </div>
         <div class="flex items-end justify-end gap-2">

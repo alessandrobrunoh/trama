@@ -21,7 +21,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
-      <app-section-header title="Workspace" description="General settings for everyone in this workspace." />
+      <app-section-header title="General" description="Settings for everyone in this workspace: its name, address and how dates are counted." />
       @if (!canAdmin()) {
         <app-readonly-note>Only admins and owners can change workspace settings.</app-readonly-note>
       }
@@ -31,10 +31,10 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
             <input hlmInput class="h-8 w-full text-[13px]" [value]="name()" [disabled]="!canAdmin()" (input)="name.set($any($event.target).value)" aria-label="Workspace name" />
           </app-settings-row>
           <app-settings-row label="URL" description="Changing it moves everyone to the new address. Old links stop working." wide>
-            <div class="border-input focus-within:ring-ring/50 focus-within:border-ring flex h-8 items-center overflow-hidden rounded-md border focus-within:ring-3">
-              <span class="text-muted-foreground bg-muted flex h-full items-center px-2 font-mono text-xs">{{ host }}/</span>
+            <div class="border-border focus-within:border-primary flex h-8 items-center overflow-hidden border">
+              <span class="text-faint bg-secondary flex h-full items-center px-2 font-mono text-[11px]">{{ host }}/</span>
               <input
-                class="h-full min-w-0 flex-1 bg-transparent px-2 font-mono text-xs outline-none disabled:opacity-50"
+                class="h-full min-w-0 flex-1 bg-transparent px-2 font-mono text-[11px] outline-none disabled:opacity-50"
                 [value]="slugValue()"
                 [disabled]="!canAdmin()"
                 (input)="slugValue.set($any($event.target).value.toLowerCase())"
@@ -42,11 +42,11 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
               />
             </div>
             @if (slugError(); as e) {
-              <p class="text-destructive mt-1 text-xs">{{ e }}</p>
+              <p class="text-red mt-1 font-mono text-[10.5px]">{{ e }}</p>
             }
           </app-settings-row>
           @if (canAdmin()) {
-            <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
+            <div class="flex items-center justify-end gap-2 px-1 py-3">
               @if (dirty()) {
                 <button hlmBtn type="button" variant="ghost" size="sm" (click)="resetForm()">Cancel</button>
               }
@@ -62,7 +62,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
         <app-settings-row label="Icon" description="Shown in the sidebar and workspace switcher. Its colour is also the accent colour of the whole workspace." >
           <div class="flex flex-wrap items-center justify-end gap-2">
             <span
-              class="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold"
+              class="bg-primary text-primary-foreground flex size-7 shrink-0 items-center justify-center font-mono text-[11px]"
               [style.background]="prefs().iconColor || null"
               [style.color]="prefs().iconColor ? '#fff' : null"
               aria-hidden="true"
@@ -92,7 +92,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
                   (click)="patchPrefs({ iconColor: c })"
                 ></button>
               }
-              <button type="button" class="text-muted-foreground hover:text-foreground ml-1 text-xs underline-offset-2 hover:underline" [disabled]="!canAdmin() || !prefs().iconColor" (click)="patchPrefs({ iconColor: '' })">Default</button>
+              <button type="button" class="text-faint hover:text-foreground ml-1 font-mono text-[10.5px] underline-offset-2 hover:underline" [disabled]="!canAdmin() || !prefs().iconColor" (click)="patchPrefs({ iconColor: '' })">Default</button>
             </div>
           </div>
         </app-settings-row>
@@ -117,11 +117,11 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
             }
           </datalist>
           @if (zoneError(); as e) {
-            <p class="text-destructive mt-1 text-xs">{{ e }}</p>
+            <p class="text-red mt-1 font-mono text-[10.5px]">{{ e }}</p>
           }
         </app-settings-row>
         @if (canAdmin()) {
-          <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
+          <div class="flex items-center justify-end gap-2 px-1 py-3">
             @if (prefsDirty()) {
               <button hlmBtn type="button" variant="ghost" size="sm" (click)="resetPrefs()">Cancel</button>
             }
@@ -133,17 +133,17 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 
     <app-settings-group title="Overview">
       <app-settings-row label="Created">
-        <span class="text-muted-foreground text-[13px]">{{ store.workspace()?.createdAt | fullDate }}</span>
+        <span class="text-muted-foreground font-mono text-[11.5px]">{{ store.workspace()?.createdAt | fullDate }}</span>
       </app-settings-row>
       <app-settings-row label="Contents" description="What this workspace holds right now.">
-        <span class="text-muted-foreground text-[13px] tabular-nums">{{ counts() }}</span>
+        <span class="text-muted-foreground font-mono text-[11.5px] tabular-nums">{{ counts() }}</span>
       </app-settings-row>
       <app-settings-row label="Labels" description="One catalog shared by tasks and projects.">
         <a hlmBtn variant="outline" size="sm" [routerLink]="['/', store.slug(), 'settings', 'labels']">Manage labels</a>
       </app-settings-row>
     </app-settings-group>
 
-    <app-settings-group title="Danger zone">
+    <app-settings-group title="Danger zone" class="[&_h3]:text-red">
       <app-settings-row
         label="Delete workspace"
         [description]="canOwner() ? 'Removes this workspace and all of its data. This cannot be undone.' : 'Only an owner can delete the workspace.'"

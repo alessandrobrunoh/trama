@@ -30,6 +30,14 @@ import { EmptyState } from '../../../shared/empty-state';
 import { LabelCatalog, describeUsage, type LabelUsage } from '../../../shared/label-catalog';
 import { LabelChip } from '../../../shared/label-chip';
 import { Picker, type PickOption } from '../../../shared/picker';
+import {
+  V3_FIELD,
+  V3DialogFoot,
+  V3DialogHead,
+  V3Field,
+  V3Segmented,
+  type V3SegmentOption,
+} from '../../../shared/v3';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
@@ -60,7 +68,22 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
 @Component({
   selector: 'app-labels-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, HlmButtonImports, HlmDialogImports, HlmDropdownMenuImports, HlmInputImports, LucideDynamicIcon, LabelChip, EmptyState, Picker, ...SECTION_KIT],
+  imports: [
+    NgTemplateOutlet,
+    HlmButtonImports,
+    HlmDialogImports,
+    HlmDropdownMenuImports,
+    HlmInputImports,
+    LucideDynamicIcon,
+    LabelChip,
+    EmptyState,
+    Picker,
+    V3Segmented,
+    V3DialogHead,
+    V3DialogFoot,
+    V3Field,
+    ...SECTION_KIT,
+  ],
   host: { class: 'flex flex-col gap-6' },
   template: `
     <app-section-header title="Labels" description="Each label applies to tasks or projects. Templates are task labels; their name and scope stay fixed.">
@@ -91,36 +114,12 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
           (input)="query.set($any($event.target).value)"
         />
       </div>
-      <div class="bg-muted inline-flex rounded-md p-0.5" role="group" aria-label="Which records">
-        @for (s of scopeFilters; track s.id) {
-          <button
-            type="button"
-            class="h-6 rounded-[5px] px-2.5 text-xs transition-colors"
-            [class]="scopeFilter() === s.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="scopeFilter() === s.id"
-            (click)="scopeFilter.set(s.id)"
-          >
-            {{ s.label }}
-          </button>
-        }
-      </div>
-      <div class="bg-muted inline-flex rounded-md p-0.5" role="group" aria-label="Sort labels">
-        @for (s of sorts; track s.id) {
-          <button
-            type="button"
-            class="h-6 rounded-[5px] px-2.5 text-xs transition-colors"
-            [class]="sort() === s.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-            [attr.aria-pressed]="sort() === s.id"
-            (click)="sort.set(s.id)"
-          >
-            {{ s.label }}
-          </button>
-        }
-      </div>
+      <v3-segmented aria-label="Which records" [options]="scopeFilterOptions" [value]="scopeFilter()" (valueChange)="scopeFilter.set($any($event))" />
+      <v3-segmented aria-label="Sort labels" [options]="sortOptions" [value]="sort()" (valueChange)="sort.set($any($event))" />
     </div>
 
     @if (active().length) {
-      <app-settings-group [title]="'Labels · ' + active().length">
+      <app-settings-group title="Labels" [caption]="active().length + ' in use'">
         @for (l of active(); track l.id) {
           <ng-container *ngTemplateOutlet="row; context: { $implicit: l }" />
         }
@@ -130,7 +129,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     }
 
     @if (archived().length) {
-      <app-settings-group [title]="'Archived · ' + archived().length" description="Hidden from pickers. They stay on what already carries them, and can be restored.">
+      <app-settings-group title="Archived" [caption]="archived().length + ' hidden from pickers'" description="They stay on what already carries them, and can be restored.">
         @for (l of archived(); track l.id) {
           <ng-container *ngTemplateOutlet="row; context: { $implicit: l }" />
         }
@@ -138,7 +137,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     }
 
     <ng-template #row let-l>
-      <div class="flex min-h-14 items-center gap-3 px-4 py-2">
+      <div class="border-border hover:bg-secondary flex min-h-12 items-center gap-3 border-b px-1 py-2">
         <div class="min-w-0 flex-1">
           <div class="flex min-w-0 items-center gap-2">
             @if (catalog.canManage()) {
@@ -153,14 +152,14 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
             } @else {
               <app-label-chip [labelId]="l.id" size="md" />
             }
-            <span class="text-muted-foreground text-[11px]">{{ scopeNoun(l.scope) }}</span>
+            <span class="text-faint font-mono text-[10.5px]">{{ scopeNoun(l.scope) }}</span>
             @if (l.template) {
-              <span class="text-muted-foreground text-[11px]">Template</span>
+              <span class="border-border text-faint border px-1.5 font-mono text-[10px] leading-[14px]">Template</span>
             }
           </div>
-          <div class="text-muted-foreground mt-1 text-xs md:hidden">{{ usageText(l.id) }}</div>
+          <div class="text-faint mt-1 font-mono text-[10.5px] md:hidden">{{ usageText(l.id) }}</div>
         </div>
-        <div class="text-muted-foreground hidden w-64 shrink-0 truncate text-xs md:block" [attr.title]="usageText(l.id)">{{ usageText(l.id) }}</div>
+        <div class="text-faint hidden w-64 shrink-0 truncate font-mono text-[10.5px] md:block" [attr.title]="usageText(l.id)">{{ usageText(l.id) }}</div>
         @if (catalog.canManage()) {
           <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground shrink-0" [hlmDropdownMenuTrigger]="menu" [attr.aria-label]="'Actions for ' + l.name">
             <svg [lucideIcon]="more" [size]="16"></svg>
@@ -192,23 +191,22 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     </ng-template>
 
     <hlm-dialog [state]="dlg() ? 'open' : 'closed'" (closed)="closeDialog()">
-      <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] overflow-y-auto sm:max-w-md">
+      <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] gap-0 overflow-y-auto p-0 sm:max-w-md" [showCloseButton]="false">
         @switch (dlg()?.kind) {
           @case ('form') {
             <form class="contents" (submit)="submitForm($event)">
-              <hlm-dialog-header>
+              <v3-dialog-head kicker="LABEL" (dismiss)="closeDialog()">
                 <h2 hlmDialogTitle>{{ editing() ? 'Edit label' : 'New label' }}</h2>
-                <p hlmDialogDescription>
-                  {{ editing()?.template ? 'Templates stay task labels; you can change the color.' : 'A short name, and which records it can be added to.' }}
-                </p>
-              </hlm-dialog-header>
-              <div class="flex flex-col gap-4 text-[13px]">
-                <div class="grid gap-1.5">
-                  <label class="text-muted-foreground text-xs font-medium" for="label-name">Name</label>
+              </v3-dialog-head>
+              <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3.5 text-[12.5px] leading-snug">
+                {{ editing()?.template ? 'Templates stay task labels; you can change the color.' : 'A short name, and which records it can be added to.' }}
+              </p>
+              <div class="flex flex-col gap-4 p-[18px] text-[13px]">
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-faint font-mono text-[10.5px] leading-[14px]" for="label-name">NAME</label>
                   <input
                     id="label-name"
-                    hlmInput
-                    class="h-9 w-full"
+                    [class]="fieldClass"
                     autocomplete="off"
                     [attr.maxlength]="nameMax"
                     [value]="formName()"
@@ -218,40 +216,21 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     (input)="formName.set($any($event.target).value)"
                   />
                   @if (nameError(); as e) {
-                    <span id="label-name-error" class="text-destructive text-xs">{{ e }}</span>
+                    <span id="label-name-error" class="text-red font-mono text-[10.5px]">{{ e }}</span>
                   }
                 </div>
-                <div class="grid gap-2">
-                  <span class="text-muted-foreground text-xs font-medium" id="label-scope-label">Applies to</span>
-                  <div class="bg-muted inline-flex w-fit rounded-md p-0.5" role="radiogroup" aria-labelledby="label-scope-label">
-                    @if (editing()?.scope === 'workstream') {
-                      <button
-                        type="button"
-                        role="radio"
-                        class="bg-background text-foreground h-7 rounded-[5px] px-2.5 text-xs shadow-xs"
-                        aria-checked="true"
-                        disabled
-                      >
-                        Legacy
-                      </button>
-                    }
-                    @for (s of scopes; track s.id) {
-                      <button
-                        type="button"
-                        role="radio"
-                        class="h-7 rounded-[5px] px-2.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-60"
-                        [class]="formScope() === s.id ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-                        [attr.aria-checked]="formScope() === s.id"
-                        [disabled]="!!editing()?.template || busy()"
-                        (click)="formScope.set(s.id)"
-                      >
-                        {{ s.label }}
-                      </button>
-                    }
-                  </div>
+                <div class="flex flex-col gap-1.5">
+                  <span class="text-faint font-mono text-[10.5px] leading-[14px]">APPLIES TO</span>
+                  <v3-segmented
+                    aria-label="Applies to"
+                    [options]="scopeOptions"
+                    [value]="formScope()"
+                    [disabled]="!!editing()?.template || busy()"
+                    (valueChange)="formScope.set($any($event))"
+                  />
                 </div>
-                <div class="grid gap-2">
-                  <span class="text-muted-foreground text-xs font-medium" id="label-color-label">Color</span>
+                <div class="flex flex-col gap-2">
+                  <span class="text-faint font-mono text-[10.5px] leading-[14px]" id="label-color-label">COLOR</span>
                   <div class="grid w-fit grid-cols-6 gap-2" role="radiogroup" aria-labelledby="label-color-label">
                     @for (c of swatches; track c) {
                       <button
@@ -272,14 +251,13 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                   <div class="flex items-center gap-2">
                     <input
                       type="color"
-                      class="h-8 w-10 shrink-0 cursor-pointer rounded border bg-transparent p-0.5"
+                      class="border-border h-[34px] w-10 shrink-0 cursor-pointer border bg-transparent p-0.5"
                       aria-label="Pick any color"
                       [value]="colorValid() ? formColor() : '#64748b'"
                       (input)="formColor.set($any($event.target).value)"
                     />
                     <input
-                      hlmInput
-                      class="h-8 w-28 font-mono text-xs"
+                      [class]="fieldClass + ' w-28! font-mono'"
                       aria-label="Hex color"
                       maxlength="7"
                       [value]="formColor()"
@@ -288,26 +266,26 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     />
                   </div>
                 </div>
-                <div class="bg-muted flex items-center gap-2 rounded-md px-3 py-2">
-                  <span class="text-muted-foreground text-xs">Preview</span>
+                <div class="border-border flex items-center gap-2 border px-3 py-2">
+                  <span class="text-faint font-mono text-[10.5px]">PREVIEW</span>
                   <app-label-chip [name]="formName().trim() || 'Label name'" [color]="colorValid() ? formColor() : '#64748b'" size="md" />
                 </div>
               </div>
-              <hlm-dialog-footer>
-                <button hlmBtn type="button" variant="outline" size="sm" hlmDialogClose>Cancel</button>
-                <button hlmBtn type="submit" size="sm" [disabled]="!canSubmit() || busy()">{{ editing() ? 'Save' : 'Create label' }}</button>
-              </hlm-dialog-footer>
+              <v3-dialog-foot>
+                <button hlmBtn type="button" variant="outline" hlmDialogClose>Cancel</button>
+                <button hlmBtn type="submit" [disabled]="!canSubmit() || busy()">{{ editing() ? 'Save' : 'Create label' }}</button>
+              </v3-dialog-foot>
             </form>
           }
           @case ('merge') {
             @if (target(); as l) {
-              <hlm-dialog-header>
+              <v3-dialog-head kicker="MERGE" (dismiss)="closeDialog()">
                 <h2 hlmDialogTitle>Merge “{{ l.name }}”</h2>
-                <p hlmDialogDescription>Everything labelled “{{ l.name }}” gets the label you choose instead, and “{{ l.name }}” is removed.</p>
-              </hlm-dialog-header>
-              <div class="flex flex-col gap-3 text-[13px]">
-                <div class="grid gap-1.5">
-                  <span class="text-muted-foreground text-xs font-medium">Merge into</span>
+              </v3-dialog-head>
+              <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3.5 text-[12.5px] leading-snug">Everything labelled “{{ l.name }}” gets the label you choose instead, and “{{ l.name }}” is removed.</p>
+              <div class="flex flex-col gap-3 p-[18px] text-[13px]">
+                <div class="flex flex-col gap-1.5">
+                  <span class="text-faint font-mono text-[10.5px] leading-[14px]">MERGE INTO</span>
                   <app-picker
                     variant="input"
                     label="Target label"
@@ -317,7 +295,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     (valueChange)="mergeInto.set($event[0] ?? '')"
                   />
                 </div>
-                <div class="bg-muted rounded-md px-3 py-2 text-xs leading-relaxed">
+                <div class="border-border border px-3 py-2 text-[12px] leading-relaxed">
                   @if (mergeTarget(); as t) {
                     <p>
                       {{ impact(l.id) }} will be relabeled “{{ t.name }}”. Items that already have both keep one.
@@ -329,22 +307,22 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     <p class="text-muted-foreground mt-1">{{ v }}</p>
                   }
                 </div>
-                <p class="text-muted-foreground text-xs">This cannot be undone.</p>
+                <p class="text-faint font-mono text-[10.5px]">This cannot be undone.</p>
               </div>
-              <hlm-dialog-footer>
-                <button hlmBtn type="button" variant="outline" size="sm" hlmDialogClose>Cancel</button>
-                <button hlmBtn type="button" size="sm" [disabled]="!mergeTarget() || busy()" (click)="confirmMerge()">Merge</button>
-              </hlm-dialog-footer>
+              <v3-dialog-foot>
+                <button hlmBtn type="button" variant="outline" hlmDialogClose>Cancel</button>
+                <button hlmBtn type="button" [disabled]="!mergeTarget() || busy()" (click)="confirmMerge()">Merge</button>
+              </v3-dialog-foot>
             }
           }
           @case ('delete') {
             @if (target(); as l) {
-              <hlm-dialog-header>
+              <v3-dialog-head kicker="DELETE" (dismiss)="closeDialog()">
                 <h2 hlmDialogTitle>Delete “{{ l.name }}”?</h2>
-                <p hlmDialogDescription>The label is removed from the workspace and from everything that carries it.</p>
-              </hlm-dialog-header>
-              <div class="flex flex-col gap-3 text-[13px]">
-                <div class="bg-muted rounded-md px-3 py-2 text-xs leading-relaxed">
+              </v3-dialog-head>
+              <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3.5 text-[12.5px] leading-snug">The label is removed from the workspace and from everything that carries it.</p>
+              <div class="flex flex-col gap-3 p-[18px] text-[13px]">
+                <div class="border-border border px-3 py-2 text-[12px] leading-relaxed">
                   <div class="flex items-center gap-2"><app-label-chip [labelId]="l.id" /></div>
                   @if (catalog.usageOf(l.id).total) {
                     <p class="mt-2 flex items-start gap-1.5">
@@ -358,15 +336,15 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                     <p class="text-muted-foreground mt-1">{{ v }}</p>
                   }
                 </div>
-                <p class="text-muted-foreground text-xs">Deleting cannot be undone. Archive it instead to keep it where it is and stop offering it.</p>
+                <p class="text-faint font-mono text-[10.5px]">Deleting cannot be undone. Archive it instead to keep it where it is and stop offering it.</p>
               </div>
-              <hlm-dialog-footer>
-                <button hlmBtn type="button" variant="outline" size="sm" hlmDialogClose>Cancel</button>
+              <v3-dialog-foot>
+                <button hlmBtn type="button" variant="outline" hlmDialogClose>Cancel</button>
                 @if (!l.archived) {
-                  <button hlmBtn type="button" variant="outline" size="sm" [disabled]="busy()" (click)="archiveFromDelete(l)">Archive instead</button>
+                  <button hlmBtn type="button" variant="outline" [disabled]="busy()" (click)="archiveFromDelete(l)">Archive instead</button>
                 }
-                <button hlmBtn type="button" variant="destructive" size="sm" [disabled]="busy()" (click)="confirmDelete()">Delete label</button>
-              </hlm-dialog-footer>
+                <button hlmBtn type="button" variant="destructive" [disabled]="busy()" (click)="confirmDelete()">Delete label</button>
+              </v3-dialog-foot>
             }
           }
         }
@@ -395,6 +373,9 @@ export class LabelsSection {
     { id: 'issue', label: 'Tasks' },
     { id: 'project', label: 'Projects' },
   ];
+  protected readonly sortOptions: V3SegmentOption[] = this.sorts.map((s) => ({ value: s.id, label: s.label }));
+  protected readonly scopeFilterOptions: V3SegmentOption[] = this.scopeFilters.map((s) => ({ value: s.id, label: s.label }));
+  protected readonly scopeOptions: V3SegmentOption[] = this.scopes.map((s) => ({ value: s.id, label: s.label }));
 
   protected readonly dlg = signal<Dialog | null>(null);
   protected readonly busy = signal(false);
@@ -403,6 +384,7 @@ export class LabelsSection {
   protected readonly formScope = signal<StoredLabelScope>('issue');
   protected readonly mergeInto = signal('');
 
+  protected readonly fieldClass = V3_FIELD;
   protected readonly swatches = LABEL_SWATCHES;
   protected readonly nameMax = LABEL_NAME_MAX;
   protected readonly plus = LucidePlus;

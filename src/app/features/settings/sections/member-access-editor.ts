@@ -33,11 +33,11 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
           {{ p.label }}
         </button>
       }
-      <span class="text-muted-foreground ml-auto text-xs">{{ summary() }}</span>
+      <span class="text-faint ml-auto font-mono text-[10.5px]">{{ summary() }}</span>
     </div>
 
     @if (showProjects()) {
-    <div class="bg-card overflow-hidden rounded-lg">
+    <div class="border-border overflow-hidden border">
       <div class="flex items-start gap-3 px-3 py-2.5">
         <hlm-checkbox
           class="mt-0.5"
@@ -47,7 +47,7 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
           (checkedChange)="setAllProjects($event)"
         />
         <span class="min-w-0">
-          <span class="block text-[13px] font-medium">All projects</span>
+          <span class="text-foreground block text-[13px]">All projects</span>
           <span class="text-muted-foreground block text-xs leading-snug">Including projects created after this person joins. Turn off to choose which ones they can see.</span>
         </span>
       </div>
@@ -83,8 +83,8 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
     </div>
     }
 
-    <div class="bg-card overflow-hidden rounded-lg" role="group" aria-label="What they can do">
-      <div class="text-muted-foreground flex items-center gap-3 px-3 py-1.5 text-[11px] font-medium uppercase">
+    <div class="border-border overflow-hidden border" role="group" aria-label="What they can do">
+      <div class="text-faint border-border flex items-center gap-3 border-b px-3 py-1.5 font-mono text-[10px] tracking-[1px] uppercase">
         <span class="flex-1">Action</span>
         @for (c of columns; track c.id) {
           <span class="w-14 text-center">
@@ -95,9 +95,9 @@ const ALL_GRANTS: MemberGrant[] = MEMBER_RESOURCE_ORDER.flatMap((id) =>
         }
       </div>
       @for (g of groups(); track g.name) {
-        <div class="text-muted-foreground bg-muted px-3 py-1 text-[11px] font-medium tracking-wide uppercase">{{ g.name }}</div>
+        <div class="text-faint bg-secondary border-border border-b px-3 py-1 font-mono text-[10px] tracking-[1px] uppercase">{{ g.name }}</div>
         @for (r of g.items; track r.id) {
-          <div class="flex items-center gap-3 px-3 py-1.5">
+          <div class="border-border hover:bg-secondary flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
             <span class="min-w-0 flex-1">
               <span class="block text-[13px]">{{ r.label }}</span>
               <span class="text-muted-foreground block text-xs leading-snug">{{ r.description }}</span>

@@ -55,31 +55,38 @@ export class SettingsSection {
 }
 
 /**
- * Titled group of hairline-separated rows on a flat panel (`bg-card` + 1px border, no radius):
+ * Titled group of hairline-separated rows (v3 section head, no card): Newsreader 20 title over a 1px rule,
+ * rows below each with a bottom hairline.
  *   <app-settings-group title="Workspace"> <app-settings-row …/> … </app-settings-group>
- * Content projected with `[aside]` renders right of the title (e.g. a count or a small button).
+ * Content projected with `[aside]` renders right of the title (e.g. a count or a small button); `caption`
+ * is the mono note beside the title and `description` a muted sentence under it.
  */
 @Component({
   selector: 'app-settings-group',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'block' },
+  host: { class: 'block [&+app-settings-group]:mt-8' },
   template: `
     @if (title()) {
-      <div class="mb-2.5 flex min-h-6 items-end justify-between gap-3">
-        <div class="min-w-0">
+      <div class="border-border border-b pb-2">
+        <div class="flex min-h-6 items-end gap-2.5">
           <h3 class="font-title text-foreground text-[20px] leading-normal">{{ title() }}</h3>
-          @if (description()) {
-            <p class="text-muted-foreground mt-0.5 text-[12.5px] leading-snug">{{ description() }}</p>
+          @if (caption()) {
+            <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
           }
+          <span class="flex-1"></span>
+          <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
         </div>
-        <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
+        @if (description()) {
+          <p class="text-muted-foreground mt-0.5 max-w-[720px] text-[12.5px] leading-snug">{{ description() }}</p>
+        }
       </div>
     }
-    <div class="bg-card border-border overflow-hidden border"><ng-content /></div>
+    <ng-content />
   `,
 })
 export class SettingsGroup {
   readonly title = input<string>();
+  readonly caption = input<string>();
   readonly description = input<string>();
 }
 
@@ -92,7 +99,7 @@ export class SettingsGroup {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'border-border flex min-h-12 flex-col gap-2 border-b px-4 py-2.5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
+      'border-border flex min-h-[46px] flex-col gap-2 border-b px-1 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
   },
   template: `
     <div class="min-w-0 flex-1">

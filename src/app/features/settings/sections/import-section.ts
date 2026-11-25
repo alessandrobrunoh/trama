@@ -13,7 +13,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { V3Toggle } from '../../../shared/v3';
+import { V3Segmented, V3Toggle, type V3SegmentOption } from '../../../shared/v3';
 import { ApiClient } from '../../../core/api/api-client';
 import { ApiError } from '../../../core/api/api-error';
 import {
@@ -33,7 +33,6 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { RelativeTimePipe } from '../../../shared/pipes';
-import { ProviderIcon } from '../../../shared/provider-icon';
 import {
   PHASE_LABEL,
   STATUS_TEXT,
@@ -56,7 +55,7 @@ const POLL_MS = 2000;
 @Component({
   selector: 'app-import-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AppSelect, HlmButtonImports, HlmCheckbox, HlmInputImports, V3Toggle, LucideDynamicIcon, RelativeTimePipe, ProviderIcon, ...SECTION_KIT],
+  imports: [AppSelect, HlmButtonImports, HlmCheckbox, HlmInputImports, V3Segmented, V3Toggle, LucideDynamicIcon, RelativeTimePipe, ...SECTION_KIT],
   template: `
     <app-section-header
       title="Import"
@@ -69,23 +68,23 @@ const POLL_MS = 2000;
     <div class="flex flex-col gap-8">
       @if (active(); as job) {
         <app-settings-group title="Import in progress">
-          <div class="flex flex-col gap-3 px-4 py-4" role="status" aria-live="polite">
-            <div class="flex flex-wrap items-center gap-2 text-[13px] font-medium">
+          <div class="border-border flex flex-col gap-3 border-b px-1 py-4" role="status" aria-live="polite">
+            <div class="flex flex-wrap items-center gap-2 text-[13px]">
               <svg [lucideIcon]="spinner" [size]="14" class="text-muted-foreground animate-spin"></svg>
-              <span>{{ job.sourceLabel }}</span>
-              <span class="text-muted-foreground text-xs font-normal">{{ phase(job) }}</span>
+              <span class="text-foreground">{{ job.sourceLabel }}</span>
+              <span class="text-faint font-mono text-[10.5px]">{{ phase(job) }}</span>
             </div>
-            <div class="bg-muted h-1.5 overflow-hidden rounded-full" role="progressbar" [attr.aria-valuenow]="percent(job)" aria-valuemin="0" aria-valuemax="100" aria-label="Import progress">
-              <div class="bg-primary h-full rounded-full transition-all" [class.animate-pulse]="percent(job) === null" [style.width.%]="percent(job) ?? 100"></div>
+            <div class="bg-secondary h-1 overflow-hidden" role="progressbar" [attr.aria-valuenow]="percent(job)" aria-valuemin="0" aria-valuemax="100" aria-label="Import progress">
+              <div class="bg-primary h-full transition-all" [class.animate-pulse]="percent(job) === null" [style.width.%]="percent(job) ?? 100"></div>
             </div>
-            <p class="text-muted-foreground text-xs tabular-nums">
+            <p class="text-faint font-mono text-[10.5px] tabular-nums">
               {{ job.progress.processed }}@if (job.progress.total) { of {{ job.progress.total }} }
               issues · {{ job.progress.created }} created · {{ job.progress.skipped }} already there
               @if (job.progress.comments) { · {{ job.progress.comments }} comments }
-              @if (job.progress.failed) { · <span class="text-status-blocked">{{ job.progress.failed }} failed</span> }
+              @if (job.progress.failed) { · <span class="text-red">{{ job.progress.failed }} failed</span> }
             </p>
             @if (job.waitingUntil) {
-              <p class="text-status-needs-input text-xs">Waiting for the tracker’s rate limit; it continues {{ job.waitingUntil | relativeTime }}.</p>
+              <p class="text-status-needs-input font-mono text-[10.5px]">Waiting for the tracker’s rate limit; it continues {{ job.waitingUntil | relativeTime }}.</p>
             }
             @if (canManage()) {
               <div class="flex justify-end">
@@ -101,21 +100,7 @@ const POLL_MS = 2000;
       @if (canManage()) {
         <app-settings-group title="Source" description="Where the issues are read from.">
           <app-settings-row label="Tracker">
-            <div class="flex gap-1" role="group" aria-label="Tracker">
-              @for (p of providers; track p) {
-                <button
-                  hlmBtn
-                  size="sm"
-                  [variant]="provider() === p ? 'secondary' : 'ghost'"
-                  class="h-7 gap-1.5"
-                  [attr.aria-pressed]="provider() === p"
-                  (click)="setProvider(p)"
-                >
-                  @if (p === 'github') { <app-provider-icon provider="github" /> }
-                  {{ meta(p).label }}
-                </button>
-              }
-            </div>
+            <v3-segmented aria-label="Tracker" [options]="providerOptions" [value]="provider()" (valueChange)="setProvider($any($event))" />
           </app-settings-row>
 
           <app-settings-row
@@ -139,24 +124,24 @@ const POLL_MS = 2000;
           </app-settings-row>
 
           @if (addingCredential()) {
-            <form class="bg-muted/30 flex flex-col gap-3 px-4 py-3" (submit)="saveCredential($event)">
-              <div class="flex flex-col gap-1">
-                <label class="text-xs font-medium" for="import-token">{{ provider() === 'github' ? 'Personal access token' : 'API key' }}</label>
+            <form class="border-border bg-secondary flex flex-col gap-3 border-b px-3.5 py-3" (submit)="saveCredential($event)">
+              <div class="flex flex-col gap-1.5">
+                <label class="text-faint font-mono text-[10.5px]" for="import-token">{{ provider() === 'github' ? 'PERSONAL ACCESS TOKEN' : 'API KEY' }}</label>
                 <input
                   id="import-token"
                   hlmInput
                   type="password"
                   autocomplete="off"
-                  class="h-8 w-full font-mono text-xs"
+                  class="h-8 w-full font-mono text-[11.5px]"
                   [value]="token()"
                   (input)="token.set($any($event.target).value)"
                   [placeholder]="provider() === 'github' ? 'github_pat_… (needs read access to issues)' : 'lin_api_…'"
                 />
-                <p class="text-muted-foreground text-xs">Stored encrypted on the server and only used to read. It is never shown again.</p>
+                <p class="text-faint font-mono text-[10.5px]">Stored encrypted on the server and only used to read. It is never shown again.</p>
               </div>
               @if (provider() === 'github') {
-                <div class="flex flex-col gap-1">
-                  <label class="text-xs font-medium" for="import-base">GitHub Enterprise URL (optional)</label>
+                <div class="flex flex-col gap-1.5">
+                  <label class="text-faint font-mono text-[10.5px]" for="import-base">GITHUB ENTERPRISE URL (OPTIONAL)</label>
                   <input id="import-base" hlmInput class="h-8 w-full text-[13px]" placeholder="https://github.example.com" [value]="baseUrl()" (input)="baseUrl.set($any($event.target).value)" />
                 </div>
               }
@@ -168,11 +153,11 @@ const POLL_MS = 2000;
           }
 
           @for (c of credentialsOf(provider()); track c.id) {
-            <div class="flex min-h-11 items-center gap-3 px-4 py-2">
+            <div class="border-border hover:bg-secondary flex min-h-11 items-center gap-3 border-b px-1 py-2">
               <svg [lucideIcon]="keyIcon" [size]="14" class="text-muted-foreground shrink-0"></svg>
               <div class="min-w-0 flex-1 text-[13px]">
-                <span class="font-medium">{{ c.account }}</span>
-                <span class="text-muted-foreground text-xs">
+                <span class="text-foreground">{{ c.account }}</span>
+                <span class="text-faint font-mono text-[10.5px]">
                   @if (c.baseUrl) { · {{ c.baseUrl }} }
                   · added {{ c.createdAt | relativeTime }}@if (c.lastUsedAt) { · used {{ c.lastUsedAt | relativeTime }} }
                 </span>
@@ -187,7 +172,7 @@ const POLL_MS = 2000;
             <app-settings-row label="Repository" description="owner/name, or paste the repository URL." wide>
               <input
                 hlmInput
-                class="h-8 w-full font-mono text-xs"
+                class="h-8 w-full font-mono text-[11.5px]"
                 placeholder="acme/api"
                 aria-label="Repository"
                 [value]="repository()"
@@ -197,7 +182,7 @@ const POLL_MS = 2000;
             </app-settings-row>
           }
 
-          <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
+          <div class="flex items-center justify-end gap-2 px-1 py-3">
             <button hlmBtn size="sm" [disabled]="!canPreview() || busy()" (click)="runPreview()">
               @if (busy() && !preview()) { Reading… } @else { Preview }
             </button>
@@ -205,26 +190,26 @@ const POLL_MS = 2000;
         </app-settings-group>
 
         @if (preview(); as p) {
-          <app-settings-group [title]="'Preview · ' + p.sourceLabel" [description]="'Read as ' + p.account + '. Nothing has been written yet.'">
-            <div class="grid grid-cols-2 gap-px sm:grid-cols-4">
+          <app-settings-group title="Preview" [caption]="p.sourceLabel" [description]="'Read as ' + p.account + '. Nothing has been written yet.'">
+            <div class="border-border mt-3 grid grid-cols-2 border sm:grid-cols-4">
               @for (stat of stats(p); track stat.label) {
-                <div class="bg-card px-4 py-3">
-                  <div class="text-lg font-semibold tabular-nums">{{ stat.value }}</div>
-                  <div class="text-muted-foreground text-xs">{{ stat.label }}</div>
+                <div class="border-border flex flex-col gap-1 px-[18px] py-3.5 not-first:border-l">
+                  <div class="font-title text-foreground text-[24px] leading-[28px] tabular-nums">{{ stat.value }}</div>
+                  <div class="text-faint font-mono text-[10.5px] leading-[13px]">{{ stat.label }}</div>
                 </div>
               }
             </div>
             @for (w of p.warnings; track w) {
-              <p class="text-status-needs-input flex items-start gap-1.5 px-4 py-2 text-xs"><svg [lucideIcon]="alert" [size]="13" class="mt-px shrink-0"></svg>{{ w }}</p>
+              <p class="text-status-needs-input flex items-start gap-1.5 px-1 py-2 font-mono text-[10.5px]"><svg [lucideIcon]="alert" [size]="13" class="mt-px shrink-0"></svg>{{ w }}</p>
             }
             @if (p.sample.length) {
-              <div class="px-4 py-2.5">
-                <div class="text-muted-foreground mb-1 text-xs font-medium">First issues</div>
+              <div class="px-1 py-2.5">
+                <div class="text-faint mb-1 font-mono text-[10px] tracking-[1px] uppercase">First issues</div>
                 @for (s of p.sample; track s.key) {
-                  <div class="flex items-baseline gap-2 py-0.5 text-[13px]">
-                    <span class="text-muted-foreground w-10 shrink-0 font-mono text-xs">{{ s.key }}</span>
+                  <div class="border-border flex items-baseline gap-2 border-b py-1.5 text-[13px]">
+                    <span class="text-faint w-14 shrink-0 font-mono text-[11px]">{{ s.key }}</span>
                     <span class="min-w-0 flex-1 truncate">{{ s.title }}</span>
-                    <span class="text-muted-foreground shrink-0 text-xs">{{ s.state }}</span>
+                    <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ s.state }}</span>
                   </div>
                 }
               </div>
@@ -239,7 +224,7 @@ const POLL_MS = 2000;
                 </app-settings-row>
               }
               @if (teamsChanged()) {
-                <div class="bg-muted/30 flex justify-end px-4 py-2">
+                <div class="flex justify-end px-1 py-3">
                   <button hlmBtn size="sm" variant="outline" [disabled]="busy()" (click)="runPreview(true)">Refresh preview with these teams</button>
                 </div>
               }
@@ -261,7 +246,7 @@ const POLL_MS = 2000;
                 />
               </app-settings-row>
             } @empty {
-              <p class="text-muted-foreground px-4 py-3 text-xs">No projects in the source.</p>
+              <p class="text-faint px-1 py-3 font-mono text-[10.5px]">No projects in the source.</p>
             }
           </app-settings-group>
 
@@ -280,7 +265,7 @@ const POLL_MS = 2000;
           </app-settings-group>
 
           <details class="group">
-            <summary class="text-[13px] font-medium cursor-pointer select-none">Labels ({{ p.labels.length }})</summary>
+            <summary class="font-title text-foreground cursor-pointer text-[20px] select-none">Labels <span class="text-faint font-mono text-[10.5px]">{{ p.labels.length }}</span></summary>
             <div class="mt-2">
               <app-settings-group description="A tracker label can reuse a Trama label, become a new one or be dropped. Labels named bug, security, incident, chore or idea also pick the issue kind.">
                 @for (l of p.labels; track l.id) {
@@ -294,14 +279,14 @@ const POLL_MS = 2000;
                     />
                   </app-settings-row>
                 } @empty {
-                  <p class="text-muted-foreground px-4 py-3 text-xs">No labels in the source.</p>
+                  <p class="text-faint px-1 py-3 font-mono text-[10.5px]">No labels in the source.</p>
                 }
               </app-settings-group>
             </div>
           </details>
 
           <details class="group">
-            <summary class="text-[13px] font-medium cursor-pointer select-none">People ({{ p.users.length }})</summary>
+            <summary class="font-title text-foreground cursor-pointer text-[20px] select-none">People <span class="text-faint font-mono text-[10.5px]">{{ p.users.length }}</span></summary>
             <div class="mt-2">
               <app-settings-group description="Matched by email, then by login or name. An assignee left unmatched leaves the issue unassigned.">
                 @for (u of p.users; track u.id) {
@@ -315,7 +300,7 @@ const POLL_MS = 2000;
                     />
                   </app-settings-row>
                 } @empty {
-                  <p class="text-muted-foreground px-4 py-3 text-xs">No people to map.</p>
+                  <p class="text-faint px-1 py-3 font-mono text-[10.5px]">No people to map.</p>
                 }
               </app-settings-group>
             </div>
@@ -337,8 +322,8 @@ const POLL_MS = 2000;
                 (valueChange)="setOption({ defaultKind: $any($event) })"
               />
             </app-settings-row>
-            <div class="bg-muted/30 flex items-center justify-between gap-3 px-4 py-2">
-              <span class="text-muted-foreground text-xs">
+            <div class="flex items-center justify-between gap-3 px-1 py-3">
+              <span class="text-faint font-mono text-[10.5px]">
                 @if (p.counts.issues !== null) { About {{ p.counts.issues }} issues. } Imported issues keep their dates and link back to the original.
               </span>
               <button hlmBtn size="sm" [disabled]="busy() || !!active()" (click)="start()">
@@ -351,11 +336,11 @@ const POLL_MS = 2000;
 
       <app-settings-group title="History" description="Past imports of this workspace.">
         @for (j of jobs(); track j.id) {
-          <div class="flex flex-col gap-1.5 px-4 py-3">
+          <div class="border-border hover:bg-secondary flex flex-col gap-1.5 border-b px-1 py-3">
             <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
               <svg [lucideIcon]="icon(j)" [size]="14" [class]="iconClass(j)"></svg>
-              <span class="text-[13px] font-medium">{{ j.sourceLabel }}</span>
-              <span class="text-muted-foreground text-xs">{{ statusText[j.status] }} · {{ j.createdAt | relativeTime }}</span>
+              <span class="text-foreground text-[13px]">{{ j.sourceLabel }}</span>
+              <span class="text-faint font-mono text-[10.5px]">{{ statusText[j.status] }} · {{ j.createdAt | relativeTime }}</span>
               <span class="flex-1"></span>
               @if (canManage()) {
                 @if (j.status === 'failed') {
@@ -366,16 +351,16 @@ const POLL_MS = 2000;
                 }
               }
             </div>
-            <p class="text-muted-foreground text-xs tabular-nums">
+            <p class="text-faint font-mono text-[10.5px] tabular-nums">
               {{ j.progress.created }} created · {{ j.progress.skipped }} already there · {{ j.progress.failed }} failed@if (j.progress.comments) { · {{ j.progress.comments }} comments }
             </p>
             @if (j.lastError) {
-              <p class="text-status-blocked text-xs">{{ j.lastError }}</p>
+              <p class="text-red font-mono text-[10.5px]">{{ j.lastError }}</p>
             }
             @if (j.errors.length) {
-              <details class="text-xs">
-                <summary class="text-muted-foreground hover:text-foreground cursor-pointer select-none">{{ j.progress.failed }} issues could not be imported</summary>
-                <ul class="bg-muted mt-1.5 max-h-40 space-y-0.5 overflow-y-auto rounded-md px-3 py-2">
+              <details class="text-[12px]">
+                <summary class="text-muted-foreground hover:text-foreground cursor-pointer font-mono text-[10.5px] select-none">{{ j.progress.failed }} issues could not be imported</summary>
+                <ul class="bg-secondary border-border mt-1.5 max-h-40 space-y-0.5 overflow-y-auto border px-3 py-2">
                   @for (e of j.errors; track $index) {
                     <li><span class="font-mono">{{ e.ref }}</span> {{ e.message }}</li>
                   }
@@ -384,7 +369,7 @@ const POLL_MS = 2000;
             }
           </div>
         } @empty {
-          <p class="text-muted-foreground px-4 py-6 text-center text-xs">No imports yet.</p>
+          <p class="text-faint border-border border-b px-4 py-6 text-center font-mono text-[10.5px]">No imports yet.</p>
         }
       </app-settings-group>
     </div>
@@ -398,6 +383,10 @@ export class ImportSection {
   private readonly destroyRef = inject(DestroyRef);
 
   protected readonly providers = EXTERNAL_PROVIDERS;
+  protected readonly providerOptions: V3SegmentOption[] = EXTERNAL_PROVIDERS.map((p) => ({
+    value: p,
+    label: EXTERNAL_PROVIDER_META[p].label,
+  }));
   protected readonly statusOptions: Option[] = ISSUE_STATUSES.map((s) => ({ value: s, label: ISSUE_STATUS_META[s].label }));
   protected readonly kindOptions: Option[] = ISSUE_KINDS.map((k) => ({ value: k, label: ISSUE_KIND_META[k].label }));
   protected readonly statusText = STATUS_TEXT;

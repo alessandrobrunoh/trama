@@ -25,10 +25,10 @@ import { SECTION_KIT } from './section-kit';
       <div class="mb-8 flex items-center gap-4">
         <app-actor-avatar [actor]="meRef()" [size]="56" />
         <div class="min-w-0">
-          <div class="truncate text-base font-semibold">{{ user()?.name }}</div>
-          <div class="text-muted-foreground truncate text-[13px]">{{ user()?.email }}</div>
+          <div class="font-title text-foreground truncate text-[22px] leading-[26px]">{{ user()?.name }}</div>
+          <div class="text-muted-foreground truncate font-mono text-[11.5px]">{{ user()?.email }}</div>
           @if (roleLabel(); as r) {
-            <div class="text-muted-foreground mt-0.5 text-xs">{{ r }} in {{ store.workspace()?.name }}</div>
+            <div class="text-faint mt-0.5 font-mono text-[10.5px]">{{ r }} in {{ store.workspace()?.name }}</div>
           }
         </div>
       </div>
@@ -42,8 +42,8 @@ import { SECTION_KIT } from './section-kit';
         </app-settings-row>
         <app-settings-row label="Avatar colour" description="Derived from your account, so it looks the same everywhere.">
           <span class="flex items-center gap-2">
-            <span class="ring-border size-5 ring-1" [style.background]="hueColor()"></span>
-            <span class="text-muted-foreground font-mono text-xs">hue {{ user()?.avatarHue }}</span>
+            <span class="size-5" [style.background]="hueColor()"></span>
+            <span class="text-muted-foreground font-mono text-[11px]">hue {{ user()?.avatarHue }}</span>
           </span>
         </app-settings-row>
         @if (user()?.createdAt) {
@@ -56,21 +56,21 @@ import { SECTION_KIT } from './section-kit';
 
     <app-settings-group title="Workspaces" description="Every workspace you can open with this account.">
       @for (w of session.workspaces(); track w.id) {
-        <div class="flex min-h-12 items-center gap-3 px-4 py-2.5">
-          <span class="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold">{{ w.name.charAt(0).toUpperCase() }}</span>
+        <div class="border-border hover:bg-secondary flex min-h-12 items-center gap-3 border-b px-1 py-2.5">
+          <span class="bg-secondary text-muted-foreground flex size-7 shrink-0 items-center justify-center font-mono text-[11px]">{{ w.name.charAt(0).toUpperCase() }}</span>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-[13px] font-medium">{{ w.name }}</div>
-            <div class="text-muted-foreground truncate font-mono text-xs">/{{ w.slug }}</div>
+            <div class="text-foreground truncate text-[13px]">{{ w.name }}</div>
+            <div class="text-faint truncate font-mono text-[10.5px]">/{{ w.slug }}</div>
           </div>
-          <span class="text-muted-foreground text-xs">{{ roleName(w) }}</span>
+          <span class="text-faint font-mono text-[10.5px]">{{ roleName(w) }}</span>
           @if (w.slug === store.slug()) {
-            <span class="text-muted-foreground bg-muted rounded px-1.5 py-0.5 text-[11px]">Current</span>
+            <span class="border-primary/40 text-primary border px-2 py-0.5 font-mono text-[10.5px] leading-[14px]">Current</span>
           } @else {
             <button hlmBtn size="sm" variant="outline" class="h-7" (click)="session.switchWorkspace(w.slug)">Open</button>
           }
         </div>
       }
-      <div class="flex items-center px-4 py-2">
+      <div class="flex items-center px-1 py-2">
         <a hlmBtn variant="ghost" size="sm" class="text-muted-foreground -ml-2 h-7" routerLink="/new-workspace">
           <svg [lucideIcon]="plus" [size]="14"></svg> Create workspace
         </a>

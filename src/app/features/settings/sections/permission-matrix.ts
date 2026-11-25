@@ -33,20 +33,20 @@ const SENSITIVE: ApiPermission[] = ['tokens:write', 'members:write', 'members:de
         </button>
       }
       <button type="button" hlmBtn variant="ghost" size="sm" class="text-muted-foreground h-7 text-xs" (click)="value.set([])">Clear</button>
-      <span class="text-muted-foreground ml-auto text-xs">{{ value().length }} of {{ total }} selected</span>
+      <span class="text-faint ml-auto font-mono text-[10.5px]">{{ value().length }} of {{ total }} selected</span>
     </div>
 
-    <div class="bg-card overflow-hidden rounded-lg" role="group" aria-label="API permissions">
-      <div class="text-muted-foreground flex items-center gap-3 px-3 py-1.5 text-[11px] font-medium uppercase">
+    <div class="border-border overflow-hidden border" role="group" aria-label="API permissions">
+      <div class="text-faint border-border flex items-center gap-3 border-b px-3 py-1.5 font-mono text-[10px] tracking-[1px] uppercase">
         <span class="flex-1">Resource</span>
         @for (c of columns; track c.id) {
           <span class="w-14 text-center">{{ c.label }}</span>
         }
       </div>
       @for (g of groups; track g.name) {
-        <div class="text-muted-foreground bg-muted px-3 py-1 text-[11px] font-medium">{{ g.name }}</div>
+        <div class="text-faint bg-secondary border-border border-b px-3 py-1 font-mono text-[10px] tracking-[1px] uppercase">{{ g.name }}</div>
         @for (r of g.items; track r.id) {
-          <div class="flex items-center gap-3 px-3 py-1.5">
+          <div class="border-border hover:bg-secondary flex items-center gap-3 border-b px-3 py-1.5 last:border-b-0">
             <span class="flex-1 text-[13px]">{{ r.label }}</span>
             @for (c of columns; track c.id) {
               <span class="flex w-14 justify-center">

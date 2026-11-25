@@ -41,8 +41,8 @@ import { SECTION_KIT } from './section-kit';
           <app-settings-row [label]="meta[kind].label" [description]="meta[kind].description">
             <span class="flex items-center gap-4">
               @for (channel of channels; track channel.id) {
-                <label class="flex items-center gap-2 text-xs" [class.opacity-50]="unavailable(channel.id)">
-                  <span class="text-muted-foreground">{{ channel.label }}</span>
+                <label class="flex items-center gap-2 font-mono text-[10.5px]" [class.opacity-50]="unavailable(channel.id)">
+                  <span class="text-faint">{{ channel.label }}</span>
                   <v3-toggle
                     [checked]="store.settings()[kind][channel.id]"
                     (checkedChange)="store.setChannel(kind, channel.id, $event)"

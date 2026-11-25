@@ -29,12 +29,12 @@ import { SECTION_KIT } from './section-kit';
       @for (g of groups(); track g.title) {
         <app-settings-group [title]="g.title">
           @for (i of g.items; track i.label) {
-            <div class="flex min-h-10 items-center justify-between gap-3 px-4 text-[13px]">
+            <div class="border-border hover:bg-secondary flex min-h-10 items-center justify-between gap-3 border-b px-1 text-[13px]">
               <span class="min-w-0 truncate">{{ i.label }}</span>
               <span class="flex shrink-0 items-center gap-1.5">
                 <app-kbd [keys]="i.keys" />
                 @if (i.alt) {
-                  <span class="text-muted-foreground text-xs">or</span>
+                  <span class="text-faint font-mono text-[10.5px]">or</span>
                   <app-kbd [keys]="i.alt" />
                 }
               </span>
@@ -42,7 +42,7 @@ import { SECTION_KIT } from './section-kit';
           }
         </app-settings-group>
       } @empty {
-        <p class="text-muted-foreground py-8 text-center text-[13px]">No shortcut matches “{{ query().trim() }}”.</p>
+        <p class="border-border text-muted-foreground border border-dashed py-8 text-center text-[13px]">No shortcut matches “{{ query().trim() }}”.</p>
       }
     </div>
   `,

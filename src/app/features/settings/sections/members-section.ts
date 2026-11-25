@@ -63,7 +63,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
       @if (canInvite()) {
         <app-settings-group title="Invite by email">
           <form (submit)="invite($event)">
-            <div class="flex flex-wrap items-center gap-2 px-4 pt-3">
+            <div class="flex flex-wrap items-center gap-2 px-1 pt-3">
               <input
                 hlmInput
                 type="email"
@@ -80,17 +80,17 @@ const DAY_MS = 24 * 60 * 60 * 1000;
                 Send invite
               </button>
             </div>
-            <p class="text-muted-foreground px-4 pt-2 text-xs leading-snug">
-              <strong class="text-foreground font-medium">{{ roleName(roleValue()) }}.</strong>
+            <p class="text-muted-foreground px-1 pt-2 text-[12px] leading-snug">
+              <span class="text-foreground">{{ roleName(roleValue()) }}.</span>
               {{ roleDetail(roleValue()) }}
             </p>
             @if (roleValue() !== 'owner') {
-              <div class="px-4 pt-2 pb-3">
+              <div class="border-border border-b px-1 pt-2 pb-3">
                 <label class="flex items-start gap-2 text-[13px]">
                   <hlm-checkbox class="mt-0.5" [checked]="custom()" (checkedChange)="setCustom($event)" />
                   <span>
-                    <span class="font-medium">Adjust this invitation</span>
-                    <span class="text-muted-foreground block text-xs leading-snug">They start from the {{ roleName(roleValue()) }} role. You can hide projects, and add actions that role does not include.</span>
+                    <span class="text-foreground">Adjust this invitation</span>
+                    <span class="text-muted-foreground block text-[12px] leading-snug">They start from the {{ roleName(roleValue()) }} role. You can hide projects, and add actions that role does not include.</span>
                   </span>
                 </label>
                 @if (custom()) {
@@ -100,20 +100,20 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             }
           </form>
           @if (sent(); as s) {
-            <div class="bg-muted/30 px-4 py-3" role="status">
+            <div class="border-border bg-secondary mt-3 border px-3.5 py-3" role="status">
               <p class="text-[13px] leading-snug">
                 @if (s.link.emailed) {
                   Invitation emailed to
-                  <strong class="font-medium">{{ s.link.invite.email }}</strong
+                  <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
                   >. You can also share this link:
                 } @else {
                   Email is not set up on this server. Share this link with
-                  <strong class="font-medium">{{ s.link.invite.email }}</strong
+                  <span class="text-foreground font-mono text-[12px]">{{ s.link.invite.email }}</span
                   >:
                 }
               </p>
               <app-copy-field class="mt-2" [value]="s.link.url" label="Invite link" />
-              <p class="text-muted-foreground mt-1.5 text-xs">
+              <p class="text-faint mt-1.5 font-mono text-[10.5px]">
                 It works for 7 days and only for that email address. Sending again replaces it.
               </p>
             </div>
@@ -123,12 +123,12 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     </div>
 
     @if (canInvite() && pending().length) {
-      <app-settings-group [title]="'Pending invitations · ' + pending().length">
+      <app-settings-group title="Pending invitations" [caption]="pending().length + ' waiting'">
         @for (i of pending(); track i.id) {
-          <div class="flex min-h-13 flex-wrap items-center gap-3 px-4 py-2.5">
+          <div class="border-border hover:bg-secondary flex min-h-13 flex-wrap items-center gap-3 border-b px-1 py-2.5">
             <div class="min-w-0 flex-1">
-              <div class="truncate text-[13px] font-medium">{{ i.email }}</div>
-              <div class="text-muted-foreground text-xs" [class.text-destructive]="expired(i)">
+              <div class="text-foreground truncate text-[13px]">{{ i.email }}</div>
+              <div class="text-faint font-mono text-[10.5px]" [class.text-red]="expired(i)">
                 {{ roleName(i.role) }}{{ i.access ? ' · Limited' : '' }} · {{ expiry(i) }}
               </div>
             </div>
@@ -150,7 +150,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
       </app-settings-group>
     }
 
-    <app-settings-group [title]="'Members · ' + store.members().length">
+    <app-settings-group title="Members" [caption]="store.members().length + ' people'">
       <div aside class="relative w-44">
         <svg
           [lucideIcon]="searchIcon"
@@ -167,19 +167,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
         />
       </div>
       @for (m of shown(); track m.membership.id) {
-        <div class="flex min-h-13 flex-wrap items-center gap-3 px-4 py-2.5">
-          <app-actor-avatar [actor]="{ type: 'user', id: m.user.id }" [size]="28" />
+        <div class="border-border hover:bg-secondary flex min-h-13 flex-wrap items-center gap-3 border-b px-1 py-2.5">
+          <app-actor-avatar [actor]="{ type: 'user', id: m.user.id }" [size]="22" />
           <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-1.5 text-[13px] font-medium">
-              <span class="truncate">{{ m.user.name }}</span>
+            <div class="flex items-center gap-1.5 text-[13px]">
+              <span class="text-foreground truncate">{{ m.user.name }}</span>
               @if (m.user.id === meId()) {
                 <span
-                  class="text-muted-foreground bg-muted rounded px-1 py-px text-[10px] font-normal"
-                  >You</span
+                  class="border-border text-faint border px-1.5 font-mono text-[10px] leading-[14px]"
+                  >you</span
                 >
               }
             </div>
-            <div class="text-muted-foreground truncate text-xs">
+            <div class="text-faint truncate font-mono text-[10.5px]">
               {{ m.user.email }}{{ m.membership.access ? ' · Limited' : '' }}
             </div>
           </div>
@@ -187,7 +187,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
             @let rules = rulesFor(m.membership);
             @if (rules.roleLocked) {
               <span
-                class="text-muted-foreground w-28 cursor-help text-xs"
+                class="text-muted-foreground w-28 cursor-help font-mono text-[11px]"
                 [attr.title]="rules.roleLocked"
                 tabindex="0"
                 >{{ roleName(m.membership.role) }}</span
@@ -240,16 +240,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
               </button>
             </span>
           } @else {
-            <span class="text-muted-foreground text-xs">{{ roleName(m.membership.role) }}</span>
+            <span class="text-muted-foreground font-mono text-[11px]">{{ roleName(m.membership.role) }}</span>
           }
         </div>
         @if (editingId() === m.membership.id) {
-          <div class="bg-muted px-4 py-3">
+          <div class="border-border bg-secondary border-b px-3.5 py-3">
             <label class="flex items-start gap-2 text-[13px]">
               <hlm-checkbox class="mt-0.5" [checked]="draftCustom()" (checkedChange)="setDraftCustom(m.membership, $event)" />
               <span>
-                <span class="font-medium">Adjust {{ m.user.name }}</span>
-                <span class="text-muted-foreground block text-xs leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you hide projects or add actions.</span>
+                <span class="text-foreground">Adjust {{ m.user.name }}</span>
+                <span class="text-muted-foreground block text-[12px] leading-snug">Off keeps the {{ roleName(m.membership.role) }} role as it is. On lets you hide projects or add actions.</span>
               </span>
             </label>
             @if (draftCustom()) {
@@ -262,7 +262,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
           </div>
         }
       } @empty {
-        <div class="text-muted-foreground px-4 py-6 text-center text-[13px]">
+        <div class="text-muted-foreground border-border border-b px-4 py-6 text-center text-[13px]">
           No member matches “{{ query().trim() }}”.
         </div>
       }
@@ -274,7 +274,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
     >
       @for (r of workspaceRoles(); track r.id) {
         <app-settings-row [label]="r.name" [description]="roleDetail(r.id)">
-          <span class="text-muted-foreground text-xs tabular-nums">{{ countFor(r.id) }}</span>
+          <span class="text-faint font-mono text-[11px] tabular-nums">{{ countFor(r.id) }}</span>
         </app-settings-row>
       }
     </app-settings-group>

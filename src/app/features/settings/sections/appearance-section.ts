@@ -40,21 +40,21 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
       <app-section-header title="Appearance" description="Choose how Trama looks on this device. Stored in this browser only." />
 
       <app-settings-group title="Interface theme">
-        <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">
+        <div class="grid grid-cols-1 gap-4 py-4 sm:grid-cols-3" role="radiogroup" aria-label="Interface theme">
           @for (t of themes; track t.id) {
             <button
               type="button"
               role="radio"
               [attr.aria-checked]="theme.mode() === t.id"
-              class="group focus-visible:ring-ring/50 flex flex-col gap-2 rounded-lg text-left outline-none focus-visible:ring-3"
+              class="group focus-visible:ring-ring/50 flex flex-col gap-2 text-left outline-none focus-visible:ring-2"
               (click)="theme.set(t.id)"
             >
               <span
-                class="relative block aspect-[16/10] overflow-hidden rounded-md border-2 transition-colors"
+                class="relative block aspect-[16/10] overflow-hidden border transition-colors"
                 [class.border-primary]="theme.mode() === t.id"
-                [class.border-transparent]="theme.mode() !== t.id"
+                [class.border-border]="theme.mode() !== t.id"
               >
-                <span class="ring-border absolute inset-0 flex overflow-hidden rounded-[4px] ring-1">
+                <span class="absolute inset-0 flex overflow-hidden">
                   @if (t.id === 'system') {
                     <span class="relative block w-1/2 overflow-hidden">
                       <span class="absolute inset-y-0 left-0 w-[200%]">
@@ -73,14 +73,14 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
                   }
                 </span>
                 @if (theme.mode() === t.id) {
-                  <span class="bg-primary text-primary-foreground absolute right-1.5 bottom-1.5 flex size-4 items-center justify-center rounded-full">
+                  <span class="bg-primary text-primary-foreground absolute right-1.5 bottom-1.5 flex size-4 items-center justify-center">
                     <svg [lucideIcon]="check" [size]="11" [strokeWidth]="3"></svg>
                   </span>
                 }
               </span>
-              <span class="px-0.5">
-                <span class="block text-[13px] font-medium">{{ t.label }}</span>
-                <span class="text-muted-foreground block text-xs">{{ t.hint }}</span>
+              <span class="flex items-baseline gap-2">
+                <span class="text-foreground text-[13px]">{{ t.label }}</span>
+                <span class="text-faint font-mono text-[10.5px]">{{ t.hint }}</span>
               </span>
             </button>
           }
@@ -101,53 +101,51 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
     </app-settings-group>
 
     <app-settings-group title="Git branch name format" description="Used by “Copy git branch name” on tasks (⌘⇧G). Stored in this browser only.">
-      <div class="flex flex-col gap-2 p-4" role="radiogroup" aria-label="Git branch name format">
+      <div role="radiogroup" aria-label="Git branch name format">
         @for (f of branchFormats; track f.id) {
           <button
             type="button"
             role="radio"
             [attr.aria-checked]="branches.format() === f.id"
-            class="focus-visible:ring-ring/50 flex items-start gap-3 rounded-lg p-3 text-left outline-none transition-colors focus-visible:ring-3"
-            [class]="branches.format() === f.id ? 'bg-selected' : 'bg-secondary hover:bg-hover'"
+            class="border-border focus-visible:ring-ring/50 flex w-full items-center gap-3 border-b px-1 py-2.5 text-left outline-none transition-colors focus-visible:ring-2"
+            [class]="branches.format() === f.id ? 'bg-selected' : 'hover:bg-secondary'"
             (click)="branches.setFormat(f.id)"
           >
             <span
-              class="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full border"
-              [class]="branches.format() === f.id ? 'bg-primary border-primary text-primary-foreground' : 'border-input'"
+              class="flex size-3.5 shrink-0 items-center justify-center border"
+              [class]="branches.format() === f.id ? 'bg-primary border-primary text-primary-foreground' : 'border-faint'"
               aria-hidden="true"
             >
               @if (branches.format() === f.id) {
                 <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
               }
             </span>
-            <span class="min-w-0 flex-1">
-              <span class="block text-[13px] font-medium">{{ f.label }}</span>
-              <code class="text-muted-foreground mt-0.5 block truncate font-mono text-xs">{{ branches.name(sample.key, sample.title, f.id) }}</code>
-            </span>
+            <span class="text-foreground w-[210px] shrink-0 text-[13px]">{{ f.label }}</span>
+            <code class="text-muted-foreground min-w-0 flex-1 truncate font-mono text-[11px]">{{ branches.name(sample.key, sample.title, f.id) }}</code>
           </button>
         }
       </div>
-      <div class="flex items-center gap-2 px-4 pb-3 text-xs">
-        <svg [lucideIcon]="branchIcon" [size]="13" class="text-muted-foreground shrink-0"></svg>
-        <span class="text-muted-foreground shrink-0">Preview</span>
-        <code class="min-w-0 truncate font-mono">{{ branches.name(sample.key, sample.title) }}</code>
+      <div class="flex items-center gap-2 px-1 pt-3 font-mono text-[10.5px]">
+        <svg [lucideIcon]="branchIcon" [size]="12" class="text-faint shrink-0"></svg>
+        <span class="text-faint shrink-0">PREVIEW</span>
+        <code class="text-foreground min-w-0 truncate">{{ branches.name(sample.key, sample.title) }}</code>
       </div>
     </app-settings-group>
 
     <ng-template #mock let-p>
       <span class="absolute inset-0 flex" [style.background]="p.chrome">
         <span class="flex w-[28%] flex-col gap-1 p-1.5">
-          <span class="h-1 w-3/4 rounded-full" [style.background]="p.strong"></span>
-          <span class="mt-1 h-1 w-2/3 rounded-full" [style.background]="p.text"></span>
-          <span class="h-1 w-1/2 rounded-full" [style.background]="p.text"></span>
-          <span class="h-1 w-3/5 rounded-full" [style.background]="p.text"></span>
+          <span class="h-1 w-3/4" [style.background]="p.strong"></span>
+          <span class="mt-1 h-1 w-2/3" [style.background]="p.text"></span>
+          <span class="h-1 w-1/2" [style.background]="p.text"></span>
+          <span class="h-1 w-3/5" [style.background]="p.text"></span>
         </span>
-        <span class="my-1 mr-1 flex flex-1 flex-col gap-1 rounded-[3px] border p-1.5" [style.background]="p.panel" [style.border-color]="p.line">
-          <span class="h-1.5 w-1/3 rounded-full" [style.background]="p.strong"></span>
+        <span class="my-1 mr-1 flex flex-1 flex-col gap-1 border p-1.5" [style.background]="p.panel" [style.border-color]="p.line">
+          <span class="h-1.5 w-1/3" [style.background]="p.strong"></span>
           @for (r of rows; track r) {
             <span class="flex items-center gap-1 border-t pt-1" [style.border-color]="p.line">
-              <span class="size-1.5 rounded-full" [style.background]="r === 1 ? p.accent : p.strong"></span>
-              <span class="h-1 rounded-full" [style.width.%]="40 + r * 9" [style.background]="p.text"></span>
+              <span class="size-1.5" [style.background]="r === 1 ? p.accent : p.strong"></span>
+              <span class="h-1" [style.width.%]="40 + r * 9" [style.background]="p.text"></span>
             </span>
           }
         </span>

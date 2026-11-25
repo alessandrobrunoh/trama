@@ -8,7 +8,6 @@ import {
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   STATUS_CATALOG_KEY,
   STATUS_COLOR,
@@ -26,7 +25,7 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { isLucideName, STATUS_LUCIDE } from '../../../shared/lucide-names';
-import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
+import { V3_FIELD, V3DialogFoot, V3DialogHead, V3Segmented, type V3SegmentOption } from '../../../shared/v3';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
@@ -40,7 +39,7 @@ type Dialog =
 @Component({
   selector: 'app-workflow-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, HlmInputImports, LucideDynamicIcon, V3Segmented, ...SECTION_KIT],
+  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, LucideDynamicIcon, V3DialogFoot, V3DialogHead, V3Segmented, ...SECTION_KIT],
   host: { class: 'flex flex-col' },
   template: `
     <app-section-header
@@ -96,32 +95,32 @@ type Dialog =
     </app-settings-section>
 
     <hlm-dialog [state]="dlg() ? 'open' : 'closed'" (closed)="dlg.set(null)">
-      <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] overflow-y-auto sm:max-w-md">
+      <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] gap-0 overflow-y-auto p-0 sm:max-w-md" [showCloseButton]="false">
         @switch (dlg()?.kind) {
           @case ('edit') {
             <form class="contents" (submit)="save($event)">
-              <hlm-dialog-header>
+              <v3-dialog-head kicker="STATUS" (dismiss)="dlg.set(null)">
                 <h2 hlmDialogTitle>Edit status</h2>
-                <p hlmDialogDescription>The type stays {{ typeLabel(editing()?.type ?? '') }}. Name, icon and color can change.</p>
-              </hlm-dialog-header>
+              </v3-dialog-head>
+              <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3.5 text-[12.5px] leading-snug">The type stays {{ typeLabel(editing()?.type ?? '') }}. Name, icon and color can change.</p>
               <ng-container *ngTemplateOutlet="fields; context: { showType: false }" />
-              <hlm-dialog-footer>
+              <v3-dialog-foot>
                 <button hlmBtn type="button" variant="outline" (click)="dlg.set(null)">Cancel</button>
                 <button hlmBtn type="submit" [disabled]="busy() || !valid()">Save</button>
-              </hlm-dialog-footer>
+              </v3-dialog-foot>
             </form>
           }
           @case ('add') {
             <form class="contents" (submit)="save($event)">
-              <hlm-dialog-header>
+              <v3-dialog-head kicker="NEW STATUS" (dismiss)="dlg.set(null)">
                 <h2 hlmDialogTitle>New {{ labels[current()].toLowerCase() }} status</h2>
-                <p hlmDialogDescription>Pick the type it behaves as, plus an icon and a color. The name starts as that type's name.</p>
-              </hlm-dialog-header>
+              </v3-dialog-head>
+              <p hlmDialogDescription class="text-muted-foreground px-[18px] pt-3.5 text-[12.5px] leading-snug">Pick the type it behaves as, plus an icon and a color. The name starts as that type's name.</p>
               <ng-container *ngTemplateOutlet="fields; context: { showType: true }" />
-              <hlm-dialog-footer>
+              <v3-dialog-foot>
                 <button hlmBtn type="button" variant="outline" (click)="dlg.set(null)">Cancel</button>
                 <button hlmBtn type="submit" [disabled]="busy() || !valid()">Add status</button>
-              </hlm-dialog-footer>
+              </v3-dialog-foot>
             </form>
           }
         }
@@ -129,39 +128,39 @@ type Dialog =
     </hlm-dialog>
 
     <ng-template #fields let-showType="showType">
-      <div class="flex flex-col gap-4 text-[13px]">
-        <div class="grid gap-1.5">
-          <label class="text-muted-foreground text-xs font-medium" for="status-name">Name</label>
-          <input id="status-name" hlmInput class="h-9 w-full" autocomplete="off" [attr.maxlength]="nameMax" [value]="formName()" (input)="formName.set($any($event.target).value)" />
+      <div class="flex flex-col gap-4 p-[18px] text-[13px]">
+        <div class="flex flex-col gap-1.5">
+          <label class="text-faint font-mono text-[10.5px] leading-[14px]" for="status-name">NAME</label>
+          <input id="status-name" [class]="fieldClass" autocomplete="off" [attr.maxlength]="nameMax" [value]="formName()" (input)="formName.set($any($event.target).value)" />
         </div>
         @if (showType) {
-          <div class="grid gap-1.5">
-            <label class="text-muted-foreground text-xs font-medium" for="status-type">Type</label>
+          <div class="flex flex-col gap-1.5">
+            <label class="text-faint font-mono text-[10.5px] leading-[14px]" for="status-type">TYPE</label>
             <app-select controlId="status-type" [options]="typeOptions()" [value]="formType()" (valueChange)="setType($event)" />
           </div>
         }
-        <div class="grid gap-1.5">
-          <label class="text-muted-foreground text-xs font-medium" for="status-icon">Icon</label>
-          <input id="status-icon" hlmInput class="h-9 w-full" autocomplete="off" placeholder="circle-check or an emoji" [value]="formIcon()" (input)="formIcon.set($any($event.target).value)" />
+        <div class="flex flex-col gap-1.5">
+          <label class="text-faint font-mono text-[10.5px] leading-[14px]" for="status-icon">ICON</label>
+          <input id="status-icon" [class]="fieldClass" autocomplete="off" placeholder="circle-check or an emoji" [value]="formIcon()" (input)="formIcon.set($any($event.target).value)" />
           <div class="flex flex-wrap gap-1">
             @for (name of iconChoices; track name) {
-              <button type="button" class="hover:bg-accent inline-flex size-7 items-center justify-center rounded-md border" [class.bg-accent]="formIcon() === name" [attr.aria-label]="name" (click)="formIcon.set(name)">
+              <button type="button" class="border-border hover:bg-secondary inline-flex size-7 items-center justify-center border" [class.bg-selected]="formIcon() === name" [class.border-primary]="formIcon() === name" [attr.aria-label]="name" (click)="formIcon.set(name)">
                 <svg [lucideIcon]="iconFor(name)" [size]="14"></svg>
               </button>
             }
           </div>
           @if (iconError()) {
-            <span class="text-destructive text-xs">Use a Lucide name like circle-check, or one emoji.</span>
+            <span class="text-red font-mono text-[10.5px]">Use a Lucide name like circle-check, or one emoji.</span>
           }
         </div>
-        <div class="grid gap-1.5">
-          <label class="text-muted-foreground text-xs font-medium" for="status-color">Color</label>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-faint font-mono text-[10.5px] leading-[14px]" for="status-color">COLOR</label>
           <div class="flex items-center gap-2">
-            <input id="status-color" type="color" class="size-9 shrink-0 cursor-pointer rounded-md border bg-transparent p-1" [value]="colorValue()" (input)="formColor.set($any($event.target).value)" />
-            <input hlmInput class="h-9 w-full font-mono" [value]="formColor()" maxlength="7" (input)="formColor.set($any($event.target).value)" aria-label="Hex color" />
+            <input id="status-color" type="color" class="border-border size-[34px] shrink-0 cursor-pointer border bg-transparent p-1" [value]="colorValue()" (input)="formColor.set($any($event.target).value)" />
+            <input [class]="fieldClass + ' font-mono'" [value]="formColor()" maxlength="7" (input)="formColor.set($any($event.target).value)" aria-label="Hex color" />
           </div>
           @if (colorError()) {
-            <span class="text-destructive text-xs">Color must be #rrggbb.</span>
+            <span class="text-red font-mono text-[10.5px]">Color must be #rrggbb.</span>
           }
         </div>
       </div>
@@ -178,6 +177,7 @@ export class WorkflowSection {
     value: s,
     label: STATUS_SUBJECT_LABEL[s],
   }));
+  protected readonly fieldClass = V3_FIELD;
   protected readonly labels = STATUS_SUBJECT_LABEL;
   protected readonly nameMax = STATUS_NAME_MAX;
   protected readonly iconChoices = [...STATUS_LUCIDE.keys()];
