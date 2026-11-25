@@ -4,6 +4,8 @@ export type ChangeKind = 'new' | 'improved' | 'fixed';
 export interface ChangelogEntry {
   /** ISO date (YYYY-MM-DD). */
   date: string;
+  /** Release label shown next to the date, e.g. `v0.9`; only once releases are versioned. */
+  version?: string;
   title: string;
   summary: string;
   changes: { kind: ChangeKind; text: string }[];

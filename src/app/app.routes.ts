@@ -79,6 +79,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/changelog/changelog-page').then((m) => m.ChangelogPage),
   },
   {
+    path: 'compare',
+    title: 'Compare · Trama',
+    loadComponent: () => import('./features/compare/compare-page').then((m) => m.ComparePage),
+  },
+  {
     path: 'brand',
     title: 'Brand · Trama',
     loadComponent: () => import('./features/brand/brand-page').then((m) => m.BrandPage),
