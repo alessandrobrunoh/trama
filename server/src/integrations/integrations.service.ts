@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadGatewayException, BadRequestException, ConflictException, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Request } from 'express';
 import { In, type FindOptionsWhere, type Repository } from 'typeorm';
@@ -13,6 +13,7 @@ import { outboundUrlProblem } from '../common/safe-fetch.js';
 import { notFound, uid } from '../common/util.js';
 import { IntegrationConnectionEntity, UserEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { ExternalIdentitiesService } from '../external-identities/external-identities.service.js';
 import { HttpClient, ProviderHttpError } from './http-client.js';
 import { createGitClient, normalizeBaseUrl, type GitProviderClient } from './providers.js';
 import { SecretsService } from './secrets.service.js';
@@ -66,6 +67,7 @@ export class IntegrationsService {
     private readonly events: EventsService,
     @InjectRepository(IntegrationConnectionEntity) private readonly repo: Repository<IntegrationConnectionEntity>,
     @InjectRepository(UserEntity) private readonly users: Repository<UserEntity>,
+    @Optional() private readonly identities?: ExternalIdentitiesService,
   ) {}
 
   /** Public base URL for webhook URLs: `PUBLIC_URL`, else derived from the request. */
@@ -207,6 +209,10 @@ export class IntegrationsService {
       }),
     );
     this.publish(scope, 'created', id);
+    // A personal connection proves its account login: record it as one of the owner's identities.
+    if (scope.type === 'user' && input.provider !== 'delta') {
+      await this.identities?.ensureFromConnection(scope.userId, input.provider, host, account);
+    }
     return {
       connection: await this.present(row, origin),
       webhook: webhookSecret ? this.webhookSetup(row, origin, webhookSecret) : undefined,

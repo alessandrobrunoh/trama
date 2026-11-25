@@ -21,6 +21,7 @@ import { UiStore } from '../../../core/stores/ui.store';
 import { RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { ConnectionAddForm, ConnectionTokenForm, accountLine, needsAttention, statusDot, statusLabel } from './connection-kit';
+import { ExternalIdentitiesSection } from './external-identities-section';
 import { SECTION_KIT } from './section-kit';
 
 /**
@@ -41,6 +42,7 @@ import { SECTION_KIT } from './section-kit';
     RelativeTimePipe,
     ConnectionAddForm,
     ConnectionTokenForm,
+    ExternalIdentitiesSection,
     ...SECTION_KIT,
   ],
   host: { class: 'block' },
@@ -174,7 +176,7 @@ import { SECTION_KIT } from './section-kit';
       </p>
     </div>
 
-    <!-- external identities: mounted by the lead -->
+    <app-external-identities class="mt-8 block" />
   `,
 })
 export class PersonalIntegrationsSection {
