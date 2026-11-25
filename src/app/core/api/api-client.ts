@@ -44,6 +44,11 @@ import type {
   ProjectPlacement,
   ProjectTransferPreview,
   ProjectTransferResult,
+  GitProvider,
+  RoutingConnectionOption,
+  RoutingRule,
+  RoutingRulesOverview,
+  RoutingSuggestions,
   Role,
   SharedProject,
   PublicView,
@@ -104,6 +109,9 @@ import type {
   ManualTimeEntryInput,
   TimeEntry,
   TimeEntryTarget,
+  CreateRoutingRuleInput,
+  RoutingSuggestionsQuery,
+  UpdateRoutingRuleInput,
 } from './api.types';
 
 export interface RequestOptions {
@@ -583,6 +591,24 @@ export class ApiClient {
     rotateWebhookSecret: (id: ID) =>
       this.post<IntegrationWithWebhook>(`/me/connections/${id}/rotate-webhook-secret`),
   };
+
+  /** Where a project's tasks come from: its sources (routing rules). Anyone who sees the project reads them. */
+  readonly routing = {
+    overview: (slug: string, projectId: ID, o?: RequestOptions) =>
+      this.get<RoutingRulesOverview>(this.rules(slug, projectId), undefined, o),
+    /** Connections this person may read through, the workspace one suggested. */
+    connections: (slug: string, projectId: ID, provider?: GitProvider, o?: RequestOptions) =>
+      this.get<RoutingConnectionOption[]>(`${this.rules(slug, projectId)}/connections`, { provider }, o),
+    suggestions: (slug: string, projectId: ID, query: RoutingSuggestionsQuery, o?: RequestOptions) =>
+      this.get<RoutingSuggestions>(`${this.rules(slug, projectId)}/suggestions`, { ...query }, o),
+    create: (slug: string, projectId: ID, input: CreateRoutingRuleInput) =>
+      this.post<RoutingRule>(this.rules(slug, projectId), input),
+    update: (slug: string, projectId: ID, ruleId: ID, input: UpdateRoutingRuleInput) =>
+      this.patch<RoutingRule>(`${this.rules(slug, projectId)}/${ruleId}`, input),
+    remove: (slug: string, projectId: ID, ruleId: ID) =>
+      this.del(`${this.rules(slug, projectId)}/${ruleId}`),
+  };
+  private rules = (slug: string, projectId: ID) => `${this.w(slug)}/projects/${projectId}/routing-rules`;
 
   /** Custom integrations: signed JSON POSTs to your URL for domain events. Needs the manageIntegrations capability. */
   readonly outgoingWebhooks = {

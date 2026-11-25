@@ -17,6 +17,8 @@ import type {
   ApiPermission,
   TokenLimits,
   WeekStart,
+  RoutingDirection,
+  RoutingFilters,
   OutgoingWebhook,
   ExecutionProvider,
   GitProvider,
@@ -437,4 +439,24 @@ export interface TimeEntryTarget {
 export interface ManualTimeEntryInput extends TimeEntryTarget {
   startedAt: ISODate;
   endedAt: ISODate;
+}
+
+/** A source for a project: `owner/name`, `owner/*` or a repository URL, read through one connection. */
+export interface CreateRoutingRuleInput {
+  provider: GitProvider;
+  sourcePath: string;
+  connectionId: ID;
+  filters?: RoutingFilters;
+  direction?: RoutingDirection;
+}
+/** `filters` replaces the whole set; `{}` clears it. */
+export interface UpdateRoutingRuleInput {
+  connectionId?: ID;
+  filters?: RoutingFilters;
+  direction?: RoutingDirection;
+}
+export interface RoutingSuggestionsQuery {
+  provider: GitProvider;
+  connectionId?: ID;
+  q?: string;
 }

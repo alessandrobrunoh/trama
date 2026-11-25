@@ -55,13 +55,16 @@ import { ProjectProperties } from './project-properties';
 import { ProjectTransferDialog } from './project-transfer-dialog';
 import { ProjectRoadmap } from './project-roadmap';
 import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
+import { ProjectSourcesStore } from './sources/project-sources.store';
+import { ProjectSourcesTab } from './sources/project-sources-tab';
 
-const TABS = ['overview', 'progress', 'tasks'] as const;
+const TABS = ['overview', 'progress', 'tasks', 'sources'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
   progress: 'Progress',
   tasks: 'Tasks',
+  sources: 'Sources',
 };
 
 const ACTIVITY_CAP = 20;
@@ -101,6 +104,7 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectMilestoneRows,
     ProjectRoadmap,
     ProjectTasksTab,
+    ProjectSourcesTab,
     ProjectProperties,
     ProjectTransferDialog,
   ],
@@ -241,6 +245,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
         @case ('tasks') {
           <app-project-tasks-tab [projectId]="p.id" />
         }
+        @case ('sources') {
+          <app-project-sources-tab [projectId]="p.id" />
+        }
         @default {
           <div class="flex min-w-0 flex-1 max-lg:flex-col">
             <div class="flex min-w-0 flex-1 flex-col gap-[22px] px-4 py-[22px] sm:px-10">
@@ -336,6 +343,7 @@ export class ProjectDetailPage {
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);
   private readonly listState = inject(ListStateStore);
+  private readonly sources = inject(ProjectSourcesStore);
 
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
@@ -368,6 +376,7 @@ export class ProjectDetailPage {
   });
   protected readonly counts = computed<Partial<Record<Tab, number>>>(() => ({
     tasks: this.issues().length,
+    sources: this.sources.count(),
   }));
   protected readonly openCount = computed(
     () => this.issues().filter((i) => !isClosedIssue(i, this.store.settings().statuses.issue)).length,
@@ -428,6 +437,13 @@ export class ProjectDetailPage {
     { label: this.project()?.name ?? this.id() ?? '' },
   ]);
 
+  /** The Sources tab counts the project's rules; the tab itself loads them when it is open. */
+  private readonly _sources = effect(() => {
+    const id = this.project()?.id;
+    if (!id || this.current() === 'sources') return;
+    untracked(() => void this.sources.load(id));
+  });
+
   /** A link into the Tasks tab brings its filters in the params: apply them once, then drop them. */
   private readonly _prefilter = effect(() => {
     const p = this.project();
@@ -472,7 +488,7 @@ export class ProjectDetailPage {
   /** The properties live in the rail: bring them into view and focus the first one. */
   protected openSettings(): void {
     const c = this.current();
-    if (c === 'tasks') this.setTab('overview');
+    if (c === 'tasks' || c === 'sources') this.setTab('overview');
     setTimeout(() => {
       const el = document.getElementById('project-properties');
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
