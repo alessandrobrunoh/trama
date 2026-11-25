@@ -50,6 +50,7 @@ import { SessionStore } from '../core/session/session.store';
 import { ThemeService, type ThemeMode } from '../core/theme';
 import { ActorAvatar } from '../shared/actor-avatar';
 import { Kbd } from '../shared/kbd';
+import { TramaLogo } from '../shared/trama-logo';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { ProjectGlyph } from '../features/projects/project-glyph';
@@ -66,6 +67,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
   selector: 'app-sidebar',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    TramaLogo,
     NgTemplateOutlet,
     RouterLink,
     RouterLinkActive,
@@ -109,11 +111,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         align="start"
         aria-label="Switch workspace"
       >
-        <span
-          class="bg-brand font-title flex size-6 shrink-0 items-center justify-center text-[16px] leading-none text-white"
-          aria-hidden="true"
-          >T</span
-        >
+        <app-trama-logo [size]="24" />
         <span class="flex min-w-0 flex-col gap-px">
           <span class="font-title text-foreground text-[18px] leading-[18px]">Trama</span>
           <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>

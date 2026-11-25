@@ -162,7 +162,7 @@ function threadId(url: string): string {
                   <span class="text-foreground min-w-0 truncate text-[13px] leading-[18px]">{{ c.next.text }}</span>
                   <span class="flex-1"></span>
                   @if (c.due; as d) {
-                    <span class="font-mono text-[10.5px] whitespace-nowrap" [class]="d.urgent ? 'text-primary' : 'text-muted-foreground'">{{ d.text }}</span>
+                    <span class="font-mono text-[10.5px] whitespace-nowrap" [class]="d.urgent ? 'text-red' : 'text-muted-foreground'">{{ d.text }}</span>
                   }
                   <a hlmBtn variant="outline" [routerLink]="['/', slug(), 'tasks', c.issue.key]">Open <app-kbd keys="enter" /></a>
                 </div>
@@ -492,7 +492,7 @@ export class HomePage {
 
   protected dueTone(i: Issue): string {
     if (!i.dueDate) return 'text-faint';
-    return differenceInCalendarDays(parseISO(i.dueDate), this.now()) <= 0 ? 'text-primary' : 'text-muted-foreground';
+    return differenceInCalendarDays(parseISO(i.dueDate), this.now()) <= 0 ? 'text-red' : 'text-muted-foreground';
   }
 
   protected projectSuffix(i: Issue): string {

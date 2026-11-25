@@ -58,7 +58,7 @@ const PRIORITY_LABEL: Record<Priority, string> = {
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class: 'inline-flex shrink-0 items-center gap-1.5 font-mono text-[11px] leading-none whitespace-nowrap',
-    '[class.text-primary]': "priority() === 'urgent'",
+    '[class.text-red]': "priority() === 'urgent'",
     '[class.text-muted-foreground]': "priority() !== 'urgent'",
     '[attr.aria-label]': "'Priority: ' + text()",
   },
@@ -80,7 +80,7 @@ export class V3Priority {
   protected readonly text = computed(() => PRIORITY_LABEL[this.priority()] ?? this.priority());
   protected barClass(i: number): string {
     const p = this.priority();
-    if (p === 'urgent') return 'bg-primary';
+    if (p === 'urgent') return 'bg-red';
     return i < PRIORITY_LIT[p] ? 'bg-foreground' : 'bg-faint';
   }
 }

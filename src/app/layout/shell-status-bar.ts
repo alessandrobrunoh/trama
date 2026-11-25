@@ -49,8 +49,8 @@ const PROVIDER_LABEL: Record<string, string> = {
     <button type="button" class="hover:text-muted-foreground shrink-0 whitespace-pre max-lg:hidden" (click)="ui.openModal('shortcuts')">? shortcuts</button>
     <button type="button" class="hover:text-muted-foreground -ms-1 shrink-0 max-lg:hidden" (click)="ui.openCommandPalette()">⌘K command</button>
     @if (timers.running(); as run) {
-      <span class="border-primary/40 bg-primary/12 flex shrink-0 items-center gap-2 border py-0.5 ps-2 pe-1">
-        <span class="bg-primary size-1.5" aria-hidden="true"></span>
+      <span class="border-red/40 bg-red/12 flex shrink-0 items-center gap-2 border py-0.5 ps-2 pe-1">
+        <span class="bg-red size-1.5" aria-hidden="true"></span>
         @if (runningKey(); as key) {
           <a [routerLink]="['/', slug(), 'tasks', key]" class="text-muted-foreground hover:text-foreground">{{ key }}</a>
         } @else {
@@ -59,7 +59,7 @@ const PROVIDER_LABEL: Record<string, string> = {
         <span class="text-foreground text-[11px] tabular-nums">{{ elapsed() }}</span>
         <button
           type="button"
-          class="bg-primary/20 hover:bg-primary/35 flex size-[18px] items-center justify-center"
+          class="bg-red/20 hover:bg-red/35 flex size-[18px] items-center justify-center"
           hlmTooltip="Stop timer"
           aria-label="Stop timer"
           [disabled]="timers.busy()"

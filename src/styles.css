@@ -703,11 +703,13 @@ html[data-keyboard='open'] .mobile-fab {
 
 /* ───────────────────────── Tokens ─────────────────────────
    Dark is the default (ThemeService); light is :root, dark is :root.dark.
-   v3 look (docs/designs/untitled.pen, "v3 · 01 UI Kit"): an editorial, Delta-like console.
+   v3 look (DESIGN.md, docs/designs/Trama.pen "v3 · 01 UI Kit"): an editorial, Delta-like console.
      · square corners and 1px hairlines everywhere (see "Square corners" below)
      · Newsreader for page titles and section headings (--font-serif, `font-serif`),
        IBM Plex Sans for body text (13/14), IBM Plex Mono for labels, ids and shortcuts
-     · red = the primary action and the Trama brand (--primary, --brand)
+     · the accent (--primary, default amber; `data-accent` on <html> picks another) = the primary
+       action, the current focus and the Trama brand
+     · red (--red, `text-red`) = urgent, today, overdue, the running timer, danger — whatever the accent
      · blue = Delta: threads, thread records, links to Delta (--delta)
      · status reads as a small colored square + label, never as a filled pill
    Use the semantic Tailwind colors (bg-background, text-muted-foreground, text-delta, …) — never
@@ -725,55 +727,65 @@ html[data-keyboard='open'] .mobile-fab {
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
   --font-serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
+  /* v3 "d-*" palette, light mode */
   --background: #ffffff;
-  --foreground: #17181b;
+  --bg-deep: #f4f4f5;
+  --foreground: #17181c;
+  --text-2: #3a3d44;
   --card: #f7f7f8;
-  --card-foreground: #17181b;
-  --popover: #ffffff;
-  --popover-foreground: #17181b;
-  --primary: #c2432a; /* Trama red; white text on it: 5.1:1 */
-  --primary-text: #b23c24;
-  --primary-foreground: #ffffff;
-  --brand: #c2432a;
-  --delta: #3f5fd0;
-  --delta-line: #3f5fd0;
-  --faint: #8a8d94;
-  --secondary: #f0f1f2;
-  --secondary-foreground: #24262a;
-  --muted: #f4f5f6;
-  --muted-foreground: #62656c;
-  --accent: #ebecee;
-  --accent-foreground: #17181b;
-  --destructive: #c2432a;
-  --border: #e3e4e7;
-  --border-strong: #d3d5d9;
-  --input: #cfd1d5;
-  --ring: #c2432a;
-  --hover: rgb(0 0 0 / 0.035);
-  --selected: rgb(0 0 0 / 0.06);
+  --card-foreground: #17181c;
+  --popover: #f7f7f8;
+  --popover-foreground: #17181c;
+  --primary: #c98a1e; /* accent: amber */
+  --primary-strong: #c68f25;
+  --primary-soft: #fbf2df;
+  --primary-text: #b47a12;
+  --primary-foreground: #1a1206;
+  --brand: var(--primary);
+  --red: #c2412d;
+  --yellow: #b47a12;
+  --green: #3e8e55;
+  --delta: #3d5bd9;
+  --delta-line: #3d5bd9;
+  --faint: #989ba3;
+  --line: #c9cacf;
+  --grid: #e4e4e880;
+  --secondary: #f1f1f3;
+  --secondary-foreground: #17181c;
+  --muted: #f7f7f8;
+  --muted-foreground: #5d6068;
+  --accent: #ededf0;
+  --accent-foreground: #17181c;
+  --destructive: var(--red);
+  --border: #e4e4e8;
+  --border-strong: #d4d4d9;
+  --input: #e4e4e8;
+  --ring: var(--primary);
+  --hover: #ededf0;
+  --selected: #e6e6ea;
 
   /* Diff-style rows ("+6 −4") and quoted-comment bars */
-  --diff-add: #3d8a45;
+  --diff-add: #3e8e55;
   --diff-add-bg: #e6f2e7;
-  --diff-del: #c2432a;
+  --diff-del: #c2412d;
   --diff-del-bg: #f8e4df;
-  --comment-bar: #3f5fd0;
+  --comment-bar: #3d5bd9;
 
-  --chart-1: #3f5fd0;
-  --chart-2: #3d8a45;
-  --chart-3: #b8800f;
-  --chart-4: #c2432a;
-  --chart-5: #62656c;
+  --chart-1: #3d5bd9;
+  --chart-2: #3e8e55;
+  --chart-3: #b47a12;
+  --chart-4: #c2412d;
+  --chart-5: #5d6068;
 
-  --sidebar: #f4f5f6;
+  --sidebar: #f7f7f8;
   --pane: var(--sidebar);
-  --sidebar-foreground: #24262a;
-  --sidebar-primary: #c2432a;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(0 0 0 / 0.06);
-  --sidebar-accent-foreground: #17181b;
+  --sidebar-foreground: #5d6068;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: #e6e6ea;
+  --sidebar-accent-foreground: #17181c;
   --sidebar-border: var(--border);
-  --sidebar-ring: #c2432a;
+  --sidebar-ring: var(--primary);
 
   --entity-decision: #b8800f;
   --entity-issue: #62646b;
@@ -781,13 +793,13 @@ html[data-keyboard='open'] .mobile-fab {
   /* tones (the palette behind every status) */
   --tone-neutral: #74777e;
   --tone-slate: #5f6a7a;
-  --tone-blue: #3f5fd0;
-  --tone-amber: #a0700e;
+  --tone-blue: #3d5bd9;
+  --tone-amber: #b47a12;
   --tone-orange: #bd5320;
   --tone-violet: #6f5cc4;
-  --tone-red: #c2432a;
+  --tone-red: #c2412d;
   --tone-teal: #0f7a6f;
-  --tone-green: #3d8a45;
+  --tone-green: #3e8e55;
 
   --shadow-menu: 0 0 0 1px var(--border-strong), 0 10px 28px -8px rgb(0 0 0 / 0.18);
   --shadow-panel: none;
@@ -799,35 +811,44 @@ html[data-keyboard='open'] .mobile-fab {
   /* v3 "d-*" palette: content #0F1114, side panes and cards #14161A, raised #1B1E23,
      hairline #24272D; text #DCDDE0 / muted #8C9096 / faint #5E6269. */
   --background: #0f1114;
+  --bg-deep: #0b0c0f;
   --foreground: #dcdde0;
+  --text-2: #c3c5c9;
   --card: #14161a;
   --card-foreground: #dcdde0;
-  --popover: #1b1e23;
+  --popover: #14161a;
   --popover-foreground: #dcdde0;
-  --primary: #cc4b30; /* d-red: the primary action */
-  --primary-text: #e2694d; /* red as text on dark surfaces: 5:1 */
-  --primary-foreground: #ffffff;
-  --brand: #cc4b30;
-  --delta: #8ea4ec; /* d-blue, lifted for text on dark surfaces (thread labels) */
+  --primary: #e2a93b; /* accent: amber */
+  --primary-strong: #c68f25;
+  --primary-soft: #2c2416;
+  --primary-text: #e2a93b;
+  --primary-foreground: #1a1206;
+  --brand: var(--primary);
+  --red: #cc4b30;
+  --yellow: #e2a93b;
+  --green: #6fae73;
+  --delta: #8ea4ec; /* d-blue-text: thread labels */
   --delta-line: #5274e0; /* d-blue as a line / fill */
   --faint: #5e6269;
+  --line: #3a3e45;
+  --grid: #24272d80;
   --secondary: #1b1e23;
   --secondary-foreground: #dcdde0;
   --muted: #14161a;
   --muted-foreground: #8c9096;
-  --accent: #202329;
-  --accent-foreground: #eeeff1;
-  --destructive: #e0644a;
+  --accent: #1f2227;
+  --accent-foreground: #dcdde0;
+  --destructive: var(--red);
   --border: #24272d;
-  --border-strong: #2e3138;
-  --input: #2e3138;
-  --ring: #cc4b30;
-  --hover: rgb(255 255 255 / 0.03);
-  --selected: rgb(255 255 255 / 0.055);
+  --border-strong: #33373e;
+  --input: #24272d;
+  --ring: var(--primary);
+  --hover: #1f2227;
+  --selected: #262a30;
 
   --diff-add: #6fae73;
   --diff-add-bg: rgb(111 174 115 / 0.12);
-  --diff-del: #e0644a;
+  --diff-del: #cc4b30;
   --diff-del-bg: rgb(204 75 48 / 0.14);
   --comment-bar: #5274e0;
 
@@ -838,30 +859,49 @@ html[data-keyboard='open'] .mobile-fab {
   --chart-5: #8c9096;
 
   --sidebar: #14161a;
-  --sidebar-foreground: #c9cbcf;
-  --sidebar-primary: #cc4b30;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1f2227;
+  --sidebar-foreground: #8c9096;
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: #262a30;
   --sidebar-accent-foreground: #dcdde0;
   --sidebar-border: var(--border);
-  --sidebar-ring: #cc4b30;
+  --sidebar-ring: var(--primary);
 
   --entity-decision: #e2a93b;
   --entity-issue: #8c9096;
 
   --tone-neutral: #8c9096;
   --tone-slate: #747985;
-  --tone-blue: #6f8ceb;
+  --tone-blue: #5274e0;
   --tone-amber: #e2a93b;
   --tone-orange: #e07a45;
   --tone-violet: #9a86e0;
-  --tone-red: #e0644a;
+  --tone-red: #cc4b30;
   --tone-teal: #5fb3a6;
   --tone-green: #6fae73;
 
   --shadow-menu: 0 0 0 1px var(--border-strong), 0 14px 36px -10px rgb(0 0 0 / 0.75);
   --shadow-panel: none;
 }
+
+/* Accent: the workspace can pick another colour for the primary action (Settings · General).
+   Amber is the default and is set above; `data-accent` on <html> switches it. */
+:root[data-accent='vermilion'] { --primary: #cc4b30; --primary-strong: #ae3a22; --primary-soft: #fbe9e5; --primary-text: #cc4b30; --primary-foreground: #ffffff; }
+:root[data-accent='terracotta'] { --primary: #b5583a; --primary-strong: #9a4529; --primary-soft: #f8ebe6; --primary-text: #b5583a; --primary-foreground: #ffffff; }
+:root[data-accent='violet'] { --primary: #7c5cc4; --primary-strong: #6647ad; --primary-soft: #efeaf9; --primary-text: #7c5cc4; --primary-foreground: #ffffff; }
+:root[data-accent='cobalt'] { --primary: #3d5bd9; --primary-strong: #2e48b8; --primary-soft: #e8edfc; --primary-text: #3d5bd9; --primary-foreground: #ffffff; }
+:root[data-accent='crimson'] { --primary: #e5484d; --primary-strong: #c93338; --primary-soft: #fce8e9; --primary-text: #e5484d; --primary-foreground: #ffffff; }
+:root[data-accent='orange'] { --primary: #e25e22; --primary-strong: #d2551d; --primary-soft: #fdeee6; --primary-text: #e25e22; --primary-foreground: #ffffff; }
+:root[data-accent='moss'] { --primary: #3f8f5a; --primary-strong: #2f7347; --primary-soft: #e6f2ea; --primary-text: #3f8f5a; --primary-foreground: #ffffff; }
+:root[data-accent='teal'] { --primary: #14918a; --primary-strong: #0e756f; --primary-soft: #e2f3f2; --primary-text: #14918a; --primary-foreground: #ffffff; }
+:root.dark[data-accent='vermilion'] { --primary-soft: #2b1a16; }
+:root.dark[data-accent='terracotta'] { --primary-soft: #2a1c17; }
+:root.dark[data-accent='violet'] { --primary-soft: #221c30; }
+:root.dark[data-accent='cobalt'] { --primary-soft: #181e33; }
+:root.dark[data-accent='crimson'] { --primary-soft: #2e1819; }
+:root.dark[data-accent='orange'] { --primary: #ee6a2f; --primary-text: #ee6a2f; --primary-soft: #2e1e16; }
+:root.dark[data-accent='moss'] { --primary-soft: #17251c; }
+:root.dark[data-accent='teal'] { --primary-soft: #13262a; }
 
 /* Status → tone. Semantics are shared across entities:
    neutral = not started / inactive · blue = active · amber = waiting on a human ·
@@ -900,7 +940,7 @@ html[data-keyboard='open'] .mobile-fab {
   --status-healthy: var(--tone-green);
   --status-degraded: var(--tone-amber);
   /* Priority */
-  --priority-urgent: var(--tone-orange);
+  --priority-urgent: var(--tone-red);
   --priority-high: var(--tone-orange);
   --priority-medium: var(--tone-amber);
   --priority-low: var(--tone-slate);
@@ -941,6 +981,15 @@ html[data-keyboard='open'] .mobile-fab {
   --font-serif: var(--font-serif);
 
   --color-brand: var(--brand);
+  --color-primary-strong: var(--primary-strong);
+  --color-primary-soft: var(--primary-soft);
+  --color-red: var(--red);
+  --color-yellow: var(--yellow);
+  --color-green: var(--green);
+  --color-line: var(--line);
+  --color-grid: var(--grid);
+  --color-text-2: var(--text-2);
+  --color-bg-deep: var(--bg-deep);
   --color-delta: var(--delta);
   --color-delta-line: var(--delta-line);
   --color-faint: var(--faint);
@@ -1062,12 +1111,6 @@ html[data-keyboard='open'] .mobile-fab {
   :focus:not(:focus-visible) {
     outline: none;
   }
-}
-
-/* The accent as a fill needs white text (AA); as text on dark surfaces it needs a lighter shade.
-   Unlayered on purpose: it must win over the `text-primary` utility. */
-:root.dark .text-primary {
-  color: var(--primary-text);
 }
 
 /* Square corners (v3 rule): unlayered, so it wins over every `rounded-*` utility and component

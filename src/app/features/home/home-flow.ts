@@ -37,7 +37,7 @@ const tasks = (n: number) => `${n} task${n === 1 ? '' : 's'}`;
       <span class="flex items-center gap-1.5"><span class="size-[7px] bg-[#3a3e45]"></span>Opened</span>
       @if (hasEvents()) {
         <span class="flex items-center gap-1.5"><svg [lucideIcon]="flag" [size]="11" class="text-status-done"></svg>Reached</span>
-        <span class="flex items-center gap-1.5"><svg [lucideIcon]="flag" [size]="11" class="text-primary"></svg>Missed</span>
+        <span class="flex items-center gap-1.5"><svg [lucideIcon]="flag" [size]="11" class="text-red"></svg>Missed</span>
         <span class="flex items-center gap-1.5"><svg [lucideIcon]="check" [size]="11" class="text-status-done"></svg>Project completed</span>
       }
     </div>
@@ -58,7 +58,7 @@ const tasks = (n: number) => `${n} task${n === 1 ? '' : 's'}`;
                 <svg
                   [lucideIcon]="e.kind === 'project_done' ? check : flag"
                   [size]="13"
-                  [class]="e.kind === 'milestone_missed' ? 'text-primary' : 'text-status-done'"
+                  [class]="e.kind === 'milestone_missed' ? 'text-red' : 'text-status-done'"
                 ></svg>
               </a>
             }
