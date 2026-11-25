@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, booleanAttribute, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input, model, signal } from '@angular/core';
 import { LucideCheck, LucideCopy, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { Clipboard } from '../../../core/notify/notifier';
@@ -10,9 +10,9 @@ import { Clipboard } from '../../../core/notify/notifier';
 @Component({
   selector: 'app-section-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'mb-7 flex flex-wrap items-end justify-between gap-x-4 gap-y-3' },
+  host: { class: 'flex flex-wrap items-end justify-between gap-x-6 gap-y-3', '[class.mb-7]': '!flush()' },
   template: `
-    <div class="flex min-w-0 flex-col gap-1.5">
+    <div class="flex min-w-0 flex-1 flex-col gap-1.5">
       <h2 class="font-title text-foreground text-[32px] leading-normal">{{ title() }}</h2>
       @if (description()) {
         <p class="text-muted-foreground max-w-[720px] text-[13.5px] leading-[21px]">{{ description() }}</p>
@@ -26,6 +26,8 @@ import { Clipboard } from '../../../core/notify/notifier';
 export class SectionHeader {
   readonly title = input.required<string>();
   readonly description = input<string>();
+  /** The page lays its blocks out with a 36px gap (v4 settings frames): no bottom margin. */
+  readonly flush = input(false, { transform: booleanAttribute });
 }
 
 /**
@@ -161,4 +163,206 @@ export class CopyField {
   }
 }
 
-export const SECTION_KIT = [SectionHeader, SettingsSection, SettingsGroup, SettingsRow, ReadonlyNote, CopyField] as const;
+// ───────────────────────── v4 settings frames: blocks, cards, rows, switches ─────────────────────────
+
+/** Field edge + fill of the v4 settings frames: 34px, `bg-background`, hairline, accent edge on focus. */
+export const SETTINGS_FIELD =
+  'bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary w-full min-w-0 border px-2.5 py-[7px] font-sans text-[13px] leading-[18px] outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50';
+
+/**
+ * Block of a settings page (v4 "Sec"): Newsreader 20 title, an optional mono caption, an optional `[aside]`
+ * slot on the right and an optional muted description, 12px above the projected content (a card, a table …).
+ */
+@Component({
+  selector: 'app-settings-block',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-col gap-3' },
+  template: `
+    <div class="flex items-end gap-2.5">
+      <h3 class="font-title text-foreground text-[20px] leading-normal" [class.text-red]="danger()">{{ title() }}</h3>
+      @if (caption()) {
+        <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
+      }
+      <span class="flex-1"></span>
+      <div class="flex shrink-0 items-center gap-2 pb-0.5 empty:hidden"><ng-content select="[aside]" /></div>
+    </div>
+    @if (description()) {
+      <p class="text-muted-foreground -mt-1.5 max-w-[720px] text-[12.5px] leading-[19px]">{{ description() }}</p>
+    }
+    <ng-content />
+  `,
+})
+export class SettingsBlock {
+  readonly title = input.required<string>();
+  readonly caption = input<string>();
+  readonly description = input<string>();
+  readonly danger = input(false, { transform: booleanAttribute });
+}
+
+/**
+ * Card of hairline-separated rows (v4 "Card"): `bg-card` panel with a 1px edge. `danger` tints the edge red
+ * (the Danger zone card), `accent` the amber notice variant.
+ */
+@Component({
+  selector: 'app-settings-card',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'bg-card divide-border block divide-y border', '[class]': 'edge()' },
+  template: `<ng-content />`,
+})
+export class SettingsCard {
+  readonly tone = input<'default' | 'danger'>('default');
+  protected readonly edge = computed(() => (this.tone() === 'danger' ? 'border-red/35' : 'border-border'));
+}
+
+/**
+ * Row of a card (v4 "Row"): 13.5px label over a 12.5px muted description on the left, the control on the
+ * right (projected). `wide` gives the control a 320px column (inputs, selects); `danger` paints the label red.
+ * Stacks on narrow screens. Text that belongs under the description goes in `[below]`.
+ */
+@Component({
+  selector: 'app-card-row',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex flex-col gap-2.5 px-4 py-3.5 sm:flex-row sm:items-center sm:gap-6' },
+  template: `
+    <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
+      <span class="text-[13.5px] leading-normal" [class]="danger() ? 'text-red' : 'text-foreground'">{{ label() }}</span>
+      @if (description()) {
+        <span class="text-muted-foreground text-[12.5px] leading-[18px]">{{ description() }}</span>
+      }
+      <ng-content select="[below]" />
+    </div>
+    <div
+      class="flex min-w-0 shrink-0 flex-wrap items-center gap-2 sm:justify-end"
+      [class]="wide() ? 'sm:w-80 [&>*:only-child]:w-full sm:[&>*]:min-w-0' : ''"
+    >
+      <ng-content />
+    </div>
+  `,
+})
+export class CardRow {
+  readonly label = input.required<string>();
+  readonly description = input<string>();
+  readonly wide = input(false, { transform: booleanAttribute });
+  readonly danger = input(false, { transform: booleanAttribute });
+}
+
+/**
+ * Switch of the v4 settings frames: 30×18, 2px padding, 14px square knob. On = accent fill with the knob
+ * (on-accent colour) to the right; off = raised fill with a hairline and a faint knob on the left.
+ * Same API as `<v3-toggle>`.
+ */
+@Component({
+  selector: 'app-switch',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'inline-flex shrink-0', '[attr.aria-label]': 'null' },
+  template: `
+    <button
+      type="button"
+      role="switch"
+      class="focus-visible:ring-ring/50 flex h-[18px] w-[30px] shrink-0 items-center p-0.5 transition-colors outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+      [class]="checked() ? 'bg-primary justify-end' : 'bg-secondary border-border justify-start border'"
+      [attr.aria-checked]="checked()"
+      [attr.aria-label]="ariaLabel()"
+      [disabled]="disabled()"
+      (click)="checked.set(!checked())"
+    >
+      <span class="size-3.5" [class]="checked() ? 'bg-primary-foreground' : 'bg-faint'" aria-hidden="true"></span>
+    </button>
+  `,
+})
+export class SettingsSwitch {
+  readonly checked = model(false);
+  readonly disabled = input(false, { transform: booleanAttribute });
+  readonly ariaLabel = input<string | null>(null, { alias: 'aria-label' });
+}
+
+/** One choice of a `<app-segmented>`. */
+export interface SegmentedOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Segmented control of the v4 settings frames: a 2px inset in `bg-background` with a hairline, mono 11.5
+ * options at 4/10 padding; the selected one is raised (`bg-selected`) and in text colour.
+ */
+@Component({
+  selector: 'app-segmented',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'bg-background border-border inline-flex w-fit shrink-0 items-stretch gap-0.5 border p-0.5',
+    role: 'radiogroup',
+    '[attr.aria-label]': 'ariaLabel()',
+  },
+  template: `
+    @for (o of options(); track o.value) {
+      <button
+        type="button"
+        role="radio"
+        class="focus-visible:ring-ring/50 px-2.5 py-1 font-mono text-[11.5px] leading-[normal] whitespace-nowrap outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        [class]="o.value === value() ? 'bg-selected text-foreground' : 'text-muted-foreground hover:text-foreground'"
+        [attr.aria-checked]="o.value === value()"
+        [disabled]="disabled()"
+        (click)="value.set(o.value)"
+      >
+        {{ o.label }}
+      </button>
+    }
+  `,
+})
+export class SettingsSegmented {
+  readonly options = input.required<readonly SegmentedOption[]>();
+  readonly value = model<string>('');
+  readonly disabled = input(false, { transform: booleanAttribute });
+  readonly ariaLabel = input<string | null>(null, { alias: 'aria-label' });
+}
+
+/** One cell of a `<app-stat-strip>`. */
+export interface StatCell {
+  label: string;
+  value: string;
+  /** Mono note under the value. */
+  note?: string;
+}
+
+/**
+ * Strip of stats (v4 "Stats"): equal cells in a card edge, a hairline between them; mono 10.5 label, Newsreader
+ * value (18 by default, 24 with `large`), optional mono note.
+ */
+@Component({
+  selector: 'app-stat-strip',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'bg-card border-border grid grid-cols-2 border sm:flex' },
+  template: `
+    @for (c of cells(); track c.label) {
+      <div
+        class="border-border flex min-w-0 flex-1 flex-col gap-1 px-4 py-3.5 [&:nth-child(even)]:border-l [&:nth-child(n+3)]:border-t sm:[&:nth-child(n+3)]:border-t-0 sm:[&:not(:first-child)]:border-l"
+      >
+        <span class="text-faint font-mono text-[10.5px] leading-normal uppercase">{{ c.label }}</span>
+        <span class="font-title text-foreground truncate leading-normal" [class]="large() ? 'text-[24px]' : 'text-[18px]'">{{ c.value }}</span>
+        @if (c.note) {
+          <span class="text-faint truncate font-mono text-[10.5px] leading-normal">{{ c.note }}</span>
+        }
+      </div>
+    }
+  `,
+})
+export class StatStrip {
+  readonly cells = input.required<readonly StatCell[]>();
+  readonly large = input(false, { transform: booleanAttribute });
+}
+
+export const SECTION_KIT = [
+  SectionHeader,
+  SettingsSection,
+  SettingsGroup,
+  SettingsRow,
+  ReadonlyNote,
+  CopyField,
+  SettingsBlock,
+  SettingsCard,
+  CardRow,
+  SettingsSwitch,
+  SettingsSegmented,
+  StatStrip,
+] as const;

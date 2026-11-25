@@ -11,7 +11,6 @@ import {
   LucideShieldCheck,
   LucideSlidersHorizontal,
   LucideSparkles,
-  LucideSunMoon,
   LucideTag,
   LucideTimer,
   LucideUserRound,
@@ -34,20 +33,20 @@ export interface SettingsGroupDef {
   sections: readonly SettingsSectionDef[];
 }
 
-/** The settings sidebar (v3 "Settings sidebar"): WORKSPACE first, then ACCOUNT. */
+/** The settings sidebar (v4 "Settings sidebar"): WORKSPACE first, then ACCOUNT, in the order of the frames. */
 export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
   {
     title: 'WORKSPACE',
     sections: [
       { id: 'workspace', label: 'General', icon: LucideSettings },
-      { id: 'workflow', label: 'Workflow', icon: LucideWorkflow },
-      { id: 'estimates', label: 'Estimates', icon: LucideGauge },
       { id: 'members', label: 'Members', icon: LucideUsers },
       { id: 'roles', label: 'Roles & permissions', icon: LucideShieldCheck },
+      { id: 'workflow', label: 'Workflow', icon: LucideWorkflow },
       { id: 'labels', label: 'Labels', icon: LucideTag },
-      { id: 'agents', label: 'Agents', icon: LucideBot },
-      { id: 'integrations', label: 'Integrations', icon: LucidePlug },
+      { id: 'estimates', label: 'Estimates', icon: LucideGauge },
       { id: 'time', label: 'Time tracking', icon: LucideTimer },
+      { id: 'integrations', label: 'Integrations', icon: LucidePlug },
+      { id: 'agents', label: 'Agents', icon: LucideBot },
       { id: 'import', label: 'Import', icon: LucideDownload },
     ],
   },
@@ -59,9 +58,8 @@ export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
       { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal },
       { id: 'notifications', label: 'Notifications', icon: LucideBell },
       { id: 'ai', label: 'AI & assistant', icon: LucideSparkles },
-      { id: 'appearance', label: 'Appearance', icon: LucideSunMoon },
       { id: 'shortcuts', label: 'Shortcuts', icon: LucideKeyboard },
-      { id: 'api', label: 'API & MCP', icon: LucideKeyRound },
+      { id: 'api', label: 'API tokens', icon: LucideKeyRound },
     ],
   },
 ];
@@ -73,7 +71,10 @@ const ALIASES: Readonly<Record<string, string>> = {
   danger: 'workspace',
   general: 'workspace',
   account: 'profile',
-  theme: 'appearance',
+  theme: 'preferences',
+  appearance: 'preferences',
+  personal: 'my-integrations',
+  'personal-integrations': 'my-integrations',
   statuses: 'workflow',
   tokens: 'api',
 };

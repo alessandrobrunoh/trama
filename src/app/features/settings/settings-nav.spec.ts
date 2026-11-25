@@ -10,6 +10,15 @@ describe('settings nav', () => {
     expect(resolveSettingsSection('tokens')).toBe('api');
     expect(resolveSettingsSection('statuses')).toBe('workflow');
     expect(resolveSettingsSection('danger')).toBe('workspace');
+    expect(resolveSettingsSection('appearance')).toBe('preferences');
+    expect(resolveSettingsSection('theme')).toBe('preferences');
+  });
+
+  it('lists the workspace sections before the account ones, in the frames order', () => {
+    const ids = SETTINGS_SECTIONS.map((s) => s.id);
+    expect(ids.slice(0, 3)).toEqual(['workspace', 'members', 'roles']);
+    expect(ids.indexOf('profile')).toBe(10);
+    expect(ids[11]).toBe('my-integrations');
   });
 
   it('keeps a current id as it is', () => {

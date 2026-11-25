@@ -2,15 +2,15 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink } from '@angular/router';
-import { LucideArrowLeft, LucideDynamicIcon, LucideTriangleAlert } from '@lucide/angular';
+import { LucideArrowLeft, LucideDynamicIcon } from '@lucide/angular';
 import { filter, map, startWith } from 'rxjs';
 import { TramaStore } from '../../core/stores/trama.store';
 import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
 
 /**
  * The settings sidebar (v3 "Settings sidebar", 248px): it replaces the main sidebar while a settings page
- * is open. "Back to Trama" (esc), the title, WORKSPACE and ACCOUNT groups, and the
- * danger zone pinned to the bottom. Mounted by `AppSidebar` in place of its own content.
+ * is open. "Back to Trama" (esc), the title and the WORKSPACE and ACCOUNT groups, with a count at the right
+ * of the items that have one. Mounted by `AppSidebar` in place of its own content.
  */
 @Component({
   selector: 'app-settings-sidebar',
@@ -51,22 +51,15 @@ import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
             >
               <svg [lucideIcon]="s.icon" [size]="15" class="shrink-0"></svg>
               <span class="truncate">{{ s.label }}</span>
+              <span class="flex-1"></span>
+              @if (counts()[s.id]; as n) {
+                <span class="text-faint font-mono text-[11px] leading-normal tabular-nums">{{ n }}</span>
+              }
             </a>
           }
         </div>
       }
     </nav>
-
-    <div class="border-border border-t p-2">
-      <a
-        [routerLink]="['/', slug(), 'settings', 'workspace']"
-        class="text-red hover:bg-hover/60 focus-visible:ring-sidebar-ring flex h-[30px] items-center gap-2.5 px-2.5 text-[13px] outline-hidden focus-visible:ring-2"
-        title="Delete the workspace: at the bottom of General"
-      >
-        <svg [lucideIcon]="warn" [size]="15" class="shrink-0"></svg>
-        Danger zone
-      </a>
-    </div>
   `,
 })
 export class SettingsSidebar {
@@ -76,7 +69,6 @@ export class SettingsSidebar {
 
   protected readonly groups = SETTINGS_GROUPS;
   protected readonly back = LucideArrowLeft;
-  protected readonly warn = LucideTriangleAlert;
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly workspaceName = computed(() => this.store.slug() ?? this.store.workspace()?.name ?? '');
@@ -91,6 +83,15 @@ export class SettingsSidebar {
     { initialValue: this.router.url },
   );
   protected readonly current = computed(() => settingsSectionOfUrl(this.url()));
+
+  /** The mono count at the right of a nav item (v4 frames); nothing is shown while a count is zero. */
+  protected readonly counts = computed<Readonly<Record<string, number>>>(() => ({
+    members: this.store.memberships().length,
+    labels: this.store.settings().labels.length,
+    integrations: this.store.integrations().length,
+    agents: this.store.agents().length,
+    api: this.store.tokens().length,
+  }));
 
   /** Esc leaves settings, unless it is closing something (a dialog, a menu) or the person is typing. */
   protected onEscape(event: Event): void {
