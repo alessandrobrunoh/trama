@@ -1,0 +1,682 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      tailwind = { config: { corePlugins: { preflight: false } } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono%3Awght%40400&family=IBM+Plex+Sans%3Awght%40100..700&family=Newsreader%3Awght%40200..800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, ::before, ::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body style="background-color: #0F1114">
+    <div
+      data-pencil-id="UYz2h"
+      data-pencil-name="v3 · M6 Inbox"
+      class="box-border w-[390px] h-[844px] flex flex-col gap-0 justify-start items-start bg-[#0F1114] overflow-hidden"
+    >
+      <div
+        data-pencil-id="Kuo7u"
+        data-pencil-name="M Status bar"
+        class="box-border w-full h-[44px] shrink-0 flex flex-row gap-0 p-[0px_24px] justify-start items-center"
+      >
+        <div
+          data-pencil-id="sDhXf"
+          data-pencil-name="9:41"
+          class="text-[15px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-semibold text-left [white-space:nowrap]"
+        >
+          9:41
+        </div>
+        <div
+          data-pencil-id="XRNmU"
+          data-pencil-name="Sp"
+          class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+        ></div>
+        <div
+          data-pencil-id="c4RcRE"
+          data-pencil-name="Icons"
+          class="box-border w-fit shrink-0 h-fit flex flex-row gap-[6px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="NniWz"
+            data-pencil-name="signal"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="signal"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M13.605 1.89q-.15 .044-.279 .164-.128 .121-.172 .271-.029 .107-.029 5.175 0 5.068 .029 5.175 .063 .227 .249 .347 .187 .118 .403 .096 .22-.022 .385-.187 .135-.136 .165-.315 .029-.121 .029-5.116 0-4.995-.029-5.116-.03-.179-.165-.315-.106-.121-.271-.165-.165-.044-.315-.014zM10.529 4.395q-.194 .014-.337 .157-.143 .143-.172 .337-.03 .121-.03 3.878 0 3.757 .03 3.849 .029 .194 .164 .315 .213 .209 .495 .187 .285-.022 .45-.264l.029-.029q.048-.059 .063-.209 .014-.179 .029-.857v-6.87l-.044-.103q-.091-.227-.271-.329-.179-.106-.406-.062zM7.335 6.899q-.271 .092-.406 .33l-.044 .092v5.295l.029 .103q.092 .227 .315 .347 .106 .044 .271 .044 .165 0 .271-.044 .223-.12 .315-.347l.029-.103v-5.295l-.044-.092q-.106-.194-.3-.286-.092-.044-.242-.051-.15-.007-.194 .007zM4.23 9.39q-.15 .044-.279 .164-.128 .121-.172 .271-.029 .107-.029 1.436 0 1.326 .029 1.414 .063 .227 .249 .347 .187 .118 .403 .096 .22-.022 .385-.187 .135-.136 .164-.315 .03-.121 .03-1.366 0-1.245-.03-1.366-.029-.179-.164-.315-.107-.121-.271-.165-.165-.044-.315-.014zM1.154 11.895q-.253 .029-.411 .249-.157 .216-.098 .472 .029 .194 .164 .315 .18 .179 .451 .179 .15 0 .256-.044 .224-.106 .304-.315 .084-.212 .033-.428-.051-.22-.249-.344-.194-.128-.45-.084z"
+              fill="#dcdde0"
+            />
+          </svg>
+          <svg
+            data-pencil-id="kt87o"
+            data-pencil-name="wifi"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="wifi"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.094 2.52q-1.692 .062-3.278 .684-1.582 .619-2.871 1.747-.194 .165-.257 .293-.058 .125-.058 .26 0 .271 .187 .451 .186 .179 .472 .164 .136 0 .223-.044 .092-.044 .334-.241 .436-.359 .809-.616 1.783-1.197 3.937-1.413 2.153-.22 4.149 .56 1.289 .524 2.413 1.469 .242 .197 .33 .241 .091 .044 .227 .044 .286 .015 .472-.164 .187-.18 .187-.451 0-.135-.062-.26-.059-.128-.253-.293-1.501-1.307-3.42-1.937-1.333-.451-2.641-.494l-.421-.015q-.102 0-.479 .015zM6.991 5.64q-1.022 .077-1.996 .457-.974 .381-1.802 1.044-.223 .18-.402 .359-.18 .179-.209 .256-.077 .132-.077 .282 0 .15 .066 .286 .069 .135 .212 .227 .143 .088 .293 .103 .15 .014 .268-.037 .12-.051 .271-.187 1.109-1.036 2.49-1.38 1.38-.345 2.728-.015 1.351 .33 2.388 1.26 .285 .241 .41 .307 .128 .066 .293 .052 .165-.015 .3-.103 .136-.092 .202-.216 .069-.128 .069-.293 0-.168-.069-.293-.066-.128-.418-.436-.351-.307-.699-.534-.974-.645-2.069-.927-1.095-.286-2.249-.212zM7.02 8.789q-.586 .077-1.109 .315-.359 .165-.722 .443-.359 .278-.436 .458-.117 .271 0 .527 .121 .253 .407 .344 .315 .088 .63-.197 .736-.674 1.71-.674 .974 0 1.71 .674 .315 .285 .645 .197 .271-.091 .388-.344 .121-.256 .004-.527-.077-.18-.44-.458-.359-.278-.718-.443-.465-.223-1.021-.304-.553-.084-1.048-.011zM7.394 11.895q-.194 .029-.344 .179-.224 .227-.165 .542 .058 .315 .344 .45 .106 .044 .271 .044 .271 0 .45-.179 .136-.136 .165-.315 .059-.33-.168-.553-.224-.227-.553-.168z"
+              fill="#dcdde0"
+            />
+          </svg>
+          <svg
+            data-pencil-id="xFx5T"
+            data-pencil-name="battery-full"
+            viewBox="0 0 18 18"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="battery-full"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+          >
+            <path
+              d="M2.54 3.797q-.721 .162-1.2 .694-.474 .532-.567 1.27-.035 .198-.035 3.239 0 3.041 .035 3.239 .036 .395 .216 .756 .198 .417 .567 .725 .369 .303 .839 .448l.198 .07 9.123-.017q.703 0 .813-.035 .628-.181 1.05-.602 .426-.427 .607-1.055 .035-.11 .035-.611l.017-2.918-.017-2.918q0-.501-.035-.611-.163-.628-.589-1.05-.422-.426-1.033-.607l-.18-.052h-8.983q-.72 .017-.861 .035zM12.296 5.309q.268 .127 .395 .395l.053 .128v6.336l-.053 .128q-.18 .356-.558 .431-.127 .035-4.627 .035-4.5 0-4.636-.027-.132-.026-.224-.07-.088-.048-.181-.145-.088-.101-.145-.207l-.052-.127v-6.372l.052-.127q.075-.163 .216-.277 .145-.119 .325-.137 .127-.035 4.715-.017h4.593zM4.32 6.768q-.163 .035-.308 .171-.14 .136-.215 .299-.035 .088-.035 .321v1.441 1.441q0 .233 .035 .321 .11 .273 .378 .418 .127 .052 .325 .052 .198 0 .325-.052 .268-.145 .378-.418 .035-.088 .035-.321v-1.441-1.441q0-.233-.035-.321-.11-.255-.365-.387-.25-.136-.518-.083zM7.326 6.768q-.18 .052-.334 .197-.154 .145-.207 .326-.035 .127-.035 1.722 0 1.591 .035 1.696 .075 .273 .299 .418 .224 .141 .483 .114 .264-.026 .462-.224 .162-.163 .198-.378 .035-.145 .035-1.639 0-1.494-.035-1.639-.036-.216-.198-.378-.128-.145-.325-.198-.198-.053-.378-.017zM10.314 6.768q-.145 .035-.281 .145-.132 .105-.198 .232-.062 .128-.079 .409-.018 .277-.018 1.446 0 1.169 .018 1.45 .017 .277 .07 .404 .057 .088 .154 .181 .101 .088 .207 .145 .307 .14 .619 0 .317-.145 .409-.471 .035-.105 .035-1.709 0-1.604-.035-1.709-.075-.233-.255-.37-.18-.136-.413-.153-.145-.018-.233 0zM16.326 6.768q-.18 .052-.334 .197-.154 .145-.207 .326-.035 .127-.035 1.722 0 1.591 .035 1.696 .075 .273 .299 .418 .224 .141 .483 .114 .264-.026 .462-.224 .162-.163 .198-.378 .035-.145 .035-1.639 0-1.494-.035-1.639-.036-.216-.198-.378-.128-.145-.325-.198-.198-.053-.378-.017z"
+              fill="#dcdde0"
+            />
+          </svg>
+        </div>
+      </div>
+      <div
+        data-pencil-id="vpzcF"
+        data-pencil-name="Content"
+        class="box-border w-full [flex:1_1_0] flex flex-col gap-0 justify-start items-start"
+      >
+        <div
+          data-pencil-id="iTh2y"
+          data-pencil-name="M Header"
+          class="box-border w-full h-fit shrink-0 flex flex-row gap-[12px] p-[6px_18px_12px_18px] justify-start items-center"
+        >
+          <div
+            data-pencil-id="rtygp"
+            data-pencil-name="Titles"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[1px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="yn4AO"
+              data-pencil-name="Kicker"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              4 UNREAD
+            </div>
+            <div
+              data-pencil-id="DwuLF"
+              data-pencil-name="Title"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Inbox
+            </div>
+          </div>
+          <div
+            data-pencil-id="AXF36"
+            data-pencil-name="Right"
+            class="box-border w-[28px] shrink-0 h-[28px] flex flex-row gap-0 justify-center items-center"
+          >
+            <svg
+              data-pencil-id="MP1Xi"
+              data-pencil-name="More"
+              viewBox="0 0 20 20"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="check-check"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[20px] shrink-0 h-[20px] overflow-visible"
+            >
+              <path
+                d="M14.78 4.199q-.122 .039-.341 .239-.298 .264-1.221 1.163l-7.398 7.378-1.86-1.841q-1.318-1.338-1.602-1.607-.278-.273-.4-.312-.298-.098-.61 .024-.308 .117-.45 .415-.058 .161-.058 .342v.059q0 .161 .058 .263 .103 .157 .503 .576l1.719 1.724q2.139 2.158 2.241 2.236 .181 .122 .401 .142 .219 .02 .42-.078 .117-.064 .864-.801 .752-.742 3.975-3.96 4.677-4.683 4.736-4.8 .063-.122 .063-.341 0-.22-.053-.337-.049-.122-.186-.264-.22-.22-.542-.239-.2 0-.259 .019zM18.12 7.539q-.122 .02-.234 .093-.108 .068-2.945 2.91l-2.861 2.856-.381-.38q-.381-.376-.498-.44-.283-.117-.571-.034-.288 .078-.469 .308-.18 .229-.161 .527 .02 .239 .147 .41 .131 .171 .732 .772 .703 .717 .801 .761 .18 .078 .39 .088 .21 .01 .391-.088 .098-.063 3.335-3.291 3.242-3.232 3.286-3.33 .078-.18 .078-.39 0-.21-.078-.352-.063-.117-.176-.215-.107-.102-.229-.161-.117-.063-.278-.073-.157-.01-.279 .029z"
+                fill="#dcdde0"
+              />
+            </svg>
+          </div>
+        </div>
+        <div
+          data-pencil-id="SMDOo"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="eqSz6"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="vJ6Yf"
+              data-pencil-name="history"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="history"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M1.596 1.189q-.253 .086-.379 .308l-.041 .085v3.261l.041 .072q.099 .195 .294 .28l.085 .041 2.813 .014q.321-.014 .434-.027 .072-.014 .154-.072l.014-.014q.171-.126 .219-.314 .047-.188-.031-.376-.075-.192-.257-.287-.085-.058-.266-.072-.181-.014-.769-.014h-.742l.236-.225q.742-.728 1.582-1.091 .968-.42 2.031-.42 .94 0 1.763 .349 1.176 .492 1.938 1.493 .766 1.002 .92 2.246 .027 .225 .027 .567 0 .342-.027 .568-.154 1.274-.94 2.29-.783 1.011-1.972 1.49-.814 .321-1.723 .321-.28 0-.461-.014-.182-.013-.462-.071-.882-.181-1.647-.684-.763-.506-1.282-1.254-.516-.749-.711-1.644-.085-.448-.092-.776-.007-.332-.075-.472-.086-.167-.267-.267-.058-.027-.099-.041-.041-.013-.154-.013-.113 0-.154 .013-.041 .014-.099 .041-.181 .1-.28 .267-.069 .154-.034 .653 .034 .496 .147 .988 .294 1.189 1.035 2.156 .742 .964 1.805 1.559 1.066 .595 2.297 .708 .184 .013 .533 .013 .349 0 .533-.013 1.385-.127 2.547-.869 1.148-.714 1.862-1.862 .742-1.163 .869-2.547 .013-.184 .013-.533 0-.349-.013-.533-.141-1.525-1.016-2.782-.875-1.262-2.262-1.935-.588-.28-1.149-.42-.557-.141-1.216-.154-1.091-.028-2.113 .307-.714 .24-1.302 .605-.588 .363-1.148 .91l-.281 .263v-1.679l-.041-.085q-.099-.181-.28-.267-.086-.041-.226-.047-.14-.007-.181 .006zM6.86 3.514q-.127 .027-.239 .133-.11 .106-.168 .232l-.027 .096v3.192l.041 .086q.058 .096 .126 .154 .086 .068 .366 .222l.909 .461q1.203 .605 1.302 .633 .24 .068 .455-.055 .215-.126 .273-.379 .041-.182-.041-.38-.044-.096-.116-.15-.068-.058-.318-.185l-1.835-.936-.014-2.704-.041-.099q-.044-.082-.123-.157-.075-.079-.154-.113-.075-.038-.194-.051-.117-.014-.202 0z"
+                fill="#5274e0"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="G9fsm"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="oJyvl"
+              data-pencil-name="TRM-128 · record updated"
+              class="text-[13.5px]/[normal] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              TRM-128 · record updated
+            </div>
+            <div
+              data-pencil-id="mjY6B"
+              data-pencil-name="1 new decision · PR #418"
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              1 new decision · PR #418 opened
+            </div>
+          </div>
+          <div
+            data-pencil-id="r09ed"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="krnLt"
+              data-pencil-name="4m"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              4m
+            </div>
+            <div
+              data-pencil-id="Cndzj"
+              data-pencil-name="Dot"
+              class="box-border w-[6px] h-[6px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+            ></div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="aV1wv"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="OzDIM"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="g6w2U"
+              data-pencil-name="circle-dot"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="circle-dot"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M6.692 .602q-1.162 .041-2.228 .505-1.063 .462-1.904 1.268-.837 .804-1.343 1.853-.489 1.008-.602 2.157-.027 .195-.027 .615 0 .42 .027 .615 .113 1.149 .602 2.157 .659 1.401 1.897 2.338 1.241 .936 2.751 1.203 .533 .099 1.135 .099 .755 0 1.432-.154 .68-.153 1.354-.475 1.261-.618 2.163-1.702 .903-1.083 1.255-2.444 .294-1.117 .181-2.252-.113-1.135-.602-2.171-.588-1.203-1.62-2.085-1.029-.881-2.314-1.275-1.008-.307-2.157-.252zM7.66 1.791q1.076 .14 1.992 .68 .916 .54 1.562 1.408 .828 1.104 1.009 2.547 .013 .167 .013 .574 0 .407-.013 .574-.14 1.162-.721 2.13-.582 .963-1.535 1.623-.475 .335-1.049 .561-.575 .222-1.19 .307-.253 .041-.728 .041-.475 0-.728-.041-1.077-.153-1.959-.687-.881-.533-1.527-1.387-.827-1.104-1.009-2.547-.013-.167-.013-.574 0-.407 .013-.574 .14-1.121 .67-2.051 .533-.93 1.432-1.589 .544-.407 1.207-.67 .666-.267 1.326-.325l.253-.027q.096-.014 .475 0 .38 .013 .52 .027zM6.874 5.852q-.209 .013-.376 .099-.24 .112-.4 .314-.161 .202-.233 .441-.027 .113-.027 .294 0 .181 .027 .294 .086 .308 .308 .533 .225 .222 .533 .308 .113 .027 .294 .027 .181 0 .294-.027 .308-.086 .53-.308 .225-.225 .311-.533 .027-.113 .027-.294 0-.181-.027-.294-.072-.239-.233-.441-.16-.202-.4-.314-.263-.14-.628-.099z"
+                fill="#e2a93b"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="vb9ou"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="C8E4y5"
+              data-pencil-name="Marco moved TRM-122 to I"
+              class="text-[13.5px]/[normal] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Marco moved TRM-122 to In review
+            </div>
+            <div
+              data-pencil-id="a0zl2M"
+              data-pencil-name="Mobile inbox swipe actio"
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Mobile inbox swipe actions
+            </div>
+          </div>
+          <div
+            data-pencil-id="vEXUe"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="r7P5u"
+              data-pencil-name="12m"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              12m
+            </div>
+            <div
+              data-pencil-id="XPP7F"
+              data-pencil-name="Dot"
+              class="box-border w-[6px] h-[6px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+            ></div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="SjAUG"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="TkQWc"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="bQKkM"
+              data-pencil-name="user-round"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="user-round"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M6.539 1.203q-1.176 .154-2.017 .995-.52 .519-.786 1.193-.263 .67-.236 1.411 .027 .742 .355 1.402 .332 .656 .92 1.158l.096 .086-.195 .099q-.896 .448-1.583 1.203-.683 .755-1.022 1.695-.253 .684-.307 1.398-.041 .492 .041 .66 .126 .267 .42 .314 .294 .048 .506-.147 .109-.112 .144-.208 .037-.099 .051-.352 .013-.362 .061-.629 .052-.267 .164-.574 .376-1.094 1.292-1.836 .92-.741 2.082-.868 .714-.082 1.418 .086 .708 .167 1.309 .56 .199 .127 .301 .219 .106 .089 .287 .256 .325 .322 .568 .687 .246 .363 .413 .803 .168 .441 .226 .875 .014 .141 .027 .421 .014 .253 .048 .352 .038 .096 .147 .208 .212 .195 .506 .147 .294-.047 .42-.314 .028-.085 .035-.133 .006-.052 .006-.287 0-.787-.287-1.59-.287-.806-.806-1.463-.363-.475-.869-.882-.502-.406-1.004-.628l-.141-.072 .096-.086q.714-.601 1.036-1.425 .366-.954 .171-1.976-.199-.981-.906-1.715-.708-.735-1.685-.971-.294-.072-.653-.092-.355-.021-.649 .02zM7.335 2.365q.646 .086 1.155 .52 .513 .434 .721 1.063 .127 .365 .12 .779-.007 .41-.147 .749-.225 .601-.721 1.001-.496 .397-1.128 .496-.489 .082-.995-.072-.502-.154-.864-.475-.588-.516-.759-1.275-.028-.154-.034-.417-.007-.267 .02-.421 .113-.728 .602-1.247 .324-.335 .741-.533 .592-.263 1.289-.168z"
+                fill="#dcdde0"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="Bu2TQ"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="gO5uG"
+              data-pencil-name="You were assigned TRM-13"
+              class="text-[13.5px]/[normal] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              You were assigned TRM-131
+            </div>
+            <div
+              data-pencil-id="QPLXg"
+              data-pencil-name="Webhook retries drop Git"
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Webhook retries drop GitLab events
+            </div>
+          </div>
+          <div
+            data-pencil-id="IV9Ar"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="rWOH5"
+              data-pencil-name="1h"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              1h
+            </div>
+            <div
+              data-pencil-id="P5RwNW"
+              data-pencil-name="Dot"
+              class="box-border w-[6px] h-[6px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+            ></div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="pdP2z"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="Dyuug"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="MoLn9"
+              data-pencil-name="link"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="link"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M9.365 .673q-.53 .069-.994 .294-.335 .168-.629 .39-.168 .126-.769 .728-.602 .602-.633 .673-.095 .181-.061 .366 .034 .181 .167 .314 .134 .13 .328 .161 .199 .027 .366-.072 .055-.027 .643-.608 .588-.581 .728-.68 .547-.376 1.176-.434 .687-.055 1.274 .253 .588 .307 .94 .909 .281 .478 .308 1.053 .027 .57-.212 1.09-.096 .181-.167 .294-.099 .14-.335 .393-.181 .181-.786 .783-1.005 1.022-1.132 1.107-.352 .28-.8 .4-.447 .116-.868 .061-.936-.112-1.538-.84-.126-.141-.205-.195-.075-.058-.174-.086-.222-.068-.434 .045-.209 .109-.281 .335-.041 .167-.006 .307 .034 .14 .16 .308 .646 .813 1.624 1.135 .981 .321 1.975 .068 .728-.195 1.344-.67 .126-.099 1.128-1.1 1.001-1.002 1.097-1.128 .588-.728 .741-1.679 .045-.181 .045-.523 0-.345-.045-.526-.194-1.176-1.004-1.962-.407-.407-.913-.656-.503-.253-1.077-.321-.212-.031-.506-.031-.294 0-.475 .044zM5.349 4.703q-.926 .127-1.682 .701-.126 .113-1.107 1.087-.977 .97-1.131 1.138-.506 .619-.701 1.374-.055 .249-.079 .427-.02 .175-.02 .455 0 .28 .014 .448 .017 .167 .085 .42 .181 .728 .677 1.33 .499 .601 1.172 .936 .728 .352 1.525 .352 .84 0 1.568-.366 .335-.167 .564-.348 .233-.181 .78-.742 .434-.434 .54-.54 .106-.106 .133-.174 .068-.226-.01-.434-.075-.212-.284-.308-.099-.058-.239-.058h-.014q-.14 0-.212 .031-.068 .027-.208 .153-.099 .096-.448 .448l-.027 .028q-.602 .587-.728 .687-.352 .249-.773 .369-.417 .119-.824 .078-.587-.058-1.059-.352-.468-.294-.756-.782-.287-.493-.314-1.07-.027-.581 .212-1.101 .096-.181 .167-.294 .1-.14 .335-.393 .182-.181 .769-.783 1.009-1.008 1.135-1.107 .533-.403 1.234-.475 .561-.041 1.09 .184 .534 .223 .91 .684 .112 .127 .188 .185 .078 .054 .177 .082 .154 .041 .308 0 .154-.041 .273-.161 .12-.12 .147-.294 .028-.178-.041-.331-.03-.083-.164-.243-.13-.161-.27-.301-.406-.393-.926-.636-.516-.246-1.09-.318-.14-.013-.448-.013-.308 0-.448 .027z"
+                fill="#5274e0"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="ZDX4j"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="rvzkG"
+              data-pencil-name="Lucia linked a thread to"
+              class="text-[13.5px]/[normal] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Lucia linked a thread to TRM-097
+            </div>
+            <div
+              data-pencil-id="AveAY"
+              data-pencil-name="th_a0b7e4 · Map Jira pri"
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              th_a0b7e4 · Map Jira priority
+            </div>
+          </div>
+          <div
+            data-pencil-id="mCm7d"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="SOSU6"
+              data-pencil-name="3h"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              3h
+            </div>
+            <div
+              data-pencil-id="kDr8p"
+              data-pencil-name="Dot"
+              class="box-border w-[6px] h-[6px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+            ></div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="rTQ6Y"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="hbcGL"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="bvpQk"
+              data-pencil-name="message-circle"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="message-circle"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M6.805 .588q-.533 .014-1.1 .133-.568 .12-1.07 .315-1.388 .56-2.396 1.674-1.009 1.111-1.412 2.554-.307 1.093-.225 2.215 .085 1.117 .546 2.153l.014 .041q.068 .14 .075 .225 .011 .082-.048 .294-.041 .154-.208 .67l-.058 .14q-.308 .981-.335 1.122-.014 .167 .027 .372 .045 .202 .14 .356 .058 .099 .175 .218 .119 .117 .218 .175 .168 .095 .363 .14 .198 .041 .379 .027 .127-.027 1.149-.321l.14-.045q.547-.153 .7-.194 .223-.055 .298-.048 .078 .007 .205 .061l.027 .014q.882 .379 1.976 .506 .167 .027 .595 .027 .427 0 .622-.027 .854-.086 1.644-.38 .793-.294 1.48-.782 .936-.66 1.579-1.61 .646-.954 .926-2.058 .28-1.107 .154-2.239-.127-1.134-.646-2.173-.67-1.357-1.904-2.28-1.23-.927-2.728-1.176-.632-.113-1.302-.099zM7.393 1.764q1.384 .112 2.512 .861 1.128 .749 1.771 1.982 .407 .797 .533 1.75 .027 .223 .027 .643 0 .42-.027 .66-.167 1.244-.854 2.266-.687 1.022-1.764 1.637-.574 .325-1.248 .506-.67 .181-1.329 .181-1.077 0-2.126-.448-.199-.085-.318-.119-.116-.035-.287-.048-.236-.014-.455 .027-.215 .041-1.042 .28-1.009 .294-1.015 .288-.007-.007 .3-.958 .308-.953 .322-1.107 .071-.448-.141-.913l-.14-.348q-.389-.967-.362-2.037 .027-1.07 .461-2.024 .448-.994 1.251-1.722 .807-.728 1.822-1.084 1.015-.355 2.109-.273z"
+                fill="#8c9096"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="P2Rp9"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="aI4lo"
+              data-pencil-name="GitHub comment on TRM-11"
+              class="text-[13.5px]/[normal] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              GitHub comment on TRM-119
+            </div>
+            <div
+              data-pencil-id="zeLw4"
+              data-pencil-name="“Keep the old order as f"
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              “Keep the old order as fallback?”
+            </div>
+          </div>
+          <div
+            data-pencil-id="czYQG"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="bjOz0"
+              data-pencil-name="2h"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              2h
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="ydsi8"
+          data-pencil-name="N"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[13px_18px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="l5y9e"
+            data-pencil-name="Ic"
+            class="box-border w-[30px] shrink-0 h-[30px] flex flex-row gap-0 justify-center items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <svg
+              data-pencil-id="EQpuE"
+              data-pencil-name="triangle-alert"
+              viewBox="0 0 14 14"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="triangle-alert"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[14px] shrink-0 h-[14px] overflow-visible"
+            >
+              <path
+                d="M6.874 1.162q-.462 .027-.882 .308-.113 .085-.246 .225-.134 .14-.202 .236-.113 .168-2.451 4.266-2.338 4.095-2.379 4.19-.126 .294-.126 .646-.014 .195 .007 .328 .02 .134 .078 .301 .154 .434 .503 .735 .348 .301 .813 .4 .082 .027 .896 .027h4.115 4.228q.687 0 .796-.027 .506-.113 .869-.479 .519-.516 .519-1.23 0-.421-.181-.783-.058-.099-2.369-4.142-2.307-4.047-2.392-4.187-.181-.294-.496-.503-.314-.212-.653-.284-.236-.041-.447-.027zM7.253 2.379q.096 .058 .157 .137 .065 .075 2.424 4.204 2.361 4.129 2.389 4.214 .068 .226-.052 .434-.116 .209-.355 .28-.068 .014-.855 .014h-8.763l-.113-.055q-.195-.085-.294-.294-.041-.099-.041-.232 0-.133 .048-.229 .051-.099 2.358-4.153 2.311-4.054 2.369-4.136 .113-.153 .328-.208 .215-.058 .4 .038zM6.846 4.689q-.253 .086-.379 .308l-.041 .086v2.464q0 .181 .034 .266 .038 .083 .12 .168 .085 .082 .188 .133 .106 .048 .232 .048 .126 0 .229-.048 .106-.051 .188-.133 .085-.085 .12-.168 .037-.085 .037-.266v-2.464l-.041-.086q-.099-.181-.28-.267-.085-.041-.226-.047-.14-.007-.181 .006zM6.901 9.352q-.181 .027-.321 .167-.209 .212-.154 .506 .054 .294 .321 .42 .099 .041 .253 .041 .253 0 .42-.167 .127-.127 .154-.308 .055-.294-.157-.502-.208-.212-.516-.157z"
+                fill="#e2a93b"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="pSQOF"
+            data-pencil-name="B"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[3px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="V1Xk4K"
+              data-pencil-name="TRM-104 record is stale"
+              class="text-[13.5px]/[normal] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              TRM-104 record is stale
+            </div>
+            <div
+              data-pencil-id="aeP6a"
+              data-pencil-name="Connector offline for 3 "
+              class="text-[12px]/[normal] box-border w-full text-[#5E6269] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Connector offline for 3 days
+            </div>
+          </div>
+          <div
+            data-pencil-id="b2aG0e"
+            data-pencil-name="R"
+            class="box-border w-fit shrink-0 h-fit flex flex-col gap-[6px] justify-start items-end"
+          >
+            <div
+              data-pencil-id="bUmG3"
+              data-pencil-name="1d"
+              class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              1d
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="KZstv"
+        data-pencil-name="M Tab bar"
+        class="[box-sizing:content-box] w-[390px] h-[78.5px] shrink-0 flex flex-row gap-0 p-[8px_8px_26px_8px] justify-start items-start bg-[#14161A] [border-width:1px_0px_0px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_0px_0px_0px]"
+      >
+        <div
+          data-pencil-id="S55Xix"
+          data-pencil-name="Tab Home"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[4px] p-[4px_0px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="JxrSP"
+            data-pencil-name="Icon Home"
+            viewBox="0 0 20 20"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="house"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[20px] h-[20px] shrink-0 overflow-visible"
+          >
+            <path
+              d="M9.741 .859q-.683 .039-1.22 .459-.181 .142-3.16 2.701l-2.299 1.982q-.64 .557-.84 .801-.161 .156-.284 .4v.02q-.117 .219-.18 .439l-.078 .22 .019 7.798q0 .62 .039 .742 .2 .698 .669 1.172 .474 .469 1.172 .669 .122 .039 1.021 .039l5.4 .019 5.4-.019q.899 0 1.021-.039 .698-.2 1.167-.669 .474-.474 .674-1.172 .039-.122 .039-.742l.019-7.798-.078-.22q-.063-.22-.18-.439v-.02q-.122-.244-.264-.4-.2-.244-.84-.782l-5.4-4.638q-.757-.62-1.817-.523zM10.361 2.598q.118 .063 3.028 2.544 2.91 2.48 3.071 2.656l.039 .044q.103 .097 .122 .239 .02 .181 .039 .84v7.1l-.058 .141q-.201 .396-.62 .479-.142 .039-1.402 .039h-1.26v-5.479q0-.561-.039-.762-.019-.141-.102-.297l-.039-.064q-.142-.317-.43-.537-.288-.22-.63-.322-.141-.039-.439-.039h-1.641-1.641q-.297 0-.439 .039-.342 .102-.63 .322-.288 .22-.43 .537l-.039 .064q-.083 .156-.102 .297-.039 .201-.039 .762v5.479h-1.26q-1.26 0-1.401-.039-.42-.083-.621-.479l-.058-.141v-7.139q.019-.64 .058-.84 .02-.142 .123-.22l.078-.083q.122-.117 2.978-2.568 2.862-2.451 2.984-2.529 .161-.123 .39-.132 .23-.01 .41 .088zM11.68 13.74v2.94h-3.36v-5.86h3.36z"
+              fill="#5e6269"
+            />
+          </svg>
+          <div
+            data-pencil-id="orTVY"
+            data-pencil-name="Label Home"
+            class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Home
+          </div>
+        </div>
+        <div
+          data-pencil-id="Yipqu"
+          data-pencil-name="Tab Tasks"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[4px] p-[4px_0px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="fclcd"
+            data-pencil-name="Icon Tasks"
+            viewBox="0 0 20 20"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="list-checks"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[20px] h-[20px] shrink-0 overflow-visible"
+          >
+            <path
+              d="M7.358 3.359q-.136 .02-.239 .074-.097 .048-1.538 1.469l-1.421 1.416-.581-.576q-.381-.381-.517-.503-.162-.141-.274-.18-.107-.039-.308-.039-.2 0-.341 .058-.279 .142-.401 .454-.117 .308-.019 .606 .039 .102 .2 .273 .161 .171 .83 .84 .669 .669 .84 .83 .171 .161 .273 .2 .298 .098 .596 0 .122-.039 .4-.307 .284-.274 1.543-1.553l1.397-1.401q.361-.362 .444-.499 .078-.122 .078-.283v-.039q.02-.4-.273-.649-.288-.249-.689-.191zM10.679 3.359q-.259 .039-.459 .259-.2 .22-.22 .503 0 .2 .088 .4 .093 .201 .273 .318l.039 .039q.098 .063 .24 .083 .2 .019 .859 .039l6.221-.02 .141-.058q.381-.181 .459-.601 .079-.42-.219-.722-.201-.201-.479-.24-.141-.039-3.472-.039-3.33 0-3.471 .039zM10.542 9.219q-.142 .063-.273 .185-.127 .117-.181 .23-.049 .107-.059 .166-.009 .058-.009 .2 0 .22 .058 .361 .161 .298 .464 .42l.137 .039h7.06l.122-.058q.098-.064 .215-.181 .122-.122 .181-.229 .063-.113 .063-.352 0-.239-.058-.361-.142-.24-.401-.381l-.122-.078h-6.64q-.479 .019-.557 .039zM7.28 11.699q-.161 .039-.42 .274-.258 .229-1.279 1.269l-1.421 1.397-.581-.581q-.6-.577-.698-.64-.161-.078-.381-.078-.22 0-.381 .078-.117 .063-.229 .195-.108 .127-.171 .249-.098 .298 0 .596 .039 .103 .19 .273 .152 .171 .83 .831 .943 .957 1.04 1.02 .181 .078 .391 .078 .21 0 .391-.078 .097-.063 1.865-1.831 1.772-1.772 1.831-1.89 .063-.122 .063-.341 0-.22-.053-.337-.049-.122-.166-.264-.24-.22-.562-.239-.2 0-.259 .019zM10.64 15.02q-.201 .058-.371 .219-.171 .161-.23 .362-.078 .278 .039 .561 .122 .278 .381 .42 .103 .059 .283 .059 .259 .019 1.016 .039l5.923-.02 .161-.058q.298-.162 .415-.459 .122-.303 .01-.601-.108-.303-.406-.464l-.141-.058-3.501-.02q-3.477 0-3.579 .02z"
+              fill="#5e6269"
+            />
+          </svg>
+          <div
+            data-pencil-id="BpurR"
+            data-pencil-name="Label Tasks"
+            class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Tasks
+          </div>
+        </div>
+        <div
+          data-pencil-id="roKXG"
+          data-pencil-name="Tab Inbox"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[4px] p-[4px_0px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="cVFlZ"
+            data-pencil-name="Icon Inbox"
+            viewBox="0 0 20 20"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="inbox"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[20px] h-[20px] shrink-0 overflow-visible"
+          >
+            <path
+              d="M5.679 2.519q-.498 .079-.972 .372-.469 .288-.727 .688-.142 .2-1.622 3.184-1.479 2.978-1.508 3.091-.03 .107-.01 2.807v2.28q.019 .459 .039 .577 .181 .761 .727 1.284 .552 .517 1.314 .659 .239 .039 7.08 .039 6.841 0 7.08-.039 .762-.142 1.309-.659 .552-.523 .732-1.284 .02-.118 .039-.577v-2.28q.02-2.7-.01-2.807-.029-.113-1.508-3.091-1.48-2.984-1.602-3.164-.278-.42-.762-.718-.478-.303-.976-.362-.2-.019-4.321-.019-4.122 0-4.302 .019zM14.258 4.219q.141 .063 .264 .18 .097 .083 .278 .435 .181 .347 1.02 1.987 1.158 2.32 1.158 2.339 0 .02-1.9 .02h-1.66q-.278 0-.4 .053-.118 .049-.23 .152-.107 .097-.83 1.196l-.737 1.099h-2.442l-.737-1.099q-.723-1.099-.835-1.196-.107-.103-.229-.152-.118-.053-.396-.053h-1.66q-1.904 0-1.904-.02 0-.019 1.162-2.339 .84-1.64 1.02-1.987 .181-.352 .279-.435 .122-.117 .229-.156 .112-.044 .674-.063h3.618 3.618q.542 0 .64 .039zM6.958 11.919q.723 1.099 .83 1.201 .112 .098 .23 .151 .122 .049 .38 .049h1.602 1.602q.258 0 .376-.049 .122-.053 .229-.151 .112-.102 .835-1.201l.737-1.099h3.721l-.019 4.4-.059 .141q-.161 .298-.464 .42l-.137 .039h-13.642l-.137-.039q-.303-.122-.464-.42l-.058-.141-.02-4.4h3.721z"
+              fill="#dcdde0"
+            />
+          </svg>
+          <div
+            data-pencil-id="LGiyR"
+            data-pencil-name="Label Inbox"
+            class="text-[10px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Inbox
+          </div>
+        </div>
+        <div
+          data-pencil-id="DbtzV"
+          data-pencil-name="Tab Search"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[4px] p-[4px_0px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="U7vQp"
+            data-pencil-name="Icon Search"
+            viewBox="0 0 20 20"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="search"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[20px] h-[20px] shrink-0 overflow-visible"
+          >
+            <path
+              d="M8.579 1.68q-.058 .019-.337 .039-.82 .102-1.66 .415-.84 .307-1.562 .786-.562 .381-1.07 .874-.508 .488-.888 1.006-.923 1.318-1.241 2.9-.083 .401-.112 .659-.029 .259-.029 .821 0 .62 .039 .971 .039 .347 .18 .85 .279 1.079 .86 2.051 .581 .967 1.382 1.689 .581 .518 1.167 .86 .59 .341 1.313 .62 1.519 .561 3.169 .42 1.65-.142 3.071-.943 .181-.097 .479-.298 .298-.2 .42-.302l.078-.078 1.582 1.582q1.602 1.577 1.719 1.65 .122 .068 .342 .068 .219 0 .336-.048 .123-.054 .259-.191 .142-.142 .191-.259 .053-.122 .053-.341 0-.22-.073-.337-.068-.122-1.645-1.724l-1.582-1.582 .078-.098q.083-.078 .283-.361 1.177-1.758 1.274-3.867 .103-2.11-.913-3.95-.761-1.382-2.031-2.349-1.27-.972-2.793-1.333-.42-.098-.771-.137-.347-.044-.865-.063-.62 0-.703 0zM9.639 3.359q.542 .02 1.133 .201 .59 .18 1.127 .459 1.06 .561 1.841 1.543 .782 .976 1.079 2.138 .103 .401 .132 .713 .03 .308 .03 .728 0 1.001-.279 1.86-.561 1.66-1.914 2.729-1.348 1.07-3.086 1.25-.283 .02-.703 .01-.42-.01-.698-.049-.762-.122-1.485-.439-.717-.322-1.337-.801-.201-.18-.503-.488-.298-.313-.474-.532-.82-1.099-1.06-2.422-.122-.62-.092-1.299 .029-.679 .171-1.279 .419-1.641 1.699-2.798 1.279-1.162 2.939-1.465 .259-.039 .601-.059 .342-.019 .498-.019z"
+              fill="#5e6269"
+            />
+          </svg>
+          <div
+            data-pencil-id="nE2Na"
+            data-pencil-name="Label Search"
+            class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Search
+          </div>
+        </div>
+        <div
+          data-pencil-id="F3Yje"
+          data-pencil-name="Tab Me"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[4px] p-[4px_0px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="EiIb4"
+            data-pencil-name="Icon Me"
+            viewBox="0 0 20 20"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-user-round"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[20px] h-[20px] shrink-0 overflow-visible"
+          >
+            <path
+              d="M9.561 .859q-1.661 .059-3.184 .723-1.519 .659-2.72 1.812-1.196 1.147-1.919 2.646-.698 1.44-.859 3.081-.039 .278-.039 .879 0 .601 .039 .879 .161 1.641 .859 3.081 .943 2.002 2.71 3.34 1.773 1.338 3.931 1.719 .762 .141 1.621 .141 .859 0 1.621-.141 2.158-.381 3.916-1.719 1.763-1.338 2.725-3.32 .82-1.739 .898-3.628 .078-1.89-.62-3.692-.62-1.601-1.831-2.9-1.211-1.299-2.769-2.041-1.04-.479-2.109-.699-1.069-.219-2.29-.161zM10.942 2.559q1.539 .2 2.847 .971 1.309 .772 2.232 2.012 1.181 1.577 1.44 3.638 .02 .239 .02 .82 0 .581-.02 .82-.259 2.1-1.479 3.702-.342 .458-.372 .458-.029 0-.048-.087-.02-.093-.152-.391-.132-.303-.229-.503-.381-.737-.982-1.367-.6-.63-1.318-1.03l-.161-.103q0 0 .22-.239 .981-.982 1.181-2.339 .039-.2 .039-.581 0-.381-.039-.581-.161-1.079-.82-1.948-.659-.87-1.641-1.29-.439-.2-.801-.268-.361-.073-.859-.073-.498 0-.859 .073-.362 .068-.801 .268-.982 .42-1.641 1.29-.659 .869-.82 1.948-.039 .2-.039 .581 0 .381 .039 .581 .2 1.357 1.182 2.339 .219 .239 .219 .239l-.161 .103q-.718 .4-1.318 1.03-.601 .63-.982 1.367-.097 .2-.229 .503-.132 .298-.152 .391-.019 .087-.058 .078-.039-.01-.332-.401-.288-.39-.449-.669-.84-1.401-1.06-3.081-.019-.239-.019-.82 0-.581 .019-.82 .2-1.602 .957-2.93 .762-1.328 2.046-2.271 .776-.581 1.724-.957 .952-.38 1.894-.463l.362-.04q.136-.019 .678 0 .542 .02 .742 .04zM10.278 5.859q.581 .039 1.119 .411 .542 .371 .83 .942 .293 .566 .263 1.26-.029 .688-.41 1.23-.22 .337-.542 .591-.317 .249-.659 .386-.278 .083-.41 .112-.127 .029-.469 .029-.342 0-.474-.029-.127-.029-.405-.112-.561-.2-.972-.669-.41-.469-.571-1.05-.156-.659 .02-1.299 .18-.64 .649-1.099 .474-.463 1.133-.644 .122-.039 .351-.068 .23-.03 .308-.01zM10.64 12.559q.898 .122 1.66 .634 .762 .508 1.24 1.309 .459 .718 .601 1.66 0 .078-.054 .117-.049 .039-.366 .24h-.02q-1.201 .683-2.661 .903-.381 .059-1.04 .059-.659 0-1.06-.059-1.44-.22-2.641-.903h-.02q-.317-.201-.371-.24-.049-.039-.049-.117 .22-1.484 1.241-2.48 1.059-1.04 2.602-1.162 .117-.02 .445 0 .332 .019 .493 .039z"
+              fill="#5e6269"
+            />
+          </svg>
+          <div
+            data-pencil-id="MUJIz"
+            data-pencil-name="Label Me"
+            class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Me
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

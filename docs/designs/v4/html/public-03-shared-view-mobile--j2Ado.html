@@ -1,0 +1,860 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      tailwind = { config: { corePlugins: { preflight: false } } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono%3Awght%40400&family=IBM+Plex+Sans%3Awght%40100..700&family=Newsreader%3Awght%40200..800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, ::before, ::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body style="background-color: #0F1114">
+    <div
+      data-pencil-id="j2Ado"
+      data-pencil-name="Public · 03 Shared view (mobile)"
+      class="box-border w-[390px] h-[844px] flex flex-col gap-0 justify-start items-start bg-[#0F1114] overflow-hidden"
+    >
+      <div
+        data-pencil-id="e5mgj"
+        data-pencil-name="Status bar"
+        class="box-border w-full h-[44px] shrink-0 flex flex-row gap-0 p-[0px_24px] justify-start items-center"
+      >
+        <div
+          data-pencil-id="sDhXf"
+          data-pencil-name="9:41"
+          class="text-[15px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-semibold text-left [white-space:nowrap]"
+        >
+          9:41
+        </div>
+        <div
+          data-pencil-id="XRNmU"
+          data-pencil-name="Sp"
+          class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+        ></div>
+        <div
+          data-pencil-id="c4RcRE"
+          data-pencil-name="Icons"
+          class="box-border w-fit shrink-0 h-fit flex flex-row gap-[6px] justify-start items-center"
+        >
+          <svg
+            data-pencil-id="NniWz"
+            data-pencil-name="signal"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="signal"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M13.605 1.89q-.15 .044-.279 .164-.128 .121-.172 .271-.029 .107-.029 5.175 0 5.068 .029 5.175 .063 .227 .249 .347 .187 .118 .403 .096 .22-.022 .385-.187 .135-.136 .165-.315 .029-.121 .029-5.116 0-4.995-.029-5.116-.03-.179-.165-.315-.106-.121-.271-.165-.165-.044-.315-.014zM10.529 4.395q-.194 .014-.337 .157-.143 .143-.172 .337-.03 .121-.03 3.878 0 3.757 .03 3.849 .029 .194 .164 .315 .213 .209 .495 .187 .285-.022 .45-.264l.029-.029q.048-.059 .063-.209 .014-.179 .029-.857v-6.87l-.044-.103q-.091-.227-.271-.329-.179-.106-.406-.062zM7.335 6.899q-.271 .092-.406 .33l-.044 .092v5.295l.029 .103q.092 .227 .315 .347 .106 .044 .271 .044 .165 0 .271-.044 .223-.12 .315-.347l.029-.103v-5.295l-.044-.092q-.106-.194-.3-.286-.092-.044-.242-.051-.15-.007-.194 .007zM4.23 9.39q-.15 .044-.279 .164-.128 .121-.172 .271-.029 .107-.029 1.436 0 1.326 .029 1.414 .063 .227 .249 .347 .187 .118 .403 .096 .22-.022 .385-.187 .135-.136 .164-.315 .03-.121 .03-1.366 0-1.245-.03-1.366-.029-.179-.164-.315-.107-.121-.271-.165-.165-.044-.315-.014zM1.154 11.895q-.253 .029-.411 .249-.157 .216-.098 .472 .029 .194 .164 .315 .18 .179 .451 .179 .15 0 .256-.044 .224-.106 .304-.315 .084-.212 .033-.428-.051-.22-.249-.344-.194-.128-.45-.084z"
+              fill="#dcdde0"
+            />
+          </svg>
+          <svg
+            data-pencil-id="kt87o"
+            data-pencil-name="wifi"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="wifi"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.094 2.52q-1.692 .062-3.278 .684-1.582 .619-2.871 1.747-.194 .165-.257 .293-.058 .125-.058 .26 0 .271 .187 .451 .186 .179 .472 .164 .136 0 .223-.044 .092-.044 .334-.241 .436-.359 .809-.616 1.783-1.197 3.937-1.413 2.153-.22 4.149 .56 1.289 .524 2.413 1.469 .242 .197 .33 .241 .091 .044 .227 .044 .286 .015 .472-.164 .187-.18 .187-.451 0-.135-.062-.26-.059-.128-.253-.293-1.501-1.307-3.42-1.937-1.333-.451-2.641-.494l-.421-.015q-.102 0-.479 .015zM6.991 5.64q-1.022 .077-1.996 .457-.974 .381-1.802 1.044-.223 .18-.402 .359-.18 .179-.209 .256-.077 .132-.077 .282 0 .15 .066 .286 .069 .135 .212 .227 .143 .088 .293 .103 .15 .014 .268-.037 .12-.051 .271-.187 1.109-1.036 2.49-1.38 1.38-.345 2.728-.015 1.351 .33 2.388 1.26 .285 .241 .41 .307 .128 .066 .293 .052 .165-.015 .3-.103 .136-.092 .202-.216 .069-.128 .069-.293 0-.168-.069-.293-.066-.128-.418-.436-.351-.307-.699-.534-.974-.645-2.069-.927-1.095-.286-2.249-.212zM7.02 8.789q-.586 .077-1.109 .315-.359 .165-.722 .443-.359 .278-.436 .458-.117 .271 0 .527 .121 .253 .407 .344 .315 .088 .63-.197 .736-.674 1.71-.674 .974 0 1.71 .674 .315 .285 .645 .197 .271-.091 .388-.344 .121-.256 .004-.527-.077-.18-.44-.458-.359-.278-.718-.443-.465-.223-1.021-.304-.553-.084-1.048-.011zM7.394 11.895q-.194 .029-.344 .179-.224 .227-.165 .542 .058 .315 .344 .45 .106 .044 .271 .044 .271 0 .45-.179 .136-.136 .165-.315 .059-.33-.168-.553-.224-.227-.553-.168z"
+              fill="#dcdde0"
+            />
+          </svg>
+          <svg
+            data-pencil-id="xFx5T"
+            data-pencil-name="battery-full"
+            viewBox="0 0 18 18"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="battery-full"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+          >
+            <path
+              d="M2.54 3.797q-.721 .162-1.2 .694-.474 .532-.567 1.27-.035 .198-.035 3.239 0 3.041 .035 3.239 .036 .395 .216 .756 .198 .417 .567 .725 .369 .303 .839 .448l.198 .07 9.123-.017q.703 0 .813-.035 .628-.181 1.05-.602 .426-.427 .607-1.055 .035-.11 .035-.611l.017-2.918-.017-2.918q0-.501-.035-.611-.163-.628-.589-1.05-.422-.426-1.033-.607l-.18-.052h-8.983q-.72 .017-.861 .035zM12.296 5.309q.268 .127 .395 .395l.053 .128v6.336l-.053 .128q-.18 .356-.558 .431-.127 .035-4.627 .035-4.5 0-4.636-.027-.132-.026-.224-.07-.088-.048-.181-.145-.088-.101-.145-.207l-.052-.127v-6.372l.052-.127q.075-.163 .216-.277 .145-.119 .325-.137 .127-.035 4.715-.017h4.593zM4.32 6.768q-.163 .035-.308 .171-.14 .136-.215 .299-.035 .088-.035 .321v1.441 1.441q0 .233 .035 .321 .11 .273 .378 .418 .127 .052 .325 .052 .198 0 .325-.052 .268-.145 .378-.418 .035-.088 .035-.321v-1.441-1.441q0-.233-.035-.321-.11-.255-.365-.387-.25-.136-.518-.083zM7.326 6.768q-.18 .052-.334 .197-.154 .145-.207 .326-.035 .127-.035 1.722 0 1.591 .035 1.696 .075 .273 .299 .418 .224 .141 .483 .114 .264-.026 .462-.224 .162-.163 .198-.378 .035-.145 .035-1.639 0-1.494-.035-1.639-.036-.216-.198-.378-.128-.145-.325-.198-.198-.053-.378-.017zM10.314 6.768q-.145 .035-.281 .145-.132 .105-.198 .232-.062 .128-.079 .409-.018 .277-.018 1.446 0 1.169 .018 1.45 .017 .277 .07 .404 .057 .088 .154 .181 .101 .088 .207 .145 .307 .14 .619 0 .317-.145 .409-.471 .035-.105 .035-1.709 0-1.604-.035-1.709-.075-.233-.255-.37-.18-.136-.413-.153-.145-.018-.233 0zM16.326 6.768q-.18 .052-.334 .197-.154 .145-.207 .326-.035 .127-.035 1.722 0 1.591 .035 1.696 .075 .273 .299 .418 .224 .141 .483 .114 .264-.026 .462-.224 .162-.163 .198-.378 .035-.145 .035-1.639 0-1.494-.035-1.639-.036-.216-.198-.378-.128-.145-.325-.198-.198-.053-.378-.017z"
+              fill="#dcdde0"
+            />
+          </svg>
+        </div>
+      </div>
+      <div
+        data-pencil-id="iAZLD"
+        data-pencil-name="Public bar"
+        class="[box-sizing:content-box] w-[390px] h-[39.5px] shrink-0 flex flex-row gap-0 p-[10px_16px] justify-between items-center [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+      >
+        <div
+          data-pencil-id="yxk79"
+          data-pencil-name="L"
+          class="box-border w-fit shrink-0 h-fit flex flex-row gap-[8px] justify-start items-center"
+        >
+          <div
+            data-pencil-id="jCbdB"
+            data-pencil-name="Logo"
+            class="box-border w-[20px] shrink-0 h-[20px] relative"
+          >
+            <svg
+              data-pencil-id="K0iCg"
+              data-pencil-name="Strand A"
+              viewBox="0 0 20 20"
+              preserveAspectRatio="none"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[20px] h-[20px] absolute left-0 top-0 overflow-visible [z-index:0]"
+            >
+              <path
+                d="M.8 .8h12v2h-12zM.8 .8h2v12h-2zM10.8 .8h2v12h-2zM.8 10.8h4.8v2h-4.8z"
+                fill="#e2a93b"
+              />
+            </svg>
+            <svg
+              data-pencil-id="yZtzu"
+              data-pencil-name="Strand B"
+              viewBox="0 0 20 20"
+              preserveAspectRatio="none"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[20px] h-[20px] absolute left-0 top-0 overflow-visible [z-index:1]"
+            >
+              <path
+                d="M7.2 7.2h2v12h-2zM7.2 17.2h12v2h-12zM17.2 7.2h2v12h-2zM14.4 7.2h4.8v2h-4.8z"
+                fill="#dcdde0"
+              />
+            </svg>
+          </div>
+          <div
+            data-pencil-id="grCdr"
+            data-pencil-name="B"
+            class="text-[16px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Trama
+          </div>
+        </div>
+        <div
+          data-pencil-id="Tp0yx"
+          data-pencil-name="R"
+          class="box-border w-fit shrink-0 h-fit flex flex-row gap-[8px] justify-start items-center"
+        >
+          <div
+            data-pencil-id="KD4qI"
+            data-pencil-name="Read-only"
+            class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] p-[3px_7px] justify-start items-center bg-[#1B1E23]"
+          >
+            <svg
+              data-pencil-id="UH4zb"
+              data-pencil-name="eye"
+              viewBox="0 0 11 11"
+              preserveAspectRatio="xMidYMid meet"
+              data-icon-name="eye"
+              data-icon-set="lucide"
+              xmlns="http://www.w3.org/2000/svg"
+              class="box-border w-[11px] shrink-0 h-[11px] overflow-visible"
+            >
+              <path
+                d="M5.248 1.848q-.97 .032-1.878 .424-.905 .389-1.611 1.082-.747 .728-1.155 1.617-.086 .199-.115 .298-.027 .099-.027 .231 0 .132 .027 .226 .029 .094 .105 .279 .298 .65 .765 1.211 .467 .561 1.05 .98 1.144 .79 2.586 .946 .164 .021 .505 .021 .341 0 .494-.021 .948-.1 1.767-.473 .819-.376 1.48-1.012 .757-.739 1.166-1.652 .075-.185 .102-.279 .029-.094 .029-.226 0-.132-.029-.226-.027-.094-.102-.279-.288-.618-.734-1.165-.443-.551-1.004-.959-.661-.484-1.437-.747-.776-.266-1.59-.287-.163 0-.394 .011zM6.029 2.782q1.155 .132 2.1 .827 .946 .693 1.429 1.749l.067 .142-.067 .153q-.494 1.058-1.44 1.746-.945 .687-2.145 .83-.143 .01-.473 .01-.33 0-.473-.01-.87-.1-1.614-.489-.741-.392-1.302-1.042-.406-.484-.669-1.056l-.067-.142 .067-.142q.341-.75 .935-1.332 .593-.583 1.375-.913 .714-.309 1.528-.352 .11-.011 .362 0 .253 .01 .387 .021zM5.215 3.695q-.706 .121-1.133 .65-.145 .175-.228 .352-.081 .177-.148 .408-.021 .086-.027 .153-.005 .065-.005 .242 0 .22 .021 .341 .022 .121 .089 .298 .132 .373 .416 .661 .288 .284 .661 .416 .177 .067 .298 .089 .121 .021 .341 .021 .22 0 .341-.021 .121-.022 .298-.089 .373-.132 .658-.416 .288-.288 .419-.661 .067-.177 .089-.298 .021-.121 .021-.341 0-.22-.021-.341-.022-.121-.089-.298-.164-.438-.524-.747-.357-.309-.819-.408-.11-.021-.335-.027-.226-.005-.323 .016zM5.731 4.608q.22 .057 .411 .25 .193 .191 .25 .411 .021 .099 .021 .231 0 .132-.021 .22-.057 .231-.239 .419-.18 .185-.422 .253-.089 .021-.231 .021-.142 0-.231-.021-.242-.068-.424-.253-.18-.188-.237-.419-.021-.088-.021-.22 0-.132 .021-.231 .046-.177 .178-.341 .131-.164 .319-.252 .274-.143 .626-.068z"
+                fill="#8c9096"
+              />
+            </svg>
+            <div
+              data-pencil-id="zhRXL"
+              data-pencil-name="L"
+              class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Read-only
+            </div>
+          </div>
+          <svg
+            data-pencil-id="dsn1w"
+            data-pencil-name="share"
+            viewBox="0 0 16 16"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="share"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[16px] shrink-0 h-[16px] overflow-visible"
+          >
+            <path
+              d="M7.824 .687q-.097 .016-.179 .075-.079 .054-1.469 1.445l-.192 .191q-.718 .739-.929 .946-.27 .289-.336 .398-.047 .082-.047 .227v.031q0 .273 .207 .48 .129 .129 .32 .168 .192 .039 .367-.023 .082-.031 .227-.16 .145-.129 .703-.688 .817-.816 .832-.816 .016 0 .016 3.613v3.617l.047 .098q.05 .078 .144 .176 .098 .094 .184 .144 .09 .047 .281 .047 .191 0 .277-.047 .09-.05 .184-.144 .098-.098 .148-.176l.047-.098v-3.617q0-3.613 .016-3.613 .016 0 .832 .801 .559 .574 .703 .703 .145 .129 .227 .16 .175 .062 .367 .023 .191-.039 .32-.168 .207-.207 .207-.48v-.031q0-.145-.047-.227-.066-.109-.336-.398-.211-.207-.929-.946l-.207-.191q-1.395-1.406-1.473-1.445-.078-.043-.184-.075-.105-.031-.16-.031-.054 0-.168 .031zM2.434 7.375q-.114 .051-.219 .148-.102 .094-.152 .188l-.047 .113-.016 2.817q0 2.816 .016 2.976 .097 .621 .527 1.078 .434 .457 1.059 .602 .125 .016 .765 .031h3.633 3.633q.64-.015 .765-.031 .625-.145 1.055-.602 .434-.457 .531-1.078 .016-.16 .016-2.976l-.016-2.817-.046-.113q-.051-.109-.157-.195-.101-.09-.215-.137-.109-.051-.261-.043-.153 .008-.25 .055-.223 .113-.336 .336l-.047 .128-.016 5.649-.062 .113q-.113 .223-.336 .336l-.082 .031h-8.352l-.082-.031q-.222-.113-.336-.336l-.062-.113-.016-5.649-.047-.128q-.113-.223-.336-.336-.097-.047-.25-.047-.152 0-.261 .031z"
+              fill="#8c9096"
+            />
+          </svg>
+        </div>
+      </div>
+      <div
+        data-pencil-id="s4ojf"
+        data-pencil-name="Header"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[10px] p-[20px_16px_14px_16px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="iv5uj"
+          data-pencil-name="By"
+          class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          Shared by Alessandro Bruno
+        </div>
+        <div
+          data-pencil-id="lXA5g"
+          data-pencil-name="Title"
+          class="text-[32px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal tracking-[-0.5px] text-left [white-space:nowrap]"
+        >
+          Trama Changelog
+        </div>
+        <div
+          data-pencil-id="tVwMq"
+          data-pencil-name="Meta"
+          class="text-[11px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          90 tasks · Done · updated today
+        </div>
+        <div
+          data-pencil-id="Vv2eO"
+          data-pencil-name="Chips"
+          class="box-border w-fit h-fit shrink-0 flex flex-row gap-[6px] p-[4px_0px_0px_0px] justify-start items-start"
+        >
+          <div
+            data-pencil-id="k71zb"
+            data-pencil-name="Project · Trama"
+            class="box-border w-fit shrink-0 h-fit flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="VVMa1"
+              data-pencil-name="L"
+              class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Project · Trama
+            </div>
+          </div>
+          <div
+            data-pencil-id="J85xI"
+            data-pencil-name="Status · Done"
+            class="box-border w-fit shrink-0 h-fit flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="jkRzb"
+              data-pencil-name="L"
+              class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Status · Done
+            </div>
+          </div>
+          <div
+            data-pencil-id="m9DBV"
+            data-pencil-name="Month"
+            class="box-border w-fit shrink-0 h-fit flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="c0E3b"
+              data-pencil-name="L"
+              class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Month
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="s5jSd"
+        data-pencil-name="Search"
+        class="box-border w-full h-fit shrink-0 flex flex-row gap-0 p-[0px_16px_10px_16px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="dHHdI"
+          data-pencil-name="Input"
+          class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[8px_10px] justify-start items-center bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+        >
+          <svg
+            data-pencil-id="l9oBWe"
+            data-pencil-name="search"
+            viewBox="0 0 13 13"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="search"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[13px] shrink-0 h-[13px] overflow-visible"
+          >
+            <path
+              d="M5.576 1.092q-.038 .012-.219 .025-.533 .067-1.079 .27-.546 .2-1.015 .511-.365 .247-.695 .568-.33 .317-.578 .654-.6 .857-.806 1.885-.054 .26-.073 .429-.019 .168-.019 .533 0 .403 .025 .631 .026 .226 .118 .553 .181 .701 .558 1.333 .378 .628 .898 1.098 .378 .336 .759 .558 .384 .223 .854 .403 .987 .365 2.06 .273 1.072-.092 1.996-.612 .117-.064 .311-.194 .194-.13 .273-.197l.051-.05 1.028 1.028q1.041 1.025 1.117 1.073 .08 .044 .222 .044 .143 0 .219-.032 .08-.034 .169-.123 .092-.092 .123-.169 .035-.079 .035-.222 0-.142-.047-.219-.045-.079-1.07-1.12l-1.028-1.028 .051-.064q.053-.051 .184-.235 .764-1.142 .828-2.513 .067-1.371-.594-2.568-.495-.898-1.32-1.527-.825-.631-1.815-.866-.273-.064-.502-.089-.225-.029-.562-.041-.403 0-.457 0zM6.265 2.184q.352 .012 .736 .13 .385 .117 .734 .298 .688 .365 1.196 1.003 .508 .635 .702 1.39 .066 .26 .085 .464 .019 .199 .019 .472 0 .651-.181 1.21-.365 1.079-1.244 1.774-.876 .695-2.006 .812-.184 .013-.457 .007-.273-.007-.453-.032-.496-.079-.965-.286-.467-.209-.87-.52-.13-.118-.327-.318-.193-.203-.308-.346-.533-.714-.688-1.574-.08-.403-.061-.844 .019-.441 .111-.832 .273-1.066 1.105-1.818 .831-.756 1.91-.952 .169-.026 .391-.038 .222-.013 .324-.013z"
+              fill="#5e6269"
+            />
+          </svg>
+          <div
+            data-pencil-id="DLfdC"
+            data-pencil-name="P"
+            class="text-[12px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Search in this view
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="JNcbH"
+        data-pencil-name="List"
+        class="box-border w-full [flex:1_1_0] flex flex-col gap-0 justify-start items-start overflow-hidden"
+      >
+        <div
+          data-pencil-id="TJbLz"
+          data-pencil-name="Group"
+          class="[box-sizing:content-box] w-[390px] h-[34px] shrink-0 flex flex-row gap-[8px] p-[10px_16px] justify-start items-center bg-[#14161A] [border-width:1px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_0px_-0.5px_0px]"
+        >
+          <div
+            data-pencil-id="P7YH4X"
+            data-pencil-name="T"
+            class="text-[15px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            November 2026
+          </div>
+          <div
+            data-pencil-id="XIbjn"
+            data-pencil-name="N"
+            class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            24
+          </div>
+        </div>
+        <div
+          data-pencil-id="Yvtlj"
+          data-pencil-name="TRMA-97"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="qjR7T"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="PUEmP"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="DZAYR"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Build container images in pull-request CI
+            </div>
+            <div
+              data-pencil-id="U8a3g"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="ouOMU"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-97
+              </div>
+              <div
+                data-pencil-id="lXd72"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="FTezX"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#5274E0] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="F9WFM"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Improvement
+                </div>
+              </div>
+              <div
+                data-pencil-id="Kxzzd"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 24
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="idxjp"
+          data-pencil-name="TRMA-96"
+          class="[box-sizing:content-box] w-[390px] h-[81.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="pmu2E"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="b0cct3"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="kmDPf"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Bound import worker concurrency and enforce one active workspace job
+            </div>
+            <div
+              data-pencil-id="p8ZoAr"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="JpsID"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-96
+              </div>
+              <div
+                data-pencil-id="cWMG7"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="SjcXC"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#CC4B30] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="T9VLg"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Bug
+                </div>
+              </div>
+              <div
+                data-pencil-id="lYVBW"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 22
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="tdmvJ"
+          data-pencil-name="TRMA-95"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="Ojq9u"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="i3WsC"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="hYvPg"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Keep lazy route chunks lazy in the service worker
+            </div>
+            <div
+              data-pencil-id="tioVh"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="E0bnsk"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-95
+              </div>
+              <div
+                data-pencil-id="Kzvcy"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="MWRyL"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#5274E0] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="k0lIj"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Improvement
+                </div>
+              </div>
+              <div
+                data-pencil-id="EhdV1"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 21
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="Grss2"
+          data-pencil-name="TRMA-94"
+          class="[box-sizing:content-box] w-[390px] h-[81.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="AdtpB"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="ImA5v"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="tAnaG"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Batch notification fanout queries and subscription matching
+            </div>
+            <div
+              data-pencil-id="I2JEop"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="I3M6wd"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-94
+              </div>
+              <div
+                data-pencil-id="HF3cP"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="mf9gh"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#5274E0] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="zvUkS"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Improvement
+                </div>
+              </div>
+              <div
+                data-pencil-id="tIFag"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 19
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="I5qqh"
+          data-pencil-name="TRMA-91"
+          class="[box-sizing:content-box] w-[390px] h-[81.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="T2QNU3"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="c3FJvC"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="jsrLV"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Parse Lucide icon data without executing dependency source
+            </div>
+            <div
+              data-pencil-id="DRaFw"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="t0wjk"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-91
+              </div>
+              <div
+                data-pencil-id="bGAZ6"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="BlLYR"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#CC4B30] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="GGEoC"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Bug
+                </div>
+              </div>
+              <div
+                data-pencil-id="k8QZ5"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 18
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="r29Mpw"
+          data-pencil-name="TRMA-75"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="k1nyc"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="IqIj4"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="s38ZF"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Sync Trama Roadmap with Shared View
+            </div>
+            <div
+              data-pencil-id="qHxgf"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="rLJgQ"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-75
+              </div>
+              <div
+                data-pencil-id="Pwq1p"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 12
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="m8Mz0V"
+          data-pencil-name="TRMA-73"
+          class="[box-sizing:content-box] w-[390px] h-[62.5px] shrink-0 flex flex-row gap-[12px] p-[12px_16px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+        >
+          <svg
+            data-pencil-id="XNWwR"
+            data-pencil-name="circle-check"
+            viewBox="0 0 15 15"
+            preserveAspectRatio="xMidYMid meet"
+            data-icon-name="circle-check"
+            data-icon-set="lucide"
+            xmlns="http://www.w3.org/2000/svg"
+            class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+          >
+            <path
+              d="M7.17 .645q-1.245 .043-2.387 .541-1.139 .495-2.04 1.359-.897 .861-1.439 1.985-.524 1.08-.645 2.311-.029 .209-.029 .659 0 .45 .029 .659 .121 1.231 .645 2.311 .707 1.501 2.032 2.505 1.33 1.003 2.948 1.289 .571 .106 1.216 .106 .809 0 1.534-.165 .729-.164 1.451-.509 1.351-.663 2.318-1.823 .967-1.161 1.344-2.619 .315-1.197 .194-2.413-.121-1.216-.645-2.326-.63-1.289-1.735-2.234-1.103-.944-2.48-1.366-1.08-.329-2.311-.27zM8.207 1.919q1.153 .15 2.135 .729 .981 .578 1.673 1.508 .887 1.183 1.081 2.729 .014 .179 .014 .615 0 .436-.014 .615-.15 1.245-.773 2.282-.623 1.032-1.644 1.739-.509 .359-1.125 .601-.615 .238-1.274 .329-.271 .044-.78 .044-.509 0-.78-.044-1.154-.164-2.098-.736-.945-.571-1.637-1.486-.887-1.183-1.081-2.729-.014-.179-.014-.615 0-.436 .014-.615 .15-1.201 .718-2.198 .571-.996 1.535-1.702 .582-.436 1.292-.718 .714-.286 1.421-.348l.271-.029q.103-.015 .509 0 .407 .014 .557 .029zM9.225 5.64q-.073 .029-.136 .055-.058 .022-1.139 1.098l-1.065 1.066-.436-.432q-.286-.286-.388-.363-.136-.121-.213-.15-.073-.029-.208-.029-.136 0-.18 .014-.044 .015-.106 .044-.194 .107-.3 .286-.044 .092-.044 .271v.015q0 .15 .036 .227 .041 .073 .191 .238 .102 .121 .524 .542l.043 .044q.451 .45 .594 .586 .143 .131 .216 .164 .15 .074 .315 .059 .165-.015 .3-.106 .077-.059 1.381-1.363 .93-.93 1.124-1.138 .198-.213 .227-.29 .103-.296-.062-.56-.165-.264-.48-.278-.136-.015-.194 0z"
+              fill="#6fae73"
+            />
+          </svg>
+          <div
+            data-pencil-id="uZnr8"
+            data-pencil-name="T"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="VWK6y"
+              data-pencil-name="Title"
+              class="text-[14px]/[19px] box-border w-full text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Insert files and images into document bodies
+            </div>
+            <div
+              data-pencil-id="bvrQo"
+              data-pencil-name="Meta"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="T423e"
+                data-pencil-name="K"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                TRMA-73
+              </div>
+              <div
+                data-pencil-id="g2Z73Z"
+                data-pencil-name="Label"
+                class="box-border w-fit shrink-0 h-fit flex flex-row gap-[5px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="a4GsV3"
+                  data-pencil-name="Dot"
+                  class="box-border w-[6px] shrink-0 h-[6px] bg-[#E2A93B] rounded-[50%]"
+                ></div>
+                <div
+                  data-pencil-id="J6EEv"
+                  data-pencil-name="L"
+                  class="text-[10.5px]/[normal] box-border text-[#8C9096] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Feature
+                </div>
+              </div>
+              <div
+                data-pencil-id="c5VoLL"
+                data-pencil-name="D"
+                class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · Nov 10
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="ty4NX"
+        data-pencil-name="CTA"
+        class="[box-sizing:content-box] w-[390px] h-[72.5px] shrink-0 flex flex-row gap-[10px] p-[12px_16px_28px_16px] justify-start items-center bg-[#14161A] [border-width:1px_0px_0px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_0px_0px_0px]"
+      >
+        <div
+          data-pencil-id="LEKfJ"
+          data-pencil-name="T"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[2px] justify-start items-start"
+        >
+          <div
+            data-pencil-id="RQI42"
+            data-pencil-name="A"
+            class="text-[13px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Made with Trama
+          </div>
+          <div
+            data-pencil-id="THkiw"
+            data-pencil-name="B"
+            class="text-[10.5px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Plan in Trama. Work in Delta.
+          </div>
+        </div>
+        <div
+          data-pencil-id="fHPyL"
+          data-pencil-name="Btn"
+          class="box-border w-fit shrink-0 h-fit flex flex-row gap-0 p-[8px_12px] justify-start items-start bg-[#E2A93B]"
+        >
+          <div
+            data-pencil-id="LIhwV"
+            data-pencil-name="L"
+            class="text-[12px]/[normal] box-border text-[#1A1206] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Try free
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

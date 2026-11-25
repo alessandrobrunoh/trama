@@ -551,7 +551,6 @@ interface ChangedFile {
         </div>
       </div>
     </div>
-    </div>
     <div class="border-border pointer-events-none absolute inset-0 border"></div>
   `,
 })

@@ -34,7 +34,6 @@ import {
   V3_FIELD,
   V3DialogFoot,
   V3DialogHead,
-  V3Field,
   V3Segmented,
   type V3SegmentOption,
 } from '../../../shared/v3';
@@ -81,7 +80,6 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     V3Segmented,
     V3DialogHead,
     V3DialogFoot,
-    V3Field,
     ...SECTION_KIT,
   ],
   host: { class: 'flex flex-col gap-6' },

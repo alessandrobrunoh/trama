@@ -1,0 +1,1969 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      tailwind = { config: { corePlugins: { preflight: false } } };
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono%3Awght%40400&family=IBM+Plex+Sans%3Awght%40100..700&family=Newsreader%3Aital%2Cwght%400%2C200..800%3B1%2C200..800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      *, ::before, ::after {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body style="background-color: #0F1114">
+    <div
+      data-pencil-id="nZJrL"
+      data-pencil-name="v3 · 00 Flow — how Trama works"
+      class="box-border w-[2960px] h-fit flex flex-col gap-[48px] p-[64px_72px] justify-start items-start bg-[#0F1114]"
+    >
+      <div
+        data-pencil-id="Gon5L"
+        data-pencil-name="Head"
+        class="box-border w-full h-fit shrink-0 flex flex-row gap-[80px] justify-start items-end"
+      >
+        <div
+          data-pencil-id="e9dtS0"
+          data-pencil-name="L"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[12px] justify-start items-start"
+        >
+          <div
+            data-pencil-id="U7Q6AU"
+            data-pencil-name="Trama · v3 · complete pr"
+            class="text-[16px]/[normal] box-border text-[#8C9096] font-[Newsreader,system-ui,sans-serif] font-normal italic text-left [white-space:nowrap]"
+          >
+            Trama · v3 · complete product
+          </div>
+          <div
+            data-pencil-id="Tw3GW"
+            data-pencil-name="Plan in Trama. Work in D"
+            class="text-[56px]/[60px] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal tracking-[-1px] text-left [white-space:nowrap]"
+          >
+            Plan in Trama. Work in Delta.
+            <br />
+            Keep the record forever.
+          </div>
+        </div>
+        <div
+          data-pencil-id="I0hobk"
+          data-pencil-name="Trama is a cloud task ma"
+          class="text-[16px]/[25px] box-border w-[900px] shrink-0 text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+        >
+          Trama is a cloud task manager (web + mobile) that connects to any issue tracker. Each task
+          — and each subtask — links exactly one Delta thread. Work starts in Delta with the /trama
+          skill: the agent reads the task, links its own thread and syncs a read-only record
+          (summary, decisions, events, changes). Time spent is tracked per task.
+        </div>
+      </div>
+      <div
+        data-pencil-id="Jl7bC"
+        data-pencil-name="Flow"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[16px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="P9M4zA"
+          data-pencil-name="The flow"
+          class="text-[30px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          The flow
+        </div>
+        <div
+          data-pencil-id="GpPIe"
+          data-pencil-name="Steps"
+          class="box-border w-full h-fit shrink-0 flex flex-row gap-0 justify-start items-start"
+        >
+          <div
+            data-pencil-id="C0zWjc"
+            data-pencil-name="Step 1"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="Yovcy"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="iAR0A"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#1B1E23]"
+              >
+                <div
+                  data-pencil-id="ZcrL5"
+                  data-pencil-name="1"
+                  class="text-[12px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  1
+                </div>
+              </div>
+              <div
+                data-pencil-id="J2P3oB"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="NtwEP"
+                data-pencil-name="github"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="github"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M3.634 .773q-.158 .018-.312 .128-.154 .105-.224 .25-.11 .198-.202 .809-.07 .378-.062 .918 .009 .541 .084 .936l.035 .163-.092 .163q-.396 .703-.558 1.586-.035 .176-.044 .699-.009 .523 .009 .795 .162 1.727 1.384 2.914 .76 .703 1.714 1.081 .198 .07 .492 .162 .299 .088 .351 .088 .053 0 .053 .04 0 .035-.053 .158-.07 .255-.145 .624-.07 .365-.07 .585v.123l-.18 .057q-.431 .123-.848 .105-.233-.017-.378-.052-.141-.036-.321-.124-.18-.092-.343-.228-.162-.136-.487-.44-.664-.615-.937-.773-.483-.272-.953-.272-.145 0-.207 .008-.061 .009-.153 .044-.361 .163-.422 .541-.062 .378 .206 .668 .163 .162 .488 .215 .198 .035 .312 .11 .119 .07 .567 .483 .4 .378 .558 .515 .163 .136 .36 .259 .541 .36 1.156 .488 .251 .052 .637 .052 .387 0 .677-.035l.268-.052q.018 0 .018 1.041 0 .738 0 .91 0 .171 .044 .281 .048 .105 .153 .215 .11 .106 .242 .172 .136 .061 .299 .061 .163 0 .294-.061 .137-.066 .242-.172 .11-.11 .154-.215 .048-.11 .048-.36v-3.459q.018-.826 .541-1.547 .105-.162 .14-.242 .04-.083 .066-.188 .027-.11 0-.242-.026-.136-.074-.224-.044-.093-.145-.189-.097-.101-.216-.154-.114-.057-.422-.075-.518-.017-.936-.127-.936-.233-1.599-.826-.396-.326-.668-.783-.268-.461-.361-.962-.035-.163-.052-.576-.018-.417 0-.633 .052-.808 .54-1.546 .163-.251 .189-.405 .027-.154-.044-.426-.11-.483-.11-1.006 0-.343 .018-.343l.233 .127q.308 .163 .936 .594 .255 .162 .47 .18 .088-.018 .413-.071 1.244-.215 2.593-.215 1.349 0 2.593 .215 .325 .071 .413 .071 .215-.018 .448-.18 .633-.413 .901-.567 .273-.154 .29-.145 .018 .008 .018 .29 0 .277-.027 .505-.026 .224-.083 .505-.053 .277-.053 .348 0 .197 .198 .523 .395 .61 .523 1.278 .017 .181 .026 .602 .009 .422-.026 .638-.18 1.441-1.442 2.285-.54 .343-1.221 .523-.418 .11-.936 .127-.198 .018-.282 .035-.079 .018-.153 .053-.339 .163-.431 .558-.053 .273 .162 .576 .484 .703 .576 1.336 .018 .158 .018 2.07v1.674q0 .268 .044 .378 .048 .105 .154 .215 .109 .106 .241 .172 .136 .061 .299 .061 .163 0 .294-.061 .137-.066 .242-.172 .11-.11 .145-.215 .04-.11 .057-.4l.018-1.709q0-1.96-.018-2.158-.07-.431-.197-.831-.053-.14-.053-.176 0-.039 .053-.039 .052 0 .347-.097 .299-.101 .496-.171 .739-.29 1.358-.782 .624-.497 1.02-1.125 .215-.326 .387-.739 .171-.417 .241-.813 .128-.558 .119-1.239-.009-.685-.136-1.169-.181-.65-.466-1.191l-.11-.18 .035-.215q.145-.866 .022-1.727-.075-.668-.193-.884-.115-.215-.365-.342-.488-.216-1.622 .36-.395 .18-.848 .488l-.268 .18-.233-.035q-1.191-.198-2.557-.198-1.367 0-2.663 .198l-.181 .035-.18-.128q-.668-.465-1.327-.725-.655-.263-1.033-.211z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="MqXRD"
+              data-pencil-name="Issue arrives"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Issue arrives
+            </div>
+            <div
+              data-pencil-id="bNvkV"
+              data-pencil-name="An issue on GitHub, GitL"
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              An issue on GitHub, GitLab or Jira is synced into Trama as a task. Or create it
+              directly.
+            </div>
+            <div
+              data-pencil-id="Z6xeD"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="V3KdC0"
+                data-pencil-name="Trama cloud"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Trama cloud
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="MEdBu"
+            data-pencil-name="Step 2"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[189px] flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [border-width:1px_1px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_-0.5px_-0.5px_0px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="n9HUq"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="OgoXd"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#1B1E23]"
+              >
+                <div
+                  data-pencil-id="WtYoN"
+                  data-pencil-name="2"
+                  class="text-[12px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  2
+                </div>
+              </div>
+              <div
+                data-pencil-id="VqqNS"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="o6uB4"
+                data-pencil-name="list-tree"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="list-tree"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M2.123 3.023q-.123 .018-.225 .066-.096 .044-.197 .163-.097 .114-.154 .224l-.035 .123v9.558l.07 .198q.202 .668 .721 1.107 .523 .44 1.208 .515 .198 .035 1.341 .035 1.142 0 1.287-.035 .216-.036 .378-.198 .286-.29 .215-.668-.07-.378-.448-.558-.075-.035-.255-.035l-2.465-.036-.127-.052q-.361-.163-.414-.558-.017-.11-.026-1.675-.009-1.569 .009-1.569l.18 .058q.11 .035 .316 .043 .207 .009 1.231 .009h1.244q.197 0 .285-.035 .273-.11 .418-.378 .052-.127 .052-.325 0-.127-.008-.18-.009-.053-.044-.145-.057-.106-.176-.211-.114-.11-.224-.154-.106-.048-.286-.048h-1.046q-1.204 0-1.331-.035-.378-.075-.558-.431l-.053-.128-.035-3.814q0-.343-.035-.4-.11-.233-.334-.356-.225-.127-.479-.075zM5.884 3.006q-.303 .053-.492 .316-.189 .26-.119 .567 .018 .123 .062 .215 .048 .088 .145 .181 .101 .088 .207 .145l.127 .052h10.134l.127-.052q.343-.163 .413-.541 .071-.378-.197-.65-.181-.18-.431-.216-.128-.035-4.988-.035-4.86 0-4.988 .018zM9.488 8.297q-.128 .057-.246 .167-.115 .105-.163 .206-.044 .097-.053 .15-.008 .053-.008 .18 0 .198 .052 .325 .145 .268 .418 .378l.123 .035h6.354l.11-.052q.088-.058 .194-.163 .109-.11 .162-.207 .057-.101 .057-.316 0-.215-.052-.325-.128-.216-.361-.343l-.11-.07h-5.976q-.431 .017-.501 .035zM9.576 13.518q-.18 .052-.334 .197-.154 .145-.207 .326-.07 .25 .035 .505 .11 .25 .343 .378 .092 .053 .255 .053 .233 .017 .914 .035l5.331-.018 .145-.053q.268-.145 .373-.413 .11-.272 .009-.54-.097-.273-.365-.418l-.127-.052-3.151-.018q-3.129 0-3.221 .018z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="DsgNL"
+              data-pencil-name="Plan"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Plan
+            </div>
+            <div
+              data-pencil-id="Nwe1A"
+              data-pencil-name="Split it into subtasks, "
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Split it into subtasks, set status, priority, assignee and due date. People own the
+              status.
+            </div>
+            <div
+              data-pencil-id="ewh82"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="QGaFY"
+                data-pencil-name="Trama cloud"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Trama cloud
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="YB9qN"
+            data-pencil-name="Step 3"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[189px] flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [border-width:1px_1px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_-0.5px_-0.5px_0px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="Q9XYTv"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="T91hZR"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#5274E0]"
+              >
+                <div
+                  data-pencil-id="TkmHi"
+                  data-pencil-name="3"
+                  class="text-[12px]/[normal] box-border text-[#FFF] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  3
+                </div>
+              </div>
+              <div
+                data-pencil-id="mRiiM"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="lwox2"
+                data-pencil-name="message-square"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="message-square"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M2.54 1.547q-.505 .11-.923 .435-.413 .321-.646 .791-.162 .36-.215 .756-.018 .215 0 6.442v5.366q.017 .879 .035 .971 .145 .431 .479 .686 .334 .25 .747 .25 .303 0 .593-.145 .128-.053 .286-.206 .163-.154 .848-.818 .954-.953 1.064-1.011l.105-.052 10.406-.018 .216-.053q.325-.092 .567-.232 .241-.145 .474-.378 .238-.238 .378-.479 .145-.242 .237-.567l.053-.216 .018-8.099q-.018-1.046-.035-1.388-.018-.251-.053-.431-.18-.611-.65-1.042-.466-.435-1.082-.562-.14-.035-1.041-.035h-5.419-5.365q-.936 .017-1.077 .035zM15.122 3.023q.395 .053 .558 .413l.052 .128v9.36l-.035 .11q-.162 .321-.452 .431-.071 .017-5.274 .035l-5.181 .018-.202 .035q-.176 .057-.338 .127-.273 .11-.471 .273-.197 .158-.773 .751l-.756 .738 .018-11.878 .052-.128q.075-.162 .216-.276 .145-.119 .298-.145 .154-.027 6.148-.027 5.995 0 6.14 .035z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="aZzaO"
+              data-pencil-name="Work in Delta"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Start in Delta
+            </div>
+            <div
+              data-pencil-id="Ot7Ir"
+              data-pencil-name="Open Delta and work with"
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Open a thread and type /trama TRM-128. The agent reads the task, its subtasks and past
+              decisions from Trama.
+            </div>
+            <div
+              data-pencil-id="KmLhV"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="BaUbl"
+                data-pencil-name="Delta"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Delta
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="N8Dywy"
+            data-pencil-name="Step 4"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[189px] flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [border-width:1px_1px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_-0.5px_-0.5px_0px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="a4AiI"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="i6Wgl7"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#E2A93B]"
+              >
+                <div
+                  data-pencil-id="S5e2E5"
+                  data-pencil-name="4"
+                  class="text-[12px]/[normal] box-border text-[#FFF] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  4
+                </div>
+              </div>
+              <div
+                data-pencil-id="p7d5O"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="BPplz"
+                data-pencil-name="link"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="link"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M12.041 .866q-.681 .088-1.279 .378-.43 .215-.808 .501-.216 .162-.989 .936-.774 .773-.813 .865-.123 .233-.079 .471 .044 .232 .215 .404 .172 .167 .422 .206 .255 .036 .47-.092 .071-.035 .826-.782 .756-.747 .936-.875 .704-.483 1.512-.558 .883-.07 1.639 .325 .756 .396 1.209 1.169 .36 .616 .395 1.354 .035 .734-.272 1.402-.123 .233-.215 .378-.128 .18-.431 .505-.233 .233-1.011 1.006-1.292 1.314-1.454 1.424-.453 .361-1.029 .514-.575 .15-1.116 .08-1.204-.145-1.978-1.081-.162-.181-.263-.251-.097-.075-.224-.11-.286-.088-.558 .057-.269 .141-.361 .431-.053 .215-.009 .395 .044 .181 .207 .396 .831 1.046 2.087 1.459 1.262 .413 2.54 .088 .936-.251 1.727-.861 .163-.128 1.451-1.416 1.287-1.287 1.41-1.45 .756-.936 .954-2.157 .057-.233 .057-.673 0-.444-.057-.677-.251-1.511-1.292-2.522-.523-.523-1.173-.844-.646-.325-1.385-.413-.272-.039-.65-.039-.378 0-.611 .057zM6.877 6.047q-1.19 .162-2.162 .901-.162 .145-1.423 1.397-1.257 1.248-1.455 1.464-.65 .795-.901 1.766-.07 .321-.101 .55-.026 .224-.026 .584 0 .36 .017 .576 .022 .215 .11 .54 .233 .936 .87 1.71 .642 .773 1.507 1.204 .937 .452 1.96 .452 1.082 0 2.018-.47 .43-.215 .725-.448 .298-.233 1.002-.954 .558-.558 .694-.694 .136-.136 .171-.224 .088-.29-.013-.558-.097-.273-.365-.396-.127-.074-.307-.074h-.018q-.18 0-.272 .039-.088 .035-.268 .198-.128 .123-.576 .576l-.035 .035q-.774 .756-.936 .883-.453 .321-.993 .475-.536 .153-1.059 .101-.756-.075-1.363-.453-.602-.378-.971-1.006-.369-.633-.404-1.376-.035-.747 .272-1.415 .123-.233 .216-.378 .127-.18 .43-.505 .233-.233 .989-1.006 1.296-1.297 1.459-1.424 .686-.519 1.586-.611 .721-.053 1.402 .237 .686 .286 1.169 .879 .145 .163 .242 .237 .101 .071 .228 .106 .198 .053 .396 0 .198-.053 .352-.207 .153-.154 .188-.378 .036-.228-.052-.426-.04-.105-.211-.312-.167-.206-.347-.387-.523-.505-1.191-.817-.664-.316-1.402-.409-.18-.017-.576-.017-.395 0-.576 .035z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="r13Gt"
+              data-pencil-name="Link the thread"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Agent links it
+            </div>
+            <div
+              data-pencil-id="Q9jJ0"
+              data-pencil-name="Trama Desktop links that"
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              The agent runs trama link with its own thread. Already linked? It asks you to create a
+              subtask instead.
+            </div>
+            <div
+              data-pencil-id="vOSK3"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="e9F4m"
+                data-pencil-name="Trama Desktop"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                /trama skill
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="W3pYk2"
+            data-pencil-name="Step 5"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[189px] flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [border-width:1px_1px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_-0.5px_-0.5px_0px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="C5sMxB"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="d0esB"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#E2A93B]"
+              >
+                <div
+                  data-pencil-id="YM03P"
+                  data-pencil-name="5"
+                  class="text-[12px]/[normal] box-border text-[#FFF] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  5
+                </div>
+              </div>
+              <div
+                data-pencil-id="Uwy1n"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="BTdRm"
+                data-pencil-name="history"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="history"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M2.052 1.529q-.325 .11-.488 .396l-.052 .11v4.192l.052 .092q.128 .251 .378 .361l.11 .052 3.617 .018q.413-.018 .558-.035 .092-.018 .198-.092l.017-.018q.22-.163 .282-.404 .061-.242-.04-.484-.097-.246-.329-.369-.11-.075-.343-.092-.233-.018-.989-.018h-.954l.304-.29q.953-.936 2.034-1.402 1.244-.54 2.611-.54 1.208 0 2.267 .448 1.512 .633 2.492 1.92 .984 1.288 1.182 2.888 .035 .29 .035 .729 0 .44-.035 .73-.198 1.639-1.208 2.944-1.007 1.301-2.536 1.916-1.046 .413-2.215 .413-.36 0-.593-.017-.233-.018-.593-.093-1.134-.233-2.119-.879-.98-.65-1.648-1.612-.663-.963-.914-2.114-.11-.576-.118-.998-.009-.426-.097-.606-.11-.216-.343-.343-.075-.035-.127-.053-.053-.017-.198-.017-.145 0-.198 .017-.052 .018-.127 .053-.233 .127-.361 .343-.087 .198-.043 .839 .043 .637 .188 1.27 .378 1.529 1.332 2.773 .954 1.239 2.32 2.004 1.371 .765 2.953 .91 .238 .017 .686 .017 .448 0 .686-.017 1.779-.163 3.274-1.116 1.476-.919 2.395-2.396 .953-1.494 1.116-3.273 .017-.238 .017-.686 0-.448-.017-.686-.18-1.96-1.305-3.577-1.125-1.621-2.91-2.487-.755-.36-1.476-.541-.716-.18-1.565-.197-1.401-.035-2.715 .395-.919 .308-1.675 .778-.756 .466-1.476 1.169l-.361 .338v-2.157l-.052-.11q-.128-.233-.361-.343-.11-.053-.29-.062-.18-.008-.233 .009zM8.82 4.518q-.163 .035-.308 .171-.14 .136-.215 .299l-.035 .123v4.104l.052 .11q.075 .123 .163 .198 .11 .088 .47 .286l1.169 .593q1.547 .778 1.675 .813 .307 .088 .584-.07 .277-.163 .352-.488 .052-.233-.053-.488-.057-.123-.15-.193-.087-.075-.408-.238l-2.36-1.204-.018-3.476-.052-.127q-.058-.106-.159-.203-.096-.101-.197-.145-.097-.048-.251-.065-.149-.018-.259 0z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="imyTW"
+              data-pencil-name="Record uploads"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Record syncs
+            </div>
+            <div
+              data-pencil-id="ue24g"
+              data-pencil-name="The connector uploads su"
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              After each step the agent runs trama sync: summary, decisions, events, files and PR.
+              Read-only, stale if it falls behind.
+            </div>
+            <div
+              data-pencil-id="V8qLF"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="z0JoQ"
+                data-pencil-name="Trama Desktop"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                /trama skill
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="HhrGI"
+            data-pencil-name="Step 6"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[189px] flex flex-col gap-[14px] p-[20px_22px] justify-start items-start bg-[#14161A] [border-width:1px_1px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:-0.5px_-0.5px_-0.5px_0px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="G3JN0q"
+              data-pencil-name="H"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="nv72W"
+                data-pencil-name="N"
+                class="box-border w-[26px] shrink-0 h-[26px] flex flex-row gap-0 justify-center items-center bg-[#6FAE73]"
+              >
+                <div
+                  data-pencil-id="LATxq"
+                  data-pencil-name="6"
+                  class="text-[12px]/[normal] box-border text-[#FFF] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  6
+                </div>
+              </div>
+              <div
+                data-pencil-id="kYCRO"
+                data-pencil-name="Sp"
+                class="box-border [flex:1_1_0] h-[1px] flex flex-row gap-0 justify-start items-start"
+              ></div>
+              <svg
+                data-pencil-id="Ruxx9"
+                data-pencil-name="git-pull-request"
+                viewBox="0 0 18 18"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="git-pull-request"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[18px] shrink-0 h-[18px] overflow-visible"
+              >
+                <path
+                  d="M4.034 1.547q-1.156 .198-1.854 1.063-.238 .286-.374 .576-.132 .29-.242 .668-.035 .141-.043 .25-.009 .106-.009 .396 0 .36 .035 .558 .035 .198 .145 .488 .233 .628 .716 1.107 .488 .475 1.138 .69l.216 .075v8.547l.052 .11q.058 .088 .163 .198 .11 .105 .207 .163 .101 .052 .316 .052 .215 0 .312-.052 .101-.058 .207-.163 .109-.11 .167-.198l.052-.11v-8.547l.216-.075q.65-.215 1.133-.69 .488-.479 .721-1.107 .11-.29 .145-.488 .035-.198 .035-.558 0-.36-.035-.558-.035-.198-.145-.488-.268-.716-.857-1.222-.584-.505-1.34-.668-.18-.035-.549-.044-.37-.008-.528 .027zM4.878 3.041q.36 .092 .672 .409 .317 .312 .409 .672 .035 .163 .035 .378 0 .215-.035 .36-.092 .378-.391 .686-.295 .303-.69 .413-.145 .035-.378 .035-.233 0-.378-.035-.395-.11-.694-.413-.295-.308-.387-.686-.035-.145-.035-.36 0-.215 .035-.378 .075-.29 .29-.558 .215-.268 .523-.413 .448-.233 1.024-.11zM9.488 3.797q-.128 .057-.246 .167-.115 .105-.172 .224-.052 .114-.061 .303-.009 .189 .044 .308 .057 .114 .162 .224 .11 .105 .216 .163l.127 .052 2.611 .018 .127 .053q.268 .127 .395 .395l.053 .128 .018 4.75-.216 .075q-.65 .215-1.138 .694-.483 .475-.716 1.103-.11 .29-.145 .488-.035 .198-.035 .558 0 .36 .035 .558 .035 .198 .145 .488 .215 .611 .681 1.081 .47 .466 1.081 .681 .29 .11 .488 .145 .198 .035 .558 .035 .36 0 .558-.035 .198-.035 .488-.145 .611-.215 1.077-.681 .47-.47 .685-1.081 .11-.29 .145-.488 .035-.198 .035-.558 0-.36-.035-.558-.035-.198-.145-.488-.233-.628-.721-1.103-.483-.479-1.133-.694l-.216-.075-.017-4.698q0-.338-.035-.448-.326-1.046-1.244-1.477-.198-.087-.378-.145-.127-.035-.334-.044-.207-.008-1.23-.008h-1.227q-.215 0-.285 .035zM13.878 12.041q.36 .092 .672 .409 .317 .312 .409 .672 .035 .163 .035 .378 0 .215-.035 .36-.092 .378-.391 .686-.295 .303-.69 .413-.145 .035-.378 .035-.233 0-.378-.035-.395-.11-.694-.413-.295-.308-.387-.686-.035-.145-.035-.36 0-.215 .035-.378 .075-.29 .29-.558 .215-.268 .523-.413 .448-.233 1.024-.11z"
+                  fill="#8c9096"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="ctrlr"
+              data-pencil-name="Review &amp; close"
+              class="text-[22px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Review &amp; close
+            </div>
+            <div
+              data-pencil-id="l9iKX"
+              data-pencil-name="PR reviewed and merged. "
+              class="text-[13px]/[20px] box-border w-full text-[#C3C5C9] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              PR reviewed and merged. You set Done; the summary and the time logged are posted back
+              to the issue.
+            </div>
+            <div
+              data-pencil-id="G5FSW"
+              data-pencil-name="Where"
+              class="box-border w-fit h-fit shrink-0 flex flex-row gap-0 p-[3px_8px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="Z8JQHH"
+                data-pencil-name="Trama cloud"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Trama cloud
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="phb2L"
+        data-pencil-name="Model row"
+        class="box-border w-full h-fit shrink-0 flex flex-row gap-[32px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="bKA8c"
+          data-pencil-name="Architecture"
+          class="box-border [flex:1_1_0] h-fit flex flex-col gap-[16px] justify-start items-start"
+        >
+          <div
+            data-pencil-id="x7RL0"
+            data-pencil-name="Architecture"
+            class="text-[30px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Architecture
+          </div>
+          <div
+            data-pencil-id="TYWJS"
+            data-pencil-name="Diagram"
+            class="box-border w-full h-fit shrink-0 flex flex-row gap-0 p-[24px] justify-start items-center [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="fqVpc"
+              data-pencil-name="Box Trackers"
+              class="box-border w-[300px] shrink-0 h-fit flex flex-col gap-[10px] p-[18px] justify-start items-start bg-[#14161A] [outline:1px_solid_#3A3E45] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="mYfCa"
+                data-pencil-name="H"
+                class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="nEJvk"
+                  data-pencil-name="Sw"
+                  class="box-border w-[9px] shrink-0 h-[9px] flex flex-row gap-0 justify-start items-start bg-[#3A3E45]"
+                ></div>
+                <div
+                  data-pencil-id="BDDVu"
+                  data-pencil-name="Trackers"
+                  class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Trackers
+                </div>
+              </div>
+              <div
+                data-pencil-id="eoRra"
+                data-pencil-name="GitHub · GitLab · Jira ·"
+                class="text-[12.5px]/[normal] box-border text-[#8C9096] font-[Newsreader,system-ui,sans-serif] font-normal italic text-left [white-space:nowrap]"
+              >
+                GitHub · GitLab · Jira · REST
+              </div>
+              <div
+                data-pencil-id="h7Z4mG"
+                data-pencil-name="· issues"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · issues
+              </div>
+              <div
+                data-pencil-id="dp3tX"
+                data-pencil-name="· labels, assignees"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · labels, assignees
+              </div>
+              <div
+                data-pencil-id="laqUQ"
+                data-pencil-name="· comments"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · comments
+              </div>
+            </div>
+            <div
+              data-pencil-id="GCmTU"
+              data-pencil-name="Arrow"
+              class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] p-[0px_10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="NtoyZ"
+                data-pencil-name="sync ⇄"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                sync ⇄
+              </div>
+              <div
+                data-pencil-id="ITE9t"
+                data-pencil-name="Line"
+                class="box-border w-full h-[1px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#5E6269]"
+              ></div>
+              <div
+                data-pencil-id="PssSD"
+                data-pencil-name="OAuth + webhooks"
+                class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                OAuth + webhooks
+              </div>
+            </div>
+            <div
+              data-pencil-id="V66fvI"
+              data-pencil-name="Box Trama cloud"
+              class="box-border w-[300px] shrink-0 h-fit flex flex-col gap-[10px] p-[18px] justify-start items-start bg-[#14161A] [outline:1px_solid_#E2A93B] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="CqXzT"
+                data-pencil-name="H"
+                class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="g3Kcn"
+                  data-pencil-name="Sw"
+                  class="box-border w-[9px] shrink-0 h-[9px] flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+                ></div>
+                <div
+                  data-pencil-id="U7OLx"
+                  data-pencil-name="Trama cloud"
+                  class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Trama cloud
+                </div>
+              </div>
+              <div
+                data-pencil-id="Ji9iH"
+                data-pencil-name="web + mobile"
+                class="text-[12.5px]/[normal] box-border text-[#8C9096] font-[Newsreader,system-ui,sans-serif] font-normal italic text-left [white-space:nowrap]"
+              >
+                web + mobile
+              </div>
+              <div
+                data-pencil-id="D3Sfqm"
+                data-pencil-name="· tasks &amp; subtasks"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · tasks &amp; subtasks
+              </div>
+              <div
+                data-pencil-id="U3mnl"
+                data-pencil-name="· workflow status"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · workflow status
+              </div>
+              <div
+                data-pencil-id="oc9Jj"
+                data-pencil-name="· thread records"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · thread records
+              </div>
+            </div>
+            <div
+              data-pencil-id="wGflH"
+              data-pencil-name="Arrow"
+              class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] p-[0px_10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="P2GZS"
+                data-pencil-name="← record"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                ← link · sync
+              </div>
+              <div
+                data-pencil-id="zE71I"
+                data-pencil-name="Line"
+                class="box-border w-full h-[1px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#5E6269]"
+              ></div>
+              <div
+                data-pencil-id="k3JIge"
+                data-pencil-name="HTTPS API"
+                class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                project token
+              </div>
+            </div>
+            <div
+              data-pencil-id="ROmLd"
+              data-pencil-name="Box Trama Desktop"
+              class="box-border w-[300px] shrink-0 h-fit flex flex-col gap-[10px] p-[18px] justify-start items-start bg-[#14161A] [outline:1px_solid_#E2A93B] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="Hxa2d"
+                data-pencil-name="H"
+                class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="JLfON"
+                  data-pencil-name="Sw"
+                  class="box-border w-[9px] shrink-0 h-[9px] flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+                ></div>
+                <div
+                  data-pencil-id="WFHv5"
+                  data-pencil-name="Trama Desktop"
+                  class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Delta agent
+                </div>
+              </div>
+              <div
+                data-pencil-id="U4BJX"
+                data-pencil-name="next to Delta"
+                class="text-[12.5px]/[normal] box-border text-[#8C9096] font-[Newsreader,system-ui,sans-serif] font-normal italic text-left [white-space:nowrap]"
+              >
+                /trama skill · CLI or MCP
+              </div>
+              <div
+                data-pencil-id="CxG6F"
+                data-pencil-name="· delta CLI"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · trama show → context
+              </div>
+              <div
+                data-pencil-id="galEr"
+                data-pencil-name="· link thread ↔ task"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · trama link → 1 thread
+              </div>
+              <div
+                data-pencil-id="W08Ea"
+                data-pencil-name="· upload record"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · trama sync → record
+              </div>
+            </div>
+            <div
+              data-pencil-id="v2iLy"
+              data-pencil-name="Arrow"
+              class="box-border [flex:1_1_0] h-fit flex flex-col gap-[6px] p-[0px_10px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="gdIda"
+                data-pencil-name="CLI"
+                class="text-[10.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                runs inside
+              </div>
+              <div
+                data-pencil-id="nQ2F5"
+                data-pencil-name="Line"
+                class="box-border w-full h-[1px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#5E6269]"
+              ></div>
+              <div
+                data-pencil-id="Z5zsD5"
+                data-pencil-name="read only"
+                class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                same machine
+              </div>
+            </div>
+            <div
+              data-pencil-id="mTrBT"
+              data-pencil-name="Box Delta"
+              class="box-border w-[300px] shrink-0 h-fit flex flex-col gap-[10px] p-[18px] justify-start items-start bg-[#14161A] [outline:1px_solid_#5274E0] [outline-offset:-0.5px]"
+            >
+              <div
+                data-pencil-id="M4pjs7"
+                data-pencil-name="H"
+                class="box-border w-fit h-fit shrink-0 flex flex-row gap-[8px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="GACLm"
+                  data-pencil-name="Sw"
+                  class="box-border w-[9px] shrink-0 h-[9px] flex flex-row gap-0 justify-start items-start bg-[#5274E0]"
+                ></div>
+                <div
+                  data-pencil-id="F74NU1"
+                  data-pencil-name="Delta"
+                  class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  Delta
+                </div>
+              </div>
+              <div
+                data-pencil-id="M02wAj"
+                data-pencil-name="where work happens"
+                class="text-[12.5px]/[normal] box-border text-[#8C9096] font-[Newsreader,system-ui,sans-serif] font-normal italic text-left [white-space:nowrap]"
+              >
+                where work happens
+              </div>
+              <div
+                data-pencil-id="plDzt"
+                data-pencil-name="· threads &amp; agents"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · threads &amp; agents
+              </div>
+              <div
+                data-pencil-id="HwJrZ"
+                data-pencil-name="· DeltaDB"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · DeltaDB
+              </div>
+              <div
+                data-pencil-id="icYif"
+                data-pencil-name="· review &amp; merge"
+                class="text-[11.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                · review &amp; merge
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          data-pencil-id="deMIT"
+          data-pencil-name="Data model"
+          class="box-border w-[820px] shrink-0 h-fit flex flex-col gap-[16px] justify-start items-start"
+        >
+          <div
+            data-pencil-id="gopWZ"
+            data-pencil-name="Data model"
+            class="text-[30px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+          >
+            Data model
+          </div>
+          <div
+            data-pencil-id="kl6iC"
+            data-pencil-name="ER"
+            class="box-border w-full h-fit shrink-0 flex flex-col gap-[12px] p-[24px] justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+          >
+            <div
+              data-pencil-id="VUx9D"
+              data-pencil-name="R1"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[12px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="ZxjhT"
+                data-pencil-name="E Task"
+                class="box-border [flex:1_1_0] h-fit flex flex-col gap-0 justify-start items-start bg-[#14161A] [outline:1px_solid_#E2A93B] [outline-offset:-0.5px]"
+              >
+                <div
+                  data-pencil-id="hDKjJ"
+                  data-pencil-name="H"
+                  class="[box-sizing:content-box] w-[329px] h-[31.5px] shrink-0 flex flex-row gap-0 p-[8px_12px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+                >
+                  <div
+                    data-pencil-id="UtkmS"
+                    data-pencil-name="Task"
+                    class="text-[12px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    Task
+                  </div>
+                </div>
+                <div
+                  data-pencil-id="Z8pmwF"
+                  data-pencil-name="B"
+                  class="box-border w-full h-fit shrink-0 flex flex-col gap-[3px] p-[8px_12px] justify-start items-start"
+                >
+                  <div
+                    data-pencil-id="EIMZe"
+                    data-pencil-name="id · title · description"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    id · title · description
+                  </div>
+                  <div
+                    data-pencil-id="FDSl8"
+                    data-pencil-name="status · priority · due"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    status · priority · due
+                  </div>
+                  <div
+                    data-pencil-id="g8MRa8"
+                    data-pencil-name="assignee · project · lab"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    assignee · project · labels
+                  </div>
+                  <div
+                    data-pencil-id="dYso8"
+                    data-pencil-name="parent_id → Task (subtas"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    parent_id → Task (subtask)
+                  </div>
+                  <div
+                    data-pencil-id="Q3FqX"
+                    data-pencil-name="source_ref → issue"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    source_ref → issue
+                  </div>
+                </div>
+              </div>
+              <div
+                data-pencil-id="z3dFb"
+                data-pencil-name="Rel"
+                class="box-border w-[90px] shrink-0 h-fit flex flex-col gap-[4px] justify-start items-center"
+              >
+                <div
+                  data-pencil-id="S5spL"
+                  data-pencil-name="1 — 0..1"
+                  class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  1 — 0..1
+                </div>
+                <div
+                  data-pencil-id="dtvvE"
+                  data-pencil-name="L"
+                  class="box-border w-full h-[1px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#E2A93B]"
+                ></div>
+                <div
+                  data-pencil-id="vTIBO"
+                  data-pencil-name="one thread"
+                  class="text-[10px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                >
+                  one thread
+                </div>
+              </div>
+              <div
+                data-pencil-id="Ly4sn"
+                data-pencil-name="E ThreadRecord"
+                class="box-border [flex:1_1_0] h-fit flex flex-col gap-0 justify-start items-start bg-[#14161A] [outline:1px_solid_#5274E0] [outline-offset:-0.5px]"
+              >
+                <div
+                  data-pencil-id="Q1O3F"
+                  data-pencil-name="H"
+                  class="[box-sizing:content-box] w-[329px] h-[31.5px] shrink-0 flex flex-row gap-0 p-[8px_12px] justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+                >
+                  <div
+                    data-pencil-id="sZ4QY"
+                    data-pencil-name="ThreadRecord"
+                    class="text-[12px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    ThreadRecord
+                  </div>
+                </div>
+                <div
+                  data-pencil-id="R9jFQG"
+                  data-pencil-name="B"
+                  class="box-border w-full h-fit shrink-0 flex flex-col gap-[3px] p-[8px_12px] justify-start items-start"
+                >
+                  <div
+                    data-pencil-id="c28gM"
+                    data-pencil-name="delta_thread_id · share_"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    delta_thread_id · share_url
+                  </div>
+                  <div
+                    data-pencil-id="hni4K"
+                    data-pencil-name="summary · decisions[]"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    summary · decisions[]
+                  </div>
+                  <div
+                    data-pencil-id="QDml7"
+                    data-pencil-name="events[] · files[] · dif"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    events[] · files[] · diff
+                  </div>
+                  <div
+                    data-pencil-id="UadpZ"
+                    data-pencil-name="pr_url · last_sync"
+                    class="text-[10.5px]/[normal] box-border text-[#C3C5C9] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+                  >
+                    pr_url · last_sync
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div
+              data-pencil-id="SLHJJ"
+              data-pencil-name="R2"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[12px] justify-start items-start"
+            >
+              <div
+                data-pencil-id="Shoi9"
+                data-pencil-name="Task 1 — N Subtasks (Tas"
+                class="text-[11px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Task 1 — N Subtasks (Task.parent_id) · each subtask may link its own thread
+              </div>
+            </div>
+            <div
+              data-pencil-id="IAeC1"
+              data-pencil-name="R3"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[12px] justify-start items-start"
+            >
+              <div
+                data-pencil-id="epBbG"
+                data-pencil-name="Task 0..1 — 1 ExternalRe"
+                class="text-[11px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Task 0..1 — 1 ExternalRef (provider, repo, number, url, sync cursor)
+              </div>
+            </div>
+            <div
+              data-pencil-id="EVWBO"
+              data-pencil-name="R4"
+              class="box-border w-full h-fit shrink-0 flex flex-row gap-[12px] justify-start items-start"
+            >
+              <div
+                data-pencil-id="JSoJ3"
+                data-pencil-name="Task 1 — N TimeEntry (pe"
+                class="text-[11px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Task 1 — N TimeEntry (person, start, duration, source: timer | manual | suggested
+                from thread)
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="HtxsQ"
+        data-pencil-name="Capabilities"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[16px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="epbIc"
+          data-pencil-name="What you can do where"
+          class="text-[30px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          What you can do where
+        </div>
+        <div
+          data-pencil-id="RMK0C"
+          data-pencil-name="Table"
+          class="box-border w-full h-fit shrink-0 flex flex-col gap-0 justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+        >
+          <div
+            data-pencil-id="QrZW9"
+            data-pencil-name="R "
+            class="[box-sizing:content-box] w-[2816px] h-[38.5px] shrink-0 flex flex-row gap-0 justify-start items-start bg-[#14161A] [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="ZJ7lC"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="kClHl"
+                class="text-[11.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              ></div>
+            </div>
+            <div
+              data-pencil-id="cdguV"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <div
+                data-pencil-id="d2sjMf"
+                data-pencil-name="WEB · MOBILE"
+                class="text-[11.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                WEB · MOBILE
+              </div>
+            </div>
+            <div
+              data-pencil-id="StheX"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <div
+                data-pencil-id="heA9O"
+                data-pencil-name="TRAMA DESKTOP"
+                class="text-[11.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                AGENT · /trama
+              </div>
+            </div>
+            <div
+              data-pencil-id="RR2wC"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <div
+                data-pencil-id="xJhVJ"
+                data-pencil-name="DELTA"
+                class="text-[11.5px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                DELTA
+              </div>
+            </div>
+          </div>
+          <div
+            data-pencil-id="VtOrZ"
+            data-pencil-name="R Tasks, subtasks, status, assignees, due dates"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="WkARZ"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="B8yWRu"
+                data-pencil-name="Tasks, subtasks, status,"
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Tasks, subtasks, status, assignees, due dates
+              </div>
+            </div>
+            <div
+              data-pencil-id="pNTnS"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="CjOy2"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="Y0MAXU"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="K337W"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="FaIeZ"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="BuMKx"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="axcEw"
+            data-pencil-name="R Sync with GitHub / GitLab / Jira"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="vjpxW"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="FgG9y"
+                data-pencil-name="Sync with GitHub / GitLa"
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Sync with GitHub / GitLab / Jira
+              </div>
+            </div>
+            <div
+              data-pencil-id="EeZPq"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="WgYof"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="znTLX"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="QchDW"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="VZ9zG"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="t0NQM3"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="VtY4P"
+            data-pencil-name="R Read a thread record (summary, decisions, changes)"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="ulfKZ"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="z5tdB"
+                data-pencil-name="Read a thread record (su"
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Read a thread record (summary, decisions, changes)
+              </div>
+            </div>
+            <div
+              data-pencil-id="Sr9rm"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="X3UswS"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="YSyyZ"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="l85zDa"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="pW0fS"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="J17KdA"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="xpLu5"
+            data-pencil-name="R Link / unlink a Delta thread to a task or subtask"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="U555Kk"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="nRmdr"
+                data-pencil-name="Link / unlink a Delta th"
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Link / unlink a Delta thread to a task or subtask
+              </div>
+            </div>
+            <div
+              data-pencil-id="Ge8ja"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="H3YcV"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="pwceH"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="TOnfE"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="uw1mH"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="IymXe"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="CHr7Z"
+            data-pencil-name="R Ask across all records (delta thread ask)"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="QlZ69"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="yzY8n"
+                data-pencil-name="Ask across all records ("
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Ask across all records (delta thread ask)
+              </div>
+            </div>
+            <div
+              data-pencil-id="vGav7"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="FrYq5"
+                data-pencil-name="eye"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="eye"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M7.156 2.52q-1.322 .043-2.56 .578-1.234 .531-2.197 1.476-1.018 .992-1.575 2.205-.117 .271-.157 .406-.037 .136-.037 .315 0 .179 .037 .308 .04 .128 .142 .38 .407 .887 1.044 1.652 .637 .765 1.432 1.337 1.56 1.076 3.527 1.289 .223 .029 .688 .029 .465 0 .674-.029 1.293-.136 2.41-.645 1.116-.512 2.017-1.38 1.033-1.007 1.59-2.253 .102-.252 .139-.38 .04-.129 .04-.308 0-.179-.04-.308-.037-.128-.139-.38-.392-.843-1-1.59-.604-.751-1.37-1.307-.901-.659-1.959-1.018-1.058-.363-2.168-.392-.223 0-.538 .015zM8.221 3.794q1.575 .179 2.864 1.128 1.289 .945 1.949 2.384l.091 .194-.091 .209q-.674 1.443-1.963 2.38-1.289 .938-2.926 1.132-.195 .014-.645 .014-.45 0-.645-.014-1.186-.136-2.2-.667-1.011-.534-1.777-1.421-.553-.659-.911-1.439l-.092-.194 .092-.194q.465-1.022 1.274-1.817 .809-.794 1.875-1.245 .974-.421 2.084-.479 .15-.015 .494 0 .344 .014 .527 .029zM7.112 5.039q-.963 .165-1.546 .886-.197 .238-.311 .48-.11 .242-.201 .557-.03 .117-.037 .208-.007 .088-.007 .33 0 .3 .029 .465 .029 .165 .121 .407 .179 .509 .568 .9 .391 .389 .9 .568 .242 .092 .407 .121 .165 .029 .465 .029 .3 0 .465-.029 .165-.029 .407-.121 .509-.179 .897-.568 .392-.391 .571-.9 .092-.242 .121-.407 .029-.165 .029-.465 0-.3-.029-.465-.029-.165-.121-.407-.223-.597-.714-1.018-.487-.421-1.117-.556-.15-.03-.458-.037-.307-.007-.439 .022zM7.815 6.284q.3 .077 .56 .341 .264 .26 .341 .56 .029 .136 .029 .315 0 .179-.029 .3-.077 .315-.326 .572-.245 .252-.575 .344-.121 .029-.315 .029-.194 0-.315-.029-.33-.092-.579-.344-.245-.257-.322-.572-.029-.121-.029-.3 0-.179 .029-.315 .062-.242 .242-.465 .179-.223 .436-.344 .373-.194 .853-.092z"
+                  fill="#e2a93b"
+                />
+              </svg>
+              <div
+                data-pencil-id="gJswt"
+                data-pencil-name="saved answers"
+                class="text-[11px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                saved answers
+              </div>
+            </div>
+            <div
+              data-pencil-id="Irlwl"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="ZWRqb"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="Y7OxRw"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="MxmJX"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="tGT1d"
+            data-pencil-name="R Chat with agents, run, review &amp; merge code"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="qHIgQ"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="Al41a"
+                data-pencil-name="Chat with agents, run, r"
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Chat with agents, run, review &amp; merge code
+              </div>
+            </div>
+            <div
+              data-pencil-id="qPTSS"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="QINqI"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="N7vpDZ"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="gxpg0"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="UjrAg"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="yXSJ1"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="vGx0Y"
+            data-pencil-name="R Track time per task and subtask (timer, manual, suggested)"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="Kd5LB"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="xPqhj"
+                data-pencil-name="Track time per task and "
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Track time per task and subtask (timer, manual, suggested)
+              </div>
+            </div>
+            <div
+              data-pencil-id="S1jaO"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="z1FpG0"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="LNlRc"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="tnqCb"
+                data-pencil-name="eye"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="eye"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M7.156 2.52q-1.322 .043-2.56 .578-1.234 .531-2.197 1.476-1.018 .992-1.575 2.205-.117 .271-.157 .406-.037 .136-.037 .315 0 .179 .037 .308 .04 .128 .142 .38 .407 .887 1.044 1.652 .637 .765 1.432 1.337 1.56 1.076 3.527 1.289 .223 .029 .688 .029 .465 0 .674-.029 1.293-.136 2.41-.645 1.116-.512 2.017-1.38 1.033-1.007 1.59-2.253 .102-.252 .139-.38 .04-.129 .04-.308 0-.179-.04-.308-.037-.128-.139-.38-.392-.843-1-1.59-.604-.751-1.37-1.307-.901-.659-1.959-1.018-1.058-.363-2.168-.392-.223 0-.538 .015zM8.221 3.794q1.575 .179 2.864 1.128 1.289 .945 1.949 2.384l.091 .194-.091 .209q-.674 1.443-1.963 2.38-1.289 .938-2.926 1.132-.195 .014-.645 .014-.45 0-.645-.014-1.186-.136-2.2-.667-1.011-.534-1.777-1.421-.553-.659-.911-1.439l-.092-.194 .092-.194q.465-1.022 1.274-1.817 .809-.794 1.875-1.245 .974-.421 2.084-.479 .15-.015 .494 0 .344 .014 .527 .029zM7.112 5.039q-.963 .165-1.546 .886-.197 .238-.311 .48-.11 .242-.201 .557-.03 .117-.037 .208-.007 .088-.007 .33 0 .3 .029 .465 .029 .165 .121 .407 .179 .509 .568 .9 .391 .389 .9 .568 .242 .092 .407 .121 .165 .029 .465 .029 .3 0 .465-.029 .165-.029 .407-.121 .509-.179 .897-.568 .392-.391 .571-.9 .092-.242 .121-.407 .029-.165 .029-.465 0-.3-.029-.465-.029-.165-.121-.407-.223-.597-.714-1.018-.487-.421-1.117-.556-.15-.03-.458-.037-.307-.007-.439 .022zM7.815 6.284q.3 .077 .56 .341 .264 .26 .341 .56 .029 .136 .029 .315 0 .179-.029 .3-.077 .315-.326 .572-.245 .252-.575 .344-.121 .029-.315 .029-.194 0-.315-.029-.33-.092-.579-.344-.245-.257-.322-.572-.029-.121-.029-.3 0-.179 .029-.315 .062-.242 .242-.465 .179-.223 .436-.344 .373-.194 .853-.092z"
+                  fill="#e2a93b"
+                />
+              </svg>
+              <div
+                data-pencil-id="MvYrW"
+                data-pencil-name="suggests from thread"
+                class="text-[11px]/[normal] box-border text-[#5E6269] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                suggests from thread
+              </div>
+            </div>
+            <div
+              data-pencil-id="jEOlp"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="Rs7dW"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+          <div
+            data-pencil-id="q2dNLS"
+            data-pencil-name="R Optional: Trama Desktop — auto-refresh records, link old threads by hand"
+            class="[box-sizing:content-box] w-[2816px] h-[41.5px] shrink-0 flex flex-row gap-0 justify-start items-start [border-width:0px_0px_1px_0px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_-0.5px_0px]"
+          >
+            <div
+              data-pencil-id="DBVP6"
+              data-pencil-name="C"
+              class="box-border [flex:1_1_0] h-fit flex flex-row gap-[8px] p-[12px_18px] justify-start items-center"
+            >
+              <div
+                data-pencil-id="AKyai"
+                data-pencil-name="Optional: Trama Desktop "
+                class="text-[14px]/[normal] box-border text-[#DCDDE0] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+              >
+                Optional: Trama Desktop — auto-refresh records, link old threads by hand
+              </div>
+            </div>
+            <div
+              data-pencil-id="QvRtX"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="N3EqUm"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="MQjpo"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="XOsR6"
+                data-pencil-name="check"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="check"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M12.301 3.164q-.077 .015-.139 .062-.059 .044-3.296 3.285l-3.241 3.223-1.381-1.381q-1.38-1.377-1.479-1.421-.095-.047-.238-.047-.143 0-.249 .04-.103 .037-.202 .121-.095 .08-.142 .183-.03 .077-.037 .121-.007 .044-.007 .15v.044q-.015 .121 .044 .212 .077 .118 .391 .432 .209 .228 1.037 1.052l1.604 1.589q.3 .286 .417 .362 .077 .059 .198 .044l.103 .015q.077 0 .15-.029 .091-.077 .344-.308 .256-.234 .857-.817l2.446-2.446q2.234-2.248 2.893-2.908 .66-.662 .692-.736 .044-.091 .044-.256 0-.106-.007-.15-.007-.044-.037-.121-.047-.088-.146-.176-.095-.091-.194-.128-.095-.04-.224-.04-.128 0-.201 .029z"
+                  fill="#6fae73"
+                />
+              </svg>
+            </div>
+            <div
+              data-pencil-id="LOcN2"
+              data-pencil-name="C"
+              class="[box-sizing:content-box] w-[379.5px] shrink-0 h-[39px] flex flex-row gap-[8px] p-[12px_18px] justify-start items-center [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px]"
+            >
+              <svg
+                data-pencil-id="S5CdWi"
+                data-pencil-name="minus"
+                viewBox="0 0 15 15"
+                preserveAspectRatio="xMidYMid meet"
+                data-icon-name="minus"
+                data-icon-set="lucide"
+                xmlns="http://www.w3.org/2000/svg"
+                class="box-border w-[15px] shrink-0 h-[15px] overflow-visible"
+              >
+                <path
+                  d="M2.926 6.914q-.256 .092-.37 .348-.11 .253-.007 .494 .062 .103 .15 .194 .092 .088 .198 .136l.102 .029h9.002l.102-.029q.107-.048 .194-.136 .092-.091 .143-.201 .055-.114 .055-.249 0-.135-.044-.256-.106-.209-.315-.315l-.091-.044h-4.53q-4.53 0-4.589 .029z"
+                  fill="#5e6269"
+                />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        data-pencil-id="o3HKA"
+        data-pencil-name="Index"
+        class="box-border w-full h-fit shrink-0 flex flex-col gap-[16px] justify-start items-start"
+      >
+        <div
+          data-pencil-id="aCqzm"
+          data-pencil-name="In this file"
+          class="text-[30px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+        >
+          In this file
+        </div>
+        <div
+          data-pencil-id="WY75o"
+          data-pencil-name="Groups"
+          class="box-border w-full h-fit shrink-0 flex flex-row gap-0 justify-start items-start [outline:1px_solid_#24272D] [outline-offset:-0.5px]"
+        >
+          <div
+            data-pencil-id="OAEW7"
+            data-pencil-name="G UI Kit"
+            class="box-border [flex:1_1_0] h-fit flex flex-col gap-[8px] p-[16px_18px] justify-start items-start"
+          >
+            <div
+              data-pencil-id="sl6OE"
+              data-pencil-name="01"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              01
+            </div>
+            <div
+              data-pencil-id="AJaqr"
+              data-pencil-name="UI Kit"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              UI Kit
+            </div>
+            <div
+              data-pencil-id="krkCs"
+              data-pencil-name="Foundations, atoms, rows"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Foundations, atoms, rows, thread record, forms, shell, mobile chrome
+            </div>
+          </div>
+          <div
+            data-pencil-id="Bl7cV"
+            data-pencil-name="G Desktop web"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[120px] flex flex-col gap-[8px] p-[16px_18px] justify-start items-start [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="i1xBdp"
+              data-pencil-name="02–13"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              02–13
+            </div>
+            <div
+              data-pencil-id="zby2k"
+              data-pencil-name="Desktop web"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Desktop web
+            </div>
+            <div
+              data-pencil-id="ucihj"
+              data-pencil-name="Home · Inbox · Tasks · B"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Home · Inbox · Tasks · Board · Task detail · Subtask detail · Project · Timeline · Ask
+              · Integrations · Trama Desktop · Settings
+            </div>
+          </div>
+          <div
+            data-pencil-id="nRnui"
+            data-pencil-name="G Dialogs"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[120px] flex flex-col gap-[8px] p-[16px_18px] justify-start items-start [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="sGrWW"
+              data-pencil-name="14–18"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              14–18
+            </div>
+            <div
+              data-pencil-id="EMy3m"
+              data-pencil-name="Dialogs"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Dialogs
+            </div>
+            <div
+              data-pencil-id="LFlWu"
+              data-pencil-name="Command palette · New ta"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Command palette · New task · Row menu &amp; status · Assignee picker · Delete &amp;
+              toasts
+            </div>
+          </div>
+          <div
+            data-pencil-id="Jr0dq"
+            data-pencil-name="G Trama Desktop app"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[101px] flex flex-col gap-[8px] p-[16px_18px] justify-start items-start [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="JsNK1"
+              data-pencil-name="19–21"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              19–21 · optional
+            </div>
+            <div
+              data-pencil-id="ywvbJ"
+              data-pencil-name="Trama Desktop app"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Trama Desktop app
+            </div>
+            <div
+              data-pencil-id="zn438"
+              data-pencil-name="Threads list · Link to t"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Threads list · Link to task · Already linked → create subtask
+            </div>
+          </div>
+          <div
+            data-pencil-id="PzUrI"
+            data-pencil-name="G Mobile"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[120px] flex flex-col gap-[8px] p-[16px_18px] justify-start items-start [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="OEl4E"
+              data-pencil-name="M1–M8"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              M1–M8
+            </div>
+            <div
+              data-pencil-id="wAXLn"
+              data-pencil-name="Mobile"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Mobile
+            </div>
+            <div
+              data-pencil-id="F6CH03"
+              data-pencil-name="Home · Tasks · Task deta"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              Home · Tasks · Task detail · Thread record · Subtask (no thread) · Inbox · New task ·
+              Status
+            </div>
+          </div>
+          <div
+            data-pencil-id="Lr7Dc"
+            data-pencil-name="G Agent &amp; Time"
+            class="[box-sizing:content-box] [flex:1_1_0] h-[120px] flex flex-col gap-[8px] p-[16px_18px] justify-start items-start [border-width:0px_0px_0px_1px] [border-style:solid] [border-color:#24272D] [margin:0px_0px_0px_-0.5px] w-[468.833px]"
+          >
+            <div
+              data-pencil-id="Czr2S"
+              data-pencil-name="22–26 · M9–M10"
+              class="text-[11px]/[normal] box-border text-[#E2A93B] font-['IBM_Plex_Mono',system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              22–26 · M9–M10
+            </div>
+            <div
+              data-pencil-id="HU2hx"
+              data-pencil-name="Agent &amp; Time"
+              class="text-[20px]/[normal] box-border text-[#DCDDE0] font-[Newsreader,system-ui,sans-serif] font-normal text-left [white-space:nowrap]"
+            >
+              Agent &amp; Time
+            </div>
+            <div
+              data-pencil-id="FrAgS"
+              data-pencil-name="/trama skill &amp; CLI · Tim"
+              class="text-[12.5px]/[19px] box-border w-full text-[#8C9096] font-['IBM_Plex_Sans',system-ui,sans-serif] font-normal text-left"
+            >
+              /trama skill &amp; CLI · Timesheet · Time reports · Log time · Time settings · Mobile
+              timer · Estimate picker · Estimates calibration · Estimate settings
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

@@ -80,7 +80,7 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
         class="mb-6"
         aria-label="Role"
         [options]="roleOptions()"
-        [value]="selected()?.id ?? ''"
+        [value]="selected().id"
         (valueChange)="select($event)"
       />
 
