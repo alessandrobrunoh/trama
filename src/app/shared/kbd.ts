@@ -33,11 +33,11 @@ const icon = (value: LucideIcon, label: string): KbdPart => ({ icon: value, labe
  * Platform-aware parts for modifier / special key names. The IBM Plex Mono subset has no ⌘ ⇧ ⌥ ⌃ ↵ ⌫ ←
  * →, so those are drawn as lucide icons instead of depending on whichever fallback font the OS picks.
  */
-const GLYPHS: Record<string, KbdPart> = {
-  mod: isMac ? icon(LucideCommand, 'Command') : text('Ctrl'),
+const glyphs = (mac: boolean): Record<string, KbdPart> => ({
+  mod: mac ? icon(LucideCommand, 'Command') : text('Ctrl'),
   cmd: icon(LucideCommand, 'Command'),
-  ctrl: isMac ? icon(LucideChevronUp, 'Control') : text('Ctrl'),
-  alt: isMac ? icon(LucideOption, 'Option') : text('Alt'),
+  ctrl: mac ? icon(LucideChevronUp, 'Control') : text('Ctrl'),
+  alt: mac ? icon(LucideOption, 'Option') : text('Alt'),
   option: icon(LucideOption, 'Option'),
   shift: icon(LucideArrowBigUp, 'Shift'),
   enter: icon(LucideCornerDownLeft, 'Enter'),
@@ -52,7 +52,10 @@ const GLYPHS: Record<string, KbdPart> = {
   delete: icon(LucideDelete, 'Delete'),
   tab: text('Tab'),
   space: text('Space'),
-};
+});
+
+const GLYPHS_MAC = glyphs(true);
+const GLYPHS_OTHER = glyphs(false);
 
 /** Characters people type in `keys` instead of a name ("⌘+k"): same parts as the named keys. */
 const SYMBOLS: Record<string, string> = {
@@ -74,9 +77,9 @@ export interface KbdChip {
   readonly label: string;
 }
 
-export function kbdPart(key: string): KbdPart {
+export function kbdPart(key: string, mac = isMac): KbdPart {
   const name = SYMBOLS[key] ?? key.toLowerCase();
-  return GLYPHS[name] ?? text(key.length === 1 ? key.toUpperCase() : key);
+  return (mac ? GLYPHS_MAC : GLYPHS_OTHER)[name] ?? text(key.length === 1 ? key.toUpperCase() : key);
 }
 
 /**
@@ -118,11 +121,19 @@ export class Kbd {
   readonly keys = input.required<string | readonly string[]>();
   /** Keys are pressed one after the other ("g i"), so show "G then I". */
   readonly chord = input(false);
+  /** Draws the keys of another platform than the one the app runs on (the Shortcuts page). */
+  readonly platform = input<'mac' | 'windows' | null>(null);
+
+  private readonly mac = computed(() => {
+    const p = this.platform();
+    return p ? p === 'mac' : isMac;
+  });
 
   protected readonly parts = computed<readonly KbdPart[]>(() => {
     const raw = this.keys();
+    const mac = this.mac();
     const list = typeof raw === 'string' ? raw.split(/[\s+]+/) : [...raw];
-    return list.filter(Boolean).map(kbdPart);
+    return list.filter(Boolean).map((k) => kbdPart(k, mac));
   });
   /** v3: a combo is one key cap ("⌘K", "⇧R"); chords ("g i") and lists stay one cap per key. */
   protected readonly chips = computed<readonly KbdChip[]>(() => {
@@ -131,7 +142,7 @@ export class Kbd {
     const combo = !this.chord() && typeof raw === 'string' && raw.includes('+');
     const caps = combo ? [parts] : parts.map((p) => [p]);
     return caps.map((cap) => ({
-      parts: isMac ? cap : cap.flatMap((p, i) => (i ? [text('+'), p] : [p])),
+      parts: this.mac() ? cap : cap.flatMap((p, i) => (i ? [text('+'), p] : [p])),
       label: cap.map((p) => p.label).join(' '),
     }));
   });

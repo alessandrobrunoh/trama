@@ -1,3 +1,4 @@
+import { DatePipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -12,79 +13,86 @@ import { ActorAvatar } from '../../../shared/actor-avatar';
 import { FullDatePipe } from '../../../shared/pipes';
 import { SECTION_KIT } from './section-kit';
 
-/** Your account: identity (set at sign-up, read-only), workspaces you belong to, sign out. */
+/**
+ * Settings → Profile (v4 frame): the avatar head, the account card (identity set at sign-up, read-only), the
+ * workspaces you belong to and sign out.
+ */
 @Component({
   selector: 'app-profile-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, ActorAvatar, LucideDynamicIcon, FullDatePipe, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-10' },
+  imports: [RouterLink, HlmButtonImports, ActorAvatar, LucideDynamicIcon, DatePipe, FullDatePipe, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9' },
   template: `
-    <div>
-      <app-section-header title="Profile" description="How you appear to teammates and agents across Trama." />
-
-      <div class="mb-8 flex items-center gap-4">
-        <app-actor-avatar [actor]="meRef()" [size]="56" />
-        <div class="min-w-0">
-          <div class="font-title text-foreground truncate text-[22px] leading-[26px]">{{ user()?.name }}</div>
-          <div class="text-muted-foreground truncate font-mono text-[11.5px]">{{ user()?.email }}</div>
-          @if (roleLabel(); as r) {
-            <div class="text-faint mt-0.5 font-mono text-[10.5px]">{{ r }} in {{ store.workspace()?.name }}</div>
+    <div class="flex items-center gap-5">
+      <app-actor-avatar [actor]="meRef()" [size]="72" />
+      <div class="flex min-w-0 flex-1 flex-col gap-[5px]">
+        <h2 class="font-title text-foreground truncate text-[32px] leading-normal">{{ user()?.name }}</h2>
+        <p class="text-muted-foreground font-mono text-[10.5px]">
+          {{ session.workspaces().length }} {{ session.workspaces().length === 1 ? 'workspace' : 'workspaces' }}
+          @if (user()?.createdAt; as since) {
+            · member since {{ since | date: 'MMM d, y' }}
           }
-        </div>
+          @if (roleLabel(); as r) {
+            · {{ r }} in {{ store.workspace()?.name }}
+          }
+        </p>
       </div>
+    </div>
 
-      <app-settings-group title="Account" description="Your name and email come from sign-up and identify you on comments and assignments.">
-        <app-settings-row label="Full name">
-          <span class="text-[13px]">{{ user()?.name }}</span>
-        </app-settings-row>
-        <app-settings-row label="Email" description="Used to sign in and to be added to workspaces.">
-          <button type="button" class="hover:text-foreground text-muted-foreground font-mono text-xs" title="Copy email" (click)="copyEmail()">{{ user()?.email }}</button>
-        </app-settings-row>
-        <app-settings-row label="Avatar colour" description="Derived from your account, so it looks the same everywhere.">
+    <app-settings-block title="Account" description="Your name and email come from sign-up and identify you on comments and assignments.">
+      <app-settings-card>
+        <app-card-row label="Full name">
+          <span class="text-foreground text-[13px]">{{ user()?.name }}</span>
+        </app-card-row>
+        <app-card-row label="Email" description="Used to sign in and to be added to workspaces.">
+          <button type="button" class="hover:text-foreground text-muted-foreground font-mono text-[12px]" title="Copy email" (click)="copyEmail()">{{ user()?.email }}</button>
+        </app-card-row>
+        <app-card-row label="Avatar colour" description="Derived from your account, so it looks the same everywhere.">
           <span class="flex items-center gap-2">
             <span class="size-5" [style.background]="hueColor()"></span>
             <span class="text-muted-foreground font-mono text-[11px]">hue {{ user()?.avatarHue }}</span>
           </span>
-        </app-settings-row>
+        </app-card-row>
         @if (user()?.createdAt) {
-          <app-settings-row label="Member since">
+          <app-card-row label="Member since">
             <span class="text-muted-foreground text-[13px]">{{ user()?.createdAt | fullDate }}</span>
-          </app-settings-row>
+          </app-card-row>
         }
-      </app-settings-group>
-    </div>
+      </app-settings-card>
+    </app-settings-block>
 
-    <app-settings-group title="Workspaces" description="Every workspace you can open with this account.">
-      @for (w of session.workspaces(); track w.id) {
-        <div class="border-border hover:bg-secondary flex min-h-12 items-center gap-3 border-b px-1 py-2.5">
-          <span class="bg-secondary text-muted-foreground flex size-7 shrink-0 items-center justify-center font-mono text-[11px]">{{ w.name.charAt(0).toUpperCase() }}</span>
-          <div class="min-w-0 flex-1">
-            <div class="text-foreground truncate text-[13px]">{{ w.name }}</div>
-            <div class="text-faint truncate font-mono text-[10.5px]">/{{ w.slug }}</div>
+    <app-settings-block title="Workspaces" [caption]="'' + session.workspaces().length" description="Every workspace you can open with this account.">
+      <a aside hlmBtn size="sm" variant="outline" routerLink="/new-workspace">
+        <svg [lucideIcon]="plus" [size]="13"></svg> Create workspace
+      </a>
+      <app-settings-card>
+        @for (w of session.workspaces(); track w.id) {
+          <div class="hover:bg-secondary flex min-h-[54px] items-center gap-3 px-4 py-2.5">
+            <span class="bg-secondary text-foreground font-title flex size-[26px] shrink-0 items-center justify-center text-[14px]">{{ w.name.charAt(0).toUpperCase() }}</span>
+            <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+              <span class="text-foreground truncate text-[13px]">{{ w.name }}</span>
+              <span class="text-faint truncate font-mono text-[10.5px]">/{{ w.slug }}@if (roleName(w); as r) { · {{ r }} }</span>
+            </div>
+            @if (w.slug === store.slug()) {
+              <span class="border-primary/40 bg-primary/10 text-foreground/80 border px-[7px] py-0.5 font-mono text-[11px]">current</span>
+            } @else {
+              <button hlmBtn size="sm" variant="outline" (click)="session.switchWorkspace(w.slug)">Open</button>
+            }
           </div>
-          <span class="text-faint font-mono text-[10.5px]">{{ roleName(w) }}</span>
-          @if (w.slug === store.slug()) {
-            <span class="border-primary/40 text-primary border px-2 py-0.5 font-mono text-[10.5px] leading-[14px]">Current</span>
-          } @else {
-            <button hlmBtn size="sm" variant="outline" class="h-7" (click)="session.switchWorkspace(w.slug)">Open</button>
-          }
-        </div>
-      }
-      <div class="flex items-center px-1 py-2">
-        <a hlmBtn variant="ghost" size="sm" class="text-muted-foreground -ml-2 h-7" routerLink="/new-workspace">
-          <svg [lucideIcon]="plus" [size]="14"></svg> Create workspace
-        </a>
-      </div>
-    </app-settings-group>
+        }
+      </app-settings-card>
+    </app-settings-block>
 
-    <app-settings-group title="Session">
-      <app-settings-row label="Sign out" description="End this session on this device.">
-        <button hlmBtn variant="outline" size="sm" (click)="session.logout()">
-          <svg [lucideIcon]="logout" [size]="14"></svg>
-          Log out
-        </button>
-      </app-settings-row>
-    </app-settings-group>
+    <app-settings-block title="Session">
+      <app-settings-card>
+        <app-card-row label="Sign out" description="End this session on this device.">
+          <button hlmBtn variant="outline" size="sm" (click)="session.logout()">
+            <svg [lucideIcon]="logout" [size]="14"></svg>
+            Log out
+          </button>
+        </app-card-row>
+      </app-settings-card>
+    </app-settings-block>
   `,
 })
 export class ProfileSection {
