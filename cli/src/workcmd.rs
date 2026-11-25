@@ -12,7 +12,7 @@ use serde_json::{Value, json};
 use crate::Ctx;
 use crate::catalog::{Call, Method, encode_segment};
 use crate::cmdtree::{self, Registry};
-use crate::error::{CliError, Kind, Result};
+use crate::error::{CliError, Result};
 use crate::http::ACCEPT_JSON;
 use crate::output::{self, Mode};
 use crate::{exec, work};
