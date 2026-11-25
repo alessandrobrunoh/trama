@@ -1137,17 +1137,6 @@ html[data-keyboard='open'] .mobile-fab {
   text-transform: uppercase;
   color: var(--muted-foreground);
 }
-/* The 3px brand stripe on top of the app: red on the left, Delta blue on the right. */
-@utility brand-stripe {
-  height: 3px;
-  background: linear-gradient(
-    to right,
-    var(--brand) 0 25%,
-    var(--border) 25% 75%,
-    var(--comment-bar) 75% 100%
-  );
-}
-
 /* Utilities available to every feature */
 @utility text-meta {
   font-size: 0.75rem;

@@ -62,13 +62,11 @@ import { Viewport } from '../core/viewport';
       class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-1.5 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >Skip to content</a
     >
-    <!-- v3 brand stripe: red · hairline · Delta blue -->
-    <div class="brand-stripe fixed inset-x-0 top-0 z-30 max-md:hidden" aria-hidden="true"></div>
-    <div hlmSidebarWrapper class="bg-sidebar relative h-svh min-h-0 overflow-hidden pt-[3px] max-md:h-dvh max-md:pt-0">
-      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0 border-e border-sidebar-border md:top-[3px]! md:h-[calc(100svh-3px)]!" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
+    <div hlmSidebarWrapper class="bg-sidebar relative h-svh min-h-0 overflow-hidden max-md:h-dvh">
+      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0 border-e border-sidebar-border" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
         <app-sidebar />
       </hlm-sidebar>
-      <main hlmSidebarInset class="h-[calc(100svh-3px)] min-w-0 overflow-hidden max-md:h-dvh">
+      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh">
         <app-top-bar />
         @if (viewport.isMobile()) {
           <app-mobile-header />
