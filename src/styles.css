@@ -723,8 +723,10 @@ html[data-keyboard='open'] .mobile-fab {
   --radius: 0px;
 
   --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto,
-    'Helvetica Neue', sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+    'Helvetica Neue', 'Apple Symbols', 'Segoe UI Symbol', 'Noto Sans Symbols 2', sans-serif;
+  /* The self-hosted Plex subsets stop at U+2193: the key glyphs (⌘ ⇧ ⌥ ↵ ⌫) come from the system symbol faces. */
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas,
+    'Apple Symbols', 'Segoe UI Symbol', 'Noto Sans Symbols 2', monospace;
   --font-serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
   /* v3 "d-*" palette, light mode */
@@ -1775,5 +1777,10 @@ html[data-motion='reduce'] *::after {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+  /* The loader keeps a slow opacity pulse (no movement) so a wait still reads as a wait. */
+  html:not([data-motion='full']) .trama-loader {
+    animation-duration: 1.8s !important;
+    animation-iteration-count: infinite !important;
   }
 }

@@ -1,9 +1,19 @@
 import { DOCUMENT } from '@angular/common';
-import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  computed,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
 import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
 import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
+import { NavigationLoading } from '../core/navigation-loading';
+import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
@@ -19,6 +29,7 @@ import { PullToRefresh } from './mobile-pull-to-refresh';
 import { ShellStatusBar } from './shell-status-bar';
 import { Viewport } from '../core/viewport';
 import { AssistantOverlay } from '../features/ai/assistant-overlay';
+import { TramaLoader } from '../shared/trama-loader';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
@@ -47,6 +58,7 @@ import { AssistantOverlay } from '../features/ai/assistant-overlay';
     PullToRefresh,
     ShellStatusBar,
     AssistantOverlay,
+    TramaLoader,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
@@ -74,8 +86,18 @@ import { AssistantOverlay } from '../features/ai/assistant-overlay';
           <app-mobile-header />
           <app-pull-to-refresh />
         }
-        <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
-          <router-outlet />
+        <div class="relative flex min-h-0 w-full min-w-0 flex-1 flex-col">
+          <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
+            <router-outlet />
+          </div>
+          @if (loading()) {
+            <!-- a slow lazy route or workspace load: the page below is on its way -->
+            <div
+              class="bg-background/85 animate-in fade-in-0 pointer-events-none absolute inset-0 z-10 flex items-center justify-center duration-150"
+            >
+              <app-trama-loader [size]="40" [caption]="store.status() === 'loading' ? 'Loading workspace…' : 'Loading…'" />
+            </div>
+          }
         </div>
         <app-shell-status-bar />
         <app-mobile-nav />
@@ -121,6 +143,10 @@ import { AssistantOverlay } from '../features/ai/assistant-overlay';
 export class AppShell {
   protected readonly ui = inject(UiStore);
   protected readonly viewport = inject(Viewport);
+  protected readonly store = inject(TramaStore);
+  private readonly navigation = inject(NavigationLoading);
+  /** A navigation or workspace load that has taken longer than a blink. */
+  protected readonly loading = computed(() => this.navigation.pending());
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J ask, C, G-chords, j/k…). */
@@ -138,6 +164,9 @@ export class AppShell {
       query.addEventListener('change', onChange);
       inject(DestroyRef).onDestroy(() => query.removeEventListener('change', onChange));
     }
+    // Until the shell exists a slow load is shown full-screen by the root; from here on it is shown in the pane.
+    this.navigation.shellMounted.set(true);
+    inject(DestroyRef).onDestroy(() => this.navigation.shellMounted.set(false));
     // UiStore (persisted, driven by keyboard shortcuts) → Spartan sidebar state.
     effect(() => this.sidebar.setOpen(!this.ui.sidebarCollapsed() && !this.compact()));
   }

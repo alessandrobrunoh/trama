@@ -3,14 +3,22 @@ import { RouterOutlet } from '@angular/router';
 import { HlmToasterImports } from '@spartan-ng/helm/sonner';
 import { Preferences } from './core/preferences';
 import { AccentService, ThemeService } from './core/theme';
+import { NavigationLoading } from './core/navigation-loading';
 import { Viewport } from './core/viewport';
+import { TramaLoader } from './shared/trama-loader';
 
 @Component({
   selector: 'app-root',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterOutlet, HlmToasterImports],
+  imports: [RouterOutlet, HlmToasterImports, TramaLoader],
   template: `
     <router-outlet />
+    @if (navigation.pending() && !navigation.shellMounted()) {
+      <!-- the first load of a workspace (session + snapshot) happens before the shell exists -->
+      <div class="bg-background fixed inset-0 z-[60] flex items-center justify-center">
+        <app-trama-loader [size]="48" caption="Loading Trama…" />
+      </div>
+    }
     <hlm-toaster position="bottom-right" [theme]="theme.resolved()" />
   `,
 })
@@ -23,4 +31,5 @@ export class App {
   protected readonly accent = inject(AccentService);
   // Instantiate early: touch/keyboard state and the browser theme colour.
   protected readonly viewport = inject(Viewport);
+  protected readonly navigation = inject(NavigationLoading);
 }

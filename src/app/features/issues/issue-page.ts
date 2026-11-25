@@ -9,6 +9,7 @@ import { TramaStore, UiStore, usePageShortcuts } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
+import { TramaLoader } from '../../shared/trama-loader';
 import type { FilterPreset } from '../../shared/filter-bar/filter-bar';
 import { IssueBoard } from './issue-board';
 import { ISSUE_TABS, asViewTab, tabStatuses, type IssueLayout, type IssueViewTab } from './issue-model';
@@ -44,7 +45,16 @@ const BOARD_CHIPS = ['thread'] as const;
 @Component({
   selector: 'app-issue-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmTooltip, PageHeader, Kbd, TopBarActions, IssueBoard, IssueCommandDialog],
+  imports: [
+    HlmButtonImports,
+    HlmTooltip,
+    PageHeader,
+    Kbd,
+    TopBarActions,
+    IssueBoard,
+    IssueCommandDialog,
+    TramaLoader,
+  ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
@@ -59,6 +69,11 @@ const BOARD_CHIPS = ['thread'] as const;
     </ng-template>
 
     <app-page-header [title]="title()" />
+    @if (awaitingTasks()) {
+      <div class="flex min-h-0 flex-1 items-center justify-center">
+        <app-trama-loader [size]="40" caption="Loading tasks…" />
+      </div>
+    } @else {
     <app-issue-board
       [issues]="store.issues()"
       [scope]="scope()"
@@ -73,6 +88,7 @@ const BOARD_CHIPS = ['thread'] as const;
       [emptyTitle]="empty().title"
       [emptyDescription]="empty().description"
     />
+    }
     <app-issue-command-dialog />
   `,
 })
@@ -104,6 +120,10 @@ export class IssuePage {
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
+  /** The snapshot is still on its way and there is nothing to show yet: the loader replaces the empty state. */
+  protected readonly awaitingTasks = computed(
+    () => this.store.status() === 'loading' && this.store.issues().length === 0,
+  );
   protected readonly title = computed(() => (this.isBoard() ? 'Board' : 'All tasks'));
   protected readonly counts = computed(() => {
     const list = this.store.issues();
