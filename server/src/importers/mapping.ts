@@ -120,10 +120,17 @@ const norm = (s: string) => s.trim().toLowerCase();
 const squash = (s: string) => norm(s).replace(/[^a-z0-9]+/g, '');
 
 /**
- * Matches a tracker user to a workspace member: same email first, then login against the email's local part,
- * then the display name. A weaker rule that matches several members matches none.
+ * Matches a tracker user to a workspace member: a known external identity first (`byLogin`: lower-cased
+ * login → member id), then same email, then login against the email's local part, then the display name.
+ * A weaker rule that matches several members matches none.
  */
-export function suggestUser(user: ExternalUser, members: readonly Member[]): string | null {
+export function suggestUser(
+  user: ExternalUser,
+  members: readonly Member[],
+  byLogin?: ReadonlyMap<string, string>,
+): string | null {
+  const known = user.login ? byLogin?.get(user.login.toLowerCase()) : undefined;
+  if (known && members.some((m) => m.id === known)) return known;
   if (user.email) {
     const hit = members.find((m) => norm(m.email) === norm(user.email!));
     if (hit) return hit.id;
@@ -169,9 +176,11 @@ export interface PreviewContext {
   teams: readonly { id: string; name: string; key: string }[];
   projects: readonly { id: string; name: string }[];
   labels: readonly { id: string; name: string }[];
+  /** External identities of the source's host that belong to members: lower-cased login → member id. */
+  byLogin?: ReadonlyMap<string, string>;
 }
 
-const map = (id: string): ImportTarget => ({ action: 'map', id });
+const map =(id: string): ImportTarget => ({ action: 'map', id });
 
 /** Discovery plus suggested targets (existing entity with the same name, otherwise create / skip). */
 export function buildPreview(discovery: Discovery, ctx: PreviewContext): ImportPreview {
@@ -193,7 +202,7 @@ export function buildPreview(discovery: Discovery, ctx: PreviewContext): ImportP
     name: u.name,
     login: u.login,
     email: u.email,
-    suggestedUserId: suggestUser(u, ctx.members),
+    suggestedUserId: suggestUser(u, ctx.members, ctx.byLogin),
   }));
   const statuses = discovery.statuses.map((s) => ({ ...s, suggested: suggestStatus(discovery.provider, s) }));
   return {

@@ -82,6 +82,14 @@ describe('user mapping', () => {
     expect(suggestUser({ id: 'x', name: 'Ada Lovelace' }, members)).toBe('u_ada');
   });
 
+  it('prefers a linked external identity over every guess', () => {
+    const byLogin = new Map([['ada-home', 'u_bob'], ['ghost', 'u_gone']]);
+    // two logins of one person: the linked one wins even when the email says otherwise
+    expect(suggestUser({ id: 'x', login: 'Ada-Home', email: 'ada@acme.dev' }, members, byLogin)).toBe('u_bob');
+    // an identity of someone who is not in the workspace is ignored
+    expect(suggestUser({ id: 'ada', login: 'ghost', name: 'Ada Lovelace' }, members, byLogin)).toBe('u_ada');
+  });
+
   it('refuses an ambiguous match instead of guessing', () => {
     // two members are called Bob Stone
     expect(suggestUser({ id: 'x', name: 'Bob Stone' }, members)).toBeNull();

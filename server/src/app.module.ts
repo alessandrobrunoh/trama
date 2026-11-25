@@ -7,6 +7,7 @@ import { CommentsModule } from './comments/comments.module.js';
 import { CommonModule } from './common/common.module.js';
 import { DatabaseModule } from './database/database.module.js';
 import { EventsModule } from './events/events.module.js';
+import { ExternalIdentitiesModule } from './external-identities/external-identities.module.js';
 import { requestStoreMiddleware } from './events/request-store.js';
 import { FavoritesModule } from './favorites/favorites.module.js';
 import { HealthController } from './health/health.controller.js';
@@ -39,6 +40,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     WorkspacesModule,
     InvitesModule,
     FavoritesModule,
+    ExternalIdentitiesModule,
     NotificationsModule,
     TimeEntriesModule,
     ProjectsModule,

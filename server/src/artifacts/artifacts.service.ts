@@ -37,6 +37,11 @@ export interface ArtifactInput {
   review?: ReviewState | null;
   hasConflicts?: boolean | null;
   environment?: string | null;
+  /**
+   * Server-side only (the HTTP DTOs do not carry it): the people a review was asked from, when
+   * that is known, so only they hear about it. Recorded on `review.requested`, never stored.
+   */
+  reviewerUserIds?: string[];
 }
 
 export interface ArtifactFilter {
@@ -265,11 +270,16 @@ export class ArtifactsService {
         ...artifactOwners(row),
       },
     });
-    if (row.review === 'requested') await this.reviewRequested(row, actor);
+    if (row.review === 'requested')
+      await this.reviewRequested(row, actor, input.reviewerUserIds);
     return row;
   }
 
-  private reviewRequested(row: ArtifactEntity, actor: ActorRef) {
+  private reviewRequested(
+    row: ArtifactEntity,
+    actor: ActorRef,
+    reviewerUserIds?: string[],
+  ) {
     return this.events.record(
       {
         workspaceId: row.workspaceId,
@@ -280,6 +290,7 @@ export class ArtifactsService {
           title: row.title,
           externalId: row.externalId,
           ...artifactOwners(row),
+          ...(reviewerUserIds?.length ? { reviewerUserIds } : {}),
         },
       },
       false,
@@ -350,7 +361,7 @@ export class ArtifactsService {
       await this.uploads?.releaseIds(workspaceId, [released]);
     }
     if (changes.review && row.review === 'requested')
-      await this.reviewRequested(row, actor);
+      await this.reviewRequested(row, actor, patch.reviewerUserIds);
     return row;
   }
 

@@ -217,6 +217,7 @@ export class WebhooksService {
       conn.workspaceId,
       repo,
       parsed.candidate,
+      { host: conn.baseUrl },
     );
     if (!res.created && !res.updated && !res.issueKeys.length)
       return {

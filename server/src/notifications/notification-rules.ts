@@ -68,13 +68,21 @@ export function planNotifications(ctx: RuleContext): NotificationDraft[] {
     }
     case 'review.requested': {
       if (!issue) break;
-      add(issue.assigneeId, {
-        kind: 'review_requested',
+      const draft = {
+        kind: 'review_requested' as const,
         title: `Review requested: ${asString(event.data['title']) ?? 'a pull request'}`,
         body: `${issue.key} · ${issue.title}`,
         link: `tasks/${issue.key}`,
         subject: event.subject,
-      });
+      };
+      // The people the provider asked (mapped through their external identities) hear about it;
+      // when none is known the task's assignee does.
+      const asked: unknown = event.data['reviewerUserIds'];
+      const reviewers = Array.isArray(asked)
+        ? asked.filter((id): id is string => typeof id === 'string' && !!id)
+        : [];
+      if (reviewers.length) for (const id of reviewers) add(id, draft);
+      else add(issue.assigneeId, draft);
       break;
     }
     case 'artifact.updated': {

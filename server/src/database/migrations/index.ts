@@ -48,6 +48,7 @@ import { IssueThreadUrl1793880000000 } from './1793880000000-IssueThreadUrl.js';
 import { IssueDueDate1793890000000 } from './1793890000000-IssueDueDate.js';
 import { RemoveLunaGest1793900000000 } from './1793900000000-RemoveLunaGest.js';
 import { ConnectionOwnership1794200000000 } from './1794200000000-ConnectionOwnership.js';
+import { ExternalIdentities1794400000000 } from './1794400000000-ExternalIdentities.js';
 
 /** Registered explicitly (not by glob) so they load identically from dist and from vitest. */
 export const MIGRATIONS = [
@@ -101,4 +102,5 @@ export const MIGRATIONS = [
   IssueDueDate1793890000000,
   RemoveLunaGest1793900000000,
   ConnectionOwnership1794200000000,
+  ExternalIdentities1794400000000,
 ];

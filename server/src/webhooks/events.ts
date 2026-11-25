@@ -26,6 +26,23 @@ function num(v: unknown, name: string): number {
 }
 const optStr = (v: unknown): string | undefined => (typeof v === 'string' && v ? v : undefined);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+/** `x[key]` of an object-ish value when it is a non-empty string. */
+const field = (v: unknown, key: string): string | undefined =>
+  typeof v === 'object' && v !== null ? optStr((v as Obj)[key]) : undefined;
+/** The non-empty string `key` of every object in a list, without duplicates. */
+const fieldsOf = (list: unknown, ...keys: string[]): string[] => [
+  ...new Set(
+    arr(list).flatMap((x) => {
+      const found = keys.map((k) => field(x, k)).find((s) => s !== undefined);
+      return found ? [found] : [];
+    }),
+  ),
+];
+/** `{ reviewerLogins }` only when there is something to say, so candidates stay as small as before. */
+const withLogins = (c: ArtifactCandidate, reviewers: string[], actor: string | undefined): void => {
+  if (reviewers.length) c.reviewerLogins = reviewers;
+  if (actor) c.actorLogin = actor;
+};
 
 // ───────────────────────────── GitHub ─────────────────────────────
 
@@ -79,6 +96,11 @@ export function parseGithubEvent(event: string, payload: unknown): ParsedEvent {
         candidate.review = 'requested';
         candidate.reviewOnlyFrom = ['none'];
       }
+      withLogins(
+        candidate,
+        action === 'review_requested' ? fieldsOf([p.requested_reviewer], 'login') : fieldsOf(pr.requested_reviewers, 'login'),
+        field(p.sender, 'login'),
+      );
       return { kind: 'pr', repo: githubRepo(repoObj), candidate };
     }
     case 'check_suite':
@@ -156,6 +178,7 @@ export function parseGitlabEvent(payload: unknown): ParsedEvent {
         candidate.review = 'requested';
         candidate.reviewOnlyFrom = ['none'];
       }
+      withLogins(candidate, fieldsOf(p.reviewers, 'username'), field(p.user, 'username'));
       return { kind: 'pr', repo: project(), candidate };
     }
     case 'pipeline': {
@@ -234,6 +257,7 @@ export function parseBitbucketEvent(eventKey: string, payload: unknown): ParsedE
       candidate.review = 'requested';
       candidate.reviewOnlyFrom = ['none'];
     }
+    withLogins(candidate, fieldsOf(pr.reviewers, 'nickname', 'username'), field(p.actor, 'nickname') ?? field(p.actor, 'username'));
     return { kind: 'pr', repo: bitbucketRepo(obj(p.repository, 'repository')), candidate };
   }
   if (eventKey === 'repo:commit_status_created' || eventKey === 'repo:commit_status_updated') {

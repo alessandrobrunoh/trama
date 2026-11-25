@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Inject, Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, type Repository } from 'typeorm';
 import {
@@ -17,6 +17,7 @@ import { RefsService } from '../common/refs.service.js';
 import { notFound, uid } from '../common/util.js';
 import { MembershipEntity, ProjectEntity, UserEntity, WorkspaceEntity } from '../database/entities/index.js';
 import { EventsService } from '../events/events.service.js';
+import { ExternalIdentitiesService } from '../external-identities/external-identities.service.js';
 import { HttpClient } from '../integrations/http-client.js';
 import { CredentialsService, createAdapter, providerFailure } from './credentials.service.js';
 import { ImportJobEntity } from './entities.js';
@@ -64,6 +65,7 @@ export class ImportsService {
     private readonly credentials: CredentialsService,
     private readonly runner: ImportRunnerService,
     @InjectRepository(ImportJobEntity) private readonly jobs: Repository<ImportJobEntity>,
+    @Optional() @Inject(ExternalIdentitiesService) private readonly identities?: ExternalIdentitiesService,
   ) {}
 
   // ───────────── preview ─────────────
@@ -89,7 +91,16 @@ export class ImportsService {
     const label = EXTERNAL_PROVIDER_META[req.provider].label;
     try {
       const discovery = await createAdapter(this.http, req.provider, cred, source).discover();
-      return buildPreview(discovery, await this.context(workspaceId));
+      const ctx = await this.context(workspaceId);
+      if (req.provider === 'github' && this.identities)
+        // A GitHub login one of the members has linked is the strongest hint for who an assignee is.
+        ctx.byLogin = await this.identities.resolveMembersByLogins(
+          workspaceId,
+          'github',
+          cred.baseUrl,
+          discovery.users.flatMap((u) => (u.login ? [u.login] : [])),
+        );
+      return buildPreview(discovery, ctx);
     } catch (e) {
       throw providerFailure(label, e, [cred.token]);
     }

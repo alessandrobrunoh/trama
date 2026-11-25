@@ -147,6 +147,37 @@ describe('planNotifications', () => {
     expect(none).toEqual([]);
   });
 
+  it('sends a review request to the people it was asked from, not the assignee', () => {
+    const drafts = planNotifications(
+      ctx({
+        type: 'review.requested',
+        actor: { type: 'system' },
+        issue,
+        data: { title: 'PR #318', reviewerUserIds: ['usr_a', 'usr_b', 'usr_a', 7, ''] },
+      }),
+    );
+    expect(drafts.map((d) => [d.userId, d.kind])).toEqual([
+      ['usr_a', 'review_requested'],
+      ['usr_b', 'review_requested'],
+    ]);
+  });
+
+  it('keeps the actor out of their own review request and falls back to the assignee when none is known', () => {
+    const own = planNotifications(
+      ctx({
+        type: 'review.requested',
+        actor: { type: 'user', id: 'usr_a' },
+        issue,
+        data: { reviewerUserIds: ['usr_a'] },
+      }),
+    );
+    expect(own).toEqual([]);
+    const unknown = planNotifications(
+      ctx({ type: 'review.requested', issue, data: { reviewerUserIds: [] } }),
+    );
+    expect(unknown.map((d) => d.userId)).toEqual(['usr_dev']);
+  });
+
   it('ignores retired customer, decision, and input events', () => {
     for (const type of [
       'input.requested',

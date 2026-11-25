@@ -511,6 +511,78 @@ export const GIT_PROVIDER_META: Record<
 /** Longest `Project.repository` / artifact repository string, in characters. */
 export const PROJECT_REPOSITORY_MAX = 2048;
 
+// ───────────────────────────── External identities ─────────────────────────────
+
+/** Tools where a person has a login that is not their Trama account. */
+export type ExternalIdentityProvider = GitProvider | 'linear' | 'jira';
+export const EXTERNAL_IDENTITY_PROVIDERS: ExternalIdentityProvider[] = [
+  'github',
+  'gitlab',
+  'bitbucket',
+  'linear',
+  'jira',
+];
+/** `host` is used when none is given; Jira sites differ per company, so it has no default. */
+export const EXTERNAL_IDENTITY_PROVIDER_META: Record<
+  ExternalIdentityProvider,
+  { label: string; defaultHost?: string }
+> = {
+  github: { label: 'GitHub', defaultHost: 'github.com' },
+  gitlab: { label: 'GitLab', defaultHost: 'gitlab.com' },
+  bitbucket: { label: 'Bitbucket', defaultHost: 'bitbucket.org' },
+  linear: { label: 'Linear', defaultHost: 'linear.app' },
+  jira: { label: 'Jira' },
+};
+
+/** `connection`: filled in from a personal connection. `manual`: typed in by the person. */
+export type ExternalIdentitySource = 'connection' | 'manual';
+export const EXTERNAL_IDENTITY_SOURCES: ExternalIdentitySource[] = ['connection', 'manual'];
+
+/** How many external identities one account can hold. */
+export const EXTERNAL_IDENTITIES_MAX = 20;
+export const EXTERNAL_IDENTITY_LOGIN_MAX = 100;
+
+/**
+ * A login a person has in another tool (`github.com` / `alessandro-b`). With several accounts per
+ * provider, every one of them counts as the same person for assignees, review requests and mentions.
+ * A (provider, host, login) triple belongs to at most one account (compared case-insensitively).
+ */
+export interface ExternalIdentity {
+  id: ID;
+  userId: ID;
+  provider: ExternalIdentityProvider;
+  /** Lower-case host without scheme or path, e.g. `github.com` or `git.acme.dev`. */
+  host: string;
+  /** The login as the tool spells it. Compared case-insensitively. */
+  login: string;
+  source: ExternalIdentitySource;
+  createdAt: ISODate;
+}
+
+export interface ExternalIdentityInput {
+  provider: ExternalIdentityProvider;
+  /** Defaults to the provider's public host. Required for Jira. */
+  host?: string;
+  login: string;
+}
+
+/** `https://GitHub.com/` → `github.com`; `null` when it is not a plain host (optionally with a port). */
+export function normalizeIdentityHost(raw: string): string | null {
+  let host = raw.trim().toLowerCase().replace(/^[a-z][a-z0-9+.-]*:\/\//, '');
+  host = host.split(/[/?#]/)[0]?.replace(/\.$/, '') ?? '';
+  return /^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?(:\d{1,5})?$/.test(host) ? host : null;
+}
+
+/** Drops a leading `@` and surrounding spaces; `null` when nothing usable is left. */
+export function normalizeIdentityLogin(raw: string): string | null {
+  const login = raw.trim().replace(/^@/, '');
+  return login.length > 0 &&
+    login.length <= EXTERNAL_IDENTITY_LOGIN_MAX &&
+    /^[^\s/\\]+$/.test(login)
+    ? login
+    : null;
+}
+
 // ───────────────────────────── Projects ─────────────────────────────
 
 /** Linear-style project lifecycle. Planning-level and independent of Issue status. */

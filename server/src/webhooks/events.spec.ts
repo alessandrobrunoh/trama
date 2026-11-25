@@ -34,6 +34,25 @@ describe('GitHub payload mapping', () => {
     expect(get({ requested_reviewers: [{ login: 'x' }] }, 'opened')).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
     expect(get({}, 'review_request_removed')).toMatchObject({ review: 'none', reviewOnlyFrom: ['requested'] });
   });
+  it('reports who was asked to review and who sent the event', () => {
+    const get = (payload: unknown) => {
+      const r = parseGithubEvent('pull_request', payload);
+      if (r.kind !== 'pr') throw new Error('expected pr');
+      return r.candidate;
+    };
+    const asked = get({
+      ...ghPullRequest({ requested_reviewers: [{ login: 'Bob-GH' }, { login: 'Eve' }] }, 'review_requested'),
+      requested_reviewer: { login: 'Bob-GH' },
+      sender: { login: 'Ada-GH' },
+    });
+    expect(asked.reviewerLogins).toEqual(['Bob-GH']); // only the one this event asked
+    expect(asked.actorLogin).toBe('Ada-GH');
+    const opened = get(ghPullRequest({ requested_reviewers: [{ login: 'Bob-GH' }, { login: 'Eve' }, { login: 'Bob-GH' }] }));
+    expect(opened.reviewerLogins).toEqual(['Bob-GH', 'Eve']);
+    const none = get(ghPullRequest());
+    expect(none.reviewerLogins).toBeUndefined();
+    expect(none.actorLogin).toBeUndefined();
+  });
   it('maps CI from check_suite, check_run and status', () => {
     const ci = (e: string, p: unknown) => {
       const r = parseGithubEvent(e, p);
@@ -82,6 +101,11 @@ describe('GitLab payload mapping', () => {
     expect(mr({ action: 'open' }, { reviewers: [{ id: 1 }] })).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
     expect(mr({ action: 'update', oldrev: 'abc' }).ci).toBe('pending');
   });
+  it('reports reviewers and the user behind the event', () => {
+    const c = mr({ action: 'open' }, { reviewers: [{ username: 'bob' }, { id: 3 }], user: { username: 'ada' } });
+    expect(c.reviewerLogins).toEqual(['bob']);
+    expect(c.actorLogin).toBe('ada');
+  });
   it('maps pipelines', () => {
     const ci = (status: string, iid?: number) => {
       const r = parseGitlabEvent(glPipeline(status, iid));
@@ -122,6 +146,11 @@ describe('Bitbucket payload mapping', () => {
     expect(pr('pullrequest:unapproved', { reviewers: [{ uuid: 'x' }] }).candidate.review).toBe('requested');
     expect(pr('pullrequest:changes_request_created').candidate.review).toBe('changes_requested');
     expect(pr('pullrequest:created', { reviewers: [{ uuid: 'x' }] }).candidate).toMatchObject({ review: 'requested', reviewOnlyFrom: ['none'] });
+  });
+  it('reports reviewers and the actor by nickname', () => {
+    const c = pr('pullrequest:created', { reviewers: [{ nickname: 'bob' }, { uuid: 'x' }] }, { actor: { nickname: 'ada' } }).candidate;
+    expect(c.reviewerLogins).toEqual(['bob']);
+    expect(c.actorLogin).toBe('ada');
   });
   it('maps build statuses', () => {
     const ci = (state: string) => {

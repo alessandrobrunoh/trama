@@ -1,8 +1,9 @@
-import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, type Repository } from 'typeorm';
 import { CountersService } from '../common/counters.service.js';
 import { EventsService } from '../events/events.service.js';
+import { ExternalIdentitiesService } from '../external-identities/external-identities.service.js';
 import { HttpClient } from '../integrations/http-client.js';
 import { MilestonesService } from '../milestones/milestones.service.js';
 import { ProjectsService } from '../projects/projects.service.js';
@@ -49,6 +50,7 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
     private readonly projects: ProjectsService,
     private readonly milestones: MilestonesService,
     @InjectRepository(ImportJobEntity) private readonly jobs: Repository<ImportJobEntity>,
+    @Optional() @Inject(ExternalIdentitiesService) private readonly identities?: ExternalIdentitiesService,
   ) {}
 
   onModuleInit(): void {
@@ -127,7 +129,16 @@ export class ImportRunnerService implements OnModuleInit, OnModuleDestroy {
       token = cred.token;
       const adapter = createAdapter(this.http, job.provider, cred, job.source);
       const sink = new TypeormImportSink(
-        { ds: this.ds, counters: this.counters, projects: this.projects, milestones: this.milestones },
+        {
+          ds: this.ds,
+          counters: this.counters,
+          projects: this.projects,
+          milestones: this.milestones,
+          resolveAssignee:
+            job.provider === 'github' && this.identities
+              ? (login) => this.identities!.resolveMemberByLogin(job.workspaceId, 'github', cred.baseUrl, login)
+              : undefined,
+        },
         job.workspaceId,
         job.createdBy,
         job.id,
