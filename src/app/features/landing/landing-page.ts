@@ -1,593 +1,549 @@
-import { DatePipe } from '@angular/common';
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import { ChangeDetectionStrategy, Component, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideArrowRight,
-  LucideBot,
-  LucideCircleCheck,
-  LucideCircleDot,
+  LucideCheck,
+  LucideCopy,
+  LucideDatabase,
   LucideDynamicIcon,
-  LucideGitPullRequest,
-  LucideHand,
-  LucideKeyRound,
-  LucideLightbulb,
-  LucideMessageCircleQuestion,
-  LucideUsers,
+  LucideListChecks,
+  LucideMessagesSquare,
+  LucideRefreshCw,
+  LucideRuler,
+  LucideSparkles,
+  LucideSquareKanban,
+  LucideTerminal,
+  LucideTimer,
+  LucideTriangle,
+  type LucideIcon,
 } from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { BLOG_POSTS } from '../blog/blog-posts';
-import { ComparisonTable } from './comparison-table';
+import { TramaLogo } from '../../shared/trama-logo';
+import { LandingProductShot } from './landing-product-shot';
+import { SiteCta } from './site-cta';
 import { SiteFooter } from './site-footer';
 import { SiteHeader } from './site-header';
 
-/** Public landing page at `/`, available to signed-out and signed-in visitors. */
+interface Step {
+  n: string;
+  title: string;
+  body: string;
+  chip: string;
+  tick: string;
+  chipDot: string;
+}
+
+interface Feature {
+  icon: LucideIcon;
+  title: string;
+  body: string;
+}
+
+interface TerminalLine {
+  prompt: string;
+  text: string;
+  tone: string;
+}
+
+const COMMAND = '/trama TRM-128';
+
+/** Public landing page at `/`, available to signed-out and signed-in visitors (v3 frame 32). */
 @Component({
   selector: 'app-landing-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    DatePipe,
     RouterLink,
-    HlmButtonImports,
     LucideDynamicIcon,
-    ComparisonTable,
-    SiteHeader,
+    TramaLogo,
+    LandingProductShot,
+    SiteCta,
     SiteFooter,
+    SiteHeader,
   ],
-  host: { class: 'bg-background text-foreground relative isolate block min-h-svh overflow-x-clip' },
+  host: { class: 'bg-background text-foreground block min-h-svh overflow-x-clip leading-normal' },
   template: `
-    <div
-      aria-hidden="true"
-      class="bg-primary/12 pointer-events-none absolute top-[-22rem] left-1/2 -z-10 h-[40rem] w-[64rem] max-w-[160vw] -translate-x-1/2 rounded-full blur-3xl"
-    ></div>
-
     <app-site-header />
 
     <main>
       <!-- Hero -->
-      <section class="mx-auto max-w-6xl px-4 pt-16 pb-12 text-center sm:px-6 sm:pt-24">
-        <a
-          [routerLink]="['/blog', 'introducing-trama']"
-          class="bg-secondary text-muted-foreground hover:text-foreground mx-auto inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs transition-colors"
-        >
-          <span class="bg-primary size-1.5 rounded-full"></span>
-          Introducing Trama · source-available, built for humans and coding agents
-          <svg [lucideIcon]="arrowIcon" [size]="12"></svg>
-        </a>
-        <h1
-          class="mx-auto mt-6 max-w-3xl text-[clamp(2.25rem,6vw,4rem)] leading-[1.05] font-semibold tracking-[-0.035em] text-balance"
-        >
-          Issues describe problems.
-          <span class="text-muted-foreground">Issues are the unit of work.</span>
-        </h1>
-        <p
-          class="text-muted-foreground mx-auto mt-5 max-w-2xl text-[15px] leading-relaxed text-pretty sm:text-base"
-        >
-          Trello, Jira and Linear treat every ticket as a unit of work. Trama keeps your tasks, and
-          adds what teams need around them: pull requests traced back to the work, and human input
-          requests in Question or Decision mode.
-        </p>
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a hlmBtn size="lg" routerLink="/register">
-            Create your workspace
-            <svg [lucideIcon]="arrowIcon" [size]="15"></svg>
-          </a>
-          <a hlmBtn size="lg" variant="outline" routerLink="/" fragment="compare"
-            >Compare with Jira & Linear</a
-          >
+      <section
+        class="mx-auto flex w-full max-w-[1440px] flex-col gap-12 px-5 pt-14 md:gap-16 md:px-10 md:pt-28 xl:px-[120px]"
+      >
+        <div class="flex flex-col justify-between gap-12 lg:flex-row lg:items-end lg:gap-20">
+          <div class="flex flex-col items-start gap-7 lg:max-w-[760px]">
+            <a
+              routerLink="/"
+              fragment="delta"
+              class="bg-card border-border hover:bg-hover flex max-w-full items-center gap-2.5 border py-[5px] pr-2.5 pl-1.5 transition-colors"
+            >
+              <span
+                class="bg-primary/20 text-primary px-1.5 py-px font-mono text-[10.5px] tracking-[1px]"
+                >NEW</span
+              >
+              <span class="text-muted-foreground truncate font-mono text-[12px]"
+                >Built for delta.dev: type /trama in any thread</span
+              >
+              <svg
+                [lucideIcon]="arrowIcon"
+                [size]="12"
+                class="text-muted-foreground shrink-0"
+              ></svg>
+            </a>
+            <h1
+              class="font-title text-foreground text-[clamp(44px,6.1vw,88px)] leading-none tracking-[-0.023em]"
+            >
+              Plan in Trama.<br />Work in Delta.
+            </h1>
+            <p class="text-muted-foreground max-w-[640px] text-[18px] leading-[29px]">
+              Trama is the task hub for teams that build with Delta. Every task links one Delta
+              thread: the agent reads the task with /trama, does the work in Delta, and syncs back a
+              record that stays forever. Summary, decisions, files, PR.
+            </p>
+            <div class="flex flex-wrap items-center gap-3 pt-2">
+              <a
+                routerLink="/register"
+                class="bg-primary text-primary-foreground hover:bg-primary-strong inline-flex items-center gap-2.5 py-[11px] pr-2.5 pl-4 font-mono text-[14px] leading-normal whitespace-nowrap transition-colors"
+              >
+                Get started free
+                <span class="bg-white/15 px-1.5 py-px text-[11px] leading-normal" aria-hidden="true"
+                  >G</span
+                >
+              </a>
+              <button
+                type="button"
+                class="bg-card border-border hover:bg-hover flex items-center gap-3 border py-[11px] pr-3 pl-4 font-mono text-[14px] leading-normal whitespace-nowrap transition-colors"
+                aria-label="Copy the /trama command"
+                (click)="copyCommand()"
+              >
+                <span class="text-faint" aria-hidden="true">›</span>
+                <span class="text-foreground">{{ command }}</span>
+                <svg
+                  [lucideIcon]="copied() ? checkIcon : copyIcon"
+                  [size]="14"
+                  class="text-muted-foreground"
+                ></svg>
+              </button>
+            </div>
+          </div>
+          <dl class="flex flex-col gap-3.5 pb-2 lg:w-[300px] lg:shrink-0">
+            @for (row of meta; track row.k) {
+              <div class="border-border flex flex-col gap-1 border-b pb-3.5">
+                <dt class="text-faint font-mono text-[10.5px] tracking-[1.2px]">{{ row.k }}</dt>
+                <dd class="text-foreground text-[14px]">{{ row.v }}</dd>
+              </div>
+            }
+          </dl>
         </div>
 
-        <!-- Product preview -->
-        <div class="relative mx-auto mt-14 max-w-5xl text-left sm:mt-20">
-          <div
-            aria-hidden="true"
-            class="bg-primary/15 absolute inset-x-10 -top-6 -z-10 h-40 rounded-full blur-3xl"
-          ></div>
-          <div
-            class="bg-card overflow-hidden rounded-xl shadow-[0_30px_80px_-30px_rgb(0_0_0/0.35)]"
-            role="img"
-            aria-label="Preview of a Trama task with related tasks, activity and a human input request"
+        <app-landing-product-shot />
+      </section>
+
+      <!-- Sources -->
+      <section class="border-border border-b">
+        <div
+          class="mx-auto flex w-full max-w-[1440px] flex-col justify-between gap-6 px-5 py-10 md:px-10 lg:flex-row lg:items-center lg:gap-10 xl:px-[120px]"
+        >
+          <p class="text-faint font-mono text-[11px] tracking-[1.2px]">
+            ISSUES IN → WORK IN DELTA → RECORD IN TRAMA
+          </p>
+          <ul
+            class="text-muted-foreground flex flex-wrap items-center gap-x-8 gap-y-3 text-[15px] xl:gap-x-12"
           >
-            <div class="flex h-9 items-center gap-1.5 px-3.5">
-              <span class="bg-border-strong size-2.5 rounded-full"></span>
-              <span class="bg-border-strong size-2.5 rounded-full"></span>
-              <span class="bg-border-strong size-2.5 rounded-full"></span>
-              <span class="text-muted-foreground ml-3 truncate font-mono text-[11px]"
-                >trama / acme / issues / AUTH-142</span
+            <li class="flex items-center gap-2">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"
+                />
+                <path d="M9 18c-4.51 2-5-2-7-2" />
+              </svg>
+              GitHub
+            </li>
+            <li class="flex items-center gap-2">
+              <svg
+                width="15"
+                height="15"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path
+                  d="m22 13.29-3.33-10a.42.42 0 0 0-.14-.18.38.38 0 0 0-.22-.11.39.39 0 0 0-.23.07.42.42 0 0 0-.14.18l-2.26 6.67H8.32L6.1 3.26a.42.42 0 0 0-.1-.18.38.38 0 0 0-.26-.08.39.39 0 0 0-.23.07.42.42 0 0 0-.14.18L2 13.29a.74.74 0 0 0 .27.83L12 21l9.69-6.88a.71.71 0 0 0 .31-.83Z"
+                />
+              </svg>
+              GitLab
+            </li>
+            <li class="flex items-center gap-2">
+              <svg [lucideIcon]="kanbanIcon" [size]="15"></svg>
+              Jira
+            </li>
+            <li class="text-foreground flex items-center gap-2">
+              <svg [lucideIcon]="triangleIcon" [size]="15" class="text-primary"></svg>
+              Delta
+            </li>
+            <li class="flex items-center gap-2">
+              <svg [lucideIcon]="terminalIcon" [size]="15"></svg>
+              /trama skill
+            </li>
+            <li class="flex items-center gap-2">
+              <svg [lucideIcon]="databaseIcon" [size]="15"></svg>
+              DeltaDB
+            </li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- 01 How it works -->
+      <section id="how" class="scroll-mt-16">
+        <div
+          class="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-5 pt-16 pb-14 md:gap-14 md:px-10 md:pt-[120px] md:pb-28 xl:px-[120px]"
+        >
+          <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div class="flex flex-col gap-4">
+              <div class="flex items-center gap-2.5 font-mono text-[12px]">
+                <span class="text-primary">01</span>
+                <span class="text-faint tracking-[1.2px]">HOW IT WORKS</span>
+              </div>
+              <h2
+                class="font-title text-foreground text-[clamp(36px,3.6vw,52px)] leading-[1.077] tracking-[-0.019em]"
+              >
+                Trama plans it.<br />Delta builds it.
+              </h2>
+            </div>
+            <p class="text-muted-foreground max-w-[380px] text-[16px] leading-[26px]">
+              Trama never runs agents. That happens in Delta. Trama keeps the task, the status and
+              the record of every thread that worked on it.
+            </p>
+          </div>
+          <div class="grid gap-y-10 md:grid-cols-3">
+            @for (step of steps; track step.n) {
+              <article class="border-border flex flex-col items-start gap-3.5 border-t pt-7 pr-8">
+                <div class="flex items-center gap-3">
+                  <span class="size-2" [class]="step.tick"></span>
+                  <span class="text-faint font-mono text-[12px]">{{ step.n }}</span>
+                </div>
+                <h3 class="font-title text-foreground text-[32px] leading-tight">
+                  {{ step.title }}
+                </h3>
+                <p class="text-muted-foreground text-[15px] leading-6">{{ step.body }}</p>
+                <span
+                  class="bg-secondary text-muted-foreground flex items-center gap-1.5 px-2 py-[3px] font-mono text-[11px]"
+                >
+                  <span class="size-1.5" [class]="step.chipDot"></span>
+                  {{ step.chip }}
+                </span>
+              </article>
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- 02 Inside Delta -->
+      <section id="delta" class="bg-card border-border scroll-mt-16 border-y">
+        <div
+          class="mx-auto flex w-full max-w-[1440px] flex-col gap-12 px-5 py-16 md:px-10 md:py-28 lg:flex-row lg:items-center lg:gap-20 xl:px-[120px]"
+        >
+          <div class="flex flex-col gap-5 lg:w-[440px] lg:shrink-0">
+            <div class="flex items-center gap-2.5 font-mono text-[12px]">
+              <span class="text-primary">02</span>
+              <span class="text-faint tracking-[1.2px]">INSIDE DELTA</span>
+            </div>
+            <h2
+              class="font-title text-foreground text-[clamp(32px,3.1vw,44px)] leading-[1.09] tracking-[-0.018em]"
+            >
+              Type /trama in any Delta thread.
+            </h2>
+            <p class="text-muted-foreground text-[16px] leading-[26px]">
+              The /trama skill gives the Delta agent three verbs. It works over the CLI or MCP, on
+              the same machine as Delta, with a project token. No extra app to run.
+            </p>
+            <ul class="flex flex-col gap-2.5 pt-2">
+              @for (bullet of bullets; track bullet) {
+                <li class="text-foreground flex items-center gap-2.5 text-[14px]">
+                  <svg [lucideIcon]="checkIcon" [size]="14" class="text-primary shrink-0"></svg>
+                  {{ bullet }}
+                </li>
+              }
+            </ul>
+          </div>
+          <div class="bg-background border-border min-w-0 flex-1 border">
+            <div class="border-border flex items-center gap-2 border-b px-3.5 py-2.5">
+              <span class="bg-line size-[9px]"></span>
+              <span class="bg-line size-[9px]"></span>
+              <span class="bg-line size-[9px]"></span>
+              <span class="text-faint truncate font-mono text-[11px]"
+                >delta — thread th_d93f10</span
               >
             </div>
-            <div class="flex">
-              <aside
-                class="bg-sidebar hidden w-48 shrink-0 p-2.5 text-[12.5px] md:block"
-              >
-                @for (item of sidebar; track item.label) {
-                  <div
-                    class="flex items-center justify-between rounded-md px-2 py-1.5"
-                    [class.bg-sidebar-accent]="item.active"
-                    [class.text-sidebar-accent-foreground]="item.active"
-                    [class.text-sidebar-foreground]="!item.active"
-                  >
-                    {{ item.label }}
-                    @if (item.count) {
-                      <span class="text-muted-foreground text-[11px]">{{ item.count }}</span>
-                    }
-                  </div>
-                }
-              </aside>
-              <div class="min-w-0 flex-1 p-4 sm:p-6">
-                <div class="flex flex-wrap items-center gap-2 text-xs">
-                  <span class="text-entity-issue inline-flex items-center gap-1 font-medium">
-                    <svg [lucideIcon]="openIcon" [size]="13"></svg> AUTH-142
-                  </span>
-                  <span
-                    class="bg-tone-blue/12 text-tone-blue rounded-full px-2 py-0.5 text-[11px] font-medium"
-                    >Active</span
-                  >
-                  <span class="text-muted-foreground hidden sm:inline"
-                    >· 2 of 3 issues done · 1 PR merged · CI passing</span
-                  >
+            <div
+              class="flex flex-col gap-[9px] overflow-x-auto px-6 pt-[22px] pb-[26px] font-mono text-[13px]"
+            >
+              @for (line of terminal; track $index) {
+                <div class="flex gap-3 whitespace-nowrap">
+                  <span class="text-faint w-2 shrink-0">{{ line.prompt }}</span>
+                  <span [class]="line.tone">{{ line.text || ' ' }}</span>
                 </div>
-                <h2 class="mt-2 text-lg font-semibold tracking-tight sm:text-xl">
-                  Session expires unexpectedly
-                </h2>
-                <p class="text-muted-foreground mt-1 text-[13px]">
-                  Session handling fails after an access token expires.
-                </p>
+              }
+            </div>
+          </div>
+        </div>
+      </section>
 
-                <div class="mt-5 grid gap-5 lg:grid-cols-[1.25fr_1fr]">
-                  <div class="flex flex-col gap-4">
-                    <div>
-                      <p
-                        class="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase"
-                      >
-                        Related issues
-                      </p>
-                      <ul
-                        class="bg-muted rounded-lg text-[13px]"
-                      >
-                        @for (issue of issues; track issue.key) {
-                          <li class="flex items-center gap-2.5 px-3 py-2">
-                            <svg
-                              [lucideIcon]="issue.done ? doneIcon : openIcon"
-                              [size]="14"
-                              [class]="
-                                issue.done
-                                  ? 'text-tone-green shrink-0'
-                                  : 'text-muted-foreground shrink-0'
-                              "
-                            ></svg>
-                            <span
-                              class="text-muted-foreground w-16 shrink-0 font-mono text-[11px]"
-                              >{{ issue.key }}</span
-                            >
-                            <span class="truncate">{{ issue.title }}</span>
-                          </li>
-                        }
-                      </ul>
-                    </div>
-                  </div>
-                  <div>
-                    <p
-                      class="text-muted-foreground mb-2 text-[11px] font-medium tracking-wide uppercase"
-                    >
-                      Activity
-                    </p>
-                    <ul class="flex flex-col gap-3 text-[12.5px]">
-                      <li class="flex items-start gap-2">
-                        <span
-                          class="bg-primary/12 text-primary mt-px flex size-5 shrink-0 items-center justify-center rounded-full"
-                        >
-                          <svg [lucideIcon]="botIcon" [size]="12"></svg>
-                        </span>
-                        <span
-                          ><b class="font-medium">claude-code</b
-                          ><span class="text-muted-foreground"> opened </span>PR #318 · rotate
-                          refresh tokens</span
-                        >
-                      </li>
-                      <li class="flex items-start gap-2">
-                        <span
-                          class="bg-entity-decision/12 text-entity-decision mt-px flex size-5 shrink-0 items-center justify-center rounded-full"
-                        >
-                          <svg [lucideIcon]="decisionIcon" [size]="12"></svg>
-                        </span>
-                        <span
-                          ><b class="font-medium">Marta</b
-                          ><span class="text-muted-foreground"> accepted </span>DEC-7 · keep the old
-                          token valid for 30s</span
-                        >
-                      </li>
-                      <li class="flex items-start gap-2">
-                        <span
-                          class="bg-tone-amber/12 text-tone-amber mt-px flex size-5 shrink-0 items-center justify-center rounded-full"
-                        >
-                          <svg [lucideIcon]="questionIcon" [size]="12"></svg>
-                        </span>
-                        <span
-                          ><b class="font-medium">codex</b
-                          ><span class="text-muted-foreground"> asked </span>Drop support for Safari
-                          16?</span
-                        >
-                      </li>
-                      <li class="flex items-start gap-2">
-                        <span
-                          class="bg-tone-green/12 text-tone-green mt-px flex size-5 shrink-0 items-center justify-center rounded-full"
-                        >
-                          <svg [lucideIcon]="prIcon" [size]="12"></svg>
-                        </span>
-                        <span
-                          ><b class="font-medium">PR #311</b
-                          ><span class="text-muted-foreground"> merged · fixes </span>AUTH-142,
-                          AUTH-153</span
-                        >
-                      </li>
-                    </ul>
-                  </div>
-                </div>
+      <!-- 03 Where things live -->
+      <section
+        class="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-5 pt-16 md:gap-12 md:px-10 md:pt-28 xl:px-[120px]"
+      >
+        <div class="flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+          <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-2.5 font-mono text-[12px]">
+              <span class="text-primary">03</span>
+              <span class="text-faint tracking-[1.2px]">WHERE THINGS LIVE</span>
+            </div>
+            <h2
+              class="font-title text-foreground text-[clamp(32px,3.1vw,44px)] leading-[1.2] tracking-[-0.018em]"
+            >
+              Nothing copied twice.
+            </h2>
+          </div>
+          <p class="text-muted-foreground max-w-[420px] text-[16px] leading-[26px]">
+            Trama links to the transcript in Delta. It keeps only what helps the next person
+            understand and continue the work.
+          </p>
+        </div>
+        <div class="border-border grid border lg:grid-cols-[1fr_239px_1fr]">
+          <div class="bg-card">
+            <div class="border-border flex items-center gap-3 border-b px-5 py-5 md:px-7">
+              <app-trama-logo [size]="28" />
+              <div class="flex flex-col gap-0.5">
+                <span class="font-title text-foreground text-[24px] leading-tight">Trama</span>
+                <span class="text-faint font-mono text-[11px]">web + mobile</span>
               </div>
             </div>
+            @for (item of tramaItems; track item) {
+              <div class="border-border flex items-center gap-2.5 border-b px-5 py-3.5 md:px-7">
+                <span class="bg-primary size-1.5 shrink-0"></span>
+                <span class="text-foreground text-[14.5px]">{{ item }}</span>
+              </div>
+            }
           </div>
-        </div>
-      </section>
-
-      <!-- The problem -->
-      <section class="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <div class="max-w-2xl">
-          <p class="text-primary text-[13px] font-medium">The problem</p>
-          <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
-            Issue trackers assume one ticket is one piece of work. It rarely is anymore.
-          </h2>
-          <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-            Five bug reports share one root cause. One fix spans three repositories. Two developers
-            and an agent work in the same context. The ticket can't hold all of that, so the real
-            story ends up scattered across comments, chats and pull requests.
-          </p>
-        </div>
-        <div class="mt-12 grid gap-4 lg:grid-cols-2">
-          <div class="bg-card rounded-xl p-6">
-            <p class="text-muted-foreground text-[13px] font-medium">Trello, Jira, Linear</p>
-            <ol class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[12px]">
-              @for (s of ticketFlow; track s; let last = $last) {
-                <li class="bg-background rounded-md px-2.5 py-1.5">{{ s }}</li>
-                @if (!last) {
-                  <li aria-hidden="true" class="text-muted-foreground">→</li>
-                }
-              }
-            </ol>
-            <p class="text-muted-foreground mt-5 text-[13px] leading-relaxed">
-              The ticket is the request, the plan, the discussion and the status all at once. Agents
-              become just another assignee, one ticket at a time.
-            </p>
-          </div>
-          <div class="bg-primary/10 rounded-xl p-6">
-            <p class="text-primary text-[13px] font-medium">Trama</p>
-            <ol class="mt-5 flex flex-wrap items-center gap-2 font-mono text-[12px]">
-              @for (s of tramaFlow; track s; let last = $last) {
-                <li class="bg-background rounded-md px-2.5 py-1.5">
-                  {{ s }}
-                </li>
-                @if (!last) {
-                  <li aria-hidden="true" class="text-primary/60">→</li>
-                }
-              }
-            </ol>
-            <p class="text-muted-foreground mt-5 text-[13px] leading-relaxed">
-              Tasks are granular units of work; agents can ask a human a question or request a
-              decision.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Why Trama -->
-      <section id="why" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
-        <div class="max-w-2xl">
-          <p class="text-primary text-[13px] font-medium">Why Trama</p>
-          <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
-            Six things your issue tracker doesn't do.
-          </h2>
-          <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-            Everything you expect is still here: issues, statuses, priorities, estimates, teams,
-            views, a timeline and a command palette. This is what's new.
-          </p>
-        </div>
-        <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          @for (d of differentiators; track d.title) {
-            <article
-              class="bg-card hover:bg-secondary flex flex-col rounded-xl p-5 transition-colors"
-            >
-              <span class="flex size-8 items-center justify-center rounded-lg" [class]="d.tint">
-                <svg [lucideIcon]="d.icon" [size]="16"></svg>
-              </span>
-              <h3 class="mt-4 font-medium">{{ d.title }}</h3>
-              <p class="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">{{ d.body }}</p>
-              <p
-                class="text-muted-foreground/80 mt-4 pt-1 text-[12px] leading-relaxed"
+          <div
+            class="border-border flex flex-col items-center justify-center gap-3.5 border-y p-6 lg:border-x lg:border-y-0"
+          >
+            <span class="text-primary font-mono text-[12px]">/trama skill</span>
+            @for (verb of verbs; track verb.cmd) {
+              <div
+                class="bg-secondary flex w-full max-w-[320px] justify-between px-3 py-2 lg:max-w-none"
               >
-                <span class="text-foreground/80 font-medium">Elsewhere:</span> {{ d.elsewhere }}
-              </p>
+                <span class="text-foreground font-mono text-[12px]">{{ verb.cmd }}</span>
+                <span class="text-faint font-mono text-[11px]">{{ verb.to }}</span>
+              </div>
+            }
+            <span class="text-faint font-mono text-[10.5px]">CLI or MCP · same machine</span>
+          </div>
+          <div>
+            <div class="border-border flex items-center gap-3 border-b px-5 py-5 md:px-7">
+              <span class="border-border flex size-7 items-center justify-center border">
+                <svg [lucideIcon]="triangleIcon" [size]="13" class="text-foreground"></svg>
+              </span>
+              <div class="flex flex-col gap-0.5">
+                <span class="font-title text-foreground text-[24px] leading-tight">Delta</span>
+                <span class="text-faint font-mono text-[11px]">delta.dev · where work happens</span>
+              </div>
+            </div>
+            @for (item of deltaItems; track item) {
+              <div class="border-border flex items-center gap-2.5 border-b px-5 py-3.5 md:px-7">
+                <span class="bg-faint size-1.5 shrink-0"></span>
+                <span class="text-foreground text-[14.5px]">{{ item }}</span>
+              </div>
+            }
+          </div>
+        </div>
+      </section>
+
+      <!-- 04 Everything else -->
+      <section
+        class="mx-auto flex w-full max-w-[1440px] flex-col gap-10 px-5 py-16 md:gap-12 md:px-10 md:py-28 xl:px-[120px]"
+      >
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center gap-2.5 font-mono text-[12px]">
+            <span class="text-primary">04</span>
+            <span class="text-faint tracking-[1.2px]">EVERYTHING ELSE</span>
+          </div>
+          <h2
+            class="font-title text-foreground text-[clamp(32px,3.1vw,44px)] leading-[1.2] tracking-[-0.018em]"
+          >
+            A tracker that stays out of the way.
+          </h2>
+        </div>
+        <div class="grid sm:grid-cols-2 lg:grid-cols-3">
+          @for (feature of features; track feature.title) {
+            <article class="border-border flex flex-col gap-3 border-t py-7 pr-10">
+              <svg [lucideIcon]="feature.icon" [size]="16" class="text-muted-foreground"></svg>
+              <h3 class="text-foreground text-[17px] font-semibold">{{ feature.title }}</h3>
+              <p class="text-muted-foreground text-[14.5px] leading-[23px]">{{ feature.body }}</p>
             </article>
           }
         </div>
       </section>
 
-      <!-- Compare -->
-      <section id="compare" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
-        <div class="flex flex-wrap items-end justify-between gap-6">
-          <div class="max-w-2xl">
-            <p class="text-primary text-[13px] font-medium">Compare</p>
-            <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
-              Trama, next to the tools you know.
-            </h2>
-            <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-              Trello, Jira and Linear are great at tracking tickets. Trama is built for coordinating
-              outcomes.
-            </p>
-          </div>
-          <a hlmBtn variant="outline" [routerLink]="['/blog', 'trama-vs-trello-jira-linear']">
-            Read the full comparison
-            <svg [lucideIcon]="arrowIcon" [size]="15"></svg>
-          </a>
-        </div>
-        <app-comparison-table class="mt-10" />
-      </section>
-
-      <!-- Agents -->
-      <section id="agents" class="mx-auto max-w-6xl scroll-mt-20 px-4 py-20 sm:px-6">
-        <div
-          class="bg-card grid items-center gap-10 rounded-2xl p-6 sm:p-10 lg:grid-cols-2"
-        >
-          <div>
-            <p class="text-primary text-[13px] font-medium">Agents</p>
-            <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance">
-              Give agents a seat at the table, not the keys to everything.
-            </h2>
-            <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-              Claude Code, Codex, Cursor or your own agents connect through the MCP server and the
-              API. They work on tasks, link their pull requests, and ask a human a
-              question or request a decision when they're blocked.
-            </p>
-            <ul class="mt-5 flex flex-col gap-2 text-[14px]">
-              @for (point of agentPoints; track point) {
-                <li class="flex items-start gap-2">
-                  <svg
-                    [lucideIcon]="doneIcon"
-                    [size]="16"
-                    class="text-primary mt-0.5 shrink-0"
-                  ></svg>
-                  {{ point }}
-                </li>
-              }
-            </ul>
-            <a hlmBtn class="mt-7" routerLink="/register">
-              Connect your first agent
-              <svg [lucideIcon]="arrowIcon" [size]="15"></svg>
-            </a>
-          </div>
-          <div
-            class="bg-muted overflow-x-auto rounded-xl font-mono text-[12px]"
-          >
-            <div
-              class="text-muted-foreground flex items-center gap-2 px-4 py-2.5"
-            >
-              <svg [lucideIcon]="keyIcon" [size]="13"></svg>
-              api-token · ci-agent
-            </div>
-            <table class="w-full">
-              <thead class="text-muted-foreground text-left text-[11px]">
-                <tr>
-                  <th class="px-4 py-2 font-normal">resource</th>
-                  <th class="px-2 py-2 font-normal">read</th>
-                  <th class="px-2 py-2 font-normal">write</th>
-                  <th class="px-2 py-2 font-normal">delete</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (row of permissions; track row.resource) {
-                  <tr>
-                    <td class="px-4 py-2">{{ row.resource }}</td>
-                    @for (allowed of row.actions; track $index) {
-                      <td
-                        class="px-2 py-2"
-                        [class]="allowed ? 'text-tone-green' : 'text-muted-foreground/50'"
-                      >
-                        {{ allowed ? '✓' : '—' }}
-                      </td>
-                    }
-                  </tr>
-                }
-              </tbody>
-            </table>
-            <div class="text-muted-foreground px-4 py-2.5">
-              limit · 500 requests / day
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- Source-available -->
-      <section class="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <div class="grid gap-10 lg:grid-cols-[1fr_1.1fr] lg:items-center">
-          <div>
-            <p class="text-primary text-[13px] font-medium">Source-available</p>
-            <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl">
-              Your work, on your infrastructure.
-            </h2>
-            <p class="text-muted-foreground mt-4 text-[15px] leading-relaxed">
-              Trama is source-available under PolyForm Shield and self-hostable. A web app, an API
-              and PostgreSQL: no infrastructure zoo, no feature held hostage. The self-hosted
-              edition is the real product.
-            </p>
-          </div>
-          <dl
-            class="grid grid-cols-2 gap-2"
-          >
-            @for (fact of facts; track fact.label) {
-              <div class="bg-card rounded-xl p-5">
-                <dt class="text-muted-foreground text-[12px]">{{ fact.label }}</dt>
-                <dd class="mt-1 text-lg font-semibold tracking-tight">{{ fact.value }}</dd>
-              </div>
-            }
-          </dl>
-        </div>
-      </section>
-
-      <!-- Blog -->
-      <section class="mx-auto max-w-6xl px-4 py-20 sm:px-6">
-        <div class="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p class="text-primary text-[13px] font-medium">From the blog</p>
-            <h2 class="mt-2 text-3xl font-semibold tracking-[-0.025em]">
-              Read more about the idea
-            </h2>
-          </div>
-          <a
-            routerLink="/blog"
-            class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 text-[13px]"
-          >
-            All posts <svg [lucideIcon]="arrowIcon" [size]="14"></svg>
-          </a>
-        </div>
-        <div class="mt-10 grid gap-4 md:grid-cols-2">
-          @for (post of posts; track post.slug) {
-            <a
-              [routerLink]="['/blog', post.slug]"
-              class="group bg-card hover:bg-secondary flex flex-col rounded-xl p-6 transition-colors"
-            >
-              <span class="text-muted-foreground flex items-center gap-2 text-xs">
-                <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{{
-                  post.tag
-                }}</span>
-                {{ post.date | date: 'MMM d, y' }}
-              </span>
-              <h3
-                class="group-hover:text-primary mt-4 text-lg font-semibold tracking-tight transition-colors"
-              >
-                {{ post.title }}
-              </h3>
-              <p class="text-muted-foreground mt-2 text-[13px] leading-relaxed">
-                {{ post.description }}
-              </p>
-            </a>
-          }
-        </div>
-      </section>
-
-      <!-- CTA -->
-      <section class="mx-auto max-w-6xl px-4 pt-8 pb-24 text-center sm:px-6">
-        <img src="/icons/trama-symbol-black.svg" alt="" class="mx-auto size-12 dark:hidden" />
-        <img src="/icons/trama-symbol-white.svg" alt="" class="mx-auto hidden size-12 dark:block" />
-        <h2
-          class="mx-auto mt-6 max-w-xl text-3xl font-semibold tracking-[-0.025em] text-balance sm:text-4xl"
-        >
-          Weave your team's work together.
-        </h2>
-        <p class="text-muted-foreground mx-auto mt-3 max-w-md text-[15px]">
-          Create a workspace in under a minute. Start with a task and invite an agent when you are
-          ready.
-        </p>
-        <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-          <a hlmBtn size="lg" routerLink="/register">Get started</a>
-          <a hlmBtn size="lg" variant="ghost" routerLink="/login">I already have an account</a>
-        </div>
-      </section>
+      <app-site-cta />
     </main>
 
     <app-site-footer />
   `,
 })
 export class LandingPage {
+  protected readonly command = COMMAND;
+  protected readonly copied = signal(false);
+
   protected readonly arrowIcon = LucideArrowRight;
-  protected readonly decisionIcon = LucideLightbulb;
-  protected readonly botIcon = LucideBot;
-  protected readonly prIcon = LucideGitPullRequest;
-  protected readonly keyIcon = LucideKeyRound;
-  protected readonly questionIcon = LucideMessageCircleQuestion;
-  protected readonly openIcon = LucideCircleDot;
-  protected readonly doneIcon = LucideCircleCheck;
+  protected readonly checkIcon = LucideCheck;
+  protected readonly copyIcon = LucideCopy;
+  protected readonly kanbanIcon = LucideSquareKanban;
+  protected readonly triangleIcon = LucideTriangle;
+  protected readonly terminalIcon = LucideTerminal;
+  protected readonly databaseIcon = LucideDatabase;
 
-  protected readonly posts = BLOG_POSTS;
-
-  protected readonly sidebar = [
-    { label: 'Overview', count: 0, active: false },
-    { label: 'My Attention', count: 3, active: false },
-    { label: 'Issues', count: 42, active: true },
-    { label: 'Decisions', count: 9, active: false },
-    { label: 'Graph', count: 0, active: false },
-    { label: 'Timeline', count: 0, active: false },
+  protected readonly meta: readonly { k: string; v: string }[] = [
+    { k: 'WORKS WITH', v: 'delta.dev · Claude Code · any MCP client' },
+    { k: 'ISSUES FROM', v: 'GitHub · GitLab · Jira · REST' },
+    { k: 'LICENSE', v: 'Source-available · PolyForm Shield' },
   ];
 
-  protected readonly issues = [
-    { key: 'AUTH-142', title: 'Session expires unexpectedly', done: true },
-    { key: 'AUTH-148', title: 'OAuth callback loops on Safari', done: false },
-    { key: 'AUTH-153', title: 'Logout leaves a stale authentication cookie', done: true },
-  ];
-
-  protected readonly ticketFlow = ['Issue', 'Assignee', 'Branch', 'PR', 'Done'];
-  protected readonly tramaFlow = ['Task', 'Question / Decision', 'Branch', 'PR', 'Done'];
-
-  protected readonly differentiators = [
+  protected readonly steps: readonly Step[] = [
     {
-      icon: LucideCircleDot,
-      tint: 'bg-entity-issue/12 text-entity-issue',
-      title: 'Issues are the unit of work',
-      body: 'Keep work granular and actionable. Each task tracks one piece of work, with its own status, estimate and pull requests.',
-      elsewhere: 'tickets overloaded with requests, plans and discussion.',
+      n: '01',
+      title: 'Plan in Trama',
+      body: 'An issue from GitHub, GitLab or Jira syncs in as a task. Split it into subtasks, set priority, assignee and due date. People own the status.',
+      chip: 'github · acme/web#412',
+      tick: 'bg-faint',
+      chipDot: 'bg-primary',
     },
     {
-      icon: LucideLightbulb,
-      tint: 'bg-entity-decision/12 text-entity-decision',
-      title: 'Decisions that outlive the chat',
-      body: 'Durable choices become decisions: proposed, accepted or superseded, linked to the work they shaped. Six months later, the why is one click away.',
-      elsewhere: 'buried in comments or a wiki page nobody finds.',
+      n: '02',
+      title: 'Work in Delta',
+      body: 'Open a Delta thread and type /trama TRM-128. The agent reads the task, its subtasks and past decisions, then links its own thread.',
+      chip: 'delta · th_d93f10',
+      tick: 'bg-primary',
+      chipDot: 'bg-primary',
     },
     {
-      icon: LucideGitPullRequest,
-      tint: 'bg-tone-green/12 text-tone-green',
-      title: 'Artifacts with traceability',
-      body: 'Pull requests and builds are linked to the task they address, with CI and review state, so shipped work traces back to its task.',
-      elsewhere: 'PR links scattered across individual tickets.',
-    },
-    {
-      icon: LucideCircleCheck,
-      tint: 'bg-tone-blue/12 text-tone-blue',
-      title: 'Facts, not fake progress',
-      body: 'Task status reflects the work at hand, and time statistics come from tracked time, not from how long a task sat in a status.',
-      elsewhere: 'story points, burndowns and manual status updates.',
-    },
-    {
-      icon: LucideUsers,
-      tint: 'bg-primary/12 text-primary',
-      title: 'Contributors, not just assignees',
-      body: 'People and agents can contribute to issues. Agents can ask for human input using Question or Decision mode.',
-      elsewhere: 'one assignee per ticket, human or bot.',
-    },
-    {
-      icon: LucideHand,
-      tint: 'bg-tone-amber/12 text-tone-amber',
-      title: 'An inbox for what needs you',
-      body: 'When an agent is blocked it opens an input request. My Attention collects those, reviews and stale work, so humans step in exactly where it matters.',
-      elsewhere: 'a firehose of notifications for every field change.',
+      n: '03',
+      title: 'Keep the record',
+      body: 'After each step the agent runs trama sync: summary, decisions, events, files and PR. When you close the task, the summary and time go back to the issue.',
+      chip: 'record · synced 2m ago',
+      tick: 'bg-faint',
+      chipDot: 'bg-delta-line',
     },
   ];
 
-  protected readonly agentPoints = [
-    'Scoped tokens: permissions per resource and action, never all-or-nothing',
-    'Usage caps per token, so a runaway loop stays a small problem',
-    'Input requests route questions to the right human',
-    'Works without AI too: agent-native, not agent-dependent',
+  protected readonly bullets: readonly string[] = [
+    'trama show: task, subtasks and past decisions',
+    'trama link: one thread per task, or a new subtask',
+    'trama sync: a read-only record of what happened',
   ];
 
-  protected readonly permissions = [
-    { resource: 'issues', actions: [true, true, false] },
-    { resource: 'input requests', actions: [true, true, false] },
-    { resource: 'decisions', actions: [true, false, false] },
-    { resource: 'members', actions: [false, false, false] },
+  protected readonly terminal: readonly TerminalLine[] = [
+    { prompt: '›', text: '/trama TRM-128', tone: 'text-foreground' },
+    {
+      prompt: '',
+      text: 'trama show → Rotate OAuth tokens before expiry · 2 subtasks',
+      tone: 'text-muted-foreground',
+    },
+    {
+      prompt: '',
+      text: 'Past decision (TRM-97): rotate every 30 days, not 90',
+      tone: 'text-primary',
+    },
+    {
+      prompt: '',
+      text: 'trama link th_d93f10 → linked to TRM-128',
+      tone: 'text-muted-foreground',
+    },
+    { prompt: '', text: '', tone: 'text-faint' },
+    { prompt: '›', text: 'trama sync', tone: 'text-foreground' },
+    {
+      prompt: '',
+      text: '✓ Record synced · 3 decisions · 6 files · PR acme/web#431',
+      tone: 'text-green',
+    },
+    { prompt: '', text: '✓ 1h 20m suggested from thread', tone: 'text-green' },
   ];
 
-  protected readonly facts = [
-    { label: 'License', value: 'PolyForm Shield' },
-    { label: 'Database', value: 'PostgreSQL' },
-    { label: 'Agent protocol', value: 'MCP + REST' },
-    { label: 'Vendor lock-in', value: 'None' },
+  protected readonly tramaItems: readonly string[] = [
+    'Tasks, subtasks, status, assignees, due dates',
+    'Two-way sync with GitHub, GitLab, Jira',
+    'Thread records: summary, decisions, changes',
+    'Ask across every record',
+    'Time per task and subtask',
   ];
+
+  protected readonly deltaItems: readonly string[] = [
+    'Threads and agents',
+    'Chat, run, review and merge code',
+    'DeltaDB and the full transcript',
+    'Subagents and parallel sessions',
+    'Your repo, on your machine',
+  ];
+
+  protected readonly verbs: readonly { cmd: string; to: string }[] = [
+    { cmd: 'trama show', to: '← context' },
+    { cmd: 'trama link', to: '→ 1 thread' },
+    { cmd: 'trama sync', to: '→ record' },
+  ];
+
+  protected readonly features: readonly Feature[] = [
+    {
+      icon: LucideListChecks,
+      title: 'Tasks & subtasks',
+      body: 'Keyboard-first list and board. C to create, / to search, ⌘K for everything.',
+    },
+    {
+      icon: LucideMessagesSquare,
+      title: 'Delta thread records',
+      body: 'Summary, decisions, events, files and PR for every linked thread. Read-only, flagged when stale.',
+    },
+    {
+      icon: LucideSparkles,
+      title: 'Ask',
+      body: 'Ask across every Delta thread record and save the answers that matter.',
+    },
+    {
+      icon: LucideRefreshCw,
+      title: 'Issue sync',
+      body: 'Two-way with GitHub, GitLab and Jira. Close in Trama, and the summary posts back to the issue.',
+    },
+    {
+      icon: LucideTimer,
+      title: 'Time tracking',
+      body: 'Start a timer from any row, or accept the time Trama suggests from the Delta thread.',
+    },
+    {
+      icon: LucideRuler,
+      title: 'Estimates',
+      body: 'Points or hours, per project. Compare estimate to actual at a glance.',
+    },
+  ];
+
+  protected copyCommand(): void {
+    void navigator.clipboard?.writeText(COMMAND).then(
+      () => {
+        this.copied.set(true);
+        setTimeout(() => this.copied.set(false), 1500);
+      },
+      () => undefined,
+    );
+  }
 }
