@@ -16,7 +16,6 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import {
   LABEL_NAME_MAX,
   LABEL_SWATCHES,
@@ -30,14 +29,8 @@ import { EmptyState } from '../../../shared/empty-state';
 import { LabelCatalog, describeUsage, type LabelUsage } from '../../../shared/label-catalog';
 import { LabelChip } from '../../../shared/label-chip';
 import { Picker, type PickOption } from '../../../shared/picker';
-import {
-  V3_FIELD,
-  V3DialogFoot,
-  V3DialogHead,
-  V3Segmented,
-  type V3SegmentOption,
-} from '../../../shared/v3';
-import { SECTION_KIT } from './section-kit';
+import { V3_FIELD, V3DialogFoot, V3DialogHead } from '../../../shared/v3';
+import { SECTION_KIT, type SegmentedOption } from './section-kit';
 
 type Dialog =
   | { kind: 'form'; label: WorkspaceLabel | null }
@@ -72,23 +65,21 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     HlmButtonImports,
     HlmDialogImports,
     HlmDropdownMenuImports,
-    HlmInputImports,
     LucideDynamicIcon,
     LabelChip,
     EmptyState,
     Picker,
-    V3Segmented,
     V3DialogHead,
     V3DialogFoot,
     ...SECTION_KIT,
   ],
-  host: { class: 'flex flex-col gap-6' },
+  host: { class: 'flex flex-col gap-9' },
   template: `
-    <app-section-header title="Labels" description="Each label applies to tasks or projects. Templates are task labels; their name and scope stay fixed.">
+    <app-section-header flush title="Labels" description="Tag tasks across projects. Each label applies to tasks or projects. Templates are task labels; their name and scope stay fixed.">
       <div actions>
         @if (catalog.canCreate()) {
-          <button hlmBtn size="sm" (click)="openForm(null)">
-            <svg [lucideIcon]="plus" [size]="14"></svg>
+          <button hlmBtn (click)="openForm(null)">
+            <svg [lucideIcon]="plus" [size]="13"></svg>
             New label
           </button>
         }
@@ -96,71 +87,92 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
     </app-section-header>
 
     @if (!catalog.canManage()) {
-      <app-readonly-note>Only admins can rename, recolor, merge, archive or delete labels. You can still add a label from any label picker.</app-readonly-note>
+      <app-readonly-note class="mb-0!">Only admins can rename, recolor, merge, archive or delete labels. You can still add a label from any label picker.</app-readonly-note>
     }
 
     <div class="flex flex-wrap items-center gap-2">
-      <div class="relative min-w-0 flex-1 basis-56">
-        <svg [lucideIcon]="searchIcon" [size]="14" class="text-muted-foreground pointer-events-none absolute top-1/2 left-2.5 -translate-y-1/2"></svg>
+      <div
+        class="bg-background border-border focus-within:border-primary flex w-full min-w-0 items-center gap-2 border px-2.5 py-[7px] sm:w-[260px]"
+      >
+        <svg [lucideIcon]="searchIcon" [size]="13" class="text-faint shrink-0"></svg>
         <input
-          hlmInput
           type="search"
-          class="h-8 w-full pl-8 text-[13px]"
-          placeholder="Filter labels…"
+          class="text-foreground placeholder:text-faint min-w-0 flex-1 bg-transparent text-[13px] leading-[18px] outline-none"
+          placeholder="Filter labels"
           aria-label="Filter labels"
           [value]="query()"
           (input)="query.set($any($event.target).value)"
         />
       </div>
-      <v3-segmented aria-label="Which records" [options]="scopeFilterOptions" [value]="scopeFilter()" (valueChange)="scopeFilter.set($any($event))" />
-      <v3-segmented aria-label="Sort labels" [options]="sortOptions" [value]="sort()" (valueChange)="sort.set($any($event))" />
+      <app-segmented aria-label="Which records" [options]="scopeFilterOptions" [value]="scopeFilter()" (valueChange)="scopeFilter.set($any($event))" />
+      <span class="flex-1"></span>
+      <span class="text-faint font-mono text-[10.5px]">{{ matching().length }} {{ matching().length === 1 ? 'label' : 'labels' }}</span>
+      <app-segmented aria-label="Sort labels" [options]="sortOptions" [value]="sort()" (valueChange)="sort.set($any($event))" />
     </div>
 
     @if (active().length) {
-      <app-settings-group title="Labels" [caption]="active().length + ' in use'">
+      <div class="bg-card border-border border">
+        <ng-container *ngTemplateOutlet="head" />
         @for (l of active(); track l.id) {
           <ng-container *ngTemplateOutlet="row; context: { $implicit: l }" />
         }
-      </app-settings-group>
+      </div>
     } @else {
       <app-empty-state [icon]="searchIcon" title="No label matches" [description]="query() ? 'Nothing is called “' + query() + '”.' : 'Create the first label.'" />
     }
 
     @if (archived().length) {
-      <app-settings-group title="Archived" [caption]="archived().length + ' hidden from pickers'" description="They stay on what already carries them, and can be restored.">
-        @for (l of archived(); track l.id) {
-          <ng-container *ngTemplateOutlet="row; context: { $implicit: l }" />
-        }
-      </app-settings-group>
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <svg [lucideIcon]="archive" [size]="13" class="text-muted-foreground shrink-0"></svg>
+          <span class="text-foreground text-[13px] font-medium">Archived</span>
+          <span class="text-faint font-mono text-[10.5px]">{{ archived().length }} · hidden from pickers, restorable</span>
+        </div>
+        <div class="bg-card border-border border">
+          <ng-container *ngTemplateOutlet="head" />
+          @for (l of archived(); track l.id) {
+            <ng-container *ngTemplateOutlet="row; context: { $implicit: l }" />
+          }
+        </div>
+      </div>
     }
 
+    <ng-template #head>
+      <div class="bg-bg-deep text-faint flex items-center gap-4 px-4 py-2 font-mono text-[10.5px] leading-normal">
+        <span class="min-w-0 flex-1 sm:w-[220px] sm:flex-none">LABEL</span>
+        <span class="hidden min-w-0 flex-1 md:block">USED BY</span>
+        <span class="hidden w-[120px] shrink-0 sm:block">SCOPE</span>
+        <span class="w-[60px] shrink-0">USED</span>
+        <span class="w-[14px] shrink-0"></span>
+      </div>
+    </ng-template>
+
     <ng-template #row let-l>
-      <div class="border-border hover:bg-secondary flex min-h-12 items-center gap-3 border-b px-1 py-2">
-        <div class="min-w-0 flex-1">
-          <div class="flex min-w-0 items-center gap-2">
-            @if (catalog.canManage()) {
-              <button
-                type="button"
-                class="focus-visible:ring-ring -m-1 min-w-0 p-1 outline-none focus-visible:ring-2"
-                [attr.aria-label]="'Edit label ' + l.name"
-                (click)="openForm(l)"
-              >
-                <app-label-chip [labelId]="l.id" size="md" />
-              </button>
-            } @else {
-              <app-label-chip [labelId]="l.id" size="md" />
-            }
-            <span class="text-faint font-mono text-[10.5px]">{{ scopeNoun(l.scope) }}</span>
-            @if (l.template) {
-              <span class="border-border text-faint border px-1.5 font-mono text-[10px] leading-[14px]">Template</span>
-            }
-          </div>
-          <div class="text-faint mt-1 font-mono text-[10.5px] md:hidden">{{ usageText(l.id) }}</div>
+      <div class="border-border hover:bg-hover/40 flex items-center gap-4 border-t px-4 py-[9px]">
+        <div class="flex min-w-0 flex-1 items-center gap-2 sm:w-[220px] sm:flex-none">
+          <span class="size-[9px] shrink-0" [style.background]="l.color" aria-hidden="true"></span>
+          @if (catalog.canManage()) {
+            <button
+              type="button"
+              class="text-foreground focus-visible:ring-ring min-w-0 truncate text-left text-[13px] outline-none focus-visible:ring-2"
+              [attr.aria-label]="'Edit label ' + l.name"
+              (click)="openForm(l)"
+            >
+              {{ l.name }}
+            </button>
+          } @else {
+            <span class="text-foreground min-w-0 truncate text-[13px]">{{ l.name }}</span>
+          }
+          @if (l.template) {
+            <span class="border-border text-faint border px-1.5 font-mono text-[10px] leading-[14px]">Template</span>
+          }
         </div>
-        <div class="text-faint hidden w-64 shrink-0 truncate font-mono text-[10.5px] md:block" [attr.title]="usageText(l.id)">{{ usageText(l.id) }}</div>
+        <span class="text-muted-foreground hidden min-w-0 flex-1 truncate text-[12.5px] md:block" [attr.title]="usageText(l.id)">{{ usageText(l.id) }}</span>
+        <span class="text-muted-foreground hidden w-[120px] shrink-0 font-mono text-[10.5px] sm:block">{{ scopeNoun(l.scope) }}</span>
+        <span class="text-text-2 w-[60px] shrink-0 font-mono text-[10.5px] tabular-nums">{{ catalog.usageOf(l.id).total }}</span>
         @if (catalog.canManage()) {
-          <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground shrink-0" [hlmDropdownMenuTrigger]="menu" [attr.aria-label]="'Actions for ' + l.name">
-            <svg [lucideIcon]="more" [size]="16"></svg>
+          <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground -my-1 -mr-1.5 size-6 shrink-0" [hlmDropdownMenuTrigger]="menu" [attr.aria-label]="'Actions for ' + l.name">
+            <svg [lucideIcon]="more" [size]="14"></svg>
           </button>
           <ng-template #menu>
             <hlm-dropdown-menu class="w-48">
@@ -184,6 +196,8 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
               }
             </hlm-dropdown-menu>
           </ng-template>
+        } @else {
+          <span class="w-[14px] shrink-0"></span>
         }
       </div>
     </ng-template>
@@ -219,7 +233,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                 </div>
                 <div class="flex flex-col gap-1.5">
                   <span class="text-faint font-mono text-[10.5px] leading-[14px]">APPLIES TO</span>
-                  <v3-segmented
+                  <app-segmented
                     aria-label="Applies to"
                     [options]="scopeOptions"
                     [value]="formScope()"
@@ -371,9 +385,9 @@ export class LabelsSection {
     { id: 'issue', label: 'Tasks' },
     { id: 'project', label: 'Projects' },
   ];
-  protected readonly sortOptions: V3SegmentOption[] = this.sorts.map((s) => ({ value: s.id, label: s.label }));
-  protected readonly scopeFilterOptions: V3SegmentOption[] = this.scopeFilters.map((s) => ({ value: s.id, label: s.label }));
-  protected readonly scopeOptions: V3SegmentOption[] = this.scopes.map((s) => ({ value: s.id, label: s.label }));
+  protected readonly sortOptions: SegmentedOption[] = this.sorts.map((s) => ({ value: s.id, label: s.label }));
+  protected readonly scopeFilterOptions: SegmentedOption[] = this.scopeFilters.map((s) => ({ value: s.id, label: s.label }));
+  protected readonly scopeOptions: SegmentedOption[] = this.scopes.map((s) => ({ value: s.id, label: s.label }));
 
   protected readonly dlg = signal<Dialog | null>(null);
   protected readonly busy = signal(false);
@@ -396,7 +410,7 @@ export class LabelsSection {
   protected readonly checkIcon = LucideCheck;
   protected readonly warn = LucideTriangleAlert;
 
-  private readonly matching = computed(() => {
+  protected readonly matching = computed(() => {
     const q = this.query().trim().toLowerCase();
     const scope = this.scopeFilter();
     const list = this.catalog.all().filter((label) => (scope === 'all' || label.scope === scope) && (!q || label.name.toLowerCase().includes(q)));

@@ -2,6 +2,7 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import {
   LucideDynamicIcon,
+  LucideInfo,
   LucidePencil,
   LucidePlus,
   LucideTrash2,
@@ -25,8 +26,30 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { isLucideName, STATUS_LUCIDE } from '../../../shared/lucide-names';
-import { V3_FIELD, V3DialogFoot, V3DialogHead, V3Segmented, type V3SegmentOption } from '../../../shared/v3';
-import { SECTION_KIT } from './section-kit';
+import { V3_FIELD, V3DialogFoot, V3DialogHead } from '../../../shared/v3';
+import { SECTION_KIT, type SegmentedOption } from './section-kit';
+
+/** How a status counts (v4 frame 05): the four categories the types fall into, in flow order. */
+const CATEGORIES: readonly { id: string; title: string; caption: string; types: readonly string[] }[] = [
+  { id: 'not-started', title: 'NOT STARTED', caption: 'Not counted in progress yet.', types: ['draft', 'backlog', 'todo', 'planned'] },
+  { id: 'started', title: 'STARTED', caption: 'Counts towards progress; timers can run.', types: ['in_progress', 'in_review', 'paused'] },
+  { id: 'completed', title: 'COMPLETED', caption: 'Closes the task and stops timers.', types: ['done', 'completed'] },
+  { id: 'canceled', title: 'CANCELED', caption: 'Closes the task without counting it as done.', types: ['canceled'] },
+];
+
+/** One line on what each status type means, shown beside the status. */
+const TYPE_HINT: Readonly<Record<string, string>> = {
+  draft: 'Ideas, agent proposals, half-written tasks',
+  backlog: 'Ideas and work nobody has picked up yet',
+  todo: 'Agreed and ready to pick up',
+  planned: 'Agreed and scheduled',
+  in_progress: 'Someone, or an agent, is on it',
+  in_review: 'A pull request or a deliverable is waiting for review, or blocked on someone',
+  paused: 'Started, then put on hold',
+  done: 'Shipped. Closed by a merged PR or by hand',
+  completed: 'Shipped and closed',
+  canceled: "Won't do, duplicate or obsolete. Still searchable",
+};
 
 type Dialog =
   | { kind: 'edit'; entry: StatusEntry }
@@ -39,60 +62,103 @@ type Dialog =
 @Component({
   selector: 'app-workflow-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, LucideDynamicIcon, V3DialogFoot, V3DialogHead, V3Segmented, ...SECTION_KIT],
-  host: { class: 'flex flex-col' },
+  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, LucideDynamicIcon, V3DialogFoot, V3DialogHead, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-9' },
   template: `
     <app-section-header
+      flush
       title="Workflow"
-      description="Statuses are set by people. Linking a thread or opening a PR never changes a status on its own."
-    />
+      description="The statuses a task moves through. The category decides how a status counts. Statuses are set by people: linking a thread or opening a PR never changes one on its own."
+    >
+      <app-segmented actions aria-label="Status catalogs" [options]="subjectOptions" [value]="current()" (valueChange)="setSubject($event)" />
+    </app-section-header>
 
     @if (!canManage()) {
-      <app-readonly-note>Only admins can edit or add statuses.</app-readonly-note>
+      <app-readonly-note class="mb-0!">Only admins can edit or add statuses.</app-readonly-note>
     }
 
-    <app-settings-section title="Statuses" [caption]="caption()">
-      <div aside class="flex items-center gap-3">
-        <v3-segmented aria-label="Status catalogs" [options]="subjectOptions" [value]="current()" (valueChange)="setSubject($event)" />
-        @if (canManage()) {
-          <button hlmBtn variant="ghost" class="gap-1.5 px-2.5" (click)="openAdd()">
-            <svg [lucideIcon]="plus" [size]="13"></svg>
-            Add status
-          </button>
-        }
-      </div>
-      @for (entry of entries(); track entry.id) {
-        <div class="border-border flex min-h-[39px] items-center gap-3.5 border-b py-2">
-          <span class="w-[110px] shrink-0 sm:w-[150px]">
-            <span class="border-border text-foreground inline-flex max-w-full items-center gap-1.5 border px-2 py-[3px] font-mono text-[11px] leading-[13px]">
-              <span class="size-[7px] shrink-0" [style.background]="entry.color" aria-hidden="true"></span>
-              <span class="truncate">{{ entry.name }}</span>
-            </span>
-          </span>
-          <span class="text-text-2 min-w-0 flex-1 truncate text-[13px]">{{ usageText(entry) }}</span>
-          <span class="text-faint hidden font-mono text-[10.5px] sm:inline">{{ typeLabel(entry.type) }}</span>
-          @if (canManage()) {
-            <span class="flex shrink-0 items-center">
-              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Edit ' + entry.name" (click)="openEdit(entry)">
-                <svg [lucideIcon]="pencil" [size]="13"></svg>
-              </button>
-              <button
-                hlmBtn
-                variant="ghost"
-                size="icon-sm"
-                class="text-muted-foreground size-6"
-                [disabled]="!canRemove(entry)"
-                [attr.aria-label]="'Remove ' + entry.name"
-                [attr.title]="removeHint(entry)"
-                (click)="openDelete(entry)"
-              >
-                <svg [lucideIcon]="trash" [size]="13"></svg>
-              </button>
+    @if (flow().length) {
+      <div class="flex flex-col gap-2">
+        <div class="flex h-2 w-full gap-0.5 overflow-hidden" role="img" [attr.aria-label]="'Share of ' + subjectNoun() + ' by status'">
+          @for (s of flow(); track s.id) {
+            @if (s.count > 0) {
+              <span class="h-2 min-w-0" [style.flex]="s.count + ' 1 0'" [style.background]="s.color" [attr.title]="s.name + ' ' + s.count"></span>
+            }
+          }
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1">
+          @for (s of flow(); track s.id) {
+            <span class="text-muted-foreground inline-flex items-center gap-[5px] font-mono text-[10.5px] leading-normal">
+              <span class="size-1.5 shrink-0" [style.background]="s.color" aria-hidden="true"></span>
+              {{ s.name }} {{ s.count }}
             </span>
           }
         </div>
+      </div>
+    }
+
+    <div class="bg-card border-border divide-border divide-y border">
+      @for (g of groups(); track g.id) {
+        <section [attr.aria-label]="g.title">
+          <div class="bg-bg-deep flex items-center gap-2.5 px-3 py-2.5">
+            <span class="text-text-2 font-mono text-[10.5px] leading-normal">{{ g.title }}</span>
+            <span class="text-faint min-w-0 truncate font-mono text-[10.5px] leading-normal">{{ g.caption }}</span>
+            <span class="flex-1"></span>
+            @if (canManage()) {
+              <button
+                type="button"
+                class="text-muted-foreground hover:text-foreground focus-visible:ring-ring/50 inline-flex items-center gap-1 font-mono text-[10.5px] leading-normal outline-none focus-visible:ring-2"
+                (click)="openAdd(g.types[0])"
+              >
+                <svg [lucideIcon]="plus" [size]="12"></svg>
+                Add
+              </button>
+            }
+          </div>
+          @for (entry of g.entries; track entry.id) {
+            <div class="border-border hover:bg-hover/40 flex items-center gap-3 border-t py-[9px] pr-3 pl-3.5">
+              <span class="flex w-[15px] shrink-0 items-center justify-center" [style.color]="entry.color" aria-hidden="true">
+                @if (emoji(entry.icon); as e) {
+                  <span class="text-[13px] leading-none">{{ e }}</span>
+                } @else {
+                  <svg [lucideIcon]="iconFor(entry.icon)" [size]="15"></svg>
+                }
+              </span>
+              <span class="text-foreground w-[132px] shrink-0 truncate text-[13px] sm:w-[180px]">{{ entry.name }}</span>
+              <span class="text-muted-foreground hidden min-w-0 flex-1 truncate text-[12.5px] sm:block">{{ hint(entry) }}</span>
+              <span class="flex-1 sm:hidden"></span>
+              <span class="text-faint shrink-0 font-mono text-[10.5px] leading-normal">{{ usage(entry) }} {{ subjectNoun() }}</span>
+              @if (canManage()) {
+                <span class="flex shrink-0 items-center">
+                  <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Edit ' + entry.name" (click)="openEdit(entry)">
+                    <svg [lucideIcon]="pencil" [size]="13"></svg>
+                  </button>
+                  <button
+                    hlmBtn
+                    variant="ghost"
+                    size="icon-sm"
+                    class="text-muted-foreground size-6"
+                    [disabled]="!canRemove(entry)"
+                    [attr.aria-label]="'Remove ' + entry.name"
+                    [attr.title]="removeHint(entry)"
+                    (click)="openDelete(entry)"
+                  >
+                    <svg [lucideIcon]="trash" [size]="13"></svg>
+                  </button>
+                </span>
+              }
+            </div>
+          }
+        </section>
       }
-    </app-settings-section>
+    </div>
+
+    <div class="bg-card border-border flex items-start gap-2.5 border px-3.5 py-2.5">
+      <svg [lucideIcon]="info" [size]="14" class="text-muted-foreground mt-[3px] shrink-0"></svg>
+      <p class="text-text-2 flex-1 text-[12.5px] leading-[19px]">
+        Canceled isn't Trash: canceled {{ subjectNoun() }} stay in lists and search, closed. A status can only be removed once nothing uses it.
+      </p>
+    </div>
 
     <hlm-dialog [state]="dlg() ? 'open' : 'closed'" (closed)="dlg.set(null)">
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] gap-0 overflow-y-auto p-0 sm:max-w-md" [showCloseButton]="false">
@@ -173,9 +239,9 @@ export class WorkflowSection {
 
   /** Project health went away with project updates: only task and project statuses are configurable. */
   protected readonly subjects = STATUS_SUBJECTS.filter((s) => s === 'issue' || s === 'project');
-  protected readonly subjectOptions: V3SegmentOption[] = this.subjects.map((s) => ({
+  protected readonly subjectOptions: SegmentedOption[] = this.subjects.map((s) => ({
     value: s,
-    label: STATUS_SUBJECT_LABEL[s],
+    label: s === 'issue' ? 'Tasks' : STATUS_SUBJECT_LABEL[s],
   }));
   protected readonly fieldClass = V3_FIELD;
   protected readonly labels = STATUS_SUBJECT_LABEL;
@@ -184,6 +250,7 @@ export class WorkflowSection {
   protected readonly plus = LucidePlus;
   protected readonly pencil = LucidePencil;
   protected readonly trash = LucideTrash2;
+  protected readonly info = LucideInfo;
 
   protected readonly current = signal<StatusSubject>('issue');
   protected readonly dlg = signal<Dialog | null>(null);
@@ -194,10 +261,25 @@ export class WorkflowSection {
   protected readonly formType = signal('todo');
 
   protected readonly canManage = computed(() => this.store.can('admin'));
-  protected readonly caption = computed(() => {
-    const n = this.entries().length;
-    return `${this.labels[this.current()].toLowerCase()} · ${n} ${n === 1 ? 'status' : 'statuses'}`;
+  protected readonly subjectNoun = computed(() => (this.current() === 'issue' ? 'tasks' : 'projects'));
+  /** Statuses in category order: the catalog order inside each category. A custom type lands in the last. */
+  protected readonly groups = computed(() => {
+    const entries = this.entries();
+    return CATEGORIES.map((c) => ({
+      ...c,
+      types: c.types.filter((t) => this.types().includes(t)),
+      entries: entries.filter((e) => c.types.includes(e.type)),
+    })).filter((g) => g.types.length > 0 || g.entries.length > 0);
   });
+  /** The bar and legend under the title: how many records sit in each status. */
+  protected readonly flow = computed(() =>
+    this.groups()
+      .flatMap((g) => g.entries)
+      .map((e) => ({ id: e.id, name: e.name, color: e.color, count: this.usage(e) })),
+  );
+  protected hint(entry: StatusEntry): string {
+    return TYPE_HINT[entry.type] ?? this.typeLabel(entry.type);
+  }
   protected setSubject(value: string): void {
     const subject = this.subjects.find((s) => s === value);
     if (subject) this.current.set(subject);
@@ -237,11 +319,6 @@ export class WorkflowSection {
     }
   }
 
-  protected usageText(entry: StatusEntry): string {
-    const n = this.usage(entry);
-    return n === 0 ? 'Not used' : `${n} in use`;
-  }
-
   protected canRemove(entry: StatusEntry): boolean {
     return this.usage(entry) === 0 && this.entries().filter((item) => item.type === entry.type).length > 1;
   }
@@ -278,8 +355,8 @@ export class WorkflowSection {
     this.dlg.set({ kind: 'edit', entry });
   }
 
-  protected openAdd(): void {
-    const type = this.types()[0] ?? 'todo';
+  protected openAdd(preferred?: string): void {
+    const type = preferred ?? this.types()[0] ?? 'todo';
     this.formType.set(type);
     this.formName.set(statusTypeLabel(this.current(), type));
     this.formIcon.set('circle');
