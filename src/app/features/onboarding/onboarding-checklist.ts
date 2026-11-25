@@ -18,16 +18,16 @@ import { Viewport } from '../../core/viewport';
   host: { class: 'block' },
   template: `
     @if (onboarding.visible() && compact() && !expanded()) {
-      <section class="bg-card flex flex-wrap items-center gap-x-3 gap-y-1.5 rounded-lg px-4 py-2" aria-label="Setup checklist">
+      <section class="bg-card border-border flex flex-wrap items-center gap-x-3 gap-y-1.5 border px-4 py-2" aria-label="Setup checklist">
         <div
-          class="bg-muted h-1 w-16 shrink-0 overflow-hidden rounded-full max-sm:hidden"
+          class="bg-secondary h-1 w-16 shrink-0 overflow-hidden max-sm:hidden"
           role="progressbar"
           aria-label="Setup progress"
           [attr.aria-valuenow]="onboarding.doneCount()"
           aria-valuemin="0"
           [attr.aria-valuemax]="onboarding.total()"
         >
-          <div class="bg-primary h-full rounded-full" [style.width.%]="percent()"></div>
+          <div class="bg-primary h-full" [style.width.%]="percent()"></div>
         </div>
         <p class="min-w-0 flex-1 truncate text-[13px]">
           <span class="font-medium">{{ onboarding.complete() ? 'You are all set' : 'Get started' }}</span>
@@ -48,10 +48,10 @@ import { Viewport } from '../../core/viewport';
         </button>
       </section>
     } @else if (onboarding.visible()) {
-      <section class="bg-card rounded-lg" aria-labelledby="onboarding-title">
+      <section class="bg-card border-border border" aria-labelledby="onboarding-title">
         <header class="flex items-start gap-3 px-4 pt-4 pb-3 sm:px-5">
           <div class="min-w-0 flex-1">
-            <h2 id="onboarding-title" class="text-[15px] font-semibold tracking-tight">
+            <h2 id="onboarding-title" class="font-title text-foreground text-[21px] leading-tight">
               @if (onboarding.complete()) { You are all set } @else { Get started with Trama }
             </h2>
             <p class="text-muted-foreground mt-0.5 text-[13px] leading-snug">
@@ -77,21 +77,21 @@ import { Viewport } from '../../core/viewport';
         </header>
 
         <div
-          class="bg-muted mx-4 h-1 overflow-hidden rounded-full sm:mx-5"
+          class="bg-secondary mx-4 h-1 overflow-hidden sm:mx-5"
           role="progressbar"
           aria-label="Setup progress"
           [attr.aria-valuenow]="onboarding.doneCount()"
           aria-valuemin="0"
           [attr.aria-valuemax]="onboarding.total()"
         >
-          <div class="bg-primary h-full rounded-full transition-[width] duration-300" [style.width.%]="percent()"></div>
+          <div class="bg-primary h-full transition-[width] duration-300" [style.width.%]="percent()"></div>
         </div>
 
         <ol class="mt-2 pb-2">
           @for (step of onboarding.steps(); track step.id) {
-            <li class="flex items-start gap-3 px-4 py-2 sm:px-5" [class.bg-muted]="onboarding.next()?.id === step.id">
+            <li class="flex items-start gap-3 px-4 py-2 sm:px-5" [class.bg-hover]="onboarding.next()?.id === step.id">
               <span
-                class="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border"
+                class="border-border mt-0.5 flex size-4 shrink-0 items-center justify-center border"
                 [class.bg-primary]="step.done"
                 [class.border-primary]="step.done"
                 [class.text-primary-foreground]="step.done"

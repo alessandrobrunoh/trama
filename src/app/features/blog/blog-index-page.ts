@@ -4,67 +4,83 @@ import { RouterLink } from '@angular/router';
 import { LucideArrowRight, LucideDynamicIcon } from '@lucide/angular';
 import { SiteFooter } from '../landing/site-footer';
 import { SiteHeader } from '../landing/site-header';
+import { SiteWeave } from '../landing/site-weave';
 import { BLOG_POSTS } from './blog-posts';
 
-/** `/blog`: public list of posts, newest first. */
+/** `/blog`: public list of posts, newest first, as a hairline index. */
 @Component({
   selector: 'app-blog-index-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DatePipe, RouterLink, LucideDynamicIcon, SiteHeader, SiteFooter],
-  host: {
-    class: 'bg-background text-foreground relative isolate flex min-h-svh flex-col overflow-x-clip',
-  },
+  imports: [DatePipe, RouterLink, LucideDynamicIcon, SiteHeader, SiteFooter, SiteWeave],
+  host: { class: 'bg-background text-foreground block min-h-svh overflow-x-clip leading-normal' },
   template: `
-    <div
-      aria-hidden="true"
-      class="bg-primary/10 pointer-events-none absolute top-[-22rem] left-1/2 -z-10 h-[36rem] w-[60rem] max-w-[160vw] -translate-x-1/2 rounded-full blur-3xl"
-    ></div>
     <app-site-header />
 
-    <main class="mx-auto w-full max-w-3xl flex-1 px-4 pt-16 pb-24 sm:px-6 sm:pt-24">
-      <p class="text-primary text-[13px] font-medium">Blog</p>
-      <h1 class="mt-2 text-4xl font-semibold tracking-[-0.03em] sm:text-5xl">
-        Notes from the loom
-      </h1>
-      <p class="text-muted-foreground mt-4 max-w-xl text-[15px] leading-relaxed">
-        Product updates, ideas about how humans and coding agents work together, and honest
-        comparisons with the tools you already use.
-      </p>
+    <main>
+      <section
+        class="mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-5 pt-14 pb-12 md:px-10 md:pt-24 md:pb-16 xl:px-[120px]"
+      >
+        <div class="flex items-center gap-2.5">
+          <span class="bg-primary size-2" aria-hidden="true"></span>
+          <p class="text-faint font-mono text-[12px] tracking-[1.2px]">BLOG</p>
+        </div>
+        <h1
+          class="font-title text-foreground text-[clamp(44px,5vw,72px)] leading-none tracking-[-0.021em]"
+        >
+          Notes from the loom
+        </h1>
+        <p class="text-muted-foreground max-w-[720px] text-[18px] leading-[29px]">
+          Product updates, ideas about how humans and coding agents work together, and honest
+          comparisons with the tools you already use.
+        </p>
+      </section>
 
-      <ul class="mt-12 flex flex-col">
-        @for (post of posts; track post.slug) {
-          <li>
-            <a [routerLink]="['/blog', post.slug]" class="group flex flex-col gap-2 py-7">
-              <span class="text-muted-foreground flex items-center gap-2 text-xs">
-                <span class="bg-primary/10 text-primary rounded-full px-2 py-0.5 font-medium">{{
-                  post.tag
-                }}</span>
-                <time [attr.datetime]="post.date">{{ post.date | date: 'MMMM d, y' }}</time>
-                <span aria-hidden="true">·</span>
-                {{ post.readingMinutes }} min read
-              </span>
-              <h2
-                class="group-hover:text-primary text-xl font-semibold tracking-tight transition-colors sm:text-2xl"
+      <app-site-weave />
+
+      <section
+        class="mx-auto w-full max-w-[1440px] px-5 py-12 md:px-10 md:py-20 xl:px-[120px]"
+        aria-label="Posts"
+      >
+        <ul class="flex flex-col">
+          @for (post of posts; track post.slug; let first = $first) {
+            <li class="border-border border-b" [class.border-t]="first">
+              <a
+                [routerLink]="['/blog', post.slug]"
+                class="group hover:bg-card flex flex-col gap-4 py-8 transition-colors lg:flex-row lg:gap-16"
               >
-                {{ post.title }}
-              </h2>
-              <p class="text-muted-foreground text-[14px] leading-relaxed">
-                {{ post.description }}
-              </p>
-              <span
-                class="text-primary mt-1 inline-flex items-center gap-1 text-[13px] font-medium"
-              >
-                Read post
-                <svg
-                  [lucideIcon]="arrowIcon"
-                  [size]="14"
-                  class="transition-transform group-hover:translate-x-0.5"
-                ></svg>
-              </span>
-            </a>
-          </li>
-        }
-      </ul>
+                <div
+                  class="text-faint flex shrink-0 items-center gap-3 font-mono text-[11px] tracking-[1.2px] lg:w-[260px] lg:flex-col lg:items-start lg:gap-2"
+                >
+                  <span class="text-primary">{{ post.tag.toUpperCase() }}</span>
+                  <span class="flex items-center gap-2">
+                    <time [attr.datetime]="post.date">{{ post.date | date: 'MMM d, y' }}</time>
+                    <span aria-hidden="true">·</span>
+                    {{ post.readingMinutes }} min read
+                  </span>
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col gap-3">
+                  <h2
+                    class="font-title text-foreground group-hover:text-primary text-[clamp(26px,3vw,36px)] leading-[1.15] tracking-[-0.014em] transition-colors"
+                  >
+                    {{ post.title }}
+                  </h2>
+                  <p class="text-muted-foreground max-w-[680px] text-[15px] leading-6">
+                    {{ post.description }}
+                  </p>
+                  <span class="text-foreground mt-1 inline-flex items-center gap-1.5 font-mono text-[12px]">
+                    Read post
+                    <svg
+                      [lucideIcon]="arrowIcon"
+                      [size]="13"
+                      class="transition-transform group-hover:translate-x-0.5"
+                    ></svg>
+                  </span>
+                </div>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
     </main>
 
     <app-site-footer />

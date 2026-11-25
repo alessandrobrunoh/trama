@@ -21,27 +21,29 @@ import { AuthShell } from './auth-shell';
   imports: [RouterLink, HlmButtonImports, HlmSpinner, LucideDynamicIcon, AuthShell],
   template: `
     @if (state() === 'loading') {
-      <app-auth-shell title="Opening your invitation…">
+      <app-auth-shell kicker="INVITATION" title="Opening your invitation…">
         <div class="flex justify-center py-6"><hlm-spinner /></div>
       </app-auth-shell>
     } @else if (invite(); as inv) {
-      <app-auth-shell [title]="'Join ' + inv.workspaceName" [subtitle]="subtitle()">
+      <app-auth-shell kicker="INVITATION" [title]="'Join ' + inv.workspaceName" [subtitle]="subtitle()">
         <div class="flex flex-col gap-4">
           @if (error(); as e) {
             <div
               role="alert"
-              class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
+              class="bg-red/10 border-red/40 text-red flex items-start gap-2 border px-2.5 py-2 text-[13px]"
             >
               <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
               <span>{{ e }}</span>
             </div>
           }
 
-          <dl class="bg-muted grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 rounded-lg px-3.5 py-3 text-[13px]">
-            <dt class="text-muted-foreground">Invited email</dt>
-            <dd class="min-w-0 truncate font-medium">{{ inv.email }}</dd>
-            <dt class="text-muted-foreground">Role</dt>
-            <dd class="font-medium">{{ roleLabel() }}</dd>
+          <dl
+            class="bg-card border-border grid grid-cols-[auto_1fr] items-baseline gap-x-4 gap-y-2 border px-3.5 py-3 text-[13px]"
+          >
+            <dt class="text-faint font-mono text-[10.5px] tracking-[1.2px]">INVITED EMAIL</dt>
+            <dd class="min-w-0 truncate">{{ inv.email }}</dd>
+            <dt class="text-faint font-mono text-[10.5px] tracking-[1.2px]">ROLE</dt>
+            <dd>{{ roleLabel() }}</dd>
           </dl>
 
           @if (!session.isAuthenticated()) {
@@ -66,7 +68,7 @@ import { AuthShell } from './auth-shell';
         </div>
       </app-auth-shell>
     } @else {
-      <app-auth-shell title="This invitation is no longer valid" subtitle="It may have expired, been used already, or been withdrawn.">
+      <app-auth-shell kicker="INVITATION" title="This invitation is no longer valid" subtitle="It may have expired, been used already, or been withdrawn.">
         <div class="flex flex-col gap-3">
           <p class="text-muted-foreground text-[13px] leading-relaxed">Ask the person who invited you to send a new one.</p>
           <a hlmBtn size="lg" variant="outline" class="w-full" routerLink="/">{{ session.isAuthenticated() ? 'Go to Trama' : 'Back to the home page' }}</a>

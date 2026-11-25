@@ -2,12 +2,12 @@ import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, injec
 import { RouterLink } from '@angular/router';
 import { LucideCheck, LucideDynamicIcon, LucideLoaderCircle, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { API_BASE_URL, MCP_URL } from '../../core/config';
 import { PERMISSION_PRESETS } from '../../core/contracts/domain';
 import type { ApiToken } from '../../core/contracts/domain';
 import { TramaStore } from '../../core/stores/trama.store';
 import { PageHeader } from '../../shared/page-header';
+import { V3_FIELD, V3SectionTitle } from '../../shared/v3';
 import { AppSelect, type Option } from '../create/form-kit';
 import { CodeBlock } from '../settings/sections/connect-snippets';
 import { CopyField, ReadonlyNote } from '../settings/sections/section-kit';
@@ -48,29 +48,26 @@ const EXPIRY: Option[] = [
 @Component({
   selector: 'app-connect-agent-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, PageHeader, AppSelect, CodeBlock, CopyField, ReadonlyNote],
+  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, PageHeader, AppSelect, CodeBlock, CopyField, ReadonlyNote, V3SectionTitle],
   host: { class: 'block min-h-full' },
   template: `
     <app-page-header title="Connect your agent" description="Let Claude Code, Cursor or the CLI read and report on this workspace" />
 
-    <div class="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-8 sm:px-8">
-      <p class="text-muted-foreground text-[13px] leading-relaxed">
+    <div class="mx-auto flex w-full max-w-3xl flex-col gap-10 px-4 py-8 sm:px-8">
+      <p class="text-muted-foreground text-[14px] leading-[22px]">
         An agent talks to Trama through the MCP server or the <code class="font-mono text-xs">trama</code> CLI, with a token that decides what it may do.
         Create one that can only do what the agent needs, add it to your client, and Trama shows you when the first call arrives.
       </p>
 
       <!-- 1 -->
       <section aria-labelledby="step-token">
-        <h2 id="step-token" class="mb-3 flex items-center gap-2 text-[15px] font-semibold">
-          <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-full text-[11px]">1</span>
-          Create a token with narrow access
-        </h2>
+        <v3-section-title class="mb-4" title="Create a token with narrow access" caption="STEP 01" />
         @if (!canCreate()) {
           <app-readonly-note>
             Your role cannot create API tokens here. Ask an admin for a token, then continue with step 2 using the placeholder.
           </app-readonly-note>
         } @else if (secret(); as s) {
-          <div class="bg-card flex flex-col gap-3 rounded-lg p-4">
+          <div class="bg-card border-border flex flex-col gap-3 border p-4">
             <p class="text-status-needs-input flex items-center gap-1.5 text-[13px] font-medium">
               <svg [lucideIcon]="warn" [size]="14"></svg>
               Copy this token now. You will not be able to see it again.
@@ -79,19 +76,20 @@ const EXPIRY: Option[] = [
             <p class="text-muted-foreground text-xs">The commands below already contain it. Manage or revoke it in <a class="underline underline-offset-2" [routerLink]="['/', slug(), 'settings', 'tokens']">Settings → API tokens</a>.</p>
           </div>
         } @else {
-          <form class="bg-card flex flex-col gap-4 rounded-lg p-4" (submit)="create($event)">
-            <label class="flex flex-col gap-1.5 text-[13px] font-medium">
-              Name
-              <input hlmInput class="h-8 text-[13px] font-normal" [value]="name()" (input)="rename($any($event.target).value)" placeholder="Claude Code on my laptop" />
-              <span class="text-muted-foreground text-xs font-normal">Something that tells you where it is used.</span>
+          <form class="bg-card border-border flex flex-col gap-4 border p-4" (submit)="create($event)">
+            <label class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px] leading-[14px]">
+              NAME
+              <input [class]="fieldClass" [value]="name()" (input)="rename($any($event.target).value)" placeholder="Claude Code on my laptop" />
+              <span class="text-muted-foreground font-sans text-xs">Something that tells you where it is used.</span>
             </label>
             <div role="radiogroup" aria-label="Access" class="grid gap-2 sm:grid-cols-2">
               @for (a of access; track a.id) {
                 <button
                   type="button"
                   role="radio"
-                  class="hover:bg-hover rounded-md px-3 py-2 text-left transition-colors"
-                  [class.bg-secondary]="level() !== a.id"
+                  class="hover:bg-hover border px-3 py-2 text-left transition-colors"
+                  [class.border-border]="level() !== a.id"
+                  [class.border-primary]="level() === a.id"
                   [class.bg-selected]="level() === a.id"
                   [attr.aria-checked]="level() === a.id"
                   (click)="level.set(a.id)"
@@ -111,19 +109,17 @@ const EXPIRY: Option[] = [
 
       <!-- 2 -->
       <section aria-labelledby="step-client">
-        <h2 id="step-client" class="mb-3 flex items-center gap-2 text-[15px] font-semibold">
-          <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-full text-[11px]">2</span>
-          Add Trama to your client
-        </h2>
-        <div class="flex flex-wrap gap-1" role="tablist" aria-label="Client">
-          @for (c of clients; track c.id) {
+        <v3-section-title class="mb-4" title="Add Trama to your client" caption="STEP 02" />
+        <div class="border-border flex w-fit max-w-full flex-wrap border" role="tablist" aria-label="Client">
+          @for (c of clients; track c.id; let first = $first) {
             <button
               type="button"
               role="tab"
-              class="hover:bg-accent text-muted-foreground hover:text-foreground h-8 rounded-md px-3 text-[13px] transition-colors"
-              [class.bg-accent]="client() === c.id"
+              class="hover:text-foreground text-muted-foreground h-8 px-3 font-mono text-[12px] transition-colors"
+              [class.border-border]="!first"
+              [class.border-l]="!first"
+              [class.bg-secondary]="client() === c.id"
               [class.text-foreground]="client() === c.id"
-              [class.font-medium]="client() === c.id"
               [attr.aria-selected]="client() === c.id"
               (click)="client.set(c.id)"
             >
@@ -146,11 +142,8 @@ const EXPIRY: Option[] = [
 
       <!-- 3 -->
       <section aria-labelledby="step-check">
-        <h2 id="step-check" class="mb-3 flex items-center gap-2 text-[15px] font-semibold">
-          <span class="bg-foreground text-background flex size-5 items-center justify-center rounded-full text-[11px]">3</span>
-          Check the connection
-        </h2>
-        <div class="bg-card flex flex-col gap-2 rounded-lg p-4 text-[13px]" role="status" aria-live="polite">
+        <v3-section-title class="mb-4" title="Check the connection" caption="STEP 03" />
+        <div class="bg-card border-border flex flex-col gap-2 border p-4 text-[13px]" role="status" aria-live="polite">
           @if (connected()) {
             <p class="text-status-done flex items-center gap-2 font-medium">
               <svg [lucideIcon]="check" [size]="15" [strokeWidth]="2.5"></svg>
@@ -180,6 +173,7 @@ export class ConnectAgentPage {
   protected readonly access = ACCESS;
   protected readonly expiry = EXPIRY;
   protected readonly placeholder = PLACEHOLDER;
+  protected readonly fieldClass = V3_FIELD;
   protected readonly warn = LucideTriangleAlert;
   protected readonly check = LucideCheck;
   protected readonly spinner = LucideLoaderCircle;

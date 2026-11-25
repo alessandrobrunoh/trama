@@ -4,6 +4,8 @@ import { LucideDynamicIcon, LucideServerOff } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { SessionStore } from '../../core/session/session.store';
 import { Kbd } from '../../shared/kbd';
+import { TramaLogo } from '../../shared/trama-logo';
+import { SiteWeave } from '../landing/site-weave';
 
 /**
  * 404. Rendered inside the shell (unknown page in a workspace: `workspaceSlug` is set) or standalone at
@@ -12,32 +14,41 @@ import { Kbd } from '../../shared/kbd';
 @Component({
   selector: 'app-not-found-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, Kbd],
-  host: { class: 'bg-background text-foreground relative isolate block min-h-full overflow-hidden' },
+  imports: [RouterLink, HlmButtonImports, LucideDynamicIcon, Kbd, TramaLogo, SiteWeave],
+  host: { class: 'bg-background text-foreground relative block min-h-full overflow-hidden leading-normal' },
   template: `
     @if (!inShell()) {
-      <div
-        aria-hidden="true"
-        class="bg-primary/10 pointer-events-none absolute top-[-18rem] left-1/2 -z-10 h-[32rem] w-[52rem] -translate-x-1/2 rounded-full blur-3xl"
-      ></div>
-      <a routerLink="/" class="absolute top-3 left-4 flex items-center gap-2 text-[13px] font-semibold tracking-tight sm:left-6">
-        <img src="/icons/trama-symbol-black.svg" alt="" class="size-5 dark:hidden" />
-        <img src="/icons/trama-symbol-white.svg" alt="" class="hidden size-5 dark:block" />
-        Trama
-      </a>
+      <header
+        class="mx-auto flex h-16 w-full max-w-[1440px] items-center px-5 md:px-10 xl:px-[120px]"
+      >
+        <a routerLink="/" class="flex items-center gap-2.5" aria-label="Trama home">
+          <app-trama-logo [size]="28" />
+          <span class="font-title text-foreground text-[24px] leading-none">Trama</span>
+        </a>
+      </header>
+      <app-site-weave />
     }
-    <div class="mx-auto flex min-h-full max-w-md flex-col items-center justify-center px-6 py-20 text-center" [class.min-h-svh]="!inShell()">
+    <div
+      class="mx-auto flex min-h-full w-full max-w-[1440px] flex-col items-start justify-center gap-5 px-5 py-16 md:px-10 xl:px-[120px]"
+      [class]="inShell() ? '' : 'min-h-[calc(100svh-89px)]'"
+    >
+      <div class="flex items-center gap-2.5">
+        <span class="bg-primary size-2" aria-hidden="true"></span>
+        <p class="text-faint font-mono text-[12px] tracking-[1.2px]">
+          {{ serverError() ? 'OFFLINE' : 'ERROR · 404' }}
+        </p>
+      </div>
       @if (serverError()) {
-        <span class="bg-muted text-muted-foreground mb-5 flex size-11 items-center justify-center rounded-xl">
-          <svg [lucideIcon]="offIcon" [size]="20" [strokeWidth]="1.5"></svg>
-        </span>
-      } @else {
-        <span class="text-muted-foreground/40 mb-3 font-mono text-6xl font-semibold tracking-tighter select-none" aria-hidden="true">404</span>
+        <svg [lucideIcon]="offIcon" [size]="28" [strokeWidth]="1.5" class="text-faint"></svg>
       }
-      <h1 class="text-xl font-semibold tracking-tight">{{ heading() }}</h1>
-      <p class="text-muted-foreground mt-2 text-[13px] leading-relaxed">{{ message() }}</p>
+      <h1
+        class="font-title text-foreground max-w-[720px] text-[clamp(40px,6vw,72px)] leading-none tracking-[-0.021em]"
+      >
+        {{ heading() }}
+      </h1>
+      <p class="text-muted-foreground max-w-[520px] text-[16px] leading-[26px]">{{ message() }}</p>
 
-      <div class="mt-6 flex flex-wrap items-center justify-center gap-2">
+      <div class="mt-2 flex flex-wrap items-center gap-3">
         @if (serverError()) {
           <button hlmBtn size="sm" (click)="reload()">Try again</button>
         } @else if (home(); as h) {
@@ -56,7 +67,7 @@ import { Kbd } from '../../shared/kbd';
       </div>
 
       @if (inShell()) {
-        <p class="text-muted-foreground mt-8 flex items-center gap-1.5 text-xs">
+        <p class="text-faint mt-6 flex items-center gap-1.5 font-mono text-[11px]">
           Looking for something? Press <app-kbd keys="mod+k" /> to search.
         </p>
       }

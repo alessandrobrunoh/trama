@@ -36,6 +36,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   ],
   template: `
     <app-auth-shell
+      kicker="SIGN IN"
       title="Sign in to Trama"
       subtitle="Coordination for teams of humans and coding agents."
     >
@@ -43,41 +44,29 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         @if (demo()) {
           <aside
             aria-labelledby="demo-login-title"
-            class="bg-primary/10 mb-1 rounded-xl p-3.5"
+            class="bg-card border-border mb-1 flex flex-col gap-3 border p-4"
           >
-            <div class="flex items-start gap-3">
-              <span
-                aria-hidden="true"
-                class="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-lg"
-              >
-                <svg [lucideIcon]="demoIcon" [size]="16"></svg>
-              </span>
-              <div class="min-w-0 flex-1">
-                <h2 id="demo-login-title" class="text-sm font-medium">Try the sample workspace</h2>
-                <p class="text-muted-foreground mt-0.5 text-xs leading-relaxed">
-                  No sign-up needed. Use the shared demo account to explore Trama.
-                </p>
-                <div
-                  class="bg-background/70 mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 rounded-md px-2.5 py-2 text-xs"
-                >
-                  <span class="text-muted-foreground">Email</span>
-                  <code class="text-foreground font-mono">demo@trama.dev</code>
-                  <span class="text-muted-foreground">Password</span>
-                  <code class="text-foreground font-mono">trama-demo</code>
-                </div>
-              </div>
+            <div class="flex items-center gap-2">
+              <svg [lucideIcon]="demoIcon" [size]="14" class="text-primary"></svg>
+              <h2 id="demo-login-title" class="text-foreground font-mono text-[11px] tracking-[1.2px]">
+                TRY THE SAMPLE WORKSPACE
+              </h2>
             </div>
-            <p class="text-muted-foreground mt-2 text-[11px] leading-relaxed">
+            <p class="text-muted-foreground text-[13px] leading-5">
+              No sign-up needed. Use the shared demo account to explore Trama.
+            </p>
+            <div
+              class="bg-background border-border grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 border px-2.5 py-2 text-xs"
+            >
+              <span class="text-faint font-mono text-[10.5px]">EMAIL</span>
+              <code class="text-foreground font-mono">demo@trama.dev</code>
+              <span class="text-faint font-mono text-[10.5px]">PASSWORD</span>
+              <code class="text-foreground font-mono">trama-demo</code>
+            </div>
+            <p class="text-faint font-mono text-[10.5px] leading-4">
               Shared workspace: please don't add personal or sensitive data.
             </p>
-            <button
-              hlmBtn
-              type="button"
-              size="sm"
-              variant="outline"
-              class="mt-3 w-full"
-              (click)="fillDemo()"
-            >
+            <button hlmBtn type="button" size="sm" variant="outline" class="w-full" (click)="fillDemo()">
               Fill in demo credentials
             </button>
           </aside>
@@ -85,7 +74,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         @if (error(); as e) {
           <div
             role="alert"
-            class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
+            class="bg-red/10 border-red/40 text-red flex items-start gap-2 border px-2.5 py-2 text-[13px]"
           >
             <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
             <span>{{ e }}</span>

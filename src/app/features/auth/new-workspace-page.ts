@@ -28,6 +28,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
   imports: [FormsModule, HlmButtonImports, HlmFieldImports, HlmInputImports, HlmSpinner, LucideDynamicIcon, AuthShell],
   template: `
     <app-auth-shell
+      kicker="NEW WORKSPACE"
       title="Create a workspace"
       [subtitle]="
         hasWorkspaces()
@@ -39,7 +40,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,38})[a-z0-9]$/;
         @if (error(); as e) {
           <div
             role="alert"
-            class="bg-destructive/10 text-destructive flex items-start gap-2 rounded-md px-2.5 py-2 text-sm"
+            class="bg-red/10 border-red/40 text-red flex items-start gap-2 border px-2.5 py-2 text-[13px]"
           >
             <svg [lucideIcon]="alertIcon" [size]="15" class="mt-0.5 shrink-0"></svg>
             <span>{{ e }}</span>
