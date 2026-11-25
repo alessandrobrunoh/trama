@@ -16,6 +16,7 @@ import {
   effectiveMemberAccess,
   findWorkspaceRole,
   freshWorkspaceRoles,
+  isProjectLimited,
   normalizeCapabilities,
   normalizeGrantList,
   normalizeMemberAccess,
@@ -28,12 +29,15 @@ import {
   AgentEntity,
   ApiTokenEntity,
   InviteEntity,
+  IssueEntity,
   MembershipEntity,
   UserEntity,
   WorkspaceEntity,
 } from '../database/entities/index.js';
+import { applyProjectScope, currentAccess } from '../auth/member-access.js';
 import { notFound, slugify, uid } from '../common/util.js';
 import { EventsService } from '../events/events.service.js';
+import { visibleMemberships } from './people-scope.js';
 import {
   assertCanChangeRole,
   assertCanRemoveMember,
@@ -237,8 +241,10 @@ export class WorkspacesService {
 
   // ───────── members
 
-  async listMembers(workspaceId: string) {
-    const rows = await this.memberships.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+  /** Everyone in the workspace, or, for someone limited to some projects, the people on those projects. */
+  async listMembers(workspaceId: string, viewer?: Pick<WorkspaceContext, 'workspace' | 'access' | 'userId'>) {
+    const all = await this.memberships.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+    const rows = viewer ? visibleMemberships(all, viewer.workspace.resolved().roles, viewer.access, viewer.userId) : all;
     const users = await this.users.findBy({ id: In(rows.map((r) => r.userId)) });
     const byId = new Map(users.map((u) => [u.id, u]));
     return rows.map((m) => Object.assign(m, { user: byId.get(m.userId) }));
@@ -368,8 +374,19 @@ export class WorkspacesService {
 
   // ───────── agents
 
-  listAgents(workspaceId: string) {
-    return this.agents.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+  /** Every agent, or, for someone limited to some projects, the agents with a task on those projects. */
+  async listAgents(workspaceId: string) {
+    const rows = await this.agents.find({ where: { workspaceId }, order: { createdAt: 'ASC' } });
+    if (!isProjectLimited(currentAccess()) || !rows.length) return rows;
+    const qb = this.ds
+      .getRepository(IssueEntity)
+      .createQueryBuilder('i')
+      .select('DISTINCT i."assigneeId"', 'id')
+      .where('i."workspaceId" = :workspaceId', { workspaceId })
+      .andWhere('i."assigneeId" IN (:...agentIds)', { agentIds: rows.map((row) => row.id) });
+    applyProjectScope(qb, 'i', 'projectId');
+    const used = new Set((await qb.getRawMany<{ id: string }>()).map((row) => row.id));
+    return rows.filter((row) => used.has(row.id));
   }
 
   async getAgent(workspaceId: string, id: string) {

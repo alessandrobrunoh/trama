@@ -20,6 +20,7 @@ import {
   CAPABILITY_KEY,
   IS_PUBLIC_KEY,
   MULTIPART_KEY,
+  NO_GUESTS_KEY,
   REQUIRE_USER_KEY,
   ROLES_KEY,
   SESSION_ONLY_KEY,
@@ -36,6 +37,7 @@ import {
   applyTokenScope,
   effectiveMemberAccess,
   findWorkspaceRole,
+  GUEST_ROLE_ID,
   roleAllows,
 } from '../contracts/domain.js';
 import { requiredMemberGrant } from '../auth/member-access.js';
@@ -242,6 +244,12 @@ export class AccessGuard implements CanActivate {
         ) ?? (mutating ? 'member' : 'viewer');
       const scope = auth.token?.scope;
       const effective = capRole(baseRole, scope);
+      if (
+        membership.kind === 'user' &&
+        memberRole === GUEST_ROLE_ID &&
+        this.reflector.getAllAndOverride<boolean>(NO_GUESTS_KEY, targets)
+      )
+        throw new ForbiddenException('Guests cannot do that');
       const stored = membership.kind === 'user' ? membership.access : null;
       const access = effectiveMemberAccess(effective, stored);
       const needed = requiredMemberGrant(

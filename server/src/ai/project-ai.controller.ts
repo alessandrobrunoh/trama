@@ -11,6 +11,7 @@ import type { Response } from 'express';
 import {
   Auth,
   Ctx,
+  NoGuests,
   RequireUser,
   Roles,
   type AuthInfo,
@@ -26,6 +27,7 @@ import { ProjectAiService } from './project-ai.service.js';
 @Controller('w/:slug/projects/:id/ai')
 @RequireUser()
 @Roles('viewer')
+@NoGuests()
 export class ProjectAiController {
   constructor(private readonly service: ProjectAiService) {}
 

@@ -27,6 +27,14 @@ export type Role = string;
 export type LegacyRole = 'owner' | 'admin' | 'member' | 'viewer';
 export const LEGACY_ROLES: readonly LegacyRole[] = ['owner', 'admin', 'member', 'viewer'];
 
+/**
+ * Default role of a person invited to one or a few projects. It only works on the projects in the
+ * membership's `access.projects`; a guest without any project sees nothing.
+ */
+export const GUEST_ROLE_ID = 'guest';
+/** Default role that manages projects, milestones and tasks without administering the workspace. */
+export const ORGANIZER_ROLE_ID = 'organizer';
+
 export interface User {
   id: ID;
   name: string;
@@ -276,9 +284,10 @@ export function normalizeMemberAccess(
 /**
  * Role grants plus this person's extras. Null for the owner role (always full), and when the result
  * is every action on every project. Unknown role: nothing.
+ * The guest role never means "every project": without a project list it sees no project at all.
  */
 export function effectiveMemberAccess(
-  role: { owner: boolean; grants: readonly MemberGrant[] } | null | undefined,
+  role: { id?: string; owner: boolean; grants: readonly MemberGrant[] } | null | undefined,
   stored: MemberAccess | null | undefined,
 ): MemberAccess | null {
   if (!role) return { projects: { all: false, projectIds: [] }, includeUnassigned: false, grants: [] };
@@ -286,8 +295,9 @@ export function effectiveMemberAccess(
   const base = new Set(role.grants);
   for (const grant of stored?.grants ?? []) base.add(grant);
   const grants = MEMBER_GRANTS.filter((grant) => base.has(grant));
-  const projects = stored?.projects ?? { all: true, projectIds: [] };
-  const includeUnassigned = projects.all || (stored?.includeUnassigned ?? true);
+  const guestWithoutProjects = role.id === GUEST_ROLE_ID && (!stored || stored.projects.all);
+  const projects = guestWithoutProjects ? { all: false, projectIds: [] as ID[] } : (stored?.projects ?? { all: true, projectIds: [] });
+  const includeUnassigned = role.id === GUEST_ROLE_ID ? false : projects.all || (stored?.includeUnassigned ?? true);
   if (projects.all && includeUnassigned && grants.length === MEMBER_GRANTS.length) return null;
   return {
     projects: projects.all
@@ -318,6 +328,22 @@ export function accessWithin(
     if (projects.projectIds.some((id) => !caller.projects.projectIds.includes(id))) return false;
   }
   return true;
+}
+
+/** The person works only on some projects (a guest, or a member limited to a list). */
+export function isProjectLimited(access: MemberAccess | null | undefined): boolean {
+  return !!access && !access.projects.all;
+}
+
+/** Does this access reach the project? `null` access reaches every project. */
+export function accessIncludesProject(access: MemberAccess | null | undefined, projectId: string): boolean {
+  return !access || access.projects.all || access.projects.projectIds.includes(projectId);
+}
+
+/** Do the two people have at least one project in common? Someone with every project shares with everybody. */
+export function accessesShareProject(a: MemberAccess | null | undefined, b: MemberAccess | null | undefined): boolean {
+  if (!a || !b || a.projects.all || b.projects.all) return true;
+  return a.projects.projectIds.some((id) => b.projects.projectIds.includes(id));
 }
 
 // ───────────────────────────── Notifications ─────────────────────────────
@@ -461,6 +487,27 @@ export interface InvitePreview {
   invitedByName?: string;
   expiresAt: ISODate;
 }
+
+/** One person with access to a project, as listed by its Share dialog. */
+export interface ProjectShareMember extends Membership {
+  user?: User;
+  /** Sees every project of the workspace, so this project cannot be taken away from them on its own. */
+  allProjects: boolean;
+}
+
+/** GET /projects/:id/share — who can open the project, and who was invited to it and has not joined yet. */
+export interface ProjectShare {
+  members: ProjectShareMember[];
+  invites: WorkspaceInvite[];
+}
+
+/**
+ * POST /projects/:id/invites. `invited`: a person without access got an invitation (share `link.url`
+ * if the email did not arrive). `added`: an existing guest or limited member now also sees this project.
+ */
+export type ProjectInviteResult =
+  | { status: 'invited'; link: InviteLink }
+  | { status: 'added'; member: ProjectShareMember };
 
 /** Runtimes that can act in a workspace. `human` = a person. */
 export type ExecutionProvider = 'human' | 'delta' | 'claude_code' | 'codex' | 'cursor' | 'other';
@@ -1680,6 +1727,7 @@ export type Capability =
   | 'deleteIssues'
   | 'manageSharedViews'
   | 'inviteMembers'
+  | 'inviteToProject'
   | 'manageAgents'
   | 'manageTokens'
   | 'manageIntegrations';
@@ -1699,6 +1747,7 @@ export const CAPABILITIES: Capability[] = [
   'deleteIssues',
   'manageSharedViews',
   'inviteMembers',
+  'inviteToProject',
   'manageAgents',
   'manageTokens',
   'manageIntegrations',
@@ -1710,6 +1759,7 @@ export const CAPABILITY_META: Record<Capability, CapabilityMeta> = {
   deleteIssues: { group: 'Work', label: 'Delete issues', description: 'Permanently delete an issue (prefer canceling it).' },
   manageSharedViews: { group: 'Work', label: 'Share views', description: 'Create or publish saved views for the whole workspace.' },
   inviteMembers: { group: 'Access & automation', label: 'Invite members', description: 'Add people to the workspace. You can only invite someone into a role whose permissions you already have.' },
+  inviteToProject: { group: 'Access & automation', label: 'Share projects', description: 'Invite people to a single project as guests, and change or remove their access to it. They never see the rest of the workspace.' },
   manageAgents: { group: 'Access & automation', label: 'Manage agents', description: 'Register agents, edit them, and mint tokens that act as an agent.' },
   manageTokens: { group: 'Access & automation', label: 'Create API tokens', description: 'Create personal API tokens (read / write scope). A write-scoped token cannot create an admin-scoped one.' },
   manageIntegrations: { group: 'Access & automation', label: 'Manage integrations', description: 'Connect GitHub, GitLab and Delta, and manage outgoing webhooks.' },
@@ -1722,6 +1772,7 @@ export const DEFAULT_PERMISSIONS: PermissionMap = {
   deleteIssues: 'member',
   manageSharedViews: 'member',
   inviteMembers: 'admin',
+  inviteToProject: 'admin',
   manageAgents: 'admin',
   manageTokens: 'member',
   manageIntegrations: 'admin',
@@ -1948,10 +1999,13 @@ export interface WorkspaceRole {
 }
 
 /** The owner role always keeps these, so someone can still manage members. Managing roles is the owner role itself. */
-export const OWNER_REQUIRED_CAPABILITIES: readonly Capability[] = ['inviteMembers'];
+export const OWNER_REQUIRED_CAPABILITIES: readonly Capability[] = ['inviteMembers', 'inviteToProject'];
 
-/** Capabilities that used to require an admin. A write-scoped token cannot use them. Holding any of them administers the workspace. */
+/** Capabilities that used to require an admin. A write-scoped token cannot use them. Holding any of them administers the workspace, except the ones listed in `ADMIN_POWER_EXEMPT`. */
 export const ADMIN_CAPABILITIES: readonly Capability[] = CAPABILITIES.filter((cap) => DEFAULT_PERMISSIONS[cap] === 'admin');
+
+/** Capabilities a write-scoped token lacks but that do not make their holder a workspace administrator (an organizer shares projects, nothing more). */
+const ADMIN_POWER_EXEMPT: readonly Capability[] = ['inviteToProject'];
 
 const LEGACY_RANK: Record<LegacyRole, number> = { viewer: 0, member: 1, admin: 2, owner: 3 };
 
@@ -2004,13 +2058,49 @@ export function migrateLegacyRoles(
   }
   const byRole = resolveRoleGrants(grants);
   const names: Record<LegacyRole, string> = { owner: 'Owner', admin: 'Admin', member: 'Member', viewer: 'Viewer' };
-  return LEGACY_ROLES.map((id) => ({
+  const legacy = LEGACY_ROLES.map((id) => ({
     id,
     name: names[id],
     owner: id === OWNER_ROLE_ID,
     capabilities: capabilitiesForLegacyRole(id, perms),
     grants: id === OWNER_ROLE_ID ? [...MEMBER_GRANTS] : byRole[id],
   }));
+  return [...legacy, ...defaultProjectRoles()];
+}
+
+/**
+ * The Organizer and Guest roles every workspace gets next to the four old ranks.
+ * Organizer runs projects, milestones and tasks but administers nothing. Guest works only on the
+ * projects of their membership: tasks and comments there, read-only statuses and labels.
+ */
+export function defaultProjectRoles(): WorkspaceRole[] {
+  const guestGrants: MemberGrant[] = [
+    'projects:view',
+    'milestones:view',
+    'issues:view',
+    'issues:create',
+    'issues:update',
+    'artifacts:view',
+    'comments:view',
+    'comments:create',
+    'comments:update',
+  ];
+  return [
+    {
+      id: ORGANIZER_ROLE_ID,
+      name: 'Organizer',
+      owner: false,
+      capabilities: ['manageProjects', 'createIssues', 'deleteIssues', 'manageSharedViews', 'inviteToProject'],
+      grants: [...MEMBER_GRANTS],
+    },
+    {
+      id: GUEST_ROLE_ID,
+      name: 'Guest',
+      owner: false,
+      capabilities: ['createIssues'],
+      grants: guestGrants,
+    },
+  ];
 }
 
 /** Drops unknown ids, keeps a single owner role, and puts the required capabilities back on it. */
@@ -2057,7 +2147,11 @@ export function roleHasCapability(roles: readonly WorkspaceRole[], roleId: strin
 
 /** Owner, or a role that holds a capability which used to require an admin. */
 export function roleHasAdminPower(role: Pick<WorkspaceRole, 'owner' | 'capabilities'> | null | undefined): boolean {
-  return !!role && (role.owner || ADMIN_CAPABILITIES.some((cap) => role.capabilities.includes(cap)));
+  return (
+    !!role &&
+    (role.owner ||
+      ADMIN_CAPABILITIES.some((cap) => !ADMIN_POWER_EXEMPT.includes(cap) && role.capabilities.includes(cap)))
+  );
 }
 
 /**

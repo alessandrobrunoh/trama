@@ -23,6 +23,8 @@ export interface RuleContext {
     title: string;
     assigneeId?: string | null;
     reporterId?: string | null;
+    /** Lets delivery skip people who cannot open the task's project. */
+    projectId?: string | null;
   };
 }
 

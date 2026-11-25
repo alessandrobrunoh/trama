@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import { currentAccess, projectHidden } from '../auth/member-access.js';
 import { notFound, uid } from '../common/util.js';
 import { IssueEntity } from '../database/entities/index.js';
 import { ProjectsService } from '../projects/projects.service.js';
@@ -26,12 +27,15 @@ export class TimeEntriesService {
     private readonly projects: ProjectsService,
   ) {}
 
-  list(workspaceId: string, userId: string) {
-    return this.entries.find({
+  /** The caller's own entries. Time logged on a project they can no longer open is not listed. */
+  async list(workspaceId: string, userId: string) {
+    const access = currentAccess();
+    const rows = await this.entries.find({
       where: { workspaceId, userId },
       order: { startedAt: 'DESC' },
       take: 100,
     });
+    return access ? rows.filter((row) => !row.projectId || !projectHidden(access, row.projectId)) : rows;
   }
 
   /** Stops any timer this person already has running, then starts a new one. */
@@ -112,7 +116,7 @@ export class TimeEntriesService {
     if (projectId) await this.projects.get(workspaceId, projectId);
     if (issueId) {
       const issue = await this.issues.findOneBy({ workspaceId, id: issueId });
-      if (!issue) throw notFound('Issue', issueId);
+      if (!issue || projectHidden(currentAccess(), issue.projectId)) throw notFound('Issue', issueId);
       if (issue.projectId && projectId && issue.projectId !== projectId) {
         throw new BadRequestException('That issue is not in the selected project');
       }

@@ -47,6 +47,7 @@ import { RemoveProjectUpdatesDocumentsContext1793870000000 } from './17938700000
 import { IssueThreadUrl1793880000000 } from './1793880000000-IssueThreadUrl.js';
 import { IssueDueDate1793890000000 } from './1793890000000-IssueDueDate.js';
 import { RemoveLunaGest1793900000000 } from './1793900000000-RemoveLunaGest.js';
+import { GuestOrganizerRoles1794000000000 } from './1794000000000-GuestOrganizerRoles.js';
 import { PersonalWorkspaces1794100000000 } from './1794100000000-PersonalWorkspaces.js';
 import { ConnectionOwnership1794200000000 } from './1794200000000-ConnectionOwnership.js';
 import { RoutingRules1794300000000 } from './1794300000000-RoutingRules.js';
@@ -103,6 +104,7 @@ export const MIGRATIONS = [
   IssueThreadUrl1793880000000,
   IssueDueDate1793890000000,
   RemoveLunaGest1793900000000,
+  GuestOrganizerRoles1794000000000,
   PersonalWorkspaces1794100000000,
   ConnectionOwnership1794200000000,
   RoutingRules1794300000000,

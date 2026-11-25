@@ -74,12 +74,15 @@ export class EventsController {
       filter((e) => e.workspaceId === ctx.workspace.id && (!e.userId || e.userId === ctx.userId)),
       mergeMap(async (published) => ({
         published,
-        visible: await this.visibility.isLiveVisible(
-          ctx.workspace.id,
-          published.event,
-          ctx.access,
-          published.subject,
-        ),
+        // Events addressed to this person (notifications, favorites) carry nothing of anyone else's work.
+        visible: published.userId
+          ? true
+          : await this.visibility.isLiveVisible(
+              ctx.workspace.id,
+              published.event,
+              ctx.access,
+              published.subject,
+            ),
       }), 8),
       filter(({ visible }) => visible),
       map(({ published }): MessageEvent => ({ data: published.event })),
