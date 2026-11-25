@@ -9,14 +9,15 @@ import {
   eachMonthOfInterval,
   eachQuarterOfInterval,
   eachWeekOfInterval,
-  endOfMonth,
   endOfQuarter,
+  endOfWeek,
   format,
+  getISOWeek,
+  getWeek,
   max as maxDate,
   min as minDate,
   parseISO,
   startOfDay,
-  startOfMonth,
   startOfQuarter,
   startOfWeek,
   subDays,
@@ -241,7 +242,7 @@ export const ZOOMS: readonly { value: Zoom; label: string }[] = [
   { value: 'quarter', label: 'Quarter' },
 ];
 
-export const PX_PER_DAY: Record<Zoom, number> = { week: 36, month: 10, quarter: 3.2 };
+export const PX_PER_DAY: Record<Zoom, number> = { week: 56, month: 32, quarter: 10 };
 /** Empty time kept around the data, in days. */
 const PADDING_DAYS: Record<Zoom, number> = { week: 14, month: 30, quarter: 60 };
 /** The axis is never shorter than this, in days. */
@@ -281,8 +282,9 @@ export function buildScale(
     origin = startOfQuarter(origin);
     end = endOfQuarter(end);
   } else {
-    origin = zoom === 'month' ? startOfMonth(origin) : startOfWeek(origin, { weekStartsOn });
-    end = endOfMonth(end);
+    // Week and month zoom both draw days under week bands, so both snap to whole weeks.
+    origin = startOfWeek(origin, { weekStartsOn });
+    end = endOfWeek(end, { weekStartsOn });
   }
   origin = startOfDay(origin);
   end = startOfDay(end);
@@ -306,6 +308,8 @@ export interface AxisBand {
   x: number;
   width: number;
   label: string;
+  /** Second, quieter text next to the label: the date range of a week, a weekday letter. */
+  sub?: string;
   /** A weekend day or the like, drawn quieter. */
   quiet?: boolean;
 }
@@ -320,6 +324,7 @@ function bandsOf(
   starts: readonly Date[],
   label: (d: Date) => string,
   quiet?: (d: Date) => boolean,
+  sub?: (d: Date) => string,
 ): AxisBand[] {
   return starts.map((start, i) => {
     const from = maxDate([start, scale.origin]);
@@ -330,9 +335,53 @@ function bandsOf(
       x,
       width: dateX(scale, next) - x,
       label: label(start),
+      sub: sub?.(start),
       quiet: quiet?.(start),
     };
   });
+}
+
+/** "Nov 23 – 29", "Nov 30 – Dec 6": the seven days from `start`. */
+export function weekRange(start: Date): string {
+  const end = addDays(start, 6);
+  return start.getMonth() === end.getMonth()
+    ? `${format(start, 'MMM d')} – ${format(end, 'd')}`
+    : `${format(start, 'MMM d')} – ${format(end, 'MMM d')}`;
+}
+
+/** Week number as the header prints it: ISO weeks when weeks start on Monday. */
+export function weekNumber(start: Date, weekStartsOn: 0 | 1 | 6 = 1): number {
+  return weekStartsOn === 1 ? getISOWeek(start) : getWeek(start, { weekStartsOn, firstWeekContainsDate: 4 });
+}
+
+/**
+ * The v3 timeline header: week bands ("W48  Nov 23 – 29") over days ("M 23", weekends quiet) in week and month zoom,
+ * months over week starts in quarter zoom.
+ */
+export function frameBands(scale: TimeScale, weekStartsOn: 0 | 1 | 6 = 1): AxisBands {
+  const interval = { start: scale.origin, end: scale.end };
+  if (scale.zoom === 'quarter') {
+    return {
+      upper: bandsOf(scale, eachMonthOfInterval(interval), (d) => format(d, 'MMMM'), undefined, (d) => format(d, 'yyyy')),
+      lower: bandsOf(scale, eachWeekOfInterval(interval, { weekStartsOn }), (d) => format(d, 'd')),
+    };
+  }
+  return {
+    upper: bandsOf(
+      scale,
+      eachWeekOfInterval(interval, { weekStartsOn }),
+      (d) => `W${weekNumber(d, weekStartsOn)}`,
+      undefined,
+      weekRange,
+    ),
+    lower: bandsOf(
+      scale,
+      eachDayOfInterval(interval),
+      (d) => format(d, 'd'),
+      (d) => d.getDay() === 0 || d.getDay() === 6,
+      (d) => format(d, 'EEEEE'),
+    ),
+  };
 }
 
 /** Two header rows: months over days (week zoom), months over weeks (month zoom), quarters over months. */
@@ -393,3 +442,46 @@ export function compareSpans(a: ProjectSpan | undefined, b: ProjectSpan | undefi
 }
 
 export const parseDate = parse;
+
+/** The dates of a task that place it on the axis. */
+export interface TaskDates {
+  startedAt?: string;
+  dueDate?: string;
+  completedAt?: string;
+  /** Neither done nor canceled. */
+  open: boolean;
+}
+
+/**
+ * Where a task sits on the axis: from when work started to its due date (or, once closed, to when it closed; while
+ * open and without a due date, to today). A task with only a due date is a one-day mark on that day. A task with no
+ * dates at all has no place on the axis.
+ */
+export function taskSpan(t: TaskDates, now: Date): ProjectSpan | undefined {
+  const started = parse(t.startedAt);
+  const due = parse(t.dueDate);
+  const completed = parse(t.completedAt);
+  const today = startOfDay(now);
+  const start = started ? startOfDay(started) : undefined;
+  const end = !t.open && completed ? startOfDay(completed) : due ? startOfDay(due) : undefined;
+  if (start && end) return start <= end ? { start, end } : { start: end, end: start };
+  if (start) return { start, end: t.open ? maxDate([today, start]) : start };
+  if (end) return { start: end, end };
+  return undefined;
+}
+
+/** v3 status colours, for a status the workspace catalog does not colour (the catalog wins when it does). */
+export const STATUS_TONE: Readonly<Record<string, string>> = {
+  draft: '#5e6269',
+  backlog: '#5e6269',
+  todo: '#8c9096',
+  in_progress: '#e2a93b',
+  in_review: '#5274e0',
+  done: '#6fae73',
+  canceled: '#3a3e45',
+};
+
+/** `color` at `percent` opacity over whatever is behind it: bar fills (18%) and legend swatches (33%). */
+export function mix(color: string, percent: number): string {
+  return `color-mix(in srgb, ${color} ${percent}%, transparent)`;
+}

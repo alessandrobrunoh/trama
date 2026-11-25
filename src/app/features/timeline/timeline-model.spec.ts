@@ -7,7 +7,9 @@ import {
   dateEndX,
   dateX,
   forecastProject,
+  frameBands,
   projectSpan,
+  taskSpan,
   type ForecastInput,
   type ForecastTask,
 } from './timeline-model';
@@ -248,5 +250,81 @@ describe('time scale', () => {
     const quarter = axisBands(buildScale('quarter', [target], NOW, 1), 1);
     expect(quarter.upper.some((b) => b.label === 'Q4 2026')).toBe(true);
     expect(quarter.lower.some((b) => b.label === 'Nov')).toBe(true);
+  });
+});
+
+describe('v3 axis header', () => {
+  const target = new Date(2026, 11, 31);
+
+  it('draws week bands over days in week and month zoom', () => {
+    for (const zoom of ['week', 'month'] as const) {
+      const { upper, lower } = frameBands(buildScale(zoom, [target], NOW, 1), 1);
+      expect(upper.find((b) => b.start.getDate() === 23 && b.start.getMonth() === 10)).toMatchObject({
+        label: 'W48',
+        sub: 'Nov 23 – 29',
+      });
+      expect(upper.find((b) => b.start.getDate() === 30)?.sub).toBe('Nov 30 – Dec 6');
+      expect(lower.find((b) => b.start.getDate() === 21 && b.start.getMonth() === 10)).toMatchObject({
+        label: '21',
+        sub: 'S',
+        quiet: true,
+      });
+      expect(lower.find((b) => b.start.getDate() === 19 && b.start.getMonth() === 10)).toMatchObject({
+        label: '19',
+        sub: 'T',
+        quiet: false,
+      });
+    }
+  });
+
+  it('draws months over week starts in quarter zoom and tiles both rows', () => {
+    const scale = buildScale('quarter', [target], NOW, 1);
+    const { upper, lower } = frameBands(scale, 1);
+    expect(upper.find((b) => b.start.getMonth() === 10)).toMatchObject({ label: 'November', sub: '2026' });
+    for (const row of [upper, lower]) {
+      for (let i = 1; i < row.length; i++) {
+        expect(row[i].x).toBeCloseTo(row[i - 1].x + row[i - 1].width);
+      }
+      const last = row[row.length - 1];
+      expect(last.x + last.width).toBeCloseTo(scale.width);
+    }
+  });
+
+  it('snaps week and month scales to whole weeks', () => {
+    for (const zoom of ['week', 'month'] as const) {
+      const scale = buildScale(zoom, [target], NOW, 1);
+      expect(scale.origin.getDay()).toBe(1);
+      expect(scale.days % 7).toBe(0);
+    }
+  });
+});
+
+describe('task span', () => {
+  const at = (offset: number): string => day(offset);
+
+  it('runs from the start of work to the due date', () => {
+    const span = taskSpan({ startedAt: at(-3), dueDate: at(4), open: true }, NOW);
+    expect(differenceInCalendarDays(span!.end, span!.start)).toBe(7);
+  });
+
+  it('runs an open task without a due date up to today', () => {
+    const span = taskSpan({ startedAt: at(-3), open: true }, NOW);
+    expect(differenceInCalendarDays(span!.end, span!.start)).toBe(3);
+  });
+
+  it('ends a closed task when it was closed', () => {
+    const span = taskSpan({ startedAt: at(-10), dueDate: at(5), completedAt: at(-2), open: false }, NOW);
+    expect(differenceInCalendarDays(span!.end, span!.start)).toBe(8);
+  });
+
+  it('marks a task that only has a due date as a single day', () => {
+    const span = taskSpan({ dueDate: at(6), open: true }, NOW);
+    expect(span!.start.getTime()).toBe(span!.end.getTime());
+  });
+
+  it('puts no bar on a task without dates and never draws a negative bar', () => {
+    expect(taskSpan({ open: true }, NOW)).toBeUndefined();
+    const span = taskSpan({ startedAt: at(5), dueDate: at(1), open: true }, NOW);
+    expect(span!.start <= span!.end).toBe(true);
   });
 });
