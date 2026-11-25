@@ -116,6 +116,26 @@ Linear-style planning entity: the outcome we want, by when, and where. `Project 
 - `PATCH /:id` any of the create fields (`null` clears `summary`, `description`, `leadId`, `repository`, dates). Changing `key` re-keys the project's issues and retains their old keys as aliases.
 - `DELETE /:id` (`204`; its milestones are deleted and removed from issues, and its issues become unassigned under the `UNPR` prefix).
 - Events: `project.created|updated|status_changed|health_changed|deleted` (subject `project`). `health_changed` carries `data: { from, to }` (either may be `null`); `updated.data.fields` also lists `health`. Saved and public views can filter, sort and group projects by `health`.
+- `GET /:id/transfer-preview?target=<workspace slug>` and `POST /:id/transfer { target }` (browser session only; owner or admin of this workspace **and** of the target). Moves the project with its milestones, issues (keys kept, so the tag must be free in the target), time entries, comments, artifacts, history and files. Issue and project statuses map to the target's by type and name; labels map by name and are created when missing; guests (people limited to this project) become limited members of the target; assignees, reporters and leads who are not in the target are cleared. One transaction. `404` for a target workspace you do not belong to, `403` when you are not admin there, `409` when something blocks it (tag or issue keys in use, label cap). The preview returns `{ counts, mappings, guests, unassigned, blockers }`.
+- Events: `project.transferred` in the target workspace (`data.from` names the source).
+
+### Shared with me and "Show in" — `/shared` (account routes, browser session only)
+
+A project is **shared with** a person when their membership in its workspace is limited to some projects (a guest). It never leaves its workspace.
+
+| Route                                       | Notes                                                                                                                                                              |
+| ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /shared/projects`                      | `SharedProject[]`: `{ id, name, key, color, icon?, workspace: { id, slug, name }, role, placement? }`. Open one at `/<workspace.slug>/projects/<id>`.            |
+| `PUT /shared/projects/:id/placement`        | `{ workspaceId, position? }` shows it in one of **my** workspaces (`404` if I am not a member there or it is not shared with me, `400` for its own workspace). `{ workspaceId: null }` hides it from Shared with me. One row per person and project. |
+| `DELETE /shared/projects/:id/placement`     | Back to Shared with me (`204`).                                                                                                                                    |
+| `POST /shared/projects/:id/leave`           | Removes my access to the project from that workspace's membership (`204`). A `guest` left with no project loses the membership.                                    |
+
+A placement belongs to one person and grants **nobody** access: reading the project still goes through its own workspace's permission checks, and a placement whose person lost their access stops being listed.
+
+### Personal workspace
+
+Sign-up (and the first login of an older account) creates the person's personal workspace: `personal: true`, named after them, slug derived from the name (unique, never reserved). One per user. It can be renamed, but it cannot be left (`DELETE /members/:id` on the owner), deleted or handed over (`409`).
+
 ### Milestones — `/milestones` (writes: `manageProjects`)
 
 Linear-style milestones inside a project (flat resource). `Milestone { id: ms_…, workspaceId, projectId, name, description?, targetDate?, sortOrder, createdAt, updatedAt }`; also in the snapshot (`milestones`, ordered by `sortOrder`).

@@ -46,6 +46,11 @@ export interface Workspace {
    * or demote them, and only they can remove or demote other owners. Absent on legacy rows.
    */
   primaryOwnerId?: ID;
+  /**
+   * The person's own workspace, created on sign-up. One per user. It can be renamed, but it cannot be left,
+   * deleted or handed over. Absent (or false) on every other workspace.
+   */
+  personal?: boolean;
   createdAt: ISODate;
 }
 
@@ -643,6 +648,77 @@ export interface Project {
 /** Linear-style project health: set by hand on a project, and also what the AI risk assessment reports. */
 export type ProjectHealth = 'on_track' | 'at_risk' | 'off_track';
 export const PROJECT_HEALTHS: ProjectHealth[] = ['on_track', 'at_risk', 'off_track'];
+
+// ───────────────────────────── Shared projects, placements and transfer ─────────────────────────────
+
+/**
+ * Where one person chose to show a project that was shared with them. Per user, nothing is stored on the
+ * project, and it gives nobody any access: opening the project still goes through its own workspace.
+ * `workspaceId` null means "hidden from Shared with me".
+ */
+export interface ProjectPlacement {
+  projectId: ID;
+  workspaceId: ID | null;
+  position: number;
+}
+
+/** A project the caller reaches through a limited (guest) membership in a workspace that is not theirs. */
+export interface SharedProject {
+  id: ID;
+  name: string;
+  key: string;
+  color: string;
+  icon?: string;
+  /** The workspace that owns the project. Open it at `/<workspace.slug>/projects/<id>`. */
+  workspace: { id: ID; slug: string; name: string };
+  /** The caller's role in that workspace. */
+  role: Role;
+  /** Absent: shown under Shared with me. */
+  placement?: ProjectPlacement;
+}
+
+/** What a project transfer will do to one status or label. */
+export interface ProjectTransferMapping {
+  /** `issue`, `project` or `project_health` for statuses; `label` for labels. */
+  kind: StatusSubject | 'label';
+  from: string;
+  /** Name in the target workspace. */
+  to: string;
+  /** `create` only for labels the target does not have yet. */
+  action: 'map' | 'create';
+  /** Records that carry it. */
+  count: number;
+}
+
+export interface ProjectTransferGuest {
+  userId: ID;
+  name: string;
+  email: string;
+  /** `add`: new guest in the target. `extend`: already a limited member there. `keep`: already has full access. */
+  action: 'add' | 'extend' | 'keep';
+  /** Role they get in the target. */
+  role: Role;
+}
+
+export interface ProjectTransferPreview {
+  project: { id: ID; name: string; key: string };
+  source: { id: ID; slug: string; name: string };
+  target: { id: ID; slug: string; name: string };
+  counts: { issues: number; milestones: number; timeEntries: number };
+  mappings: ProjectTransferMapping[];
+  guests: ProjectTransferGuest[];
+  /** Records whose assignee, lead or reporter is not a member of the target: they lose that person. */
+  unassigned: number;
+  /** Anything in here blocks the transfer (for example a project tag that is already used). */
+  blockers: string[];
+}
+
+export interface ProjectTransferResult {
+  project: Project;
+  target: { id: ID; slug: string; name: string };
+  counts: { issues: number; milestones: number; timeEntries: number };
+  unassigned: number;
+}
 
 // ── AI suggestions for a project (POST /w/:slug/projects/:id/ai/:kind) ──
 

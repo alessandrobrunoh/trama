@@ -22,6 +22,7 @@ import { MilestonesModule } from './milestones/milestones.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
 import { SearchModule } from './search/search.module.js';
+import { SharingModule } from './sharing/sharing.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
 import { TimeEntriesModule } from './time-entries/time-entries.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
@@ -44,6 +45,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     NotificationsModule,
     TimeEntriesModule,
     ProjectsModule,
+    SharingModule,
     IssuesModule,
     MilestonesModule,
     ArtifactsModule,

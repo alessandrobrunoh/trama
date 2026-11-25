@@ -4,6 +4,7 @@ import { IMPORT_ENTITIES } from '../importers/entities.js';
 import { EXTERNAL_IDENTITY_ENTITIES } from '../external-identities/external-identity.entity.js';
 import { INTEGRATION_ENTITIES } from '../integrations/entities.js';
 import { TIME_ENTRY_ENTITIES } from '../time-entries/time-entry.entity.js';
+import { SHARING_ENTITIES } from '../sharing/project-placement.entity.js';
 import { MIGRATIONS } from './migrations/index.js';
 
 export const DEFAULT_DATABASE_URL =
@@ -24,6 +25,7 @@ export function dataSourceOptions(url?: string): DataSourceOptions {
       ...EXTERNAL_IDENTITY_ENTITIES,
       ...IMPORT_ENTITIES,
       ...TIME_ENTRY_ENTITIES,
+      ...SHARING_ENTITIES,
     ],
     migrations: MIGRATIONS,
     migrationsRun: true,

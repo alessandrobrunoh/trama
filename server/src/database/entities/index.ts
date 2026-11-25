@@ -85,6 +85,10 @@ export class SessionEntity {
 }
 
 @Entity('workspaces')
+@Index('UQ_workspaces_personal_owner', ['primaryOwnerId'], {
+  unique: true,
+  where: '"personal"',
+})
 @ForeignKey(() => UserEntity, ['primaryOwnerId'], ['id'], {
   onDelete: 'SET NULL',
 })
@@ -99,6 +103,8 @@ export class WorkspaceEntity extends Wire {
   settings: Partial<WorkspaceSettings>;
   /** The user who owns the workspace (its creator until ownership is transferred); see `member-rules.ts`. */
   @Column({ type: 'varchar', nullable: true }) primaryOwnerId: string | null;
+  /** A person's own workspace: one per user (partial unique index on `primaryOwnerId`), never left, deleted or handed over. */
+  @Column({ type: 'boolean', default: false }) personal: boolean;
   @Column({ type: 'timestamptz', default: NOW }) createdAt: Date;
 
   /** Settings with defaults applied. */
