@@ -46,6 +46,7 @@ import {
   ListStateStore,
   TramaStore,
   UiStore,
+  Viewport,
   filterValues,
   isTypingTarget,
   queryGroups,
@@ -107,6 +108,11 @@ interface RowColumn {
 }
 
 const DRAGGABLE = new Set<IssueGroup>(['status', 'priority', 'assigneeId']);
+
+/** Heights of a desktop list row (`min-h-10`, `min-h-8`, and a sub-task's `min-h-[38px]`). */
+const ROW_PX = 40;
+const ROW_COMPACT_PX = 32;
+const SUBTASK_ROW_PX = 38;
 
 const FILTER_LABEL: Record<string, string> = {
   status: 'Status',
@@ -426,6 +432,7 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
         [layout]="d().layout === 'board' ? 'board' : 'list'"
         [disabled]="!draggable()"
         [prefix]="dropPrefix()"
+        [rowHeight]="rowHeight()"
         [addable]="canEdit() && showCreate()"
         addLabel="New task in this group"
         emptyText="No tasks"
@@ -777,6 +784,7 @@ export class IssueBoard {
   protected readonly actions = inject(IssueActions);
   protected readonly favorites = inject(FavoritesStore);
   private readonly document = inject(DOCUMENT);
+  private readonly vp = inject(Viewport);
 
   /** Issues this board shows. */
   readonly issues = input.required<readonly Issue[]>();
@@ -964,6 +972,17 @@ export class IssueBoard {
   protected readonly dateField = computed<'dueDate' | 'updatedAt' | 'createdAt'>(() => {
     const sort = this.d().sortField;
     return sort === 'createdAt' || sort === 'updatedAt' ? sort : 'dueDate';
+  });
+
+  /**
+   * Row heights of the desktop list (the phone rows are two lines of varying height): lets the list draw
+   * only the rows near the viewport. Keep in step with the row classes in issue-items.ts.
+   */
+  protected readonly rowHeight = computed<((row: IssueTreeRow) => number) | null>(() => {
+    if (this.vp.isMobile() || this.d().layout !== 'list') return null;
+    const row = this.d().density === 'compact' ? ROW_COMPACT_PX : ROW_PX;
+    const nested = this.nested();
+    return (r) => (nested && r.depth > 0 ? SUBTASK_ROW_PX : row);
   });
 
   protected readonly flow = computed(() =>
