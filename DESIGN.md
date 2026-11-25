@@ -273,8 +273,8 @@ Frame → route → where the code lives. ✓ = rebuilt to the frame; ○ = not 
 
 | Frame | Node | Route / surface | Status |
 |---|---|---|---|
-| 02 Home | `kdjLY` | `/:ws/overview` (`features/home`) | ✓ (accent to update) |
-| 03 Inbox | `blc9n` | `/:ws/inbox` | ○ |
+| 02 Home | `kdjLY` | `/:ws/overview` (`features/home`) | ✓ |
+| 03 Inbox | `blc9n` | `/:ws/inbox` (`features/inbox`) | ✓ |
 | 04 Tasks | `FuEwS` | `/:ws/tasks` | ○ |
 | 05 Board | `XiRmK` | `/:ws/board` | ○ |
 | 06 Task detail | `zkj4G` | `/:ws/tasks/:key` | ○ |

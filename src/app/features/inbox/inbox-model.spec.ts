@@ -1,6 +1,6 @@
 import type { Artifact, AttentionItem, Issue, Notification } from '../../core';
 import { DAY } from '../stats/flow-stats';
-import { buildInbox, taskKeyOf, type InboxContext } from './inbox-model';
+import { LEGACY_TABS, buildInbox, taskKeyOf, tabOf, type InboxContext } from './inbox-model';
 
 const NOW = Date.parse('2026-03-20T12:00:00Z');
 const iso = (offsetDays: number): string => new Date(NOW + offsetDays * DAY).toISOString();
@@ -163,6 +163,32 @@ describe('buildInbox', () => {
     expect(updates[1].sentence).toBe('Marco commented on AH-31');
     expect(updates[0].unread).toBe(true);
     expect(updates[1].unread).toBe(false);
+  });
+
+  it('files every entry under one tab and names its kind for the preview', () => {
+    const sections = buildInbox(
+      {
+        attention: [attention('review'), attention('gone', { state: 'dismissed' })],
+        mine: issues,
+        notifications: [],
+      },
+      ctx,
+    );
+    const all = sections.flatMap((s) => s.entries);
+    const tab = (id: string) => tabOf(all.find((e) => e.id === id)!);
+    expect(tab('review')).toBe('sync');
+    expect(tab('gone')).toBe('later');
+    expect(tab('task:40')).toBe('records');
+    expect(all.find((e) => e.id === 'review')?.kicker).toBe('Review requested');
+    expect(all.find((e) => e.id === 'task:40')?.kicker).toBe('Stale');
+  });
+
+  it('maps old and current ?tab= values to a tab', () => {
+    expect(LEGACY_TABS['needs-you']).toBe('sync');
+    expect(LEGACY_TABS['tasks']).toBe('records');
+    expect(LEGACY_TABS['updates']).toBe('mentions');
+    expect(LEGACY_TABS['mentions']).toBe('mentions');
+    expect(LEGACY_TABS['nope']).toBeUndefined();
   });
 
   it('always keeps the first section, even when empty', () => {

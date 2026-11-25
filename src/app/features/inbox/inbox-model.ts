@@ -7,12 +7,14 @@
 //   Updates             assignments and comments that concern you
 //   Snoozed and dismissed   what you set aside (shown collapsed, one click from coming back)
 import {
+  LucideCircleDot,
   LucideCircleX,
   LucideGitMerge,
   LucideGitPullRequest,
   LucideInbox,
-  LucideMessageSquare,
-  LucideUserRoundCheck,
+  LucideMessageCircle,
+  LucideTriangleAlert,
+  LucideUser,
   type LucideIcon,
 } from '@lucide/angular';
 import {
@@ -29,12 +31,47 @@ import { groupOf } from './my-tasks';
 
 export type InboxSectionId = 'action' | 'progress' | 'stale' | 'updates' | 'later';
 
-/** The `?tab=` values older links use, and the section each one points at. */
-export const LEGACY_TABS: Readonly<Record<string, InboxSectionId>> = {
-  'needs-you': 'action',
-  tasks: 'progress',
-  updates: 'updates',
+/**
+ * The Inbox tabs (v3): All, then one tab per origin.
+ *   Mentions  assignments and comments that concern you
+ *   Records   your tasks in progress, and the ones gone stale
+ *   Sync      what the providers report: reviews, failing checks, conflicts, triage
+ *   Later     what you snoozed or dismissed (only shown when there is some)
+ */
+export type InboxTab = 'all' | 'mentions' | 'records' | 'sync' | 'later';
+
+export const INBOX_TABS: readonly { id: InboxTab; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'mentions', label: 'Mentions' },
+  { id: 'records', label: 'Records' },
+  { id: 'sync', label: 'Sync' },
+  { id: 'later', label: 'Later' },
+];
+
+/** The tab an entry belongs to (besides All, which holds everything but Later). */
+export function tabOf(e: Pick<InboxEntry, 'section'>): Exclude<InboxTab, 'all'> {
+  switch (e.section) {
+    case 'action':
+      return 'sync';
+    case 'progress':
+    case 'stale':
+      return 'records';
+    case 'updates':
+      return 'mentions';
+    case 'later':
+      return 'later';
+  }
+}
+
+export const isInboxTab = (v: unknown): v is InboxTab => INBOX_TABS.some((t) => t.id === v);
+
+/** The `?tab=` values older links use (and the current ones), and the tab each opens. */
+export const LEGACY_TABS: Readonly<Record<string, InboxTab>> = {
+  'needs-you': 'sync',
+  tasks: 'records',
+  updates: 'mentions',
   later: 'later',
+  ...Object.fromEntries(INBOX_TABS.map((t) => [t.id, t.id])),
 };
 
 export type RowAction =
@@ -54,6 +91,8 @@ export interface InboxEntry {
   section: InboxSectionId;
   /** One plain sentence: why this is here. */
   sentence: string;
+  /** What kind of event it is, in a few words ("Review requested", "Stale"): the preview's kicker. */
+  kicker: string;
   /** What it is about: the task key and a short text (the title, or the comment). */
   key?: string;
   text?: string;
@@ -127,11 +166,13 @@ export function artifactRef(a: Artifact | undefined, fallback: string): string {
 const isRequest = (a: Artifact | undefined): boolean =>
   a?.kind === 'pull_request' || a?.kind === 'merge_request';
 
-const ATTENTION_ICON: Record<AttentionItem['kind'], { icon: LucideIcon; color: string }> = {
-  review_requested: { icon: LucideGitPullRequest, color: 'text-status-in-review' },
-  ci_failed: { icon: LucideCircleX, color: 'text-status-blocked' },
-  conflict: { icon: LucideGitMerge, color: 'text-status-blocked' },
-  triage: { icon: LucideInbox, color: 'text-status-working' },
+// v3 Inbox icon colours: blue for review and links, red for what is broken, yellow for status and staleness,
+// muted for the rest.
+const ATTENTION_ICON: Record<AttentionItem['kind'], { icon: LucideIcon; color: string; kicker: string }> = {
+  review_requested: { icon: LucideGitPullRequest, color: 'text-delta-line', kicker: 'Review requested' },
+  ci_failed: { icon: LucideCircleX, color: 'text-red', kicker: 'Checks failing' },
+  conflict: { icon: LucideGitMerge, color: 'text-red', kicker: 'Merge conflict' },
+  triage: { icon: LucideInbox, color: 'text-muted-foreground', kicker: 'Needs triage' },
 };
 
 /** The sentence for an attention item: what is wrong or asked, where, and for which task. */
@@ -180,6 +221,7 @@ export function attentionEntry(item: AttentionItem, ctx: InboxContext): InboxEnt
     return {
       ...base,
       section: 'later',
+      kicker: item.state === 'snoozed' ? 'Snoozed' : 'Dismissed',
       sentence: attentionSentence(item, ctx),
       primary: { type: 'restore', label: 'Restore' },
       canSnooze: false,
@@ -199,6 +241,7 @@ export function attentionEntry(item: AttentionItem, ctx: InboxContext): InboxEnt
   return {
     ...base,
     section: 'action',
+    kicker: view.kicker,
     sentence: attentionSentence(item, ctx),
     primary,
     canSnooze: true,
@@ -222,6 +265,7 @@ export function taskEntry(issue: Issue, ctx: InboxContext): InboxEntry {
     id: `task:${issue.id}`,
     source: 'task',
     section: idle ? 'stale' : 'progress',
+    kicker: idle ? 'Stale' : state,
     sentence: issue.title,
     key: issue.key,
     text: idle ? `No activity for ${plural(days, 'day')}` : state,
@@ -229,8 +273,8 @@ export function taskEntry(issue: Issue, ctx: InboxContext): InboxEntry {
     issueKey: issue.key,
     at: new Date(at).toISOString(),
     unread: false,
-    icon: LucideInbox,
-    iconColor: 'text-muted-foreground',
+    icon: idle ? LucideTriangleAlert : LucideCircleDot,
+    iconColor: idle || issue.status !== 'in_review' ? 'text-yellow' : 'text-delta-line',
     status: issue.status,
     primary: idle ? { type: 'open', label: 'Open' } : { type: 'done', label: 'Mark done' },
     canSnooze: false,
@@ -241,9 +285,9 @@ export function taskEntry(issue: Issue, ctx: InboxContext): InboxEntry {
   };
 }
 
-const UPDATE_ICON: Record<string, { icon: LucideIcon; color: string }> = {
-  assigned: { icon: LucideUserRoundCheck, color: 'text-primary' },
-  comment: { icon: LucideMessageSquare, color: 'text-muted-foreground' },
+const UPDATE_ICON: Record<string, { icon: LucideIcon; color: string; kicker: string }> = {
+  assigned: { icon: LucideUser, color: 'text-muted-foreground', kicker: 'Assigned to you' },
+  comment: { icon: LucideMessageCircle, color: 'text-muted-foreground', kicker: 'New comment' },
 };
 
 export function updateEntry(n: Notification, ctx: InboxContext): InboxEntry {
@@ -260,6 +304,7 @@ export function updateEntry(n: Notification, ctx: InboxContext): InboxEntry {
     id: n.id,
     source: 'update',
     section: 'updates',
+    kicker: UPDATE_ICON[n.kind]?.kicker ?? 'Update',
     sentence,
     key: issue?.key ?? key,
     text: n.kind === 'comment' && n.body ? `“${n.body}”` : (issue?.title ?? n.body),

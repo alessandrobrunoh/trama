@@ -9,12 +9,12 @@ import {
   signal,
   untracked,
 } from '@angular/core';
+import { NgTemplateOutlet } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
-import { LucideChevronRight, LucideDynamicIcon, LucideInbox } from '@lucide/angular';
+import { LucideInbox } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCalendar } from '@spartan-ng/helm/calendar';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
-import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { toast } from '@spartan-ng/brain/sonner';
 import {
   ApiClient,
@@ -24,25 +24,29 @@ import {
   TimeEntriesStore,
   TramaStore,
   UiStore,
+  Viewport,
   resolveStatusEntry,
   shortDate,
   usePageShortcuts,
   type AttentionItem,
 } from '../../core';
-import { StatusBar } from '../../layout/status-bar';
+import { TopBarActions } from '../../layout/page-chrome';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { morningOf, snoozePresets } from '../attention/snooze';
-import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
 import { DEFAULT_IDLE_DAYS, activityLookup } from '../stats/flow-stats';
 import {
+  INBOX_TABS,
   LEGACY_TABS,
   buildInbox,
+  isInboxTab,
+  tabOf,
   type InboxContext,
   type InboxEntry,
-  type InboxSectionId,
+  type InboxTab,
 } from './inbox-model';
+import { InboxPreview } from './inbox-preview';
 import { InboxRow } from './inbox-row';
 
 type Scope = 'mine' | 'all';
@@ -51,182 +55,164 @@ type Scope = 'mine' | 'all';
 const RECENT_MS = 3 * 86_400_000;
 const UPDATES_VISIBLE = 8;
 
+const newest = (a: InboxEntry, b: InboxEntry): number => b.at.localeCompare(a.at);
+
+/** Enter on a focused control belongs to that control, not to the selected row. */
+const onControl = (): boolean =>
+  document.activeElement instanceof HTMLElement &&
+  !!document.activeElement.closest('a[href], button, input, textarea, select, [role="menuitem"]');
+
 /**
- * `/:workspace/inbox`: everything that concerns you, in one list. Every row is one plain sentence that says why it is
- * here, what it is about and the one action that resolves it.
+ * `/:workspace/inbox` (v3 "03 · Inbox"): everything that concerns you, as one list with a preview beside it.
  *
- *   Needs your action       reviews, failing checks, conflicts and triage
- *   Your tasks in progress  what you are working on and that is moving
- *   Stale                   started, but quiet for a while
- *   Updates                 assignments and comments that concern you
- *   Snoozed and dismissed   set aside, collapsed, one click from coming back
+ *   tabs      All · Mentions (assignments, comments) · Records (your tasks moving or stale) ·
+ *             Sync (reviews, failing checks, conflicts, triage) · Later (snoozed and dismissed, when any)
+ *   list      480px; one 60px row per item, newest first, the selected one filled
+ *   preview   what it is, what changed, what Trama will not do for you, and the actions with their keys
  *
- * The old `?tab=needs-you|tasks|updates|later` links still work: they scroll to (and open) that section.
- * Keyboard: J/K move, Enter opens, E dismisses (or marks read), H snoozes, D marks a task done, R restores.
+ * `?tab=` opens a tab (older links such as `?tab=needs-you` still work). Phones show the list only and a tap opens
+ * the item. Keyboard: J/K move, Enter opens, O opens the Delta thread, E dismisses (or marks read), H snoozes,
+ * D marks a task done, R restores, ⇧R marks every update read.
  */
 @Component({
   selector: 'app-inbox-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    NgTemplateOutlet,
     RouterLink,
-    LucideDynamicIcon,
     HlmButtonImports,
     HlmCalendar,
     HlmDialogImports,
-    HlmToggleGroupImports,
     EmptyState,
     Kbd,
     PageHeader,
-    StatusBar,
-    OnboardingChecklist,
+    TopBarActions,
+    InboxPreview,
     InboxRow,
   ],
-  host: { class: 'flex min-h-full flex-col' },
+  host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
-    <app-page-header title="Inbox" [description]="summary()" />
+    <app-page-header title="Inbox" />
 
-    <app-status-bar>
-      <span aria-live="polite">{{ summary() }}</span>
-      @if (hasRows()) {
-        <span class="flex items-center gap-1"><app-kbd keys="j" /><app-kbd keys="k" /> move</span>
-        <span class="flex items-center gap-1"><app-kbd keys="enter" /> open</span>
-        <span class="flex items-center gap-1"><app-kbd keys="e" /> dismiss</span>
-        <span class="flex items-center gap-1"><app-kbd keys="h" /> snooze</span>
-      }
+    <ng-template appTopBarActions>
       @if (canSeeAll()) {
-        <hlm-toggle-group
-          end
-          type="single"
-          variant="outline"
-          size="sm"
-          [value]="scope()"
-          (valueChange)="setScope($event)"
-          aria-label="Whose actions"
-        >
-          <button hlmToggleGroupItem value="mine">Mine</button>
-          <button hlmToggleGroupItem value="all">Everyone</button>
-        </hlm-toggle-group>
-      }
-    </app-status-bar>
-
-    <app-onboarding-checklist compact class="px-4 pt-3 sm:px-6" />
-
-    @if (canSeeAll()) {
-      <div class="flex justify-end px-4 pt-2 sm:hidden">
-        <hlm-toggle-group
-          type="single"
-          variant="outline"
-          size="sm"
-          [value]="scope()"
-          (valueChange)="setScope($event)"
-          aria-label="Whose actions"
-        >
-          <button hlmToggleGroupItem value="mine" class="h-9">Mine</button>
-          <button hlmToggleGroupItem value="all" class="h-9">Everyone</button>
-        </hlm-toggle-group>
-      </div>
-    }
-
-    @if (scope() === 'all' && loadingAll()) {
-      <p class="text-meta px-4 py-6 sm:px-6">Loading everyone's actions…</p>
-    } @else {
-      @if (allClear()) {
-        <app-empty-state
-          [icon]="inboxIcon"
-          title="Nothing needs you"
-          description="No reviews, failing checks, stale tasks or unread updates. Anything that needs a human shows up here, with what to do next."
-        >
-          <div class="flex flex-wrap justify-center gap-2">
-            <a hlmBtn variant="outline" size="sm" [routerLink]="['/', slug(), 'tasks']">Browse tasks</a>
-            @if (!store.agents().length) {
-              <a hlmBtn variant="ghost" size="sm" [routerLink]="['/', slug(), 'connect']">Connect your agent</a>
-            }
-          </div>
-        </app-empty-state>
-      }
-
-      @for (s of visible(); track s.id) {
-        @if (s.id !== 'later') {
-          @if (!(s.id === 'action' && allClear())) {
-            <section [attr.aria-label]="s.title" [attr.id]="'inbox-' + s.id" class="scroll-mt-2">
-              <header class="text-muted-foreground mt-2 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5">
-                <h2 class="font-normal">{{ s.title }}</h2>
-                <span class="tabular-nums">{{ s.total }}</span>
-                <span class="text-meta ms-2 hidden truncate md:inline">{{ s.hint }}</span>
-                @if (s.id === 'updates' && notifications.unread()) {
-                  <button
-                    type="button"
-                    hlmBtn
-                    variant="ghost"
-                    size="sm"
-                    class="text-muted-foreground ms-auto h-6 px-2 text-xs"
-                    (click)="notifications.markRead()"
-                  >
-                    Mark all as read
-                  </button>
-                }
-              </header>
-              @for (e of s.entries; track e.id) {
-                <app-inbox-row
-                  [entry]="e"
-                  [slug]="slug()"
-                  [focused]="ui.focusedRowId() === e.id"
-                  (rowClicked)="ui.setFocusedRow(e.id)"
-                  (visited)="visited(e)"
-                  (open)="open(e)"
-                  (primary)="primary(e)"
-                  (snooze)="snooze(e.attention!, $event)"
-                  (pickDate)="openSnooze(e.attention!)"
-                  (dismiss)="dismiss(e.attention!)"
-                  (markDone)="markDone(e)"
-                  (markRead)="markRead(e)"
-                />
-              } @empty {
-                <p class="text-meta px-4 py-2 ps-[2.875rem] sm:pe-5">Nothing needs you right now.</p>
-              }
-              @if (s.id === 'updates' && s.hidden > 0) {
-                <button
-                  type="button"
-                  class="text-meta hover:text-foreground px-4 py-2 ps-[2.875rem] text-start outline-none focus-visible:underline sm:pe-5"
-                  (click)="showOlder.set(true)"
-                >
-                  Show {{ s.hidden }} older
-                </button>
-              }
-            </section>
-          }
-        } @else {
-          <section aria-label="Snoozed and dismissed" id="inbox-later" class="scroll-mt-2">
+        <div class="flex items-center" role="group" aria-label="Whose actions">
+          @for (s of scopes; track s.id) {
             <button
               type="button"
-              class="text-muted-foreground hover:bg-hover mt-2 flex h-8 w-full items-center gap-2 px-4 text-start text-[13px] outline-none focus-visible:underline sm:px-5"
-              [attr.aria-expanded]="laterOpen()"
-              (click)="laterOpen.set(!laterOpen())"
+              class="border-border -ms-px h-[22px] border px-2.5 font-mono text-[11px] first:ms-0"
+              [class.bg-secondary]="scope() === s.id"
+              [class.text-foreground]="scope() === s.id"
+              [class.text-muted-foreground]="scope() !== s.id"
+              [attr.aria-pressed]="scope() === s.id"
+              (click)="setScope(s.id)"
             >
-              <span class="flex shrink-0 transition-transform" [class.rotate-90]="laterOpen()">
-                <svg [lucideIcon]="chevron" [size]="12"></svg>
-              </span>
-              <span>{{ s.title }}</span>
-              <span class="tabular-nums">{{ s.total }}</span>
-              <span class="text-meta ms-2 hidden truncate md:inline">{{ s.hint }}</span>
+              {{ s.label }}
             </button>
-            @if (laterOpen()) {
-              @for (e of s.entries; track e.id) {
-                <app-inbox-row
-                  [entry]="e"
-                  [slug]="slug()"
-                  [focused]="ui.focusedRowId() === e.id"
-                  (rowClicked)="ui.setFocusedRow(e.id)"
-                  (visited)="visited(e)"
-                  (open)="open(e)"
-                  (primary)="primary(e)"
-                />
+          }
+        </div>
+      }
+      <button
+        hlmBtn
+        variant="outline"
+        type="button"
+        [disabled]="!notifications.unread()"
+        (click)="notifications.markRead()"
+      >
+        Mark all read <app-kbd keys="shift+r" />
+      </button>
+    </ng-template>
+
+    <div class="flex min-h-0 flex-1">
+      <!-- list -->
+      <div class="border-border flex min-h-0 w-full flex-col md:w-[480px] md:shrink-0 md:border-r">
+        <div class="border-border flex shrink-0 items-center gap-4 overflow-x-auto border-b px-4 py-2.5" role="tablist">
+          @for (t of tabs(); track t.id) {
+            <button
+              type="button"
+              role="tab"
+              class="flex shrink-0 items-baseline gap-1.5 font-mono outline-none focus-visible:underline"
+              [attr.aria-selected]="tab() === t.id"
+              (click)="selectTab(t.id)"
+            >
+              <span
+                class="text-[11.5px] leading-[14px]"
+                [class.text-foreground]="tab() === t.id"
+                [class.text-muted-foreground]="tab() !== t.id"
+                >{{ t.label }}</span
+              >
+              <span class="text-faint text-[10.5px] leading-[13px] tabular-nums">{{ t.count }}</span>
+            </button>
+          }
+        </div>
+
+        <div class="min-h-0 flex-1 overflow-y-auto" role="listbox" aria-label="Inbox">
+          @if (scope() === 'all' && loadingAll()) {
+            <p class="text-faint px-4 py-6 text-[12px]">Loading everyone's actions…</p>
+          } @else {
+            @for (e of list().entries; track e.id) {
+              <app-inbox-row
+                [entry]="e"
+                [focused]="selected()?.id === e.id"
+                [openOnClick]="viewport.isMobile()"
+                (rowClicked)="ui.setFocusedRow(e.id)"
+                (open)="open(e)"
+              />
+            } @empty {
+              @if (!allClear()) {
+                <p class="text-faint px-4 py-6 text-[12px]">Nothing in {{ tabLabel() }}.</p>
               }
             }
-          </section>
+            @if (list().hidden > 0) {
+              <button
+                type="button"
+                class="text-faint hover:text-foreground w-full px-4 py-3 text-start font-mono text-[11px] outline-none focus-visible:underline"
+                (click)="showOlder.set(true)"
+              >
+                Show {{ list().hidden }} older
+              </button>
+            }
+          }
+          @if (allClear() && viewport.isMobile()) {
+            <ng-container *ngTemplateOutlet="empty" />
+          }
+        </div>
+      </div>
+
+      <!-- preview -->
+      <div class="hidden min-h-0 min-w-0 flex-1 overflow-y-auto md:block">
+        @if (selected(); as e) {
+          <app-inbox-preview
+            [entry]="e"
+            [slug]="slug()"
+            (open)="open(e)"
+            (markDone)="markDone(e)"
+            (markRead)="markRead(e)"
+            (dismiss)="dismiss(e.attention!)"
+            (snooze)="openSnooze(e.attention!)"
+            (restore)="restore(e.attention!)"
+            (toReview)="toReview(e)"
+          />
+        } @else if (allClear()) {
+          <ng-container *ngTemplateOutlet="empty" />
         }
-      }
-    }
+      </div>
+    </div>
+
+    <ng-template #empty>
+      <app-empty-state
+        [icon]="inboxIcon"
+        title="Nothing needs you"
+        description="No reviews, failing checks, stale tasks or unread updates. Anything that needs a human shows up here, with what to do next."
+      >
+        <div class="flex flex-wrap justify-center gap-2">
+          <a hlmBtn variant="outline" [routerLink]="['/', slug(), 'tasks']">Browse tasks</a>
+          @if (!store.agents().length) {
+            <a hlmBtn variant="ghost" [routerLink]="['/', slug(), 'connect']">Connect your agent</a>
+          }
+        </div>
+      </app-empty-state>
+    </ng-template>
 
     <!-- Snooze with a date -->
     <hlm-dialog [state]="snoozeFor() ? 'open' : 'closed'" (closed)="closeSnooze()">
@@ -243,7 +229,7 @@ const UPDATES_VISIBLE = 8;
             </button>
           }
         </div>
-        <div class="flex justify-center rounded-md border">
+        <div class="border-border flex justify-center border">
           <hlm-calendar
             [date]="pickedDate()"
             [min]="minDate"
@@ -264,12 +250,13 @@ const UPDATES_VISIBLE = 8;
 export class InboxPage {
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
-  /** From `?tab=`: an old link to one of the former tabs. It scrolls to that section. */
-  readonly tab = input<string>();
+  /** From `?tab=`: the tab to open (older links name a former section, see LEGACY_TABS). */
+  readonly tabParam = input<string>(undefined, { alias: 'tab' });
 
   protected readonly store = inject(TramaStore);
   protected readonly notifications = inject(NotificationsStore);
   protected readonly ui = inject(UiStore);
+  protected readonly viewport = inject(Viewport);
   private readonly listState = inject(ListStateStore);
   private readonly api = inject(ApiClient);
   private readonly time = inject(TimeEntriesStore);
@@ -277,14 +264,17 @@ export class InboxPage {
   private readonly router = inject(Router);
 
   protected readonly inboxIcon = LucideInbox;
-  protected readonly chevron = LucideChevronRight;
   protected readonly minDate = new Date();
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
+  protected readonly scopes: readonly { id: Scope; label: string }[] = [
+    { id: 'mine', label: 'Mine' },
+    { id: 'all', label: 'Everyone' },
+  ];
 
-  // Scope survives navigation inside the app (see ListStateStore).
+  // Scope and tab survive navigation inside the app (see ListStateStore).
   protected readonly scope = this.listState.remember<Scope>('attention.scope', 'mine');
+  private readonly pickedTab = this.listState.remember<InboxTab>('inbox.tab', 'all');
   protected readonly canSeeAll = computed(() => this.store.can('admin'));
-  protected readonly laterOpen = signal(false);
   protected readonly showOlder = signal(false);
 
   /** Re-read the clock once a minute so "stale" and the relative times do not go old on a long-open tab. */
@@ -322,55 +312,52 @@ export class InboxPage {
     idleDays: DEFAULT_IDLE_DAYS,
   }));
 
-  private readonly model = computed(() =>
+  private readonly entries = computed(() =>
     buildInbox(
       { attention: this.attention(), mine: this.mine(), notifications: this.notifications.items() },
       this.context(),
+    ).flatMap((s) => s.entries),
+  );
+
+  private readonly inTab = (tab: InboxTab): InboxEntry[] => {
+    const all = this.entries();
+    // All: everything but what was set aside, newest first. Sync keeps the severity order of the queue.
+    if (tab === 'all') return all.filter((e) => e.section !== 'later').sort(newest);
+    return all.filter((e) => tabOf(e) === tab);
+  };
+
+  /** The tabs with their counts; Later only while something is snoozed or dismissed. */
+  protected readonly tabs = computed(() =>
+    INBOX_TABS.map((t) => ({ ...t, count: this.inTab(t.id).length })).filter(
+      (t) => t.id !== 'later' || t.count > 0 || this.pickedTab() === 'later',
     ),
   );
+  protected readonly tab = computed<InboxTab>(() => {
+    const t = this.pickedTab();
+    return this.tabs().some((x) => x.id === t) ? t : 'all';
+  });
+  protected readonly tabLabel = computed(() => INBOX_TABS.find((t) => t.id === this.tab())?.label ?? 'All');
 
-  /** The sections as shown: Updates cut to the recent ones unless "Show older" was pressed. */
-  protected readonly visible = computed(() => {
-    const older = this.showOlder();
+  /** The rows of the open tab: read updates older than a few days wait behind "Show older". */
+  protected readonly list = computed(() => {
+    const entries = this.inTab(this.tab());
+    if (this.showOlder()) return { entries, hidden: 0 };
     const cutoff = this.now() - RECENT_MS;
-    return this.model().map((s) => {
-      if (s.id !== 'updates' || older) return { ...s, total: s.entries.length, hidden: 0 };
-      const shown = s.entries.filter((e, i) => e.unread || i < UPDATES_VISIBLE || Date.parse(e.at) >= cutoff);
-      return { ...s, entries: shown, total: s.entries.length, hidden: s.entries.length - shown.length };
-    });
+    let updates = 0;
+    const shown = entries.filter(
+      (e) => e.source !== 'update' || e.unread || updates++ < UPDATES_VISIBLE || Date.parse(e.at) >= cutoff,
+    );
+    return { entries: shown, hidden: entries.length - shown.length };
   });
 
-  /** Rows in on-screen order (drives focus movement after an action). */
-  private readonly flat = computed(() =>
-    this.visible().flatMap((s) => (s.id === 'later' && !this.laterOpen() ? [] : s.entries)),
-  );
-  private readonly count = (id: InboxSectionId): number =>
-    this.model().find((s) => s.id === id)?.entries.length ?? 0;
-
-  protected readonly hasRows = computed(() => this.flat().length > 0);
   /** Nothing to act on, nothing moving, nothing unread: the empty state. */
-  protected readonly allClear = computed(
-    () =>
-      this.count('action') === 0 &&
-      this.count('progress') === 0 &&
-      this.count('stale') === 0 &&
-      this.count('updates') === 0,
-  );
+  protected readonly allClear = computed(() => this.inTab('all').length === 0);
 
-  protected readonly summary = computed(() => {
-    const parts: string[] = [];
-    const n = this.count('action');
-    if (n) parts.push(`${n} ${n === 1 ? 'needs' : 'need'} your action`);
-    const s = this.count('stale');
-    if (s) parts.push(`${s} stale`);
-    const u = this.notifications.updatesUnread();
-    if (u) parts.push(`${u} unread`);
-    return parts.join(' · ') || 'All clear';
-  });
-
-  private readonly focusedEntry = computed(() => {
+  /** The selected row: the keyboard-focused one, else the first. Its preview shows on the right. */
+  protected readonly selected = computed<InboxEntry | undefined>(() => {
+    const list = this.list().entries;
     const id = this.ui.focusedRowId();
-    return id ? this.flat().find((e) => e.id === id) : undefined;
+    return list.find((e) => e.id === id) ?? list[0];
   });
 
   // snooze dialog
@@ -384,30 +371,50 @@ export class InboxPage {
     const tick = setInterval(() => this.now.set(Date.now()), 60_000);
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
 
-    // An old `?tab=` link points at one section: open it and scroll there once its rows exist.
+    // The list always has a selection: keep the keyboard focus on it, so J moves on from the row on screen.
+    effect(() => {
+      const id = this.selected()?.id ?? null;
+      if (id && untracked(() => this.ui.focusedRowId()) !== id) untracked(() => this.ui.setFocusedRow(id));
+    });
+
+    // `?tab=` opens that tab (once per value).
     let handled: string | undefined;
     effect(() => {
-      const target = LEGACY_TABS[this.tab() ?? ''];
-      const ready = !!target && this.model().some((s) => s.id === target && s.entries.length > 0);
-      if (!target || !ready || handled === this.tab()) return;
-      handled = this.tab();
-      untracked(() => {
-        if (target === 'later') this.laterOpen.set(true);
-        if (target !== 'action')
-          setTimeout(() => document.getElementById(`inbox-${target}`)?.scrollIntoView({ block: 'start' }), 100);
-      });
+      const raw = this.tabParam() ?? '';
+      const target = LEGACY_TABS[raw];
+      if (!target || handled === raw) return;
+      handled = raw;
+      untracked(() => this.pickedTab.set(target));
     });
 
     usePageShortcuts([
       {
+        keys: 'enter',
+        label: 'Open the selected item',
+        when: () => !!this.selected() && !onControl(),
+        run: () => this.open(this.selected()!),
+      },
+      {
+        keys: 'o',
+        label: 'Open the task’s Delta thread',
+        when: () => !!this.selected()?.issue?.threadUrl,
+        run: () => window.open(this.selected()!.issue!.threadUrl, '_blank', 'noopener'),
+      },
+      {
+        keys: 'shift+r',
+        label: 'Mark all updates as read',
+        when: () => this.notifications.unread() > 0,
+        run: () => void this.notifications.markRead(),
+      },
+      {
         keys: 'e',
         label: 'Dismiss item or mark update as read',
         when: () => {
-          const e = this.focusedEntry();
+          const e = this.selected();
           return !!e && (e.canDismiss || e.canMarkRead);
         },
         run: () => {
-          const e = this.focusedEntry()!;
+          const e = this.selected()!;
           if (e.canDismiss) this.dismiss(e.attention!);
           else this.markRead(e);
         },
@@ -415,26 +422,26 @@ export class InboxPage {
       {
         keys: 'h',
         label: 'Snooze item…',
-        when: () => !!this.focusedEntry()?.canSnooze,
-        run: () => this.openSnooze(this.focusedEntry()!.attention!),
+        when: () => !!this.selected()?.canSnooze,
+        run: () => this.openSnooze(this.selected()!.attention!),
       },
       {
         keys: 's',
         label: 'Snooze item… (alias of H)',
-        when: () => !!this.focusedEntry()?.canSnooze,
-        run: () => this.openSnooze(this.focusedEntry()!.attention!),
+        when: () => !!this.selected()?.canSnooze,
+        run: () => this.openSnooze(this.selected()!.attention!),
       },
       {
         keys: 'd',
         label: 'Mark task done',
-        when: () => this.focusedEntry()?.source === 'task',
-        run: () => this.markDone(this.focusedEntry()!),
+        when: () => this.selected()?.source === 'task',
+        run: () => this.markDone(this.selected()!),
       },
       {
         keys: 'r',
         label: 'Restore item',
-        when: () => this.focusedEntry()?.section === 'later',
-        run: () => this.restore(this.focusedEntry()!.attention!),
+        when: () => this.selected()?.section === 'later',
+        run: () => this.restore(this.selected()!.attention!),
       },
     ]);
 
@@ -446,6 +453,12 @@ export class InboxPage {
       const t = setTimeout(() => void this.loadAll(slug), this.allItems() === null ? 0 : 600);
       onCleanup(() => clearTimeout(t));
     });
+  }
+
+  protected selectTab(t: InboxTab): void {
+    if (!isInboxTab(t)) return;
+    this.pickedTab.set(t);
+    this.ui.setFocusedRow(null);
   }
 
   private async loadAll(slug: string): Promise<void> {
@@ -464,8 +477,7 @@ export class InboxPage {
     }
   }
 
-  protected setScope(v: unknown): void {
-    const next: Scope = v === 'all' ? 'all' : 'mine';
+  protected setScope(next: Scope): void {
     if (next === this.scope()) return;
     this.allItems.set(null);
     this.scope.set(next);
@@ -473,38 +485,16 @@ export class InboxPage {
 
   // ───────── row actions ─────────
 
-  /** The row's link was followed: an update the person looked at counts as read. */
-  protected visited(e: InboxEntry): void {
-    if (e.canMarkRead) this.markRead(e);
-  }
-
   /** A click on the row: open it. */
   protected open(e: InboxEntry): void {
     if (e.canMarkRead) this.markRead(e);
     void this.router.navigate(['/', this.slug(), ...e.route], { queryParams: e.query });
   }
 
-  /** The primary button. "Open" links navigate on their own; here only what they leave behind happens. */
-  protected primary(e: InboxEntry): void {
-    switch (e.primary.type) {
-      case 'open':
-        if (e.canMarkRead) this.markRead(e);
-        break;
-      case 'done':
-        void this.markDone(e);
-        break;
-      case 'restore':
-        this.restore(e.attention!);
-        break;
-      case 'external':
-        break;
-    }
-  }
-
   /** Move the keyboard focus to the neighbour before `id` disappears from the list. */
   private advanceFocus(id: string): void {
-    if (this.ui.focusedRowId() !== id) return;
-    const flat = this.flat();
+    if (this.selected()?.id !== id) return;
+    const flat = this.list().entries;
     const i = flat.findIndex((e) => e.id === id);
     this.ui.setFocusedRow((flat[i + 1] ?? flat[i - 1])?.id ?? null);
   }
@@ -524,6 +514,19 @@ export class InboxPage {
     const prev = issue.status;
     const name = resolveStatusEntry(this.store.settings().statuses.issue, 'done')?.name ?? 'Done';
     if (await this.store.updateIssue(issue.id, { status: 'done' })) {
+      this.notifier.success(`${issue.key} → ${name}`, {
+        action: { label: 'Undo', run: () => void this.store.updateIssue(issue.id, { status: prev }) },
+      });
+    }
+  }
+
+  /** A task with an open PR, moved to In review by the person (Trama never does it on its own). */
+  protected async toReview(e: InboxEntry): Promise<void> {
+    const issue = e.issue;
+    if (!issue) return;
+    const prev = issue.status;
+    const name = resolveStatusEntry(this.store.settings().statuses.issue, 'in_review')?.name ?? 'In review';
+    if (await this.store.updateIssue(issue.id, { status: 'in_review' })) {
       this.notifier.success(`${issue.key} → ${name}`, {
         action: { label: 'Undo', run: () => void this.store.updateIssue(issue.id, { status: prev }) },
       });
