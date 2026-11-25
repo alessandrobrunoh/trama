@@ -9,7 +9,7 @@ import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
 
 /**
  * The settings sidebar (v3 "Settings sidebar", 248px): it replaces the main sidebar while a settings page
- * is open. Window squares, "Back to Trama" (esc), the title, WORKSPACE and ACCOUNT groups, and the
+ * is open. "Back to Trama" (esc), the title, WORKSPACE and ACCOUNT groups, and the
  * danger zone pinned to the bottom. Mounted by `AppSidebar` in place of its own content.
  */
 @Component({
@@ -21,15 +21,7 @@ import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
     '(document:keydown.escape)': 'onEscape($event)',
   },
   template: `
-    <div class="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5" aria-hidden="true">
-      <span class="flex gap-1.5">
-        <span class="bg-line size-[9px]"></span>
-        <span class="bg-line size-[9px]"></span>
-        <span class="bg-line size-[9px]"></span>
-      </span>
-    </div>
-
-    <div class="px-2 pt-0.5 pb-1.5">
+    <div class="px-2 pt-2 pb-1.5">
       <a
         [routerLink]="backLink()"
         class="bg-background border-border text-foreground hover:border-border-strong focus-visible:ring-sidebar-ring flex h-8 items-center gap-2 border px-2.5 text-[13px] outline-hidden focus-visible:ring-2"

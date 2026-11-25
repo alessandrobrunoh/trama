@@ -5,7 +5,6 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/ro
 import { filter, map, startWith } from 'rxjs';
 import {
   LucideBell,
-  LucideSquare,
   LucideChevronDown,
   LucideChevronsUpDown,
   LucideCheck,
@@ -91,17 +90,30 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       <app-settings-sidebar class="min-h-0 flex-1" />
     } @else {
     <div hlmSidebarHeader class="gap-0 p-0">
-      <!-- top row: three window marks, the panel toggle on the right -->
-      <div class="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5">
-        <span class="flex gap-1.5" aria-hidden="true">
-          <span class="size-[9px] bg-[#33363c]"></span>
-          <span class="size-[9px] bg-[#33363c]"></span>
-          <span class="size-[9px] bg-[#33363c]"></span>
-        </span>
-        <span class="flex-1"></span>
+      <!-- workspace row (44px): logo, "Trama" in serif, mono "acme · 6 members", switcher chevrons, panel toggle -->
+      <div class="border-sidebar-border flex h-11 items-center gap-2.5 border-b px-3.5">
         <button
           type="button"
-          class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring -m-1 flex size-[22px] items-center justify-center outline-hidden focus-visible:ring-2"
+          class="group/ws focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
+          [hlmDropdownMenuTrigger]="workspaceMenu"
+          align="start"
+          aria-label="Switch workspace"
+        >
+          <app-trama-logo [size]="24" />
+          <span class="flex min-w-0 flex-col gap-px">
+            <span class="font-title text-foreground text-[18px] leading-[18px]">Trama</span>
+            <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>
+          </span>
+          <span class="flex-1"></span>
+          <svg
+            [lucideIcon]="chevrons"
+            [size]="13"
+            class="text-faint group-hover/ws:text-foreground group-data-open/ws:text-foreground shrink-0"
+          ></svg>
+        </button>
+        <button
+          type="button"
+          class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring flex size-[14px] shrink-0 items-center justify-center outline-hidden focus-visible:ring-2"
           hlmTooltip="Hide sidebar  ⌘B"
           position="bottom"
           aria-label="Hide sidebar (⌘B)"
@@ -110,25 +122,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
         </button>
       </div>
-      <!-- workspace: red "T" mark, "Trama" in serif, mono "acme · 6 members" -->
-      <button
-        type="button"
-        class="hover:bg-sidebar-accent/50 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex items-center gap-2.5 px-3.5 pt-1 pb-3 text-start outline-hidden focus-visible:ring-2"
-        [hlmDropdownMenuTrigger]="workspaceMenu"
-        align="start"
-        aria-label="Switch workspace"
-      >
-        <app-trama-logo [size]="24" />
-        <span class="flex min-w-0 flex-col gap-px">
-          <span class="font-title text-foreground text-[18px] leading-[18px]">Trama</span>
-          <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>
-        </span>
-        <span class="flex-1"></span>
-        <svg [lucideIcon]="chevrons" [size]="13" class="text-faint shrink-0"></svg>
-      </button>
 
       <!-- search or jump (opens the command palette) -->
-      <div class="px-3 pb-2.5">
+      <div class="px-3 pt-2.5 pb-2.5">
         <button
           type="button"
           class="bg-background border-border text-faint hover:text-muted-foreground hover:border-border-strong focus-visible:ring-sidebar-ring flex h-[30px] w-full items-center gap-2 border px-2 text-start outline-hidden focus-visible:ring-2"
@@ -228,7 +224,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                   [tooltip]="p.project.name"
                   closeMobileSidebarOnClick
                 >
-                  <svg [lucideIcon]="squareIcon" [size]="15" class="text-muted-foreground group-data-active/menu-button:text-foreground"></svg>
+                  <app-project-glyph [project]="p.project" [size]="15" />
                   <span class="truncate-fade flex-1">{{ p.project.name }}</span>
                   @if (p.open) {
                     <span class="text-faint font-mono text-[11px] tabular-nums">{{ p.open }}</span>
@@ -660,7 +656,6 @@ export class AppSidebar {
   );
   /** On a settings page this sidebar gives way to the settings sidebar. */
   protected readonly inSettings = computed(() => settingsSectionOfUrl(this.url()) !== null);
-  protected readonly squareIcon = LucideSquare;
   protected readonly bellIcon = LucideBell;
   protected readonly chevrons = LucideChevronsUpDown;
   protected readonly search = LucideSearch;
