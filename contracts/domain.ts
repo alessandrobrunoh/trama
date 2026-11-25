@@ -1195,8 +1195,27 @@ export type ViewLayout = 'list' | 'board' | 'timeline';
 
 export interface ViewFilter {
   field: string;
-  /** `gte` / `lte` compare numeric fields (estimates and similar). */
-  op: 'is' | 'is_not' | 'in' | 'not_in' | 'contains' | 'before' | 'after' | 'gte' | 'lte';
+  /**
+   * `gte` / `lte` compare numeric fields (estimates and similar). `all` (every listed value is present),
+   * `between` (`[from, to]`), `last` / `next` (a number of days) and `overdue` are only used by the task
+   * list filters; saved views and the public view evaluator do not accept them yet. Date values are
+   * `YYYY-MM-DD` or a relative token (`today`, `-7d`, `week_start`…).
+   */
+  op:
+    | 'is'
+    | 'is_not'
+    | 'in'
+    | 'not_in'
+    | 'contains'
+    | 'before'
+    | 'after'
+    | 'gte'
+    | 'lte'
+    | 'all'
+    | 'between'
+    | 'last'
+    | 'next'
+    | 'overdue';
   value: string | string[];
 }
 

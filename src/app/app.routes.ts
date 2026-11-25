@@ -25,7 +25,8 @@ function redirectInbox(path: string, tab: string): Route {
  * `workspaceSlug = input<string>()`.
  *
  * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, shared, blog, roadmap,
- * changelog, compare, why, brand, new-workspace, 404.
+ * changelog, compare, why, brand, new-workspace, 404. (`my-tasks` is reserved too: it is a page under a
+ * workspace, and keeping it out of the slugs keeps links such as /my-tasks unambiguous.)
  */
 export const routes: Routes = [
   {
@@ -137,10 +138,18 @@ export const routes: Routes = [
         title: 'Inbox · Trama',
         loadComponent: () => import('./features/inbox/inbox-page').then((m) => m.InboxPage),
       },
-      // My Attention, Notifications and My Work became tabs of the Inbox; old links keep working.
+      // My Attention and Notifications became tabs of the Inbox; old links keep working.
       redirectInbox('attention', 'needs-you'),
       redirectInbox('notifications', 'updates'),
-      redirectInbox('my-work', 'tasks'),
+      {
+        // The task table under a fixed "Assignee is me" scope.
+        path: 'my-tasks',
+        title: 'My tasks · Trama',
+        data: { mine: true },
+        loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
+      },
+      // My Work was a tab of the Inbox for a while; old links and installed shortcuts land on My tasks.
+      { path: 'my-work', pathMatch: 'full', redirectTo: 'my-tasks' },
       {
         path: 'connect',
         title: 'Connect your agent · Trama',

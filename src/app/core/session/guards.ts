@@ -61,12 +61,11 @@ export function roleGuard(minRole: import('../contracts/domain').Role): CanActiv
 }
 
 /** Where an installed app opens (`start_url`) and where its home-screen shortcuts point. */
-const LAUNCH_SECTIONS = new Set(['inbox', 'tasks', 'projects']);
+const LAUNCH_SECTIONS = new Set(['inbox', 'my-tasks', 'tasks', 'projects']);
 
-/** `my-work` and `overview` were merged into the Inbox; installed home-screen shortcuts may still use them. */
+/** `my-work` is now My tasks and `overview` was merged into the Inbox; installed home-screen shortcuts may still use them. */
 const LAUNCH_ALIASES: Record<string, string> = {
-  'my-tasks': 'inbox?tab=tasks',
-  'my-work': 'inbox?tab=tasks',
+  'my-work': 'my-tasks',
   overview: 'inbox',
   issues: 'tasks',
 };

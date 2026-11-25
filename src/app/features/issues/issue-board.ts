@@ -12,9 +12,10 @@ import {
   output,
   signal,
   untracked,
+  viewChild,
   type WritableSignal,
 } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import {
   LucideCheck,
   LucideChevronsUpDown,
@@ -49,13 +50,18 @@ import {
   Viewport,
   filterValues,
   isTypingTarget,
+  matchesFilter,
+  parseFilters,
   queryGroups,
   queryItems,
+  sameFilters,
+  serializeFilters,
   setFilter,
   usePageShortcuts,
   type Issue,
   type IssueStatus,
   type Priority,
+  type QueryContext,
   type ViewFilter,
 } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
@@ -68,7 +74,8 @@ import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { V3StatusDot } from '../../shared/v3';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { FilterBar, type FilterBarExtra, type FilterPreset } from '../../shared/filter-bar/filter-bar';
+import { FilterBar, type FilterMatch, type FilterPreset } from '../../shared/filter-bar/filter-bar';
+import { fieldLabel } from '../views/view-model';
 import { IssueActions } from './issue-actions';
 import { IssueFlow } from './issue-flow';
 import { IssueCard, IssueRow } from './issue-items';
@@ -186,9 +193,13 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           entity="issue"
           [filters]="filters()"
           (filtersChange)="filters.set($event)"
-          [defaultFields]="chipFields()"
-          [extras]="extras()"
-          (extraChange)="setExtra($event)"
+          [extended]="true"
+          [items]="filterPool()"
+          [ctx]="queryCtx()"
+          [locked]="showBase() ? baseFilters() : []"
+          [matchable]="true"
+          [match]="match()"
+          (matchChange)="match.set($event)"
           [presets]="presetMap()"
           [presetActive]="presetActive()"
           (presetPick)="statusPresetChange.emit($event.id)"
@@ -266,6 +277,15 @@ function rememberKeyed<T>(list: ListStateStore, key: () => string, initial: T): 
           />
         }
         <div trailing class="ms-1 flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            class="text-faint hover:text-foreground hover:bg-hover inline-flex size-[22px] items-center justify-center outline-none focus-visible:text-foreground max-md:hidden"
+            aria-label="Search tasks"
+            hlmTooltip="Search tasks"
+            (click)="openSearch()"
+          >
+            <svg [lucideIcon]="searchIcon" [size]="13"></svg>
+          </button>
           @if (hasTree()) {
             <button
               type="button"
@@ -785,6 +805,8 @@ export class IssueBoard {
   protected readonly favorites = inject(FavoritesStore);
   private readonly document = inject(DOCUMENT);
   private readonly vp = inject(Viewport);
+  private readonly router = inject(Router);
+  private readonly filterBar = viewChild(FilterBar);
 
   /** Issues this board shows. */
   readonly issues = input.required<readonly Issue[]>();
@@ -826,8 +848,17 @@ export class IssueBoard {
    * of this table. Used by the Tasks and Board pages.
    */
   readonly pageSwitch = input(false);
-  /** Filter chips that are always on the bar ("any" until set): fields of a task, or `thread`. */
-  readonly chipFields = input<readonly string[]>(['status', 'assigneeId', 'projectId', 'thread', 'source']);
+  /** Show the base filters as locked chips on the bar ("Assignee is me" on My tasks). */
+  readonly showBase = input(false);
+  /**
+   * Write the filters into the page URL (`?f=status:in:todo&match=any`) and read them back from it, so
+   * a filtered list can be linked. Only the page that owns the URL turns it on.
+   */
+  readonly syncUrl = input(false);
+  /** Query `f` (repeated): the filters of a link. */
+  readonly urlFilters = input<string | readonly string[] | undefined>(undefined);
+  /** Query `match`: `any` when the filters of a link are alternatives. */
+  readonly urlMatch = input<string | undefined>(undefined);
   /** Named views of the Status chip (the page's tabs: All / Active / Backlog / Done / Drafts). */
   readonly statusPresets = input<readonly FilterPreset[]>([]);
   readonly statusPreset = input('');
@@ -856,15 +887,20 @@ export class IssueBoard {
   // Filters survive navigation inside the app (see ListStateStore); display options persist in localStorage.
   protected readonly filters = rememberKeyed<ViewFilter[]>(this.listState, () => `${this.stateKey()}.filters`, []);
   protected readonly search = rememberKeyed(this.listState, () => `${this.stateKey()}.search`, '');
-  /** The Thread chip: '' = any, 'linked' = has a thread link, 'none' = has none. */
-  protected readonly thread = rememberKeyed<string>(this.listState, () => `${this.stateKey()}.thread`, '');
+  /** Do the filters all have to match, or any of them? */
+  protected readonly match = rememberKeyed<FilterMatch>(this.listState, () => `${this.stateKey()}.match`, 'all');
   /** The search field is out (Filter · F); it stays while it holds text. */
   protected readonly searchOpen = signal(false);
   /** Sub-tasks the user collapsed (ids), remembered while the app is open. */
   private readonly collapsed = rememberKeyed<string[]>(this.listState, () => `${this.stateKey()}.collapsed`, []);
   private anchor: string | null = null;
 
-  private readonly queryCtx = computed(() => ({}));
+  /** What the filters read besides the task: today, and which tasks have sub-tasks. */
+  protected readonly queryCtx = computed<QueryContext>(() => {
+    const parents = new Set<string>();
+    for (const i of this.issues()) if (i.parentId) parents.add(i.parentId);
+    return { now: new Date(), subtaskParents: parents };
+  });
   protected readonly props = PROPS;
   protected readonly expandAllIcon = LucideChevronsUpDown;
   protected readonly listLayouts: readonly { id: IssueLayout; label: string; hint: string }[] = [
@@ -923,23 +959,8 @@ export class IssueBoard {
     const p = this.statusPresets();
     return p.length > 0 && this.statusPreset() !== p[0].id;
   });
-  protected readonly extras = computed<FilterBarExtra[]>(() => [
-    {
-      id: 'thread',
-      label: 'Thread',
-      options: [
-        { value: 'linked', label: 'Thread linked' },
-        { value: 'none', label: 'No thread' },
-      ],
-      selected: this.thread(),
-    },
-  ]);
   protected readonly hasFilters = computed(
-    () =>
-      this.filters().length > 0 ||
-      this.search().trim().length > 0 ||
-      this.thread() !== '' ||
-      this.presetOn(),
+    () => this.filters().length > 0 || this.search().trim().length > 0 || this.presetOn(),
   );
   /** What the board says next to the chips. */
   protected readonly hint = computed(() => {
@@ -991,9 +1012,8 @@ export class IssueBoard {
   protected readonly filterSummary = computed(() => {
     const parts = this.filters().map((f) => {
       const n = Array.isArray(f.value) ? f.value.length : 1;
-      return `${FILTER_LABEL[f.field] ?? f.field}${n > 1 ? ` (${n})` : ''}`;
+      return `${FILTER_LABEL[f.field] ?? fieldLabel('issue', f.field)}${n > 1 ? ` (${n})` : ''}`;
     });
-    if (this.thread()) parts.push('Thread');
     if (this.presetOn()) parts.push('Status');
     const q = this.search().trim();
     if (q) parts.push(`“${q}”`);
@@ -1008,6 +1028,8 @@ export class IssueBoard {
     const base = this.baseFilters();
     return base.length ? queryItems('issue', inScope, { filters: base }, this.queryCtx()) : inScope;
   });
+  /** What the value counts of the filter menus are taken from. */
+  protected readonly filterPool = computed(() => this.scoped());
 
   protected readonly columns = computed<Column[]>(() => {
     const group = this.effectiveGroup();
@@ -1018,23 +1040,28 @@ export class IssueBoard {
       // keep empty status columns inside the view tab / status filter
       if (include && group === 'status') {
         const scope = this.scope();
-        const picked = filterValues(this.filters(), 'status');
+        const ctx = this.queryCtx();
+        const statusFilter = this.match() === 'all' ? this.filters().find((f) => f.field === 'status') : undefined;
         include = include.filter(
           (s) =>
-            (!scope || scope.includes(s as IssueStatus)) && (!picked.length || picked.includes(s)),
+            (!scope || scope.includes(s as IssueStatus)) &&
+            (!statusFilter || matchesFilter('issue', { status: s } as Issue, statusFilter, ctx)),
         );
       }
     }
-    const thread = this.thread();
+    const ctx = this.queryCtx();
+    const filters = this.filters();
     const inScope = this.scoped();
-    const items = thread
-      ? inScope.filter((i) => (thread === 'linked' ? !!i.threadUrl : !i.threadUrl))
-      : inScope;
+    // "Match any": a task needs one of the filters (the base filters still all apply).
+    const items =
+      this.match() === 'any' && filters.length > 1
+        ? inScope.filter((i) => filters.some((f) => matchesFilter('issue', i, f, ctx)))
+        : inScope;
     return queryGroups(
       'issue',
       items as Issue[],
       {
-        filters: [...this.baseFilters(), ...this.filters()],
+        filters: [...this.baseFilters(), ...(this.match() === 'any' && filters.length > 1 ? [] : filters)],
         search: this.search(),
         sort: { field: d.sortField, direction: d.sortDir },
         groupBy: group === 'none' ? null : group,
@@ -1228,7 +1255,7 @@ export class IssueBoard {
       when: () => this.canEdit() && this.shown() > 0 && !this.typing(),
       run: () => this.selectAll(),
     },
-    { keys: 'f', label: 'Filter tasks', group: 'Tasks', run: () => this.openSearch() },
+    { keys: 'f', label: 'Filter tasks', group: 'Tasks', when: () => this.toolbar(), run: () => this.openFilter() },
   ]);
 
   constructor() {
@@ -1256,6 +1283,50 @@ export class IssueBoard {
           const known = this.store.settings().statuses.issue.some((entry) => entry.id === status || entry.type === status);
           if (status && known) next = setFilter(next, 'status', 'in', [status]);
           return next;
+        });
+      });
+    });
+    // Filters in the URL (`?f=status:in:todo,done&match=any`): a link brings its filters, and what the
+    // user changes is written back (replacing the history entry), so the address is always shareable.
+    // `written` is the last state this board put in the URL: seeing it come back changes nothing.
+    let written = '';
+    const stateKey = (list: readonly string[], match: string): string => `${list.join('|')}#${match}`;
+    effect(() => {
+      if (!this.syncUrl()) return;
+      const raw = this.urlFilters();
+      const match = this.urlMatch() === 'any' ? 'any' : 'all';
+      untracked(() => {
+        if (raw === undefined && this.urlMatch() === undefined) return;
+        const incoming = parseFilters(raw, 'issue', true);
+        const key = stateKey(serializeFilters(incoming), match);
+        if (key === written) return;
+        written = key;
+        if (!sameFilters(incoming, this.filters())) this.filters.set(incoming);
+        if (this.match() !== match) this.match.set(match);
+      });
+    });
+    effect(() => {
+      if (!this.syncUrl()) return;
+      const list = serializeFilters(this.filters());
+      const match = this.match();
+      untracked(() => {
+        const key = stateKey(list, match);
+        const inUrl = stateKey(
+          serializeFilters(parseFilters(this.urlFilters(), 'issue', true)),
+          this.urlMatch() === 'any' ? 'any' : 'all',
+        );
+        if (key === written || (key === inUrl && !this.status() && !this.project())) return;
+        written = key;
+        void this.router.navigate([], {
+          queryParams: {
+            f: list.length ? list : null,
+            match: match === 'any' ? 'any' : null,
+            // now part of `f`
+            status: null,
+            project: null,
+          },
+          queryParamsHandling: 'merge',
+          replaceUrl: true,
         });
       });
     });
@@ -1356,13 +1427,14 @@ export class IssueBoard {
   protected clearFilters(): void {
     this.filters.set([]);
     this.search.set('');
-    this.thread.set('');
+    this.match.set('all');
     const first = this.statusPresets()[0];
     if (first && this.presetOn()) this.statusPresetChange.emit(first.id);
   }
 
-  protected setExtra(e: { id: string; value: string }): void {
-    if (e.id === 'thread') this.thread.set(e.value);
+  /** Filter · F: open the "add filter" menu (properties, then values). */
+  openFilter(): void {
+    this.filterBar()?.openAdd();
   }
 
   /** Filter · F: bring out the search field and put the cursor in it. */

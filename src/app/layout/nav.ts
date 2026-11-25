@@ -53,12 +53,12 @@ export const PRIMARY_NAV: NavItem[] = [
     keywords: 'attention notifications needs you updates unread',
   },
   {
-    segment: 'my-work',
+    segment: 'my-tasks',
     label: 'My tasks',
     icon: LucideCircleUserRound,
     keys: 'g m',
     badge: 'mine',
-    hint: 'Tasks assigned to you',
+    hint: 'Tasks assigned to you, as a list or a board',
     keywords: 'my work assigned mine',
   },
   {

@@ -62,6 +62,7 @@ export const RESERVED_SLUGS = new Set([
   'workspaces',
   'invite',
   'shared',
+  'my-tasks',
 ]);
 
 const SLUG_RE = /^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$/;

@@ -9,6 +9,7 @@ import {
   PROVIDER_META,
 } from '../meta';
 import { EntityOf, FieldDef, QueryContext, Queryable, fieldDef, fieldValues } from './fields';
+import { matchesDate } from './filter-model';
 
 export interface SortSpec {
   field: string;
@@ -71,10 +72,27 @@ export function matchesFilter<E extends ViewEntity>(
       const needle = want[0]?.toLowerCase() ?? '';
       return values.some((v) => v.toLowerCase().includes(needle));
     }
+    case 'all':
+      return want.every((w) => (w === '' ? values.length === 0 : values.includes(w)));
     case 'before':
-      return values.length > 0 && values[0] < want[0];
     case 'after':
-      return values.length > 0 && values[0] > want[0];
+      // Date fields compare by calendar day (and accept `today`, `-7d`…); other fields compare as text.
+      if (fieldDef(entity, filter.field)?.kind === 'date') {
+        return matchesDate(filter, filter.field, values[0], ctx.now ?? new Date(), false);
+      }
+      if (values.length === 0) return false;
+      return filter.op === 'before' ? values[0] < want[0] : values[0] > want[0];
+    case 'between':
+    case 'last':
+    case 'next':
+    case 'overdue':
+      return matchesDate(
+        filter,
+        filter.field,
+        values[0],
+        ctx.now ?? new Date(),
+        !!(item as { completedAt?: string }).completedAt,
+      );
     case 'gte':
     case 'lte': {
       // Numeric fields compare as numbers (a string compare would put "9" after "10").

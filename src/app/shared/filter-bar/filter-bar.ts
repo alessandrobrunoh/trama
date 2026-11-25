@@ -1,12 +1,14 @@
-// The filter / sort / group bar of the task table and saved views, as one reusable control (v3: mono
-// chips "Status  is not Done", then "Group: status · Sort: priority" at the right). It edits nothing
-// itself: it shows the current filters as chips, a "+ Filter" button that lists every other filterable
-// field, and Group and Sort menus, and reports every change through outputs.
+// The filter / sort / group bar of the task table and saved views, as one reusable control. Linear-style:
+// a "+ Filter" button (F) opens a command-style menu (properties, then values), and every active filter is
+// a segmented chip: [icon Property] [operator ▾] [value(s) ▾] [×]. Then "Group: status · Sort: priority".
+// It edits nothing itself: every change goes out through outputs.
 //
 //   <app-filter-bar
-//     entity="issue"
+//     entity="issue" [extended]="true"
 //     [filters]="filters()" (filtersChange)="filters.set($event)"
-//     [defaultFields]="['status', 'assigneeId', 'thread']"      <!-- chips that are always there ("any") -->
+//     [items]="items()" [ctx]="ctx()"                   <!-- what the value counts are taken from -->
+//     [locked]="scope()"                                <!-- a scope the user cannot remove (My tasks) -->
+//     [matchable]="true" [match]="match()" (matchChange)="match.set($event)"   <!-- All / Any -->
 //     [sort]="sort()" (sortChange)="setSort($event)"
 //     [groupBy]="group()" (groupByChange)="setGroup($event)">
 //     <div leading>…</div>                      <!-- optional, before the chips (layout switch) -->
@@ -14,57 +16,54 @@
 //     <button trailing>…</button>               <!-- optional, after Sort -->
 //   </app-filter-bar>
 //
-// Two things beyond plain field filters, both for the Tasks page:
-//  - `extras`: chips for a filter the query model has no field for (a task's thread link). The owner
-//    applies them; the bar only draws the chip and reports the pick (`extraChange`).
-//  - `presets`: named views shown at the top of a field chip's menu (the All / Active / Backlog / Done /
-//    Drafts views of the Status chip); the owner applies them (`presetPick`).
+// `presets`: named views shown as a chip of their own (the All / Active / Backlog / Done / Drafts views of
+// the Status chip); the owner applies them (`presetPick`). `extended` turns on what only the task list
+// offers: dates, estimate, thread, sub-tasks, creator and the date / "includes all" operators; saved views
+// keep to what the server's public evaluator understands.
 import {
   ChangeDetectionStrategy,
   Component,
   computed,
-  effect,
   inject,
   input,
   output,
   signal,
-  untracked,
 } from '@angular/core';
-import { LucideDynamicIcon, LucidePlus, LucideX } from '@lucide/angular';
+import { LucideDynamicIcon, LucideLock, LucidePlus } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
+import { HlmPopoverImports } from '@spartan-ng/helm/popover';
 import {
   FIELD_DEFS,
   TramaStore,
-  filterValues,
-  setFilter,
+  buildFilter,
+  datePresetOf,
+  describeDateToken,
+  filterFields,
+  operatorLabel,
+  operatorMenuLabel,
+  operatorOf,
+  operatorsFor,
+  replaceFilter,
+  valuesOf,
+  type FieldDef,
+  type FilterOp,
+  type Queryable,
+  type QueryContext,
   type ViewEntity,
   type ViewFilter,
 } from '../../core';
 import { OptionLeading, type PickOption } from '../../features/views/option-controls';
-import {
-  describeFilter,
-  fieldLabel,
-  fieldOptions,
-  filterableFields,
-  isEditableFilter,
-  isNumberField,
-} from '../../features/views/view-model';
-import { FilterChip } from './filter-chip';
+import { fieldLabel, valueColor, valueGlyph, valueLabel } from '../../features/views/view-model';
+import { iconOfField, nounOfField } from './filter-fields';
+import { CHIP_SEGMENT, CHIP_SEGMENT_BUTTON, FilterChip } from './filter-chip';
+import { FilterMenu } from './filter-menu';
 
 export interface FilterBarSort {
   field: string;
   direction: 'asc' | 'desc';
 }
 
-/** A chip for a filter that is not a field of the entity (the owner applies it). `selected` '' = any. */
-export interface FilterBarExtra {
-  id: string;
-  label: string;
-  options: readonly { value: string; label: string }[];
-  selected: string;
-}
-
-/** A named view offered at the top of a field chip's menu. The first preset is the "no preset" one. */
+/** A named view offered as a chip of its own. The first preset is the "no preset" one. */
 export interface FilterPreset {
   id: string;
   label: string;
@@ -72,194 +71,275 @@ export interface FilterPreset {
   count?: number;
 }
 
-interface FieldChip {
-  kind: 'field';
+export type FilterMatch = 'all' | 'any';
+
+/** What the operator segment does to the values when it changes. */
+type ValueGroup = 'list' | 'range' | 'day' | 'num' | 'none';
+const VALUE_GROUP: Record<FilterOp, ValueGroup> = {
+  in: 'list',
+  not_in: 'list',
+  all: 'list',
+  between: 'range',
+  before: 'day',
+  after: 'day',
+  last: 'num',
+  next: 'num',
+  eq: 'num',
+  gte: 'num',
+  lte: 'num',
+  set: 'none',
+  unset: 'none',
+  overdue: 'none',
+};
+
+interface Chip {
   field: string;
   label: string;
-  numeric: boolean;
-  min: string;
+  icon: ReturnType<typeof iconOfField>;
+  filter: ViewFilter;
+  op: FilterOp;
+  opText: string;
+  ops: readonly { id: FilterOp; label: string }[];
+  /** Chips the bar cannot edit (a text filter from an old view) are plain text. */
   editable: boolean;
-  options: PickOption[];
-  values: string[];
-  /** Text of a filter the bar cannot edit ("Created after …"). */
-  text: string;
+  hasValue: boolean;
+  valueText: string;
+  /** Glyph of the single value (status square, avatar, label colour). */
+  lead?: PickOption;
+  aria: string;
+}
+
+interface ViewChip {
+  field: string;
+  label: string;
+  value: string;
+  active: boolean;
   presets: readonly FilterPreset[];
   presetId: string;
-  active: boolean;
-  value: string;
-  /** Always shown, even without a value. */
-  fixed: boolean;
 }
-
-interface ExtraChip {
-  kind: 'extra';
-  id: string;
-  label: string;
-  options: readonly { value: string; label: string }[];
-  selected: string;
-  active: boolean;
-  value: string;
-}
-
-type Chip = FieldChip | ExtraChip;
 
 @Component({
   selector: 'app-filter-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmDropdownMenuImports, LucideDynamicIcon, OptionLeading, FilterChip],
+  imports: [
+    HlmDropdownMenuImports,
+    HlmPopoverImports,
+    LucideDynamicIcon,
+    OptionLeading,
+    FilterChip,
+    FilterMenu,
+  ],
   host: { class: 'flex min-w-0 items-center gap-2.5 max-md:flex-nowrap md:flex-wrap' },
   template: `
     <ng-content select="[leading]" />
 
-    @for (c of chips(); track c.kind === 'field' ? c.field : c.id) {
-      @if (c.kind === 'extra') {
-        <app-filter-chip
-          [label]="c.label"
-          [value]="c.value"
-          [active]="c.active"
-          [menu]="extraMenu"
+    @for (v of viewChips(); track v.field) {
+      <app-filter-chip
+        [label]="v.label + ' ' + v.value"
+        [active]="v.active"
+        [removable]="v.active && canEdit()"
+        (removed)="presetPick.emit({ field: v.field, id: v.presets[0].id })"
+      >
+        <span [class]="segment">{{ v.label }}</span>
+        <button
+          type="button"
+          [class]="segmentButton + ' border-l ' + (v.active ? 'border-primary/25' : 'border-border')"
+          [hlmDropdownMenuTrigger]="viewMenu"
           [disabled]="!canEdit()"
-          (removed)="extraChange.emit({ id: c.id, value: '' })"
-        />
-        <ng-template #extraMenu>
-          <hlm-dropdown-menu class="w-52">
-            <hlm-dropdown-menu-label>{{ c.label }}</hlm-dropdown-menu-label>
-            <button
-              hlmDropdownMenuRadio
-              [checked]="!c.selected"
-              [keepOpen]="false"
-              (triggered)="extraChange.emit({ id: c.id, value: '' })"
-            >
-              <span class="text-muted-foreground">Any</span>
-              <hlm-dropdown-menu-radio-indicator />
-            </button>
-            @for (o of c.options; track o.value) {
+          [attr.aria-label]="v.label + ' view: ' + v.value"
+        >
+          <span class="text-foreground truncate">{{ v.value }}</span>
+        </button>
+        <ng-template #viewMenu>
+          <hlm-dropdown-menu class="max-h-80 w-56 overflow-y-auto">
+            <hlm-dropdown-menu-label>{{ v.label }}</hlm-dropdown-menu-label>
+            @for (p of v.presets; track p.id) {
               <button
                 hlmDropdownMenuRadio
-                [checked]="c.selected === o.value"
+                [checked]="v.presetId === p.id"
                 [keepOpen]="false"
-                (triggered)="extraChange.emit({ id: c.id, value: o.value })"
+                (triggered)="presetPick.emit({ field: v.field, id: p.id })"
               >
-                {{ o.label }}
+                {{ p.label }}
+                @if (p.count !== undefined) {
+                  <span class="text-faint ml-auto pr-5 font-mono text-[10.5px] tabular-nums">{{ p.count }}</span>
+                }
                 <hlm-dropdown-menu-radio-indicator />
               </button>
             }
           </hlm-dropdown-menu>
         </ng-template>
-      } @else if (c.numeric) {
-        <span
-          class="border-delta-line/40 bg-delta-line/8 inline-flex h-[22px] shrink-0 items-stretch border font-mono text-[11px] leading-[13px]"
-        >
-          <span class="text-muted-foreground flex items-center pl-2">{{ c.label }}</span>
-          <span class="text-muted-foreground flex items-center px-1.5">at least</span>
-          <input
-            type="number"
-            min="0"
-            step="1"
-            class="w-16 bg-transparent px-1 tabular-nums outline-none"
-            [attr.aria-label]="c.label + ' minimum'"
-            [value]="c.min"
-            [disabled]="!canEdit()"
-            (change)="setMin(c.field, $any($event.target).value)"
-          />
-          @if (canEdit()) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-hover inline-flex w-5 items-center justify-center"
-              [attr.aria-label]="'Remove ' + c.label + ' filter'"
-              (click)="removeFilter(c.field)"
-            >
-              <svg [lucideIcon]="xIcon" [size]="11"></svg>
-            </button>
-          }
+      </app-filter-chip>
+    }
+
+    @for (l of lockedChips(); track l.field) {
+      <app-filter-chip [label]="l.aria" [active]="false" [removable]="false">
+        <span [class]="segment" [attr.title]="'Always applied on this page'">
+          <svg [lucideIcon]="lockIcon" [size]="11" class="text-faint"></svg>
+          <svg [lucideIcon]="l.icon" [size]="12" class="text-muted-foreground"></svg>
+          <span class="text-muted-foreground">{{ l.label }}</span>
         </span>
-      } @else if (c.editable) {
-        <app-filter-chip
-          [label]="c.label"
-          [value]="c.value"
-          [active]="c.active"
-          [menu]="fieldMenu"
-          [disabled]="!canEdit()"
-          (removed)="clearChip(c)"
-        />
-        <ng-template #fieldMenu>
-          <hlm-dropdown-menu class="max-h-80 w-60 overflow-y-auto">
-            @if (c.presets.length) {
-              <hlm-dropdown-menu-label>View</hlm-dropdown-menu-label>
-              @for (p of c.presets; track p.id) {
+        <span [class]="segment + ' border-border text-muted-foreground border-l'">{{ l.opText }}</span>
+        @if (l.hasValue) {
+          <span [class]="segment + ' border-border border-l'">
+            @if (l.lead; as lead) {
+              <app-option-leading [option]="lead" />
+            }
+            <span class="text-foreground truncate">{{ l.valueText }}</span>
+          </span>
+        }
+      </app-filter-chip>
+    }
+
+    @if (matchable() && canEdit() && chips().length > 1) {
+      <span
+        class="border-border flex h-[22px] shrink-0 items-stretch border font-mono text-[11px]"
+        role="group"
+        aria-label="Match filters"
+      >
+        <span class="text-faint flex items-center px-1.5">Match</span>
+        @for (m of matchOptions; track m.id) {
+          <button
+            type="button"
+            class="border-border -ms-px flex items-center border-l px-2 outline-none focus-visible:underline"
+            [class]="match() === m.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            [attr.aria-pressed]="match() === m.id"
+            (click)="matchChange.emit(m.id)"
+          >
+            {{ m.label }}
+          </button>
+        }
+      </span>
+    }
+
+    @for (c of chips(); track c.field) {
+      <app-filter-chip
+        [label]="c.aria"
+        [active]="true"
+        [removable]="canEdit()"
+        (removed)="removeFilter(c.field)"
+      >
+        <span [class]="segment">
+          <svg [lucideIcon]="c.icon" [size]="12" class="text-muted-foreground"></svg>
+          <span class="text-muted-foreground">{{ c.label }}</span>
+        </span>
+
+        @if (c.editable && canEdit() && c.ops.length > 1) {
+          <button
+            type="button"
+            [class]="segmentButton + ' border-primary/25 border-l'"
+            [hlmDropdownMenuTrigger]="opMenu"
+            [attr.aria-label]="c.label + ' operator: ' + c.opText"
+          >
+            <span class="text-muted-foreground">{{ c.opText }}</span>
+          </button>
+          <ng-template #opMenu>
+            <hlm-dropdown-menu class="w-52">
+              <hlm-dropdown-menu-label>{{ c.label }}</hlm-dropdown-menu-label>
+              @for (o of c.ops; track o.id) {
                 <button
                   hlmDropdownMenuRadio
-                  [checked]="c.presetId === p.id"
+                  [checked]="o.id === c.op"
                   [keepOpen]="false"
-                  (triggered)="presetPick.emit({ field: c.field, id: p.id })"
+                  (triggered)="changeOp(c, o.id)"
                 >
-                  {{ p.label }}
-                  @if (p.count !== undefined) {
-                    <span class="text-faint ml-auto pr-5 font-mono text-[10.5px] tabular-nums">{{ p.count }}</span>
-                  }
+                  {{ o.label }}
                   <hlm-dropdown-menu-radio-indicator />
                 </button>
               }
-              <hlm-dropdown-menu-separator />
-              <hlm-dropdown-menu-label>{{ c.label }}</hlm-dropdown-menu-label>
-            }
-            @for (o of c.options; track o.value) {
-              <button hlmDropdownMenuCheckbox [checked]="c.values.includes(o.value)" (triggered)="toggleValue(c, o.value)">
-                <app-option-leading [option]="o" />
-                <span class="truncate" [class.font-mono]="o.mono">{{ o.label }}</span>
-                <hlm-dropdown-menu-checkbox-indicator />
-              </button>
-            }
-            @if (c.values.length) {
-              <hlm-dropdown-menu-separator />
-              <button hlmDropdownMenuItem (triggered)="setValues(c.field, [])">
-                <svg [lucideIcon]="xIcon" [size]="13"></svg> Clear
-              </button>
-            }
-          </hlm-dropdown-menu>
-        </ng-template>
-      } @else {
-        <span
-          class="border-delta-line/40 bg-delta-line/8 inline-flex h-[22px] shrink-0 items-center gap-1.5 border pl-2 font-mono text-[11px] leading-[13px]"
-          [class.pr-2]="!canEdit()"
-        >
-          {{ c.text }}
-          @if (canEdit()) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-hover inline-flex h-full w-5 items-center justify-center"
-              [attr.aria-label]="'Remove ' + c.label + ' filter'"
-              (click)="removeFilter(c.field)"
+            </hlm-dropdown-menu>
+          </ng-template>
+        } @else {
+          <span [class]="segment + ' text-muted-foreground border-primary/25 border-l'">{{ c.opText }}</span>
+        }
+
+        @if (c.hasValue) {
+          @if (c.editable && canEdit()) {
+            <hlm-popover
+              class="contents"
+              align="start"
+              [sideOffset]="6"
+              [state]="valueOpen() === c.field ? 'open' : 'closed'"
+              (stateChanged)="onValueState(c, $event)"
             >
-              <svg [lucideIcon]="xIcon" [size]="11"></svg>
-            </button>
+              <button
+                hlmPopoverTrigger
+                type="button"
+                [class]="segmentButton + ' border-primary/25 border-l'"
+                [attr.aria-label]="c.label + ' value: ' + c.valueText"
+              >
+                @if (c.lead; as lead) {
+                  <app-option-leading [option]="lead" />
+                }
+                <span class="text-foreground truncate">{{ c.valueText }}</span>
+              </button>
+              <hlm-popover-content *hlmPopoverPortal class="w-72 gap-0 p-0">
+                <app-filter-menu
+                  [entity]="entity()"
+                  [filters]="filters()"
+                  [extended]="extended()"
+                  [items]="items()"
+                  [ctx]="ctx()"
+                  [field]="c.field"
+                  (filtersChange)="filtersChange.emit($event)"
+                  (done)="valueOpen.set(null)"
+                />
+              </hlm-popover-content>
+            </hlm-popover>
+          } @else {
+            <span [class]="segment + ' border-primary/25 border-l'">
+              @if (c.lead; as lead) {
+                <app-option-leading [option]="lead" />
+              }
+              <span class="text-foreground truncate">{{ c.valueText }}</span>
+            </span>
           }
-        </span>
-      }
+        }
+      </app-filter-chip>
     }
 
-    @if (canEdit() && addableFields().length) {
+    @if (canEdit() && chips().length) {
       <button
         type="button"
-        class="text-faint hover:text-foreground hover:bg-hover inline-flex h-[22px] shrink-0 items-center gap-1 px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
-        [hlmDropdownMenuTrigger]="addFilter"
-        aria-label="Add filter"
+        class="text-faint hover:text-foreground hover:bg-hover inline-flex h-[22px] shrink-0 items-center px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
+        (click)="clear()"
       >
-        <svg [lucideIcon]="plusIcon" [size]="11"></svg>
-        <span class="max-sm:hidden">Filter</span>
+        Clear
       </button>
-      <ng-template #addFilter>
-        <hlm-dropdown-menu class="max-h-80 w-56 overflow-y-auto">
-          <hlm-dropdown-menu-label>Filter by</hlm-dropdown-menu-label>
-          @for (fd of addableFields(); track fd.field) {
-            <button hlmDropdownMenuItem (triggered)="addPending(fd.field)">
-              {{ fd.label }}
-            </button>
-          }
-        </hlm-dropdown-menu>
-      </ng-template>
     }
-    @if (!chips().length && !canEdit()) {
+
+    @if (canEdit() && fields().length) {
+      <hlm-popover
+        class="contents"
+        align="start"
+        [sideOffset]="6"
+        [state]="addOpen() ? 'open' : 'closed'"
+        (stateChanged)="addOpen.set($event === 'open')"
+      >
+        <button
+          hlmPopoverTrigger
+          type="button"
+          class="text-faint hover:text-foreground hover:bg-hover aria-expanded:text-foreground inline-flex h-[22px] shrink-0 items-center gap-1 px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
+          aria-label="Add filter"
+          aria-keyshortcuts="f"
+        >
+          <svg [lucideIcon]="plusIcon" [size]="11"></svg>
+          <span class="max-sm:hidden">Filter</span>
+        </button>
+        <hlm-popover-content *hlmPopoverPortal class="w-72 gap-0 p-0">
+          <app-filter-menu
+            [entity]="entity()"
+            [filters]="filters()"
+            [extended]="extended()"
+            [items]="items()"
+            [ctx]="ctx()"
+            (filtersChange)="filtersChange.emit($event)"
+            (done)="addOpen.set(false)"
+          />
+        </hlm-popover-content>
+      </hlm-popover>
+    }
+    @if (!chips().length && !lockedChips().length && !viewChips().length && !canEdit()) {
       <span class="text-faint font-mono text-[11px]">No filters</span>
     }
 
@@ -373,10 +453,18 @@ export class FilterBar {
   readonly showSort = input(true);
   /** Offer "Default" in the Sort menu (otherwise a field is always chosen). */
   readonly defaultSort = input(true);
-  /** Chips that are always shown, in this order: a field of the entity, or the id of one of `extras`. */
-  readonly defaultFields = input<readonly string[]>([]);
-  readonly extras = input<readonly FilterBarExtra[]>([]);
-  /** Named views at the top of a field's chip menu, by field. */
+  /** The task list: dates, estimate, thread, sub-tasks, creator, and the date / "includes all" operators. */
+  readonly extended = input(false);
+  /** The list the counts in the value menus are taken from (the page's tasks, before these filters). */
+  readonly items = input<readonly Queryable[]>([]);
+  /** Context of the filters (today, which tasks have sub-tasks). */
+  readonly ctx = input<QueryContext>({});
+  /** A scope the user cannot remove, shown as locked chips before the others ("Assignee is me"). */
+  readonly locked = input<readonly ViewFilter[]>([]);
+  /** Offer the All / Any switch once there are two filters. */
+  readonly matchable = input(false);
+  readonly match = input<FilterMatch>('all');
+  /** Named views as chips of their own, by field. */
   readonly presets = input<Readonly<Record<string, readonly FilterPreset[]>>>({});
   /** The preset in force, by field (an id of `presets[field]`). */
   readonly presetActive = input<Readonly<Record<string, string>>>({});
@@ -384,48 +472,23 @@ export class FilterBar {
   readonly filtersChange = output<ViewFilter[]>();
   readonly sortChange = output<FilterBarSort | null>();
   readonly groupByChange = output<string | null>();
-  readonly extraChange = output<{ id: string; value: string }>();
+  readonly matchChange = output<FilterMatch>();
   readonly presetPick = output<{ field: string; id: string }>();
 
-  protected readonly xIcon = LucideX;
   protected readonly plusIcon = LucidePlus;
+  protected readonly lockIcon = LucideLock;
+  protected readonly segment = CHIP_SEGMENT;
+  protected readonly segmentButton = CHIP_SEGMENT_BUTTON;
+  protected readonly matchOptions: readonly { id: FilterMatch; label: string }[] = [
+    { id: 'all', label: 'All' },
+    { id: 'any', label: 'Any' },
+  ];
 
-  /** Fields added with "Filter" that have no values yet (not part of the filters). */
-  private readonly pending = signal<string[]>([]);
+  protected readonly addOpen = signal(false);
+  /** The field whose value popover is open. */
+  protected readonly valueOpen = signal<string | null>(null);
 
-  protected readonly chips = computed<Chip[]>(() => {
-    const entity = this.entity();
-    const filters = this.filters();
-    const extras = this.extras();
-    const fixed = this.defaultFields();
-    const out: Chip[] = [];
-    const seen = new Set<string>();
-    for (const key of fixed) {
-      const extra = extras.find((e) => e.id === key);
-      if (extra) {
-        const o = extra.options.find((x) => x.value === extra.selected);
-        out.push({ kind: 'extra', ...extra, active: !!extra.selected, value: o ? `is ${o.label}` : 'any' });
-      } else {
-        out.push(this.chip(entity, filters, key, true));
-        seen.add(key);
-      }
-    }
-    for (const f of filters) {
-      if (seen.has(f.field)) continue;
-      seen.add(f.field);
-      out.push(this.chip(entity, filters, f.field, false));
-    }
-    for (const field of this.pending()) {
-      if (seen.has(field)) continue;
-      seen.add(field);
-      out.push(this.chip(entity, filters, field, false));
-    }
-    return out;
-  });
-  protected readonly addableFields = computed(() => {
-    const used = new Set(this.chips().flatMap((c) => (c.kind === 'field' ? [c.field] : [])));
-    return filterableFields(this.entity()).filter((f) => !used.has(f.field));
-  });
+  protected readonly fields = computed(() => filterFields(this.entity(), this.extended()));
   protected readonly groupableFields = computed(() => FIELD_DEFS[this.entity()].filter((f) => f.groupable));
   protected readonly sortableFields = computed(() => FIELD_DEFS[this.entity()].filter((f) => f.sortable));
   protected readonly groupText = computed(() => {
@@ -437,85 +500,154 @@ export class FilterBar {
     return (s ? fieldLabel(this.entity(), s.field) : 'default').toLowerCase();
   });
 
-  constructor() {
-    // Half-added chips belong to one entity: forget them when the owner switches.
-    effect(() => {
-      this.entity();
-      untracked(() => this.pending.set([]));
-    });
-  }
-
-  private chip(entity: ViewEntity, filters: readonly ViewFilter[], field: string, fixed: boolean): FieldChip {
-    const f = filters.find((x) => x.field === field);
-    const numeric = isNumberField(entity, field);
-    const editable = !numeric && (!f || isEditableFilter(f));
-    const options = editable ? fieldOptions(this.store, entity, field) : [];
-    const values = f ? filterValues(filters, field) : [];
-    const presets = this.presets()[field] ?? [];
-    const presetId = this.presetActive()[field] ?? presets[0]?.id ?? '';
-    const preset = presets.find((p) => p.id === presetId);
-    const presetOn = !!preset && presetId !== presets[0]?.id;
-    const byValue = new Map(options.map((o) => [o.value, o.label]));
-    const parts: string[] = [];
-    if (presetOn && preset) parts.push(preset.label);
-    if (values.length) {
-      const first = byValue.get(values[0]) ?? values[0];
-      parts.push(`is ${first}${values.length > 1 ? ` +${values.length - 1}` : ''}`);
+  protected readonly viewChips = computed<ViewChip[]>(() => {
+    const out: ViewChip[] = [];
+    for (const [field, presets] of Object.entries(this.presets())) {
+      if (!presets.length) continue;
+      const presetId = this.presetActive()[field] ?? presets[0].id;
+      const on = presets.find((p) => p.id === presetId) ?? presets[0];
+      out.push({
+        field,
+        label: fieldLabel(this.entity(), field),
+        value: on.label,
+        active: on.id !== presets[0].id,
+        presets,
+        presetId: on.id,
+      });
     }
-    return {
-      kind: 'field',
-      field,
-      label: fieldLabel(entity, field),
-      numeric,
-      min: numeric && f?.op === 'gte' ? String(f.value) : '',
-      editable,
-      options,
-      values,
-      text: f ? describeFilter(this.store, entity, f) : '',
-      presets,
-      presetId,
-      active: values.length > 0 || presetOn || (!!f && !editable),
-      value: parts.join(' · ') || 'any',
-      fixed,
-    };
+    return out;
+  });
+  protected readonly chips = computed<Chip[]>(() => this.filters().map((f) => this.chipOf(f)));
+  protected readonly lockedChips = computed<Chip[]>(() => this.locked().map((f) => this.chipOf(f)));
+
+  /** Open the "add filter" menu (the F shortcut). */
+  openAdd(): void {
+    if (this.canEdit() && this.fields().length) this.addOpen.set(true);
   }
 
-  protected addPending(field: string): void {
-    this.pending.update((p) => (p.includes(field) ? p : [...p, field]));
-  }
+  // ───────────────────────── chips ─────────────────────────
 
-  protected toggleValue(c: FieldChip, value: string): void {
-    this.setValues(
-      c.field,
-      c.values.includes(value) ? c.values.filter((v) => v !== value) : [...c.values, value],
+  private defOf(field: string): FieldDef {
+    return (
+      FIELD_DEFS[this.entity()].find((d) => d.field === field) ?? {
+        field,
+        label: field,
+        kind: 'text',
+        sortable: false,
+        groupable: false,
+      }
     );
   }
 
-  protected setValues(field: string, values: string[]): void {
-    this.filtersChange.emit(setFilter(this.filters(), field, 'in', values));
-    if (!values.length) this.pending.update((p) => p.filter((x) => x !== field));
+  private chipOf(filter: ViewFilter): Chip {
+    const def = this.defOf(filter.field);
+    const available = operatorsFor(def, this.extended());
+    const op = operatorOf(filter, def.kind);
+    const values = valuesOf(filter);
+    const opText =
+      filter.op === 'contains' ? 'contains' : operatorLabel(op, def.kind, values.length);
+    const editable = available.includes(op) && filter.op !== 'contains';
+    const { text, lead } = this.valueSummary(def, op, values);
+    const hasValue = !['set', 'unset', 'overdue'].includes(op);
+    return {
+      field: filter.field,
+      label: def.label,
+      icon: iconOfField(filter.field),
+      filter,
+      op,
+      opText,
+      ops: available.map((id) => ({ id, label: operatorMenuLabel(id, def.kind) })),
+      editable,
+      hasValue,
+      valueText: text,
+      lead,
+      aria: `${def.label} ${opText}${hasValue ? ' ' + text : ''}`,
+    };
   }
 
-  /** × on a chip: drop its values, and its preset back to the first one. */
-  protected clearChip(c: FieldChip): void {
-    if (c.presets.length && c.presetId !== c.presets[0].id) {
-      this.presetPick.emit({ field: c.field, id: c.presets[0].id });
+  private valueSummary(def: FieldDef, op: FilterOp, values: readonly string[]): { text: string; lead?: PickOption } {
+    switch (op) {
+      case 'between': {
+        const preset = datePresetOf(values);
+        return { text: preset ? preset.label : `${describeDateToken(values[0] ?? '')} – ${describeDateToken(values[1] ?? '')}` };
+      }
+      case 'before':
+      case 'after':
+        return { text: describeDateToken(values[0] ?? '') };
+      case 'last':
+      case 'next':
+        return { text: `${values[0] ?? 0} day${Number(values[0]) === 1 ? '' : 's'}` };
+      case 'eq':
+      case 'gte':
+      case 'lte':
+        return { text: values[0] ?? '' };
+      case 'set':
+      case 'unset':
+      case 'overdue':
+        return { text: '' };
+      default: {
+        if (def.kind === 'text') return { text: values.join(', ') };
+        if (values.length === 0) return { text: 'select…' };
+        if (values.length > 1) return { text: `${values.length} ${nounOfField(def.field)}` };
+        return { text: this.nameOf(def.field, values[0]), lead: this.leadOf(def.field, values[0]) };
+      }
     }
-    if (c.fixed) this.setValues(c.field, []);
-    else this.removeFilter(c.field);
   }
 
-  /** "At least N" on a numeric field; empty or invalid removes the filter. */
-  protected setMin(field: string, raw: string): void {
-    const n = Number(raw);
-    if (!raw.trim() || !Number.isFinite(n) || n < 0) return this.removeFilter(field);
-    this.filtersChange.emit(setFilter(this.filters(), field, 'gte', String(Math.floor(n))));
+  private nameOf(field: string, value: string): string {
+    if (FIELD_DEFS[this.entity()].find((d) => d.field === field)?.refersTo === 'user' && value === this.store.me()?.id) {
+      return 'Me';
+    }
+    return valueLabel(this.store, this.entity(), field, value);
   }
+
+  private leadOf(field: string, value: string): PickOption {
+    const entity = this.entity();
+    const label = field === 'labels' ? this.store.settings().labels.find((l) => l.id === value) : undefined;
+    return {
+      value,
+      label: valueLabel(this.store, entity, field, value),
+      ...valueGlyph(entity, field, value, this.store),
+      color: label?.color ?? valueColor(entity, field, value),
+    };
+  }
+
+  // ───────────────────────── editing ─────────────────────────
 
   protected removeFilter(field: string): void {
-    this.pending.update((p) => p.filter((x) => x !== field));
-    if (this.filters().some((f) => f.field === field)) {
-      this.filtersChange.emit(this.filters().filter((f) => f.field !== field));
+    this.filtersChange.emit(replaceFilter(this.filters(), field, null));
+  }
+
+  protected clear(): void {
+    this.filtersChange.emit([]);
+  }
+
+  /** The operator segment: keep the values when the new operator reads them the same way, else start over. */
+  protected changeOp(chip: Chip, op: FilterOp): void {
+    if (op === chip.op) return;
+    const from = VALUE_GROUP[chip.op];
+    const to = VALUE_GROUP[op];
+    let values: string[];
+    if (from === to && to !== 'none') values = valuesOf(chip.filter);
+    else if (to === 'range') values = ['week_start', 'week_end'];
+    else if (to === 'day') values = ['today'];
+    else if (to === 'num') values = [op === 'last' || op === 'next' ? '7' : '1'];
+    else values = [];
+    this.filtersChange.emit(replaceFilter(this.filters(), chip.field, buildFilter(chip.field, op, values)));
+    // Nothing to read yet (any of … after "is set"): ask for the values straight away.
+    if (to === 'list' && !values.length) this.valueOpen.set(chip.field);
+  }
+
+  protected onValueState(chip: Chip, state: 'open' | 'closed'): void {
+    if (state === 'open') {
+      this.valueOpen.set(chip.field);
+      return;
+    }
+    if (this.valueOpen() === chip.field) this.valueOpen.set(null);
+    // A list filter left with no value would hide everything: drop it.
+    const f = this.filters().find((x) => x.field === chip.field);
+    if (f && VALUE_GROUP[operatorOf(f, this.defOf(f.field).kind)] === 'list' && valuesOf(f).length === 0) {
+      this.removeFilter(chip.field);
     }
   }
 

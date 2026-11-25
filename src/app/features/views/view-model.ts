@@ -55,6 +55,7 @@ const SOURCE_LABEL: Record<string, string> = {
   manual: 'Manual',
   github: 'GitHub',
   gitlab: 'GitLab',
+  linear: 'Linear',
   email: 'Email',
   api: 'API',
   agent: 'Agent',
@@ -89,6 +90,8 @@ function enumLabel(entity: ViewEntity, field: string, value: string): string | u
   if (field === 'priority') return PRIORITY_META[value as keyof typeof PRIORITY_META]?.label;
   if (field === 'kind') return ISSUE_KIND_META[value as keyof typeof ISSUE_KIND_META]?.label;
   if (field === 'source') return SOURCE_LABEL[value];
+  if (field === 'thread') return value === 'linked' ? 'Thread linked' : 'No thread';
+  if (field === 'subtasks') return value === 'yes' ? 'Has sub-tasks' : 'No sub-tasks';
   return undefined;
 }
 
@@ -182,7 +185,12 @@ export function fieldOptions(store: TramaStore, entity: ViewEntity, field: strin
   const none = def.kind === 'id' ? [opt('')] : [];
   switch (def.refersTo) {
     case 'user':
-      return [...none, ...store.users().map((u) => opt(u.id))];
+    {
+      // The signed-in person first: "my" tasks are the filter people reach for most.
+      const me = store.me()?.id;
+      const users = store.users().map((u) => opt(u.id, u.id === me ? { hint: 'you' } : {}));
+      return [...none, ...users.filter((o) => o.value === me), ...users.filter((o) => o.value !== me)];
+    }
     case 'project':
       return [...none, ...store.projects().map((p) => opt(p.id))];
     case 'milestone':
@@ -208,6 +216,11 @@ const OP_LABEL: Record<ViewFilter['op'], string> = {
   after: 'after',
   gte: 'at least',
   lte: 'at most',
+  all: 'includes all of',
+  between: 'between',
+  last: 'in the last (days)',
+  next: 'in the next (days)',
+  overdue: 'is overdue',
 };
 
 export function describeFilter(store: TramaStore, entity: ViewEntity, f: ViewFilter): string {

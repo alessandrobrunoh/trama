@@ -1,11 +1,12 @@
 // The Tasks page (/:ws/tasks) and the Board page (/:ws/board): the one task table, with the v3 header
 // (Filter F · New task C) and a filter bar whose Status chip carries the old All / Active / Backlog /
-// Done / Drafts tabs. The Board route sets `data.layout = 'board'`.
+// Done / Drafts tabs. The Board route sets `data.layout = 'board'`. My tasks (/:ws/my-tasks, route data
+// `mine`) is the same table under a fixed "Assignee is me" scope, with its own list / board switch.
 import { ChangeDetectionStrategy, Component, computed, inject, input, viewChild } from '@angular/core';
 import { Router } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { TramaStore, UiStore, usePageShortcuts } from '../../core';
+import { TramaStore, UiStore, usePageShortcuts, type ViewFilter } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
@@ -38,9 +39,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   },
 };
 
-/** Chips of the Tasks page; the board's columns are the statuses, so it only keeps Thread. */
-const LIST_CHIPS = ['status', 'assigneeId', 'projectId', 'thread', 'source'] as const;
-const BOARD_CHIPS = ['thread'] as const;
+const MY_LAYOUTS: readonly IssueLayout[] = ['list', 'board', 'flow'];
 
 @Component({
   selector: 'app-issue-page',
@@ -58,7 +57,7 @@ const BOARD_CHIPS = ['thread'] as const;
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
-      <button hlmBtn variant="outline" type="button" (click)="board()?.openSearch()">
+      <button hlmBtn variant="outline" type="button" (click)="board()?.openFilter()">
         Filter <app-kbd keys="f" />
       </button>
       @if (store.allowed('createIssues')) {
@@ -68,7 +67,7 @@ const BOARD_CHIPS = ['thread'] as const;
       }
     </ng-template>
 
-    <app-page-header [title]="title()" />
+    <app-page-header [title]="title()" [description]="description()" />
     @if (awaitingTasks()) {
       <div class="flex min-h-0 flex-1 items-center justify-center">
         <app-trama-loader [size]="40" caption="Loading tasks…" />
@@ -80,8 +79,15 @@ const BOARD_CHIPS = ['thread'] as const;
       [status]="status()"
       [project]="project()"
       [layouts]="layouts()"
-      [pageSwitch]="true"
-      [chipFields]="chips()"
+      [pageSwitch]="!isMine()"
+      [syncUrl]="true"
+      [urlFilters]="f()"
+      [urlMatch]="match()"
+      [baseFilters]="baseFilters()"
+      [showBase]="isMine()"
+      [stateKey]="isMine() ? 'my-tasks' : 'issues'"
+      [storageKey]="isMine() ? 'trama.my-tasks.display.v1' : 'trama.issues.display.v1'"
+      [createDefaults]="createDefaults()"
       [statusPresets]="presets()"
       [statusPreset]="tab()"
       (statusPresetChange)="pickTab($event)"
@@ -108,25 +114,56 @@ export class IssuePage {
   readonly view = input<string>();
   /** Route data: `board` on /:ws/board. */
   readonly layout = input<string>();
+  /** Route data: true on /:ws/my-tasks. */
+  readonly mine = input<boolean>();
+  /** Query `?f=status:in:todo` (repeated): the filters of a link. */
+  readonly f = input<string | readonly string[]>();
+  /** Query `?match=any`. */
+  readonly match = input<string>();
 
   protected readonly isBoard = computed(() => this.layout() === 'board');
+  protected readonly isMine = computed(() => this.mine() === true);
   protected readonly layouts = computed<readonly IssueLayout[]>(() =>
-    this.isBoard() ? ['board'] : ['list', 'flow'],
-  );
-  protected readonly chips = computed<readonly string[]>(() =>
-    this.isBoard() ? BOARD_CHIPS : LIST_CHIPS,
+    this.isMine() ? MY_LAYOUTS : this.isBoard() ? ['board'] : ['list', 'flow'],
   );
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
-  protected readonly empty = computed(() => EMPTY[this.tab()]);
   /** The snapshot is still on its way and there is nothing to show yet: the loader replaces the empty state. */
   protected readonly awaitingTasks = computed(
     () => this.store.status() === 'loading' && this.store.issues().length === 0,
   );
-  protected readonly title = computed(() => (this.isBoard() ? 'Board' : 'All tasks'));
+  protected readonly empty = computed(() =>
+    this.isMine() && this.tab() === 'all'
+      ? { title: 'Nothing assigned to you', description: 'Tasks assigned to you show up here.' }
+      : EMPTY[this.tab()],
+  );
+  protected readonly title = computed(() =>
+    this.isMine() ? 'My tasks' : this.isBoard() ? 'Board' : 'All tasks',
+  );
+  /** The fixed scope of My tasks: assigned to me. */
+  protected readonly baseFilters = computed<readonly ViewFilter[]>(() => {
+    const me = this.store.me()?.id;
+    return this.isMine() && me ? [{ field: 'assigneeId', op: 'in', value: [me] }] : [];
+  });
+  /** The tasks the page is about (everything, or mine). */
+  private readonly pool = computed(() => {
+    const me = this.store.me()?.id;
+    return this.isMine() ? this.store.issues().filter((i) => i.assigneeId === me) : this.store.issues();
+  });
+  protected readonly description = computed(() => {
+    if (!this.isMine()) return undefined;
+    const list = this.pool().filter((i) => i.status !== 'draft');
+    const open = list.filter((i) => !['done', 'canceled'].includes(i.status)).length;
+    const progress = list.filter((i) => i.status === 'in_progress').length;
+    return `${open} open · ${progress} in progress · ${list.length} assigned to you`;
+  });
+  protected readonly createDefaults = computed<Record<string, unknown>>(() => {
+    const me = this.store.me()?.id;
+    return this.isMine() && me ? { assigneeId: me } : {};
+  });
   protected readonly counts = computed(() => {
-    const list = this.store.issues();
+    const list = this.pool();
     const out = {} as Record<IssueViewTab, number>;
     for (const t of ISSUE_TABS)
       out[t.id] = t.statuses
@@ -158,6 +195,7 @@ export class IssuePage {
   protected create(): void {
     const status = this.scope()?.[0];
     this.ui.openCreate('issue', {
+      ...this.createDefaults(),
       ...(status && status !== 'done' ? { status } : {}),
     });
   }
