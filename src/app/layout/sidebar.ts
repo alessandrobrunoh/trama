@@ -554,7 +554,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
         <hlm-dropdown-menu-label class="flex items-center justify-between">
-          Theme <app-kbd keys="mod+j" />
+          Theme <app-kbd keys="mod+shift+l" />
         </hlm-dropdown-menu-label>
         <hlm-dropdown-menu-group>
           @for (t of themes; track t.mode) {

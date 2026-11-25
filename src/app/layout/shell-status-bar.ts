@@ -8,6 +8,7 @@ import {
   signal,
 } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { LucideDynamicIcon, LucideSparkles } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TimeEntriesStore } from '../core/stores/time-entries.store';
 import { TramaStore } from '../core/stores/trama.store';
@@ -24,14 +25,14 @@ const PROVIDER_LABEL: Record<string, string> = {
 
 /**
  * The v3 status bar under the main pane ("v3 · 01 UI Kit" → App shell → Status bar):
- *   [● Agent sync 4m ago] [GitHub · GitLab · Jira synced 1m ago] … [? shortcuts   ⌘K command] [timer pill]
+ *   [● Agent sync 4m ago] [GitHub · GitLab · Jira synced 1m ago] … [✦ Ask Trama ⌘J] [? shortcuts   ⌘K command] [timer pill]
  * 28px, IBM Plex Mono 10.5px, faint. Page-level `<app-status-bar>` content is not shown here (the v3
  * shell has no per-page status line).
  */
 @Component({
   selector: 'app-shell-status-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmTooltip],
+  imports: [RouterLink, HlmTooltip, LucideDynamicIcon],
   host: {
     role: 'status',
     class:
@@ -46,6 +47,18 @@ const PROVIDER_LABEL: Record<string, string> = {
       <span class="min-w-0 shrink truncate">{{ t }}</span>
     }
     <span class="flex-1"></span>
+    <button
+      type="button"
+      id="ask-trama-chip"
+      class="bg-primary/10 border-primary/40 hover:bg-primary/20 flex shrink-0 items-center gap-1.5 border py-0.5 ps-2 pe-1.5 outline-none focus-visible:border-primary"
+      aria-controls="trama-assistant"
+      [attr.aria-expanded]="ui.askOpen()"
+      (click)="ui.toggleAsk()"
+    >
+      <svg [lucideIcon]="sparklesIcon" [size]="11" class="text-primary shrink-0" aria-hidden="true"></svg>
+      <span class="text-foreground">Ask Trama</span>
+      <kbd class="bg-secondary text-muted-foreground px-1 font-mono text-[10px]">{{ askKeys }}</kbd>
+    </button>
     <button type="button" class="hover:text-muted-foreground shrink-0 whitespace-pre max-lg:hidden" (click)="ui.openModal('shortcuts')">? shortcuts</button>
     <button type="button" class="hover:text-muted-foreground -ms-1 shrink-0 max-lg:hidden" (click)="ui.openCommandPalette()">⌘K command</button>
     @if (timers.running(); as run) {
@@ -73,6 +86,11 @@ const PROVIDER_LABEL: Record<string, string> = {
 })
 export class ShellStatusBar {
   protected readonly ui = inject(UiStore);
+  protected readonly sparklesIcon = LucideSparkles;
+  protected readonly askKeys =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent)
+      ? '⌘J'
+      : 'Ctrl J';
   protected readonly timers = inject(TimeEntriesStore);
   private readonly sync = inject(SyncStatus);
   private readonly store = inject(TramaStore);

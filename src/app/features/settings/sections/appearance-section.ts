@@ -86,7 +86,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
           }
         </div>
         <app-settings-row label="Quick toggle" description="Flip between light and dark from anywhere.">
-          <app-kbd keys="mod+j" />
+          <app-kbd keys="mod+shift+l" />
         </app-settings-row>
       </app-settings-group>
     </div>

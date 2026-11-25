@@ -920,6 +920,14 @@ export class CommandPanel {
     }
     out.push(
       {
+        id: 'ask-trama',
+        label: 'Ask Trama',
+        keywords: 'assistant ai question chat records',
+        icon: LucideSparkles,
+        keys: 'mod+j',
+        run: () => this.ui.askOpen.set(true),
+      },
+      {
         id: 'search',
         label: 'Search everything',
         icon: LucideSearch,
@@ -938,7 +946,7 @@ export class CommandPanel {
         label: 'Toggle theme',
         keywords: 'dark light mode appearance',
         icon: this.theme.isDark() ? LucideSun : LucideMoon,
-        keys: 'mod+j',
+        keys: 'mod+shift+l',
         run: () => this.theme.toggle(),
       },
       {

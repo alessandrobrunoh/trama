@@ -1,7 +1,7 @@
 // Global keyboard shortcuts. Instantiate once from AppShell (`inject(KeyboardShortcuts)`;
 // the constructor attaches the document listener).
 //
-// Global bindings: ⌘K palette, ⌘B sidebar, ⌘J theme, `/` search, `?` shortcuts, `C` create
+// Global bindings: ⌘K palette, ⌘B sidebar, ⌘J Ask Trama, ⌘⇧L theme, `/` search, `?` shortcuts, `C` create
 // (context-aware), G-chords (G O/Y/A/I/W/D/R/X/S/T/V), Esc (close overlay → up one level),
 // list navigation over `[data-row-id]` rows (j/k/↑/↓, Enter, Space/x).
 // Pages add their own bindings with `usePageShortcuts([...])` / `registerPageShortcuts([...])`.
@@ -114,7 +114,7 @@ export class KeyboardShortcuts {
   /**
    * Register page-level shortcuts; returns the unregister function. Prefer `usePageShortcuts`
    * in components (auto-unregisters). Later registrations win on conflicts; page shortcuts
-   * take priority over `c`, list navigation and `/`, but not over ⌘K/⌘B/⌘J, `?`, G-chords.
+   * take priority over `c`, list navigation and `/`, but not over ⌘K/⌘B/⌘J/⌘⇧L, `?`, G-chords.
    */
   registerPageShortcuts(list: readonly PageShortcut[]): () => void {
     const entries = list.map((def) => ({ id: this.nextId++, combo: parseCombo(def.keys), def }));
@@ -131,7 +131,7 @@ export class KeyboardShortcuts {
     this.pageShortcuts.set(this._pageShortcuts().map((e) => e.def));
   }
 
-  /** Flip light/dark (⌘J). */
+  /** Flip light/dark (⌘⇧L). */
   toggleTheme(): void {
     this.theme.toggle();
   }
@@ -203,6 +203,11 @@ export class KeyboardShortcuts {
     }
 
     // Modifier shortcuts work while typing.
+    if (mod && !event.altKey && event.shiftKey && lower === 'l') {
+      event.preventDefault();
+      this.toggleTheme();
+      return;
+    }
     if (mod && !event.altKey && !event.shiftKey) {
       if (lower === 'k') {
         event.preventDefault();
@@ -217,7 +222,7 @@ export class KeyboardShortcuts {
       }
       if (lower === 'j') {
         event.preventDefault();
-        this.toggleTheme();
+        this.ui.toggleAsk();
         return;
       }
     }

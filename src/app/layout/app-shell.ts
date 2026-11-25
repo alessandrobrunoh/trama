@@ -18,6 +18,7 @@ import { MobileNav } from './mobile-nav';
 import { PullToRefresh } from './mobile-pull-to-refresh';
 import { ShellStatusBar } from './shell-status-bar';
 import { Viewport } from '../core/viewport';
+import { AssistantOverlay } from '../features/ai/assistant-overlay';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
@@ -45,6 +46,7 @@ import { Viewport } from '../core/viewport';
     MobileHeader,
     PullToRefresh,
     ShellStatusBar,
+    AssistantOverlay,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
@@ -108,6 +110,12 @@ import { Viewport } from '../core/viewport';
       <app-search-dialog />
       <app-confirm-dialog />
     }
+
+    <!-- "Ask Trama" (⌘J): loaded the first time it is opened; its chats and draft live in AssistantStore,
+         so the panel keeps its state while the pages change underneath. -->
+    @defer (when ui.askOpen()) {
+      <app-assistant-overlay />
+    }
   `,
 })
 export class AppShell {
@@ -115,7 +123,7 @@ export class AppShell {
   protected readonly viewport = inject(Viewport);
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
-  /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */
+  /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J ask, C, G-chords, j/k…). */
   private readonly keyboard = inject(KeyboardShortcuts);
 
   /** 768-1023px: the page next to a 240px sidebar is too narrow for list rows, so start collapsed. */

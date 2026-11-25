@@ -103,6 +103,8 @@ export class UiStore {
   readonly createKind = signal<CreateKind>('issue');
   readonly createDefaults = signal<CreateDefaults>({});
   readonly confirmDelete = signal<ConfirmDeleteState | null>(null);
+  /** The floating "Ask Trama" panel (⌘J). Not a modal: it stays open while the page is used. */
+  readonly askOpen = signal(false);
   /** True right after "g" is pressed (G-chord pending); show a hint if you like. */
   readonly pendingG = signal(false);
   /** Keyboard-focused list row (`data-row-id`). */
@@ -172,6 +174,9 @@ export class UiStore {
   closeModal(): void {
     this.modal.set(null);
     this.confirmDelete.set(null);
+  }
+  toggleAsk(): void {
+    this.askOpen.update((v) => !v);
   }
   openCommandPalette(): void {
     this.openModal('command');

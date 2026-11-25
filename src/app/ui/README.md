@@ -176,4 +176,4 @@ Status labels also available as `statusLabel(status)`, providers as `providerLab
 - **Header avatars**: `<app-page-header title="…" [actors]="[assignee, reporter]">` shows a stacked `<app-avatar-stack>` after the title.
 - **Breadcrumbs**: derived from the URL. Override in a page: `usePageCrumbs(() => [{ label: 'Issues', link: ['/', slug(), 'issues'] }, { label: issue()?.key ?? '', mono: true }])`.
 - **Global overlays still to build by the feature layer** (the shell does NOT mount them): the *create dialog* (`ui.modal() === 'create'`, `ui.createKind()`, `ui.createDefaults()`) and the `/` search dialog* (`ui.modal() === 'search'`). Add their components to `AppShell`'s `imports` + template (one-line additive change).
-- Theme: `inject(ThemeService)` → `mode()`, `resolved()`, `isDark()`, `set('light'|'dark'|'system')`, `toggle()`. ⌘J works through core's `ThemeToggle` (flipping `html.dark`), which `ThemeService` adopts.
+- Theme: `inject(ThemeService)` → `mode()`, `resolved()`, `isDark()`, `set('light'|'dark'|'system')`, `toggle()`. ⌘⇧L works through core's `ThemeToggle` (flipping `html.dark`), which `ThemeService` adopts.

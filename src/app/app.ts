@@ -15,7 +15,7 @@ import { Viewport } from './core/viewport';
   `,
 })
 export class App {
-  // Instantiate early so the saved theme is applied and ⌘J / system changes are tracked.
+  // Instantiate early so the saved theme is applied and ⌘⇧L / system changes are tracked.
   protected readonly theme = inject(ThemeService);
   // Instantiate early so font size, cursors, links and motion preferences are applied.
   protected readonly preferences = inject(Preferences);

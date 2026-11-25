@@ -11,7 +11,7 @@ export const THEME_STORAGE_KEY = 'trama.theme';
  *  - `mode`     user preference (persisted)
  *  - `resolved` what is actually applied ('light' | 'dark')
  * Applies the `dark` class (and `color-scheme`) on <html>. In `system` mode it follows
- * `prefers-color-scheme` live. `toggle()` (⌘J) flips the *resolved* theme and pins it.
+ * `prefers-color-scheme` live. `toggle()` (⌘⇧L) flips the *resolved* theme and pins it.
  * If something else flips `html.dark` (e.g. core's ThemeToggle), the service adopts it.
  */
 @Injectable({ providedIn: 'root' })
@@ -60,7 +60,7 @@ export class ThemeService {
     this.mode.set(mode);
   }
 
-  /** ⌘J: flip between light and dark based on what is currently shown. */
+  /** ⌘⇧L: flip between light and dark based on what is currently shown. */
   toggle(): void {
     this.mode.set(this.isDark() ? 'light' : 'dark');
   }
@@ -72,7 +72,7 @@ export class ThemeService {
     } catch {
       /* ignore */
     }
-    // The v3 design is dark-first; light stays one ⌘J away.
+    // The v3 design is dark-first; light stays one ⌘⇧L away.
     return 'dark';
   }
 }

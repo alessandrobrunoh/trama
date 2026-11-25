@@ -4,6 +4,13 @@ import { NavigationEnd, Router } from '@angular/router';
 import { filter, map } from 'rxjs';
 import { SessionStore } from '../session/session.store';
 import { TramaStore } from '../stores/trama.store';
+import { UiStore } from '../stores/ui.store';
+import {
+  askChipsFromUrl,
+  primaryAskContext,
+  visibleAskChips,
+  type AskContextChip,
+} from './ask-context';
 import {
   AiApi,
   type ActivityStep,
@@ -74,7 +81,8 @@ export class AssistantStore {
   private controller?: AbortController;
   private revision = 0;
   private grokPoll?: ReturnType<typeof setTimeout>;
-  readonly open = signal(false);
+  /** The floating "Ask Trama" panel; the flag lives in UiStore so ⌘J works before this store exists. */
+  readonly open = inject(UiStore).askOpen;
   /** Set when the popup expands into the full page, so the page keeps that chat instead of starting a new one. */
   handoverToPage = false;
   readonly expanded = signal(false);
@@ -104,27 +112,38 @@ export class AssistantStore {
   readonly onAssistantPage = computed(
     () => this.url().split(/[?#]/)[0].split('/')[2] === 'assistant',
   );
-  readonly context = computed<ChatContext>(() => {
-    const parts =
-      this.router.parseUrl(this.url()).root.children['primary']?.segments.map((s) => s.path) ?? [];
-    const page = parts[1] ?? 'inbox';
-    const id = parts[2];
-    if (id && (page === 'tasks' || page === 'issues'))
-      return {
-        kind: 'issue',
-        id,
-        label: this.store.issues().find((i) => i.key === id || i.id === id)?.key ?? id,
-      };
-    if (id && page === 'projects')
-      return {
-        kind: 'project',
-        id,
-        label: this.store.getProject(id)?.name ?? id,
-      };
-    return {
-      kind: 'page',
-      label: page.charAt(0).toUpperCase() + page.slice(1).replaceAll('-', ' '),
-    };
+
+  /** Chips the current route fills in by itself (task, project, view or page). */
+  readonly routeChips = computed<AskContextChip[]>(() =>
+    askChipsFromUrl(this.url(), {
+      issue: (ref) => this.store.getIssue(ref),
+      project: (id) => this.store.getProject(id),
+      view: (id) => this.store.getView(id),
+    }),
+  );
+  /** Route chips the person removed from the panel's CONTEXT row (by chip id). */
+  private readonly dismissedChips = signal<ReadonlySet<string>>(new Set());
+  /** Chips the person added with "+ add". */
+  private readonly addedChips = signal<readonly AskContextChip[]>([]);
+  /** The CONTEXT row of the "Ask Trama" panel. */
+  readonly chips = computed(() =>
+    visibleAskChips(this.routeChips(), this.dismissedChips(), this.addedChips()),
+  );
+  /** Route chips that were removed and can be put back. */
+  readonly removedChips = computed(() =>
+    this.routeChips().filter((c) => this.dismissedChips().has(c.id)),
+  );
+  /**
+   * What the backend is told about the screen. The full page has no chips of its own: it keeps the
+   * page as the subject (its scope toggle decides whether it is shared).
+   */
+  readonly context = computed<ChatContext | undefined>(() =>
+    primaryAskContext(this.onAssistantPage() ? this.routeChips() : this.chips()),
+  );
+  /** The linked Delta thread of the task in context, for "Open in Delta". */
+  readonly contextThreadUrl = computed(() => {
+    const ctx = this.context();
+    return ctx?.kind === 'issue' && ctx.id ? this.store.getIssue(ctx.id)?.threadUrl : undefined;
   });
   readonly ready = computed(
     () =>
@@ -141,6 +160,7 @@ export class AssistantStore {
       const id = this.activeId();
       if (id && this.viewing()) untracked(() => this.markRead(id));
     });
+    let firstRun = true;
     effect(() => {
       const user = this.session.user()?.id;
       const slug = this.slug();
@@ -148,7 +168,11 @@ export class AssistantStore {
         this.revision++;
         this.newChat();
         this.loadChats(user, slug);
-        this.open.set(false);
+        // The store is created when the panel is first opened: that first run must not close it.
+        if (!firstRun) this.open.set(false);
+        firstRun = false;
+        this.dismissedChips.set(new Set());
+        this.addedChips.set([]);
         this.dock.set([]);
         this.status.set(null);
         this.statusError.set('');
@@ -157,6 +181,28 @@ export class AssistantStore {
         if (user && slug) void this.refreshStatus();
       });
     });
+  }
+
+  /** Takes a chip off the CONTEXT row (a route chip stays off until it is added back). */
+  removeChip(id: string): void {
+    if (this.addedChips().some((c) => c.id === id)) {
+      this.addedChips.update((list) => list.filter((c) => c.id !== id));
+    } else {
+      this.dismissedChips.update((set) => new Set(set).add(id));
+    }
+  }
+
+  /** Adds a chip to the CONTEXT row, or puts back a route chip that was removed. */
+  addChip(chip: AskContextChip): void {
+    if (this.dismissedChips().has(chip.id)) {
+      this.dismissedChips.update((set) => {
+        const next = new Set(set);
+        next.delete(chip.id);
+        return next;
+      });
+    } else if (!this.chips().some((c) => c.id === chip.id)) {
+      this.addedChips.update((list) => [...list, chip]);
+    }
   }
 
   async refreshStatus(): Promise<void> {

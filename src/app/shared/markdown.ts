@@ -525,7 +525,7 @@ function parseBlocks(lines: string[], link?: TextLinker): Block[] {
             ><code>{{ b.v }}</code></pre>
           }
           @case ('quote') {
-            <blockquote class="text-muted-foreground my-3 border-s-2 ps-3">
+            <blockquote class="text-muted-foreground border-primary/40 my-3 border-s-2 ps-3">
               <ng-container *ngTemplateOutlet="blk; context: { $implicit: b.blocks }" />
             </blockquote>
           }
