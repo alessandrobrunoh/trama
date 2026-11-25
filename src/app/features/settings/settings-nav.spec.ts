@@ -1,4 +1,4 @@
-import { SETTINGS_SECTIONS, resolveSettingsSection, settingsSectionOfUrl } from './settings-nav';
+import { SETTINGS_GROUPS, SETTINGS_SECTIONS, resolveSettingsSection, settingsSectionOfUrl } from './settings-nav';
 
 describe('settings nav', () => {
   it('opens Profile when the URL has no section', () => {
@@ -25,6 +25,15 @@ describe('settings nav', () => {
   it('is null away from settings', () => {
     expect(settingsSectionOfUrl('/acme/tasks')).toBeNull();
     expect(settingsSectionOfUrl('/')).toBeNull();
+  });
+
+  it('keeps personal integrations in the account group, apart from the workspace ones', () => {
+    const account = SETTINGS_GROUPS.find((g) => g.title === 'ACCOUNT')!.sections.map((s) => s.id);
+    const workspace = SETTINGS_GROUPS.find((g) => g.title === 'WORKSPACE')!.sections.map((s) => s.id);
+    expect(account).toContain('my-integrations');
+    expect(workspace).toContain('integrations');
+    expect(account).not.toContain('integrations');
+    expect(settingsSectionOfUrl('/acme/settings/my-integrations')).toBe('my-integrations');
   });
 
   it('has no duplicate ids', () => {

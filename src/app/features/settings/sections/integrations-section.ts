@@ -1,328 +1,340 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { LucideDynamicIcon, LucideEye, LucideEyeOff, LucideWebhook } from '@lucide/angular';
+import {
+  LucideBan,
+  LucideDynamicIcon,
+  LucideEllipsis,
+  LucideKeyRound,
+  LucidePencil,
+  LucidePlus,
+  LucideRefreshCw,
+  LucideRotateCw,
+  LucideTrash2,
+  LucideTriangleAlert,
+  LucideWebhook,
+} from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSpinner } from '@spartan-ng/helm/spinner';
-import type { IntegrationDetail, WebhookSetup } from '../../../core/api/api.types';
-import type { IntegrationConnection } from '../../../core/contracts/domain';
+import type { CreateIntegrationInput, IntegrationDetail, WebhookSetup } from '../../../core/api/api.types';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import { TopBarActions } from '../../../layout/page-chrome';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { RelativeTimePipe } from '../../../shared/pipes';
-import { SECTION_KIT } from './section-kit';
+import {
+  ConnectionAddForm,
+  ConnectionTokenForm,
+  PROVIDER_INFO,
+  accountLine,
+  needsAttention,
+  statusDot,
+  statusLabel,
+  type ConnProvider,
+} from './connection-kit';
 import { OutgoingWebhooks } from './outgoing-webhooks';
+import { SECTION_KIT } from './section-kit';
 import { WebhookSetupDialog } from './webhook-setup-dialog';
-
-type ConnProvider = IntegrationConnection['provider'];
-
-const PROVIDER_INFO: Record<ConnProvider, { label: string; blurb: string; base: string; baseHint: string; scopes: string }> = {
-  github: {
-    label: 'GitHub',
-    blurb: 'Pull requests, reviews and CI',
-    base: 'https://github.example.com',
-    baseHint: 'Only for GitHub Enterprise Server. Leave empty for github.com.',
-    scopes: 'Fine-grained token with Metadata and Pull requests (read) on the repositories, or a classic token with repo.',
-  },
-  gitlab: {
-    label: 'GitLab',
-    blurb: 'Merge requests and pipelines',
-    base: 'https://gitlab.example.com',
-    baseHint: 'Only for self-hosted GitLab. Leave empty for gitlab.com.',
-    scopes: 'Personal or project access token with read_api.',
-  },
-  bitbucket: {
-    label: 'Bitbucket',
-    blurb: 'Pull requests and build statuses (Cloud)',
-    base: '',
-    baseHint: '',
-    scopes:
-      'An Atlassian API token as email:token (scopes read:user, read:repository and read:pullrequest), or a repository or workspace access token.',
-  },
-  delta: {
-    label: 'Delta',
-    blurb: 'Agent threads and sessions',
-    base: 'https://delta.example.com',
-    baseHint: 'Required: the address of your Delta instance.',
-    scopes: 'A Delta API token. Stored encrypted; Delta connections are not validated yet.',
-  },
-};
-
-/**
- * What can be connected. A choice is a provider, optionally preset to a self-hosted instance
- * (GitHub Enterprise Server, self-hosted GitLab), where the base URL becomes required.
- */
-interface Choice {
-  id: string;
-  provider: ConnProvider;
-  label: string;
-  blurb: string;
-  /** The connection must point at your own instance. */
-  selfHosted?: boolean;
-}
-
-const CHOICES: Choice[] = [
-  { id: 'github', provider: 'github', label: 'GitHub', blurb: PROVIDER_INFO.github.blurb },
-  { id: 'github-enterprise', provider: 'github', label: 'GitHub Enterprise', blurb: 'Self-hosted GitHub Enterprise Server', selfHosted: true },
-  { id: 'gitlab', provider: 'gitlab', label: 'GitLab', blurb: PROVIDER_INFO.gitlab.blurb },
-  { id: 'gitlab-self-hosted', provider: 'gitlab', label: 'GitLab Self-Hosted', blurb: 'Your own GitLab instance', selfHosted: true },
-  { id: 'bitbucket', provider: 'bitbucket', label: 'Bitbucket', blurb: PROVIDER_INFO.bitbucket.blurb },
-  { id: 'delta', provider: 'delta', label: 'Delta', blurb: PROVIDER_INFO.delta.blurb },
-];
 
 type Row = IntegrationDetail & { detailed: boolean };
 
 /** What the right-hand pane shows. */
 type Selection =
   | { kind: 'conn'; id: string }
-  | { kind: 'connect' }
+  | { kind: 'connect'; preset: string | null }
   | { kind: 'webhooks' };
 
-/** One line of the left-hand list (v3 "Providers"). */
-interface ListItem {
-  key: string;
-  sel: Selection;
-  provider: ConnProvider | null;
-  label: string;
-  sub: string;
-  status: string;
-  /** Tailwind class for the 6px status square. */
-  dot: string;
-  /** Preset the connect form to this choice when the line is a provider that is not connected. */
-  choice?: Choice;
-}
+const GROUPS: readonly { provider: ConnProvider; title: string }[] = [
+  { provider: 'github', title: 'GITHUB' },
+  { provider: 'gitlab', title: 'GITLAB' },
+  { provider: 'bitbucket', title: 'BITBUCKET' },
+  { provider: 'delta', title: 'DELTA' },
+];
 
 /**
- * Settings · Integrations (v3 frame 11): master / detail. The left list holds every connection (and the
- * providers still to connect and custom webhooks); the right pane shows the one selected: its
- * account, status and webhook, with re-validate, token replacement, secret rotation and disconnect.
- * GitHub / GitLab / Bitbucket / Delta connections work as before; nothing here is fake data.
+ * Settings · Integrations · Workspace (v4 frame "09 Integrations · Workspace"): the connections the
+ * workspace owns, installed by whoever has the integrations permission. They keep working when people
+ * leave. Several per provider, each with a name; a failing or revoked one says so and can be
+ * reconnected. Personal accounts live under the account's own Integrations page.
  */
 @Component({
   selector: 'app-integrations-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     HlmButtonImports,
+    HlmDropdownMenuImports,
     HlmInputImports,
-    HlmSpinner,
     LucideDynamicIcon,
     ProviderIcon,
     RelativeTimePipe,
+    ConnectionAddForm,
+    ConnectionTokenForm,
     OutgoingWebhooks,
     WebhookSetupDialog,
-    TopBarActions,
     ...SECTION_KIT,
   ],
-  host: { class: 'flex h-full min-h-0 flex-col overflow-y-auto md:flex-row md:overflow-hidden' },
+  host: { class: 'block h-full min-h-0 overflow-y-auto' },
   template: `
-    <ng-template appTopBarActions>
-      @if (canAdmin()) {
-        <button hlmBtn (click)="openConnect()">Add integration</button>
-      }
-    </ng-template>
+    <div class="w-full max-w-[1240px] px-5 py-6 sm:px-10 sm:py-8 lg:px-14">
+      <app-section-header
+        title="Integrations"
+        [description]="
+          'Workspace connections, installed by admins. They belong to ' +
+          workspaceName() +
+          ' and keep working when people leave. Your own accounts live in Account · Integrations.'
+        "
+      >
+        @if (canAdmin()) {
+          <button actions hlmBtn (click)="openConnect(null)">
+            <svg [lucideIcon]="plus" [size]="13"></svg>
+            Add connection
+          </button>
+        }
+      </app-section-header>
 
-    <!-- master: connections and what can still be connected -->
-    <div class="border-border flex shrink-0 flex-col border-b md:min-h-0 md:w-[340px] md:overflow-y-auto md:border-r md:border-b-0">
-      <div class="border-border text-foreground border-b px-4 py-3 font-mono text-[10.5px] leading-none">CONNECTIONS</div>
-      @for (item of items(); track item.key) {
-        <button
-          type="button"
-          class="border-border hover:bg-hover/60 flex min-h-[62px] items-center gap-3 border-b px-4 py-3.5 text-left"
-          [class.bg-hover]="isSelected(item)"
-          [attr.aria-current]="isSelected(item) ? 'true' : null"
-          (click)="select(item)"
-        >
-          <span class="bg-secondary text-foreground flex size-8 shrink-0 items-center justify-center">
-            @if (item.provider) {
-              <app-provider-icon [provider]="item.provider" [size]="16" />
-            } @else {
-              <svg [lucideIcon]="hook" [size]="16"></svg>
-            }
-          </span>
-          <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
-            <span class="text-foreground truncate text-[13.5px] leading-none">{{ item.label }}</span>
-            <span class="text-faint truncate font-mono text-[10.5px] leading-none">{{ item.sub }}</span>
-          </span>
-          @if (item.status) {
-            <span class="flex shrink-0 items-center gap-[5px]">
-              <span class="size-1.5" [class]="item.dot" aria-hidden="true"></span>
-              <span class="text-muted-foreground font-mono text-[10px] leading-none">{{ item.status }}</span>
-            </span>
-          }
-        </button>
-      }
-    </div>
-
-    <!-- detail -->
-    <div class="min-w-0 flex-1 px-5 py-6 md:min-h-0 md:overflow-y-auto md:px-10 md:py-7">
       @if (!canAdmin()) {
         <app-readonly-note>Your role cannot manage integrations. You can still see what is connected.</app-readonly-note>
       }
 
-      @switch (selection().kind) {
-        @case ('connect') {
-          <app-section-header
-            title="Add integration"
-            description="Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects. Secrets are encrypted and never shown again."
-          />
-          @if (canAdmin()) {
-            <form (submit)="connect($event)" class="flex max-w-[720px] flex-col gap-4">
-              <div class="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label="Provider">
-                @for (p of choices; track p.id) {
+      <!-- summary -->
+      <div class="border-border text-muted-foreground flex flex-wrap items-center gap-x-5 gap-y-1 border px-4 py-2.5 font-mono text-[10.5px]">
+        <span class="flex items-center gap-1.5"><span class="bg-green size-1.5" aria-hidden="true"></span>{{ rows().length }} {{ rows().length === 1 ? 'connection' : 'connections' }}</span>
+        @if (attention() > 0) {
+          <span class="text-foreground flex items-center gap-1.5"><span class="bg-red size-1.5" aria-hidden="true"></span>{{ attention() }} {{ attention() === 1 ? 'needs' : 'need' }} attention</span>
+        }
+      </div>
+
+      <div class="mt-7 flex flex-col gap-8 lg:flex-row lg:gap-0">
+        <!-- master: connections by provider -->
+        <nav class="flex shrink-0 flex-col gap-5 lg:w-[290px] lg:pr-6" aria-label="Connections">
+          @for (g of groups(); track g.provider) {
+            <div class="flex flex-col">
+              <div class="flex h-6 items-center justify-between px-1">
+                <span class="text-faint font-mono text-[10px] leading-none tracking-wide">{{ g.title }}</span>
+                @if (canAdmin()) {
                   <button
                     type="button"
-                    role="radio"
-                    class="hover:bg-hover flex items-center gap-2.5 border px-3 py-2.5 text-left transition-colors"
-                    [class]="choice().id === p.id ? 'bg-selected border-border-strong' : 'bg-secondary border-border'"
-                    [attr.aria-checked]="choice().id === p.id"
-                    (click)="choose(p)"
+                    class="text-muted-foreground hover:text-foreground flex size-6 items-center justify-center"
+                    [attr.aria-label]="'Add a ' + g.label + ' connection'"
+                    (click)="openConnect(g.provider)"
                   >
-                    <app-provider-icon [provider]="p.provider" [size]="18" />
-                    <span class="min-w-0">
-                      <span class="text-foreground block text-[13px]">{{ p.label }}</span>
-                      <span class="text-faint block truncate font-mono text-[10px]">{{ p.blurb }}</span>
-                    </span>
+                    <svg [lucideIcon]="plus" [size]="13"></svg>
                   </button>
                 }
               </div>
-              <app-settings-group>
-                <app-settings-row label="Access token" [description]="info[provider()].scopes" wide>
-                  <div class="relative">
-                    <input
-                      hlmInput
-                      class="h-8 w-full pr-9 font-mono text-xs"
-                      [type]="showToken() ? 'text' : 'password'"
-                      autocomplete="off"
-                      spellcheck="false"
-                      [placeholder]="tokenPlaceholder()"
-                      [value]="token()"
-                      (input)="token.set($any($event.target).value)"
-                      aria-label="Access token"
-                    />
-                    <button type="button" class="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2" [attr.aria-label]="showToken() ? 'Hide token' : 'Show token'" (click)="showToken.set(!showToken())">
-                      <svg [lucideIcon]="showToken() ? eyeOff : eye" [size]="14"></svg>
-                    </button>
-                  </div>
-                </app-settings-row>
-                @if (provider() !== 'bitbucket') {
-                  <app-settings-row [label]="provider() === 'delta' ? 'Delta URL' : 'Base URL'" [description]="baseHint()" wide>
-                    <input hlmInput class="h-8 w-full font-mono text-xs" type="url" [placeholder]="info[provider()].base" [value]="baseUrl()" (input)="baseUrl.set($any($event.target).value)" aria-label="Base URL" />
-                  </app-settings-row>
-                }
-              </app-settings-group>
-              <div class="flex items-center justify-end gap-2">
-                <button hlmBtn type="button" variant="ghost" (click)="closeConnect()">Cancel</button>
-                <button hlmBtn type="submit" [disabled]="!canConnect() || busy()">
-                  @if (busy()) {
-                    <hlm-spinner class="size-3.5" />
-                  }
-                  {{ busy() ? 'Checking token…' : 'Connect ' + choice().label }}
-                </button>
-              </div>
-            </form>
-          }
-        }
-
-        @case ('webhooks') {
-          <app-outgoing-webhooks />
-        }
-
-        @default {
-          @if (current(); as c) {
-            <!-- head: tile, name, status line, actions -->
-            <div class="flex flex-wrap items-center gap-3.5">
-              <span class="bg-secondary text-foreground flex size-11 shrink-0 items-center justify-center">
-                <app-provider-icon [provider]="c.provider" [size]="22" />
-              </span>
-              <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
-                <h2 class="font-title text-foreground truncate text-[28px] leading-normal">{{ c.account || info[c.provider].label }}</h2>
-                <p class="text-faint font-mono text-[10.5px] leading-[15px]">
-                  {{ statusLabel(c.status) }} · {{ info[c.provider].label }}{{ c.baseUrl ? ' · ' + host(c.baseUrl) : '' }} · connected {{ c.createdAt | relativeTime }}@if (c.lastWebhookAt) { · last event {{ c.lastWebhookAt | relativeTime }} }
-                </p>
-              </div>
-              @if (canAdmin()) {
-                <div class="flex flex-wrap items-center gap-2">
-                  <button hlmBtn variant="outline" (click)="revalidate(c)">Re-validate</button>
-                  <button hlmBtn variant="outline" (click)="startEdit(c)">Replace token…</button>
-                  @if (c.provider !== 'delta') {
-                    <button hlmBtn variant="outline" (click)="rotate(c)">Rotate secret</button>
-                  }
-                  <button hlmBtn variant="destructive" (click)="disconnect(c)">Disconnect</button>
-                </div>
-              }
-            </div>
-
-            @if (c.lastError) {
-              <div class="border-red/40 text-red mt-5 border px-3 py-2 text-[12.5px]">{{ c.lastError }}</div>
-            }
-
-            @if (editing() === c.id) {
-              <form class="mt-6 max-w-[720px]" (submit)="saveEdit($event, c)">
-                <app-settings-group>
-                  <app-settings-row label="New token" description="Checked against the provider before it replaces the old one." wide>
-                    <input hlmInput type="password" autocomplete="off" class="h-8 w-full font-mono text-xs" placeholder="Leave empty to keep the current token" [value]="editToken()" (input)="editToken.set($any($event.target).value)" aria-label="New token" />
-                  </app-settings-row>
-                  @if (c.provider !== 'bitbucket') {
-                    <app-settings-row [label]="c.provider === 'delta' ? 'Delta URL' : 'Base URL'" [description]="info[c.provider].baseHint" wide>
-                      <input hlmInput type="url" class="h-8 w-full font-mono text-xs" [placeholder]="info[c.provider].base" [value]="editBase()" (input)="editBase.set($any($event.target).value)" aria-label="Base URL" />
-                    </app-settings-row>
-                  }
-                  <div class="flex items-center justify-end gap-2 px-4 py-2">
-                    <button hlmBtn type="button" variant="ghost" (click)="editing.set(null)">Cancel</button>
-                    <button hlmBtn type="submit" [disabled]="busy() || (c.provider === 'delta' && !editBase().trim())">Save and re-validate</button>
-                  </div>
-                </app-settings-group>
-              </form>
-            }
-
-            <div class="mt-7">
-              @if (c.provider === 'delta') {
-                <app-settings-section title="Delta" caption="stored for agent sessions">
-                  <p class="text-muted-foreground pt-3 text-[13px] leading-snug">
-                    Delta has no repository or webhook API yet, so there is nothing else to set up.
-                    @if (c.baseUrl) {
-                      <span class="text-foreground font-mono text-xs">{{ host(c.baseUrl) }}</span>
-                    }
-                  </p>
-                </app-settings-section>
-              } @else {
-                <app-settings-section
-                  title="Webhook"
-                  [caption]="
-                    c.lastWebhookAt
-                      ? 'last delivery ' + (c.lastWebhookAt | relativeTime)
-                      : c.detailed
-                        ? 'no delivery yet'
-                        : 'details are visible to admins'
-                  "
+              @for (c of g.rows; track c.id) {
+                <button
+                  type="button"
+                  class="hover:bg-hover/60 flex min-h-[50px] items-center gap-2.5 border-l-2 px-2.5 py-2 text-left"
+                  [class]="isSelected(c.id) ? 'bg-hover border-primary' : 'border-transparent'"
+                  [attr.aria-current]="isSelected(c.id) ? 'true' : null"
+                  (click)="select({ kind: 'conn', id: c.id })"
                 >
-                  <div class="flex max-w-[720px] flex-col gap-2 pt-3">
-                    @if (c.webhookUrl) {
-                      <app-copy-field [value]="c.webhookUrl" label="Webhook URL" />
-                      @if (!c.lastWebhookAt) {
-                        <p class="text-muted-foreground text-[12px]">Add this URL as a webhook in {{ info[c.provider].label }}.</p>
-                      }
-                    } @else {
-                      <span class="text-faint font-mono text-[11.5px]">{{ c.webhookConfigured ? 'Configured' : 'Not configured' }}</span>
-                    }
-                  </div>
-                </app-settings-section>
+                  <span class="bg-secondary text-foreground flex size-[30px] shrink-0 items-center justify-center">
+                    <app-provider-icon [provider]="c.provider" [size]="15" />
+                  </span>
+                  <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
+                    <span class="text-foreground truncate text-[13px] leading-none">{{ c.label }}</span>
+                    <span class="text-faint truncate font-mono text-[10px] leading-none">{{ line(c) }}</span>
+                  </span>
+                  <span class="size-1.5 shrink-0" [class]="dot(c.status)" [attr.title]="statusText(c.status)" aria-hidden="true"></span>
+                  <span class="sr-only">{{ statusText(c.status) }}</span>
+                </button>
+              } @empty {
+                <span class="text-faint px-2.5 py-2 font-mono text-[10.5px]">None connected</span>
               }
             </div>
-          } @else {
-            <div class="flex max-w-md flex-col gap-2 pt-10">
-              <h2 class="font-title text-foreground text-[20px] leading-normal">Nothing connected yet</h2>
-              <p class="text-muted-foreground text-[13px] leading-snug">
-                Connect GitHub, GitLab or Bitbucket to see pull requests and CI on tasks and projects.
+          }
+          <div class="flex flex-col">
+            <div class="flex h-6 items-center px-1">
+              <span class="text-faint font-mono text-[10px] leading-none tracking-wide">OTHER</span>
+            </div>
+            <button
+              type="button"
+              class="hover:bg-hover/60 flex min-h-[50px] items-center gap-2.5 border-l-2 px-2.5 py-2 text-left"
+              [class]="selection().kind === 'webhooks' ? 'bg-hover border-primary' : 'border-transparent'"
+              [attr.aria-current]="selection().kind === 'webhooks' ? 'true' : null"
+              (click)="select({ kind: 'webhooks' })"
+            >
+              <span class="bg-secondary text-foreground flex size-[30px] shrink-0 items-center justify-center">
+                <svg [lucideIcon]="hook" [size]="15"></svg>
+              </span>
+              <span class="flex min-w-0 flex-1 flex-col gap-[3px]">
+                <span class="text-foreground truncate text-[13px] leading-none">REST &amp; webhooks</span>
+                <span class="text-faint truncate font-mono text-[10px] leading-none">{{ hooksLine() }}</span>
+              </span>
+            </button>
+          </div>
+        </nav>
+
+        <!-- detail -->
+        <div class="border-border min-w-0 flex-1 lg:border-l lg:pl-8">
+          @switch (selection().kind) {
+            @case ('connect') {
+              <h3 class="font-title text-foreground text-[24px] leading-normal">Add connection</h3>
+              <p class="text-muted-foreground mt-1 mb-5 max-w-[640px] text-[13px] leading-snug">
+                Connect GitHub, GitLab (cloud or self-hosted), Bitbucket or Delta so pull requests and CI show up on tasks and projects. You can add several
+                accounts per provider. Secrets are encrypted and never shown again.
               </p>
               @if (canAdmin()) {
-                <div class="pt-2"><button hlmBtn (click)="openConnect()">Add integration</button></div>
+                <app-connection-add-form
+                  [preset]="connectPreset()"
+                  scopeWord="workspace"
+                  [busy]="busy()"
+                  (submitted)="connect($event)"
+                  (cancelled)="closeConnect()"
+                />
               }
-            </div>
+            }
+
+            @case ('webhooks') {
+              <app-outgoing-webhooks />
+            }
+
+            @default {
+              @if (current(); as c) {
+                <!-- head: tile, name, chips, sub line, actions -->
+                <div class="flex flex-wrap items-start gap-3.5">
+                  <span class="bg-secondary text-foreground flex size-11 shrink-0 items-center justify-center">
+                    <app-provider-icon [provider]="c.provider" [size]="22" />
+                  </span>
+                  <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+                    @if (renaming() === c.id) {
+                      <form class="flex max-w-[460px] items-center gap-2" (submit)="saveName($event, c)">
+                        <input
+                          hlmInput
+                          class="h-8 flex-1 text-[14px]"
+                          maxlength="80"
+                          aria-label="Connection name"
+                          [value]="nameDraft()"
+                          (input)="nameDraft.set($any($event.target).value)"
+                          (keydown.escape)="renaming.set(null)"
+                        />
+                        <button hlmBtn type="submit" size="sm" [disabled]="!nameDraft().trim() || busy()">Save</button>
+                        <button hlmBtn type="button" size="sm" variant="ghost" (click)="renaming.set(null)">Cancel</button>
+                      </form>
+                    } @else {
+                      <div class="flex flex-wrap items-center gap-2.5">
+                        <h3 class="font-title text-foreground min-w-0 truncate text-[24px] leading-normal">{{ c.label }}</h3>
+                        <span class="border-border text-muted-foreground flex items-center gap-[5px] border px-1.5 py-[3px] font-mono text-[10px] leading-none">
+                          <span class="size-1.5" [class]="dot(c.status)" aria-hidden="true"></span>{{ statusText(c.status) }}
+                        </span>
+                        <span class="border-border text-muted-foreground border px-1.5 py-[3px] font-mono text-[10px] leading-none">workspace</span>
+                      </div>
+                    }
+                    <p class="text-faint font-mono text-[10.5px] leading-[15px]">
+                      {{ line(c) }} · added {{ c.createdAt | relativeTime }}@if (c.lastWebhookAt) { · last event {{ c.lastWebhookAt | relativeTime }} }
+                    </p>
+                  </div>
+                  @if (canAdmin()) {
+                    <button
+                      hlmBtn
+                      variant="outline"
+                      size="icon"
+                      aria-label="Connection actions"
+                      [hlmDropdownMenuTrigger]="menu"
+                    >
+                      <svg [lucideIcon]="more" [size]="15"></svg>
+                    </button>
+                    <ng-template #menu>
+                      <hlm-dropdown-menu class="w-52">
+                        <button hlmDropdownMenuItem (triggered)="startRename(c)"><svg [lucideIcon]="pencil" [size]="14"></svg> Rename</button>
+                        <button hlmDropdownMenuItem (triggered)="startEdit(c)"><svg [lucideIcon]="key" [size]="14"></svg> Replace token…</button>
+                        @if (c.status !== 'revoked' && c.provider !== 'delta') {
+                          <button hlmDropdownMenuItem (triggered)="revalidate(c)"><svg [lucideIcon]="refresh" [size]="14"></svg> Re-validate</button>
+                          <button hlmDropdownMenuItem (triggered)="rotate(c)"><svg [lucideIcon]="rotateIcon" [size]="14"></svg> Rotate webhook secret</button>
+                        }
+                        @if (c.status !== 'revoked') {
+                          <button hlmDropdownMenuItem (triggered)="revoke(c)"><svg [lucideIcon]="ban" [size]="14"></svg> Revoke</button>
+                        }
+                        <button hlmDropdownMenuItem variant="destructive" (triggered)="remove(c)"><svg [lucideIcon]="trash" [size]="14"></svg> Remove</button>
+                      </hlm-dropdown-menu>
+                    </ng-template>
+                  }
+                </div>
+
+                @if (needsAttention(c)) {
+                  <div class="border-red/40 bg-red/5 mt-5 flex flex-wrap items-center gap-x-3 gap-y-2 border px-4 py-3" role="alert">
+                    <svg [lucideIcon]="warn" [size]="16" class="text-red shrink-0"></svg>
+                    <div class="min-w-0 flex-1">
+                      <p class="text-foreground text-[13px]">
+                        {{ c.status === 'revoked' ? c.label + ' was revoked' : (c.lastError ?? 'The provider rejected this connection') }}
+                      </p>
+                      <p class="text-muted-foreground mt-0.5 text-[12px] leading-snug">
+                        Whatever reads through it, such as a project's sources, shows an error until it is reconnected. Reconnect with a new token, or switch the
+                        source to another connection.
+                      </p>
+                    </div>
+                    @if (canAdmin()) {
+                      <button hlmBtn (click)="startEdit(c)">
+                        <svg [lucideIcon]="refresh" [size]="13"></svg>
+                        Reconnect
+                      </button>
+                    }
+                  </div>
+                }
+
+                @if (editing() === c.id) {
+                  <div class="mt-6">
+                    <app-connection-token-form
+                      [provider]="c.provider"
+                      [currentBase]="c.baseUrl ?? null"
+                      [tokenRequired]="c.status === 'revoked'"
+                      [busy]="busy()"
+                      (saved)="saveEdit($event, c)"
+                      (cancelled)="editing.set(null)"
+                    />
+                  </div>
+                }
+
+                <div class="mt-7">
+                  @if (c.provider === 'delta') {
+                    <app-settings-section title="Delta" caption="stored for agent sessions">
+                      <p class="text-muted-foreground pt-3 text-[13px] leading-snug">
+                        Delta has no repository or webhook API yet, so there is nothing else to set up.
+                        @if (c.baseUrl) {
+                          <span class="text-foreground font-mono text-xs">{{ c.host }}</span>
+                        }
+                      </p>
+                    </app-settings-section>
+                  } @else {
+                    <app-settings-section
+                      title="Webhook"
+                      [caption]="
+                        c.lastWebhookAt
+                          ? 'last delivery ' + (c.lastWebhookAt | relativeTime)
+                          : c.detailed
+                            ? 'no delivery yet'
+                            : 'details are visible to admins'
+                      "
+                    >
+                      <div class="flex max-w-[720px] flex-col gap-2 pt-3">
+                        @if (c.webhookUrl) {
+                          <app-copy-field [value]="c.webhookUrl" label="Webhook URL" />
+                          @if (!c.lastWebhookAt) {
+                            <p class="text-muted-foreground text-[12px]">Add this URL as a webhook in {{ info[c.provider].label }}.</p>
+                          }
+                        } @else {
+                          <span class="text-faint font-mono text-[11.5px]">{{ c.webhookConfigured ? 'Configured' : 'Not configured' }}</span>
+                        }
+                      </div>
+                    </app-settings-section>
+                  }
+                </div>
+              } @else {
+                <div class="flex max-w-md flex-col gap-2 pt-2">
+                  <h3 class="font-title text-foreground text-[20px] leading-normal">Nothing connected yet</h3>
+                  <p class="text-muted-foreground text-[13px] leading-snug">
+                    Connect GitHub, GitLab or Bitbucket to see pull requests and CI on tasks and projects. Add as many accounts as you need: each one has its own name.
+                  </p>
+                  @if (canAdmin()) {
+                    <div class="pt-2"><button hlmBtn (click)="openConnect(null)">Add connection</button></div>
+                  }
+                </div>
+              }
+            }
           }
-        }
-      }
+        </div>
+      </div>
     </div>
 
     <app-webhook-setup-dialog [setup]="webhook()" [provider]="webhookProvider()" [rotated]="webhookRotated()" (closed)="webhook.set(null)" />
@@ -334,12 +346,20 @@ export class IntegrationsSection {
   private readonly notify = inject(Notifier);
 
   protected readonly info = PROVIDER_INFO;
-  protected readonly choices = CHOICES;
   protected readonly hook = LucideWebhook;
-  protected readonly eye = LucideEye;
-  protected readonly eyeOff = LucideEyeOff;
+  protected readonly plus = LucidePlus;
+  protected readonly more = LucideEllipsis;
+  protected readonly pencil = LucidePencil;
+  protected readonly key = LucideKeyRound;
+  protected readonly refresh = LucideRefreshCw;
+  protected readonly rotateIcon = LucideRotateCw;
+  protected readonly ban = LucideBan;
+  protected readonly trash = LucideTrash2;
+  protected readonly warn = LucideTriangleAlert;
+  protected readonly needsAttention = needsAttention;
 
   protected readonly canAdmin = computed(() => this.store.allowed('manageIntegrations'));
+  protected readonly workspaceName = computed(() => this.store.workspace()?.name ?? 'this workspace');
 
   /** What the right-hand pane shows. Null until the person picks: the first connection (or the connect form). */
   private readonly picked = signal<Selection | null>(null);
@@ -352,6 +372,11 @@ export class IntegrationsSection {
       return d ? { ...c, ...d, detailed: true } : { ...c, detailed: false };
     });
   });
+  protected readonly attention = computed(() => this.rows().filter(needsAttention).length);
+
+  protected readonly groups = computed(() =>
+    GROUPS.map((g) => ({ ...g, label: PROVIDER_INFO[g.provider].label, rows: this.rows().filter((r) => r.provider === g.provider) })),
+  );
 
   protected readonly selection = computed<Selection>(() => {
     const picked = this.picked();
@@ -362,78 +387,19 @@ export class IntegrationsSection {
     const sel = this.selection();
     return sel.kind === 'conn' ? (this.rows().find((r) => r.id === sel.id) ?? null) : null;
   });
-
-  protected readonly items = computed<ListItem[]>(() => {
-    const out: ListItem[] = this.rows().map((c) => ({
-      key: 'conn:' + c.id,
-      sel: { kind: 'conn', id: c.id },
-      provider: c.provider,
-      label: c.account || PROVIDER_INFO[c.provider].label,
-      sub: PROVIDER_INFO[c.provider].label + (c.baseUrl ? ' · ' + this.host(c.baseUrl) : ''),
-      status: this.statusLabel(c.status),
-      dot: c.status === 'connected' ? 'bg-green' : c.status === 'error' ? 'bg-red' : 'bg-faint',
-    }));
-    const connected = new Set(this.rows().map((c) => c.provider));
-    for (const choice of CHOICES) {
-      if (choice.selfHosted || connected.has(choice.provider)) continue;
-      out.push({
-        key: 'new:' + choice.id,
-        sel: { kind: 'connect' },
-        provider: choice.provider,
-        label: choice.label,
-        sub: '—',
-        status: 'Not connected',
-        dot: 'bg-faint',
-        choice,
-      });
-    }
-    const hooks = this.store.outgoingWebhooks().length;
-    out.push({
-      key: 'webhooks',
-      sel: { kind: 'webhooks' },
-      provider: null,
-      label: 'REST & webhooks',
-      sub: 'any tracker',
-      status: hooks ? `${hooks} ${hooks === 1 ? 'endpoint' : 'endpoints'}` : '',
-      dot: 'bg-muted-foreground',
-    });
-    return out;
+  protected readonly connectPreset = computed(() => {
+    const sel = this.selection();
+    return sel.kind === 'connect' ? sel.preset : null;
+  });
+  protected readonly hooksLine = computed(() => {
+    const n = this.store.outgoingWebhooks().length;
+    return n ? `${n} ${n === 1 ? 'endpoint' : 'endpoints'}` : 'any tracker';
   });
 
-  // connect form
-  protected readonly choice = signal<Choice>(CHOICES[0]);
-  protected readonly provider = computed(() => this.choice().provider);
-  protected readonly token = signal('');
-  protected readonly baseUrl = signal('');
-  protected readonly showToken = signal(false);
   protected readonly busy = signal(false);
-  protected readonly baseRequired = computed(() => this.provider() === 'delta' || !!this.choice().selfHosted);
-  protected readonly canConnect = computed(() => !!this.token().trim() && (!this.baseRequired() || !!this.baseUrl().trim()));
-  protected readonly baseHint = computed(() =>
-    this.baseRequired() ? `Required: the address of your ${this.choice().label.replace(/ Self-Hosted$/, '')} instance.` : PROVIDER_INFO[this.provider()].baseHint,
-  );
-  protected readonly tokenPlaceholder = computed(() => {
-    switch (this.provider()) {
-      case 'gitlab':
-        return 'glpat-…';
-      case 'github':
-        return 'github_pat_… or ghp_…';
-      case 'bitbucket':
-        return 'email:api-token or an access token';
-      default:
-        return 'Token';
-    }
-  });
-
-  protected choose(c: Choice): void {
-    this.choice.set(c);
-    this.baseUrl.set('');
-  }
-
-  // per-connection UI
   protected readonly editing = signal<string | null>(null);
-  protected readonly editToken = signal('');
-  protected readonly editBase = signal('');
+  protected readonly renaming = signal<string | null>(null);
+  protected readonly nameDraft = signal('');
 
   // one-time webhook setup
   protected readonly webhook = signal<WebhookSetup | null>(null);
@@ -450,66 +416,64 @@ export class IntegrationsSection {
 
   private fallback(): Selection {
     const first = this.rows()[0];
-    return first ? { kind: 'conn', id: first.id } : { kind: 'connect' };
+    return first ? { kind: 'conn', id: first.id } : { kind: 'connect', preset: null };
   }
 
-  protected isSelected(item: ListItem): boolean {
+  protected isSelected(id: string): boolean {
     const sel = this.selection();
-    if (item.sel.kind !== sel.kind) return false;
-    if (item.sel.kind === 'conn' && sel.kind === 'conn') return item.sel.id === sel.id;
-    // a provider that is not connected opens the connect form preset to it
-    return item.choice ? item.choice.id === this.choice().id : true;
+    return sel.kind === 'conn' && sel.id === id;
+  }
+  protected select(sel: Selection): void {
+    this.editing.set(null);
+    this.renaming.set(null);
+    this.picked.set(sel);
   }
 
-  protected select(item: ListItem): void {
-    if (item.choice) {
-      this.choose(item.choice);
-      this.openConnect();
-      return;
-    }
-    this.picked.set(item.sel);
-  }
+  protected readonly line = accountLine;
+  protected readonly dot = statusDot;
+  protected readonly statusText = statusLabel;
 
-  protected host(url: string): string {
-    try {
-      return new URL(url).host;
-    } catch {
-      return url;
-    }
-  }
-  protected statusLabel(s: IntegrationConnection['status']): string {
-    return s === 'connected' ? 'Connected' : s === 'error' ? 'Error' : 'Disconnected';
-  }
-
-  protected openConnect(): void {
-    this.picked.set({ kind: 'connect' });
-    this.token.set('');
-    this.baseUrl.set('');
-    this.showToken.set(false);
+  /** Opens the connect form, on the provider whose "+" was pressed. */
+  protected openConnect(provider: ConnProvider | null): void {
+    this.select({ kind: 'connect', preset: provider });
   }
   protected closeConnect(): void {
     this.picked.set(null);
-    this.token.set('');
-    this.baseUrl.set('');
   }
 
-  protected async connect(event: Event): Promise<void> {
-    event.preventDefault();
-    if (!this.canConnect()) return;
-    const provider = this.provider();
+  protected async connect(input: CreateIntegrationInput): Promise<void> {
     this.busy.set(true);
-    const res = await this.store.createIntegration({
-      provider,
-      token: this.token().trim(),
-      baseUrl: this.baseUrl().trim() || undefined,
-    });
+    const res = await this.store.createIntegration(input);
     this.busy.set(false);
     if (!res) return;
-    this.token.set('');
-    this.baseUrl.set('');
     this.picked.set({ kind: 'conn', id: res.connection.id });
-    this.notify.success(`${PROVIDER_INFO[provider].label} connected`, { description: res.connection.account });
-    if (res.webhook) this.showWebhook(res.webhook, provider, false);
+    this.notify.success(`${PROVIDER_INFO[input.provider].label} connected`, { description: res.connection.label });
+    if (res.webhook) this.showWebhook(res.webhook, input.provider, false);
+  }
+
+  protected startRename(c: Row): void {
+    this.editing.set(null);
+    this.nameDraft.set(c.label);
+    this.renaming.set(c.id);
+  }
+
+  protected async saveName(event: Event, c: Row): Promise<void> {
+    event.preventDefault();
+    const label = this.nameDraft().trim();
+    if (!label) return;
+    if (label === c.label) {
+      this.renaming.set(null);
+      return;
+    }
+    this.busy.set(true);
+    const res = await this.store.updateIntegration(c.id, { label });
+    this.busy.set(false);
+    if (res) this.renaming.set(null);
+  }
+
+  protected startEdit(c: Row): void {
+    this.renaming.set(null);
+    this.editing.set(c.id);
   }
 
   protected async revalidate(c: Row): Promise<void> {
@@ -517,22 +481,13 @@ export class IntegrationsSection {
     if (res) this.notify.success('Token is valid', { description: `Signed in as ${res.account}` });
   }
 
-  protected startEdit(c: Row): void {
-    this.editToken.set('');
-    this.editBase.set(c.baseUrl ?? '');
-    this.editing.set(c.id);
-  }
-
-  protected async saveEdit(event: Event, c: Row): Promise<void> {
-    event.preventDefault();
-    const token = this.editToken().trim();
-    const base = this.editBase().trim();
+  protected async saveEdit(value: { token?: string; baseUrl: string | null }, c: Row): Promise<void> {
     this.busy.set(true);
-    const res = await this.store.updateIntegration(c.id, { ...(token ? { token } : {}), baseUrl: base || null });
+    const res = await this.store.updateIntegration(c.id, value);
     this.busy.set(false);
     if (!res) return;
     this.editing.set(null);
-    this.notify.success('Connection updated', { description: `Signed in as ${res.account}` });
+    this.notify.success(c.status === 'revoked' ? 'Connection restored' : 'Connection updated', { description: `Signed in as ${res.account}` });
   }
 
   protected rotate(c: Row): void {
@@ -548,11 +503,24 @@ export class IntegrationsSection {
     });
   }
 
-  protected disconnect(c: Row): void {
+  protected revoke(c: Row): void {
     this.ui.setConfirmDelete({
-      title: `Disconnect ${c.account || PROVIDER_INFO[c.provider].label}?`,
-      description: 'Artifacts stay. Webhook deliveries for this connection start failing.',
-      confirmLabel: 'Disconnect',
+      title: `Revoke ${c.label}?`,
+      description:
+        'The token is wiped and anything reading through this connection stops and shows an error. Artifacts stay. You can reconnect it later with a new token.',
+      confirmLabel: 'Revoke',
+      onConfirm: async () => {
+        const res = await this.store.revokeIntegration(c.id);
+        if (res) this.notify.success('Connection revoked', { description: c.label });
+      },
+    });
+  }
+
+  protected remove(c: Row): void {
+    this.ui.setConfirmDelete({
+      title: `Remove ${c.label}?`,
+      description: 'Artifacts stay. Webhook deliveries for this connection start failing, and anything reading through it loses its connection.',
+      confirmLabel: 'Remove',
       onConfirm: async () => {
         await this.store.deleteIntegration(c.id);
       },

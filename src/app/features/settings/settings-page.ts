@@ -15,6 +15,7 @@ import { IntegrationsSection } from './sections/integrations-section';
 import { LabelsSection } from './sections/labels-section';
 import { MembersSection } from './sections/members-section';
 import { NotificationsSection } from './sections/notifications-section';
+import { PersonalIntegrationsSection } from './sections/personal-integrations-section';
 import { PreferencesSection } from './sections/preferences-section';
 import { ProfileSection } from './sections/profile-section';
 import { RolesSection } from './sections/roles-section';
@@ -42,6 +43,7 @@ const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
     PageHeader,
     EmptyState,
     ProfileSection,
+    PersonalIntegrationsSection,
     PreferencesSection,
     NotificationsSection,
     AppearanceSection,
@@ -91,6 +93,9 @@ const FULL_WIDTH = new Set(['workflow', 'time', 'api']);
             @case ('ai') { <app-ai-section /> }
             @case ('profile') {
               <app-profile-section />
+            }
+            @case ('my-integrations') {
+              <app-personal-integrations-section />
             }
             @case ('notifications') {
               <app-notifications-section />

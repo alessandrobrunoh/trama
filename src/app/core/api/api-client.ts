@@ -522,8 +522,24 @@ export class ApiClient {
     update: (slug: string, id: ID, input: UpdateIntegrationInput) =>
       this.patch<IntegrationDetail>(`${this.w(slug)}/integrations/${id}`, input),
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/integrations/${id}`),
+    /** Withdraws the credential: status `revoked`, token wiped. A new token via `update` reconnects it. */
+    revoke: (slug: string, id: ID) =>
+      this.post<IntegrationDetail>(`${this.w(slug)}/integrations/${id}/revoke`),
     rotateWebhookSecret: (slug: string, id: ID) =>
       this.post<IntegrationWithWebhook>(`${this.w(slug)}/integrations/${id}/rotate-webhook-secret`),
+  };
+
+  /** The signed-in person's own connections (same in every workspace); only they can see them. */
+  readonly connections = {
+    list: (o?: RequestOptions) => this.get<IntegrationDetail[]>('/me/connections', undefined, o),
+    create: (input: CreateIntegrationInput) =>
+      this.post<IntegrationWithWebhook>('/me/connections', input),
+    update: (id: ID, input: UpdateIntegrationInput) =>
+      this.patch<IntegrationDetail>(`/me/connections/${id}`, input),
+    revoke: (id: ID) => this.post<IntegrationDetail>(`/me/connections/${id}/revoke`),
+    remove: (id: ID) => this.del(`/me/connections/${id}`),
+    rotateWebhookSecret: (id: ID) =>
+      this.post<IntegrationWithWebhook>(`/me/connections/${id}/rotate-webhook-secret`),
   };
 
   /** Custom integrations: signed JSON POSTs to your URL for domain events. Needs the manageIntegrations capability. */

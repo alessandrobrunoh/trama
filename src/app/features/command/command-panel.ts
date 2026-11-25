@@ -177,6 +177,12 @@ const SETTINGS_SECTIONS: { id: string; label: string; icon: LucideIcon; keywords
     icon: LucidePlug,
     keywords: 'github gitlab delta webhook',
   },
+  {
+    id: 'my-integrations',
+    label: 'My integrations',
+    icon: LucidePlug,
+    keywords: 'personal accounts connections github gitlab',
+  },
   { id: 'shortcuts', label: 'Keyboard shortcuts', icon: LucideKeyboard },
 ];
 

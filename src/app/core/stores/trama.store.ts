@@ -1521,6 +1521,13 @@ export class TramaStore {
     });
   }
 
+  /** Withdraw the credential on purpose (status `revoked`, token wiped); a new token reconnects it. */
+  async revokeIntegration(id: ID): Promise<IntegrationDetail | undefined> {
+    return this.write('revoke integration', (s) => this.api.integrations.revoke(s, id), {
+      onResult: (c) => this.upsertIntegration(c),
+    });
+  }
+
   /** New webhook secret (the old one stops working at once). Resolves the one-time setup. */
   async rotateWebhookSecret(id: ID): Promise<IntegrationWithWebhook | undefined> {
     return this.write('rotate webhook secret', (s) => this.api.integrations.rotateWebhookSecret(s, id), {

@@ -351,11 +351,17 @@ export interface CreateIntegrationInput {
   token: string;
   /** GitHub Enterprise / self-hosted GitLab / Delta base URL (Bitbucket Cloud has none). */
   baseUrl?: string;
+  /** Display name, e.g. "GitHub · Acme". Defaults to "<Provider> · <account>". */
+  label?: string;
 }
-/** `PATCH /integrations/:id` — re-validates against the provider and refreshes account/status. */
+/**
+ * `PATCH /integrations/:id` (and `/me/connections/:id`) — a new token or base URL re-validates against
+ * the provider (and reconnects a revoked connection); `label` renames.
+ */
 export interface UpdateIntegrationInput {
   token?: string;
   baseUrl?: string | null;
+  label?: string;
 }
 /** What `GET /integrations` returns: the contract entity plus webhook / link details. */
 export type IntegrationDetail = IntegrationConnection & {

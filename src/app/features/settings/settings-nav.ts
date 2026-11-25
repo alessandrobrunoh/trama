@@ -6,6 +6,7 @@ import {
   LucideKeyRound,
   LucideKeyboard,
   LucidePlug,
+  LucidePlugZap,
   LucideSettings,
   LucideShieldCheck,
   LucideSlidersHorizontal,
@@ -54,6 +55,7 @@ export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
     title: 'ACCOUNT',
     sections: [
       { id: 'profile', label: 'Profile', icon: LucideUserRound },
+      { id: 'my-integrations', label: 'Integrations', icon: LucidePlugZap },
       { id: 'preferences', label: 'Preferences', icon: LucideSlidersHorizontal },
       { id: 'notifications', label: 'Notifications', icon: LucideBell },
       { id: 'ai', label: 'AI & assistant', icon: LucideSparkles },
