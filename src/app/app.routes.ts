@@ -188,8 +188,20 @@ export const routes: Routes = [
       },
       {
         path: 'timer',
-        title: 'Timer · Trama',
+        title: 'Time · Trama',
         loadComponent: () => import('./features/timer/timer-page').then((m) => m.TimerPage),
+      },
+      {
+        path: 'timer/reports',
+        title: 'Reports · Time · Trama',
+        loadComponent: () =>
+          import('./features/timer/time-reports-page').then((m) => m.TimeReportsPage),
+      },
+      {
+        path: 'timer/estimates',
+        title: 'Estimates · Time · Trama',
+        loadComponent: () =>
+          import('./features/timer/time-estimates-page').then((m) => m.TimeEstimatesPage),
       },
       {
         path: 'projects',
