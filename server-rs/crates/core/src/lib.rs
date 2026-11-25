@@ -13,6 +13,7 @@ pub mod state;
 #[cfg(feature = "test-support")]
 pub mod testkit;
 pub mod time;
+pub mod validation;
 
 pub use config::Config;
 pub use errors::AppError;
