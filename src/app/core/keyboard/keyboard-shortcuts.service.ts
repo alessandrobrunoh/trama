@@ -243,6 +243,8 @@ export class KeyboardShortcuts {
       return;
     }
     if (key === '?') {
+      // A page may claim `?` for a focused item (Home's "How" rows); otherwise it lists the shortcuts.
+      if (this.runPage(event)) return;
       event.preventDefault();
       this.ui.openModal('shortcuts');
       return;

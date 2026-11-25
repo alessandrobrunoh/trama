@@ -11,11 +11,15 @@ import {
 } from '@lucide/angular';
 import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { TramaStore, relativeTime, statusTypeOf, type Artifact, type Issue } from '../../core';
+import { usePageShortcuts } from '../../core/keyboard';
 import { SessionStore } from '../../core/session/session.store';
+import { UiStore } from '../../core/stores/ui.store';
 import { PageHeader } from '../../shared/page-header';
 import { Kbd } from '../../shared/kbd';
 import { V3SectionTitle, V3Status, V3Thread } from '../../shared/v3';
 import { HlmButton } from '@spartan-ng/helm/button';
+import { dailyFlow, weekTotals } from './flow-model';
+import { HomeFlow } from './home-flow';
 
 /** One "Working on now" card: an in-progress or in-review task of mine. */
 interface FocusCard {
@@ -65,12 +69,17 @@ function threadId(url: string): string {
 
 /**
  * `/:workspace/overview` (Home, v3 · 02): a personal start page. What I am working on now, with each task's Delta
- * thread record; what is next for me by due date; and the few things only I can do. Status is always moved by people.
+ * thread record; what is next for me by due date; the few things only I can do; and the last four weeks of the
+ * workspace (tasks closed against opened). Status is always moved by people.
+ *
+ * Keyboard: J/K (or ↑/↓) move through cards and rows, ↵ opens the focused task or runs its Open, and each "Needs you"
+ * key (⇧R, D, ?) runs the action of the focused row; ↵, ⇧R and D fall back to the first row offering them. `?` without
+ * a focused "How" row still opens the shortcuts list.
  */
 @Component({
   selector: 'app-home-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButton, Kbd, LucideDynamicIcon, PageHeader, RouterLink, V3SectionTitle, V3Status, V3Thread],
+  imports: [HlmButton, HomeFlow, Kbd, LucideDynamicIcon, PageHeader, RouterLink, V3SectionTitle, V3Status, V3Thread],
   host: { class: 'block min-h-full' },
   template: `
     <app-page-header title="Home" />
@@ -89,7 +98,11 @@ function threadId(url: string): string {
         @if (cards().length) {
           <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
             @for (c of cards(); track c.issue.id) {
-              <article class="bg-card border-border flex min-w-0 flex-col gap-4 border p-[22px]">
+              <article
+                class="bg-card flex min-w-0 flex-col gap-4 border p-[22px]"
+                [class]="focused() === 'card:' + c.issue.id ? 'border-border-strong' : 'border-border'"
+                [attr.data-row-id]="'card:' + c.issue.id"
+              >
                 <div class="flex items-center gap-2.5 font-mono text-[11px] leading-[14px]">
                   <span class="text-muted-foreground">{{ c.issue.key }}</span>
                   @if (c.projectName) {
@@ -172,6 +185,8 @@ function threadId(url: string): string {
               <li>
                 <a
                   class="border-border hover:bg-hover flex items-center gap-3.5 border-b px-1 py-[11px]"
+                  [class.bg-hover]="focused() === 'next:' + i.id"
+                  [attr.data-row-id]="'next:' + i.id"
                   [routerLink]="['/', slug(), 'tasks', i.key]"
                 >
                   <span class="w-[58px] shrink-0 font-mono text-[10.5px] uppercase" [class]="dueTone(i)">{{ dueLabel(i) }}</span>
@@ -192,7 +207,11 @@ function threadId(url: string): string {
           <v3-section-title title="Needs you" caption="things only you can do" />
           <ul class="border-border border-t">
             @for (n of needs(); track n.id) {
-              <li class="border-border flex items-center gap-3 border-b px-1 py-2.5">
+              <li
+                class="border-border flex items-center gap-3 border-b px-1 py-2.5"
+                [class.bg-hover]="focused() === 'need:' + n.id"
+                [attr.data-row-id]="'need:' + n.id"
+              >
                 <span class="bg-card border-border flex size-7 shrink-0 items-center justify-center border">
                   <svg [lucideIcon]="n.icon" [size]="14" [class]="n.tone"></svg>
                 </span>
@@ -208,6 +227,12 @@ function threadId(url: string): string {
           </ul>
         </section>
       </div>
+
+      <!-- the workspace, last four weeks -->
+      <section class="flex flex-col gap-3" aria-label="Last four weeks">
+        <v3-section-title title="Last four weeks" [caption]="flowCaption()" />
+        <app-home-flow [days]="flow()" [weeks]="weeks()" [slug]="slug()" />
+      </section>
     </div>
   `,
 })
@@ -215,14 +240,76 @@ export class HomePage {
   protected readonly store = inject(TramaStore);
   private readonly session = inject(SessionStore);
   private readonly router = inject(Router);
+  private readonly ui = inject(UiStore);
 
   /** Refreshed every minute so "due" and "recorded" stay current. */
   protected readonly now = signal(new Date());
+  /** The card or row J/K focused (`card:<id>`, `next:<id>`, `need:<id>`). */
+  protected readonly focused = this.ui.focusedRowId;
 
   constructor() {
+    // Start without a focused row, so keys never act on a row picked on an earlier visit.
+    this.ui.setFocusedRow(null);
     const tick = setInterval(() => this.now.set(new Date()), 60_000);
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
+
+    usePageShortcuts([
+      {
+        keys: 'enter',
+        label: 'Run Open on the focused row',
+        when: () => !!this.needFor('enter', false),
+        run: () => this.needFor('enter', false)!.run(),
+      },
+      {
+        keys: 'shift+r',
+        label: 'Move the task with an open PR to In review',
+        when: () => !!this.needFor('shift+r', true),
+        run: () => this.needFor('shift+r', true)!.run(),
+      },
+      {
+        keys: 'd',
+        label: 'Open the details of a CI failure or conflict',
+        when: () => !!this.needFor('d', true),
+        run: () => this.needFor('d', true)!.run(),
+      },
+      {
+        keys: '?',
+        label: 'How to link a thread (focused row)',
+        when: () => !!this.needFor('?', false),
+        run: () => this.needFor('?', false)!.run(),
+      },
+    ]);
   }
+
+  /**
+   * The "Needs you" row a key acts on: the focused row when it offers that key; with no "Needs you" row focused,
+   * and when `fallback`, the first row offering it.
+   */
+  private needFor(keys: string, fallback: boolean): NeedRow | undefined {
+    const focused = this.focused();
+    const rows = this.needs();
+    const current = rows.find((n) => `need:${n.id}` === focused);
+    if (current) return current.keys === keys ? current : undefined;
+    return fallback ? rows.find((n) => n.keys === keys) : undefined;
+  }
+
+  protected readonly flow = computed(() => {
+    const statuses = this.store.settings().statuses;
+    return dailyFlow({
+      now: this.now(),
+      issues: this.store.issues(),
+      projects: this.store.projects(),
+      milestones: this.store.milestones(),
+      issueType: (s) => statusTypeOf(statuses.issue, s),
+      projectType: (s) => statusTypeOf(statuses.project, s),
+    });
+  });
+  protected readonly weeks = computed(() => weekTotals(this.flow()));
+  protected readonly flowCaption = computed(() => {
+    const closed = this.flow().reduce((n, d) => n + d.closed, 0);
+    const opened = this.flow().reduce((n, d) => n + d.created, 0);
+    return `workspace · ${closed} closed · ${opened} opened`;
+  });
 
   protected readonly slug = computed(() => this.store.workspace()?.slug ?? '');
   private readonly typeOf = (i: Issue) => statusTypeOf(this.store.settings().statuses.issue, i.status) ?? i.status;
