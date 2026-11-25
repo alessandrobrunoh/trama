@@ -16,7 +16,7 @@ import { NotificationsStore } from '../core/stores/notifications.store';
 import { SessionStore } from '../core/session/session.store';
 import { UiStore } from '../core/stores/ui.store';
 import { haptic } from '../core/viewport';
-import { MORE_NAV, PRIMARY_NAV, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, navForRole, type NavItem } from './nav';
 
 interface SheetGroup {
   title: string;
@@ -103,9 +103,11 @@ interface SheetGroup {
             </div>
           }
           <div class="mobile-menu__group" role="group" aria-label="Trama">
-            <button class="mobile-menu__link" type="button" (click)="openAssistant()">
-              <svg [lucideIcon]="assistantIcon" [size]="20" aria-hidden="true"></svg><span>Assistant</span>
-            </button>
+            @if (!isGuest()) {
+              <button class="mobile-menu__link" type="button" (click)="openAssistant()">
+                <svg [lucideIcon]="assistantIcon" [size]="20" aria-hidden="true"></svg><span>Assistant</span>
+              </button>
+            }
             <a
               [routerLink]="['/', slug(), 'settings']"
               routerLinkActive="mobile-menu__link--active"
@@ -175,12 +177,16 @@ export class MobileNav {
   /** Tabs live in the bar; the sheet lists everything else. */
   private static readonly IN_BAR = new Set(['inbox', 'tasks', 'projects', 'assistant', 'settings']);
   protected readonly groups = computed<SheetGroup[]>(() => {
-    const rest = (items: NavItem[]) => items.filter((n) => !MobileNav.IN_BAR.has(n.segment));
+    const guest = this.isGuest();
+    const rest = (items: NavItem[]) =>
+      navForRole(items, guest).filter((n) => !MobileNav.IN_BAR.has(n.segment));
     return [
       { title: 'Work', items: rest(PRIMARY_NAV) },
       { title: 'Workspace', items: rest(MORE_NAV) },
     ].filter((g) => g.items.length > 0);
   });
+  /** A guest does not get the assistant or the workspace-wide places. */
+  protected readonly isGuest = this.store.isGuest;
 
   protected readonly assistantIcon = LucideMessageSquare;
   protected readonly moreIcon = LucideEllipsis;

@@ -1,6 +1,7 @@
 import { inject } from '@angular/core';
 import { Router, type Route, type Routes, type ActivatedRouteSnapshot } from '@angular/router';
 import { AppShell } from './layout/app-shell';
+import { guestRouteGuard } from './layout/guest-guard';
 import { authGuard, guestGuard, launchGuard, workspaceGuard } from './core/session/guards';
 
 /** `/:workspace/<old path>` → `/:workspace/inbox?tab=<tab>`; other query params are dropped. */
@@ -119,6 +120,7 @@ export const routes: Routes = [
     path: ':workspaceSlug',
     component: AppShell,
     canActivate: [authGuard, workspaceGuard],
+    canActivateChild: [guestRouteGuard],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'overview' },
       // Home (v3): what I work on now, what is next, what needs me. Kept at /overview so links stay valid.

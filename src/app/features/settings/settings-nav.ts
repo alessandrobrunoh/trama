@@ -66,6 +66,29 @@ export const SETTINGS_GROUPS: readonly SettingsGroupDef[] = [
 
 export const SETTINGS_SECTIONS: readonly SettingsSectionDef[] = SETTINGS_GROUPS.flatMap((g) => g.sections);
 
+/** A guest only has the personal sections: nothing about the workspace, AI or API keys. */
+const GUEST_SECTIONS: ReadonlySet<string> = new Set([
+  'profile',
+  'my-integrations',
+  'preferences',
+  'notifications',
+  'shortcuts',
+]);
+
+/** Whether a guest may open this settings section. */
+export function guestMayOpenSettings(sectionId: string): boolean {
+  return GUEST_SECTIONS.has(sectionId);
+}
+
+/** The settings sidebar for a guest (only the sections they have) or for everyone else (all of them). */
+export function settingsGroupsFor(guest: boolean): readonly SettingsGroupDef[] {
+  if (!guest) return SETTINGS_GROUPS;
+  return SETTINGS_GROUPS.map((group) => ({
+    ...group,
+    sections: group.sections.filter((section) => GUEST_SECTIONS.has(section.id)),
+  })).filter((group) => group.sections.length);
+}
+
 /** Old / alternative section ids, still linked from elsewhere in the app. */
 const ALIASES: Readonly<Record<string, string>> = {
   danger: 'workspace',

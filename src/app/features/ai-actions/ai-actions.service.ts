@@ -187,6 +187,12 @@ export class AiActions {
   refresh(): Promise<void> {
     const slug = this.store.slug();
     if (!slug) return Promise.resolve();
+    // A guest never gets AI: the server refuses it, so do not ask.
+    if (this.store.isGuest()) {
+      this._available.set(false);
+      this._checked.set(true);
+      return Promise.resolve();
+    }
     if (this.checking && this.checkingSlug === slug) return this.checking;
     this.checkedAt = Date.now();
     this.checkingSlug = slug;

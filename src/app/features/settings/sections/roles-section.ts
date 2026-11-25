@@ -23,7 +23,6 @@ import {
 } from '../../../core/contracts/domain';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
-import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
 import { MemberAccessEditor } from './member-access-editor';
 import { SECTION_KIT } from './section-kit';
 
@@ -36,13 +35,13 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
 @Component({
   selector: 'app-roles-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmCheckbox, HlmInputImports, MemberAccessEditor, V3Segmented, ...SECTION_KIT],
+  imports: [HlmButtonImports, HlmCheckbox, HlmInputImports, MemberAccessEditor, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
       <app-section-header
         title="Roles & permissions"
-        description="Create a role and choose exactly what it can do. Nothing is inherited from another role. The Owner role stays, because someone must be able to manage roles and members."
+        description="What each role can do. One role per person; access decides which projects they see. Nothing is inherited from another role, and the Owner role stays, because someone must be able to manage roles and members."
       >
         @if (isOwner()) {
           <button actions hlmBtn size="sm" [disabled]="busy()" (click)="creating.set(true)">
@@ -76,13 +75,47 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
         </form>
       }
 
-      <v3-segmented
-        class="mb-6"
-        aria-label="Role"
-        [options]="roleOptions()"
-        [value]="selected().id"
-        (valueChange)="select($event)"
-      />
+      <div class="mb-8 overflow-x-auto" role="table" aria-label="What each role can do">
+        <div class="min-w-fit">
+          <div class="border-border flex items-end border-b" role="row">
+            <div class="text-faint min-w-56 flex-1 px-1 pb-2 font-mono text-[10px] tracking-[1px] uppercase" role="columnheader">Capability</div>
+            @for (role of roles(); track role.id) {
+              <button
+                type="button"
+                role="columnheader"
+                class="hover:bg-secondary w-24 shrink-0 px-1 pt-1 pb-2 text-center"
+                [class.bg-secondary]="role.id === selected().id"
+                [attr.aria-pressed]="role.id === selected().id"
+                (click)="select(role.id)"
+              >
+                <span class="text-foreground block truncate text-[13px]">{{ role.name }}</span>
+                <span class="text-faint block font-mono text-[10px]">{{ countFor(role.id) }}</span>
+              </button>
+            }
+          </div>
+          @for (group of groups; track group) {
+            <div class="text-faint bg-secondary border-border border-b px-1 py-1 font-mono text-[10px] tracking-[1px] uppercase" role="row">{{ group }}</div>
+            @for (cap of capsIn(group); track cap) {
+              <div class="border-border hover:bg-secondary flex items-center border-b" role="row">
+                <div class="min-w-56 flex-1 px-1 py-2" role="rowheader">
+                  <span class="text-foreground block text-[13px]">{{ meta(cap).label }}</span>
+                  <span class="text-muted-foreground block text-[12px] leading-snug">{{ meta(cap).description }}</span>
+                </div>
+                @for (role of roles(); track role.id) {
+                  <div class="flex w-24 shrink-0 justify-center" role="cell">
+                    <hlm-checkbox
+                      [checked]="hasCap(role, cap)"
+                      [disabled]="!isOwner() || busy() || locked(role, cap)"
+                      [aria-label]="meta(cap).label + ' for ' + role.name"
+                      (checkedChange)="toggleCap(role, cap, $event)"
+                    />
+                  </div>
+                }
+              </div>
+            }
+          }
+        </div>
+      </div>
 
       @if (selected(); as role) {
         <app-settings-group
@@ -122,37 +155,6 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
             />
           }
         </app-settings-group>
-
-        <app-settings-section
-          class="mt-8"
-          title="Capabilities"
-          caption="checked means this role can do it; unchecked is refused"
-        >
-          @for (group of groups; track group) {
-            <div class="mt-4">
-              <div class="text-faint font-mono text-[10px] tracking-[1px] uppercase">
-                {{ group }}
-              </div>
-              @for (cap of capsIn(group); track cap) {
-                <label class="border-border hover:bg-secondary flex items-start gap-2 border-b px-1 py-2">
-                  <hlm-checkbox
-                    class="mt-0.5"
-                    [checked]="hasCap(role, cap)"
-                    [disabled]="!isOwner() || busy() || locked(role, cap)"
-                    [aria-label]="meta(cap).label"
-                    (checkedChange)="toggleCap(role, cap, $event)"
-                  />
-                  <span class="min-w-0">
-                    <span class="text-foreground block text-[13px]">{{ meta(cap).label }}</span>
-                    <span class="text-muted-foreground block text-[12px] leading-snug">{{
-                      meta(cap).description
-                    }}</span>
-                  </span>
-                </label>
-              }
-            </div>
-          }
-        </app-settings-section>
 
         @if (!role.owner) {
           <app-settings-section
@@ -201,6 +203,14 @@ const GROUP_ORDER: CapabilityMeta['group'][] = ['Work', 'Access & automation'];
         description="A member has exactly one role. Extra actions on an invitation are added on top of that role."
       />
       <app-settings-row
+        label="Projects belong to the workspace"
+        description="Nothing leaves with the person who created it, or with a guest who is removed."
+      />
+      <app-settings-row
+        label="Guests see their projects only"
+        description="The people on those projects, and nothing else: no settings, integrations, AI or tokens. Their access is the projects they were invited to."
+      />
+      <app-settings-row
         label="Agents act as members"
         description="An agent uses the historical member permissions."
       />
@@ -221,12 +231,6 @@ export class RolesSection {
   protected readonly roles = computed(() => this.store.settings().roles);
   protected readonly selected = computed(
     () => this.roles().find((role) => role.id === this.selectedId()) ?? this.roles()[0],
-  );
-  protected readonly roleOptions = computed<V3SegmentOption[]>(() =>
-    this.roles().map((role) => ({
-      value: role.id,
-      label: `${role.name} ${this.store.memberships().filter((m) => m.role === role.id).length}`,
-    })),
   );
 
   private readonly syncDraft = effect(() => {

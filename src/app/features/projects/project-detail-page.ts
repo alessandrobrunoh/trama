@@ -54,6 +54,7 @@ import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
 import { ProjectTransferDialog } from './project-transfer-dialog';
 import { ProjectRoadmap } from './project-roadmap';
+import { ProjectShareDialog } from './project-share-dialog';
 import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
 import { ProjectSourcesStore } from './sources/project-sources.store';
 import { ProjectSourcesTab } from './sources/project-sources-tab';
@@ -103,6 +104,7 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectMilestoneCards,
     ProjectMilestoneRows,
     ProjectRoadmap,
+    ProjectShareDialog,
     ProjectTasksTab,
     ProjectSourcesTab,
     ProjectProperties,
@@ -130,6 +132,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
       }
 
       <ng-template appTopBarActions>
+        @if (canShare()) {
+          <button hlmBtn variant="outline" (click)="sharing.set(true)">Share</button>
+        }
         <button hlmBtn variant="outline" (click)="openSettings()">
           Project settings <app-kbd keys="shift+p" />
         </button>
@@ -165,6 +170,10 @@ const TONE_COLOR: Record<BurnTone, string> = {
           </hlm-dropdown-menu>
         </ng-template>
       </ng-template>
+
+      @if (canShare()) {
+        <app-project-share-dialog [project]="p" [(open)]="sharing" />
+      }
 
       <header class="flex flex-col gap-4 px-4 pt-6 sm:px-10">
         <div class="flex items-end gap-5">
@@ -364,6 +373,9 @@ export class ProjectDetailPage {
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly projectLink = computed(() => ['/', this.slug(), 'projects', this.id() ?? '']);
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
+  /** Sharing a project with guests: the "Share projects" capability (owner, admin, organizer by default). */
+  protected readonly canShare = computed(() => this.store.allowed('inviteToProject'));
+  protected readonly sharing = signal(false);
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
   protected readonly current = computed<Tab>(() => {

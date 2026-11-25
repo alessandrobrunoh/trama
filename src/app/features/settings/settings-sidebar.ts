@@ -5,7 +5,7 @@ import { NavigationEnd, Router, RouterLink } from '@angular/router';
 import { LucideArrowLeft, LucideDynamicIcon } from '@lucide/angular';
 import { filter, map, startWith } from 'rxjs';
 import { TramaStore } from '../../core/stores/trama.store';
-import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
+import { settingsGroupsFor, settingsSectionOfUrl } from './settings-nav';
 
 /**
  * The settings sidebar (v3 "Settings sidebar", 248px): it replaces the main sidebar while a settings page
@@ -39,7 +39,7 @@ import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
     </div>
 
     <nav class="scrollbar-none min-h-0 flex-1 overflow-y-auto" aria-label="Settings sections">
-      @for (g of groups; track g.title) {
+      @for (g of groups(); track g.title) {
         <div class="flex flex-col gap-px p-2">
           <span class="text-faint font-mono text-[10px] leading-[13px]">{{ g.title }}</span>
           @for (s of g.sections; track s.id) {
@@ -63,11 +63,12 @@ import { SETTINGS_GROUPS, settingsSectionOfUrl } from './settings-nav';
   `,
 })
 export class SettingsSidebar {
-  private readonly store = inject(TramaStore);
+  protected readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
 
-  protected readonly groups = SETTINGS_GROUPS;
+  /** A guest has the personal sections only. */
+  protected readonly groups = computed(() => settingsGroupsFor(this.store.isGuest()));
   protected readonly back = LucideArrowLeft;
 
   protected readonly slug = computed(() => this.store.slug() ?? '');

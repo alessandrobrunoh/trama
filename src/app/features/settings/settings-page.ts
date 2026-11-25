@@ -22,7 +22,7 @@ import { ShortcutsSection } from './sections/shortcuts-section';
 import { TimeSection } from './sections/time-section';
 import { WorkflowSection } from './sections/workflow-section';
 import { WorkspaceSection } from './sections/workspace-section';
-import { SETTINGS_GROUPS, SETTINGS_SECTIONS, resolveSettingsSection } from './settings-nav';
+import { SETTINGS_SECTIONS, resolveSettingsSection, settingsGroupsFor } from './settings-nav';
 
 /**
  * Sections laid out on the wide column of the v4 frames (1072px with its 56px gutters: tables, lists, two
@@ -80,7 +80,7 @@ const WIDE = new Set([
       class="border-border scrollbar-none flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 md:hidden"
       aria-label="Settings sections"
     >
-      @for (g of groups; track g.title) {
+      @for (g of groups(); track g.title) {
         @for (s of g.sections; track s.id) {
           <a
             class="flex h-8 shrink-0 items-center gap-2 px-3 text-[13px] whitespace-nowrap"
@@ -166,7 +166,7 @@ export class SettingsPage {
 
   private readonly store = inject(TramaStore);
 
-  protected readonly groups = SETTINGS_GROUPS;
+  protected readonly groups = computed(() => settingsGroupsFor(this.store.isGuest()));
   protected readonly warn = LucideTriangleAlert;
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly sectionId = computed(() => resolveSettingsSection(this.section()));

@@ -57,7 +57,7 @@ import { ProjectGlyph } from '../features/projects/project-glyph';
 import { SettingsSidebar } from '../features/settings/settings-sidebar';
 import { settingsSectionOfUrl } from '../features/settings/settings-nav';
 import { ago } from '../shared/ago';
-import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
+import { MORE_NAV, PRIMARY_NAV, navForRole, orderNav, type NavItem } from './nav';
 
 /**
  * Sidebar content: icon row (toggle, search, inbox, create), workspace switcher, Inbox / Tasks,
@@ -236,7 +236,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                 </a>
               </li>
             } @empty {
-              @if (!shared.placedHere().length) {
+              @if (!shared.placedHere().length && !store.isGuest()) {
                 <li>
                   <button
                     type="button"
@@ -323,19 +323,21 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
     <!-- footer: agent connector, then the user row -->
     <div hlmSidebarFooter class="gap-0 p-0 pb-[env(safe-area-inset-bottom)]">
-      <a
-        [routerLink]="['/', slug(), 'connect']"
-        class="border-sidebar-border hover:bg-sidebar-accent/50 flex flex-col gap-1 border-t px-3.5 py-2.5 outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-        hlmTooltip="Connect Delta and your agent: install the /trama skill or the CLI"
-        position="top"
-        closeMobileSidebarOnClick
-      >
-        <span class="flex items-center gap-2">
-          <span class="size-[7px] shrink-0" [class]="agentSeen() ? 'bg-status-done' : 'bg-faint'" aria-hidden="true"></span>
-          <span class="text-foreground font-mono text-[10.5px] leading-[15px]">Delta · /trama skill</span>
-        </span>
-        <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ agentSub() }}</span>
-      </a>
+      @if (!store.isGuest()) {
+        <a
+          [routerLink]="['/', slug(), 'connect']"
+          class="border-sidebar-border hover:bg-sidebar-accent/50 flex flex-col gap-1 border-t px-3.5 py-2.5 outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          hlmTooltip="Connect Delta and your agent: install the /trama skill or the CLI"
+          position="top"
+          closeMobileSidebarOnClick
+        >
+          <span class="flex items-center gap-2">
+            <span class="size-[7px] shrink-0" [class]="agentSeen() ? 'bg-status-done' : 'bg-faint'" aria-hidden="true"></span>
+            <span class="text-foreground font-mono text-[10.5px] leading-[15px]">Delta · /trama skill</span>
+          </span>
+          <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ agentSub() }}</span>
+        </a>
+      }
       <div class="border-sidebar-border flex items-center gap-2.5 border-t px-3.5 py-2.5">
         <button
           type="button"
@@ -557,11 +559,13 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             <svg [lucideIcon]="plus" [size]="14"></svg>
             Create workspace
           </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'workspace'])">
-            <svg [lucideIcon]="settings" [size]="14"></svg>
-            Workspace settings
-            <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
-          </button>
+          @if (!store.isGuest()) {
+            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'workspace'])">
+              <svg [lucideIcon]="settings" [size]="14"></svg>
+              Workspace settings
+              <hlm-dropdown-menu-shortcut><app-kbd keys="g s" /></hlm-dropdown-menu-shortcut>
+            </button>
+          }
         </hlm-dropdown-menu-group>
       </hlm-dropdown-menu>
     </ng-template>
@@ -577,17 +581,19 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             </span>
           </button>
         </hlm-dropdown-menu-group>
-        <hlm-dropdown-menu-separator />
-        <hlm-dropdown-menu-group>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('view')">
-            <svg [lucideIcon]="layers" [size]="14"></svg>
-            <span class="flex-1">New view</span>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="ui.openCreate('project')">
-            <svg [lucideIcon]="projectIcon" [size]="14"></svg>
-            <span class="flex-1">New project</span>
-          </button>
-        </hlm-dropdown-menu-group>
+        @if (!store.isGuest()) {
+          <hlm-dropdown-menu-separator />
+          <hlm-dropdown-menu-group>
+            <button hlmDropdownMenuItem (triggered)="ui.openCreate('view')">
+              <svg [lucideIcon]="layers" [size]="14"></svg>
+              <span class="flex-1">New view</span>
+            </button>
+            <button hlmDropdownMenuItem (triggered)="ui.openCreate('project')">
+              <svg [lucideIcon]="projectIcon" [size]="14"></svg>
+              <span class="flex-1">New project</span>
+            </button>
+          </hlm-dropdown-menu-group>
+        }
       </hlm-dropdown-menu>
     </ng-template>
 
@@ -604,23 +610,25 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             Command palette
             <hlm-dropdown-menu-shortcut><app-kbd keys="mod+k" /></hlm-dropdown-menu-shortcut>
           </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
-            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
-            Connect your agent
-            <hlm-dropdown-menu-shortcut><app-kbd keys="g k" /></hlm-dropdown-menu-shortcut>
-          </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'tokens'])">
-            <svg [lucideIcon]="keyIcon" [size]="14"></svg>
-            API tokens
-          </button>
-          <button hlmDropdownMenuItem (triggered)="showChecklist()">
-            <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
-            Setup checklist
-          </button>
-          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'integrations'])">
-            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
-            Integrations
-          </button>
+          @if (!store.isGuest()) {
+            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
+              <svg [lucideIcon]="plugIcon" [size]="14"></svg>
+              Connect your agent
+              <hlm-dropdown-menu-shortcut><app-kbd keys="g k" /></hlm-dropdown-menu-shortcut>
+            </button>
+            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'tokens'])">
+              <svg [lucideIcon]="keyIcon" [size]="14"></svg>
+              API tokens
+            </button>
+            <button hlmDropdownMenuItem (triggered)="showChecklist()">
+              <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
+              Setup checklist
+            </button>
+            <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'integrations'])">
+              <svg [lucideIcon]="plugIcon" [size]="14"></svg>
+              Integrations
+            </button>
+          }
           <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'settings', 'profile'])">
             <svg [lucideIcon]="settings" [size]="14"></svg>
             Settings
@@ -748,13 +756,13 @@ export class AppSidebar {
 
   /** Top entries (Inbox, Tasks) the user chose to show, in their order. Projects live in the tree below. */
   protected readonly primary = computed(() =>
-    this.visible(orderNav(PRIMARY_NAV, this.ui.sidebarOrder().personal))
+    this.visible(orderNav(navForRole(PRIMARY_NAV, this.store.isGuest()), this.ui.sidebarOrder().personal))
       .filter((n) => n.segment !== 'projects')
       .map(withPath),
   );
-  /** "More" entries. "Only when badged" entries drop out while their badge is empty. */
+  /** "More" entries. "Only when badged" entries drop out while their badge is empty. A guest does not get the workspace-wide ones. */
   protected readonly moreItems = computed(() =>
-    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace)).map(withPath),
+    this.visible(orderNav(navForRole(MORE_NAV, this.store.isGuest()), this.ui.sidebarOrder().workspace)).map(withPath),
   );
   /** Active projects with their open (not done / canceled) task count. */
   protected readonly projectRows = computed(() => {

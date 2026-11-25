@@ -49,6 +49,8 @@ import type {
   RoutingRule,
   RoutingRulesOverview,
   RoutingSuggestions,
+  ProjectInviteResult,
+  ProjectShare,
   Role,
   SharedProject,
   PublicView,
@@ -292,6 +294,22 @@ export class ApiClient {
       this.post<InviteLink>(`${this.w(slug)}/invites`, input),
     resend: (slug: string, id: ID) => this.post<InviteLink>(`${this.w(slug)}/invites/${id}/resend`),
     revoke: (slug: string, id: ID) => this.del(`${this.w(slug)}/invites/${id}`),
+  };
+
+  /** Sharing one project with guests: who can open it, invite by email, take the project away from someone. */
+  readonly projectShare = {
+    get: (slug: string, projectId: ID) =>
+      this.get<ProjectShare>(`${this.w(slug)}/projects/${projectId}/share`),
+    invite: (slug: string, projectId: ID, email: string) =>
+      this.post<ProjectInviteResult>(`${this.w(slug)}/projects/${projectId}/invites`, { email }),
+    resend: (slug: string, projectId: ID, inviteId: ID) =>
+      this.post<InviteLink>(`${this.w(slug)}/projects/${projectId}/invites/${inviteId}/resend`),
+    revokeInvite: (slug: string, projectId: ID, inviteId: ID) =>
+      this.del(`${this.w(slug)}/projects/${projectId}/invites/${inviteId}`),
+    removeAccess: (slug: string, projectId: ID, membershipId: ID) =>
+      this.del<{ membershipEnded: boolean }>(
+        `${this.w(slug)}/projects/${projectId}/share/${membershipId}`,
+      ),
   };
 
   /** The signed-in user's notifications in a workspace, and their settings (the same in every workspace). */
