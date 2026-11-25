@@ -46,7 +46,7 @@ import { BrandAssets, LOGOS, logoUrl } from './brand-assets';
       <section class="mt-16" aria-labelledby="logos">
         <h2 id="logos" class="text-2xl font-semibold tracking-[-0.02em]">Logos</h2>
         <p class="text-muted-foreground mt-2 max-w-2xl text-[14px] leading-relaxed">
-          The mark is a woven T: two strands crossing into one fabric, like the weft (trama) on a
+          The mark is two square strands locked into one another, like the weft (trama) on a
           loom. Use black on light backgrounds and white on dark ones.
         </p>
         <div class="mt-8 flex flex-col gap-10">

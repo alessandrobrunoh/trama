@@ -18,7 +18,7 @@ export const LOGOS: readonly LogoAsset[] = [
   {
     kind: 'symbol',
     name: 'Logomark',
-    description: 'The woven T. Use it for avatars, app icons and anywhere space is tight.',
+    description: 'Two interlocking square strands. Use it for avatars, app icons and anywhere space is tight.',
     width: 512,
     height: 512,
   },
