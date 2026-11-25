@@ -366,3 +366,28 @@ export class V3Segmented {
 }
 
 export const V3_FORMS = [V3Toggle, V3Segmented] as const;
+
+/** Status square on its own (group headers, board columns): `size` px, in the status color. */
+@Component({
+  selector: 'v3-status-dot',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'inline-block shrink-0',
+    '[style.width.px]': 'size()',
+    '[style.height.px]': 'size()',
+    '[style.background]': 'color()',
+    'aria-hidden': 'true',
+  },
+  template: '',
+})
+export class V3StatusDot {
+  readonly status = input.required<string>();
+  readonly size = input(8);
+  private readonly store = inject(TramaStore);
+  protected readonly color = computed(
+    () =>
+      resolveStatusEntry(this.store.settings().statuses.issue, this.status())?.color ??
+      STATUS_DOT[this.status()] ??
+      '#8c9096',
+  );
+}

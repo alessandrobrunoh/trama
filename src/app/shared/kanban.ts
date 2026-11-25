@@ -1,4 +1,4 @@
-// One drag-and-drop board for issue lists.
+// One drag-and-drop board for issue lists (v3): grouped rows with 30px headers, or columns of cards.
 import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, Directive, TemplateRef, contentChild, input, output, signal } from '@angular/core';
@@ -48,27 +48,39 @@ export class KanbanLabelDirective {
     .board-item:focus-within {
       content-visibility: visible;
     }
+
+    /* v3: the card in hand is tilted with a blue outline; the one left behind fades. */
+    .board-item.cdk-drag-preview {
+      rotate: 1deg;
+      outline: 1px solid var(--delta-line);
+      box-shadow: 0 12px 32px rgb(0 0 0 / 0.6);
+    }
+    .board-item.cdk-drag-placeholder {
+      opacity: 0.4;
+    }
   `,
   template: `
     @if (layout() === 'list') {
       <div class="min-h-0 flex-1 overflow-y-auto" role="list" cdkDropListGroup>
         @for (g of columns(); track g.key) {
           <section>
-            <div class="group/gh bg-background sticky top-0 z-[2] mt-1 flex min-h-8 items-center pr-2 sm:pr-4">
+            <div class="group/gh bg-card border-border sticky top-0 z-[2] flex h-[30.5px] items-center border-b pr-3 sm:pr-4">
               <button
                 type="button"
-                class="text-muted-foreground flex min-h-8 min-w-0 flex-1 items-center gap-2 px-4 text-left text-[13px] outline-none focus-visible:underline sm:px-5"
+                class="flex h-full min-w-0 flex-1 items-center gap-2.5 px-4 text-left outline-none focus-visible:underline"
                 [attr.aria-expanded]="!collapsed().has(g.key)"
                 (click)="toggle(g.key)"
               >
-                <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="13" class="text-muted-foreground shrink-0"></svg>
-                <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
-                <span class="text-muted-foreground text-xs tabular-nums">{{ g.count ?? g.items.length }}</span>
+                <svg [lucideIcon]="collapsed().has(g.key) ? right : down" [size]="12" class="text-faint shrink-0"></svg>
+                <span class="text-foreground flex min-w-0 items-center gap-2.5 font-mono text-[11.5px]">
+                  <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
+                </span>
+                <span class="text-faint font-mono text-[11px] tabular-nums">{{ g.count ?? g.items.length }}</span>
               </button>
               @if (addable()) {
                 <button
                   type="button"
-                  class="text-muted-foreground hover:bg-accent hover:text-foreground flex size-6 items-center justify-center rounded-md opacity-0 group-hover/gh:opacity-100 focus-visible:opacity-100"
+                  class="text-faint hover:text-foreground hover:bg-hover flex size-6 items-center justify-center outline-none focus-visible:text-foreground"
                   [attr.aria-label]="addLabel()"
                   [title]="addLabel()"
                   (click)="add.emit(g.key)"
@@ -84,11 +96,21 @@ export class KanbanLabelDirective {
                 [cdkDropListData]="g.items"
                 [cdkDropListDisabled]="disabled()"
                 cdkDropListSortingDisabled
-                class="min-h-8"
+                class="min-h-6 transition-colors"
+                [class]="over() === g.key && from() !== g.key ? 'bg-delta-line/5' : ''"
+                (cdkDropListEntered)="over.set(g.key)"
+                (cdkDropListExited)="over.set(null)"
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay">
+                  <div
+                    cdkDrag
+                    [cdkDragData]="item"
+                    [cdkDragDisabled]="disabled()"
+                    [cdkDragStartDelay]="touchDelay"
+                    (cdkDragStarted)="from.set(g.key)"
+                    (cdkDragEnded)="endDrag()"
+                  >
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 }
@@ -100,16 +122,19 @@ export class KanbanLabelDirective {
     } @else {
       <!-- Phones: one column per screen, swipe sideways between them (scroll-snap). -->
       <div class="min-h-0 flex-1 overflow-x-auto overflow-y-hidden max-md:snap-x max-md:snap-mandatory max-md:scroll-px-4">
-        <div class="flex h-full min-w-max gap-3 px-4 py-3 sm:px-6" cdkDropListGroup>
+        <div class="flex h-full gap-3 px-4 py-4 sm:px-5 max-md:min-w-max" cdkDropListGroup>
           @for (g of columns(); track g.key) {
-            <section class="board-column group/col bg-muted flex h-full w-[18rem] shrink-0 flex-col rounded-lg max-md:w-[calc(100vw-3rem)] max-md:snap-start">
-              <header class="text-muted-foreground flex h-10 shrink-0 items-center gap-2 pr-1.5 pl-3 text-[13px]">
-                <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
-                <span class="text-muted-foreground text-xs font-normal tabular-nums">{{ g.count ?? g.items.length }}</span>
+            <section class="board-column group/col flex h-full min-w-[13.75rem] flex-1 basis-0 flex-col gap-2 max-md:w-[calc(100vw-3rem)] max-md:flex-none max-md:snap-start">
+              <header class="flex shrink-0 items-center gap-2 px-0.5 pt-1 pb-2">
+                <span class="text-foreground flex min-w-0 items-center gap-2 font-mono text-[11.5px]">
+                  <ng-container *ngTemplateOutlet="label().template; context: { $implicit: g.key }" />
+                </span>
+                <span class="text-faint font-mono text-[11px] tabular-nums">{{ g.count ?? g.items.length }}</span>
+                <span class="flex-1"></span>
                 @if (addable()) {
                   <button
                     type="button"
-                    class="text-muted-foreground hover:bg-accent hover:text-foreground ml-auto flex size-6 items-center justify-center rounded-md"
+                    class="text-faint hover:text-foreground hover:bg-hover flex size-5 items-center justify-center outline-none focus-visible:text-foreground"
                     [attr.aria-label]="addLabel()"
                     [title]="addLabel()"
                     (click)="add.emit(g.key)"
@@ -124,15 +149,36 @@ export class KanbanLabelDirective {
                 [cdkDropListData]="g.items"
                 [cdkDropListDisabled]="disabled()"
                 cdkDropListSortingDisabled
-                class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2"
+                class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto"
+                (cdkDropListEntered)="over.set(g.key)"
+                (cdkDropListExited)="over.set(null)"
                 (cdkDropListDropped)="drop($event)"
               >
                 @for (item of g.items; track track()(item)) {
-                  <div class="board-item shrink-0" cdkDrag [cdkDragData]="item" [cdkDragDisabled]="disabled()" [cdkDragStartDelay]="touchDelay" [class.cursor-grab]="!disabled()">
+                  <div
+                    class="board-item shrink-0"
+                    cdkDrag
+                    [cdkDragData]="item"
+                    [cdkDragDisabled]="disabled()"
+                    [cdkDragStartDelay]="touchDelay"
+                    [class.cursor-grab]="!disabled()"
+                    (cdkDragStarted)="from.set(g.key)"
+                    (cdkDragEnded)="endDrag()"
+                  >
                     <ng-container *ngTemplateOutlet="items().template; context: { $implicit: item }" />
                   </div>
                 } @empty {
-                  <p class="text-muted-foreground/70 rounded-md px-1 py-5 text-center text-xs">{{ emptyText() }}</p>
+                  @if (over() !== g.key) {
+                    <p class="text-faint px-1 py-5 text-center font-mono text-[11px]">{{ emptyText() }}</p>
+                  }
+                }
+                @if (over() === g.key && from() !== g.key) {
+                  <div
+                    class="border-delta-line bg-delta-line/8 text-delta flex h-[60px] shrink-0 items-center justify-center border font-mono text-[11px]"
+                    aria-hidden="true"
+                  >
+                    {{ dropText()(g.key) }}
+                  </div>
                 }
               </div>
             </section>
@@ -158,10 +204,15 @@ export class Kanban<T> {
   readonly add = output<string>();
   /** Placeholder of an empty board column. */
   readonly emptyText = input('Drop here');
+  /** What the drop target of a column says while a card is over it ("Drop to set In review"). */
+  readonly dropText = input<(key: string) => string>(() => 'Drop here');
 
   private readonly items = contentChild.required(KanbanItemDirective<T>);
   private readonly label = contentChild.required(KanbanLabelDirective);
   private readonly collapsed = signal<ReadonlySet<string>>(new Set());
+  /** Group key of the column / section the dragged card is over, and the one it came from. */
+  protected readonly over = signal<string | null>(null);
+  protected readonly from = signal<string | null>(null);
   protected readonly down = LucideChevronDown;
   protected readonly right = LucideChevronRight;
   protected readonly plus = LucidePlus;
@@ -179,7 +230,13 @@ export class Kanban<T> {
     });
   }
 
+  protected endDrag(): void {
+    this.over.set(null);
+    this.from.set(null);
+  }
+
   protected drop(event: CdkDragDrop<readonly T[]>): void {
+    this.endDrag();
     if (this.disabled() || event.previousContainer === event.container) return;
     const item = event.item.data as T | undefined;
     if (!item) return;

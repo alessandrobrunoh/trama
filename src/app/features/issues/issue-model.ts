@@ -268,7 +268,9 @@ export const DEFAULT_DISPLAY: IssueDisplay = {
   sortDir: 'asc',
   showEmptyGroups: false,
   density: 'comfortable',
-  hidden: [],
+  // v3 rows carry priority · key · title · sub-tasks · thread · source · status · avatar · EST · due;
+  // type, project and labels are opt-in from Display.
+  hidden: ['kind', 'project', 'labels'],
   nested: true,
 };
 
@@ -286,7 +288,7 @@ export function readDisplay(key: string): IssueDisplay {
     density: oneOf(raw.density, ['comfortable', 'compact'], DEFAULT_DISPLAY.density),
     hidden: Array.isArray(raw.hidden)
       ? raw.hidden.filter((p): p is IssueProp => (PROPS as readonly string[]).includes(p))
-      : [],
+      : [...DEFAULT_DISPLAY.hidden],
     nested: typeof raw.nested === 'boolean' ? raw.nested : DEFAULT_DISPLAY.nested,
   };
 }

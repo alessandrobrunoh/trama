@@ -1,15 +1,17 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { LucideDynamicIcon, LucidePlus } from '@lucide/angular';
+// The Tasks page (/:ws/tasks) and the Board page (/:ws/board): the one task table, with the v3 header
+// (Filter F · New task C) and a filter bar whose Status chip carries the old All / Active / Backlog /
+// Done / Drafts tabs. The Board route sets `data.layout = 'board'`.
+import { ChangeDetectionStrategy, Component, computed, inject, input, viewChild } from '@angular/core';
+import { Router } from '@angular/router';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TramaStore, UiStore, usePageShortcuts } from '../../core';
 import { TopBarActions } from '../../layout/page-chrome';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
-import { StatsStrip } from '../stats/stats-strip';
+import type { FilterPreset } from '../../shared/filter-bar/filter-bar';
 import { IssueBoard } from './issue-board';
-import { ISSUE_TABS, asViewTab, tabStatuses, type IssueViewTab } from './issue-model';
+import { ISSUE_TABS, asViewTab, tabStatuses, type IssueLayout, type IssueViewTab } from './issue-model';
 import { IssueCommandDialog } from './issue-prop';
 
 const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
@@ -35,66 +37,39 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
   },
 };
 
+/** Chips of the Tasks page; the board's columns are the statuses, so it only keeps Thread. */
+const LIST_CHIPS = ['status', 'assigneeId', 'projectId', 'thread', 'source'] as const;
+const BOARD_CHIPS = ['thread'] as const;
+
 @Component({
   selector: 'app-issue-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [
-    HlmButtonImports,
-    HlmTooltip,
-    LucideDynamicIcon,
-    RouterLink,
-    PageHeader,
-    Kbd,
-    TopBarActions,
-    IssueBoard,
-    StatsStrip,
-    IssueCommandDialog,
-  ],
+  imports: [HlmButtonImports, HlmTooltip, PageHeader, Kbd, TopBarActions, IssueBoard, IssueCommandDialog],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
+      <button hlmBtn variant="outline" type="button" (click)="board()?.openSearch()">
+        Filter <app-kbd keys="f" />
+      </button>
       @if (store.allowed('createIssues')) {
-        <button hlmBtn size="sm" hlmTooltip="Report a bug, request or incident" (click)="create()">
-          <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span>New task</span>
-          <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
+        <button hlmBtn hlmTooltip="Report a bug, request or incident" (click)="create()">
+          New task <app-kbd keys="c" />
         </button>
       }
     </ng-template>
 
-    <app-page-header [title]="title()" [description]="description()">
-      <nav
-        leading
-        class="scrollbar-none -mx-1 flex items-center gap-0.5 overflow-x-auto"
-        aria-label="Task views"
-      >
-        @for (t of tabs; track t.id) {
-          <a
-            [routerLink]="[]"
-            [queryParams]="{ view: t.id === 'all' ? null : t.id }"
-            queryParamsHandling="merge"
-            class="flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-[13px] transition-colors"
-            [class]="
-              tab() === t.id
-                ? 'bg-selected text-foreground'
-                : 'text-muted-foreground hover:bg-hover hover:text-foreground'
-            "
-            [attr.aria-current]="tab() === t.id ? 'page' : null"
-            [hlmTooltip]="t.hint"
-          >
-            {{ t.label }}
-            <span class="text-muted-foreground text-xs tabular-nums">{{ counts()[t.id] }}</span>
-          </a>
-        }
-      </nav>
-    </app-page-header>
-    <app-stats-strip />
+    <app-page-header [title]="title()" />
     <app-issue-board
       [issues]="store.issues()"
       [scope]="scope()"
       [status]="status()"
       [project]="project()"
-      [forceLayout]="layout()"
+      [layouts]="layouts()"
+      [pageSwitch]="true"
+      [chipFields]="chips()"
+      [statusPresets]="presets()"
+      [statusPreset]="tab()"
+      (statusPresetChange)="pickTab($event)"
       [emptyTitle]="empty().title"
       [emptyDescription]="empty().description"
     />
@@ -104,6 +79,8 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
 export class IssuePage {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
+  private readonly router = inject(Router);
+  protected readonly board = viewChild(IssueBoard);
 
   /** From the parent `:workspaceSlug` route segment. */
   readonly workspaceSlug = input<string>();
@@ -111,21 +88,23 @@ export class IssuePage {
   readonly status = input<string>();
   /** Query `?project=<projectId>`: only tasks planned under that project. */
   readonly project = input<string>();
-  /** Query `?view=active|backlog|done` (view tabs). */
+  /** Query `?view=active|backlog|done` (the Status chip's views; old tab links). */
   readonly view = input<string>();
-  /** Route data `{ layout: 'board' }` on `/board`: the table fixed to that layout. */
-  readonly layout = input<'board' | null>(null);
+  /** Route data: `board` on /:ws/board. */
+  readonly layout = input<string>();
 
-  protected readonly plus = LucidePlus;
-  protected readonly tabs = ISSUE_TABS;
+  protected readonly isBoard = computed(() => this.layout() === 'board');
+  protected readonly layouts = computed<readonly IssueLayout[]>(() =>
+    this.isBoard() ? ['board'] : ['list', 'flow'],
+  );
+  protected readonly chips = computed<readonly string[]>(() =>
+    this.isBoard() ? BOARD_CHIPS : LIST_CHIPS,
+  );
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
-  protected readonly title = computed(() => (this.layout() === 'board' ? 'Board' : 'Tasks'));
-  protected readonly description = computed(
-    () => 'Track bugs, requests and incidents from triage through completion.',
-  );
+  protected readonly title = computed(() => (this.isBoard() ? 'Board' : 'All tasks'));
   protected readonly counts = computed(() => {
     const list = this.store.issues();
     const out = {} as Record<IssueViewTab, number>;
@@ -135,6 +114,9 @@ export class IssuePage {
         : list.length;
     return out;
   });
+  protected readonly presets = computed<readonly FilterPreset[]>(() =>
+    ISSUE_TABS.map((t) => ({ id: t.id, label: t.label, count: this.counts()[t.id] })),
+  );
 
   private readonly _keys = usePageShortcuts([
     {
@@ -144,6 +126,14 @@ export class IssuePage {
       run: () => this.store.allowed('createIssues') && this.create(),
     },
   ]);
+
+  /** A view of the Status chip: kept in the URL as `?view=` so it can be linked and survives reloads. */
+  protected pickTab(id: string): void {
+    void this.router.navigate([], {
+      queryParams: { view: id === 'all' ? null : id },
+      queryParamsHandling: 'merge',
+    });
+  }
 
   protected create(): void {
     const status = this.scope()?.[0];

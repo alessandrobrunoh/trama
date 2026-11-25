@@ -1,16 +1,24 @@
-// The filter / sort / group bar of saved views, as one reusable control. It edits nothing itself: it
-// shows the current filters as Linear-style chips (field · operator · value · ×), a "Filter" button
-// that lists every filterable field, and Group and Sort menus on the right, and reports every change
-// through outputs. The Tasks table, project task tabs and saved views all use it.
+// The filter / sort / group bar of the task table and saved views, as one reusable control (v3: mono
+// chips "Status  is not Done", then "Group: status · Sort: priority" at the right). It edits nothing
+// itself: it shows the current filters as chips, a "+ Filter" button that lists every other filterable
+// field, and Group and Sort menus, and reports every change through outputs.
 //
 //   <app-filter-bar
 //     entity="issue"
 //     [filters]="filters()" (filtersChange)="filters.set($event)"
+//     [defaultFields]="['status', 'assigneeId', 'thread']"      <!-- chips that are always there ("any") -->
 //     [sort]="sort()" (sortChange)="setSort($event)"
 //     [groupBy]="group()" (groupByChange)="setGroup($event)">
-//     <app-search-input leading ... />          <!-- optional, before the chips -->
+//     <div leading>…</div>                      <!-- optional, before the chips (layout switch) -->
+//     <span hint>…</span>                       <!-- optional, between the chips and Group / Sort -->
 //     <button trailing>…</button>               <!-- optional, after Sort -->
 //   </app-filter-bar>
+//
+// Two things beyond plain field filters, both for the Tasks page:
+//  - `extras`: chips for a filter the query model has no field for (a task's thread link). The owner
+//    applies them; the bar only draws the chip and reports the pick (`extraChange`).
+//  - `presets`: named views shown at the top of a field chip's menu (the All / Active / Backlog / Done /
+//    Drafts views of the Status chip); the owner applies them (`presetPick`).
 import {
   ChangeDetectionStrategy,
   Component,
@@ -22,16 +30,7 @@ import {
   signal,
   untracked,
 } from '@angular/core';
-import {
-  LucideArrowDownWideNarrow,
-  LucideArrowUpNarrowWide,
-  LucideDynamicIcon,
-  LucideListFilter,
-  LucidePlus,
-  LucideRows3,
-  LucideX,
-} from '@lucide/angular';
-import { HlmButtonImports } from '@spartan-ng/helm/button';
+import { LucideDynamicIcon, LucidePlus, LucideX } from '@lucide/angular';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import {
   FIELD_DEFS,
@@ -41,7 +40,7 @@ import {
   type ViewEntity,
   type ViewFilter,
 } from '../../core';
-import { OptionMenu } from '../../features/views/option-controls';
+import { OptionLeading, type PickOption } from '../../features/views/option-controls';
 import {
   describeFilter,
   fieldLabel,
@@ -50,81 +49,187 @@ import {
   isEditableFilter,
   isNumberField,
 } from '../../features/views/view-model';
+import { FilterChip } from './filter-chip';
 
 export interface FilterBarSort {
   field: string;
   direction: 'asc' | 'desc';
 }
 
+/** A chip for a filter that is not a field of the entity (the owner applies it). `selected` '' = any. */
+export interface FilterBarExtra {
+  id: string;
+  label: string;
+  options: readonly { value: string; label: string }[];
+  selected: string;
+}
+
+/** A named view offered at the top of a field chip's menu. The first preset is the "no preset" one. */
+export interface FilterPreset {
+  id: string;
+  label: string;
+  /** Right-aligned count ("12"). */
+  count?: number;
+}
+
+interface FieldChip {
+  kind: 'field';
+  field: string;
+  label: string;
+  numeric: boolean;
+  min: string;
+  editable: boolean;
+  options: PickOption[];
+  values: string[];
+  /** Text of a filter the bar cannot edit ("Created after …"). */
+  text: string;
+  presets: readonly FilterPreset[];
+  presetId: string;
+  active: boolean;
+  value: string;
+  /** Always shown, even without a value. */
+  fixed: boolean;
+}
+
+interface ExtraChip {
+  kind: 'extra';
+  id: string;
+  label: string;
+  options: readonly { value: string; label: string }[];
+  selected: string;
+  active: boolean;
+  value: string;
+}
+
+type Chip = FieldChip | ExtraChip;
+
 @Component({
   selector: 'app-filter-bar',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmDropdownMenuImports, LucideDynamicIcon, OptionMenu],
-  host: { class: 'flex min-w-0 items-center gap-1.5 max-md:flex-nowrap md:flex-wrap' },
+  imports: [HlmDropdownMenuImports, LucideDynamicIcon, OptionLeading, FilterChip],
+  host: { class: 'flex min-w-0 items-center gap-2.5 max-md:flex-nowrap md:flex-wrap' },
   template: `
     <ng-content select="[leading]" />
 
-    @for (f of activeFilters(); track f.field) {
-      @if (f.numeric) {
-        <span class="bg-secondary inline-flex h-7 shrink-0 items-stretch gap-0.5 overflow-hidden rounded-md text-xs">
-          <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
-          <span class="text-muted-foreground flex items-center px-2">at least</span>
+    @for (c of chips(); track c.kind === 'field' ? c.field : c.id) {
+      @if (c.kind === 'extra') {
+        <app-filter-chip
+          [label]="c.label"
+          [value]="c.value"
+          [active]="c.active"
+          [menu]="extraMenu"
+          [disabled]="!canEdit()"
+          (removed)="extraChange.emit({ id: c.id, value: '' })"
+        />
+        <ng-template #extraMenu>
+          <hlm-dropdown-menu class="w-52">
+            <hlm-dropdown-menu-label>{{ c.label }}</hlm-dropdown-menu-label>
+            <button
+              hlmDropdownMenuRadio
+              [checked]="!c.selected"
+              [keepOpen]="false"
+              (triggered)="extraChange.emit({ id: c.id, value: '' })"
+            >
+              <span class="text-muted-foreground">Any</span>
+              <hlm-dropdown-menu-radio-indicator />
+            </button>
+            @for (o of c.options; track o.value) {
+              <button
+                hlmDropdownMenuRadio
+                [checked]="c.selected === o.value"
+                [keepOpen]="false"
+                (triggered)="extraChange.emit({ id: c.id, value: o.value })"
+              >
+                {{ o.label }}
+                <hlm-dropdown-menu-radio-indicator />
+              </button>
+            }
+          </hlm-dropdown-menu>
+        </ng-template>
+      } @else if (c.numeric) {
+        <span
+          class="border-delta-line/40 bg-delta-line/8 inline-flex h-[22px] shrink-0 items-stretch border font-mono text-[11px] leading-[13px]"
+        >
+          <span class="text-muted-foreground flex items-center pl-2">{{ c.label }}</span>
+          <span class="text-muted-foreground flex items-center px-1.5">at least</span>
           <input
             type="number"
             min="0"
             step="1"
-            class="w-20 bg-transparent px-2 text-xs tabular-nums outline-none"
-            [attr.aria-label]="f.label + ' minimum'"
-            [value]="f.min"
+            class="w-16 bg-transparent px-1 tabular-nums outline-none"
+            [attr.aria-label]="c.label + ' minimum'"
+            [value]="c.min"
             [disabled]="!canEdit()"
-            (change)="setMin(f.field, $any($event.target).value)"
+            (change)="setMin(c.field, $any($event.target).value)"
           />
           @if (canEdit()) {
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex w-7 items-center justify-center"
-              [attr.aria-label]="'Remove ' + f.label + ' filter'"
-              (click)="removeFilter(f.field)"
+              class="text-muted-foreground hover:text-foreground hover:bg-hover inline-flex w-5 items-center justify-center"
+              [attr.aria-label]="'Remove ' + c.label + ' filter'"
+              (click)="removeFilter(c.field)"
             >
-              <svg [lucideIcon]="xIcon" [size]="12"></svg>
+              <svg [lucideIcon]="xIcon" [size]="11"></svg>
             </button>
           }
         </span>
-      } @else if (f.editable) {
-        <span class="bg-secondary inline-flex h-7 shrink-0 items-stretch gap-0.5 overflow-hidden rounded-md text-xs">
-          <span class="text-muted-foreground flex items-center px-2">{{ f.label }}</span>
-          <span class="text-muted-foreground flex items-center px-2">{{
-            f.values.length > 1 ? 'is any of' : 'is'
-          }}</span>
-          <app-option-menu
-            variant="segment"
-            [label]="f.label"
-            [options]="f.options"
-            [selected]="f.values"
-            (selectedChange)="setValues(f.field, $event)"
-            [multi]="true"
-            [class.pointer-events-none]="!canEdit()"
-          />
-          @if (canEdit()) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex w-7 items-center justify-center"
-              [attr.aria-label]="'Remove ' + f.label + ' filter'"
-              (click)="removeFilter(f.field)"
-            >
-              <svg [lucideIcon]="xIcon" [size]="12"></svg>
-            </button>
-          }
-        </span>
+      } @else if (c.editable) {
+        <app-filter-chip
+          [label]="c.label"
+          [value]="c.value"
+          [active]="c.active"
+          [menu]="fieldMenu"
+          [disabled]="!canEdit()"
+          (removed)="clearChip(c)"
+        />
+        <ng-template #fieldMenu>
+          <hlm-dropdown-menu class="max-h-80 w-60 overflow-y-auto">
+            @if (c.presets.length) {
+              <hlm-dropdown-menu-label>View</hlm-dropdown-menu-label>
+              @for (p of c.presets; track p.id) {
+                <button
+                  hlmDropdownMenuRadio
+                  [checked]="c.presetId === p.id"
+                  [keepOpen]="false"
+                  (triggered)="presetPick.emit({ field: c.field, id: p.id })"
+                >
+                  {{ p.label }}
+                  @if (p.count !== undefined) {
+                    <span class="text-faint ml-auto pr-5 font-mono text-[10.5px] tabular-nums">{{ p.count }}</span>
+                  }
+                  <hlm-dropdown-menu-radio-indicator />
+                </button>
+              }
+              <hlm-dropdown-menu-separator />
+              <hlm-dropdown-menu-label>{{ c.label }}</hlm-dropdown-menu-label>
+            }
+            @for (o of c.options; track o.value) {
+              <button hlmDropdownMenuCheckbox [checked]="c.values.includes(o.value)" (triggered)="toggleValue(c, o.value)">
+                <app-option-leading [option]="o" />
+                <span class="truncate" [class.font-mono]="o.mono">{{ o.label }}</span>
+                <hlm-dropdown-menu-checkbox-indicator />
+              </button>
+            }
+            @if (c.values.length) {
+              <hlm-dropdown-menu-separator />
+              <button hlmDropdownMenuItem (triggered)="setValues(c.field, [])">
+                <svg [lucideIcon]="xIcon" [size]="13"></svg> Clear
+              </button>
+            }
+          </hlm-dropdown-menu>
+        </ng-template>
       } @else {
-        <span class="bg-secondary inline-flex h-7 shrink-0 items-center gap-1 rounded-md ps-2 pe-1 text-xs">
-          {{ f.text }}
+        <span
+          class="border-delta-line/40 bg-delta-line/8 inline-flex h-[22px] shrink-0 items-center gap-1.5 border pl-2 font-mono text-[11px] leading-[13px]"
+          [class.pr-2]="!canEdit()"
+        >
+          {{ c.text }}
           @if (canEdit()) {
             <button
               type="button"
-              class="text-muted-foreground hover:text-foreground hover:bg-accent inline-flex size-5 items-center justify-center rounded"
-              [attr.aria-label]="'Remove ' + f.label + ' filter'"
-              (click)="removeFilter(f.field)"
+              class="text-muted-foreground hover:text-foreground hover:bg-hover inline-flex h-full w-5 items-center justify-center"
+              [attr.aria-label]="'Remove ' + c.label + ' filter'"
+              (click)="removeFilter(c.field)"
             >
               <svg [lucideIcon]="xIcon" [size]="11"></svg>
             </button>
@@ -135,14 +240,13 @@ export interface FilterBarSort {
 
     @if (canEdit() && addableFields().length) {
       <button
-        hlmBtn
-        variant="ghost"
-        size="sm"
-        class="text-muted-foreground h-7 shrink-0 gap-1.5 px-2 text-xs"
+        type="button"
+        class="text-faint hover:text-foreground hover:bg-hover inline-flex h-[22px] shrink-0 items-center gap-1 px-1.5 font-mono text-[11px] outline-none focus-visible:underline"
         [hlmDropdownMenuTrigger]="addFilter"
+        aria-label="Add filter"
       >
-        <svg [lucideIcon]="activeFilters().length ? plusIcon : filterIcon" [size]="13"></svg>
-        {{ activeFilters().length ? 'Filter' : 'Add filter' }}
+        <svg [lucideIcon]="plusIcon" [size]="11"></svg>
+        <span class="max-sm:hidden">Filter</span>
       </button>
       <ng-template #addFilter>
         <hlm-dropdown-menu class="max-h-80 w-56 overflow-y-auto">
@@ -155,25 +259,23 @@ export interface FilterBarSort {
         </hlm-dropdown-menu>
       </ng-template>
     }
-    @if (!activeFilters().length && !canEdit()) {
-      <span class="text-meta">No filters</span>
+    @if (!chips().length && !canEdit()) {
+      <span class="text-faint font-mono text-[11px]">No filters</span>
     }
 
     <span class="flex-1 max-md:hidden"></span>
 
-    <div class="flex shrink-0 items-center gap-1 max-md:ml-auto">
+    <ng-content select="[hint]" />
+
+    <div class="text-faint flex shrink-0 items-center gap-1 font-mono text-[11px] max-md:ml-auto">
       @if (showGroup()) {
         <button
-          hlmBtn
-          variant="ghost"
-          size="sm"
-          class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
+          type="button"
+          class="hover:text-foreground aria-expanded:text-foreground px-0.5 outline-none focus-visible:underline disabled:pointer-events-none"
           [disabled]="!canEdit()"
           [hlmDropdownMenuTrigger]="groupMenu"
         >
-          <svg [lucideIcon]="groupIcon" [size]="13"></svg>
-          <span class="max-sm:hidden">{{ columns() ? 'Columns' : 'Group' }}:</span>
-          <span class="text-foreground">{{ groupText() }}</span>
+          <span class="max-sm:hidden">{{ columns() ? 'Columns' : 'Group' }}: </span>{{ groupText() }}
         </button>
         <ng-template #groupMenu>
           <hlm-dropdown-menu class="w-52">
@@ -203,19 +305,18 @@ export interface FilterBarSort {
           </hlm-dropdown-menu>
         </ng-template>
       }
-
+      @if (showGroup() && showSort()) {
+        <span aria-hidden="true">·</span>
+      }
       @if (showSort()) {
         <button
-          hlmBtn
-          variant="ghost"
-          size="sm"
-          class="text-muted-foreground h-7 gap-1.5 px-2 text-xs"
+          type="button"
+          class="hover:text-foreground aria-expanded:text-foreground px-0.5 outline-none focus-visible:underline disabled:pointer-events-none"
           [disabled]="!canEdit()"
           [hlmDropdownMenuTrigger]="sortMenu"
+          [attr.aria-label]="'Sort: ' + sortText() + (sort()?.direction === 'asc' ? ', ascending' : sort() ? ', descending' : '')"
         >
-          <svg [lucideIcon]="sort()?.direction === 'asc' ? sortAscIcon : sortDescIcon" [size]="13"></svg>
-          <span class="max-sm:hidden">Sort:</span>
-          <span class="text-foreground">{{ sortText() }}</span>
+          <span class="max-sm:hidden">Sort: </span>{{ sortText() }}
         </button>
         <ng-template #sortMenu>
           <hlm-dropdown-menu class="w-52">
@@ -245,14 +346,12 @@ export interface FilterBarSort {
             @if (sort(); as s) {
               <hlm-dropdown-menu-separator />
               <button hlmDropdownMenuItem (triggered)="flipDirection()">
-                <svg [lucideIcon]="s.direction === 'asc' ? sortDescIcon : sortAscIcon" [size]="14"></svg>
                 {{ s.direction === 'asc' ? 'Descending' : 'Ascending' }}
               </button>
             }
           </hlm-dropdown-menu>
         </ng-template>
       }
-
       <ng-content select="[trailing]" />
     </div>
   `,
@@ -274,43 +373,68 @@ export class FilterBar {
   readonly showSort = input(true);
   /** Offer "Default" in the Sort menu (otherwise a field is always chosen). */
   readonly defaultSort = input(true);
+  /** Chips that are always shown, in this order: a field of the entity, or the id of one of `extras`. */
+  readonly defaultFields = input<readonly string[]>([]);
+  readonly extras = input<readonly FilterBarExtra[]>([]);
+  /** Named views at the top of a field's chip menu, by field. */
+  readonly presets = input<Readonly<Record<string, readonly FilterPreset[]>>>({});
+  /** The preset in force, by field (an id of `presets[field]`). */
+  readonly presetActive = input<Readonly<Record<string, string>>>({});
 
   readonly filtersChange = output<ViewFilter[]>();
   readonly sortChange = output<FilterBarSort | null>();
   readonly groupByChange = output<string | null>();
+  readonly extraChange = output<{ id: string; value: string }>();
+  readonly presetPick = output<{ field: string; id: string }>();
 
   protected readonly xIcon = LucideX;
   protected readonly plusIcon = LucidePlus;
-  protected readonly filterIcon = LucideListFilter;
-  protected readonly groupIcon = LucideRows3;
-  protected readonly sortAscIcon = LucideArrowUpNarrowWide;
-  protected readonly sortDescIcon = LucideArrowDownWideNarrow;
 
   /** Fields added with "Filter" that have no values yet (not part of the filters). */
   private readonly pending = signal<string[]>([]);
 
-  protected readonly activeFilters = computed(() => {
+  protected readonly chips = computed<Chip[]>(() => {
     const entity = this.entity();
     const filters = this.filters();
-    const fromFilters = filters.map((f) => this.chip(entity, filters, f.field, f));
-    const pending = this.pending()
-      .filter((field) => !filters.some((f) => f.field === field))
-      .map((field) => this.chip(entity, filters, field, undefined));
-    return [...fromFilters, ...pending];
+    const extras = this.extras();
+    const fixed = this.defaultFields();
+    const out: Chip[] = [];
+    const seen = new Set<string>();
+    for (const key of fixed) {
+      const extra = extras.find((e) => e.id === key);
+      if (extra) {
+        const o = extra.options.find((x) => x.value === extra.selected);
+        out.push({ kind: 'extra', ...extra, active: !!extra.selected, value: o ? `is ${o.label}` : 'any' });
+      } else {
+        out.push(this.chip(entity, filters, key, true));
+        seen.add(key);
+      }
+    }
+    for (const f of filters) {
+      if (seen.has(f.field)) continue;
+      seen.add(f.field);
+      out.push(this.chip(entity, filters, f.field, false));
+    }
+    for (const field of this.pending()) {
+      if (seen.has(field)) continue;
+      seen.add(field);
+      out.push(this.chip(entity, filters, field, false));
+    }
+    return out;
   });
   protected readonly addableFields = computed(() => {
-    const used = new Set(this.activeFilters().map((f) => f.field));
+    const used = new Set(this.chips().flatMap((c) => (c.kind === 'field' ? [c.field] : [])));
     return filterableFields(this.entity()).filter((f) => !used.has(f.field));
   });
   protected readonly groupableFields = computed(() => FIELD_DEFS[this.entity()].filter((f) => f.groupable));
   protected readonly sortableFields = computed(() => FIELD_DEFS[this.entity()].filter((f) => f.sortable));
   protected readonly groupText = computed(() => {
     const g = this.groupBy();
-    return g ? fieldLabel(this.entity(), g) : 'None';
+    return (g ? fieldLabel(this.entity(), g) : 'none').toLowerCase();
   });
   protected readonly sortText = computed(() => {
     const s = this.sort();
-    return s ? fieldLabel(this.entity(), s.field) : 'Default';
+    return (s ? fieldLabel(this.entity(), s.field) : 'default').toLowerCase();
   });
 
   constructor() {
@@ -321,18 +445,38 @@ export class FilterBar {
     });
   }
 
-  private chip(entity: ViewEntity, filters: readonly ViewFilter[], field: string, f: ViewFilter | undefined) {
+  private chip(entity: ViewEntity, filters: readonly ViewFilter[], field: string, fixed: boolean): FieldChip {
+    const f = filters.find((x) => x.field === field);
     const numeric = isNumberField(entity, field);
     const editable = !numeric && (!f || isEditableFilter(f));
+    const options = editable ? fieldOptions(this.store, entity, field) : [];
+    const values = f ? filterValues(filters, field) : [];
+    const presets = this.presets()[field] ?? [];
+    const presetId = this.presetActive()[field] ?? presets[0]?.id ?? '';
+    const preset = presets.find((p) => p.id === presetId);
+    const presetOn = !!preset && presetId !== presets[0]?.id;
+    const byValue = new Map(options.map((o) => [o.value, o.label]));
+    const parts: string[] = [];
+    if (presetOn && preset) parts.push(preset.label);
+    if (values.length) {
+      const first = byValue.get(values[0]) ?? values[0];
+      parts.push(`is ${first}${values.length > 1 ? ` +${values.length - 1}` : ''}`);
+    }
     return {
+      kind: 'field',
       field,
       label: fieldLabel(entity, field),
       numeric,
       min: numeric && f?.op === 'gte' ? String(f.value) : '',
       editable,
-      options: editable ? fieldOptions(this.store, entity, field) : [],
-      values: f ? filterValues(filters, field) : [],
+      options,
+      values,
       text: f ? describeFilter(this.store, entity, f) : '',
+      presets,
+      presetId,
+      active: values.length > 0 || presetOn || (!!f && !editable),
+      value: parts.join(' · ') || 'any',
+      fixed,
     };
   }
 
@@ -340,9 +484,25 @@ export class FilterBar {
     this.pending.update((p) => (p.includes(field) ? p : [...p, field]));
   }
 
+  protected toggleValue(c: FieldChip, value: string): void {
+    this.setValues(
+      c.field,
+      c.values.includes(value) ? c.values.filter((v) => v !== value) : [...c.values, value],
+    );
+  }
+
   protected setValues(field: string, values: string[]): void {
     this.filtersChange.emit(setFilter(this.filters(), field, 'in', values));
     if (!values.length) this.pending.update((p) => p.filter((x) => x !== field));
+  }
+
+  /** × on a chip: drop its values, and its preset back to the first one. */
+  protected clearChip(c: FieldChip): void {
+    if (c.presets.length && c.presetId !== c.presets[0].id) {
+      this.presetPick.emit({ field: c.field, id: c.presets[0].id });
+    }
+    if (c.fixed) this.setValues(c.field, []);
+    else this.removeFilter(c.field);
   }
 
   /** "At least N" on a numeric field; empty or invalid removes the filter. */

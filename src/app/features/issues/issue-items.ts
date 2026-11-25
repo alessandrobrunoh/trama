@@ -24,18 +24,21 @@ import {
   LucideUserPlus,
   LucideUserRoundX,
 } from '@lucide/angular';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
-import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { SwipeRow } from '../../shared/swipe-row';
 import { LabelChips } from '../../shared/label-chip';
+import { V3Source, V3Thread, sourceRef } from '../../shared/v3';
 import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue, quietToggleStatus } from './issue-model';
 import { IssueActions } from './issue-actions';
+import { IssueCell } from './issue-cells';
 import { IssueProp } from './issue-prop';
 import { NeedsYou } from './list-preview';
+import { TaskChildren } from './task-children';
 
 /** Shared bits of row + card. */
 @Directive()
@@ -56,8 +59,8 @@ abstract class IssueItemBase {
   readonly selecting = input(false);
   /** Properties hidden through display options. */
   readonly hidden = input<readonly IssuePropName[]>([]);
-  /** Which date the date column shows. */
-  readonly dateField = input<'updatedAt' | 'createdAt'>('updatedAt');
+  /** Which date the date column shows: the due date, or when the task was last updated / created. */
+  readonly dateField = input<'dueDate' | 'updatedAt' | 'createdAt'>('dueDate');
   /** Checkbox click or shift-click: the board decides (toggle / range). */
   readonly toggleSelect = output<MouseEvent>();
 
@@ -84,10 +87,27 @@ abstract class IssueItemBase {
       this.show().estimate &&
       (this.hasEstimate() || (this.store.estimateScale() !== 'none' && this.store.can('member'))),
   );
-  protected readonly date = computed(() => shortDate(this.issue()[this.dateField()]));
-  protected readonly dateTitle = computed(
-    () => `${this.dateField() === 'createdAt' ? 'Created' : 'Updated'} ${fullDate(this.issue()[this.dateField()])}`,
-  );
+  protected readonly date = computed(() => shortDate(this.issue()[this.dateField()]) || '—');
+  protected readonly dateTitle = computed(() => {
+    const field = this.dateField();
+    const iso = this.issue()[field];
+    const what = field === 'dueDate' ? 'Due' : field === 'createdAt' ? 'Created' : 'Updated';
+    return iso ? `${what} ${fullDate(iso)}` : 'No due date';
+  });
+  /** A due date in the past on a task that is still open. */
+  protected readonly overdue = computed(() => {
+    const due = this.issue().dueDate;
+    return this.dateField() === 'dueDate' && !!due && !this.quiet() && differenceInCalendarDays(parseISO(due), new Date()) < 0;
+  });
+  private readonly children = inject(TaskChildren);
+  /** Sub-tasks of the task (all of them, wherever they sit) and how many are finished. */
+  protected readonly subTotal = computed(() => this.children.of(this.issue().id).length);
+  protected readonly subDone = computed(() => {
+    const entries = this.store.settings().statuses.issue;
+    return this.children.of(this.issue().id).filter((c) => isClosedIssue(c, entries)).length;
+  });
+  /** Where the source chip links to (the GitHub / GitLab / Jira item), when it came from one. */
+  protected readonly sourceUrl = computed(() => sourceRef(this.issue()).url);
 
   constructor() {
     const element = inject(ElementRef<HTMLElement>).nativeElement;
@@ -129,7 +149,19 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, IssueProp, ProjectChip, LabelChips, SwipeRow, PriorityIcon],
+  imports: [
+    RouterLink,
+    LucideDynamicIcon,
+    IssueProp,
+    IssueCell,
+    IssueKindLabel,
+    ProjectChip,
+    LabelChips,
+    SwipeRow,
+    PriorityIcon,
+    V3Source,
+    V3Thread,
+  ],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -210,7 +242,9 @@ abstract class IssueItemBase {
               @if (i.priority !== 'none') {
                 <app-priority-icon [priority]="i.priority" />
               }
-              <span class="ml-auto shrink-0 tabular-nums">{{ date() }}</span>
+              @if (date() !== '—') {
+                <span class="ml-auto shrink-0 tabular-nums" [class.text-red]="overdue()">{{ date() }}</span>
+              }
             </span>
           </span>
           @if (s.assignee) {
@@ -219,11 +253,14 @@ abstract class IssueItemBase {
         </div>
       </app-swipe-row>
     } @else {
+    <!-- v3 row: ☐ · priority · key · title … sub-tasks · thread · source · status · avatar · EST · due.
+         A sub-task (depth > 0) sits on a darker band, indented, with ↳ and its own done state. -->
     <div
       [attr.data-row-id]="ghost() ? null : i.id"
-      class="group/row relative flex items-center gap-2.5 pr-3 pl-3 text-[13px] sm:pr-5 sm:pl-5"
+      class="group/row border-border relative flex items-center border-b px-4"
       [class]="rowState()"
       [class.opacity-55]="ghost()"
+      [style.padding-left.px]="subtask() ? 54 + (depth() - 1) * 20 : null"
       [attr.data-depth]="tree() ? depth() : null"
       (dblclick)="onDblClick($event)"
     >
@@ -234,90 +271,133 @@ abstract class IssueItemBase {
         (click)="onLinkClick($event)"
       ></a>
 
+      @if (subtask()) {
+        <svg
+          [lucideIcon]="subtaskIcon"
+          [size]="14"
+          class="text-faint pointer-events-none shrink-0"
+          aria-hidden="true"
+        ></svg>
+      }
       @if (selectable()) {
-        <span class="relative -ml-1 flex w-4 shrink-0 justify-center">
-          <button
-            type="button"
-            role="checkbox"
-            [attr.aria-checked]="selected()"
-            [attr.aria-label]="'Select ' + i.key"
-            class="border-input flex size-3.5 items-center justify-center rounded-[4px] border transition-opacity focus-visible:opacity-100"
-            [class]="selected() ? 'bg-primary border-primary text-primary-foreground opacity-100' : selecting() ? 'bg-background opacity-100' : 'bg-background opacity-0 group-hover/row:opacity-100'"
-            (click)="onCheck($event)"
-          >
-            @if (selected()) {
-              <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
-            }
-          </button>
-        </span>
+        <button
+          type="button"
+          role="checkbox"
+          [attr.aria-checked]="selected()"
+          [attr.aria-label]="'Select ' + i.key"
+          class="focus-visible:ring-ring relative flex size-3.5 shrink-0 items-center justify-center border outline-none focus-visible:ring-1"
+          [class]="checkTone()"
+          (click)="onCheck($event)"
+        >
+          @if (selected() || (subtask() && quiet())) {
+            <svg [lucideIcon]="check" [size]="10" [strokeWidth]="3"></svg>
+          }
+        </button>
+      } @else {
+        <span class="size-3.5 shrink-0" aria-hidden="true"></span>
       }
 
-      @if (tree()) {
-        <span class="pointer-events-none shrink-0" [style.width.px]="depth() * 20" aria-hidden="true"></span>
-        <span class="relative -mr-1 flex size-5 shrink-0 items-center justify-center">
-          @if (childCount() > 0) {
-            <button
-              type="button"
-              class="text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:ring-ring flex size-5 items-center justify-center rounded outline-none focus-visible:ring-2"
-              [attr.aria-expanded]="expanded()"
-              [attr.aria-label]="(expanded() ? 'Collapse' : 'Expand') + ' sub-tasks of ' + i.key"
-              (click)="onToggle($event)"
-              (dblclick)="$event.stopPropagation()"
-            >
-              <svg [lucideIcon]="expanded() ? chevronDown : chevronRight" [size]="13"></svg>
-            </button>
-          }
-        </span>
+      @if (!subtask() && i.priority !== 'none') {
+        <app-issue-cell class="relative" [issue]="i" field="priority" />
       }
-      <app-issue-prop class="relative" [issue]="i" field="status" />
-      <span class="text-muted-foreground w-[4.5rem] shrink-0 truncate font-mono text-xs max-sm:hidden">{{ i.key }}</span>
-      <span class="min-w-0 flex-1 truncate" [class.text-muted-foreground]="quiet()">
+      <span class="text-faint shrink-0 font-mono text-[11px] max-sm:hidden">{{ i.key }}</span>
+      <span
+        class="min-w-0 truncate"
+        [class]="subtask() ? 'text-[13px]' : 'text-[13.5px]'"
+        [class.text-muted-foreground]="quiet()"
+      >
         {{ i.title }}
         @if (i.duplicateOfId) {
           <span class="text-muted-foreground ml-1 text-xs">· duplicate</span>
         }
       </span>
-      @if (childCount() > 0) {
-        <span
-          class="text-muted-foreground relative flex shrink-0 items-center gap-0.5 text-xs tabular-nums"
-          [attr.aria-label]="childCount() + (childCount() === 1 ? ' sub-task' : ' sub-tasks')"
-          title="Sub-tasks"
-        >
-          <svg [lucideIcon]="subtaskIcon" [size]="11" aria-hidden="true"></svg>{{ childCount() }}
-        </span>
+      @if (s.kind && !subtask()) {
+        <app-issue-kind class="max-lg:hidden" [kind]="i.kind" [size]="13" />
       }
       @if (s.labels && i.labels.length) {
         <app-label-chips class="relative shrink-0 max-lg:hidden" [ids]="i.labels" [max]="2" />
-      }
-      @if (showEstimate()) {
-        <app-issue-prop
-          class="relative max-sm:hidden"
-          [class]="hasEstimate() ? '' : 'opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100'"
-          [issue]="i"
-          field="estimate"
-        />
       }
       @if (s.project && projectId(); as pid) {
         <span class="relative flex min-w-0 shrink-0 items-center gap-1 max-lg:hidden">
           <app-project-chip [projectId]="pid" />
         </span>
       }
-      @if (i.priority !== 'none') {
-        <app-issue-prop class="relative" [issue]="i" field="priority" />
-      }
       @if (needsYou()) {
-        <span class="bg-primary size-2 shrink-0 rounded-full" role="img" aria-label="Needs you"></span>
+        <span class="bg-primary size-1.5 shrink-0" role="img" aria-label="Needs you"></span>
       }
+      <span class="min-w-0 flex-1"></span>
+
+      @if (!subtask()) {
+        <!-- the sub-task count is also the expand / collapse control -->
+        <button
+          type="button"
+          class="relative flex shrink-0 items-center gap-[5px] font-mono text-[11px] tabular-nums outline-none focus-visible:underline max-sm:hidden"
+          [class]="subTotal() > 0 ? (expanded() ? 'text-foreground' : 'text-faint hover:text-foreground') : 'text-faint'"
+          [disabled]="!tree() || childCount() === 0"
+          [attr.aria-expanded]="tree() && childCount() > 0 ? expanded() : null"
+          [attr.aria-label]="subTotal() + (subTotal() === 1 ? ' sub-task' : ' sub-tasks') + (tree() && childCount() > 0 ? (expanded() ? ', collapse' : ', expand') : '')"
+          (click)="onToggle($event)"
+          (dblclick)="$event.stopPropagation()"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M21 12h-8" /><path d="M21 6H8" /><path d="M21 18h-8" /><path d="M3 6v4c0 1.1.9 2 2 2h3" /><path d="M3 10v6c0 1.1.9 2 2 2h3" />
+          </svg>
+          {{ subTotal() > 0 ? subDone() + '/' + subTotal() : '–' }}
+        </button>
+      }
+      @if (i.threadUrl) {
+        <a
+          class="relative max-lg:hidden"
+          [href]="i.threadUrl"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open the thread"
+          (click)="$event.stopPropagation()"
+        >
+          <v3-thread [issue]="i" />
+        </a>
+      } @else {
+        <v3-thread class="max-lg:hidden" [issue]="i" />
+      }
+      @if (!subtask()) {
+        @if (sourceUrl(); as href) {
+          <a
+            class="relative max-xl:hidden"
+            [href]="href"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open in the source tracker"
+            (click)="$event.stopPropagation()"
+          >
+            <v3-source [issue]="i" />
+          </a>
+        } @else {
+          <v3-source class="max-xl:hidden" [issue]="i" />
+        }
+      }
+      @if (subtask() && showEstimate()) {
+        <app-issue-cell class="relative max-lg:hidden" [issue]="i" field="estimate" />
+      }
+      <app-issue-cell class="relative" [issue]="i" field="status" />
       @if (s.assignee) {
-        <app-issue-prop
+        <app-issue-cell
           class="relative"
           [class]="i.assigneeId ? '' : 'opacity-0 transition-opacity group-hover/row:opacity-100 focus-within:opacity-100'"
           [issue]="i"
           field="assignee"
         />
       }
-      @if (s.date) {
-        <span class="text-muted-foreground w-12 shrink-0 text-right text-xs tabular-nums max-sm:hidden" [attr.aria-label]="dateTitle()">{{ date() }}</span>
+      @if (!subtask() && showEstimate()) {
+        <app-issue-cell class="relative max-lg:hidden" [issue]="i" field="estimate" />
+      }
+      @if (s.date && !subtask()) {
+        <span
+          class="w-12 shrink-0 text-right font-mono text-[11px] tabular-nums max-sm:hidden"
+          [class]="overdue() ? 'text-red' : 'text-muted-foreground'"
+          [attr.aria-label]="dateTitle()"
+          [attr.title]="dateTitle()"
+          >{{ date() }}</span
+        >
       }
     </div>
     }
@@ -413,47 +493,78 @@ export class IssueRow extends IssueItemBase {
     }
   }
 
+  /** A sub-task row: nested under its parent in the tree. */
+  protected readonly subtask = computed(() => this.tree() && this.depth() > 0);
   protected readonly rowState = computed(
     () =>
-      (this.compact() ? 'min-h-8 ' : 'min-h-10 ') +
+      (this.subtask()
+        ? 'min-h-[38px] gap-2.5 text-[13px] '
+        : (this.compact() ? 'min-h-8 ' : 'min-h-10 ') + 'gap-3 text-[13.5px] ') +
       (this.selected()
-        ? 'bg-selected'
-        : this.focused()
-          ? 'bg-hover'
-          : 'hover:bg-hover'),
+        ? 'bg-delta-line/8'
+        : (this.subtask() ? 'bg-card/60 ' : '') + (this.focused() ? 'bg-hover' : 'hover:bg-hover')),
   );
+  /** The 14px check: blue when selected; on a sub-task it also shows green when the task is done. */
+  protected readonly checkTone = computed(() => {
+    if (this.selected()) return 'border-delta-line bg-delta-line text-white';
+    if (this.subtask() && this.quiet()) return 'border-status-done bg-status-done text-background';
+    return 'border-faint hover:border-muted-foreground';
+  });
 }
 
-/** Board card: key + assignee, status + title, then a small property row. */
+/**
+ * v3 board card: key + priority bars, the title, then thread · sub-tasks … avatar. Hairline box on the
+ * card fill; selected = blue tint. While it is dragged the board draws it tilted with a blue outline.
+ */
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
+  imports: [
+    RouterLink,
+    LucideDynamicIcon,
+    IssueKindLabel,
+    IssueCell,
+    ProjectChip,
+    LabelChips,
+    V3Thread,
+  ],
   host: { class: 'block' },
   template: `
     @let i = issue();
     @let s = show();
     <div
       [attr.data-row-id]="i.id"
-      class="group/card relative rounded-lg px-3 py-2.5 transition-colors"
-      [class]="selected() ? 'bg-selected' : focused() ? 'bg-background ring-1 ring-ring/40' : 'bg-background hover:bg-hover'"
+      class="group/card relative flex flex-col gap-2.5 border p-3 transition-colors"
+      [class]="
+        selected()
+          ? 'border-delta-line/60 bg-delta-line/8'
+          : focused()
+            ? 'bg-card border-ring/40'
+            : 'bg-card border-border hover:bg-hover'
+      "
       (dblclick)="onDblClick($event)"
     >
       <a
         [routerLink]="['/', slug(), 'tasks', i.key]"
-        class="focus-visible:ring-ring absolute inset-0 rounded-lg outline-none focus-visible:ring-2"
+        class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1"
         [attr.aria-label]="i.key + ' ' + i.title"
         (click)="onLinkClick($event)"
       ></a>
-      <div class="flex h-5 items-center gap-1.5">
+      <div class="flex min-h-[14px] items-center gap-2">
         @if (selectable()) {
           <button
             type="button"
             role="checkbox"
             [attr.aria-checked]="selected()"
             [attr.aria-label]="'Select ' + i.key"
-            class="border-input relative flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border focus-visible:opacity-100"
-            [class]="selected() ? 'bg-primary border-primary text-primary-foreground opacity-100' : selecting() ? 'bg-background opacity-100' : 'bg-background opacity-0 group-hover/card:opacity-100'"
+            class="focus-visible:ring-ring relative flex size-3.5 shrink-0 items-center justify-center border outline-none focus-visible:opacity-100 focus-visible:ring-1"
+            [class]="
+              selected()
+                ? 'border-delta-line bg-delta-line text-white opacity-100'
+                : selecting()
+                  ? 'border-faint opacity-100'
+                  : 'border-faint opacity-0 group-hover/card:opacity-100'
+            "
             (click)="onCheck($event)"
           >
             @if (selected()) {
@@ -461,27 +572,49 @@ export class IssueRow extends IssueItemBase {
             }
           </button>
         }
-        <span class="text-muted-foreground font-mono text-xs">{{ i.key }}</span>
+        <span class="text-faint font-mono text-[10.5px]">{{ i.key }}</span>
         @if (s.kind) {
           <app-issue-kind [kind]="i.kind" [size]="13" />
         }
         <span class="flex-1"></span>
         @if (needsYou()) {
-          <span class="bg-primary size-2 shrink-0 rounded-full" role="img" aria-label="Needs you"></span>
+          <span class="bg-primary size-1.5 shrink-0" role="img" aria-label="Needs you"></span>
         }
-        @if (s.assignee) {
-          <app-issue-prop class="relative -mr-1" [issue]="i" field="assignee" [avatarSize]="18" />
-        }
+        <app-issue-cell class="relative" [issue]="i" field="priority" [showLabel]="false" />
       </div>
-      <div class="mt-1 flex items-start gap-1.5">
+      <span
+        class="line-clamp-3 text-[13.5px] leading-[18px]"
+        [class.text-muted-foreground]="quiet()"
+        >{{ i.title }}</span
+      >
+      <div class="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+        @if (i.threadUrl) {
+          <a
+            class="relative"
+            [href]="i.threadUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open the thread"
+            (click)="$event.stopPropagation()"
+          >
+            <v3-thread [issue]="i" label="Thread" />
+          </a>
+        } @else {
+          <v3-thread [issue]="i" />
+        }
+        @if (subTotal() > 0) {
+          <span
+            class="text-faint flex items-center gap-1 font-mono text-[11px] tabular-nums"
+            [attr.aria-label]="subDone() + ' of ' + subTotal() + ' sub-tasks done'"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M21 12h-8" /><path d="M21 6H8" /><path d="M21 18h-8" /><path d="M3 6v4c0 1.1.9 2 2 2h3" /><path d="M3 10v6c0 1.1.9 2 2 2h3" />
+            </svg>
+            {{ subDone() }}/{{ subTotal() }}
+          </span>
+        }
         @if (showStatus()) {
-          <app-issue-prop class="relative -ml-1 -mt-0.5" [issue]="i" field="status" />
-        }
-        <span class="line-clamp-2 text-[13px] leading-snug " [class.text-muted-foreground]="quiet()">{{ i.title }}</span>
-      </div>
-      <div class="mt-2 flex flex-wrap items-center gap-1.5">
-        @if (i.priority !== 'none') {
-          <app-issue-prop class="relative -ml-0.5 rounded-md" [issue]="i" field="priority" />
+          <app-issue-cell class="relative" [issue]="i" field="status" />
         }
         @if (s.project && projectId(); as pid) {
           <app-project-chip [projectId]="pid" />
@@ -490,10 +623,19 @@ export class IssueRow extends IssueItemBase {
           <app-label-chips class="relative" [ids]="i.labels" [max]="2" />
         }
         @if (hasEstimate() && s.estimate) {
-          <app-estimate class="bg-secondary relative inline-flex h-6 items-center rounded-md px-1.5 text-[11px]" [value]="i.estimate" />
+          <app-issue-cell class="relative" [issue]="i" field="estimate" />
         }
-        @if (s.date) {
-          <span class="text-muted-foreground ml-auto text-[11px] tabular-nums" [attr.aria-label]="dateTitle()">{{ date() }}</span>
+        @if (s.date && date() !== '—') {
+          <span
+            class="font-mono text-[10.5px] tabular-nums"
+            [class]="overdue() ? 'text-red' : 'text-faint'"
+            [attr.aria-label]="dateTitle()"
+            >{{ date() }}</span
+          >
+        }
+        <span class="flex-1"></span>
+        @if (s.assignee) {
+          <app-issue-cell class="relative" [issue]="i" field="assignee" />
         }
       </div>
     </div>
