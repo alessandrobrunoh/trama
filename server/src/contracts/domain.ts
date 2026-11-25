@@ -2719,3 +2719,135 @@ export interface ImportJob {
   startedAt?: ISODate;
   finishedAt?: ISODate;
 }
+
+// ───────────────────────────── Routing rules ─────────────────────────────
+
+/**
+ * A routing rule belongs to one project and says that work from one external source arrives there,
+ * read through one connection. Per project, not a workspace-wide catalogue of repositories (NON-GOALS #15).
+ * A source is provider + host + path, and a workspace routes it to one project: a second rule for the
+ * same source with overlapping filters is rejected, otherwise tasks would arrive twice.
+ */
+export type RoutingDirection = 'inbound' | 'two_way';
+export const ROUTING_DIRECTIONS: RoutingDirection[] = ['inbound', 'two_way'];
+
+/** What a source can do today. Providers missing here are not offered. */
+export const ROUTING_PROVIDER_SUPPORT: Record<
+  GitProvider,
+  { issues: boolean; pullRequests: boolean; twoWay: boolean }
+> = {
+  github: { issues: true, pullRequests: true, twoWay: true },
+  gitlab: { issues: true, pullRequests: true, twoWay: true },
+  bitbucket: { issues: false, pullRequests: true, twoWay: false },
+};
+
+/** Narrows which items of the source a rule takes. Every set filter must match. */
+export interface RoutingFilters {
+  /** The item must carry all of these labels (case-insensitive). */
+  labels?: string[];
+  /** The item's milestone title (case-insensitive). */
+  milestone?: string;
+}
+
+export const ROUTING_SOURCE_PATH_MAX = 300;
+export const ROUTING_FILTER_LABELS_MAX = 10;
+export const ROUTING_FILTER_VALUE_MAX = 100;
+
+/** `repo` is one repository; `group` ends with `/*` and means everything under that owner or group. */
+export type RoutingSourceKind = 'repo' | 'group';
+export function routingSourceKind(sourcePath: string): RoutingSourceKind {
+  return sourcePath.endsWith('/*') ? 'group' : 'repo';
+}
+
+/** Chips for a rule's filters: `label = bug`, `milestone = v1.2`. */
+export function routingFilterChips(filters: RoutingFilters | undefined | null): string[] {
+  const out: string[] = [];
+  for (const label of filters?.labels ?? []) out.push(`label = ${label}`);
+  if (filters?.milestone) out.push(`milestone = ${filters.milestone}`);
+  return out;
+}
+
+/** The connection a rule reads through, as people see it. Never carries credentials. */
+export interface RoutingRuleConnection {
+  id: ID;
+  provider: GitProvider;
+  /** Display name, e.g. "GitHub · Acme". */
+  label: string;
+  ownerType: 'workspace' | 'user';
+  /** Name of the person for a personal connection. */
+  ownerName?: string;
+  /** True when the caller owns it. */
+  mine?: boolean;
+}
+
+export type RoutingRuleHealth = 'ok' | 'error';
+
+export interface RoutingRule {
+  /** `rr_…` */
+  id: ID;
+  workspaceId: ID;
+  projectId: ID;
+  /** Absent when the connection was removed. */
+  connectionId?: ID;
+  provider: GitProvider;
+  /** Lower-case host, e.g. `github.com`. */
+  host: string;
+  /** `owner/name`, or a group path ending with `/*`. */
+  sourcePath: string;
+  filters: RoutingFilters;
+  direction: RoutingDirection;
+  connection?: RoutingRuleConnection;
+  health: RoutingRuleHealth;
+  /** Why the rule is failing (revoked or removed connection, last sync error). */
+  healthReason?: string;
+  lastSyncAt?: ISODate;
+  lastError?: string;
+  /** Tasks and placed pull requests this rule created. */
+  taskCount: number;
+  /** The `Project.repository` value this rule was created from. */
+  migratedFrom?: string;
+  createdBy: ActorRef;
+  createdAt: ISODate;
+  updatedAt: ISODate;
+}
+
+export interface RoutingRuleStats {
+  /** Tasks created by this project's rules in the last 7 days. */
+  tasksArrived: number;
+  /** Pull requests without a task key that a rule placed here in the last 7 days. */
+  unmatchedPlaced: number;
+  rulesFailing: number;
+}
+
+export interface RoutingRulesOverview {
+  rules: RoutingRule[];
+  stats: RoutingRuleStats;
+  /** Whether the caller may add, change and remove rules here. */
+  canManage: boolean;
+}
+
+/** A connection the caller may read through for a rule. */
+export interface RoutingConnectionOption extends RoutingRuleConnection {
+  account: string;
+  /** The workspace connection is suggested: it keeps working when people leave. */
+  suggested: boolean;
+  healthy: boolean;
+}
+
+export type RoutingSuggestionStatus = 'available' | 'this_project' | 'other_project';
+
+export interface RoutingSourceSuggestion {
+  sourcePath: string;
+  url?: string;
+  private?: boolean;
+  status: RoutingSuggestionStatus;
+  /** The project that already receives it. */
+  projectId?: ID;
+  projectName?: string;
+}
+
+export interface RoutingSuggestions {
+  items: RoutingSourceSuggestion[];
+  /** Set when the provider could not be read (revoked token, unreachable). */
+  error?: string;
+}

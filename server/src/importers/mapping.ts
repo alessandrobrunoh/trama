@@ -12,7 +12,8 @@ import {
   type IssueStatus,
   type Priority,
 } from '../contracts/domain.js';
-import { STATE_TYPES, type Discovery, type ExternalIssue, type ExternalState, type ExternalUser, type ParsedExternalUrl } from './types.js';
+import { sourceIncludes, specificity } from '../routing/source-path.js';
+import { STATE_TYPES,type Discovery, type ExternalIssue, type ExternalState, type ExternalUser, type ParsedExternalUrl } from './types.js';
 
 const ISSUE_STATUSES: readonly IssueStatus[] = ['draft', 'backlog', 'todo', 'in_progress', 'in_review', 'done', 'canceled'];
 const ISSUE_KINDS: readonly IssueKind[] = ['bug', 'feature', 'incident', 'tech_debt', 'feedback', 'idea', 'security'];
@@ -178,6 +179,8 @@ export interface PreviewContext {
   labels: readonly { id: string; name: string }[];
   /** External identities of the source's host that belong to members: lower-cased login → member id. */
   byLogin?: ReadonlyMap<string, string>;
+  /** Routing rules: a GitHub source and the project it goes to. A repository they cover is suggested as that project. */
+  routes?: readonly { sourcePath: string; projectId: string }[];
 }
 
 const map =(id: string): ImportTarget => ({ action: 'map', id });
@@ -190,8 +193,15 @@ export function buildPreview(discovery: Discovery, ctx: PreviewContext): ImportP
     return { ...t, suggested };
   });
   const projects = discovery.projects.map((p) => {
-    const hit = matchByName(p.name, ctx.projects);
-    return { ...p, suggested: hit ? map(hit.id) : ({ action: 'create' } as ImportTarget) };
+    // A routing rule already says where this repository's work goes: that wins over a name match.
+    const routed =
+      discovery.provider === 'github'
+        ? (ctx.routes ?? [])
+            .filter((r) => sourceIncludes(r.sourcePath, p.name))
+            .sort((a, b) => specificity({ sourcePath: b.sourcePath, filters: {} }) - specificity({ sourcePath: a.sourcePath, filters: {} }))[0]
+        : undefined;
+    const hit = routed ? undefined : matchByName(p.name, ctx.projects);
+    return { ...p, suggested: routed ? map(routed.projectId) : hit ? map(hit.id) : ({ action: 'create' } as ImportTarget) };
   });
   const labels = discovery.labels.map((l) => {
     const hit = matchByName(l.name, ctx.labels);

@@ -29,6 +29,30 @@ export interface ArtifactCandidate {
   actorLogin?: string;
 }
 
+/** Labels and milestone of an issue or PR, which routing rules filter on. */
+export interface ItemMeta {
+  labels: string[];
+  milestone?: string;
+}
+
+/** A normalized issue as reported by a webhook. Only routing rules turn it into a task. */
+export interface IssueCandidate {
+  provider: Extract<ArtifactProvider, 'github' | 'gitlab' | 'bitbucket'>;
+  /** `#12` */
+  externalId: string;
+  number: number;
+  title: string;
+  body?: string;
+  url?: string;
+  state: 'open' | 'closed';
+  /** GitHub's `state_reason` of a closed issue. */
+  stateReason?: 'completed' | 'not_planned';
+  labels: string[];
+  milestone?: string;
+  /** Login of the person who opened it. */
+  author?: string;
+}
+
 /** CI result for a commit; applied to every PR/MR whose head is `sha` (or listed explicitly). */
 export interface CiPatch {
   sha?: string;

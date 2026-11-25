@@ -23,6 +23,7 @@ import { CredentialsService, createAdapter, providerFailure } from './credential
 import { ImportJobEntity } from './entities.js';
 import { emptyProgress } from './import-engine.js';
 import { ImportRunnerService } from './import-runner.service.js';
+import { RoutingRulesService } from '../routing/routing-rules.service.js';
 import { buildPreview, mappingFromPreview, parseMapping, parseOptions, type PreviewContext } from './mapping.js';
 
 const REPOSITORY_RE = /^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/;
@@ -66,6 +67,7 @@ export class ImportsService {
     private readonly runner: ImportRunnerService,
     @InjectRepository(ImportJobEntity) private readonly jobs: Repository<ImportJobEntity>,
     @Optional() @Inject(ExternalIdentitiesService) private readonly identities?: ExternalIdentitiesService,
+    @Optional() @Inject(RoutingRulesService) private readonly routing?: RoutingRulesService,
   ) {}
 
   // ───────────── preview ─────────────
@@ -82,6 +84,7 @@ export class ImportsService {
       teams: [],
       projects: projects.map((p) => ({ id: p.id, name: p.name })),
       labels: resolveLabelCatalog(ws.settings?.labels).filter((l) => l.scope === 'issue').map((l) => ({ id: l.id, name: l.name })),
+      routes: await this.routing?.routedRepositories(workspaceId),
     };
   }
 

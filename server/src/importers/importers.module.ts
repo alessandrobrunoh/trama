@@ -6,6 +6,7 @@ import { IntegrationsModule } from '../integrations/integrations.module.js';
 import { IssuesModule } from '../issues/issues.module.js';
 import { MilestonesModule } from '../milestones/milestones.module.js';
 import { ProjectsModule } from '../projects/projects.module.js';
+import { RoutingModule } from '../routing/routing.module.js';
 import { CredentialsService } from './credentials.service.js';
 import { ImportJobEntity, ImportLinkEntity, TrackerCredentialEntity } from './entities.js';
 import { ExternalLinksService } from './external-links.service.js';
@@ -21,6 +22,7 @@ import { ImportsService } from './imports.service.js';
     IssuesModule,
     ProjectsModule,
     MilestonesModule,
+    RoutingModule,
   ],
   controllers: [ImportsController, IssueExternalRefController],
   providers: [CredentialsService, ImportRunnerService, ImportsService, ExternalLinksService],

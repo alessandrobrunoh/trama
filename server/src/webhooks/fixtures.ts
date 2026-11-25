@@ -24,7 +24,25 @@ export function ghPullRequest(over: Record<string, unknown> = {}, action = 'open
   };
 }
 
-export const ghCheckSuite = (conclusion: string | null, status = 'completed', sha = 'a'.repeat(40)) => ({
+export function ghIssue(over: Record<string, unknown> = {}, action = 'opened', repository: unknown = ghRepo) {
+  return {
+    action,
+    repository,
+    issue: {
+      number: 31,
+      title: 'Login fails after password reset',
+      body: 'Steps to reproduce…',
+      state: 'open',
+      html_url: 'https://github.com/acme/auth-service/issues/31',
+      labels: [{ name: 'bug' }],
+      milestone: null,
+      user: { login: 'octo' },
+      ...over,
+    },
+  };
+}
+
+export const ghCheckSuite =(conclusion: string | null, status = 'completed', sha = 'a'.repeat(40)) => ({
   action: status === 'completed' ? 'completed' : 'requested',
   repository: ghRepo,
   check_suite: { status, conclusion, head_sha: sha, head_branch: 'auth-42/rotation', pull_requests: [{ number: 182 }] },
@@ -61,7 +79,26 @@ export function glMergeRequest(attrs: Record<string, unknown> = {}, extra: Recor
   };
 }
 
-export const glPipeline = (status: string, mrIid?: number) => ({
+export function glIssue(attrs: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) {
+  return {
+    object_kind: 'issue',
+    project: glProject,
+    user: { username: 'tanuki' },
+    labels: [{ title: 'bug' }],
+    object_attributes: {
+      iid: 5,
+      title: 'Crash on launch',
+      description: 'It crashes.',
+      state: 'opened',
+      action: 'open',
+      url: 'https://gitlab.com/acme-internal/mobile-app/-/issues/5',
+      ...attrs,
+    },
+    ...extra,
+  };
+}
+
+export const glPipeline =(status: string, mrIid?: number) => ({
   object_kind: 'pipeline',
   project: glProject,
   object_attributes: { id: 99, status, sha: 'b'.repeat(40), ref: 'web-7/ttl' },

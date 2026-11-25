@@ -22,6 +22,11 @@ export interface GitProviderClient {
   currentUser(): Promise<{ account: string }>;
   listRepositories(page: number, perPage: number): Promise<RemoteRepositoryPage>;
   getRepository(fullName: string): Promise<RemoteRepository>;
+  /**
+   * Closes or reopens one issue (not a pull request) of a repository. Only hosts whose issues Trama
+   * mirrors implement it; routing rules in two-way mode call it.
+   */
+  setIssueState?(fullName: string, number: number, state: 'open' | 'closed', reason?: 'completed' | 'not_planned'): Promise<void>;
 }
 
 function describeError(res: HttpResponse): string {
@@ -71,7 +76,12 @@ export class GithubClient implements GitProviderClient {
   }
 
   private async get(path: string): Promise<HttpResponse> {
+    return this.call('GET', path);
+  }
+
+  private async call(method: 'GET' | 'PATCH', path: string, body?: unknown): Promise<HttpResponse> {
     const res = await this.http.request({
+      method,
       url: `${this.api}${path}`,
       headers: {
         Authorization: `Bearer ${this.token}`,
@@ -79,9 +89,15 @@ export class GithubClient implements GitProviderClient {
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'trama',
       },
+      ...(body === undefined ? {} : { body }),
     });
     ensureOk(res);
     return res;
+  }
+
+  async setIssueState(fullName: string, number: number, state: 'open' | 'closed', reason?: 'completed' | 'not_planned') {
+    const stateReason = state === 'open' ? 'reopened' : (reason ?? 'completed');
+    await this.call('PATCH', `/repos/${fullName}/issues/${number}`, { state, state_reason: stateReason });
   }
 
   async currentUser() {
@@ -122,12 +138,24 @@ export class GitlabClient implements GitProviderClient {
   }
 
   private async get(path: string): Promise<HttpResponse> {
+    return this.call('GET', path);
+  }
+
+  private async call(method: 'GET' | 'PUT', path: string, body?: unknown): Promise<HttpResponse> {
     const res = await this.http.request({
+      method,
       url: `${this.api}${path}`,
       headers: { 'PRIVATE-TOKEN': this.token, Accept: 'application/json', 'User-Agent': 'trama' },
+      ...(body === undefined ? {} : { body }),
     });
     ensureOk(res);
     return res;
+  }
+
+  async setIssueState(fullName: string, number: number, state: 'open' | 'closed') {
+    await this.call('PUT', `/projects/${encodeURIComponent(fullName)}/issues/${number}`, {
+      state_event: state === 'open' ? 'reopen' : 'close',
+    });
   }
 
   async currentUser() {

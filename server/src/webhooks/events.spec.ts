@@ -1,5 +1,5 @@
 import { PayloadError, bitbucketCi, githubCi, gitlabCi, parseBitbucketEvent, parseGithubEvent, parseGitlabEvent } from './events.js';
-import { bbCommitStatus, bbPullRequest, ghCheckRun, ghCheckSuite, ghPullRequest, ghStatus, glMergeRequest, glPipeline } from './fixtures.js';
+import { bbCommitStatus, bbPullRequest, ghCheckRun, ghCheckSuite, ghIssue, ghPullRequest, ghStatus, glIssue, glMergeRequest, glPipeline } from './fixtures.js';
 
 describe('GitHub payload mapping', () => {
   it('maps an opened PR', () => {
@@ -70,9 +70,28 @@ describe('GitHub payload mapping', () => {
     expect(suite.kind === 'ci' && suite.patch).toMatchObject({ sha: 'a'.repeat(40), prExternalIds: ['#182'] });
     expect(githubCi('completed', 'cancelled')).toBe('pending');
   });
+  it('maps issues with their labels, milestone, author and close reason', () => {
+    const open = parseGithubEvent('issues', ghIssue({ milestone: { title: 'v1.2' } }));
+    if (open.kind !== 'issue') throw new Error('expected issue');
+    expect(open.repo.fullName).toBe('acme/auth-service');
+    expect(open.issue).toMatchObject({
+      provider: 'github', externalId: '#31', number: 31, state: 'open', labels: ['bug'], milestone: 'v1.2', author: 'octo',
+    });
+    const closed = parseGithubEvent('issues', ghIssue({ state: 'closed', state_reason: 'not_planned' }, 'closed'));
+    expect(closed.kind === 'issue' && closed.issue).toMatchObject({ state: 'closed', stateReason: 'not_planned' });
+    const done = parseGithubEvent('issues', ghIssue({ state: 'closed' }, 'closed'));
+    expect(done.kind === 'issue' && done.issue.stateReason).toBe('completed');
+    expect(parseGithubEvent('issues', ghIssue({ pull_request: {} })).kind).toBe('ignored');
+    expect(parseGithubEvent('issues', ghIssue({}, 'assigned')).kind).toBe('ignored');
+    expect(() => parseGithubEvent('issues', { action: 'opened' })).toThrow(PayloadError);
+  });
+  it('carries labels and milestone of a pull request for routing', () => {
+    const r = parseGithubEvent('pull_request', ghPullRequest({ labels: [{ name: 'frontend' }], milestone: { title: 'v2' } }));
+    expect(r.kind === 'pr' && r.meta).toEqual({ labels: ['frontend'], milestone: 'v2' });
+  });
   it('ignores unhandled events/actions, answers ping, rejects malformed payloads', () => {
     expect(parseGithubEvent('ping', {}).kind).toBe('ping');
-    expect(parseGithubEvent('issues', {}).kind).toBe('ignored');
+    expect(parseGithubEvent('push', {}).kind).toBe('ignored');
     expect(parseGithubEvent('pull_request', ghPullRequest({}, 'labeled')).kind).toBe('ignored');
     expect(() => parseGithubEvent('pull_request', { action: 'opened' })).toThrow(PayloadError);
     expect(() => parseGithubEvent('check_suite', { check_suite: { head_sha: 1 }, repository: {} })).toThrow(PayloadError);
@@ -115,6 +134,17 @@ describe('GitLab payload mapping', () => {
     expect(ci('failed')).toMatchObject({ ci: 'failing', prExternalIds: [] });
     expect(ci('running')).toMatchObject({ ci: 'pending' });
     expect(gitlabCi('canceled')).toBe('pending');
+  });
+  it('maps issues', () => {
+    const open = parseGitlabEvent(glIssue());
+    expect(open.kind === 'issue' && open.issue).toMatchObject({
+      provider: 'gitlab', externalId: '#5', state: 'open', labels: ['bug'], author: 'tanuki',
+    });
+    expect(open.kind === 'issue' && open.repo.fullName).toBe('acme-internal/mobile-app');
+    const closed = parseGitlabEvent(glIssue({ state: 'closed', action: 'close' }));
+    expect(closed.kind === 'issue' && closed.issue.state).toBe('closed');
+    expect(parseGitlabEvent(glIssue({ action: 'move' })).kind).toBe('ignored');
+    expect(() => parseGitlabEvent(glIssue({ iid: 'x' }))).toThrow(PayloadError);
   });
   it('ignores unhandled kinds and rejects malformed payloads', () => {
     expect(parseGitlabEvent({ object_kind: 'push', project: {} }).kind).toBe('ignored');

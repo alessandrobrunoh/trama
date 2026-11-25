@@ -44,8 +44,8 @@ export type PresentedConnection = IntegrationConnection & {
 };
 
 export const WEBHOOK_EVENTS: Record<GitProvider, string[]> = {
-  github: ['pull_request', 'check_suite', 'check_run', 'status'],
-  gitlab: ['merge_request', 'pipeline'],
+  github: ['pull_request', 'issues', 'check_suite', 'check_run', 'status'],
+  gitlab: ['merge_request', 'issue', 'pipeline'],
   bitbucket: ['pullrequest:created', 'pullrequest:updated', 'pullrequest:approved', 'pullrequest:unapproved', 'pullrequest:fulfilled', 'pullrequest:rejected', 'repo:commit_status_created', 'repo:commit_status_updated'],
 };
 

@@ -21,6 +21,7 @@ import { MailModule } from './mail/mail.module.js';
 import { MilestonesModule } from './milestones/milestones.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { ProjectsModule } from './projects/projects.module.js';
+import { RoutingModule } from './routing/routing.module.js';
 import { SearchModule } from './search/search.module.js';
 import { SharingModule } from './sharing/sharing.module.js';
 import { SnapshotModule } from './snapshot/snapshot.module.js';
@@ -59,6 +60,7 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     SnapshotModule,
     IntegrationsModule,
     ImportersModule,
+    RoutingModule,
     WebhooksModule,
     OutgoingWebhooksModule,
   ],

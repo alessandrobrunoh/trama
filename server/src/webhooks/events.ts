@@ -1,5 +1,5 @@
 import type { ArtifactState, CiState } from '../contracts/domain.js';
-import type { ArtifactCandidate, CiPatch, RepoMeta } from '../integrations/candidates.js';
+import type { ArtifactCandidate, CiPatch, IssueCandidate, ItemMeta, RepoMeta } from '../integrations/candidates.js';
 
 /** The payload is not the shape the provider documents (→ HTTP 400). */
 export class PayloadError extends Error {}
@@ -7,7 +7,8 @@ export class PayloadError extends Error {}
 export type ParsedEvent =
   | { kind: 'ignored'; reason: string }
   | { kind: 'ping' }
-  | { kind: 'pr'; repo: RepoMeta; candidate: ArtifactCandidate }
+  | { kind: 'pr'; repo: RepoMeta; candidate: ArtifactCandidate; meta?: ItemMeta }
+  | { kind: 'issue'; repo: RepoMeta; issue: IssueCandidate }
   | { kind: 'ci'; repo: RepoMeta; patch: CiPatch };
 
 type Obj = Record<string, unknown>;
@@ -101,7 +102,32 @@ export function parseGithubEvent(event: string, payload: unknown): ParsedEvent {
         action === 'review_requested' ? fieldsOf([p.requested_reviewer], 'login') : fieldsOf(pr.requested_reviewers, 'login'),
         field(p.sender, 'login'),
       );
-      return { kind: 'pr', repo: githubRepo(repoObj), candidate };
+      return { kind: 'pr', repo: githubRepo(repoObj), candidate, meta: githubMeta(pr) };
+    }
+    case 'issues': {
+      const action = str(p.action, 'action');
+      if (!GH_ISSUE_ACTIONS.has(action)) return { kind: 'ignored', reason: `issues action "${action}" is not handled` };
+      const issue = obj(p.issue, 'issue');
+      if (issue.pull_request) return { kind: 'ignored', reason: 'a pull request is not an issue' };
+      const number = num(issue.number, 'issue.number');
+      const closed = issue.state === 'closed';
+      const reason = optStr(issue.state_reason);
+      return {
+        kind: 'issue',
+        repo: githubRepo(obj(p.repository, 'repository')),
+        issue: {
+          provider: 'github',
+          externalId: `#${number}`,
+          number,
+          title: str(issue.title, 'issue.title'),
+          body: optStr(issue.body),
+          url: optStr(issue.html_url),
+          state: closed ? 'closed' : 'open',
+          ...(closed ? { stateReason: reason === 'not_planned' ? ('not_planned' as const) : ('completed' as const) } : {}),
+          ...githubMeta(issue),
+          author: issue.user && typeof issue.user === 'object' ? optStr((issue.user as Obj).login) : undefined,
+        },
+      };
     }
     case 'check_suite':
     case 'check_run': {
@@ -126,6 +152,15 @@ export function parseGithubEvent(event: string, payload: unknown): ParsedEvent {
   }
 }
 
+const GH_ISSUE_ACTIONS = new Set(['opened', 'reopened', 'closed', 'edited', 'labeled', 'unlabeled', 'milestoned', 'demilestoned']);
+
+/** Label names and milestone title of an issue or pull request object. */
+function githubMeta(o: Obj): ItemMeta {
+  const labels = arr(o.labels).flatMap((l) => (l && typeof l === 'object' && optStr((l as Obj).name) ? [optStr((l as Obj).name)!] : []));
+  const milestone = o.milestone && typeof o.milestone === 'object' ? optStr((o.milestone as Obj).title) : undefined;
+  return { labels, ...(milestone ? { milestone } : {}) };
+}
+
 function githubRepo(r: Obj): RepoMeta {
   return { fullName: str(r.full_name, 'repository.full_name'), url: optStr(r.html_url), defaultBranch: optStr(r.default_branch) };
 }
@@ -136,6 +171,13 @@ export function gitlabCi(status: unknown): CiState {
   if (status === 'success' || status === 'skipped') return 'passing';
   if (status === 'failed') return 'failing';
   return 'pending'; // created, pending, running, canceled, manual, ...
+}
+
+const GL_ISSUE_ACTIONS = new Set(['open', 'close', 'reopen', 'update']);
+
+/** GitLab lists labels as `[{ title }]` at the top of the payload. */
+function gitlabLabels(raw: unknown): string[] {
+  return arr(raw).flatMap((l) => (l && typeof l === 'object' && optStr((l as Obj).title) ? [optStr((l as Obj).title)!] : []));
 }
 
 export function parseGitlabEvent(payload: unknown): ParsedEvent {
@@ -179,7 +221,31 @@ export function parseGitlabEvent(payload: unknown): ParsedEvent {
         candidate.reviewOnlyFrom = ['none'];
       }
       withLogins(candidate, fieldsOf(p.reviewers, 'username'), field(p.user, 'username'));
-      return { kind: 'pr', repo: project(), candidate };
+      return { kind: 'pr', repo: project(), candidate, meta: { labels: gitlabLabels(p.labels) } };
+    }
+    case 'issue': {
+      const a = obj(p.object_attributes, 'object_attributes');
+      const iid = a.iid;
+      if (typeof iid !== 'number') throw new PayloadError('"object_attributes.iid" must be a number');
+      const action = optStr(a.action);
+      if (action && !GL_ISSUE_ACTIONS.has(action)) return { kind: 'ignored', reason: `issue action "${action}" is not handled` };
+      const user = p.user && typeof p.user === 'object' ? (p.user as Obj) : undefined;
+      return {
+        kind: 'issue',
+        repo: project(),
+        issue: {
+          provider: 'gitlab',
+          externalId: `#${iid}`,
+          number: iid,
+          title: str(a.title, 'object_attributes.title'),
+          body: optStr(a.description),
+          url: optStr(a.url),
+          state: a.state === 'closed' ? 'closed' : 'open',
+          ...(a.state === 'closed' ? { stateReason: 'completed' as const } : {}),
+          labels: gitlabLabels(p.labels),
+          author: optStr(user?.username),
+        },
+      };
     }
     case 'pipeline': {
       const a = obj(p.object_attributes, 'object_attributes');
