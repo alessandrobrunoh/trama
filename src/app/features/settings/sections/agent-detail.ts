@@ -1,17 +1,17 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, output, signal, untracked } from '@angular/core';
-import { LucideArrowLeft, LucideDynamicIcon, LucideKeyRound, LucidePencil, LucidePlus, LucideTrash2, LucideTriangleAlert } from '@lucide/angular';
+import { LucideArrowLeft, LucideDynamicIcon, LucidePlus, LucideSettings2, LucideTriangleAlert } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmInputImports } from '@spartan-ng/helm/input';
 import { TOKEN_SCOPES, type Agent, type ApiToken, type TokenScope } from '../../../core/contracts/domain';
 import { PROVIDER_META } from '../../../core/meta';
 import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
+import { ActorAvatar } from '../../../shared/actor-avatar';
+import { EventLine } from '../../../shared/event-line';
 import { FullDatePipe, RelativeTimePipe } from '../../../shared/pipes';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { AppSelect, type Option } from '../../create/form-kit';
-import { EventLine } from '../../../shared/event-line';
 import { ConnectSnippets } from './connect-snippets';
-import { SECTION_KIT } from './section-kit';
+import { SECTION_KIT, SETTINGS_FIELD, type StatCell } from './section-kit';
 
 const EXPIRY: Option[] = [
   { value: '', label: 'No expiry' },
@@ -22,16 +22,16 @@ const EXPIRY: Option[] = [
 const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({ value: s, label: TOKEN_SCOPES[s].label }));
 
 /**
- * One agent: who it is, the tokens it works with, how to connect a runtime to it,
- * and what it has been doing (attributed activity).
+ * One agent (v4 frame 11): who it is, what it did, who it acts as, the tokens it works with and how to
+ * connect a runtime to it.
  */
 @Component({
   selector: 'app-agent-detail',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     HlmButtonImports,
-    HlmInputImports,
     LucideDynamicIcon,
+    ActorAvatar,
     ProviderIcon,
     AppSelect,
     EventLine,
@@ -40,132 +40,147 @@ const AGENT_SCOPES: Option[] = (['write', 'read'] as TokenScope[]).map((s) => ({
     FullDatePipe,
     ...SECTION_KIT,
   ],
-  host: { class: 'flex flex-col gap-8' },
+  host: { class: 'flex flex-col gap-9' },
   template: `
     @if (agent(); as a) {
-      <div>
-        <button type="button" class="text-faint hover:text-foreground mb-4 inline-flex items-center gap-1.5 font-mono text-[10.5px]" (click)="back.emit()">
-          <svg [lucideIcon]="backIcon" [size]="13"></svg> All agents
+      <div class="flex flex-col gap-3.5">
+        <button type="button" class="text-faint hover:text-foreground inline-flex w-fit items-center gap-1.5 font-mono text-[10.5px]" (click)="back.emit()">
+          <svg [lucideIcon]="backIcon" [size]="12"></svg> Agents
         </button>
-        <div class="flex flex-wrap items-start gap-4">
-          <span class="bg-secondary text-muted-foreground flex size-12 shrink-0 items-center justify-center">
+        <div class="flex flex-wrap items-center gap-4">
+          <span class="bg-secondary text-muted-foreground flex size-[52px] shrink-0 items-center justify-center">
             <app-provider-icon [provider]="a.provider" [size]="24" />
           </span>
-          <div class="min-w-0 flex-1">
-            <h2 class="font-title text-foreground truncate text-[28px] leading-[32px]">{{ a.name }}</h2>
-            <p class="text-faint mt-0.5 font-mono text-[10.5px]">
-              {{ providerName(a.provider) }} agent{{ a.ownerUserId ? ' · owned by ' + userName(a.ownerUserId) : ' · no owner' }} · added {{ a.createdAt | relativeTime }}
+          <div class="flex min-w-0 flex-1 flex-col gap-[5px]">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <h2 class="font-title text-foreground truncate text-[32px] leading-normal">{{ a.name }}</h2>
+              <span class="border-border text-text-2 inline-flex shrink-0 items-center gap-[5px] border px-[7px] py-0.5 font-mono text-[10.5px]">
+                <span class="size-1.5" [class]="tokens().length ? 'bg-green' : 'bg-faint'"></span>
+                {{ tokens().length ? 'Connected' : 'No token' }}
+              </span>
+            </div>
+            <p class="text-muted-foreground truncate font-mono text-[10.5px]">
+              {{ providerName(a.provider) }} agent{{ a.ownerUserId ? ' · acts as ' + userName(a.ownerUserId) : ' · no owner' }} · added {{ a.createdAt | relativeTime }}
             </p>
-            <p class="text-text-2 mt-2 max-w-[720px] text-[13px] leading-snug">{{ a.description || 'No description yet. Say what this agent works on so teammates know when to rely on it.' }}</p>
           </div>
           @if (canManage()) {
-            <div class="flex shrink-0 items-center gap-1">
-              <button hlmBtn variant="outline" size="sm" (click)="edit.emit(a)"><svg [lucideIcon]="pencil" [size]="13"></svg> Edit</button>
-              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-red" aria-label="Remove agent" title="Remove" (click)="remove(a)">
-                <svg [lucideIcon]="trash" [size]="14"></svg>
-              </button>
-            </div>
+            <button hlmBtn variant="outline" (click)="edit.emit(a)"><svg [lucideIcon]="settingsIcon" [size]="13"></svg> Settings</button>
           }
         </div>
-
-        <dl class="border-border mt-6 grid grid-cols-2 border sm:grid-cols-4">
-          @for (s of stats(); track s.label) {
-            <div class="border-border flex flex-col-reverse gap-1 px-[18px] py-3.5 not-first:border-l">
-              <dt class="text-faint font-mono text-[10.5px] leading-[13px]">{{ s.label }}</dt>
-              <dd class="font-title text-foreground text-[24px] leading-[28px] tabular-nums">{{ s.value }}</dd>
-            </div>
-          }
-        </dl>
       </div>
 
-      <!-- Tokens -->
-      <div>
-        <app-settings-group title="Tokens" description="The credentials this agent uses. Everything done with them is attributed to the agent.">
-          @if (canTokens() && !creating() && !secret()) {
-            <button aside hlmBtn size="sm" variant="outline" class="h-7" (click)="startCreate(a)">
-              <svg [lucideIcon]="plus" [size]="13"></svg> New token
-            </button>
-          }
-          @if (secret(); as s) {
-            <div class="border-border flex flex-col gap-3 border-b px-1 py-4">
-              <p class="text-status-needs-input flex items-center gap-1.5 text-[13px]">
-                <svg [lucideIcon]="warn" [size]="14"></svg> Copy this token now. You will not be able to see it again.
-              </p>
-              <app-copy-field [value]="s" label="Token" />
-              <div class="flex justify-end"><button hlmBtn size="sm" variant="outline" (click)="secret.set(null)">Done</button></div>
-            </div>
-          } @else if (creating()) {
-            <form (submit)="create($event, a)">
-              <app-settings-row label="Name" description="Where this token runs, like “laptop” or “CI”." wide>
-                <input hlmInput class="h-8 w-full text-[13px]" [value]="name()" (input)="name.set($any($event.target).value)" aria-label="Token name" />
-              </app-settings-row>
-              <app-settings-row label="Scope" [description]="scopeInfo().description" wide>
-                <app-select size="sm" [options]="scopes" [(value)]="scope" label="Scope" />
-              </app-settings-row>
-              <app-settings-row label="Expiration" description="Expired tokens stop working." wide>
-                <app-select size="sm" [options]="expiry" [(value)]="expiresIn" label="Expiration" />
-              </app-settings-row>
-              <div class="flex items-center justify-end gap-2 px-1 py-3">
-                <button hlmBtn type="button" variant="ghost" size="sm" (click)="creating.set(false)">Cancel</button>
-                <button hlmBtn type="submit" size="sm" [disabled]="!name().trim() || busy()">Create token</button>
-              </div>
-            </form>
-          }
-          @for (t of tokens(); track t.id) {
-            <div class="border-border hover:bg-secondary flex min-h-12 flex-wrap items-center gap-3 border-b px-1 py-2.5">
-              <span class="bg-secondary text-muted-foreground flex size-7 shrink-0 items-center justify-center">
-                <svg [lucideIcon]="keyIcon" [size]="14"></svg>
-              </span>
-              <div class="min-w-0 flex-1">
-                <div class="flex items-center gap-2 text-[13px]">
-                  <span class="text-foreground truncate">{{ t.name }}</span>
-                  <code class="text-faint font-mono text-[11px]">{{ t.prefix }}</code>
-                  <span class="border-border text-muted-foreground border px-1.5 font-mono text-[10px] leading-[14px]">{{ scopeLabel(t) }}</span>
-                </div>
-                <div class="text-faint font-mono text-[10.5px]">
-                  Created {{ t.createdAt | relativeTime }} · {{ t.lastUsedAt ? 'used ' + (t.lastUsedAt | relativeTime) : 'never used' }}
-                  @if (t.expiresAt) {
-                    · <span [title]="t.expiresAt | fullDate">expires {{ t.expiresAt | relativeTime }}</span>
-                  }
-                </div>
-              </div>
-              @if (canManage()) {
-                <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground hover:text-red h-7" (click)="revoke(t)">Revoke</button>
+      <app-stat-strip large [cells]="stats()" />
+
+      <div class="flex flex-col gap-8 lg:flex-row">
+        <div class="flex min-w-0 flex-1 flex-col gap-7">
+          <app-settings-block title="Activity" caption="latest">
+            <div>
+              @for (e of activity(); track e.id) {
+                <app-event-line [event]="e" [slug]="slug()" compact hideDetail />
+              } @empty {
+                <div class="text-muted-foreground border-border border-t py-6 text-center text-[13px]">No activity recorded for this agent yet.</div>
               }
             </div>
-          } @empty {
-            @if (!creating() && !secret()) {
-              <div class="text-muted-foreground border-border border-b px-4 py-6 text-center text-[13px]">
-                No token yet, so this agent cannot call Trama.{{ canTokens() ? ' Create one to connect it.' : '' }}
+          </app-settings-block>
+
+          <app-settings-block
+            title="Connect"
+            [description]="'Give your agent runtime a token and it reads and updates Trama as ' + a.name + '. Actions show up with its name and an agent badge.'"
+          >
+            <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
+          </app-settings-block>
+        </div>
+
+        <aside class="flex w-full shrink-0 flex-col gap-4 lg:w-[300px]">
+          <div class="bg-card border-border flex flex-col gap-2.5 border p-3.5">
+            <span class="text-faint font-mono text-[10.5px] leading-normal">ACTS AS</span>
+            @if (a.ownerUserId) {
+              <div class="flex items-center gap-2.5">
+                <app-actor-avatar [actor]="{ type: 'user', id: a.ownerUserId }" [size]="28" />
+                <div class="flex min-w-0 flex-col">
+                  <span class="text-foreground truncate text-[13.5px]">{{ userName(a.ownerUserId) }}</span>
+                  <span class="text-faint font-mono text-[10.5px]">{{ ownerRole(a.ownerUserId) }}</span>
+                </div>
               </div>
+              <p class="text-muted-foreground text-[12.5px] leading-[18px]">
+                {{ a.name }} can do anything {{ firstName(a.ownerUserId) }} can, except transfer or delete the workspace.
+              </p>
+            } @else {
+              <p class="text-muted-foreground text-[12.5px] leading-[18px]">No owner. Edit the agent to pick the person it acts as.</p>
             }
+            @if (a.description) {
+              <p class="text-text-2 border-border border-t pt-2.5 text-[12.5px] leading-[18px]">{{ a.description }}</p>
+            }
+          </div>
+
+          <div class="bg-card border-border border">
+            <div class="flex items-center gap-2 px-3.5 py-2.5">
+              <span class="text-faint font-mono text-[10.5px] leading-normal">TOKENS · {{ tokens().length }}</span>
+              <span class="flex-1"></span>
+              @if (canTokens() && !creating() && !secret()) {
+                <button type="button" class="text-muted-foreground hover:text-foreground inline-flex items-center gap-1 font-mono text-[10.5px]" (click)="startCreate(a)">
+                  <svg [lucideIcon]="plus" [size]="12"></svg> New
+                </button>
+              }
+            </div>
+            @if (secret(); as s) {
+              <div class="border-border flex flex-col gap-2.5 border-t px-3.5 py-3">
+                <p class="text-yellow flex items-start gap-1.5 text-[12.5px] leading-snug">
+                  <svg [lucideIcon]="warn" [size]="14" class="mt-px shrink-0"></svg> Copy this token now. You will not be able to see it again.
+                </p>
+                <app-copy-field [value]="s" label="Token" />
+                <div class="flex justify-end"><button hlmBtn variant="outline" (click)="secret.set(null)">Done</button></div>
+              </div>
+            } @else if (creating()) {
+              <form class="border-border flex flex-col gap-2.5 border-t px-3.5 py-3" (submit)="create($event, a)">
+                <label class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+                  NAME
+                  <input [class]="field" [value]="name()" (input)="name.set($any($event.target).value)" aria-label="Token name" placeholder="laptop, CI…" />
+                </label>
+                <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+                  SCOPE
+                  <app-select [options]="scopes" [(value)]="scope" label="Scope" />
+                  <span class="text-muted-foreground font-sans text-[12px] leading-snug normal-case">{{ scopeInfo().description }}</span>
+                </div>
+                <div class="text-faint flex flex-col gap-1.5 font-mono text-[10.5px]">
+                  EXPIRATION
+                  <app-select [options]="expiry" [(value)]="expiresIn" label="Expiration" />
+                </div>
+                <div class="flex justify-end gap-2">
+                  <button hlmBtn type="button" variant="ghost" (click)="creating.set(false)">Cancel</button>
+                  <button hlmBtn type="submit" [disabled]="!name().trim() || busy()">Create token</button>
+                </div>
+              </form>
+            }
+            @for (t of tokens(); track t.id) {
+              <div class="border-border flex items-start gap-2 border-t px-3.5 py-2.5">
+                <div class="flex min-w-0 flex-1 flex-col gap-[3px]">
+                  <span class="text-foreground truncate font-mono text-[12.5px]">{{ t.name }} <span class="text-faint">{{ t.prefix }}</span></span>
+                  <span class="text-faint font-mono text-[10.5px] leading-snug">
+                    {{ t.expiresAt ? 'Expires ' + (t.expiresAt | fullDate) : 'No expiry' }} · {{ t.lastUsedAt ? 'used ' + (t.lastUsedAt | relativeTime) : 'never used' }}
+                  </span>
+                </div>
+                <span class="border-border text-text-2 shrink-0 border px-1.5 py-px font-mono text-[11px]">{{ scopeLabel(t) }}</span>
+                @if (canManage()) {
+                  <button type="button" class="text-muted-foreground hover:text-red shrink-0 font-mono text-[10.5px]" [attr.aria-label]="'Revoke ' + t.name" (click)="revoke(t)">Revoke</button>
+                }
+              </div>
+            } @empty {
+              @if (!creating() && !secret()) {
+                <div class="text-muted-foreground border-border border-t px-3.5 py-4 text-[12.5px] leading-snug">
+                  No token yet, so this agent cannot call Trama.{{ canTokens() ? ' Create one to connect it.' : '' }}
+                </div>
+              }
+            }
+          </div>
+
+          @if (canManage()) {
+            <div>
+              <button hlmBtn variant="destructive" (click)="remove(a)">Remove agent</button>
+            </div>
           }
-        </app-settings-group>
+        </aside>
       </div>
-
-      <!-- Connect -->
-      <app-settings-group title="Connect" description="Give your agent runtime these and it reads and updates Trama over the REST API as {{ a.name }}.">
-        <div class="flex flex-col gap-3 py-4">
-          <ol class="text-muted-foreground list-decimal space-y-1 pl-5 text-[12px] leading-snug">
-            <li>Create a token above (write scope lets the agent update work, read scope only lets it look).</li>
-            <li>Put the three variables in the runtime’s environment, or call the API directly like in the examples.</li>
-            <li>Actions show up in Trama with {{ a.name }}’s name and an agent badge.</li>
-          </ol>
-          <app-connect-snippets [token]="lastSecret()" [scope]="$any(scope())" />
-          <p class="text-faint font-mono text-[10.5px] leading-snug">Agents connect through the Trama MCP server or the REST API with this token.</p>
-        </div>
-      </app-settings-group>
-
-      <!-- Activity -->
-      <app-settings-group title="Recent activity" description="The latest events performed by this agent.">
-        <div class="px-1 py-1">
-          @for (e of activity(); track e.id) {
-            <app-event-line [event]="e" [slug]="slug()" compact hideDetail />
-          } @empty {
-            <div class="text-muted-foreground py-6 text-center text-[13px]">No activity recorded for this agent yet.</div>
-          }
-        </div>
-      </app-settings-group>
     } @else {
       <div class="text-muted-foreground py-10 text-center text-[13px]">
         This agent no longer exists.
@@ -182,11 +197,10 @@ export class AgentDetail {
   readonly back = output<void>();
   readonly edit = output<Agent>();
 
+  protected readonly field = SETTINGS_FIELD;
   protected readonly backIcon = LucideArrowLeft;
-  protected readonly pencil = LucidePencil;
-  protected readonly trash = LucideTrash2;
+  protected readonly settingsIcon = LucideSettings2;
   protected readonly plus = LucidePlus;
-  protected readonly keyIcon = LucideKeyRound;
   protected readonly warn = LucideTriangleAlert;
   protected readonly scopes = AGENT_SCOPES;
   protected readonly expiry = EXPIRY;
@@ -217,13 +231,12 @@ export class AgentDetail {
   private readonly mine = computed(() => this.store.events().filter((e) => e.actor.type === 'agent' && e.actor.id === this.agentId()));
   protected readonly activity = computed(() => this.mine().slice(0, 12));
 
-  protected readonly stats = computed(() => {
+  protected readonly stats = computed<StatCell[]>(() => {
     const last = this.mine()[0]?.at;
-    const tokens = this.tokens();
     return [
       { label: 'Actions', value: String(this.mine().length) },
       { label: 'Last active', value: last ? this.ago(last) : 'Never' },
-      { label: 'Tokens', value: String(tokens.length) },
+      { label: 'Tokens', value: String(this.tokens().length) },
     ];
   });
 
@@ -244,6 +257,13 @@ export class AgentDetail {
   }
   protected userName(id: string): string {
     return this.store.userById().get(id)?.name ?? 'Unknown';
+  }
+  protected firstName(id: string): string {
+    return this.userName(id).split(' ')[0];
+  }
+  protected ownerRole(id: string): string {
+    const role = this.store.members().find((m) => m.user.id === id)?.membership.role;
+    return role ? role[0].toUpperCase() + role.slice(1) : 'Member';
   }
   protected scopeLabel(t: ApiToken): string {
     return TOKEN_SCOPES[t.scope ?? 'write'].label;
