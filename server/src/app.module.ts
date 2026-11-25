@@ -12,7 +12,6 @@ import { FavoritesModule } from './favorites/favorites.module.js';
 import { HealthController } from './health/health.controller.js';
 import { PublicConfigController } from './public-config.controller.js';
 import { ImportersModule } from './importers/importers.module.js';
-import { LunagestModule } from './lunagest/lunagest.module.js';
 import { InsightsModule } from './insights/insights.module.js';
 import { InvitesModule } from './invites/invites.module.js';
 import { IntegrationsModule } from './integrations/integrations.module.js';
@@ -56,7 +55,6 @@ import { WorkspacesModule } from './workspaces/workspaces.module.js';
     SnapshotModule,
     IntegrationsModule,
     ImportersModule,
-    LunagestModule,
     WebhooksModule,
     OutgoingWebhooksModule,
   ],

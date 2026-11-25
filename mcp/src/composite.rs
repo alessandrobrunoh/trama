@@ -21,7 +21,6 @@ pub const HANDLERS: &[&str] = &[
     "find_work",
     "list_projects",
     "track_time",
-    "import_lunagest",
     "create_task",
     "start_work",
     "report_progress",
@@ -108,7 +107,7 @@ impl Exec<'_> {
         Ok(serde_json::from_str(&out.text).unwrap_or(Value::String(out.text)))
     }
 
-    /// Runs a route that is not in the catalog (the timer, the LunaGest import) with the caller's key.
+    /// Runs a route that is not in the catalog (the timer) with the caller's key.
     /// The key must hold every permission in `needs`; the API still has the last word (these routes are
     /// closed to `custom` tokens and the timer to keys without a user).
     pub async fn raw(&self, call: &Call, needs: &[&str]) -> Result<Value, StepError> {
@@ -412,7 +411,6 @@ pub async fn run(name: &str, args: &Value, ex: &Exec<'_>) -> Option<Res> {
         "find_work" => find_work(a, ex).await,
         "list_projects" => list_projects(a, ex).await,
         "track_time" => track_time(a, ex).await,
-        "import_lunagest" => import_lunagest(a, ex).await,
         "create_task" => create_task(a, ex).await,
         "start_work" => start_work(a, ex).await,
         "report_progress" => report_progress(a, ex).await,
@@ -701,28 +699,6 @@ async fn track_time(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
             Ok(Outcome::ok(json!({ "deleted": id })))
         }
         other => Err(format!("unknown action '{other}': use start, stop, status, list, add or delete")),
-    }
-}
-
-// ───────────────────────────── import_lunagest ─────────────────────────────
-
-/// Lists the LunaGest projects that can be imported, or imports the chosen ones with their tasks.
-async fn import_lunagest(a: &Map<String, Value>, ex: &Exec<'_>) -> Res {
-    let action = text(a, "action").ok_or("action is required")?;
-    match action {
-        "list" => {
-            let reply = ex.raw(&work::lunagest_list_call(), &["projects:write"]).await.map_err(|e| e.message())?;
-            Ok(Outcome::ok(reply))
-        }
-        "import" => {
-            let ids: Vec<String> = a.get("projectIds").and_then(Value::as_array).map(|v| v.iter().filter_map(|x| x.as_str().map(str::to_string)).collect()).unwrap_or_default();
-            let call = work::lunagest_import_call(&ids)?;
-            // It creates projects and tasks: both permissions, like the API's manageProjects + createIssues.
-            let reply = ex.raw(&call, &["projects:write", "tasks:write"]).await.map_err(|e| e.message())?;
-            let failed = reply["projects"].as_array().is_some_and(|p| p.iter().any(|r| r["project"] == "failed" || r.get("error").is_some()));
-            Ok(Outcome::with(reply, failed))
-        }
-        other => Err(format!("unknown action '{other}': use list or import")),
     }
 }
 

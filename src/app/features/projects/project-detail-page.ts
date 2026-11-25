@@ -45,7 +45,6 @@ import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } fro
 import { ProjectBurnup } from './project-burnup';
 import { buildBurnView, burnBadge, projectTargetDay, type BurnTone } from './project-burnup-model';
 import { ProjectGlyphPicker } from './project-glyph';
-import { ProjectLunagest } from './project-lunagest';
 import { ProjectMilestoneCards } from './project-milestone-cards';
 import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
@@ -94,7 +93,6 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectIssueSuggestions,
     ProjectRisksCard,
     ProjectGlyphPicker,
-    ProjectLunagest,
     ProjectMilestoneCards,
     ProjectMilestoneRows,
     ProjectRoadmap,
@@ -257,8 +255,6 @@ const TONE_COLOR: Record<BurnTone, string> = {
                     (save)="update({ description: $event.trim() || null })"
                   />
                 </section>
-
-                <app-project-lunagest [projectId]="p.id" [canManage]="canManage()" />
 
                 @if (canManage()) {
                   <app-project-risks-card [project]="p" />

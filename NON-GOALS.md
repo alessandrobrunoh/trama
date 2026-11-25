@@ -11,7 +11,7 @@ Trama reduces the work required to manage development. Tasks stay granular; comm
 3. **Be a Git host, Git client, code-review UI or CI system.** It reads PR, CI and review state from the providers and links to them.
 4. **Be a CRM.** No customers, customer requests, accounts, pipelines, contacts or revenue. A task of kind `feedback` can record demand; the rest belongs elsewhere.
 5. **Be a BI or analytics suite.** No configurable dashboards, agent performance scoring, token-usage leaderboards or velocity analytics. A few factual counts on a project or Issue are fine.
-6. **Bill time.** No timesheets, rates, invoices, or time reports. A person may start, stop, and manually add their own timer entries against a project or task. Those hours stay in Trama and are not sent to LunaGest or anywhere else.
+6. **Bill time.** No timesheets, rates, invoices, or time reports. A person may start, stop, and manually add their own timer entries against a project or task. Those hours stay in Trama and are not sent anywhere else.
 7. **Be a chat or messaging tool.** Comments on work are enough; no channels or DMs.
 8. **Be a general wiki or document store.** Trama has no documents; specs and notes live in the repository or the tools that already hold them.
 9. **Plan sprints or releases.** No cycles, burndown or velocity, and no release pipelines or release notes. Trama reads release and deployment state from the providers as artifacts.
@@ -36,8 +36,8 @@ Rule from now on: **core** surfaces may evolve; **frozen** surfaces get bug fixe
 | Agent surface: MCP, CLI, skills, scoped tokens | Core | How agents actually reach Trama. Keep the tool set small and task-oriented. |
 | Search and command palette | Core | Navigation for a dense tool. |
 | Auth, roles, token permissions, SSE live updates | Core | Needed for safe multi-actor use; the permission matrix itself is frozen. |
-| Projects and milestones | Keep, frozen | Optional planning context for Tasks; must not grow into a PM suite. A project has one optional `repository` string and may bind one LunaGest project. |
-| Timer | Core | One running timer per person. No billing and no sync to LunaGest. |
+| Projects and milestones | Keep, frozen | Optional planning context for Tasks; must not grow into a PM suite. A project has one optional `repository` string. |
+| Timer | Core | One running timer per person. No billing and no external sync. |
 | My Work | Keep, frozen | Personal entry point; could fold into one inbox with Attention. |
 | Views (saved filters) | Keep, frozen | Fine as saved filters; no new layouts. |
 | Workstreams, dependency graph, and derived lifecycle | Removed | Duplicate Task status and a second execution model add administration without helping the work. |

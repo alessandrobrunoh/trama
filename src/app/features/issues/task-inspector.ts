@@ -43,7 +43,6 @@ import { IssueMilestoneProp } from '../milestones/milestone-chips';
 import { REF_MIN, trackedByIssue } from '../stats/flow-stats';
 import { IssueActions } from './issue-actions';
 import { IssueExternalRef } from './issue-external-ref';
-import { IssueLunagest } from './issue-lunagest';
 import { SOURCE_LABEL, issueEstimateOptions, issueKindOptions } from './issue-model';
 import { IssueProp } from './issue-prop';
 import { IssueSection } from './issue-section';
@@ -86,7 +85,6 @@ export class TaskProp {
     AgoPipe,
     IssueMilestoneProp,
     IssueExternalRef,
-    IssueLunagest,
     IssueProp,
     IssueSection,
     IssueThreadLink,
@@ -474,7 +472,6 @@ export class TaskProp {
               </app-property-row>
             }
           </div>
-          <app-issue-lunagest [issueId]="i.id" />
         </app-issue-section>
 
         <app-issue-section class="border-border border-t" label="TIME ENTRIES" [summary]="trackedText()">

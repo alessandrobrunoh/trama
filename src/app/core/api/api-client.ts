@@ -95,21 +95,6 @@ import type {
   RoleInput,
   UpdateRoleInput,
   WebhookWithSecret,
-  LinkLunaGestProjectInput,
-  LinkLunaGestTaskInput,
-  LunaGestConnection,
-  LunaGestImportResult,
-  LunaGestImportableProject,
-  LunaGestIssueLink,
-  LunaGestRemoteTask,
-  LunaGestConnectionConfigured,
-  LunaGestProjectLink,
-  LunaGestProjectLinked,
-  LunaGestRealignChoice,
-  LunaGestRealignResult,
-  LunaGestRemoteProject,
-  LunaGestRemoteProjects,
-  SaveLunaGestConnectionInput,
   ManualTimeEntryInput,
   TimeEntry,
   TimeEntryTarget,
@@ -585,69 +570,7 @@ export class ApiClient {
     remove: (slug: string, id: ID) => this.del(`${this.w(slug)}/imports/${id}`),
   };
 
-  /** Workspace LunaGest connection and per-project links. Secrets are write-only. */
-  readonly lunagest = {
-    connection: (slug: string, o?: RequestOptions) =>
-      this.get<LunaGestConnection>(`${this.w(slug)}/lunagest/connection`, undefined, o),
-    saveConnection: (slug: string, input: SaveLunaGestConnectionInput, o?: RequestOptions) =>
-      this.put<LunaGestConnectionConfigured>(`${this.w(slug)}/lunagest/connection`, input, o),
-    removeConnection: (slug: string, o?: RequestOptions) =>
-      this.del(`${this.w(slug)}/lunagest/connection`, o),
-    /** Accepts `{ projects }` or a bare array. */
-    remoteProjects: async (slug: string, o?: RequestOptions): Promise<LunaGestRemoteProject[]> => {
-      const res = await this.get<LunaGestRemoteProjects | LunaGestRemoteProject[]>(
-        `${this.w(slug)}/lunagest/remote-projects`,
-        undefined,
-        o,
-      );
-      return Array.isArray(res) ? res : (res.projects ?? []);
-    },
-    /** Remote projects with their task count and whether each is already bound to a Trama project. */
-    importable: async (slug: string, o?: RequestOptions): Promise<LunaGestImportableProject[]> => {
-      const res = await this.get<{ projects: LunaGestImportableProject[] }>(
-        `${this.w(slug)}/lunagest/import/projects`,
-        undefined,
-        o,
-      );
-      return res.projects ?? [];
-    },
-    /** Idempotent: projects and tasks that are already bound are reused. At most 25 projects per call. */
-    importProjects: (slug: string, remoteProjectIds: string[], o?: RequestOptions) =>
-      this.post<LunaGestImportResult>(`${this.w(slug)}/lunagest/import`, { remoteProjectIds }, o),
-    project: (slug: string, projectId: ID, o?: RequestOptions) =>
-      this.get<LunaGestProjectLink>(`${this.w(slug)}/projects/${projectId}/lunagest`, undefined, o),
-    linkProject: (
-      slug: string,
-      projectId: ID,
-      input: LinkLunaGestProjectInput,
-      o?: RequestOptions,
-    ) =>
-      this.put<LunaGestProjectLinked>(`${this.w(slug)}/projects/${projectId}/lunagest`, input, o),
-    unlinkProject: (slug: string, projectId: ID, o?: RequestOptions) =>
-      this.del(`${this.w(slug)}/projects/${projectId}/lunagest`, o),
-    realign: (slug: string, projectId: ID, choices: LunaGestRealignChoice[] = [], o?: RequestOptions) =>
-      this.post<LunaGestRealignResult>(
-        `${this.w(slug)}/projects/${projectId}/lunagest/realign`,
-        { choices },
-        o,
-      ),
-    issue: (slug: string, idOrKey: string, o?: RequestOptions) =>
-      this.get<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest`, undefined, o),
-    remoteTasks: async (slug: string, idOrKey: string, o?: RequestOptions) => {
-      const res = await this.get<{ tasks: LunaGestRemoteTask[] }>(
-        `${this.w(slug)}/tasks/${idOrKey}/lunagest/remote-tasks`,
-        undefined,
-        o,
-      );
-      return res.tasks ?? [];
-    },
-    pushIssue: (slug: string, idOrKey: string, o?: RequestOptions) =>
-      this.post<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest/push`, {}, o),
-    linkIssue: (slug: string, idOrKey: string, input: LinkLunaGestTaskInput, o?: RequestOptions) =>
-      this.put<LunaGestIssueLink>(`${this.w(slug)}/tasks/${idOrKey}/lunagest`, input, o),
-  };
-
-  /** The signed-in person's timer. Not sent to LunaGest. */
+  /** The signed-in person's timer. */
   readonly timeEntries = {
     list: (slug: string, o?: RequestOptions) =>
       this.get<TimeEntry[]>(`${this.w(slug)}/time-entries`, undefined, o),

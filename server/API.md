@@ -225,18 +225,6 @@ Connections to GitHub, GitLab (including GitHub Enterprise / self-hosted GitLab)
 
 `PUBLIC_URL` must be the externally reachable base URL of this API (falls back to the request's own host when unset).
 
-## LunaGest import — `/w/:slug/lunagest/import*` (`manageProjects`, plus `createIssues` to run it)
-
-A workspace has one LunaGest login (`PUT /lunagest/connection`, `manageIntegrations`). On top of it:
-
-- `GET /lunagest/import/projects` → `{ projects: [{ id, name, description|null, taskCount|null, imported, projectId|null, projectName|null, linkedTaskCount }] }`. `taskCount` is `null` when LunaGest did not return that project's tasks. `imported` means a Trama project is bound to it; `projectId` and `projectName` appear only when the caller may see that project; `linkedTaskCount` counts its Trama tasks already tied to a LunaGest task.
-- `POST /lunagest/import { remoteProjectIds: string[] (1-25) }` → `201 { projects: [{ remoteProjectId, remoteProjectName, project: created|linked|existing|failed, projectId|null, projectKey|null, tasks: { created, linked, existing }, error? }] }`. `400` for an empty list, an id LunaGest does not list, or no saved connection.
-  - Project: already bound → `existing`; else the one unbound Trama project with the same name (case-insensitive) is bound (`linked`); else a Trama project is created from the name and description (`created`).
-  - Tasks: a remote task already tied to a Trama task is left alone (`existing`; differences are for `POST /projects/:id/lunagest/realign`); else a same-titled unbound Trama task of that project is tied to it (`linked`, unambiguous matches only); else a Trama task is created (`created`: kind `feature`, status `backlog`, source `api`, body from the description). Status and priority are not mapped: their LunaGest values were never recorded.
-  - Idempotent: a second run creates nothing. One failing project reports `error` and the rest still run.
-  - Import only reads from LunaGest. Created tasks are not pushed back (that would create a second remote task).
-- The Trama timer does not follow the LunaGest timer; see `NON-GOALS.md` (the clock and time-entry endpoints were not recorded).
-
 ## Imports and external links — `/w/:slug/imports` (`manageIntegrations`, admin) and `/tasks/:idOrKey/external-ref`
 
 Trama can sit next to GitHub Issues and Linear instead of replacing them. Everything is **read-only toward the tracker**: nothing is ever written back, and only `query` documents are sent to Linear. Every outbound call goes through the SSRF guard (`common/safe-fetch.ts`); the only hosts contacted are `api.github.com`, `api.linear.app` and a GitHub Enterprise host an admin configured. Tokens are encrypted at rest (AES-256-GCM, `TRAMA_ENCRYPTION_KEY`), used server-side only and **never returned or logged**; anything stored from a provider error (job errors, `lastError`) is scrubbed of the token.

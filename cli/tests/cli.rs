@@ -1583,61 +1583,12 @@ fn a_custom_token_gets_the_apis_refusal_on_the_timer() {
     assert!(err_json(&o)["error"]["message"].as_str().unwrap().contains("custom API tokens"));
 }
 
-// ───────────────────────────── LunaGest import ─────────────────────────────
-
-#[test]
-fn lunagest_lists_importable_projects_and_imports_the_chosen_ones() {
-    let mock = Mock::start(vec![
-        route("GET", "/api/w/acme/lunagest/import/projects", 200, json!({ "projects": [{ "id": "lg_1", "name": "Alpha", "taskCount": 3, "imported": false }] })),
-        route(
-            "POST",
-            "/api/w/acme/lunagest/import",
-            200,
-            json!({ "projects": [{ "remoteProjectId": "lg_1", "remoteProjectName": "Alpha", "project": "created", "projectId": "pj_1", "projectKey": "ALP", "tasks": { "created": 3, "linked": 0, "existing": 0 } }] }),
-        ),
-    ]);
-    let run = Run::new().with_key(&mock.api());
-    let o = run.run(&["lunagest", "projects", "--fields", "id,taskCount"]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(stdout(&o).trim(), r#"{"projects":[{"id":"lg_1","taskCount":3}]}"#);
-
-    let o = run.run(&["lunagest", "import", "lg_1", "lg_1"]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(out_json(&o)["projects"][0]["projectKey"], "ALP");
-    assert_eq!(mock.last().json(), json!({ "remoteProjectIds": ["lg_1"] }), "duplicates are dropped");
-}
-
-#[test]
-fn lunagest_import_mirrors_the_server_limits_and_reports_a_failed_project() {
-    let run = Run::new();
-    let many: Vec<String> = (0..26).map(|i| format!("lg_{i}")).collect();
-    let mut args = vec!["lunagest", "import"];
-    args.extend(many.iter().map(String::as_str));
-    assert_eq!(code(&run.run(&args)), 2, "at most 25 projects");
-    assert_eq!(code(&run.run(&["lunagest", "import"])), 2, "at least one");
-    let long = "x".repeat(201);
-    assert_eq!(code(&run.run(&["lunagest", "import", &long])), 2);
-    let o = run.run(&["lunagest", "import", "lg_1", "lg_2", "--dry-run"]);
-    assert_eq!(code(&o), 0, "{}", stderr(&o));
-    assert_eq!(out_json(&o)["request"]["body"], json!({ "remoteProjectIds": ["lg_1", "lg_2"] }));
-
-    let mock = Mock::start(vec![route(
-        "POST",
-        "/api/w/acme/lunagest/import",
-        200,
-        json!({ "projects": [{ "remoteProjectId": "lg_2", "remoteProjectName": "Beta", "project": "failed", "projectId": null, "projectKey": null, "tasks": { "created": 0, "linked": 0, "existing": 0 }, "error": "boom" }] }),
-    )]);
-    let o = Run::new().with_key(&mock.api()).run(&["lunagest", "import", "lg_2"]);
-    assert_eq!(code(&o), 8, "a failed project must show in the exit code");
-    assert_eq!(out_json(&o)["projects"][0]["error"], "boom", "the result is still printed");
-}
-
 #[test]
 fn the_new_commands_are_listed_by_commands() {
     let run = Run::new();
     let all = out_json(&run.run(&["commands"]));
     let names: Vec<&str> = all.as_array().unwrap().iter().map(|c| c["command"].as_str().unwrap()).collect();
-    for want in ["task subtasks", "timer start", "timer stop", "timer status", "timer list", "timer add", "timer delete", "lunagest projects", "lunagest import"] {
+    for want in ["task subtasks", "timer start", "timer stop", "timer status", "timer list", "timer add", "timer delete"] {
         assert!(names.contains(&want), "{want}");
     }
     assert_eq!(out_json(&run.run(&["commands", "timer"])).as_array().unwrap().len(), 6);

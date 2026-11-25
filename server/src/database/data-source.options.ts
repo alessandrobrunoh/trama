@@ -2,7 +2,6 @@ import type { DataSourceOptions } from 'typeorm';
 import { ENTITIES } from './entities/index.js';
 import { IMPORT_ENTITIES } from '../importers/entities.js';
 import { INTEGRATION_ENTITIES } from '../integrations/entities.js';
-import { LUNAGEST_ENTITIES } from '../lunagest/entities.js';
 import { TIME_ENTRY_ENTITIES } from '../time-entries/time-entry.entity.js';
 import { MIGRATIONS } from './migrations/index.js';
 
@@ -22,7 +21,6 @@ export function dataSourceOptions(url?: string): DataSourceOptions {
       ...ENTITIES,
       ...INTEGRATION_ENTITIES,
       ...IMPORT_ENTITIES,
-      ...LUNAGEST_ENTITIES,
       ...TIME_ENTRY_ENTITIES,
     ],
     migrations: MIGRATIONS,

@@ -15,7 +15,7 @@ export interface TimeEntryInput {
   issueId?: string | null;
 }
 
-/** A person's own timer. Never reads or writes LunaGest. */
+/** A person's own timer. */
 @Injectable()
 export class TimeEntriesService {
   constructor(

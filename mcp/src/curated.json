@@ -743,45 +743,6 @@
     }
   },
   {
-    "name": "import_lunagest",
-    "summary": "Import LunaGest projects and their tasks (list, then import the chosen ones)",
-    "kind": "composite",
-    "readOnly": false,
-    "visibleIf": [
-      "projects:write"
-    ],
-    "uses": [],
-    "writes": [
-      "projects:write",
-      "tasks:write"
-    ],
-    "description": "Import projects and tasks from the workspace's connected LunaGest account. action:list shows the remote projects with their task count and whether each is already bound to a Trama project. action:import with projectIds (1 to 25 LunaGest project ids from the list) creates or reuses the Trama project of each and imports its tasks; it is idempotent (bound projects and tasks are reused) and one failing project does not stop the others. Needs project management rights and permission to create tasks (not available to custom tokens). Example: {\"action\":\"import\",\"projectIds\":[\"lg_1\"]}.",
-    "inputSchema": {
-      "type": "object",
-      "properties": {
-        "action": {
-          "type": "string",
-          "enum": [
-            "list",
-            "import"
-          ]
-        },
-        "projectIds": {
-          "type": "array",
-          "maxItems": 25,
-          "items": {
-            "type": "string"
-          },
-          "description": "import: LunaGest project ids (1-25, from action:list)."
-        }
-      },
-      "required": [
-        "action"
-      ],
-      "additionalProperties": false
-    }
-  },
-  {
     "name": "list_capabilities",
     "summary": "Discover the full catalog: search it, get a tool's schema and how to call it",
     "kind": "composite",

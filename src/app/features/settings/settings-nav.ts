@@ -74,8 +74,6 @@ const ALIASES: Readonly<Record<string, string>> = {
   theme: 'appearance',
   statuses: 'workflow',
   tokens: 'api',
-  // LunaGest is one of the integrations now.
-  lunagest: 'integrations',
 };
 
 /** The section a route segment opens (an old id is mapped to its new home). */

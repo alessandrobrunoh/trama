@@ -1,5 +1,5 @@
 //! Helpers for the parts of a task that the REST catalog (`tools.json`) cannot express on its own:
-//! the subtask tree, a person's timer, the LunaGest import and the repository match of a project.
+//! the subtask tree, a person's timer and the repository match of a project.
 //!
 //! Shared by the MCP composites (`composite.rs`) and the `trama` CLI, so both build the same requests
 //! and apply the same validation as the API (limits copied from the server DTOs). Nothing here talks to
@@ -350,40 +350,6 @@ pub fn total_seconds(annotated: &[Value]) -> i64 {
     annotated.iter().filter_map(|e| e["durationSeconds"].as_i64()).sum()
 }
 
-// ───────────────────────────── LunaGest import ─────────────────────────────
-
-/// Most remote projects one import request may carry (the server rejects more).
-pub const LUNAGEST_IMPORT_MAX_PROJECTS: usize = 25;
-const LUNAGEST_ID_MAX: usize = 200;
-
-/// `GET /lunagest/import/projects`: the remote projects with task counts and whether each is already
-/// bound to a Trama project. Needs the project-management capability.
-pub fn lunagest_list_call() -> Call {
-    call(Method::Get, "/lunagest/import/projects", None)
-}
-
-/// `POST /lunagest/import`: imports the chosen remote projects and their tasks. Idempotent. The caller
-/// needs the project-management capability (it creates projects) and permission to create tasks.
-pub fn lunagest_import_call(remote_project_ids: &[String]) -> Result<Call, String> {
-    let mut ids: Vec<String> = vec![];
-    for raw in remote_project_ids {
-        let id = raw.trim();
-        if id.is_empty() || id.chars().count() > LUNAGEST_ID_MAX {
-            return Err(format!("each LunaGest project id must be 1 to {LUNAGEST_ID_MAX} characters"));
-        }
-        if !ids.iter().any(|x| x == id) {
-            ids.push(id.to_string());
-        }
-    }
-    if ids.is_empty() {
-        return Err("pass at least one LunaGest project id (list them first)".into());
-    }
-    if ids.len() > LUNAGEST_IMPORT_MAX_PROJECTS {
-        return Err(format!("an import carries at most {LUNAGEST_IMPORT_MAX_PROJECTS} projects; split it"));
-    }
-    Ok(call(Method::Post, "/lunagest/import", Some(json!({ "remoteProjectIds": ids }))))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -517,19 +483,5 @@ mod tests {
         assert!(running_entry(&[done]).is_none());
         assert_eq!(total_seconds(&[done_a, live_a]), 4500);
         assert_eq!(format_duration(45), "45s");
-    }
-
-    #[test]
-    fn lunagest_requests_mirror_the_server_limits() {
-        assert_eq!(lunagest_list_call().path, "/lunagest/import/projects");
-        let c = lunagest_import_call(&["rp_1".into(), " rp_2 ".into(), "rp_1".into()]).unwrap();
-        assert_eq!((c.method, c.path.as_str()), (Method::Post, "/lunagest/import"));
-        assert_eq!(c.body, Some(json!({ "remoteProjectIds": ["rp_1", "rp_2"] })));
-        assert!(lunagest_import_call(&[]).is_err());
-        assert!(lunagest_import_call(&["".into()]).is_err());
-        assert!(lunagest_import_call(&["x".repeat(201)]).is_err());
-        let many: Vec<String> = (0..26).map(|i| format!("rp_{i}")).collect();
-        assert!(lunagest_import_call(&many).is_err());
-        assert!(lunagest_import_call(&many[..25]).is_ok());
     }
 }

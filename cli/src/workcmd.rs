@@ -1,10 +1,10 @@
-//! Commands that are not one catalog route: the subtask tree, the task timer and the LunaGest import,
+//! Commands that are not one catalog route: the subtask tree and the task timer,
 //! plus two filters the API does not have (`task list --parent`, `project list --repository`).
 //!
 //! The requests and their validation live in `mcp/src/work.rs`, shared with the MCP composites, so the
 //! shell and the MCP tools behave the same. These commands are not in `tools.json` because their routes
 //! are outside the API permission catalog (custom tokens are refused there); they need a key that acts
-//! as a person (the timer) or a project manager (the import), and the API says so when it does not.
+//! as a person (the timer), and the API says so when it does not.
 
 use clap::{Arg, ArgMatches, Command, value_parser};
 use serde_json::{Value, json};
@@ -26,8 +26,6 @@ pub const EXTRA_ROWS: &[(&str, &str, &str, &str, &str, &str)] = &[
     ("timer", "timer list", "GET", "/time-entries", "user key", "Your latest time entries, optionally of one task, with durations"),
     ("timer", "timer add", "POST", "/time-entries", "user key", "Add a finished time entry"),
     ("timer", "timer delete", "DELETE", "/time-entries/{id}", "user key", "Delete one of your time entries"),
-    ("lunagest", "lunagest projects", "GET", "/lunagest/import/projects", "project manager", "LunaGest projects that can be imported"),
-    ("lunagest", "lunagest import", "POST", "/lunagest/import", "project manager + create tasks", "Import LunaGest projects and their tasks"),
 ];
 
 // ───────────────────────────── command definitions ─────────────────────────────
@@ -127,25 +125,6 @@ pub fn timer_command() -> Command {
                 .visible_alias("rm")
                 .about("Delete one of your time entries")
                 .arg(Arg::new("id").value_name("ENTRY_ID").required(true).help("Time entry id (te_…), from `trama timer list`")),
-        )
-}
-
-pub fn lunagest_command() -> Command {
-    Command::new("lunagest")
-        .about("Import projects and tasks from the connected LunaGest account")
-        .long_about(
-            "Lists the projects of the workspace's LunaGest account and imports the ones you choose, with their tasks. \
-             Importing is idempotent: projects and tasks that are already bound are reused, never duplicated, and one failing project does not stop the others. \
-             It needs project-management rights (it creates projects) and permission to create tasks, and is not available to custom tokens.",
-        )
-        .subcommand_required(true)
-        .arg_required_else_help(true)
-        .subcommand(Command::new("projects").visible_alias("list").about("Importable LunaGest projects, with task counts and whether each is already imported"))
-        .subcommand(
-            Command::new("import")
-                .about("Import the chosen LunaGest projects with their tasks (1 to 25)")
-                .arg(Arg::new("ids").value_name("REMOTE_PROJECT_ID").required(true).num_args(1..).value_delimiter(',').help("LunaGest project ids from `trama lunagest projects`"))
-                .after_help("Example:\n  trama lunagest projects\n  trama lunagest import lg_1 lg_2"),
         )
 }
 
@@ -375,30 +354,6 @@ pub async fn timer(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
             let id = flag(s, "id").expect("required");
             let call = work::timer_delete_call(&id).map_err(usage)?;
             exec::run(&format!("timer delete {id}"), &call, ACCEPT_JSON, ctx).await
-        }
-        _ => unreachable!("a subcommand is required"),
-    }
-}
-
-// ───────────────────────────── LunaGest ─────────────────────────────
-
-pub async fn lunagest(m: &ArgMatches, ctx: &Ctx) -> Result<()> {
-    match m.subcommand() {
-        Some(("projects", _)) => exec::run("lunagest projects", &work::lunagest_list_call(), ACCEPT_JSON, ctx).await,
-        Some(("import", s)) => {
-            let ids: Vec<String> = s.get_many::<String>("ids").into_iter().flatten().cloned().collect();
-            let call = work::lunagest_import_call(&ids).map_err(usage)?;
-            if ctx.dry_run {
-                return exec::run("lunagest import", &call, ACCEPT_JSON, ctx).await;
-            }
-            let result = exec::fetch(&call, ctx).await?;
-            output::print(&result, &ctx.fmt);
-            // One project can fail while the others are imported; the exit code must not hide it.
-            let failed = result["projects"].as_array().map_or(0, |p| p.iter().filter(|r| r["project"] == "failed" || r.get("error").is_some()).count());
-            if failed > 0 {
-                return Err(CliError::new(Kind::Validation, format!("{failed} project(s) could not be imported; the others were (see `error` in the result)")));
-            }
-            Ok(())
         }
         _ => unreachable!("a subcommand is required"),
     }

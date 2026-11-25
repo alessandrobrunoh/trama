@@ -75,14 +75,13 @@ route. So the server lists the **`core`** profile by default and keeps the **`fu
 | `attach_artifact` | Attach or update a PR, build or link on a task |
 | `add_comment` | Comment on any object by key or id |
 | `triage_tasks` | Triage up to 25 tasks in one call (priority, duplicates, grouping) |
-| `import_lunagest` | Import LunaGest projects and their tasks (list, then import the chosen ones) |
 | `list_capabilities` | Discover the full catalog: search it, get a tool's schema and how to call it |
 | `run_tool` | Run any catalog operation by name, with the usual validation and permissions |
 | `api_request` | Escape hatch: call any workspace REST route that has no tool (path-restricted) |
 <!-- mcp-tools-table:end -->
 
 `list_accounts` is added when several keys are connected. The composite tools (`get_context`, `find_work`, `list_projects`,
-`start_work`, `report_progress`, `track_time`, `attach_artifact`, `add_comment`, `triage_tasks`, `import_lunagest`,
+`start_work`, `report_progress`, `track_time`, `attach_artifact`, `add_comment`, `triage_tasks`,
 `create_task`) orchestrate several API calls with the caller's own key, check each step's permission and validate every
 argument, so they can do nothing a plain tool could not. A tool whose permissions the key lacks is hidden.
 
@@ -98,17 +97,13 @@ What the task-level tools cover beyond plain CRUD:
   named), `stop`, `status` (running timer plus its task), `list` (your 100 latest entries, optionally of one task, with
   durations and a total), `add` (`startedAt`/`endedAt` as ISO-8601 with a zone) and `delete` (`entryId`). It needs a key
   that acts as a user; the API refuses these routes to `custom` tokens and the tool reports that.
-- **`import_lunagest`**: `action:list` shows the connected LunaGest account's projects (task count, already imported
-  or not); `action:import` with `projectIds` (1 to 25) imports them and their tasks. Idempotent; a failing project does
-  not stop the others and is reported in the result (the call is then flagged as an error). It needs `projects:write`
-  and `tasks:write` (the API additionally needs project-management rights) and is not available to custom tokens.
 - **`list_projects {repository}`** matches the repository string itself (owner/name or URL, any spelling of the same
   repository), because the API does not filter by it. Project `health` is not exposed in any schema: it duplicates the
   project status (the API still stores it).
 
-`track_time` and `import_lunagest` call routes outside the API permission catalog, so they are composites with their own
-code (`src/composite.rs`, request building in `src/work.rs`) rather than `tools.json` entries; the `full` profile, which is
-the plain catalog, does not list them (they stay callable by name, and `api_request` reaches the same routes).
+`track_time` calls routes outside the API permission catalog, so it is a composite with its own
+code (`src/composite.rs`, request building in `src/work.rs`) rather than a `tools.json` entry; the `full` profile, which is
+the plain catalog, does not list it (it stays callable by name, and `api_request` reaches the same routes).
 
 **The long tail stays reachable.** `list_capabilities` searches the whole catalog (`{"q":"milestone"}`, `{"group":"tasks"}`)
 and returns the exact schema of one tool (`{"tool":"create_milestone"}`); `run_tool` runs it by name with the same

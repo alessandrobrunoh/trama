@@ -9,7 +9,6 @@ describe('settings nav', () => {
   it('maps old section ids to their new pages', () => {
     expect(resolveSettingsSection('tokens')).toBe('api');
     expect(resolveSettingsSection('statuses')).toBe('workflow');
-    expect(resolveSettingsSection('lunagest')).toBe('integrations');
     expect(resolveSettingsSection('danger')).toBe('workspace');
   });
 

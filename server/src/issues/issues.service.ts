@@ -40,7 +40,6 @@ import {
   projectHidden,
 } from '../auth/member-access.js';
 import { UploadsService } from '../uploads/uploads.service.js';
-import { LunagestService } from '../lunagest/lunagest.service.js';
 import { allocateIssueNumbers, issueKeyPrefix, type IssueKeyChange } from './issue-keys.js';
 
 export interface IssueInput {
@@ -157,9 +156,6 @@ export class IssuesService {
     @Optional()
     @Inject(UploadsService)
     private readonly uploads?: UploadsService,
-    @Optional()
-    @Inject(LunagestService)
-    private readonly lunagest?: LunagestService,
   ) {}
 
   private async issueCatalog(workspaceId: string) {
@@ -506,12 +502,6 @@ export class IssuesService {
       id: row.id,
       projectId: row.projectId,
     });
-    await this.noteLunaGest(workspaceId, row, {
-      created: true,
-      titleChanged: true,
-      bodyChanged: true,
-      projectChanged: false,
-    });
     await this.events.record({
       workspaceId,
       actor,
@@ -536,11 +526,6 @@ export class IssuesService {
     authorizeParents: IssueTeamAuthorizer,
   ) {
     const row = await this.get(workspaceId, idOrKey);
-    const before = {
-      title: row.title,
-      body: row.body,
-      projectId: row.projectId,
-    };
     if (patch.projectId !== undefined) assertCanUseProject(patch.projectId);
     if (patch.parentId !== undefined) {
       patch = {
@@ -644,50 +629,8 @@ export class IssuesService {
         id: row.id,
         projectId: row.projectId,
       });
-    await this.noteLunaGest(workspaceId, row, {
-      created: false,
-      titleChanged: row.title !== before.title,
-      bodyChanged: row.body !== before.body,
-      projectChanged: row.projectId !== before.projectId,
-    });
     await this.recordUpdate(workspaceId, actor, prepared);
     return row;
-  }
-
-  /** LunaGest push is best-effort. The issue row is already saved. */
-  private async noteLunaGest(
-    workspaceId: string,
-    row: IssueEntity,
-    flags: {
-      created: boolean;
-      titleChanged: boolean;
-      bodyChanged: boolean;
-      projectChanged: boolean;
-    },
-  ): Promise<void> {
-    if (!this.lunagest) return;
-    if (
-      !flags.created &&
-      !flags.titleChanged &&
-      !flags.bodyChanged &&
-      !flags.projectChanged
-    ) {
-      return;
-    }
-    try {
-      await this.lunagest.afterIssueSaved(
-        workspaceId,
-        {
-          id: row.id,
-          projectId: row.projectId,
-          title: row.title,
-          body: row.body,
-        },
-        flags,
-      );
-    } catch {
-      // afterIssueSaved records push_failed itself. A throw must not undo the issue.
-    }
   }
 
   /**

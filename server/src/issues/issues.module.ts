@@ -3,7 +3,6 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ArtifactsModule } from '../artifacts/artifacts.module.js';
 import { IssueEntity } from '../database/entities/index.js';
 import { UploadsModule } from '../uploads/uploads.module.js';
-import { LunagestModule } from '../lunagest/lunagest.module.js';
 import { IssuesController } from './issues.controller.js';
 import { IssuesService } from './issues.service.js';
 
@@ -12,7 +11,6 @@ import { IssuesService } from './issues.service.js';
     TypeOrmModule.forFeature([IssueEntity]),
     ArtifactsModule,
     UploadsModule,
-    LunagestModule,
   ],
   controllers: [IssuesController],
   providers: [IssuesService],

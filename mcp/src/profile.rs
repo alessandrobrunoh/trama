@@ -78,8 +78,8 @@ pub struct Entry {
     pub visible_if: Vec<String>,
     /// Catalog tools a composite may call.
     pub uses: Vec<String>,
-    /// Permissions a composite needs for writes that go through routes outside the catalog (the timer,
-    /// the LunaGest import), so the listing can say what to ask a workspace admin for.
+    /// Permissions a composite needs for writes that go through routes outside the catalog (the timer),
+    /// so the listing can say what to ask a workspace admin for.
     pub writes: Vec<String>,
 }
 

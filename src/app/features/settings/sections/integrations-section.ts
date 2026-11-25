@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { LucideDynamicIcon, LucideEye, LucideEyeOff, LucideMoon, LucideWebhook } from '@lucide/angular';
+import { LucideDynamicIcon, LucideEye, LucideEyeOff, LucideWebhook } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
@@ -11,7 +11,6 @@ import { UiStore } from '../../../core/stores/ui.store';
 import { TopBarActions } from '../../../layout/page-chrome';
 import { ProviderIcon } from '../../../shared/provider-icon';
 import { RelativeTimePipe } from '../../../shared/pipes';
-import { LunagestIntegration } from './lunagest-integration';
 import { SECTION_KIT } from './section-kit';
 import { OutgoingWebhooks } from './outgoing-webhooks';
 import { WebhookSetupDialog } from './webhook-setup-dialog';
@@ -78,7 +77,6 @@ type Row = IntegrationDetail & { detailed: boolean };
 type Selection =
   | { kind: 'conn'; id: string }
   | { kind: 'connect' }
-  | { kind: 'lunagest' }
   | { kind: 'webhooks' };
 
 /** One line of the left-hand list (v3 "Providers"). */
@@ -97,7 +95,7 @@ interface ListItem {
 
 /**
  * Settings · Integrations (v3 frame 11): master / detail. The left list holds every connection (and the
- * providers still to connect, LunaGest and custom webhooks); the right pane shows the one selected: its
+ * providers still to connect and custom webhooks); the right pane shows the one selected: its
  * account, status and webhook, with re-validate, token replacement, secret rotation and disconnect.
  * GitHub / GitLab / Bitbucket / Delta connections work as before; nothing here is fake data.
  */
@@ -111,7 +109,6 @@ interface ListItem {
     LucideDynamicIcon,
     ProviderIcon,
     RelativeTimePipe,
-    LunagestIntegration,
     OutgoingWebhooks,
     WebhookSetupDialog,
     TopBarActions,
@@ -139,8 +136,6 @@ interface ListItem {
           <span class="bg-secondary text-foreground flex size-8 shrink-0 items-center justify-center">
             @if (item.provider) {
               <app-provider-icon [provider]="item.provider" [size]="16" />
-            } @else if (item.sel.kind === 'lunagest') {
-              <svg [lucideIcon]="moon" [size]="16"></svg>
             } @else {
               <svg [lucideIcon]="hook" [size]="16"></svg>
             }
@@ -227,10 +222,6 @@ interface ListItem {
               </div>
             </form>
           }
-        }
-
-        @case ('lunagest') {
-          <app-lunagest-integration />
         }
 
         @case ('webhooks') {
@@ -344,7 +335,6 @@ export class IntegrationsSection {
 
   protected readonly info = PROVIDER_INFO;
   protected readonly choices = CHOICES;
-  protected readonly moon = LucideMoon;
   protected readonly hook = LucideWebhook;
   protected readonly eye = LucideEye;
   protected readonly eyeOff = LucideEyeOff;
@@ -398,15 +388,6 @@ export class IntegrationsSection {
       });
     }
     const hooks = this.store.outgoingWebhooks().length;
-    out.push({
-      key: 'lunagest',
-      sel: { kind: 'lunagest' },
-      provider: null,
-      label: 'LunaGest',
-      sub: 'project tool',
-      status: '',
-      dot: 'bg-faint',
-    });
     out.push({
       key: 'webhooks',
       sel: { kind: 'webhooks' },

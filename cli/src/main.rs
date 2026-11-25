@@ -135,9 +135,7 @@ fn build_cli(reg: &Registry) -> Command {
     for c in builtin::definitions() {
         root = root.subcommand(c);
     }
-    root = root
-        .subcommand(workcmd::timer_command())
-        .subcommand(workcmd::lunagest_command());
+    root = root.subcommand(workcmd::timer_command());
     for c in reg.commands() {
         let c = match c.get_name() {
             "event" => c.subcommand(events::command()),
@@ -266,7 +264,6 @@ async fn run() -> Result<()> {
         "skill" => skill::run(sub, &ctx),
         "update" => update::run(sub, &ctx).await,
         "timer" => workcmd::timer(sub, &ctx).await,
-        "lunagest" => workcmd::lunagest(sub, &ctx).await,
         "version" => {
             builtin::version(&ctx);
             Ok(())

@@ -88,7 +88,7 @@ describe('TimeEntriesService', () => {
     expect(await service.list('ws_1', 'usr_a')).toHaveLength(1);
   });
 
-  it('records time without a LunaGest client', async () => {
+  it('starts and stops a timer on a task', async () => {
     const { service } = setup();
     const started = await service.start('ws_1', 'usr_a', { issueId: 'in_1' });
     expect(started.projectId).toBe('pj_1');
