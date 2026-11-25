@@ -11,21 +11,21 @@ import { formatDuration } from '../insights';
   imports: [HlmTooltip],
   host: { class: 'block' },
   template: `
-    <dl class="grid grid-cols-3 gap-3">
-      <div>
-        <dt class="text-muted-foreground text-xs">Median</dt>
-        <dd class="text-xl tracking-tight tabular-nums" hlmTooltip="Half of the tasks took less than this" position="bottom">{{ text(stats().median) }}</dd>
+    <dl class="border-border grid grid-cols-3 border">
+      <div class="flex flex-col-reverse gap-1 px-[18px] py-3.5">
+        <dt class="text-faint font-mono text-[10.5px] leading-[13px]">Median</dt>
+        <dd class="font-title text-foreground text-[24px] leading-[28px] tabular-nums" hlmTooltip="Half of the tasks took less than this" position="bottom">{{ text(stats().median) }}</dd>
       </div>
-      <div>
-        <dt class="text-muted-foreground text-xs">75th percentile</dt>
-        <dd class="text-xl tracking-tight tabular-nums" [hlmTooltip]="tail('Three quarters of the tasks took less than this')" position="bottom">{{ text(stats().p75) }}</dd>
+      <div class="border-border flex flex-col-reverse gap-1 border-l px-[18px] py-3.5">
+        <dt class="text-faint font-mono text-[10.5px] leading-[13px]">75th percentile</dt>
+        <dd class="font-title text-foreground text-[24px] leading-[28px] tabular-nums" [hlmTooltip]="tail('Three quarters of the tasks took less than this')" position="bottom">{{ text(stats().p75) }}</dd>
       </div>
-      <div>
-        <dt class="text-muted-foreground text-xs">90th percentile</dt>
-        <dd class="text-xl tracking-tight tabular-nums" [hlmTooltip]="tail('Nine in ten tasks took less than this')" position="bottom">{{ text(stats().p90) }}</dd>
+      <div class="border-border flex flex-col-reverse gap-1 border-l px-[18px] py-3.5">
+        <dt class="text-faint font-mono text-[10.5px] leading-[13px]">90th percentile</dt>
+        <dd class="font-title text-foreground text-[24px] leading-[28px] tabular-nums" [hlmTooltip]="tail('Nine in ten tasks took less than this')" position="bottom">{{ text(stats().p90) }}</dd>
       </div>
     </dl>
-    <p class="text-meta mt-1 text-[11px]">From {{ stats().n }} completed {{ stats().n === 1 ? 'task' : 'tasks' }}</p>
+    <p class="text-faint mt-1.5 font-mono text-[10px]">From {{ stats().n }} completed {{ stats().n === 1 ? 'task' : 'tasks' }}</p>
   `,
 })
 export class PercentileStrip {

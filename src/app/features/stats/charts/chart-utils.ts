@@ -51,8 +51,8 @@ export function compact(value: number, digits = 1): string {
   return value.toLocaleString('en-US', { maximumFractionDigits: Number.isInteger(value) ? 0 : digits });
 }
 
-/** Path for a bar with a 4px rounded data-end and a square baseline. */
-export function barPath(x: number, y: number, w: number, h: number, r = 4): string {
+/** Path for a bar: square by default (v3 has no radius); `r` rounds the data-end when a caller asks for it. */
+export function barPath(x: number, y: number, w: number, h: number, r = 0): string {
   if (h <= 0 || w <= 0) return '';
   const rad = Math.min(r, h, w / 2);
   return `M${x},${y + h}V${y + rad}Q${x},${y} ${x + rad},${y}H${x + w - rad}Q${x + w},${y} ${x + w},${y + rad}V${y + h}Z`;

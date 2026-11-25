@@ -23,23 +23,23 @@ export interface TaskListRow {
   imports: [RouterLink, HlmButtonImports, StatusIcon],
   host: { class: 'block' },
   template: `
-    <ul class="-mx-2 flex flex-col" [attr.aria-label]="ariaLabel()">
+    <ul class="border-border flex flex-col border-t" [attr.aria-label]="ariaLabel()">
       @for (r of shown(); track r.id) {
-        <li class="hover:bg-hover flex items-start gap-2 rounded-md px-2 py-1.5 text-xs">
+        <li class="border-border hover:bg-secondary flex items-start gap-2 border-b px-1 py-2 text-xs">
           @if (r.status) {
             <app-status-icon class="mt-0.5" [status]="r.status" entity="issue" [size]="13" />
           }
           <div class="min-w-0 flex-1">
             <div class="flex min-w-0 items-baseline gap-2">
-              <a class="text-muted-foreground hover:text-foreground shrink-0 font-mono" [routerLink]="['/', slug(), 'tasks', r.key]">{{ r.key }}</a>
+              <a class="text-faint hover:text-foreground shrink-0 font-mono text-[11px]" [routerLink]="['/', slug(), 'tasks', r.key]">{{ r.key }}</a>
               <a class="min-w-0 truncate text-[13px] hover:underline" [routerLink]="['/', slug(), 'tasks', r.key]">{{ r.title }}</a>
             </div>
             @if (r.detail) {
-              <p class="text-muted-foreground mt-0.5">{{ r.detail }}</p>
+              <p class="text-faint mt-0.5 font-mono text-[10.5px]">{{ r.detail }}</p>
             }
           </div>
           @if (r.badge) {
-            <span class="shrink-0 rounded-full px-2 py-0.5 font-medium whitespace-nowrap" [class]="toneClass(r.tone)">{{ r.badge }}</span>
+            <span class="shrink-0 border px-2 py-0.5 font-mono text-[10.5px] leading-[14px] whitespace-nowrap" [class]="toneClass(r.tone)">{{ r.badge }}</span>
           }
         </li>
       }
@@ -62,13 +62,13 @@ export class TaskList {
   protected toneClass(tone: TaskListRow['tone']): string {
     switch (tone) {
       case 'warn':
-        return 'bg-status-needs-input/10 text-status-needs-input';
+        return 'border-status-in-progress/40 text-status-in-progress';
       case 'bad':
-        return 'bg-status-blocked/10 text-status-blocked';
+        return 'border-red/40 text-red';
       case 'good':
-        return 'text-status-shipped';
+        return 'border-border text-green';
       default:
-        return 'text-muted-foreground';
+        return 'border-border text-muted-foreground';
     }
   }
 }

@@ -12,32 +12,34 @@ export interface KpiDelta {
   title?: string;
 }
 
-/** Linear-Insights-style tile: label, big number, delta against the previous period, sparkline. */
+/** Time Reports tile (v3): big Newsreader number, delta against the previous period, mono label, sparkline. */
 @Component({
   selector: 'app-kpi-tile',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmTooltip, Sparkline],
-  host: { class: 'bg-card border-border flex min-w-0 flex-col gap-1 rounded-lg border px-4 py-3' },
+  host: { class: 'border-border flex min-w-0 flex-col gap-1 border px-[18px] py-3.5' },
   template: `
-    <div class="text-muted-foreground truncate text-xs">{{ label() }}</div>
-    <div class="flex items-baseline gap-2">
-      <span class="text-[26px] leading-8 tracking-tight">{{ value() }}</span>
+    <div class="flex items-end gap-2">
+      <span class="font-title text-foreground text-[28px] leading-8">{{ value() }}</span>
       @if (delta(); as d) {
         <span
-          class="inline-flex items-center gap-0.5 text-xs font-medium tabular-nums"
-          [class.text-tone-green]="d.tone === 'good'"
-          [class.text-tone-red]="d.tone === 'bad'"
-          [class.text-muted-foreground]="d.tone === 'neutral'"
+          class="inline-flex items-center gap-0.5 pb-1 font-mono text-[10.5px] leading-[13px] tabular-nums"
+          [class.text-green]="d.tone === 'good'"
+          [class.text-red]="d.tone === 'bad'"
+          [class.text-faint]="d.tone === 'neutral'"
           [hlmTooltip]="d.title ?? ''"
           position="bottom"
         >
-          <span aria-hidden="true" class="text-[9px]">{{ d.direction === 'up' ? '▲' : d.direction === 'down' ? '▼' : '–' }}</span>
+          <span aria-hidden="true" class="text-[8px]">{{ d.direction === 'up' ? '▲' : d.direction === 'down' ? '▼' : '–' }}</span>
           {{ d.text }}
           <span class="sr-only">{{ d.direction === 'up' ? 'up' : d.direction === 'down' ? 'down' : 'unchanged' }}{{ d.title ? ', ' + d.title : '' }}</span>
         </span>
       }
     </div>
-    <div class="text-meta min-h-4 text-[11px] leading-4">{{ hint() }}</div>
+    <div class="text-faint truncate font-mono text-[10.5px] leading-[13px]">{{ label() }}</div>
+    @if (hint()) {
+      <div class="text-faint min-h-3.5 font-mono text-[10px] leading-3.5 opacity-80">{{ hint() }}</div>
+    }
     @if (spark().length > 1) {
       <app-sparkline class="mt-1" [values]="spark()" [color]="sparkColor()" />
     }

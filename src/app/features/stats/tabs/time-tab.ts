@@ -35,7 +35,7 @@ const pointsText = (estimate: number, scale: EstimateScale): string => {
   host: { class: 'block' },
   template: `
     @if (!s.entries().length) {
-      <div class="bg-muted mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg px-4 py-3 text-xs">
+      <div class="border-border mb-8 flex flex-wrap items-center gap-x-4 gap-y-2 border border-dashed px-4 py-3 text-xs">
         <p class="text-muted-foreground min-w-0 flex-1">
           You have not tracked any time yet. Start the timer on a task, or add time by hand, and these charts fill in.
         </p>
@@ -109,7 +109,7 @@ const pointsText = (estimate: number, scale: EstimateScale): string => {
       description="For each finished task that has an estimate, this compares the estimate with the time you tracked on it. Estimates are points, so “expected” means your usual time per point times the estimate. It looks at your tasks that are finished, over all time, not just the period."
     >
       @if (scale() === 'none' && !paced().sample) {
-        <p class="text-meta bg-muted rounded-lg px-4 py-6 text-center text-xs">
+        <p class="text-muted-foreground border-border border border-dashed px-4 py-6 text-center text-[13px]">
           Estimates are turned off in this workspace. Pick an estimate scale in settings to compare estimates with tracked time.
         </p>
       } @else {
@@ -121,7 +121,7 @@ const pointsText = (estimate: number, scale: EstimateScale): string => {
             [note]="accuracyNote()"
           >
             @if (paceLine(); as line) {
-              <p class="mb-3 text-xs">{{ line }}</p>
+              <p class="text-muted-foreground mb-3 font-mono text-[11px]">{{ line }}</p>
             }
             <app-bar-list [rows]="estimateRows()" ariaLabel="Median tracked time per estimate" />
           </app-chart-card>

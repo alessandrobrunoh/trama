@@ -14,7 +14,7 @@ const LEVEL_MIX = [0, 24, 46, 70, 94] as const;
   host: { class: 'block min-w-0' },
   template: `
     <div
-      class="outline-none focus-visible:ring-ring/50 rounded-md focus-visible:ring-2"
+      class="outline-none focus-visible:ring-ring/50 focus-visible:ring-2"
       tabindex="0"
       role="group"
       [attr.aria-label]="ariaLabel()"
@@ -24,13 +24,13 @@ const LEVEL_MIX = [0, 24, 46, 70, 94] as const;
       <div class="grid items-center gap-[2px]" [style.grid-template-columns]="'2.25rem repeat(' + columns().length + ', minmax(0, 1fr))'" aria-hidden="true">
         <span></span>
         @for (c of columns(); track $index) {
-          <span class="text-meta text-center text-[10px] leading-4 whitespace-nowrap tabular-nums">{{ $index % colStep() === 0 ? c : '' }}</span>
+          <span class="text-faint text-center font-mono text-[10px] leading-4 whitespace-nowrap tabular-nums">{{ $index % colStep() === 0 ? c : '' }}</span>
         }
         @for (r of rows(); track r; let ri = $index) {
-          <span class="text-meta pe-1 text-[11px]">{{ r }}</span>
+          <span class="text-faint pe-1 font-mono text-[10.5px]">{{ r }}</span>
           @for (c of columns(); track $index; let ci = $index) {
             <span
-              class="h-5 rounded-[3px] transition-[outline-color]"
+              class="h-5 transition-[outline-color]"
               [style.background]="color(cell(ri, ci))"
               [class.outline-2]="isActive(ri, ci)"
               [class.outline-foreground]="isActive(ri, ci)"
@@ -42,11 +42,11 @@ const LEVEL_MIX = [0, 24, 46, 70, 94] as const;
         }
       </div>
       <div class="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs">
-        <p class="text-foreground min-h-4" aria-live="polite">{{ readout() }}</p>
-        <div class="text-meta flex items-center gap-1.5 text-[11px]" aria-hidden="true">
+        <p class="text-foreground min-h-4 font-mono text-[11px]" aria-live="polite">{{ readout() }}</p>
+        <div class="text-faint flex items-center gap-1.5 font-mono text-[10.5px]" aria-hidden="true">
           <span>Less</span>
           @for (l of levels; track l) {
-            <span class="size-3 rounded-[3px]" [style.background]="levelColor(l)"></span>
+            <span class="size-3" [style.background]="levelColor(l)"></span>
           }
           <span>More</span>
         </div>
@@ -105,7 +105,7 @@ export class Heatmap {
   }
 
   protected levelColor(level: number): string {
-    return level === 0 ? 'var(--muted)' : `color-mix(in srgb, var(--chart-1) ${LEVEL_MIX[level]}%, transparent)`;
+    return level === 0 ? 'var(--secondary)' : `color-mix(in srgb, var(--chart-1) ${LEVEL_MIX[level]}%, transparent)`;
   }
 
   protected isActive(r: number, c: number): boolean {

@@ -1,12 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { LucideChartBar } from '@lucide/angular';
-import { HlmTabsImports } from '@spartan-ng/helm/tabs';
-import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { usePageShortcuts } from '../../core';
 import { AppSelect } from '../../shared/app-select';
 import { EmptyState } from '../../shared/empty-state';
 import { PageHeader } from '../../shared/page-header';
+import { V3Segmented, type V3SegmentOption } from '../../shared/v3';
 import { StatsDateField } from './date-field';
 import { PERIOD_CHOICES } from './stats-range';
 import { StatsScope, TABS, TAB_HINT, TAB_LABEL } from './stats-scope';
@@ -26,12 +25,11 @@ import { WorkTab } from './tabs/work-tab';
   changeDetection: ChangeDetectionStrategy.OnPush,
   providers: [StatsScope],
   imports: [
-    HlmTabsImports,
-    HlmToggleGroupImports,
     HlmTooltip,
     PageHeader,
     EmptyState,
     AppSelect,
+    V3Segmented,
     StatsDateField,
     FlowTab,
     WorkTab,
@@ -45,7 +43,7 @@ import { WorkTab } from './tabs/work-tab';
       title="Statistics"
       description="What gets finished, what is open, where your time goes and how projects are doing."
     />
-    <div class="mx-auto w-full max-w-[1100px] px-4 pb-10 sm:px-6">
+    <div class="mx-auto w-full max-w-[1100px] px-4 pt-7 pb-10 sm:px-10">
       @if (!hasTasks()) {
         <app-empty-state
           [icon]="chartIcon"
@@ -53,40 +51,47 @@ import { WorkTab } from './tabs/work-tab';
           description="Statistics appear once the workspace has tasks."
         />
       } @else {
-        <div class="bg-background/90 sm:sticky sm:top-0 z-10 -mx-4 mb-6 px-4 backdrop-blur sm:-mx-6 sm:px-6">
-          <hlm-tabs [tab]="s.tab()" (tabActivated)="s.setTab($event)">
-            <div class="scrollbar-none overflow-x-auto">
-              <hlm-tabs-list variant="line" class="h-9 w-max gap-1 p-0" aria-label="Statistics sections">
-                @for (t of tabs; track t; let i = $index) {
-                  <button [hlmTabsTrigger]="t" class="h-9 flex-none px-2.5 after:bottom-0" [hlmTooltip]="hint[t] + ' (' + (i + 1) + ')'" position="bottom">
-                    {{ label[t] }}
-                  </button>
-                }
-              </hlm-tabs-list>
-            </div>
-          </hlm-tabs>
-          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 py-2">
-            <hlm-toggle-group type="single" variant="outline" size="sm" [value]="s.periodId()" (valueChange)="s.setPeriod($event)" aria-label="Period">
-              @for (p of periods; track p.id) {
-                <button hlmToggleGroupItem [value]="p.id" class="max-sm:h-9" [hlmTooltip]="p.long" position="bottom">{{ p.label }}</button>
-              }
-            </hlm-toggle-group>
+        <header class="mb-5 flex flex-col gap-1.5">
+          <p class="text-faint font-mono text-[10.5px] leading-[14px]">WORKSPACE · {{ s.range().label.toUpperCase() }}</p>
+          <h1 class="font-title text-foreground text-[34px] leading-[38px] tracking-[-0.5px]">Statistics</h1>
+          <p class="text-muted-foreground max-w-[720px] text-[13.5px] leading-[21px]">
+            What gets finished, what is open, where your time goes and how projects are doing.
+          </p>
+        </header>
+
+        <div class="bg-background sticky top-0 z-10 -mx-4 mb-6 px-4 sm:-mx-10 sm:px-10">
+          <div class="border-border scrollbar-none -mb-px flex gap-[22px] overflow-x-auto border-b" role="tablist" aria-label="Statistics sections">
+            @for (t of tabs; track t; let i = $index) {
+              <button
+                type="button"
+                role="tab"
+                class="-mb-px flex flex-none items-start gap-1.5 border-b-2 pt-3 pb-2.5 text-[13px] leading-4 whitespace-nowrap outline-none focus-visible:underline"
+                [class]="s.tab() === t ? 'border-primary text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'"
+                [attr.aria-selected]="s.tab() === t"
+                [title]="hint[t] + ' (' + (i + 1) + ')'"
+                (click)="s.setTab(t)"
+              >
+                {{ label[t] }}
+              </button>
+            }
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-2 py-3">
+            <v3-segmented aria-label="Period" [options]="periodOptions" [value]="s.periodId()" (valueChange)="s.setPeriod($event)" />
             @if (s.range().custom) {
-              <div class="flex items-center gap-2 text-xs">
+              <div class="flex items-center gap-2 font-mono text-[11px]">
                 <app-stats-date-field label="From" [value]="s.fromKey()" [max]="today()" (valueChange)="s.setRange($event, s.toKey())" />
-                <span class="text-muted-foreground" aria-hidden="true">to</span>
+                <span class="text-faint" aria-hidden="true">to</span>
                 <app-stats-date-field label="To" [value]="s.toKey()" [max]="today()" (valueChange)="s.setRange(s.fromKey(), $event)" />
               </div>
             }
-            <label class="text-muted-foreground flex items-center gap-2 text-xs">
-              Project
+            <label class="text-faint flex items-center gap-2 font-mono text-[10.5px]">
+              PROJECT
               <app-select size="sm" class="w-44" label="Project" [options]="s.projectOptions()" [value]="s.projectId() ?? 'all'" (valueChange)="s.setProject($event)" />
             </label>
-            <label class="text-muted-foreground flex items-center gap-2 text-xs" hlmTooltip="A task in progress with no activity for this long is stale and is left out of every average">
-              Stale after
+            <label class="text-faint flex items-center gap-2 font-mono text-[10.5px]" hlmTooltip="A task in progress with no activity for this long is stale and is left out of every average">
+              STALE AFTER
               <app-select size="sm" class="w-28" label="Stale after" [options]="s.idleOptions" [value]="'' + s.idleDays()" (valueChange)="s.setIdle($event)" />
             </label>
-            <span class="text-meta ms-auto text-xs">{{ s.range().label }}</span>
           </div>
         </div>
 
@@ -123,7 +128,7 @@ export class StatsPage {
   protected readonly tabs = TABS;
   protected readonly label = TAB_LABEL;
   protected readonly hint = TAB_HINT;
-  protected readonly periods = PERIOD_CHOICES;
+  protected readonly periodOptions: V3SegmentOption[] = PERIOD_CHOICES.map((p) => ({ value: p.id, label: p.label }));
   protected readonly hasTasks = computed(() => this.s.allIssues().length > 0);
   protected readonly today = computed(() => new Date(this.s.now()));
 

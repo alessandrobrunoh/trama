@@ -59,29 +59,29 @@ const plural = (n: number, one: string): string => `${n} ${n === 1 ? one : `${on
         <li class="flex"><app-kpi-tile class="w-full" label="Milestones missed" [value]="'' + totals().missed" [hint]="totals().upcoming + ' still ahead'" /></li>
       </ul>
 
-      <div class="bg-card border-border mt-4 rounded-lg border">
+      <div class="border-border mt-4 border-t">
         @if (rows().length) {
           <ul>
             @for (r of rows(); track r.project.id) {
-              <li class="border-border flex flex-col gap-2 border-b px-4 py-3 last:border-b-0">
+              <li class="border-border hover:bg-secondary flex flex-col gap-2 border-b px-1 py-3">
                 <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <a class="flex min-w-0 items-center gap-2 text-sm font-medium hover:underline" [routerLink]="['/', s.slug(), 'projects', r.project.id]">
+                  <a class="flex min-w-0 items-center gap-2 text-[13.5px] hover:underline" [routerLink]="['/', s.slug(), 'projects', r.project.id]">
                     <app-project-glyph [project]="r.project" [size]="15" />
                     <span class="truncate">{{ r.project.name }}</span>
                   </a>
                   <app-status-badge [status]="r.project.status" entity="project" />
-                  <span class="ms-auto flex items-center gap-1.5 text-xs" [title]="r.forecast.explanation">
-                    <span class="size-2 rounded-full" [style.background]="signalColor(r.forecast.signal)" aria-hidden="true"></span>
+                  <span class="text-muted-foreground ms-auto flex items-center gap-1.5 font-mono text-[10.5px]" [title]="r.forecast.explanation">
+                    <span class="size-2" [style.background]="signalColor(r.forecast.signal)" aria-hidden="true"></span>
                     {{ r.forecast.label }}
                   </span>
                 </div>
                 <div class="flex items-center gap-3">
-                  <div class="bg-muted h-2 min-w-0 flex-1 overflow-hidden rounded-full" role="progressbar" [attr.aria-valuenow]="pct(r)" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="r.project.name + ' progress'">
-                    <div class="h-full rounded-full" [style.width.%]="pct(r)" style="background: var(--status-shipped)"></div>
+                  <div class="bg-secondary h-1.5 min-w-0 flex-1 overflow-hidden" role="progressbar" [attr.aria-valuenow]="pct(r)" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="r.project.name + ' progress'">
+                    <div class="h-full" [style.width.%]="pct(r)" style="background: var(--status-shipped)"></div>
                   </div>
-                  <span class="w-28 shrink-0 text-end text-xs tabular-nums">{{ r.done }} / {{ r.total }} done · {{ pct(r) }}%</span>
+                  <span class="text-foreground w-32 shrink-0 text-end font-mono text-[10.5px] tabular-nums">{{ r.done }} / {{ r.total }} done · {{ pct(r) }}%</span>
                 </div>
-                <p class="text-muted-foreground flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+                <p class="text-faint flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[10.5px]">
                   <span>{{ r.open }} open</span>
                   <span>{{ r.closed }} closed in the period</span>
                   <span>{{ r.created }} added</span>
@@ -92,7 +92,7 @@ const plural = (n: number, one: string): string => `${n} ${n === 1 ? one : `${on
             }
           </ul>
         } @else {
-          <p class="text-meta px-4 py-8 text-center">No projects yet. Create a project and add tasks to follow its progress here.</p>
+          <p class="text-muted-foreground border-border border-b px-4 py-8 text-center text-[13px]">No projects yet. Create a project and add tasks to follow its progress here.</p>
         }
       </div>
     </app-stat-section>
@@ -138,21 +138,21 @@ const plural = (n: number, one: string): string => `${n} ${n === 1 ? one : `${on
       title="Milestones"
       description="A milestone is hit when every task in it is done, on time when the last one was done by the target date. It is missed when the target date has passed with tasks still open."
     >
-      <div class="bg-card border-border rounded-lg border">
+      <div class="border-border border-t">
         @if (milestones().length) {
           <ul>
             @for (m of shownMilestones(); track m.milestone.id) {
-              <li class="border-border flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2.5 text-xs last:border-b-0">
+              <li class="border-border hover:bg-secondary flex flex-wrap items-center gap-x-4 gap-y-1 border-b px-1 py-2.5 text-xs">
                 <div class="min-w-0 flex-1 basis-48">
                   <p class="truncate text-[13px]">{{ m.milestone.name }}</p>
-                  <p class="text-muted-foreground truncate">{{ s.projectName(m.milestone.projectId) }}</p>
+                  <p class="text-faint truncate font-mono text-[10.5px]">{{ s.projectName(m.milestone.projectId) }}</p>
                 </div>
-                <span class="flex items-center gap-1.5">
-                  <span class="size-2 rounded-full" [style.background]="stateColor(m)" aria-hidden="true"></span>
+                <span class="flex items-center gap-1.5 font-mono text-[10.5px]">
+                  <span class="size-2" [style.background]="stateColor(m)" aria-hidden="true"></span>
                   {{ stateText(m) }}
                 </span>
-                <span class="text-muted-foreground w-20 text-end tabular-nums">{{ m.done }} / {{ m.total }} done</span>
-                <span class="text-muted-foreground w-24 text-end tabular-nums">{{ targetText(m) }}</span>
+                <span class="text-muted-foreground w-20 text-end font-mono text-[10.5px] tabular-nums">{{ m.done }} / {{ m.total }} done</span>
+                <span class="text-muted-foreground w-24 text-end font-mono text-[10.5px] tabular-nums">{{ targetText(m) }}</span>
               </li>
             }
           </ul>
@@ -162,7 +162,7 @@ const plural = (n: number, one: string): string => `${n} ${n === 1 ? one : `${on
             </button>
           }
         } @else {
-          <p class="text-meta px-4 py-8 text-center">No milestones yet. Add milestones with target dates to a project to see which ones were hit.</p>
+          <p class="text-muted-foreground border-border border-b px-4 py-8 text-center text-[13px]">No milestones yet. Add milestones with target dates to a project to see which ones were hit.</p>
         }
       </div>
     </app-stat-section>

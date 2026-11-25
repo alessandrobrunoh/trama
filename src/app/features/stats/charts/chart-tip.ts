@@ -9,7 +9,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     class:
-      'bg-popover text-popover-foreground border-border pointer-events-none absolute z-20 min-w-36 max-w-64 rounded-md border px-2.5 py-2 text-xs shadow-md',
+      'bg-secondary text-foreground border-border-strong pointer-events-none absolute z-20 min-w-36 max-w-64 border px-[11px] py-[9px] text-xs shadow-[0_8px_20px_#00000088]',
     '[style.left.px]': 'x()',
     '[style.top.px]': 'y()',
     '[style.transform]': 'transform()',

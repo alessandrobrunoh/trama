@@ -28,15 +28,15 @@ interface Seg {
           <li>
             <button
               type="button"
-              class="hover:bg-hover text-muted-foreground flex items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs transition-colors"
+              class="hover:bg-secondary text-muted-foreground flex items-center gap-1.5 px-1.5 py-0.5 font-mono text-[11px] transition-colors"
               [class.opacity-45]="isHidden(s.key)"
               [attr.aria-pressed]="!isHidden(s.key)"
               (click)="toggle(s.key)"
             >
               @if (mode() === 'line') {
-                <span class="h-0.5 w-3 rounded-full" [style.background]="s.color"></span>
+                <span class="h-0.5 w-3" [style.background]="s.color"></span>
               } @else {
-                <span class="size-2 rounded-[2px]" [style.background]="s.color"></span>
+                <span class="size-2.5" [style.background]="s.color"></span>
               }
               <span [class.line-through]="isHidden(s.key)">{{ s.label }}</span>
             </button>
@@ -60,15 +60,14 @@ interface Seg {
         role="img"
         [attr.aria-label]="ariaLabel()"
       >
-        <!-- dashed gridlines + y labels -->
+        <!-- hairline gridlines + y labels -->
         @for (t of grid(); track t.value) {
           <line
             [attr.x1]="ml()"
             [attr.x2]="width() - mr"
             [attr.y1]="t.y"
             [attr.y2]="t.y"
-            [style.stroke]="t.value === 0 ? 'var(--border-strong)' : 'var(--border)'"
-            [attr.stroke-dasharray]="t.value === 0 ? null : '3 4'"
+            [style.stroke]="t.value === 0 ? 'var(--line)' : 'var(--border)'"
             stroke-width="1"
           />
           <text
@@ -76,9 +75,9 @@ interface Seg {
             [attr.y]="t.y"
             text-anchor="end"
             dominant-baseline="middle"
-            font-size="11"
-            class="tabular-nums"
-            style="fill: var(--muted-foreground)"
+            font-size="9.5"
+            class="font-mono tabular-nums"
+            style="fill: var(--faint)"
           >
             {{ t.label }}
           </text>
@@ -90,9 +89,9 @@ interface Seg {
             [attr.x]="t.x"
             [attr.y]="height() - 6"
             [attr.text-anchor]="t.anchor"
-            font-size="11"
-            class="tabular-nums"
-            style="fill: var(--muted-foreground)"
+            font-size="10"
+            class="font-mono tabular-nums"
+            style="fill: var(--faint)"
           >
             {{ t.label }}
           </text>
@@ -104,7 +103,6 @@ interface Seg {
             [attr.width]="hoverBand().w"
             [attr.y]="mt"
             [attr.height]="innerH()"
-            rx="4"
             style="fill: var(--hover)"
           />
         }
@@ -158,12 +156,12 @@ interface Seg {
         }
         @if (mode() === 'line') {
           @for (d of dots(); track d.key) {
-            <circle [attr.cx]="d.x" [attr.cy]="d.y" r="4" [style.fill]="d.color" [style.stroke]="surface" stroke-width="2" />
+            <rect [attr.x]="d.x - 4" [attr.y]="d.y - 4" width="8" height="8" [style.fill]="d.color" [style.stroke]="surface" stroke-width="2" />
           }
         }
         @if (mode() === 'stacked' && hover() !== null) {
           @for (d of stackDots(); track d.key) {
-            <circle [attr.cx]="d.x" [attr.cy]="d.y" r="3.5" [style.fill]="d.color" [style.stroke]="surface" stroke-width="2" />
+            <rect [attr.x]="d.x - 3.5" [attr.y]="d.y - 3.5" width="7" height="7" [style.fill]="d.color" [style.stroke]="surface" stroke-width="2" />
           }
         }
 
@@ -181,20 +179,20 @@ interface Seg {
 
       @if (tip(); as t) {
         <app-chart-tip [x]="t.x" [y]="mt" [bounds]="width()">
-          <div class="text-muted-foreground mb-1 text-[11px] tabular-nums">{{ t.title }}</div>
-          <ul class="flex flex-col gap-1">
+          <div class="text-foreground mb-1.5 font-mono text-[10px] leading-[13px] uppercase tabular-nums">{{ t.title }}</div>
+          <ul class="flex flex-col gap-[5px]">
             @for (r of t.rows; track r.key) {
-              <li class="flex items-center gap-2">
-                <span class="h-0.5 w-2.5 shrink-0 rounded-full" [style.background]="r.color"></span>
-                <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ r.label }}</span>
-                <span class="text-foreground font-medium tabular-nums">{{ r.value }}</span>
+              <li class="flex items-center gap-1.5">
+                <span class="size-2 shrink-0" [style.background]="r.color"></span>
+                <span class="text-muted-foreground min-w-0 flex-1 truncate text-[12px]">{{ r.label }}</span>
+                <span class="text-foreground font-mono text-[11px] tabular-nums">{{ r.value }}</span>
               </li>
             }
           </ul>
           @if (t.total) {
-            <div class="mt-1.5 flex items-center justify-between gap-2 pt-1.5">
-              <span class="text-muted-foreground">Total</span>
-              <span class="text-foreground font-medium tabular-nums">{{ t.total }}</span>
+            <div class="border-border mt-1.5 flex items-center justify-between gap-2 border-t pt-1.5">
+              <span class="text-muted-foreground text-[12px]">Total</span>
+              <span class="text-foreground font-mono text-[11px] tabular-nums">{{ t.total }}</span>
             </div>
           }
         </app-chart-tip>

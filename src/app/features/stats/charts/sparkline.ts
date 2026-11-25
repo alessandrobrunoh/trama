@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 
-/** 12-ish point trend for a KPI tile. Stretches to its box; the end dot is a separate element so it stays round. */
+/** 12-ish point trend for a KPI tile. Stretches to its box; the end marker is a separate element so it stays square. */
 @Component({
   selector: 'app-sparkline',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -20,7 +20,7 @@ import { ChangeDetectionStrategy, Component, computed, input } from '@angular/co
         />
       </svg>
       <span
-        class="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full"
+        class="absolute size-2 -translate-x-1/2 -translate-y-1/2"
         [style.background]="color()"
         [style.box-shadow]="'0 0 0 2px var(--background)'"
         [style.left]="'calc((100% - 4px) * ' + g.endX / 100 + ')'"

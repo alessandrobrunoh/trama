@@ -24,7 +24,7 @@ export interface BarRow {
   color?: string;
 }
 
-/** Horizontal bars, label left, value at the tip. Thin bars with a 4px rounded data-end on a shared baseline. */
+/** Horizontal bars, label left, value at the end: hairline rows with a square bar on a `bg-secondary` track. */
 @Component({
   selector: 'app-bar-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -32,10 +32,10 @@ export interface BarRow {
   host: { class: 'block' },
   template: `
     @if (rows().length) {
-      <ul class="flex flex-col" [attr.aria-label]="ariaLabel()">
+      <ul class="border-border flex flex-col border-t" [attr.aria-label]="ariaLabel()">
         @for (row of rows(); track row.key ?? row.label) {
           <li
-            class="hover:bg-hover focus-within:bg-hover -mx-2 grid grid-cols-[minmax(0,9rem)_minmax(0,1fr)_3rem] items-center gap-3 rounded-md px-2 py-1.5 text-xs transition-colors"
+            class="border-border hover:bg-secondary focus-within:bg-secondary grid min-h-[34px] grid-cols-[minmax(0,9rem)_minmax(0,1fr)_3rem] items-center gap-3 border-b px-1 py-1.5 text-[12.5px] transition-colors"
             [hlmTooltip]="row.detail ?? row.label + ': ' + (row.valueLabel ?? row.value)"
             position="top"
             tabindex="0"
@@ -54,23 +54,23 @@ export interface BarRow {
               }
               <span class="truncate">{{ row.label }}</span>
               @if (row.hint) {
-                <span class="text-meta shrink-0 font-mono text-[10px]">{{ row.hint }}</span>
+                <span class="text-faint shrink-0 font-mono text-[10px]">{{ row.hint }}</span>
               }
             </span>
-            <span class="border-border-strong relative h-4 border-s">
+            <span class="bg-secondary relative h-1.5">
               <span
-                class="absolute inset-y-[5px] start-0 rounded-e-[4px] motion-safe:transition-[width]"
+                class="absolute inset-y-0 start-0 motion-safe:transition-[width]"
                 [style.width.%]="width(row.value)"
                 [style.min-width.px]="row.value > 0 ? 3 : 0"
                 [style.background]="row.color ?? defaultColor()"
               ></span>
             </span>
-            <span class="text-end font-medium tabular-nums">{{ row.valueLabel ?? row.value }}</span>
+            <span class="text-foreground text-end font-mono text-[11px] tabular-nums">{{ row.valueLabel ?? row.value }}</span>
           </li>
         }
       </ul>
     } @else {
-      <p class="text-meta py-6 text-center">{{ empty() }}</p>
+      <p class="text-muted-foreground border-border border border-dashed px-5 py-6 text-center text-[13px]">{{ empty() }}</p>
     }
   `,
 })
