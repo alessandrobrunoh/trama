@@ -18,7 +18,8 @@ export class HlmCommandGroup {
   constructor() {
     classes(
       () =>
-        'text-foreground **:data-[slot=command-group-label]:text-muted-foreground overflow-hidden p-1 **:data-[slot=command-group-label]:px-2 **:data-[slot=command-group-label]:py-1.5 **:data-[slot=command-group-label]:text-xs **:data-[slot=command-group-label]:font-medium block data-hidden:hidden',
+        // v3 group: 8px padding, mono 10px faint uppercase label sitting right on top of its rows.
+        'text-foreground **:data-[slot=command-group-label]:text-faint overflow-hidden p-2 **:data-[slot=command-group-label]:px-0 **:data-[slot=command-group-label]:py-0 **:data-[slot=command-group-label]:font-mono **:data-[slot=command-group-label]:text-[10px] **:data-[slot=command-group-label]:leading-[13px] **:data-[slot=command-group-label]:font-normal **:data-[slot=command-group-label]:uppercase block data-hidden:hidden',
     );
   }
 }

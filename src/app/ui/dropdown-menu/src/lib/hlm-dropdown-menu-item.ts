@@ -36,7 +36,9 @@ export class HlmDropdownMenuItem {
   constructor() {
     classes(
       () =>
-        "hover:bg-accent focus:bg-accent hover:text-accent-foreground focus:text-accent-foreground data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:focus:bg-destructive/10 dark:data-[variant=destructive]:hover:bg-destructive/20 dark:data-[variant=destructive]:focus:bg-destructive/20 data-[variant=destructive]:hover:text-destructive data-[variant=destructive]:focus:text-destructive data-[variant=destructive]:*:[ng-icon]:text-destructive not-data-[variant=destructive]:hover:**:text-accent-foreground not-data-[variant=destructive]:focus:**:text-accent-foreground gap-2 rounded-[5px] px-2 py-1 min-h-7 text-start text-[13px] data-inset:ps-7 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/dropdown-menu-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_ng-icon]:pointer-events-none [&_ng-icon]:shrink-0",
+        // v3 Menu item: 30px, padding 0 10, gap 10, 14px muted icon, Sans 13 text, mono 11 faint hint; the
+        // hovered / focused item takes the `selected` step (#262A30), a danger item keeps its red.
+        "text-foreground hover:bg-selected focus:bg-selected data-[variant=destructive]:text-destructive data-[variant=destructive]:hover:bg-destructive/10 data-[variant=destructive]:focus:bg-destructive/10 data-[variant=destructive]:*:[ng-icon]:text-destructive data-[variant=destructive]:[&>svg]:text-destructive [&>svg:not([class*='text-'])]:text-muted-foreground gap-2.5 px-2.5 py-0 min-h-[30px] text-start text-[13px] data-inset:ps-7 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/dropdown-menu-item relative flex w-full cursor-default items-center outline-hidden select-none data-disabled:pointer-events-none data-disabled:opacity-50 [&_ng-icon]:pointer-events-none [&_ng-icon]:shrink-0 [&>svg]:shrink-0",
     );
   }
 }

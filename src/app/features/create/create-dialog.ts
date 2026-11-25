@@ -18,6 +18,7 @@ import {
   LucideBox,
   LucideGauge,
   LucideLayers,
+  LucideListTree,
   LucideMessageSquare,
   LucideTag,
   LucideX,
@@ -26,6 +27,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
+import { HlmKbd } from '@spartan-ng/helm/kbd';
 import { HlmSpinner } from '@spartan-ng/helm/spinner';
 import { HlmSwitchImports } from '@spartan-ng/helm/switch';
 import { HlmTextareaImports } from '@spartan-ng/helm/textarea';
@@ -56,7 +58,7 @@ import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore, type CreateKind } from '../../core/stores/ui.store';
 import { Kbd } from '../../shared/kbd';
 import { LabelCatalog } from '../../shared/label-catalog';
-import { StatusIcon } from '../../shared/status';
+import { V3_FIELD, V3_TEXTAREA, V3DialogFoot, V3DialogHead, V3Field, V3Toggle } from '../../shared/v3';
 import { issueEstimateOptions } from '../issues/issue-model';
 import { isValidThreadUrl, toThreadUrl } from '../issues/issue-thread-link';
 import { Picker, type PickOption } from '../../shared/picker';
@@ -92,6 +94,9 @@ const EXTRA: Partial<Record<CreateKind, { label: string; icon: LucideIcon }>> = 
 const VIEW_LAYOUTS: readonly ViewLayout[] = ['list', 'board', 'timeline'];
 const VIEW_ENTITIES: readonly ViewEntity[] = ['issue', 'project'];
 
+const IS_MAC =
+  typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
 const asStr = (v: unknown): string => (typeof v === 'string' ? v : '');
 const asArr = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : [];
@@ -125,127 +130,79 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
     HlmTextareaImports,
     HlmSpinner,
     LucideDynamicIcon,
-    StatusIcon,
     Picker,
     AppSelect,
     FormRow,
     DraftSuggestions,
     EntityChip,
     Kbd,
+    HlmKbd,
+    V3DialogHead,
+    V3DialogFoot,
+    V3Field,
+    V3Toggle,
   ],
   template: `
     <hlm-dialog [state]="open() ? 'open' : 'closed'" (closed)="onClosed()">
       <hlm-dialog-content
         *hlmDialogPortal="let ctx"
         data-variant="fullscreen"
-        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[46rem]"
+        class="max-h-[92svh] gap-0 overflow-y-auto p-0 sm:max-w-[620px]"
         [showCloseButton]="false"
         (keydown.meta.enter)="submit($event)"
         (keydown.control.enter)="submit($event)"
+        (keydown.meta.shift.enter)="submit($event, false, true)"
+        (keydown.control.shift.enter)="submit($event, false, true)"
       >
-        <hlm-dialog-header class="gap-0 px-4 pt-3 pb-0">
-          <h2 hlmDialogTitle class="sr-only">New {{ kindLabel() }}</h2>
-          <p hlmDialogDescription class="sr-only">
-            Create a new {{ kindLabel().toLowerCase() }} in this workspace.
-          </p>
-          <div class="flex items-center gap-2">
-            @if (composer(); as c) {
-              <div class="text-muted-foreground flex min-w-0 flex-1 items-center gap-1.5 text-[13px]">
-                <app-status-icon entity="issue" status="todo" [size]="13" />
-                <span>New {{ c.label.toLowerCase() }}</span>
-                @if (projectName(); as pn) {
-                  <span aria-hidden="true">›</span>
-                  <span class="text-foreground truncate">{{ pn }}</span>
-                }
-              </div>
-            } @else {
-              <div class="flex flex-1 items-center gap-2 py-1 text-sm font-medium">
-                <svg [lucideIcon]="extraIcon()" [size]="15" class="text-muted-foreground"></svg>
-                New {{ kindLabel().toLowerCase() }}
-              </div>
-            }
-            <button
-              hlmBtn
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              class="text-muted-foreground"
-              hlmDialogClose
-              aria-label="Close"
-            >
-              <svg [lucideIcon]="closeIcon" [size]="16"></svg>
-            </button>
-          </div>
-        </hlm-dialog-header>
+        <!-- v3 · 15: kicker + Newsreader title + esc, then Body (padding 18, gap 14) and Foot -->
+        <v3-dialog-head [kicker]="'NEW ' + kindLabel().toUpperCase()" (dismiss)="ui.closeModal()">
+          <h2 hlmDialogTitle>Create {{ kindLabel().toLowerCase() }}</h2>
+        </v3-dialog-head>
+        <p hlmDialogDescription class="sr-only">
+          Create a new {{ kindLabel().toLowerCase() }} in this workspace.
+        </p>
 
         <form (submit)="submit($event)" novalidate class="flex flex-col" [class]="composer() ? '' : 'sm:min-w-md'">
           @if (restored()) {
-            <div class="bg-muted/50 text-muted-foreground mx-5 mt-3 flex items-center gap-2 rounded-md px-2.5 py-1.5 text-xs" data-testid="draft-restored">
+            <div class="bg-secondary text-muted-foreground mx-[18px] mt-3.5 flex items-center gap-2 px-2.5 py-1.5 font-mono text-[10.5px]" data-testid="draft-restored">
               Restored your unsent {{ kindLabel().toLowerCase() }}.
               <button type="button" class="text-foreground ml-auto underline-offset-2 hover:underline" (click)="discardDraft()">Discard</button>
             </div>
           }
           @if (composer()) {
-            <!-- title + description -->
-            <div class="flex flex-col gap-1 px-5 pt-3">
-              <input
-                #titleEl
-                id="cr-title"
-                class="placeholder:text-muted-foreground/60 w-full bg-transparent py-1 text-xl font-semibold tracking-tight outline-none"
-                [placeholder]="titlePlaceholder()"
-                [(ngModel)]="title"
-                name="title"
-                autocomplete="off"
-                autofocus
-                aria-label="Title"
-                [attr.aria-invalid]="!!err('title')"
-              />
-              @if (err('title'); as e) {
-                <p class="text-destructive text-xs" role="alert">{{ e }}</p>
-              }
-              <textarea
-                class="placeholder:text-muted-foreground/60 field-sizing-content max-h-72 min-h-24 w-full resize-none bg-transparent py-1 text-sm leading-relaxed outline-none"
-                rows="3"
-                [placeholder]="bodyPlaceholder()"
-                [(ngModel)]="text"
-                name="body"
-                aria-label="Description"
-              ></textarea>
-              @if (kind() === 'issue' && parentId()) {
-                <p
-                  class="bg-muted/50 text-muted-foreground mt-2 flex min-w-0 flex-wrap items-center gap-1.5 rounded-md px-3 py-2 text-xs"
-                >
-                  This task will be a subtask of
-                  <app-entity-chip class="max-w-full" type="issue" [ref]="parentId()" />.
-                </p>
-              }
-              @if (kind() === 'issue') {
-                <div class="mt-1 flex items-center gap-2">
-                  <svg
-                    [lucideIcon]="threadIcon"
-                    [size]="14"
-                    class="text-muted-foreground shrink-0"
-                    aria-hidden="true"
-                  ></svg>
-                  <input
-                    class="placeholder:text-muted-foreground/60 w-full bg-transparent py-1 text-sm outline-none"
-                    placeholder="Thread link (optional), e.g. https://delta.dev/…"
-                    [(ngModel)]="threadUrl"
-                    name="threadUrl"
-                    autocomplete="off"
-                    spellcheck="false"
-                    aria-label="Thread link"
-                    [attr.aria-invalid]="!!err('thread')"
-                  />
-                </div>
-                @if (err('thread'); as e) {
-                  <p class="text-destructive pl-6 text-xs" role="alert">{{ e }}</p>
+            <div class="flex flex-col gap-3.5 p-[18px]">
+              <!-- title + description -->
+              <v3-field label="TITLE" for="cr-title">
+                <input
+                  #titleEl
+                  id="cr-title"
+                  [class]="fieldClass"
+                  [placeholder]="titlePlaceholder()"
+                  [(ngModel)]="title"
+                  name="title"
+                  autocomplete="off"
+                  autofocus
+                  aria-label="Title"
+                  [attr.aria-invalid]="!!err('title')"
+                />
+                @if (err('title'); as e) {
+                  <p class="text-red font-mono text-[10.5px]" role="alert">{{ e }}</p>
                 }
-              }
-            </div>
+              </v3-field>
+              <v3-field label="DESCRIPTION" for="cr-body">
+                <textarea
+                  id="cr-body"
+                  [class]="textareaClass"
+                  class="field-sizing-content max-h-72 min-h-[84px]"
+                  rows="3"
+                  [placeholder]="bodyPlaceholder()"
+                  [(ngModel)]="text"
+                  name="body"
+                  aria-label="Description"
+                ></textarea>
+              </v3-field>
 
-            <!-- quick suggestions -->
-            <div class="px-5 pt-3">
+              <!-- quick suggestions -->
               <app-draft-suggestions
                 [kind]="composer()!.kind"
                 [title]="title()"
@@ -258,10 +215,9 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                 (triageAccepted)="applyIssueSuggestion($event)"
                 (settingsRequested)="ui.closeModal()"
               />
-            </div>
 
-            <!-- property chips -->
-            <div class="flex flex-wrap items-center gap-1.5 px-5 pt-3 pb-3" role="group" aria-label="Task properties">
+              <!-- property pills -->
+              <div class="flex flex-wrap items-center gap-2" role="group" aria-label="Task properties">
               @switch (kind()) {
                 @case ('issue') {
                   <app-picker
@@ -336,9 +292,61 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   />
                 }
               }
+              </div>
+
+              @if (kind() === 'issue' && parentId()) {
+                <!-- Parent: the task this one hangs under -->
+                <div class="bg-background border-border flex min-w-0 items-center gap-2.5 border px-3 py-2.5">
+                  <svg [lucideIcon]="subtaskIcon" [size]="14" class="text-muted-foreground shrink-0" aria-hidden="true"></svg>
+                  <span class="text-faint font-mono text-[10px]">PARENT</span>
+                  @if (parentIssue(); as p) {
+                    <span class="text-muted-foreground shrink-0 font-mono text-[11px]">{{ p.key }}</span>
+                    <span class="text-foreground min-w-0 truncate text-[13px]">{{ p.title }}</span>
+                  } @else {
+                    <app-entity-chip class="max-w-full" type="issue" [ref]="parentId()" />
+                  }
+                  <span class="min-w-0 flex-1"></span>
+                  <span class="text-foreground shrink-0 font-mono text-[10.5px]">→ subtask</span>
+                </div>
+              }
+
+              @if (kind() === 'issue') {
+                <!-- Optional Delta thread -->
+                <div>
+                  <div class="bg-background border-border focus-within:border-primary flex h-[34px] items-center gap-2 border px-2.5 transition-colors">
+                    <svg
+                      [lucideIcon]="threadIcon"
+                      [size]="14"
+                      class="text-delta shrink-0"
+                      aria-hidden="true"
+                    ></svg>
+                    <input
+                      class="placeholder:text-faint min-w-0 flex-1 bg-transparent font-mono text-[11.5px] outline-none"
+                      placeholder="Thread link (optional), e.g. https://delta.dev/…"
+                      [(ngModel)]="threadUrl"
+                      name="threadUrl"
+                      autocomplete="off"
+                      spellcheck="false"
+                      aria-label="Thread link"
+                      [attr.aria-invalid]="!!err('thread')"
+                    />
+                  </div>
+                  @if (err('thread'); as e) {
+                    <p class="text-red mt-1.5 font-mono text-[10.5px]" role="alert">{{ e }}</p>
+                  }
+                </div>
+
+                <label class="flex items-center gap-2.5 text-[13px]">
+                  <span class="min-w-0 flex-1">Create more</span>
+                  <v3-toggle [(checked)]="createMore" aria-label="Create more" />
+                </label>
+                <p class="text-faint font-mono text-[10.5px] leading-[15px]">
+                  Start it from Delta with /trama once it exists — one thread per task or subtask.
+                </p>
+              }
             </div>
           } @else {
-            <div class="flex flex-col gap-3 px-4 pt-2 pb-4">
+            <div class="flex flex-col gap-3 p-[18px]">
               @switch (kind()) {
                 @case ('project') {
                   <app-form-row label="Name" [error]="err('title')">
@@ -441,39 +449,38 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
             </div>
           }
 
-          <hlm-dialog-footer
-            class="mx-0 mb-0 flex-row items-center justify-end gap-3 rounded-b-xl px-4 py-3"
-          >
+          <v3-dialog-foot [hint]="composer() ? anotherHint : ''">
             @if (composer()) {
               <button
                 hlmBtn
                 type="button"
                 variant="ghost"
-                size="sm"
-                class="text-muted-foreground mr-auto h-8 px-2 text-xs max-sm:h-10"
+                class="max-sm:h-10"
                 [disabled]="busy()"
                 (click)="saveDraft($event)"
               >
                 Save as draft
               </button>
-              <label class="text-muted-foreground flex cursor-pointer items-center gap-2 text-xs">
-                <hlm-switch size="sm" [(checked)]="createMore" aria-label="Create more" />
-                Create more
-              </label>
             }
-            @if (!composer()) {
-              <button hlmBtn type="button" variant="ghost" size="sm" class="max-sm:h-10" hlmDialogClose>Cancel</button>
-            }
-            <button hlmBtn type="submit" size="sm" class="max-sm:h-10" [disabled]="busy()">
+            <button hlmBtn type="button" variant="outline" class="max-sm:h-10" hlmDialogClose>
+              Cancel <kbd hlmKbd class="h-4 max-sm:hidden">esc</kbd>
+            </button>
+            <button
+              hlmBtn
+              type="submit"
+              class="max-sm:h-10"
+              [attr.aria-label]="'Create ' + kindLabel().toLowerCase()"
+              [disabled]="busy()"
+            >
               @if (busy()) {
                 <hlm-spinner />
               }
-              Create {{ kindLabel().toLowerCase() }}
+              Create
               @if (composer()) {
-                <app-kbd keys="mod+enter" class="opacity-70 max-sm:hidden" />
+                <app-kbd keys="mod+enter" class="max-sm:hidden [&_kbd]:h-4" />
               }
             </button>
-          </hlm-dialog-footer>
+          </v3-dialog-foot>
         </form>
       </hlm-dialog-content>
     </hlm-dialog>
@@ -496,7 +503,12 @@ export class CreateDialog {
   protected readonly estimateIcon = LucideGauge;
   protected readonly labelIcon = LucideTag;
   protected readonly threadIcon = LucideMessageSquare;
-  protected readonly closeIcon = LucideX;
+  protected readonly subtaskIcon = LucideListTree;
+  protected readonly fieldClass = V3_FIELD;
+  protected readonly textareaClass = V3_TEXTAREA;
+  /** Foot hint: the platform's modifier glyphs, "⇧⌘↵ create & add another". */
+  protected readonly anotherHint = `${IS_MAC ? '⇧⌘↵' : 'Shift+Ctrl+Enter'} create & add another`;
+  protected readonly parentIssue = computed(() => this.store.getIssue(this.parentId()));
 
   protected readonly open = computed(() => this.ui.modal() === 'create');
   protected readonly kind = signal<CreateKind>('issue');
@@ -859,7 +871,8 @@ export class CreateDialog {
     void this.submit(ev, true);
   }
 
-  protected async submit(ev: Event, asDraft = false): Promise<void> {
+  /** `another`: keep the dialog open for the next task (⇧⌘↵), whatever "Create more" says. */
+  protected async submit(ev: Event, asDraft = false, another = false): Promise<void> {
     ev.preventDefault();
     ev.stopPropagation();
     if (this.busy()) return;
@@ -939,7 +952,7 @@ export class CreateDialog {
           : { label: 'Open', run: () => void this.router.navigate(commands) },
       });
       this.drafts.set(this.draftKey(this.kind()), null);
-      if (this.createMore() && this.composer()) {
+      if ((this.createMore() || another) && this.composer()) {
         this.title.set('');
         this.text.set('');
         this.text2.set('');

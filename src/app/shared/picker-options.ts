@@ -6,6 +6,7 @@ import {
   type Issue,
   type TramaStore,
 } from '../core';
+import { isClosedIssue } from '../features/issues/issue-model';
 import type { PickOption } from './picker';
 
 /** Issues as picker options (circle status glyph, key as hint). */
@@ -34,13 +35,23 @@ export const providerOptions = (): PickOption[] =>
     kind: 'provider',
   }));
 
-export const userOptions = (store: TramaStore): PickOption[] =>
-  store.users().map((user) => ({
+/** People as picker options, each with its open-task count ("3 open", v3 · 17). */
+export const userOptions = (store: TramaStore): PickOption[] => {
+  const entries = store.settings().statuses.issue;
+  const open = new Map<string, number>();
+  for (const issue of store.issues()) {
+    if (issue.assigneeId && !isClosedIssue(issue, entries)) {
+      open.set(issue.assigneeId, (open.get(issue.assigneeId) ?? 0) + 1);
+    }
+  }
+  return store.users().map((user) => ({
     value: user.id,
     label: user.name,
     kind: 'user',
+    hint: `${open.get(user.id) ?? 0} open`,
     search: `${user.name} ${user.email}`,
   }));
+};
 
 /** Open projects (plus `currentId` even when closed), for the Project picker. */
 export const projectOptions = (store: TramaStore, currentId?: string | null): PickOption[] =>

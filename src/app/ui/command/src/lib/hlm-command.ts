@@ -19,7 +19,8 @@ export class HlmCommand {
   constructor() {
     classes(
       () =>
-        'bg-popover text-popover-foreground rounded-xl p-1 flex size-full flex-col overflow-hidden',
+        // Transparent: the surface is the dialog / popover that holds it (v3: palette `card`, pickers `secondary`).
+        'text-popover-foreground flex size-full flex-col overflow-hidden',
     );
   }
 }

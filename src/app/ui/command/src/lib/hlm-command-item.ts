@@ -19,7 +19,8 @@ export class HlmCommandItem {
   constructor() {
     classes(
       () =>
-        "data-selected:bg-selected data-selected:text-foreground relative flex min-h-8 cursor-default items-center gap-2 rounded-md px-2 py-1 text-start text-[13px] transition-colors outline-hidden select-none [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/command-item w-full data-disabled:pointer-events-none data-disabled:opacity-50 data-hidden:hidden [&>ng-icon]:pointer-events-none [&>ng-icon]:shrink-0",
+        // v3 row: 34px, padding 0 10, gap 10; the highlighted row takes the `selected` step.
+        "data-selected:bg-selected data-selected:text-foreground relative flex min-h-[34px] cursor-default items-center gap-2.5 px-2.5 py-0 text-start text-[13px] transition-colors outline-hidden select-none [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/command-item w-full data-disabled:pointer-events-none data-disabled:opacity-50 data-hidden:hidden [&>ng-icon]:pointer-events-none [&>ng-icon]:shrink-0",
     );
   }
 }

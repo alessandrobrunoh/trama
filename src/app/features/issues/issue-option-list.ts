@@ -21,19 +21,19 @@ const CREATE = '__create:';
       <hlm-command-input [placeholder]="placeholder()" />
       <div *hlmCommandEmptyState hlmCommandEmpty>No matches.</div>
       <hlm-command-list class="max-h-72">
-        <hlm-command-group>
+        <hlm-command-group class="p-1">
           @for (o of options(); track o.value; let n = $index) {
-            <button hlmCommandItem [value]="o.search + ' ' + o.value" (selected)="pick(o)">
+            <button hlmCommandItem class="px-2" [value]="o.search + ' ' + o.value" (selected)="pick(o)">
               <app-issue-option-glyph [option]="o" />
               @if (o.hint && field() === 'duplicate') {
-                <span class="text-muted-foreground shrink-0 font-mono text-[11px]">{{ o.hint }}</span>
+                <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ o.hint }}</span>
               }
               <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
               @if (current().has(o.value)) {
                 <svg [lucideIcon]="check" [size]="14" class="text-foreground shrink-0"></svg>
               }
               @if (n < 9 && digits()) {
-                <span class="text-muted-foreground w-3 shrink-0 text-right font-mono text-[11px]">{{ n + 1 }}</span>
+                <span class="text-faint w-3 shrink-0 text-right font-mono text-[10.5px]">{{ n + 1 }}</span>
               }
             </button>
           }

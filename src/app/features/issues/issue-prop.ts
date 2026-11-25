@@ -18,6 +18,7 @@ import { Estimate, EstimateGlyph } from '../../shared/estimate';
 import { PriorityIcon } from '../../shared/priority-icon';
 import { StatusIcon } from '../../shared/status';
 import { V3Est, V3Priority, V3Status } from '../../shared/v3';
+import { EstimateDialog } from './estimate-dialog';
 import { IssueActions } from './issue-actions';
 import { PROMPT_TITLE } from './issue-options';
 import { IssueOptionList } from './issue-option-list';
@@ -159,34 +160,45 @@ export class IssueProp {
   });
 }
 
-/** Centered "Change status…" dialog for the issues in `IssueActions.prompt()`. Mount once per page. */
+/**
+ * Centered "Change status…" dialog for the issues in `IssueActions.prompt()`. Mount once per page.
+ * The estimate prompt is its own dialog (v3 · 27, `EstimateDialog`).
+ */
 @Component({
   selector: 'app-issue-command-dialog',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmCommandImports, IssueOptionList],
+  imports: [HlmCommandImports, IssueOptionList, EstimateDialog],
   template: `
     <hlm-command-dialog
       [title]="title()"
       description="Pick a value; Esc closes."
-      [state]="prompt() ? 'open' : 'closed'"
-      (stateChange)="$event === 'closed' && actions.closePrompt()"
-      dialogContentClass="sm:max-w-lg top-[14%] sm:top-[20%] translate-y-0 max-sm:max-w-[calc(100%-1rem)]"
+      [state]="listOpen() ? 'open' : 'closed'"
+      (stateChange)="$event === 'closed' && listOpen() && actions.closePrompt()"
+      dialogContentClass="sm:max-w-[420px] top-[14%] sm:top-[20%] translate-y-0 max-sm:max-w-[calc(100%-1rem)]"
     >
       @if (prompt(); as p) {
-        <div class="text-muted-foreground flex items-center gap-2 px-3 pt-2.5 pb-2 text-xs">
-          <span class="bg-muted text-foreground rounded px-1.5 py-0.5 font-mono text-[11px]">{{ actions.subject(p.ids) }}</span>
-          @if (p.ids.length === 1) {
-            <span class="truncate">{{ firstTitle() }}</span>
-          }
-        </div>
-        <app-issue-option-list [field]="p.field" [ids]="p.ids" (done)="actions.closePrompt()" />
+        @if (p.field !== 'estimate') {
+          <div class="text-muted-foreground flex items-center gap-2.5 px-3 pt-2.5 pb-2 text-xs">
+            <span class="bg-secondary border-border text-muted-foreground border px-1.5 py-px font-mono text-[10.5px]">{{ actions.subject(p.ids) }}</span>
+            @if (p.ids.length === 1) {
+              <span class="truncate">{{ firstTitle() }}</span>
+            }
+          </div>
+          <app-issue-option-list [field]="p.field" [ids]="p.ids" (done)="actions.closePrompt()" />
+        }
       }
     </hlm-command-dialog>
+    <app-estimate-dialog />
   `,
 })
 export class IssueCommandDialog {
   protected readonly actions = inject(IssueActions);
   protected readonly prompt = this.actions.prompt;
+  /** The list dialog serves every prompt but the estimate. */
+  protected readonly listOpen = computed(() => {
+    const p = this.prompt();
+    return !!p && p.field !== 'estimate';
+  });
   protected readonly title = computed(() => {
     const p = this.prompt();
     return p ? PROMPT_TITLE[p.field] : 'Task';

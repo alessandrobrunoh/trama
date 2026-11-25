@@ -803,6 +803,12 @@ html[data-keyboard='open'] .mobile-fab {
 
   --shadow-menu: 0 0 0 1px var(--border-strong), 0 10px 28px -8px rgb(0 0 0 / 0.18);
   --shadow-panel: none;
+
+  /* v3 overlays: light-mode counterparts of the dark values below. */
+  --shadow-pop: 0 12px 32px rgb(0 0 0 / 0.14);
+  --shadow-dialog: 0 24px 60px rgb(0 0 0 / 0.2);
+  --shadow-toast: 0 8px 24px rgb(0 0 0 / 0.12);
+  --scrim: rgb(0 0 0 / 0.35);
 }
 
 :root.dark {
@@ -882,6 +888,12 @@ html[data-keyboard='open'] .mobile-fab {
 
   --shadow-menu: 0 0 0 1px var(--border-strong), 0 14px 36px -10px rgb(0 0 0 / 0.75);
   --shadow-panel: none;
+
+  /* v3 overlays (frames 14–18, 25, 27): menu / picker, dialog, toast and the scrim behind a dialog. */
+  --shadow-pop: 0 12px 32px #00000099;
+  --shadow-dialog: 0 24px 60px #000000a0;
+  --shadow-toast: 0 8px 24px #00000080;
+  --scrim: #05060899;
 }
 
 /* Accent: the workspace can pick another colour for the primary action (Settings · General).
@@ -964,6 +976,10 @@ html[data-keyboard='open'] .mobile-fab {
 
   --shadow-md: var(--shadow-menu);
   --shadow-panel: var(--shadow-panel);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-dialog: var(--shadow-dialog);
+  --shadow-toast: var(--shadow-toast);
+  --color-scrim: var(--scrim);
 
   /* Motion: every `transition-*` utility shares one short, decelerating curve (Linear / Raycast feel). */
   /* Regular weight almost everywhere: hierarchy is near-black vs muted gray, not bold. The

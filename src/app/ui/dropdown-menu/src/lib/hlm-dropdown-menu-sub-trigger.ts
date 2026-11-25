@@ -48,6 +48,6 @@ export class HlmDropdownMenuSubTrigger {
       updateMenuPosition(this._cdkTrigger, this._menuPosition());
     });
 
-    classes(() => 'aria-expanded:bg-accent aria-expanded:text-accent-foreground');
+    classes(() => 'aria-expanded:bg-selected aria-expanded:text-foreground');
   }
 }

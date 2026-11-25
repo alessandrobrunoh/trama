@@ -189,12 +189,12 @@ const byUpdated = <T extends { updatedAt: string }>(a: T, b: T) =>
   a.updatedAt < b.updatedAt ? 1 : -1;
 
 /**
- * Floating command surface. Compact on phones, 40rem on desktop, pinned near the top.
+ * Floating command surface (v3 · 14): 640px on desktop, its top edge at ~15.5% of the viewport (140px at 900).
  * Height comes from the panel, which grows with its rows up to a cap.
  */
 export const COMMAND_DIALOG_CLASS =
   // Widths use viewport units: the CDK pane shrink-wraps its content, so a `%` width collapses to the content width.
-  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(40rem,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
+  'w-[min(32rem,calc(100vw-1.5rem))] sm:w-[min(640px,calc(100vw-2rem))] max-w-none sm:max-w-none top-[min(12vh,5rem)] sm:top-[15.5svh] translate-y-0 gap-0 overflow-hidden rounded-lg p-0 duration-150 data-open:slide-in-from-top-2 data-closed:slide-out-to-top-2';
 
 /**
  * Shared body of the ⌘K palette and the `/` search dialog.
@@ -243,7 +243,7 @@ export const COMMAND_DIALOG_CLASS =
       } @else {
         <svg
           [lucideIcon]="c.icon"
-          [size]="16"
+          [size]="14"
           class="shrink-0"
           [class]="c.ai ? 'text-primary' : 'text-muted-foreground'"
         ></svg>
@@ -254,21 +254,21 @@ export const COMMAND_DIALOG_CLASS =
           ><app-kbd [keys]="c.keys" [chord]="isChord(c.keys)"
         /></hlm-command-shortcut>
       } @else if (c.hint) {
-        <span class="text-muted-foreground shrink-0 text-xs">{{ c.hint }}</span>
+        <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ c.hint }}</span>
       }
     </ng-template>
 
     <hlm-command
-      class="h-auto max-h-[min(34rem,78svh)] rounded-none p-0"
+      class="h-auto max-h-[min(34rem,78svh)]"
       [filter]="filter"
       [(search)]="query"
     >
       <div class="shrink-0">
-        <div class="flex h-12 items-center gap-2.5 px-4 max-md:h-14">
+        <div class="border-border flex h-[51.5px] items-center gap-3 border-b px-[18px] max-md:h-14">
           @if (mode() === 'palette' && context(); as ctx) {
             <button
               type="button"
-              class="bg-secondary text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 rounded-md px-2 font-mono text-xs transition-colors"
+              class="bg-secondary border-border text-muted-foreground hover:text-foreground flex h-6 shrink-0 items-center gap-1.5 border px-2 font-mono text-[11px] transition-colors"
               [attr.aria-label]="page() === 'status' ? 'Back to ' + ctx.key + ' actions' : ctx.key"
               [disabled]="page() === 'root'"
               (mousedown)="$event.preventDefault()"
@@ -299,7 +299,7 @@ export const COMMAND_DIALOG_CLASS =
           <input
             brnCommandInput
             data-slot="command-input"
-            class="placeholder:text-muted-foreground min-w-0 flex-1 bg-transparent text-[15px] outline-hidden"
+            class="placeholder:text-faint caret-primary min-w-0 flex-1 bg-transparent text-[16px] outline-hidden"
             [placeholder]="placeholder()"
             [attr.aria-label]="placeholder()"
             enterkeyhint="search"
@@ -321,7 +321,7 @@ export const COMMAND_DIALOG_CLASS =
           @if (canAsk()) {
             <button
               type="button"
-              class="text-muted-foreground hover:bg-hover hover:text-foreground -mr-1.5 flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs transition-colors max-sm:hidden"
+              class="text-muted-foreground hover:bg-hover hover:text-foreground flex shrink-0 items-center gap-1.5 px-2 py-1 font-mono text-[11px] transition-colors max-sm:hidden"
               (mousedown)="$event.preventDefault()"
               (click)="askAssistant()"
             >
@@ -334,11 +334,20 @@ export const COMMAND_DIALOG_CLASS =
               Ask Trama <app-kbd keys="mod+enter" />
             </button>
           }
+          <button
+            type="button"
+            class="bg-secondary border-border text-muted-foreground hover:text-foreground shrink-0 border px-[5px] py-px font-mono text-[10.5px] leading-[14px] max-md:hidden"
+            aria-label="Close"
+            (mousedown)="$event.preventDefault()"
+            (click)="ui.closeModal()"
+          >
+            esc
+          </button>
         </div>
 
         @if (showScopes()) {
           <div
-            class="scrollbar-none flex items-center gap-1 overflow-x-auto px-3 pb-2"
+            class="scrollbar-none border-border flex items-center gap-1.5 overflow-x-auto border-b px-[18px] py-2"
             role="tablist"
             aria-label="Search scope"
           >
@@ -346,11 +355,11 @@ export const COMMAND_DIALOG_CLASS =
               <button
                 type="button"
                 role="tab"
-                class="flex h-6 shrink-0 items-center rounded-md px-2 text-xs transition-colors"
+                class="flex h-[22px] shrink-0 items-center border px-2.5 font-mono text-[11px] transition-colors"
                 [class]="
                   scope() === s.id
-                    ? 'bg-selected text-foreground font-medium'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-hover'
+                    ? 'bg-secondary border-border text-foreground'
+                    : 'text-muted-foreground hover:text-foreground border-transparent'
                 "
                 [attr.aria-selected]="scope() === s.id"
                 (mousedown)="$event.preventDefault()"
@@ -380,7 +389,7 @@ export const COMMAND_DIALOG_CLASS =
       </div>
 
       <hlm-command-list
-        class="max-h-[min(26rem,calc(78svh-7.5rem))] overscroll-contain px-2 pt-1 pb-2 [&_[data-slot=command-group]]:p-0 [&_[data-slot=command-group]]:pb-1 [&_[data-slot=command-group-label]]:px-2 [&_[data-slot=command-group-label]]:pt-3 [&_[data-slot=command-group-label]]:pb-1 [&_[data-slot=command-group-label]]:text-[11px] [&_[data-slot=command-item]]:min-h-9 [&_[data-slot=command-item]]:gap-2.5"
+        class="max-h-[min(26rem,calc(78svh-7.5rem))] overscroll-contain [&_[data-slot=command-item][data-selected]]:bg-hover [&_[data-slot=command-item][data-selected]]:shadow-[inset_2px_0_0_var(--primary)]"
       >
         @if (page() === 'status') {
           <hlm-command-group>
@@ -447,25 +456,32 @@ export const COMMAND_DIALOG_CLASS =
                     [ngTemplateOutlet]="glyph"
                     [ngTemplateOutletContext]="{ $implicit: h }"
                   />
+                  <!-- v3: title, then its key right after it, hints on the right -->
+                  <span class="min-w-0 truncate">{{ h.title }}</span>
                   @if (h.key) {
-                    <span class="text-muted-foreground shrink-0 font-mono text-xs">{{
-                      h.key
-                    }}</span>
+                    <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ h.key }}</span>
                   }
-                  <span class="min-w-0 flex-1 truncate">{{ h.title }}</span>
+                  <span class="min-w-0 flex-1"></span>
                   @if (h.type === 'person') {
                     <span
-                      class="text-muted-foreground max-w-[45%] shrink-0 truncate text-xs max-sm:hidden"
+                      class="text-faint max-w-[45%] shrink-0 truncate font-mono text-[10.5px] max-sm:hidden"
                       >{{ h.subtitle }}</span
                     >
                     <span
-                      class="text-muted-foreground shrink-0 text-[11px] opacity-0 [[data-selected]_&]:opacity-100"
+                      class="text-faint shrink-0 font-mono text-[10.5px] opacity-0 [[data-selected]_&]:opacity-100"
                       >Copy email</span
                     >
-                  } @else if (h.subtitle) {
+                  } @else {
+                    @if (h.subtitle) {
+                      <span
+                        class="text-faint max-w-[40%] shrink-0 truncate font-mono text-[10.5px] max-sm:hidden"
+                        >{{ h.subtitle }}</span
+                      >
+                    }
                     <span
-                      class="text-muted-foreground max-w-[40%] shrink-0 truncate font-mono text-xs max-sm:hidden"
-                      >{{ h.subtitle }}</span
+                      class="text-faint shrink-0 font-mono text-[10.5px] opacity-0 max-sm:hidden [[data-selected]_&]:opacity-100"
+                      aria-hidden="true"
+                      >↵</span
                     >
                   }
                 </button>
@@ -522,19 +538,19 @@ export const COMMAND_DIALOG_CLASS =
         }
       </hlm-command-list>
 
+      <!-- v3 foot: 33px, hints in mono 10.5 faint (↑↓ navigate · ↵ open …), what is searched on the right -->
       <div
-        class="text-muted-foreground flex h-9 shrink-0 items-center gap-4 px-4 text-[11px] max-sm:hidden"
+        class="border-border text-faint flex h-[33.5px] shrink-0 items-center gap-4 border-t px-[18px] font-mono text-[10.5px] max-sm:hidden"
       >
-        <span class="flex items-center gap-1.5"><app-kbd keys="up down" /> navigate</span>
-        <span class="flex items-center gap-1.5"><app-kbd keys="enter" /> select</span>
+        <span>↑↓ navigate</span>
+        <span>↵ open</span>
         @if (page() === 'root') {
-          <span class="flex items-center gap-1.5"><app-kbd keys="tab" /> scope</span>
+          <span>tab scope</span>
         } @else {
-          <span class="flex items-center gap-1.5"><app-kbd keys="esc" /> back</span>
+          <span>esc back</span>
         }
-        @if (loading()) {
-          <span class="ml-auto">Searching…</span>
-        }
+        <span class="flex-1"></span>
+        <span>{{ loading() ? 'Searching…' : 'Searches tasks, projects and people' }}</span>
       </div>
     </hlm-command>
   `,

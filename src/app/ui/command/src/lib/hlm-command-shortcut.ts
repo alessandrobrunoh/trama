@@ -11,7 +11,8 @@ export class HlmCommandShortcut {
   constructor() {
     classes(
       () =>
-        'text-muted-foreground group-data-[selected]/command-item:text-foreground ms-auto text-xs tracking-widest',
+        // Mono 10.5 faint; an <app-kbd> inside is flattened to plain text (frame 14: "C", "⇧C", "G I").
+        'text-faint ms-auto font-mono text-[10.5px] tracking-normal [&_kbd]:h-auto [&_kbd]:min-w-0 [&_kbd]:border-0 [&_kbd]:bg-transparent [&_kbd]:p-0 [&_kbd]:text-[10.5px] [&_kbd]:text-faint',
     );
   }
 }

@@ -149,18 +149,17 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
             type="button"
             variant="ghost"
             size="sm"
-            class="bg-muted/60 hover:bg-muted h-7 max-w-full gap-1.5 rounded-md px-2 text-xs font-normal"
-            [class.text-muted-foreground]="selected().length === 0"
+            class="border-border hover:bg-hover h-[22px] max-w-full gap-1.5 border px-2 font-mono text-[11px] font-normal"
             [disabled]="disabled()"
             [attr.aria-label]="label()"
           >
             @if (selected().length === 1) {
               <ng-container *ngTemplateOutlet="glyph; context: { $implicit: selected()[0] }" />
-              <span class="truncate">{{ selected()[0].label }}</span>
+              <span class="text-foreground truncate">{{ selected()[0].label }}</span>
             } @else if (selected().length > 1) {
               <span class="text-muted-foreground">{{ label() }}</span>
               <span class="bg-border h-3.5 w-px shrink-0"></span>
-              <span>{{ selected().length }}</span>
+              <span class="text-foreground">{{ selected().length }}</span>
             } @else {
               @if (icon(); as ic) {
                 <svg [lucideIcon]="ic" [size]="13" class="text-muted-foreground shrink-0"></svg>
@@ -251,8 +250,13 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
         }
       }
 
-      <hlm-popover-content *hlmPopoverPortal="let ctx" class="w-60 p-0 sm:w-64">
-        <hlm-command class="h-auto max-h-[22rem] rounded-lg" (keydown)="onQuickKey($event)">
+      <!-- v3 · 17: 300px list on the raised step, search row 37px, rows 34px, "Unassign"-style clear row last -->
+      <hlm-popover-content
+        *hlmPopoverPortal="let ctx"
+        class="w-60 p-0 sm:w-64"
+        [style.width]="people() ? '300px' : null"
+      >
+        <hlm-command class="h-auto max-h-[22rem]" (keydown)="onQuickKey($event)">
           @if (searchable()) {
             <hlm-command-input
               [placeholder]="searchPlaceholder() ?? 'Search ' + label().toLowerCase() + '…'"
@@ -260,42 +264,55 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           }
           <div *hlmCommandEmptyState hlmCommandEmpty>No matches.</div>
           <hlm-command-list class="max-h-64">
-            @if (clearable() && (clearAlways() || selected().length > 0)) {
-              <hlm-command-group>
+            @if (clearable() && clearAlways()) {
+              <hlm-command-group class="p-1">
                 <button hlmCommandItem value="__clear" (selected)="clear()">
                   <span class="text-muted-foreground min-w-0 flex-1 truncate">{{
                     clearLabel()
                   }}</span>
-                  @if (clearAlways() && selected().length === 0) {
-                    <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
+                  @if (selected().length === 0) {
+                    <svg [lucideIcon]="check" [size]="14" class="text-foreground shrink-0"></svg>
                   }
                 </button>
               </hlm-command-group>
             }
             @for (g of optionGroups(); track $index) {
-              <hlm-command-group>
+              <hlm-command-group class="p-1">
                 @if (g.label) {
-                  <hlm-command-group-label
-                    class="text-muted-foreground px-2 pt-1.5 pb-0.5 text-[11px] font-medium"
-                    >{{ g.label }}</hlm-command-group-label
-                  >
+                  <hlm-command-group-label class="px-2! pt-1.5! pb-1!">{{
+                    g.label
+                  }}</hlm-command-group-label>
                 }
                 @for (o of g.items; track o.value) {
                   <button
                     hlmCommandItem
+                    class="px-2"
+                    [class.text-muted-foreground]="isPerson(o)"
                     [value]="(o.search ?? o.label) + ' ' + o.value"
                     (selected)="pick(o)"
                   >
-                    <ng-container *ngTemplateOutlet="glyph; context: { $implicit: o }" />
+                    <ng-container
+                      *ngTemplateOutlet="glyph; context: { $implicit: o, size: isPerson(o) ? 22 : 16 }"
+                    />
                     <span class="min-w-0 flex-1 truncate">{{ o.label }}</span>
                     @if (o.hint) {
-                      <span class="text-muted-foreground font-mono text-[11px]">{{ o.hint }}</span>
+                      <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ o.hint }}</span>
                     }
                     @if (isSelected(o.value)) {
-                      <svg [lucideIcon]="check" [size]="14" class="text-primary shrink-0"></svg>
+                      <svg [lucideIcon]="check" [size]="14" class="text-foreground shrink-0"></svg>
                     }
                   </button>
                 }
+              </hlm-command-group>
+            }
+            @if (clearable() && !clearAlways() && selected().length > 0) {
+              <div class="bg-border h-px w-full" role="separator"></div>
+              <hlm-command-group class="p-1">
+                <button hlmCommandItem value="__clear" class="px-3" (selected)="clear()">
+                  <span class="text-muted-foreground min-w-0 flex-1 truncate">{{
+                    clearLabel()
+                  }}</span>
+                </button>
               </hlm-command-group>
             }
           </hlm-command-list>
@@ -317,7 +334,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
       </hlm-popover-content>
     </hlm-popover>
 
-    <ng-template #glyph let-o>
+    <ng-template #glyph let-o let-size="size">
       @switch (o.kind ?? 'plain') {
         @case ('status') {
           <app-status-icon
@@ -329,13 +346,13 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
           <app-priority-icon [priority]="asPriority(o.value)" />
         }
         @case ('user') {
-          <app-actor-avatar [actor]="userRef(o.value)" [size]="16" />
+          <app-actor-avatar [actor]="userRef(o.value)" [size]="size ?? 16" />
         }
         @case ('agent') {
-          <app-actor-avatar [actor]="agentRef(o.value)" [size]="16" />
+          <app-actor-avatar [actor]="agentRef(o.value)" [size]="size ?? 16" />
         }
         @case ('actor') {
-          <app-actor-avatar [actor]="actorRef(o.value)" [size]="16" />
+          <app-actor-avatar [actor]="actorRef(o.value)" [size]="size ?? 16" />
         }
         @case ('provider') {
           <app-provider-icon
@@ -406,6 +423,11 @@ export class Picker {
     }
     return groups;
   });
+  /** Lists of people get the wider v3 · 17 layout (22px avatars, 300px). */
+  protected readonly people = computed(() => this.options().some((o) => this.isPerson(o)));
+  protected isPerson(o: PickOption): boolean {
+    return o.kind === 'user' || o.kind === 'agent' || o.kind === 'actor';
+  }
   private readonly byValue = computed(() => new Map(this.options().map((o) => [o.value, o])));
   protected readonly selected = computed<PickOption[]>(() =>
     this.value().map((v) => this.byValue().get(v) ?? { value: v, label: v }),

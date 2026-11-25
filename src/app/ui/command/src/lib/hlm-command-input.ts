@@ -2,33 +2,29 @@ import { ChangeDetectionStrategy, Component, input } from '@angular/core';
 import { NgIcon, provideIcons } from '@ng-icons/core';
 import { lucideSearch } from '@ng-icons/lucide';
 import { BrnCommandInput } from '@spartan-ng/brain/command';
-import { HlmInputGroupImports } from '@spartan-ng/helm/input-group';
 import { classes } from '@spartan-ng/helm/utils';
 
+/**
+ * v3 picker search (frame 17): a 37px row with a 13px faint search glyph and a Sans 13 field, accent caret,
+ * closed by a hairline.
+ */
 @Component({
   selector: 'hlm-command-input',
-  imports: [HlmInputGroupImports, NgIcon, BrnCommandInput],
+  imports: [NgIcon, BrnCommandInput],
   providers: [provideIcons({ lucideSearch })],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
     'data-slot': 'command-input-wrapper',
   },
   template: `
-    <hlm-input-group
-      class="bg-input/30 border-input/30 h-8! rounded-lg! shadow-none! *:data-[slot=input-group-addon]:ps-2!"
-    >
-      <input
-        brnCommandInput
-        data-slot="command-input"
-        class="w-full text-sm outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
-        [id]="inputId()"
-        [placeholder]="placeholder()"
-      />
-
-      <hlm-input-group-addon>
-        <ng-icon name="lucideSearch" class="shrink-0 text-[length:--spacing(4)] opacity-50" />
-      </hlm-input-group-addon>
-    </hlm-input-group>
+    <ng-icon name="lucideSearch" class="text-faint shrink-0 text-[13px]" />
+    <input
+      brnCommandInput
+      data-slot="command-input"
+      class="placeholder:text-faint caret-primary min-w-0 flex-1 bg-transparent text-[13px] outline-hidden disabled:cursor-not-allowed disabled:opacity-50"
+      [id]="inputId()"
+      [placeholder]="placeholder()"
+    />
   `,
 })
 export class HlmCommandInput {
@@ -36,6 +32,6 @@ export class HlmCommandInput {
   public readonly placeholder = input<string>('');
 
   constructor() {
-    classes(() => 'p-1 pb-0');
+    classes(() => 'border-border flex h-[37.5px] shrink-0 items-center gap-2 border-b px-3');
   }
 }

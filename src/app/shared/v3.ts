@@ -15,6 +15,7 @@ import {
   inject,
   input,
   model,
+  output,
 } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon, LucidePenLine, LucideSquareKanban } from '@lucide/angular';
 import { resolveStatusEntry, type Issue, type Priority } from '../core/contracts/domain';
@@ -391,3 +392,87 @@ export class V3StatusDot {
       '#8c9096',
   );
 }
+
+// ───────────────────────── overlays: dialog frame, field (toggle: see V3Toggle above) ─────────────────────────
+// "v3 · 15 New task", "18 Delete confirm", "25 Log time", "27 Estimate picker": the dialog is a
+// `bg-card` panel with a `border-strong` edge (see ui/dialog), split into Head 48 · Body · Foot 50.
+/** Field edge + fill (Input / Select): 34px, `bg-background`, hairline, accent edge on focus. */
+export const V3_FIELD =
+  'bg-background border-border text-foreground placeholder:text-faint focus-visible:border-primary h-[34px] w-full min-w-0 border px-2.5 font-sans text-[13px] outline-none transition-colors';
+/** Textarea: same edge as the field, 10px padding. */
+export const V3_TEXTAREA =
+  'bg-background border-border text-text-2 placeholder:text-faint focus-visible:border-primary w-full min-w-0 resize-none border p-2.5 font-sans text-[13px] leading-[18px] outline-none transition-colors';
+/** Standalone key cap (Kbd): raised fill, hairline, mono 10.5. */
+export const V3_KBD =
+  'bg-secondary border-border text-muted-foreground inline-flex items-center border px-[5px] py-px font-mono text-[10.5px] leading-[14px] whitespace-nowrap';
+
+/**
+ * Dialog head: optional mono kicker ("NEW TASK"), the projected title (`<h2 hlmDialogTitle>`, styled here as
+ * Newsreader 20), a flexible gap, optional `[v3-actions]` and an `esc` key cap that closes (`dismiss`).
+ */
+@Component({
+  selector: 'v3-dialog-head',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class:
+      'border-border flex shrink-0 items-center gap-2.5 border-b px-[18px] py-3.5 [&_h2]:font-title [&_h2]:text-foreground [&_h2]:m-0 [&_h2]:text-[20px] [&_h2]:leading-normal [&_h2]:font-normal [&_h2]:tracking-normal',
+  },
+  template: `
+    @if (kicker()) {
+      <span class="text-faint font-mono text-[10.5px] leading-[14px]">{{ kicker() }}</span>
+    }
+    <ng-content />
+    <span class="min-w-0 flex-1"></span>
+    <ng-content select="[v3-actions]" />
+    @if (esc()) {
+      <button
+        type="button"
+        class="bg-secondary border-border text-muted-foreground hover:text-foreground inline-flex items-center border px-[5px] py-px font-mono text-[10.5px] leading-[14px]"
+        aria-label="Close"
+        (click)="dismiss.emit()"
+      >
+        esc
+      </button>
+    }
+  `,
+})
+export class V3DialogHead {
+  readonly kicker = input<string>('');
+  readonly esc = input(true, { transform: booleanAttribute });
+  readonly dismiss = output<void>();
+}
+
+/** Dialog foot: optional mono hint on the left (or `[v3-hint]`), buttons projected on the right. */
+@Component({
+  selector: 'v3-dialog-foot',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'border-border flex shrink-0 items-center gap-2 border-t px-[18px] py-3' },
+  template: `
+    @if (hint()) {
+      <span class="text-faint min-w-0 truncate font-mono text-[10.5px] leading-[14px]">{{ hint() }}</span>
+    }
+    <ng-content select="[v3-hint]" />
+    <span class="min-w-0 flex-1"></span>
+    <ng-content />
+  `,
+})
+export class V3DialogFoot {
+  readonly hint = input<string>('');
+}
+
+/** Label (mono 10.5, faint, written uppercase by the caller) over a control, 6px apart. */
+@Component({
+  selector: 'v3-field',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'flex min-w-0 flex-col gap-1.5' },
+  template: `
+    <label [attr.for]="for()" class="text-faint font-mono text-[10.5px] leading-[14px]">{{ label() }}</label>
+    <ng-content />
+  `,
+})
+export class V3Field {
+  readonly label = input.required<string>();
+  readonly for = input<string>();
+}
+
+export const V3_OVERLAY = [V3DialogHead, V3DialogFoot, V3Field, V3Toggle] as const;
