@@ -56,7 +56,7 @@ import { ProgressChart } from './progress-chart';
     @let m = ms();
     @let s = stats();
     <div
-      class="group/ms hover:bg-hover flex min-h-9 items-center gap-1.5 px-1.5 text-[13px]"
+      class="group/ms hover:bg-secondary flex min-h-[42px] items-center gap-1.5 px-1.5 text-[13px]"
       [hlmContextMenuTrigger]="canEdit() ? menu : null"
     >
       <span
@@ -94,13 +94,13 @@ import { ProgressChart } from './progress-chart';
       } @else {
         <button type="button" class="min-w-0 flex-1 truncate text-left outline-none focus-visible:underline" (click)="toggle()">{{ m.name }}</button>
       }
-      <span class="text-muted-foreground shrink-0 text-xs tabular-nums max-sm:hidden" [hlmTooltip]="tip()" position="bottom">{{ label() }}</span>
+      <span class="text-faint shrink-0 font-mono text-[10.5px] tabular-nums max-sm:hidden" [hlmTooltip]="tip()" position="bottom">{{ label() }}</span>
 
       <app-date-picker
         class="shrink-0"
         label="Milestone target date"
         align="end"
-        triggerClass="h-6 gap-1 px-1.5 text-xs tabular-nums"
+        triggerClass="h-6 gap-1 px-1.5 font-mono text-[10.5px] tabular-nums"
         [disabled]="!canEdit()"
         [value]="m.targetDate"
         (dateChange)="actions.setDate(m, $event)"
@@ -121,7 +121,7 @@ import { ProgressChart } from './progress-chart';
     </div>
 
     @if (open()) {
-      <div class="bg-muted flex flex-col gap-3 rounded-md px-4 py-3 pl-10">
+      <div class="bg-secondary flex flex-col gap-3 px-4 py-3 pl-10">
         <app-editable-markdown
           class="text-[13px]"
           label="milestone description"
@@ -135,7 +135,7 @@ import { ProgressChart } from './progress-chart';
         }
         <div>
           <div class="mb-1 flex items-center gap-2">
-            <h3 class="text-muted-foreground text-xs">Tasks <span class="tabular-nums">{{ issues().length }}</span></h3>
+            <h3 class="text-faint font-mono text-[10.5px] tracking-[0.04em] uppercase">Tasks <span class="tabular-nums">{{ issues().length }}</span></h3>
             @if (canEdit() && addable().length) {
               <app-picker
                 class="ml-auto"
@@ -154,7 +154,7 @@ import { ProgressChart } from './progress-chart';
           </div>
           @if (issues().length) {
             <!-- the one task table of the app, scoped to this milestone -->
-            <div class="bg-background flex max-h-[26rem] flex-col overflow-hidden rounded-md">
+            <div class="bg-background border-border flex max-h-[26rem] flex-col overflow-hidden border">
               <app-issue-board
                 [issues]="allIssues()"
                 [baseFilters]="milestoneFilter()"

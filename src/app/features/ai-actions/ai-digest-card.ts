@@ -19,7 +19,7 @@ import { AiResult } from './ai-result';
   imports: [HlmButtonImports, LucideDynamicIcon, RouterLink, AiButton, AiResult, Markdown],
   host: { class: 'block' },
   template: `
-    <section class="bg-card rounded-lg px-3 py-2.5" aria-labelledby="ai-digest-title">
+    <section class="border-border border-b px-1 py-2.5" aria-labelledby="ai-digest-title">
       <header class="flex items-center gap-1.5">
         <svg [lucideIcon]="sparkles" [size]="14" [strokeWidth]="1.75" class="text-primary"></svg>
         <h3 id="ai-digest-title" class="text-[13px] font-medium">Standup digest</h3>

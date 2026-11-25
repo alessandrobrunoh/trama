@@ -20,10 +20,9 @@ import { ProgressChart } from './progress-chart';
   host: { class: 'block' },
   template: `
     <section aria-labelledby="project-milestones-title">
-      <header class="mb-2 flex items-center gap-2">
-        <app-milestone-icon [size]="15" state="idle" />
-        <h2 id="project-milestones-title" class="text-muted-foreground text-[13px] font-normal">Milestones</h2>
-        <span class="text-muted-foreground text-xs tabular-nums">{{ milestones().length }}</span>
+      <header class="border-border mb-3 flex items-end gap-2.5 border-b pb-2">
+        <h2 id="project-milestones-title" class="font-title text-foreground text-[20px] leading-[24px]">Milestones</h2>
+        <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none tabular-nums">{{ milestones().length }}</span>
         @if (canEdit()) {
           <button hlmBtn variant="ghost" size="icon-xs" class="text-muted-foreground hover:text-foreground ml-auto" aria-label="Add milestone" (click)="startAdd()">
             <svg [lucideIcon]="plus" [size]="14"></svg>
@@ -32,14 +31,14 @@ import { ProgressChart } from './progress-chart';
       </header>
 
       @if (showChart() && hasIssues()) {
-        <div class="bg-card border-border mb-3 rounded-lg border px-3 pt-3 pb-2">
+        <div class="border-border mb-4 border-b px-1 pt-1 pb-3">
           <app-progress-chart [project]="project()" [height]="190" />
         </div>
       }
 
-      <div class="flex flex-col gap-0.5" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
+      <div class="flex flex-col" cdkDropList [cdkDropListDisabled]="!canEdit()" (cdkDropListDropped)="drop($event)">
         @for (m of milestones(); track m.id; let i = $index) {
-          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-background overflow-hidden rounded-md" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
+          <app-milestone-row cdkDrag cdkDragLockAxis="y" class="bg-background border-border overflow-hidden border-b" [ms]="m" [project]="project()" [readonly]="readonly()" [index]="i" [count]="milestones().length" />
         }
         @if (adding()) {
           <div class="flex min-h-10 items-center gap-2 px-2.5">
@@ -63,7 +62,7 @@ import { ProgressChart } from './progress-chart';
             <button hlmBtn variant="ghost" size="xs" (click)="adding.set(false)">Cancel</button>
           </div>
         } @else if (!milestones().length) {
-          <p class="text-muted-foreground px-3 py-3 text-sm">
+          <p class="text-muted-foreground px-1 py-3 text-[13px]">
             Break this project into milestones. Each groups some of its tasks and has its own target date.
             @if (canEdit()) {
               <button type="button" class="text-foreground underline-offset-2 hover:underline" (click)="startAdd()">Add the first milestone</button>

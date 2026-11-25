@@ -29,7 +29,7 @@ import { AiActions, SETUP_MESSAGE, type AiFailure, type JobState } from './ai-ac
       [attr.aria-label]="title()"
       [attr.aria-busy]="state() === 'loading'"
       class="focus-visible:ring-ring outline-none focus-visible:ring-2"
-      [class]="bare() ? '' : 'bg-card rounded-lg'"
+      [class]="bare() ? '' : 'bg-secondary border-border border'"
       (keydown.escape)="escape($event)"
     >
       @if (!bare()) {

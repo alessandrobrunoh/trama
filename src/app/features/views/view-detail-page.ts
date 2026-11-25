@@ -151,7 +151,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
             [canEdit]="canEdit()"
             (save)="rename($event)"
           />
-          <span class="text-meta shrink-0">{{ entityLabel() }}</span>
+          <span class="text-faint shrink-0 font-mono text-[10.5px] uppercase">{{ entityLabel() }}</span>
         </span>
         <span actions class="flex items-center gap-1.5">
           <app-view-share [view]="v" />
@@ -250,11 +250,11 @@ type PageLayout = 'list' | 'board' | 'timeline';
       } @else if (layout() === 'board') {
         <div class="flex min-h-0 flex-1 gap-3 overflow-x-auto px-4 py-3 sm:px-5">
           @for (g of groups(); track g.key) {
-            <section class="bg-muted flex w-72 shrink-0 flex-col rounded-lg" [attr.aria-label]="g.label">
-              <header class="text-muted-foreground flex h-9 shrink-0 items-center gap-2 px-3 text-[13px]">
+            <section class="bg-secondary border-border flex w-72 shrink-0 flex-col border" [attr.aria-label]="g.label">
+              <header class="border-border text-muted-foreground flex h-9 shrink-0 items-center gap-2 border-b px-3 text-[13px]">
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
                 <span class="truncate">{{ g.label }}</span>
-                <span class="tabular-nums">{{ g.items.length }}</span>
+                <span class="text-faint font-mono text-[10.5px] tabular-nums">{{ g.items.length }}</span>
               </header>
               <div class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-2 pb-2">
                 @for (item of g.items; track item.id) {
@@ -279,11 +279,11 @@ type PageLayout = 'list' | 'board' | 'timeline';
           @for (g of groups(); track g.key) {
             @if (grouped()) {
               <div
-                class="text-muted-foreground bg-background sticky top-0 z-10 mt-1 flex h-8 items-center gap-2 px-4 text-[13px] sm:px-5"
+                class="text-muted-foreground bg-background border-border sticky top-0 z-10 flex h-8 items-center gap-2 border-b px-4 text-[13px] sm:px-5"
               >
                 <ng-container *ngTemplateOutlet="glyph; context: { $implicit: g }" />
                 <span>{{ g.label }}</span>
-                <span class="tabular-nums">{{ g.items.length }}</span>
+                <span class="text-faint font-mono text-[10.5px] tabular-nums">{{ g.items.length }}</span>
               </div>
             }
             @for (item of g.items; track item.id) {
@@ -304,7 +304,7 @@ type PageLayout = 'list' | 'board' | 'timeline';
         } @else if (g.actor) {
           <app-actor-avatar [actor]="g.actor" [size]="16" />
         } @else if (g.color) {
-          <span class="size-2 shrink-0 rounded-full" [style.background]="g.color"></span>
+          <span class="size-2 shrink-0" [style.background]="g.color"></span>
         }
       </ng-template>
     } @else {

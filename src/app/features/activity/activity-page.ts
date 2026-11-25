@@ -29,6 +29,7 @@ import {
   type EventCategory,
 } from '../../shared/event-line';
 import { Picker, type PickOption } from '../../shared/picker';
+import { V3Segmented, type V3SegmentOption } from '../../shared/v3';
 
 type TypeFilter = 'all' | Exclude<EventCategory, 'other'>;
 
@@ -78,31 +79,21 @@ function dayLabel(iso: string, now = new Date()): string {
     EmptyState,
     EventLine,
     Picker,
+    V3Segmented,
   ],
   host: { class: 'flex min-h-full flex-col' },
   template: `
-    <app-page-header title="Activity" [description]="description()">
-      <div class="flex flex-wrap items-center gap-x-1 gap-y-2 px-4 py-2 sm:px-6">
-        <div
-          class="-ms-1 flex flex-wrap items-center gap-0.5"
-          role="tablist"
-          aria-label="Event type"
-        >
-          @for (t of typeTabs; track t) {
-            <button
-              type="button"
-              role="tab"
-              class="hover:bg-accent text-muted-foreground hover:text-foreground aria-selected:bg-accent aria-selected:text-foreground flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium"
-              [attr.aria-selected]="type() === t"
-              (click)="setType(t)"
-            >
-              {{ typeLabel(t) }}
-              @if (counts()[t]; as n) {
-                <span class="text-muted-foreground tabular-nums">{{ n }}</span>
-              }
-            </button>
-          }
-        </div>
+    <app-page-header title="Activity" [description]="description()" />
+
+    <div class="mx-auto w-full max-w-4xl px-4 pt-7 sm:px-10">
+      <header class="flex flex-col gap-1.5">
+        <p class="text-faint font-mono text-[10.5px] leading-[14px]">WORKSPACE · NEWEST FIRST</p>
+        <h1 class="font-title text-foreground text-[34px] leading-[38px] tracking-[-0.5px]">Activity</h1>
+        <p class="text-muted-foreground text-[13.5px] leading-[21px]">{{ description() }}</p>
+      </header>
+
+      <div class="mt-5 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <v3-segmented aria-label="Event type" [options]="typeOptions()" [value]="type()" (valueChange)="setType($any($event))" />
         <span class="flex-1"></span>
         <app-picker
           variant="chip"
@@ -118,13 +109,13 @@ function dayLabel(iso: string, now = new Date()): string {
           hlmBtn
           variant="outline"
           size="sm"
-          class="h-7 gap-1.5 px-2 text-xs font-normal"
-          [class.bg-accent]="!showSystem()"
+          class="h-[22px] gap-1.5 px-2 text-[11px]"
+          [class.bg-secondary]="!showSystem()"
           [attr.aria-pressed]="!showSystem()"
           (click)="showSystem.set(!showSystem())"
           title="Hide changes made automatically by Trama and integrations"
         >
-          <svg [lucideIcon]="botIcon" [size]="13" class="text-muted-foreground"></svg>
+          <svg [lucideIcon]="botIcon" [size]="12" class="text-muted-foreground"></svg>
           {{ showSystem() ? 'Automated shown' : 'Automated hidden' }}
         </button>
         @if (filtered()) {
@@ -132,14 +123,14 @@ function dayLabel(iso: string, now = new Date()): string {
             hlmBtn
             variant="ghost"
             size="sm"
-            class="text-muted-foreground h-7 gap-1 px-2 text-xs"
+            class="text-muted-foreground h-[22px] gap-1 px-2 text-[11px]"
             (click)="clear()"
           >
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
           </button>
         }
       </div>
-    </app-page-header>
+    </div>
 
     @if (groups().length === 0) {
       <app-empty-state
@@ -167,21 +158,21 @@ function dayLabel(iso: string, now = new Date()): string {
         </div>
       </app-empty-state>
     } @else {
-      <div class="mx-auto w-full max-w-4xl px-4 pb-10 sm:px-6">
+      <div class="mx-auto w-full max-w-4xl px-4 pb-10 sm:px-10">
         @for (g of groups(); track g.key) {
-          <section [attr.aria-label]="g.label" class="pt-5">
+          <section [attr.aria-label]="g.label" class="pt-6">
             <h2
-              class="bg-background/95 text-muted-foreground sticky top-0 z-[1] -mx-2 flex items-baseline gap-2 px-2 py-1.5 text-xs font-medium backdrop-blur"
+              class="border-border bg-background sticky top-0 z-[1] flex items-end gap-2.5 border-b pb-2"
             >
-              {{ g.label }}
-              <span class="text-meta tabular-nums">{{ g.events.length }}</span>
+              <span class="font-title text-foreground text-[20px] leading-[24px]">{{ g.label }}</span>
+              <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none tabular-nums">{{ g.events.length }}</span>
             </h2>
             <div class="flex flex-col">
               @for (e of g.events; track e.id) {
                 <app-event-line
                   [event]="e"
                   [slug]="slug()"
-                  class="hover:bg-hover -mx-2 rounded-md px-2"
+                  class="border-border hover:bg-secondary border-b px-1"
                 />
               }
             </div>
@@ -189,7 +180,7 @@ function dayLabel(iso: string, now = new Date()): string {
         }
         <div class="flex flex-col items-center gap-1 pt-6">
           @if (exhausted()) {
-            <p class="text-meta">That's the beginning of this workspace's history.</p>
+            <p class="text-faint font-mono text-[10.5px]">That's the beginning of this workspace's history.</p>
           } @else {
             <button hlmBtn variant="outline" size="sm" [disabled]="loading()" (click)="loadMore()">
               @if (loading()) {
@@ -197,7 +188,7 @@ function dayLabel(iso: string, now = new Date()): string {
               }
               Load older activity
             </button>
-            <p class="text-meta">Showing activity since {{ oldestLabel() }}</p>
+            <p class="text-faint font-mono text-[10.5px]">Showing activity since {{ oldestLabel() }}</p>
           }
         </div>
       </div>
@@ -219,6 +210,12 @@ export class ActivityPage {
   protected readonly userIcon = LucideUser;
   protected readonly xIcon = LucideX;
   protected readonly typeTabs = TYPE_TABS;
+  protected readonly typeOptions = computed<V3SegmentOption[]>(() =>
+    TYPE_TABS.map((t) => {
+      const n = this.counts()[t];
+      return { value: t, label: n ? `${this.typeLabel(t)} ${n}` : this.typeLabel(t) };
+    }),
+  );
 
   protected readonly slug = computed(() => this.workspaceSlug() ?? this.store.slug() ?? '');
   // Filters survive navigation inside the app (see ListStateStore); query params still win.

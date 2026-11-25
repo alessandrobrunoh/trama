@@ -31,7 +31,7 @@ let seq = 0;
       <div class="mb-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
         @for (s of legend(); track s.key) {
           <span class="inline-flex items-center gap-1.5">
-            <span class="h-0.5 w-3 shrink-0 rounded-full" [style.background]="s.color"></span>
+            <span class="h-0.5 w-3 shrink-0" [style.background]="s.color"></span>
             <span class="text-muted-foreground">{{ s.label }}</span>
             <span class="text-foreground font-medium tabular-nums">{{ s.value }}</span>
           </span>
@@ -48,7 +48,7 @@ let seq = 0;
     }
 
     @if (m.totals.scope === 0) {
-      <div class="text-muted-foreground bg-muted flex items-center justify-center rounded-md px-4 text-center text-xs" [style.height.px]="height()">
+      <div class="text-faint bg-secondary flex items-center justify-center px-4 text-center font-mono text-[10.5px]" [style.height.px]="height()">
         {{ milestone() ? 'No tasks in this milestone yet.' : 'Link tasks to see progress over time.' }}
       </div>
     } @else {
@@ -122,7 +122,7 @@ let seq = 0;
             <ul class="flex flex-col gap-1">
               @for (r of t.rows; track r.key) {
                 <li class="flex items-center gap-2">
-                  <span class="h-0.5 w-2.5 shrink-0 rounded-full" [style.background]="r.color"></span>
+                  <span class="h-0.5 w-2.5 shrink-0" [style.background]="r.color"></span>
                   <span class="text-muted-foreground min-w-0 flex-1 truncate">{{ r.label }}</span>
                   <span class="text-foreground font-medium tabular-nums">{{ r.value }}</span>
                 </li>
