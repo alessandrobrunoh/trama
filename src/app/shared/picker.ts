@@ -12,9 +12,10 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCommandImports } from '@spartan-ng/helm/command';
 import { HlmPopoverImports } from '@spartan-ng/helm/popover';
-import { TramaStore, type ActorRef, type Priority } from '../core';
+import { TramaStore, type ActorRef, type IssueKind, type Priority } from '../core';
 import { ActorAvatar } from './actor-avatar';
 import { EstimateGlyph } from './estimate';
+import { IssueKindLabel } from './issue';
 import { PriorityIcon } from './priority-icon';
 import { ProviderIcon, type AnyProvider } from './provider-icon';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
@@ -30,6 +31,7 @@ export type PickKind =
   | 'provider'
   | 'project'
   | 'label'
+  | 'kind'
   | 'estimate';
 
 export interface PickOption {
@@ -84,6 +86,7 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
     PriorityIcon,
     ActorAvatar,
     ProviderIcon,
+    IssueKindLabel,
     EstimateGlyph,
     ProjectGlyph,
     NgTemplateOutlet,
@@ -371,6 +374,9 @@ export const actorValue = (a: ActorRef): string => `${a.type}:${a.id ?? ''}`;
         @case ('label') {
           <span class="size-2 shrink-0 rounded-full" [style.background]="o.color || 'var(--color-muted-foreground)'"></span>
         }
+        @case ('kind') {
+          <app-issue-kind [kind]="asKind(o.value)" [size]="14" />
+        }
         @case ('estimate') {
           <app-estimate-glyph
             class="text-muted-foreground"
@@ -485,6 +491,7 @@ export class Picker {
 
   protected asStatus = (v: string) => v as AnyStatus;
   protected asPriority = (v: string) => v as Priority;
+  protected asKind = (v: string) => v as IssueKind;
   protected asProvider = (v: string) => v as AnyProvider;
   protected projectOf = (id: string) => this.store.getProject(id);
   protected userRef = (v: string): ActorRef => ({ type: 'user', id: v });

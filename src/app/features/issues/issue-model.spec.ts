@@ -1,4 +1,4 @@
-import { issueFlow, quietToggleStatus, subtaskStatus } from './issue-model';
+import { issueFlow, issueKindOptions, quietToggleStatus, subtaskStatus } from './issue-model';
 import type { StatusEntry, IssueStatus } from '../../core';
 
 describe('subtaskStatus', () => {
@@ -55,5 +55,13 @@ describe('issueFlow', () => {
       now,
     );
     expect(flow).toEqual({ open: 2, inProgress: 1, opened: 1, closed: 1 });
+  });
+});
+
+describe('issueKindOptions', () => {
+  it('gives every task type a glyph in the pickers', () => {
+    const options = issueKindOptions();
+    expect(options.length).toBeGreaterThan(0);
+    expect(options.every((o) => o.kind === 'kind')).toBe(true);
   });
 });

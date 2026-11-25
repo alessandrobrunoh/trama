@@ -20,6 +20,7 @@ import {
   LucideLayers,
   LucideListTree,
   LucideMessageSquare,
+  LucideShapes,
   LucideTag,
   LucideX,
   type LucideIcon,
@@ -285,6 +286,7 @@ const oneOf = <T extends string>(list: readonly T[], v: unknown): T | undefined 
                   <app-picker
                     variant="pill"
                     label="Type"
+                    [icon]="typeIcon"
                     [searchable]="false"
                     [options]="issueKindOptions"
                     [value]="[issueKind()]"
@@ -499,6 +501,7 @@ export class CreateDialog {
   private readonly labelCatalog = inject(LabelCatalog);
 
   protected readonly userIcon = LucideCircleUser;
+  protected readonly typeIcon = LucideShapes;
   protected readonly projectIcon = LucideBox;
   protected readonly estimateIcon = LucideGauge;
   protected readonly labelIcon = LucideTag;
@@ -590,6 +593,7 @@ export class CreateDialog {
   protected readonly issueKindOptions: PickOption[] = ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,
+    kind: 'kind' as const,
   }));
   protected readonly viewEntityOptions: Option[] = [
     { value: 'issue', label: 'Tasks' },
