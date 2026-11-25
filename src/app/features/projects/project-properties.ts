@@ -16,6 +16,7 @@ import { PropertyRow } from '../../shared/property-row';
 import { isClosedIssue } from '../issues/issue-model';
 import { isoFromDate } from '../milestones/milestone-actions';
 import { isOverdue, projectStatusOptions } from './project-model';
+import { tasksQuery } from './project-tasks-link';
 
 const MEMBERS_SHOWN = 6;
 const RECORDS_SHOWN = 3;
@@ -84,7 +85,11 @@ const repoLabel = (repo: string): string => repo.replace(/^https?:\/\/(www\.)?/i
         }
         <div class="flex items-center gap-2.5">
           <span class="text-faint w-20 shrink-0 font-mono text-[10.5px] leading-[13px]">Tasks</span>
-          <span class="text-foreground font-mono text-[11px] leading-[14px]">{{ counts().open }} open · {{ counts().done }} done</span>
+          <span class="text-foreground font-mono text-[11px] leading-[14px]">
+            <a class="underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="openTasks">{{ counts().open }} open</a>
+            ·
+            <a class="underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="doneTasks">{{ counts().done }} done</a>
+          </span>
         </div>
       </section>
 
@@ -93,14 +98,15 @@ const repoLabel = (repo: string): string => repo.replace(/^https?:\/\/(www\.)?/i
         @if (coverage(); as c) {
           <div class="flex items-end gap-2">
             <span class="font-title text-foreground text-[28px] leading-8">{{ c.percent }}%</span>
-            <span class="text-faint pb-1 font-mono text-[10.5px] leading-[13px]">of in-progress work</span>
+            <a class="text-faint hover:text-foreground pb-1 font-mono text-[10.5px] leading-[13px] underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="inProgressTasks">of in-progress work</a>
           </div>
           <div class="bg-line h-1 w-full" role="img" [attr.aria-label]="c.percent + '% of in-progress tasks have a Delta thread'">
             <div class="bg-delta-line h-1" [style.width.%]="c.percent"></div>
           </div>
           <p class="text-muted-foreground text-xs leading-4">
             @if (c.missing) {
-              {{ c.missing }} {{ c.missing === 1 ? 'task' : 'tasks' }} in progress {{ c.missing === 1 ? 'has' : 'have' }} no Delta thread yet.
+              <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="link()" [queryParams]="inProgressTasks">{{ c.missing }} {{ c.missing === 1 ? 'task' : 'tasks' }} in progress</a>
+              {{ c.missing === 1 ? 'has' : 'have' }} no Delta thread yet.
             } @else {
               Every task in progress has a Delta thread.
             }
@@ -230,6 +236,10 @@ export class ProjectProperties {
   protected readonly statuses = computed(() => projectStatusOptions(this.entries().project));
   protected readonly users = computed(() => userOptions(this.store));
   protected readonly slug = computed(() => this.store.slug() ?? '');
+  protected readonly link = computed(() => ['/', this.slug(), 'projects', this.id()]);
+  protected readonly openTasks = tasksQuery({ status: ['open'] });
+  protected readonly doneTasks = tasksQuery({ status: ['done'] });
+  protected readonly inProgressTasks = tasksQuery({ status: ['in_progress'] });
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly overdue = computed(() => {
     const p = this.project();

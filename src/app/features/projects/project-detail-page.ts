@@ -5,9 +5,11 @@ import {
   ChangeDetectionStrategy,
   Component,
   computed,
+  effect,
   inject,
   input,
   signal,
+  untracked,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
@@ -21,6 +23,7 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { PROJECT_KEY_MAX, resolveStatusEntry } from '../../core/contracts/domain';
 import {
+  ListStateStore,
   TramaStore,
   UiStore,
   usePageShortcuts,
@@ -49,15 +52,14 @@ import { ProjectMilestoneCards } from './project-milestone-cards';
 import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
 import { ProjectRoadmap } from './project-roadmap';
-import { ProjectStatsTab } from './project-stats-tab';
+import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
 
-const TABS = ['overview', 'progress', 'tasks', 'stats'] as const;
+const TABS = ['overview', 'progress', 'tasks'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
   progress: 'Progress',
   tasks: 'Tasks',
-  stats: 'Stats',
 };
 
 const ACTIVITY_CAP = 20;
@@ -96,7 +98,6 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectMilestoneCards,
     ProjectMilestoneRows,
     ProjectRoadmap,
-    ProjectStatsTab,
     ProjectTasksTab,
     ProjectProperties,
   ],
@@ -107,7 +108,11 @@ const TONE_COLOR: Record<BurnTone, string> = {
 
       @if (current() !== 'tasks') {
         <app-status-bar>
-          <span class="tabular-nums">{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }} · {{ openCount() }} open</span>
+          <span class="tabular-nums">
+            <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="projectLink()" [queryParams]="allTasks">{{ issues().length }} {{ issues().length === 1 ? 'task' : 'tasks' }}</a>
+            ·
+            <a class="hover:text-foreground underline-offset-2 hover:underline" [routerLink]="projectLink()" [queryParams]="openTasks">{{ openCount() }} open</a>
+          </span>
           @if (milestoneCount()) {
             <span class="tabular-nums">{{ milestoneCount() }} {{ milestoneCount() === 1 ? 'milestone' : 'milestones' }}</span>
           }
@@ -228,11 +233,6 @@ const TONE_COLOR: Record<BurnTone, string> = {
         @case ('tasks') {
           <app-project-tasks-tab [projectId]="p.id" />
         }
-        @case ('stats') {
-          <div class="min-w-0 flex-1 px-4 py-5 sm:px-10">
-            <app-project-stats-tab [project]="p" />
-          </div>
-        }
         @default {
           <div class="flex min-w-0 flex-1 max-lg:flex-col">
             <div class="flex min-w-0 flex-1 flex-col gap-[22px] px-4 py-[22px] sm:px-10">
@@ -316,11 +316,15 @@ export class ProjectDetailPage {
   readonly id = input<string>();
   /** `?tab=` query param (bound by the router), default overview. */
   readonly tab = input<string>();
+  /** `?status=` / `?milestone=` from a link into the Tasks tab (see `project-tasks-link`). */
+  readonly status = input<string>();
+  readonly milestone = input<string>();
 
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);
+  private readonly listState = inject(ListStateStore);
 
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
@@ -328,11 +332,14 @@ export class ProjectDetailPage {
   protected readonly linkIcon = LucideLink;
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
+  protected readonly allTasks = tasksQuery();
+  protected readonly openTasks = tasksQuery({ status: ['open'] });
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
   protected readonly activityCap = ACTIVITY_CAP;
   protected readonly allActivity = signal(false);
 
   protected readonly slug = computed(() => this.store.slug() ?? this.workspaceSlug() ?? '');
+  protected readonly projectLink = computed(() => ['/', this.slug(), 'projects', this.id() ?? '']);
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
@@ -406,6 +413,23 @@ export class ProjectDetailPage {
     { label: this.project()?.name ?? this.id() ?? '' },
   ]);
 
+  /** A link into the Tasks tab brings its filters in the params: apply them once, then drop them. */
+  private readonly _prefilter = effect(() => {
+    const p = this.project();
+    const status = this.status();
+    const milestone = this.milestone();
+    if (!p || this.current() !== 'tasks' || (!status && !milestone)) return;
+    untracked(() => {
+      const entries = this.store.settings().statuses.issue;
+      applyTasksPrefilter(this.listState, p.id, prefilterOf(p.id, entries, status, milestone));
+      void this.router.navigate([], {
+        queryParams: { status: null, milestone: null },
+        queryParamsHandling: 'merge',
+        replaceUrl: true,
+      });
+    });
+  });
+
   private readonly _keys = usePageShortcuts([
     ...TABS.map((t, i) => ({
       keys: String(i + 1),
@@ -433,7 +457,7 @@ export class ProjectDetailPage {
   /** The properties live in the rail: bring them into view and focus the first one. */
   protected openSettings(): void {
     const c = this.current();
-    if (c === 'tasks' || c === 'stats') this.setTab('overview');
+    if (c === 'tasks') this.setTab('overview');
     setTimeout(() => {
       const el = document.getElementById('project-properties');
       el?.scrollIntoView({ block: 'center', behavior: 'smooth' });

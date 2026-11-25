@@ -1,10 +1,10 @@
 // The milestones of a project as v3 "08 · Project" draws them: the next one open as a card (progress bar by
 // status, legend, its open tasks), the others as a line with a thin bar, shipped ones as a single line.
 // Everything the old milestone rows did stays: add, rename, target date, description, add tasks,
-// move up / down and delete, and "view all" opens the shared task table scoped to the milestone.
+// move up / down and delete. The counts and "view all" open the Tasks tab filtered by the milestone.
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, ElementRef, computed, effect, inject, input, signal, viewChild } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { RouterLink, type Params } from '@angular/router';
 import { format } from 'date-fns';
 import {
   LucideCalendar,
@@ -27,8 +27,6 @@ import { EditableMarkdown } from '../../shared/inline-edit';
 import { Picker } from '../../shared/picker';
 import { issueOptions } from '../../shared/picker-options';
 import { V3SectionTitle } from '../../shared/v3';
-import { IssueBoard } from '../issues/issue-board';
-import type { IssueProp } from '../issues/issue-model';
 import { MilestoneActions, isoFromDate } from '../milestones/milestone-actions';
 import {
   dateOfDay,
@@ -41,6 +39,7 @@ import {
 } from '../milestones/milestone-model';
 import { MilestoneInfo } from '../milestones/milestone-stats';
 import { dueText } from './project-burnup-model';
+import { tasksQuery } from './project-tasks-link';
 
 const OPEN_VISIBLE = 4;
 
@@ -94,6 +93,14 @@ const SEGMENT_META: readonly { key: Bucket; label: string; cls: string }[] = [
   { key: 'todo', label: 'Todo', cls: 'bg-line' },
 ];
 
+/** The status types each bucket of the bar stands for (see `BUCKET`). */
+const BUCKET_STATUS: Record<Bucket, readonly string[]> = {
+  done: ['done'],
+  review: ['in_review'],
+  progress: ['in_progress'],
+  todo: ['draft', 'backlog', 'todo'],
+};
+
 const OPEN_ORDER: Record<Bucket, number> = { progress: 0, review: 1, todo: 2, done: 3 };
 
 @Component({
@@ -111,7 +118,6 @@ const OPEN_ORDER: Record<Bucket, number> = { progress: 0, review: 1, todo: 2, do
     EditableMarkdown,
     Picker,
     V3SectionTitle,
-    IssueBoard,
   ],
   host: { class: 'flex flex-col' },
   template: `
@@ -167,10 +173,21 @@ const OPEN_ORDER: Record<Bucket, number> = { progress: 0, review: 1, todo: 2, do
                 <span class="flex-1"></span>
                 @if (shipped) {
                   <span class="text-muted-foreground shrink-0 font-mono text-[10.5px] leading-[13px]">{{ open ? 'Close summary' : 'Open summary →' }}</span>
+                }
+              </button>
+              @if (!shipped) {
+                @if (c.issues.length) {
+                  <a
+                    class="text-foreground shrink-0 font-mono text-[11px] leading-[14px] underline-offset-2 outline-none hover:underline focus-visible:underline"
+                    [routerLink]="projectLink()"
+                    [queryParams]="query(c)"
+                    [attr.aria-label]="'Show the tasks of ' + c.ms.name"
+                    >{{ c.summary }}</a
+                  >
                 } @else {
                   <span class="text-foreground shrink-0 font-mono text-[11px] leading-[14px]">{{ c.summary }}</span>
                 }
-              </button>
+              }
             }
             @if (canEdit()) {
               <button
@@ -199,9 +216,13 @@ const OPEN_ORDER: Record<Bucket, number> = { progress: 0, review: 1, todo: 2, do
               </div>
               <div class="flex flex-wrap gap-4">
                 @for (s of c.segments; track s.key) {
-                  <span class="text-faint inline-flex items-center gap-[5px] font-mono text-[10.5px] leading-[13px]">
+                  <a
+                    class="text-faint hover:text-foreground inline-flex items-center gap-[5px] font-mono text-[10.5px] leading-[13px] outline-none focus-visible:underline"
+                    [routerLink]="projectLink()"
+                    [queryParams]="query(c, s.key)"
+                  >
                     <span class="size-1.5" [class]="s.cls"></span>{{ s.label }} {{ s.count }}
-                  </span>
+                  </a>
                 }
               </div>
             } @else {
@@ -252,41 +273,27 @@ const OPEN_ORDER: Record<Bucket, number> = { progress: 0, review: 1, todo: 2, do
                 }
               </div>
             }
-            @if (all().has(c.ms.id)) {
-              <div class="bg-background border-border flex max-h-[26rem] flex-col overflow-hidden border-t">
-                <app-issue-board
-                  [issues]="allIssues()"
-                  [baseFilters]="filterOf(c.ms)"
-                  [toolbar]="false"
-                  [statusBar]="false"
-                  [showCreate]="false"
-                  [hideProps]="hiddenProps"
-                  forceLayout="list"
-                  forceGroup="none"
-                  [stateKey]="'milestone.' + c.ms.id"
-                  [dropPrefix]="'milestone-issue-col-' + c.ms.id"
-                />
-              </div>
-              <button type="button" class="text-muted-foreground hover:text-foreground border-border border-t px-4 py-2.5 text-left font-mono text-[10.5px]" (click)="toggleAll(c.ms.id)">
-                Show open tasks only
-              </button>
-            } @else if (c.open.length) {
+            @if (c.open.length) {
               <div class="border-border flex flex-col border-t">
                 @for (i of c.open.slice(0, openVisible); track i.id) {
                   <ng-container [ngTemplateOutlet]="task" [ngTemplateOutletContext]="{ $implicit: i }" />
                 }
               </div>
-              <button type="button" class="text-muted-foreground hover:text-foreground px-4 py-2.5 text-left font-mono text-[10.5px] leading-[13px]" (click)="toggleAll(c.ms.id)">
+              <a
+                class="text-muted-foreground hover:text-foreground px-4 py-2.5 text-left font-mono text-[10.5px] leading-[13px] outline-none focus-visible:underline"
+                [routerLink]="projectLink()"
+                [queryParams]="query(c)"
+              >
                 @if (c.open.length > openVisible) {
                   + {{ c.open.length - openVisible }} more open ·
                 }
                 view all {{ c.issues.length }}
-              </button>
+              </a>
             } @else {
               <p class="text-faint border-border border-t px-4 py-3 font-mono text-[10.5px]">
                 @if (c.issues.length) {
                   Nothing open.
-                  <button type="button" class="hover:text-foreground underline underline-offset-2" (click)="toggleAll(c.ms.id)">View all {{ c.issues.length }}</button>
+                  <a class="hover:text-foreground underline underline-offset-2" [routerLink]="projectLink()" [queryParams]="query(c)">View all {{ c.issues.length }}</a>
                 } @else {
                   No tasks in this milestone. Add some, or set a milestone on a task row.
                 }
@@ -410,16 +417,13 @@ export class ProjectMilestoneCards {
   protected readonly up = LucideMoveUp;
   protected readonly down = LucideMoveDown;
   protected readonly trash = LucideTrash2;
-  /** Rows inside a milestone do not repeat the project. */
-  protected readonly hiddenProps: readonly IssueProp[] = ['project'];
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
-  protected readonly allIssues = computed(() => this.store.issues());
+  protected readonly projectLink = computed(() => ['/', this.slug(), 'projects', this.project().id]);
   protected readonly canEdit = computed(() => !this.readonly() && this.store.allowed('manageProjects'));
 
   /** Cards the reader opened (true) or closed (false); the rest follows the default. */
   private readonly toggled = signal<Readonly<Record<string, boolean>>>({});
-  protected readonly all = signal<ReadonlySet<string>>(new Set());
   protected readonly renaming = signal<string | null>(null);
   protected readonly draft = signal('');
   protected readonly adding = signal(false);
@@ -527,14 +531,6 @@ export class ProjectMilestoneCards {
     this.toggled.update((t) => ({ ...t, [c.ms.id]: !this.isOpen(c) }));
   }
 
-  protected toggleAll(id: string): void {
-    this.all.update((s) => {
-      const next = new Set(s);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
-  }
-
   protected statusColor(i: Issue): string {
     return resolveStatusEntry(this.store.settings().statuses.issue, i.status)?.color ?? '#8c9096';
   }
@@ -543,8 +539,9 @@ export class ProjectMilestoneCards {
     return format(dateOfDay(dayOf(ms.targetDate!)), 'MMM d');
   }
 
-  protected filterOf(ms: Milestone): { field: string; op: 'in'; value: string[] }[] {
-    return [{ field: 'milestoneIds', op: 'in', value: [ms.id] }];
+  /** The project's Tasks tab, filtered by this milestone (and by the status bucket when given). */
+  protected query(c: Card, bucket?: Bucket): Params {
+    return tasksQuery({ milestone: c.ms.id, status: bucket ? BUCKET_STATUS[bucket] : [] });
   }
 
   protected addable(c: Card): readonly Issue[] {

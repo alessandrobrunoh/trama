@@ -1,11 +1,14 @@
 // The roadmap strip of the project page (v3 "08 · Project"): the months as hairline ticks, the elapsed
 // part of the line, TODAY, and one square per milestone with its name, date and progress beneath it.
+import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { format } from 'date-fns';
 import { TramaStore, type Project } from '../../core';
 import { V3SectionTitle } from '../../shared/v3';
 import { dateOfDay, dayOf, todayDay, type MilestoneState } from '../milestones/milestone-model';
 import { MilestoneInfo } from '../milestones/milestone-stats';
+import { tasksQuery } from './project-tasks-link';
 
 export interface RoadmapRange {
   /** First day of the first month. */
@@ -38,7 +41,7 @@ const MARKER: Record<MilestoneState, string> = {
 @Component({
   selector: 'app-project-roadmap',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [V3SectionTitle],
+  imports: [NgTemplateOutlet, RouterLink, V3SectionTitle],
   host: { class: 'flex flex-col gap-2.5' },
   template: `
     @if (strip(); as s) {
@@ -51,20 +54,36 @@ const MARKER: Record<MilestoneState, string> = {
         <span class="bg-secondary absolute top-[52px] left-0 h-0.5 w-full"></span>
         @if (s.today !== null) {
           <span class="bg-muted-foreground absolute top-[52px] left-0 h-0.5" [style.width.%]="s.today"></span>
-          <span class="bg-red absolute top-[36px] h-[34px] w-px" [style.left.%]="s.today"></span>
-          <span class="text-red absolute top-[36px] ml-[5px] font-mono text-[9.5px] leading-3" [style.left.%]="s.today">TODAY</span>
+          <span class="bg-primary absolute top-[36px] h-[34px] w-px" [style.left.%]="s.today"></span>
+          <span class="text-primary absolute top-[36px] ml-[5px] font-mono text-[9.5px] leading-3" [style.left.%]="s.today">TODAY</span>
         }
         @for (m of s.marks; track m.id) {
           <span class="outline-background absolute top-[47px] size-3 outline-2 -outline-offset-1" [class]="m.cls" [style.left.%]="m.at"></span>
-          <span
-            class="absolute top-[68px] flex flex-col gap-0.5"
-            [class]="m.flip ? 'items-end text-right' : ''"
-            [style.left.%]="m.at"
-            [style.transform]="m.flip ? 'translateX(calc(-100% + 12px))' : null"
-          >
+          <ng-template #label>
             <span class="text-foreground text-[12.5px] leading-4 whitespace-nowrap">{{ m.name }}</span>
             <span class="text-faint font-mono text-[10px] leading-3 whitespace-nowrap">{{ m.note }}</span>
-          </span>
+          </ng-template>
+          @if (m.tasks) {
+            <a
+              class="absolute top-[68px] flex flex-col gap-0.5 outline-none hover:[&>span:last-child]:text-foreground focus-visible:underline"
+              [class]="m.flip ? 'items-end text-right' : ''"
+              [style.left.%]="m.at"
+              [style.transform]="m.flip ? 'translateX(calc(-100% + 12px))' : null"
+              [routerLink]="link()"
+              [queryParams]="m.query"
+            >
+              <ng-container *ngTemplateOutlet="label" />
+            </a>
+          } @else {
+            <span
+              class="absolute top-[68px] flex flex-col gap-0.5"
+              [class]="m.flip ? 'items-end text-right' : ''"
+              [style.left.%]="m.at"
+              [style.transform]="m.flip ? 'translateX(calc(-100% + 12px))' : null"
+            >
+              <ng-container *ngTemplateOutlet="label" />
+            </span>
+          }
         }
       </div>
     }
@@ -75,6 +94,8 @@ export class ProjectRoadmap {
   private readonly info = inject(MilestoneInfo);
 
   readonly project = input.required<Project>();
+
+  protected readonly link = computed(() => ['/', this.store.slug() ?? '', 'projects', this.project().id]);
 
   protected readonly strip = computed(() => {
     const p = this.project();
@@ -96,7 +117,17 @@ export class ProjectRoadmap {
       const note =
         state === 'done' ? `${when} · shipped` : s && s.issues > 0 ? `${when} · ${s.doneIssues}/${s.issues}` : `${when} · no tasks`;
       const pos = at(dayOf(m.targetDate!));
-      return { id: m.id, name: m.name, note, at: pos, cls: MARKER[state], flip: pos > 86 };
+      const tasks = !!s && s.issues > 0;
+      return {
+        id: m.id,
+        name: m.name,
+        note,
+        at: pos,
+        cls: MARKER[state],
+        flip: pos > 86,
+        tasks,
+        query: tasksQuery({ milestone: m.id }),
+      };
     });
     const first = format(dateOfDay(r.from), 'MMM');
     const last = format(dateOfDay(r.to - 1), 'MMM');

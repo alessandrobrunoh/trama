@@ -3,6 +3,7 @@
 // The project filter is a normal filter chip: removing it widens the list to every task.
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { TramaStore } from '../../core';
+import { projectTasksStateKey } from '../projects/project-tasks-link';
 import { IssueBoard } from './issue-board';
 import { IssueCommandDialog } from './issue-prop';
 
@@ -31,6 +32,6 @@ export class ProjectTasksTab {
   readonly projectId = input.required<string>();
 
   /** Filters and search are remembered per project, apart from the Tasks page. */
-  protected readonly stateKey = computed(() => `project-tasks.${this.projectId()}`);
+  protected readonly stateKey = computed(() => projectTasksStateKey(this.projectId()));
   protected readonly createDefaults = computed(() => ({ projectId: this.projectId() }));
 }

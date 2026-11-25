@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { TramaStore, UiStore, statusTypeOf } from '../../core';
@@ -15,6 +15,7 @@ import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
 import { V3Priority } from '../../shared/v3';
 import { ProjectGlyph } from './project-glyph';
+import { tasksQuery } from './project-tasks-link';
 import { isClosed, isOverdue, projectStatusOptions } from './project-model';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
@@ -167,8 +168,11 @@ import { SearchInput } from '../../shared/search-input';
                   class="flex items-center gap-3 max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] md:contents"
                 >
                   <span
-                    class="flex w-28 shrink-0 items-center gap-2 max-md:w-auto"
-                    [attr.aria-label]="row.percent + '% complete'"
+                    class="hover:bg-hover -my-1 flex w-28 shrink-0 items-center gap-2 py-1 max-md:w-auto"
+                    role="link"
+                    title="Open the tasks of this project"
+                    [attr.aria-label]="row.percent + '% complete, open the tasks'"
+                    (click)="openTasks($event, p.id)"
                   >
                     <span class="bg-line h-1 w-14" aria-hidden="true">
                       <span class="bg-status-done block h-full" [style.width.%]="row.percent"></span>
@@ -203,6 +207,7 @@ export class ProjectListPage {
 
   protected readonly store = inject(TramaStore);
   private readonly listState = inject(ListStateStore);
+  private readonly router = inject(Router);
   protected readonly ui = inject(UiStore);
 
   protected readonly plus = LucidePlus;
@@ -285,6 +290,13 @@ export class ProjectListPage {
     const noun = n === 1 ? 'project' : 'projects';
     return this.hasFilters() ? `${this.rows().length} of ${n} ${noun}` : `${n} ${noun}`;
   });
+
+  /** The progress of a row opens that project's Tasks tab instead of the row's own link. */
+  protected openTasks(e: Event, projectId: string): void {
+    e.preventDefault();
+    e.stopPropagation();
+    void this.router.navigate(['/', this.slug(), 'projects', projectId], { queryParams: tasksQuery() });
+  }
 
   protected create(): void {
     this.ui.openCreate('project');
