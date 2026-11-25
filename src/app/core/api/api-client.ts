@@ -20,6 +20,8 @@ import type {
   CommentPage,
   SnapshotCommentsMode,
   DomainEvent,
+  ExternalIdentity,
+  ExternalIdentityInput,
   Favorite,
   ImportCredential,
   ImportJob,
@@ -324,6 +326,17 @@ export class ApiClient {
       this.post<Favorite>(`${this.w(slug)}/favorites`, { type, subjectId }),
     remove: (slug: string, type: FavoriteType, subjectId: ID) =>
       this.del(`${this.w(slug)}/favorites/${type}/${encodeURIComponent(subjectId)}`),
+  };
+
+  /**
+   * The signed-in user's logins in other tools (GitHub, GitLab, Jira…), shared by all their workspaces.
+   * `add` answers 409 when someone else already has the login.
+   */
+  readonly externalIdentities = {
+    list: () => this.get<ExternalIdentity[]>('/me/external-identities', undefined, { quiet: true }),
+    add: (input: ExternalIdentityInput) =>
+      this.post<ExternalIdentity>('/me/external-identities', input, { quiet: true }),
+    remove: (id: ID) => this.del(`/me/external-identities/${encodeURIComponent(id)}`),
   };
 
   /** The page behind an invitation link: `preview` is public, `accept` needs a signed-in user. */
