@@ -3,16 +3,19 @@ import { LucideCheck, LucideCopy, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { Clipboard } from '../../../core/notify/notifier';
 
-/** Section title + description with an optional right-aligned actions slot (Linear settings heading). */
+/**
+ * Settings page heading (v3 "H"): Newsreader 32px title over a 13.5px muted description, with an optional
+ * right-aligned actions slot.
+ */
 @Component({
   selector: 'app-section-header',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'mb-8 flex flex-wrap items-end justify-between gap-x-4 gap-y-3' },
+  host: { class: 'mb-7 flex flex-wrap items-end justify-between gap-x-4 gap-y-3' },
   template: `
-    <div class="min-w-0">
-      <h2 class="text-xl font-semibold tracking-tight">{{ title() }}</h2>
+    <div class="flex min-w-0 flex-col gap-1.5">
+      <h2 class="font-title text-foreground text-[32px] leading-normal">{{ title() }}</h2>
       @if (description()) {
-        <p class="text-muted-foreground mt-1 max-w-prose text-[13px] leading-snug">{{ description() }}</p>
+        <p class="text-muted-foreground max-w-[720px] text-[13.5px] leading-[21px]">{{ description() }}</p>
       }
     </div>
     <div class="flex shrink-0 items-center gap-2 empty:hidden">
@@ -26,7 +29,33 @@ export class SectionHeader {
 }
 
 /**
- * Titled group of hairline-separated rows:
+ * Flat section (v3 "SH"): Newsreader 20px title, an optional mono caption beside it and an optional
+ * `[aside]` slot on the right, all over a 1px hairline. The content is projected as is.
+ *   <app-settings-section title="Statuses" caption="drag to reorder"> … </app-settings-section>
+ */
+@Component({
+  selector: 'app-settings-section',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { class: 'block' },
+  template: `
+    <div class="border-border flex items-end gap-2.5 border-b pb-2">
+      <h3 class="font-title text-foreground text-[20px] leading-normal">{{ title() }}</h3>
+      @if (caption()) {
+        <span class="text-faint pb-[3px] font-mono text-[10.5px] leading-none">{{ caption() }}</span>
+      }
+      <span class="flex-1"></span>
+      <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
+    </div>
+    <ng-content />
+  `,
+})
+export class SettingsSection {
+  readonly title = input.required<string>();
+  readonly caption = input<string>();
+}
+
+/**
+ * Titled group of hairline-separated rows on a flat panel (`bg-card` + 1px border, no radius):
  *   <app-settings-group title="Workspace"> <app-settings-row …/> … </app-settings-group>
  * Content projected with `[aside]` renders right of the title (e.g. a count or a small button).
  */
@@ -36,17 +65,17 @@ export class SectionHeader {
   host: { class: 'block' },
   template: `
     @if (title()) {
-      <div class="mb-2 flex min-h-6 items-end justify-between gap-3 px-0.5">
+      <div class="mb-2.5 flex min-h-6 items-end justify-between gap-3">
         <div class="min-w-0">
-          <h3 class="text-[13px] font-medium">{{ title() }}</h3>
+          <h3 class="font-title text-foreground text-[20px] leading-normal">{{ title() }}</h3>
           @if (description()) {
-            <p class="text-muted-foreground mt-0.5 text-xs leading-snug">{{ description() }}</p>
+            <p class="text-muted-foreground mt-0.5 text-[12.5px] leading-snug">{{ description() }}</p>
           }
         </div>
         <div class="flex shrink-0 items-center gap-2 empty:hidden"><ng-content select="[aside]" /></div>
       </div>
     }
-    <div class="bg-card overflow-hidden rounded-lg"><ng-content /></div>
+    <div class="bg-card border-border overflow-hidden border"><ng-content /></div>
   `,
 })
 export class SettingsGroup {
@@ -61,12 +90,15 @@ export class SettingsGroup {
 @Component({
   selector: 'app-settings-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'flex min-h-14 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6' },
+  host: {
+    class:
+      'border-border flex min-h-12 flex-col gap-2 border-b px-4 py-2.5 last:border-b-0 sm:flex-row sm:items-center sm:justify-between sm:gap-6',
+  },
   template: `
     <div class="min-w-0 flex-1">
-      <div class="text-[13px] font-medium">{{ label() }}</div>
+      <div class="text-foreground text-[13px]">{{ label() }}</div>
       @if (description()) {
-        <div class="text-muted-foreground mt-0.5 text-xs leading-snug">{{ description() }}</div>
+        <div class="text-muted-foreground mt-0.5 text-[12px] leading-snug">{{ description() }}</div>
       }
     </div>
     <div class="min-w-0" [class]="wide() ? 'sm:w-72 sm:shrink-0' : 'flex shrink-0 flex-wrap items-center gap-2 sm:justify-end'">
@@ -80,11 +112,11 @@ export class SettingsRow {
   readonly wide = input(false, { transform: booleanAttribute });
 }
 
-/** Muted notice shown to people who can see but not change a section. */
+/** Notice shown to people who can see but not change a section (mono, hairline, no fill). */
 @Component({
   selector: 'app-readonly-note',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  host: { class: 'text-muted-foreground bg-muted mb-6 block rounded-md px-3 py-2 text-xs' },
+  host: { class: 'text-muted-foreground border-border mb-6 block border px-3 py-2 font-mono text-[11px] leading-snug' },
   template: `<ng-content />`,
 })
 export class ReadonlyNote {}
@@ -94,9 +126,9 @@ export class ReadonlyNote {}
   selector: 'app-copy-field',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, LucideDynamicIcon],
-  host: { class: 'bg-secondary flex min-w-0 items-center gap-2 rounded-md py-1 pr-1 pl-2.5' },
+  host: { class: 'bg-bg-deep border-border flex min-w-0 items-center gap-2 border py-1 pr-1 pl-2.5' },
   template: `
-    <code class="min-w-0 flex-1 font-mono text-xs break-all select-all" [class.blur-sm]="masked()">{{ value() }}</code>
+    <code class="min-w-0 flex-1 font-mono text-[11.5px] break-all select-all" [class.blur-sm]="masked()">{{ value() }}</code>
     <ng-content />
     <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-7 shrink-0" [attr.aria-label]="'Copy ' + (label() || 'value')" (click)="copy()">
       <svg [lucideIcon]="copied() ? checkIcon : copyIcon" [size]="13"></svg>
@@ -122,4 +154,4 @@ export class CopyField {
   }
 }
 
-export const SECTION_KIT = [SectionHeader, SettingsGroup, SettingsRow, ReadonlyNote, CopyField] as const;
+export const SECTION_KIT = [SectionHeader, SettingsSection, SettingsGroup, SettingsRow, ReadonlyNote, CopyField] as const;

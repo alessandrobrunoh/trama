@@ -1,7 +1,7 @@
 import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { LucideCheck, LucideDynamicIcon, LucideGitBranch } from '@lucide/angular';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
+import { V3Toggle } from '../../../shared/v3';
 import { BranchNames } from '../../../core/branch-prefs';
 import type { BranchFormat } from '../../../core/branch-name';
 import { UiStore } from '../../../core/stores/ui.store';
@@ -33,7 +33,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
 @Component({
   selector: 'app-appearance-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, LucideDynamicIcon, HlmSwitchImports, Kbd, ...SECTION_KIT],
+  imports: [NgTemplateOutlet, LucideDynamicIcon, V3Toggle, Kbd, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -95,7 +95,7 @@ const BRANCH_FORMATS: { id: BranchFormat; label: string }[] = [
       <app-settings-row label="Collapse sidebar" description="Hide the navigation to give lists and boards the full width.">
         <span class="flex items-center gap-3">
           <app-kbd keys="mod+b" class="max-sm:hidden" />
-          <hlm-switch [checked]="ui.sidebarCollapsed()" (checkedChange)="ui.setSidebarCollapsed($event)" aria-label="Collapse sidebar" />
+          <v3-toggle [checked]="ui.sidebarCollapsed()" (checkedChange)="ui.setSidebarCollapsed($event)" aria-label="Collapse sidebar" />
         </span>
       </app-settings-row>
     </app-settings-group>

@@ -42,7 +42,7 @@ import { SECTION_KIT } from './section-kit';
         </app-settings-row>
         <app-settings-row label="Avatar colour" description="Derived from your account, so it looks the same everywhere.">
           <span class="flex items-center gap-2">
-            <span class="ring-border size-5 rounded-full ring-1" [style.background]="hueColor()"></span>
+            <span class="ring-border size-5 ring-1" [style.background]="hueColor()"></span>
             <span class="text-muted-foreground font-mono text-xs">hue {{ user()?.avatarHue }}</span>
           </span>
         </app-settings-row>

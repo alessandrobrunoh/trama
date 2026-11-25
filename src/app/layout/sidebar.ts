@@ -54,6 +54,8 @@ import { TramaLogo } from '../shared/trama-logo';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { ProjectGlyph } from '../features/projects/project-glyph';
+import { SettingsSidebar } from '../features/settings/settings-sidebar';
+import { settingsSectionOfUrl } from '../features/settings/settings-nav';
 import { ago } from '../shared/ago';
 import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 
@@ -80,9 +82,14 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     ActorAvatar,
     StatusIcon,
     ProjectGlyph,
+    SettingsSidebar,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
+    @if (inSettings()) {
+      <!-- a settings page replaces this sidebar with the settings sidebar (features/settings) -->
+      <app-settings-sidebar class="min-h-0 flex-1" />
+    } @else {
     <div hlmSidebarHeader class="gap-0 p-0">
       <!-- top row: three window marks, the panel toggle on the right -->
       <div class="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5">
@@ -293,6 +300,8 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         </a>
       </div>
     </div>
+
+    }
 
     <!-- mono uppercase section label ("PROJECTS"); the fold chevron and actions show on hover / focus -->
     <ng-template #sectionLabel let-id let-label="label" let-all="all" let-allLabel="allLabel" let-create="create" let-createLabel="createLabel">
@@ -649,6 +658,8 @@ export class AppSidebar {
     ),
     { initialValue: this.router.url },
   );
+  /** On a settings page this sidebar gives way to the settings sidebar. */
+  protected readonly inSettings = computed(() => settingsSectionOfUrl(this.url()) !== null);
   protected readonly squareIcon = LucideSquare;
   protected readonly bellIcon = LucideBell;
   protected readonly chevrons = LucideChevronsUpDown;

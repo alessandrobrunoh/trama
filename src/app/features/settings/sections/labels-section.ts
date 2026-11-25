@@ -144,7 +144,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
             @if (catalog.canManage()) {
               <button
                 type="button"
-                class="focus-visible:ring-ring -m-1 min-w-0 rounded-full p-1 outline-none focus-visible:ring-2"
+                class="focus-visible:ring-ring -m-1 min-w-0 p-1 outline-none focus-visible:ring-2"
                 [attr.aria-label]="'Edit label ' + l.name"
                 (click)="openForm(l)"
               >
@@ -257,7 +257,7 @@ const impactText = (u: LabelUsage): string => describeUsage(u, 'nothing yet').re
                       <button
                         type="button"
                         role="radio"
-                        class="focus-visible:ring-ring flex size-7 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
+                        class="focus-visible:ring-ring flex size-7 items-center justify-center outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
                         [style.background]="c"
                         [attr.aria-checked]="formColor().toLowerCase() === c"
                         [attr.aria-label]="c"

@@ -1,6 +1,6 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
+import { V3Toggle } from '../../../shared/v3';
 import {
   FONT_SIZES,
   HOME_VIEWS,
@@ -33,7 +33,7 @@ const MOTION_LABELS: Record<MotionMode, string> = {
 @Component({
   selector: 'app-preferences-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmSwitchImports, AppSelect, ...SECTION_KIT],
+  imports: [HlmButtonImports, V3Toggle, AppSelect, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -77,7 +77,7 @@ const MOTION_LABELS: Record<MotionMode, string> = {
           label="Convert emoji shortcodes"
           description="Typing :skull: in a comment turns it into 💀."
         >
-          <hlm-switch
+          <v3-toggle
             [checked]="prefs.emojiShortcodes()"
             (checkedChange)="prefs.emojiShortcodes.set($event)"
             aria-label="Convert emoji shortcodes"
@@ -104,7 +104,7 @@ const MOTION_LABELS: Record<MotionMode, string> = {
         label="Use pointer cursors"
         description="Show a hand cursor when hovering over buttons and links."
       >
-        <hlm-switch
+        <v3-toggle
           [checked]="prefs.pointerCursors()"
           (checkedChange)="prefs.pointerCursors.set($event)"
           aria-label="Use pointer cursors"
@@ -114,7 +114,7 @@ const MOTION_LABELS: Record<MotionMode, string> = {
         label="Underline links"
         description="Always underline links in descriptions and comments."
       >
-        <hlm-switch
+        <v3-toggle
           [checked]="prefs.underlineLinks()"
           (checkedChange)="prefs.underlineLinks.set($event)"
           aria-label="Underline links"

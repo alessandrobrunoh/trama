@@ -6,24 +6,28 @@ import type { TokenScope } from '../../../core/contracts/domain';
 import { Clipboard } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
 
-/** Monospace block with a copy button. */
+/** Monospace block with a header strip (v3 "Code"): deep fill, hairline, label left and copy right. */
 @Component({
   selector: 'app-code-block',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [HlmButtonImports, LucideDynamicIcon],
-  host: { class: 'bg-secondary relative block min-w-0 rounded-md' },
+  host: { class: 'bg-bg-deep border-border block min-w-0 border' },
   template: `
-    <pre class="overflow-x-auto p-3 pr-11 font-mono text-xs leading-relaxed whitespace-pre select-all" tabindex="0"><code>{{ code() }}</code></pre>
-    <button
-      hlmBtn
-      variant="ghost"
-      size="icon-sm"
-      class="text-muted-foreground absolute top-1.5 right-1.5 size-7"
-      [attr.aria-label]="'Copy ' + (label() || 'code')"
-      (click)="copy()"
-    >
-      <svg [lucideIcon]="copied() ? checkIcon : copyIcon" [size]="13"></svg>
-    </button>
+    <div class="border-border flex h-[26px] items-center gap-2 border-b pr-1 pl-3">
+      <span class="text-muted-foreground font-mono text-[10px] leading-none uppercase">{{ label() || 'code' }}</span>
+      <span class="flex-1"></span>
+      <button
+        hlmBtn
+        variant="ghost"
+        size="icon-sm"
+        class="text-muted-foreground size-5"
+        [attr.aria-label]="'Copy ' + (label() || 'code')"
+        (click)="copy()"
+      >
+        <svg [lucideIcon]="copied() ? checkIcon : copyIcon" [size]="12"></svg>
+      </button>
+    </div>
+    <pre class="text-text-2 overflow-x-auto px-3.5 py-3 font-mono text-[11.5px] leading-[1.7] whitespace-pre select-all" tabindex="0"><code>{{ code() }}</code></pre>
   `,
 })
 export class CodeBlock {
@@ -56,15 +60,13 @@ type Tab = 'mcp-cli' | 'mcp-json' | 'mcp-docker' | 'cli' | 'env' | 'read' | 'wri
   imports: [CodeBlock],
   host: { class: 'flex flex-col gap-3' },
   template: `
-    <div class="flex flex-wrap gap-1" role="tablist" aria-label="Examples">
+    <div class="flex flex-wrap gap-1.5" role="tablist" aria-label="Examples">
       @for (t of tabs(); track t.id) {
         <button
           type="button"
           role="tab"
-          class="hover:bg-accent text-muted-foreground hover:text-foreground h-7 rounded-md px-2.5 text-xs transition-colors"
-          [class.bg-accent]="tab() === t.id"
-          [class.text-foreground]="tab() === t.id"
-          [class.font-medium]="tab() === t.id"
+          class="border-border h-[22px] border px-2.5 font-mono text-[11px] transition-colors"
+          [class]="tab() === t.id ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground'"
           [attr.aria-selected]="tab() === t.id"
           (click)="tab.set(t.id)"
         >

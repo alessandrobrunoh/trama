@@ -7,7 +7,15 @@
  *   <v3-est [value]="3" />                       EST 3
  *   <v3-check [done]="true" />                   ☑
  */
-import { ChangeDetectionStrategy, Component, booleanAttribute, computed, inject, input } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  booleanAttribute,
+  computed,
+  inject,
+  input,
+  model,
+} from '@angular/core';
 import { LucideCheck, LucideDynamicIcon, LucidePenLine, LucideSquareKanban } from '@lucide/angular';
 import { resolveStatusEntry, type Issue, type Priority } from '../core/contracts/domain';
 import { TramaStore } from '../core/stores/trama.store';
@@ -279,3 +287,82 @@ export class V3SectionTitle {
 }
 
 export const V3 = [V3Status, V3Priority, V3Thread, V3Source, V3Est, V3Check, V3SectionTitle] as const;
+
+/**
+ * Toggle (v3 Forms → Toggle row): 30×16 square switch, 2px padding, 12×12 knob.
+ * On = accent fill, white knob on the right; off = raised fill, faint knob on the left.
+ * Same API as `<hlm-switch>`: `[checked]`, `(checkedChange)`, `[disabled]`, `aria-label`.
+ */
+@Component({
+  selector: 'v3-toggle',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'inline-flex shrink-0',
+    '[attr.aria-label]': 'null',
+  },
+  template: `
+    <button
+      type="button"
+      role="switch"
+      class="focus-visible:ring-ring/50 flex h-4 w-[30px] shrink-0 items-start p-0.5 transition-colors outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+      [class]="checked() ? 'bg-primary justify-end' : 'bg-secondary justify-start'"
+      [attr.aria-checked]="checked()"
+      [attr.aria-label]="ariaLabel()"
+      [disabled]="disabled()"
+      (click)="checked.set(!checked())"
+    >
+      <span class="size-3" [class]="checked() ? 'bg-white' : 'bg-faint'" aria-hidden="true"></span>
+    </button>
+  `,
+})
+export class V3Toggle {
+  readonly checked = model(false);
+  readonly disabled = input(false, { transform: booleanAttribute });
+  readonly ariaLabel = input<string | null>(null, { alias: 'aria-label' });
+}
+
+/** One choice of a segmented control. */
+export interface V3SegmentOption {
+  value: string;
+  label: string;
+}
+
+/**
+ * Segmented control (v3 Forms → Segmented): 22px, a hairline around the group and between segments,
+ * mono 11px; the selected segment is raised and in text color, the others muted.
+ */
+@Component({
+  selector: 'v3-segmented',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    class: 'border-border inline-flex w-fit shrink-0 items-stretch border',
+    role: 'radiogroup',
+    '[attr.aria-label]': 'ariaLabel()',
+  },
+  template: `
+    @for (o of options(); track o.value; let first = $first) {
+      <button
+        type="button"
+        role="radio"
+        class="focus-visible:ring-ring/50 h-[20px] px-[9px] font-mono text-[11px] leading-[20px] whitespace-nowrap outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+        [class]="
+          (first ? '' : 'border-border border-l ') +
+          (o.value === value() ? 'bg-secondary text-foreground' : 'text-muted-foreground hover:text-foreground')
+        "
+        [attr.aria-checked]="o.value === value()"
+        [disabled]="disabled()"
+        (click)="value.set(o.value)"
+      >
+        {{ o.label }}
+      </button>
+    }
+  `,
+})
+export class V3Segmented {
+  readonly options = input.required<readonly V3SegmentOption[]>();
+  readonly value = model<string>('');
+  readonly disabled = input(false, { transform: booleanAttribute });
+  readonly ariaLabel = input<string | null>(null, { alias: 'aria-label' });
+}
+
+export const V3_FORMS = [V3Toggle, V3Segmented] as const;

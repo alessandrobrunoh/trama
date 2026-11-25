@@ -1,10 +1,8 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { LucideCheck, LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { ESTIMATE_SCALES, WEEK_STARTS, type EstimateScale, type WeekStart } from '../../../core/contracts/domain';
-import { ESTIMATE_SCALE_DEFS, ESTIMATE_SCALE_ORDER } from '../../../core/estimates';
+import { WEEK_STARTS, type WeekStart } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { SessionStore } from '../../../core/session/session.store';
 import { TramaStore } from '../../../core/stores/trama.store';
@@ -19,7 +17,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
 @Component({
   selector: 'app-workspace-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, HlmButtonImports, HlmInputImports, LucideDynamicIcon, FullDatePipe, AppSelect, ...SECTION_KIT],
+  imports: [RouterLink, HlmButtonImports, HlmInputImports, FullDatePipe, AppSelect, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -85,7 +83,7 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
                 <button
                   type="button"
                   role="radio"
-                  class="size-5 rounded-full border-2 transition-transform hover:scale-110 disabled:opacity-50"
+                  class="size-5 border-2 transition-transform hover:scale-110 disabled:opacity-50"
                   [style.background]="c"
                   [class]="prefs().iconColor === c ? 'border-foreground' : 'border-transparent'"
                   [attr.aria-checked]="prefs().iconColor === c"
@@ -133,49 +131,6 @@ const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{0,38}[a-z0-9])?$/;
       </app-settings-group>
     </form>
 
-    <app-settings-group title="Estimates" description="How tasks are sized. Estimates are stored as numbers, so switching scale never rewrites a task: a value that is not on the new scale stays visible and selectable.">
-      <div class="grid grid-cols-1 gap-3 p-4 sm:grid-cols-2" role="radiogroup" aria-label="Estimate scale">
-        @for (d of scaleDefs; track d.id) {
-          <button
-            type="button"
-            role="radio"
-            [attr.aria-checked]="scale() === d.id"
-            [disabled]="!canAdmin() || savingScale()"
-            class="focus-visible:ring-ring/50 relative flex flex-col gap-2 rounded-lg p-3 text-left outline-none transition-colors focus-visible:ring-3 disabled:cursor-not-allowed"
-            [class]="scale() === d.id ? 'bg-selected' : 'bg-secondary enabled:hover:bg-hover'"
-            (click)="setScale(d.id)"
-          >
-            <span class="flex items-center gap-2">
-              <span class="text-[13px] font-medium">{{ d.label }}</span>
-              @if (d.range) {
-                <span class="text-muted-foreground text-xs">{{ d.range }}</span>
-              }
-              <span
-                class="ml-auto flex size-4 shrink-0 items-center justify-center rounded-full border"
-                [class]="scale() === d.id ? 'bg-primary border-primary text-primary-foreground' : 'border-input'"
-                aria-hidden="true"
-              >
-                @if (scale() === d.id) {
-                  <svg [lucideIcon]="checkIcon" [size]="10" [strokeWidth]="3"></svg>
-                }
-              </span>
-            </span>
-            <span class="flex min-h-5 flex-wrap items-center gap-1">
-              @for (c of d.chips; track c.label) {
-                <span class="bg-muted text-muted-foreground inline-flex min-w-5 items-center justify-center rounded px-1 text-[11px] leading-5 tabular-nums" [title]="c.title">{{ c.label }}</span>
-              } @empty {
-                <span class="text-muted-foreground text-[11px] italic">No estimate field</span>
-              }
-            </span>
-            <span class="text-muted-foreground text-xs leading-snug">{{ d.description }}</span>
-          </button>
-        }
-      </div>
-      @if (!canAdmin()) {
-        <div class="text-muted-foreground px-4 pb-3 text-xs">Only admins and owners can change the estimate scale.</div>
-      }
-    </app-settings-group>
-
     <app-settings-group title="Overview">
       <app-settings-row label="Created">
         <span class="text-muted-foreground text-[13px]">{{ store.workspace()?.createdAt | fullDate }}</span>
@@ -221,21 +176,6 @@ export class WorkspaceSection {
   });
   // ───── preferences (server-side workspace settings)
   protected readonly swatches = ['#5e6ad2', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#8b5cf6', '#64748b'];
-  protected readonly checkIcon = LucideCheck;
-  protected readonly savingScale = signal(false);
-  protected readonly scale = computed(() => this.store.estimateScale());
-  protected readonly scaleDefs = ESTIMATE_SCALE_ORDER.filter((s) => ESTIMATE_SCALES.includes(s)).map((id) => {
-    const def = ESTIMATE_SCALE_DEFS[id];
-    const first = def.options[0]?.label;
-    const last = def.options[def.options.length - 1]?.label;
-    return {
-      id,
-      label: def.label,
-      description: def.description,
-      range: def.options.length && id !== 'tshirt' ? `${first}–${last}` : '',
-      chips: def.options.map((o) => ({ label: o.label, title: o.label === String(o.value) ? `${o.value} points` : `${o.label} = ${o.value} points` })),
-    };
-  });
   protected readonly weekOptions: Option[] = WEEK_STARTS.map((w) => ({ value: w, label: w[0].toUpperCase() + w.slice(1) }));
   protected readonly browserZone = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
   protected readonly zones: string[] = (typeof Intl !== 'undefined' && 'supportedValuesOf' in Intl
@@ -285,14 +225,6 @@ export class WorkspaceSection {
       weekStart: s.weekStart as WeekStart,
       timeZone: s.timeZone,
     };
-  }
-  /** Saves immediately (a radio choice, not a form field). */
-  protected async setScale(scale: EstimateScale): Promise<void> {
-    if (!this.canAdmin() || scale === this.scale() || this.savingScale()) return;
-    this.savingScale.set(true);
-    const ok = await this.store.updateSettings({ estimateScale: scale });
-    this.savingScale.set(false);
-    if (ok) this.notify.success(`Estimates: ${ESTIMATE_SCALE_DEFS[scale].label}`, { description: scale === 'none' ? 'Estimates are hidden; existing values are kept.' : 'Existing estimates keep their value.' });
   }
   protected patchPrefs(change: Partial<ReturnType<WorkspaceSection['storedPrefs']>>): void {
     this.prefs.update((p) => ({ ...p, ...change }));

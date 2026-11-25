@@ -15,7 +15,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
+import { V3Toggle } from '../../../shared/v3';
 import { WEBHOOK_EVENT_GROUPS, type OutgoingWebhook, type WebhookDeliveryLog } from '../../../core/contracts/domain';
 import { Notifier } from '../../../core/notify/notifier';
 import { TramaStore } from '../../../core/stores/trama.store';
@@ -69,7 +69,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
     HlmButtonImports,
     HlmDropdownMenuImports,
     HlmInputImports,
-    HlmSwitchImports,
+    V3Toggle,
     LucideDynamicIcon,
     RelativeTimePipe,
     CodeBlock,
@@ -154,7 +154,7 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
             </div>
           </div>
           <app-settings-row label="Enabled" description="A disabled webhook keeps its settings but receives nothing.">
-            <hlm-switch [checked]="f.enabled" (checkedChange)="patch({ enabled: $event })" aria-label="Enabled" />
+            <v3-toggle [checked]="f.enabled" (checkedChange)="patch({ enabled: $event })" aria-label="Enabled" />
           </app-settings-row>
           <div class="bg-muted/30 flex items-center justify-end gap-2 px-4 py-2">
             <button hlmBtn type="button" variant="ghost" size="sm" (click)="form.set(null)">Cancel</button>
@@ -173,14 +173,14 @@ const emptyDraft = (): Draft => ({ name: '', url: '', events: [], enabled: true 
               <div class="flex items-center gap-2 text-[13px] font-medium">
                 <span class="truncate">{{ w.name }}</span>
                 <span class="flex shrink-0 items-center gap-1 text-xs font-normal" [class]="statusClass(w)">
-                  <span class="size-1.5 rounded-full bg-current"></span>{{ statusText(w) }}
+                  <span class="size-1.5 bg-current"></span>{{ statusText(w) }}
                 </span>
               </div>
               <div class="text-muted-foreground truncate font-mono text-xs" [title]="w.url">{{ w.url }}</div>
               <div class="text-muted-foreground truncate text-xs">{{ summary(w) }}</div>
             </div>
             @if (canManage()) {
-              <hlm-switch [checked]="w.enabled" (checkedChange)="toggle(w, $event)" [attr.aria-label]="(w.enabled ? 'Disable ' : 'Enable ') + w.name" />
+              <v3-toggle [checked]="w.enabled" (checkedChange)="toggle(w, $event)" [aria-label]="(w.enabled ? 'Disable ' : 'Enable ') + w.name" />
               <button hlmBtn variant="outline" size="sm" class="h-7" [disabled]="testing() === w.id" (click)="test(w)">
                 <svg [lucideIcon]="send" [size]="12"></svg> {{ testing() === w.id ? 'Sending…' : 'Test' }}
               </button>

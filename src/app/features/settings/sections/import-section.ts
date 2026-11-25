@@ -13,7 +13,7 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmCheckbox } from '@spartan-ng/helm/checkbox';
 import { HlmInputImports } from '@spartan-ng/helm/input';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
+import { V3Toggle } from '../../../shared/v3';
 import { ApiClient } from '../../../core/api/api-client';
 import { ApiError } from '../../../core/api/api-error';
 import {
@@ -56,7 +56,7 @@ const POLL_MS = 2000;
 @Component({
   selector: 'app-import-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [AppSelect, HlmButtonImports, HlmCheckbox, HlmInputImports, HlmSwitchImports, LucideDynamicIcon, RelativeTimePipe, ProviderIcon, ...SECTION_KIT],
+  imports: [AppSelect, HlmButtonImports, HlmCheckbox, HlmInputImports, V3Toggle, LucideDynamicIcon, RelativeTimePipe, ProviderIcon, ...SECTION_KIT],
   template: `
     <app-section-header
       title="Import"
@@ -323,10 +323,10 @@ const POLL_MS = 2000;
 
           <app-settings-group title="Options">
             <app-settings-row label="Comments" description="Copy each issue’s comments. They appear as written by you, with the original author and date in the text.">
-              <hlm-switch [checked]="options().includeComments" (checkedChange)="setOption({ includeComments: $event })" aria-label="Import comments" />
+              <v3-toggle [checked]="options().includeComments" (checkedChange)="setOption({ includeComments: $event })" aria-label="Import comments" />
             </app-settings-row>
             <app-settings-row label="Closed issues" description="Also import issues that are closed, completed or canceled.">
-              <hlm-switch [checked]="options().includeClosed" (checkedChange)="setOption({ includeClosed: $event })" aria-label="Import closed issues" />
+              <v3-toggle [checked]="options().includeClosed" (checkedChange)="setOption({ includeClosed: $event })" aria-label="Import closed issues" />
             </app-settings-row>
             <app-settings-row label="Default kind" description="For issues with no label that says bug, feature, incident…" wide>
               <app-select

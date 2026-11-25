@@ -57,7 +57,7 @@ const IMPORT_MAX = 25;
           <hlm-spinner class="size-4" />
         } @else if (configured()) {
           <span class="text-status-shipped flex shrink-0 items-center gap-1.5 text-xs">
-            <span class="size-1.5 rounded-full bg-current"></span>Connected
+            <span class="size-1.5 bg-current"></span>Connected
           </span>
           @if (canManage()) {
             <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [hlmDropdownMenuTrigger]="menu" aria-label="LunaGest connection actions">
@@ -185,7 +185,7 @@ const IMPORT_MAX = 25;
                         {{ p.taskCount === null ? 'tasks unavailable' : p.taskCount + (p.taskCount === 1 ? ' task' : ' tasks') }}
                       </span>
                       @if (p.imported) {
-                        <span class="bg-muted text-muted-foreground shrink-0 rounded-full px-2 py-0.5 text-[11px]">
+                        <span class="bg-muted text-muted-foreground shrink-0 px-2 py-0.5 text-[11px]">
                           {{ p.projectName ? 'Linked to ' + p.projectName : 'Already linked' }}{{ p.linkedTaskCount ? ' · ' + p.linkedTaskCount + ' linked' : '' }}
                         </span>
                       }

@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, inject, OnInit } from '@angular/core';
-import { HlmSwitchImports } from '@spartan-ng/helm/switch';
+import { V3Toggle } from '../../../shared/v3';
 import {
   NOTIFICATION_KINDS,
   NOTIFICATION_KIND_META,
@@ -13,7 +13,7 @@ import { SECTION_KIT } from './section-kit';
 @Component({
   selector: 'app-notifications-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmSwitchImports, ...SECTION_KIT],
+  imports: [V3Toggle, ...SECTION_KIT],
   host: { class: 'flex flex-col gap-10' },
   template: `
     <div>
@@ -28,7 +28,7 @@ import { SECTION_KIT } from './section-kit';
       }
       <app-settings-group title="This device">
         <app-settings-row label="System notifications" [description]="deviceHint()">
-          <hlm-switch
+          <v3-toggle
             [checked]="store.pushSubscribed()"
             [disabled]="!canTogglePush()"
             (checkedChange)="togglePush($event)"
@@ -43,7 +43,7 @@ import { SECTION_KIT } from './section-kit';
               @for (channel of channels; track channel.id) {
                 <label class="flex items-center gap-2 text-xs" [class.opacity-50]="unavailable(channel.id)">
                   <span class="text-muted-foreground">{{ channel.label }}</span>
-                  <hlm-switch
+                  <v3-toggle
                     [checked]="store.settings()[kind][channel.id]"
                     (checkedChange)="store.setChannel(kind, channel.id, $event)"
                     [aria-label]="meta[kind].label + ': ' + channel.label"

@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
-import { LucideDynamicIcon, LucideKeyRound, LucidePlus, LucideTriangleAlert } from '@lucide/angular';
+import { LucideDynamicIcon, LucideTriangleAlert, LucideX } from '@lucide/angular';
+import { TopBarActions } from '../../../layout/page-chrome';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmInputImports } from '@spartan-ng/helm/input';
 import { TramaStore } from '../../../core/stores/trama.store';
@@ -21,24 +22,27 @@ const EXPIRY: Option[] = [
   { value: '365', label: '1 year' },
 ];
 
-/** Personal and agent API tokens. Secrets are shown once, right after creation. */
+/**
+ * Settings · API & MCP (v3 frame 12): tokens for scripts, CI, agents and MCP clients, and how to install
+ * the CLI / skill with one. Secrets are shown once, right after creation.
+ */
 @Component({
-  selector: 'app-tokens-section',
+  selector: 'app-api-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, ActorAvatar, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, PermissionMatrix, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-10' },
+  imports: [HlmButtonImports, HlmInputImports, LucideDynamicIcon, ActorAvatar, AppSelect, RelativeTimePipe, FullDatePipe, ConnectSnippets, PermissionMatrix, TopBarActions, ...SECTION_KIT],
+  host: { class: 'flex flex-col gap-6' },
   template: `
+    <ng-template appTopBarActions>
+      @if (canCreate() && !creating() && !secret()) {
+        <button hlmBtn (click)="creating.set(true)">New token</button>
+      }
+    </ng-template>
+
     <div>
       <app-section-header
-        title="API tokens"
-        description="A token is a password for a script, CI job, AI agent or MCP client (Claude, Cursor…): it lets that program use Trama, as you or as an agent, without logging in. Pick exactly what it may do."
-      >
-        @if (canCreate() && !creating() && !secret()) {
-          <button actions hlmBtn size="sm" (click)="creating.set(true)">
-            <svg [lucideIcon]="plus" [size]="14"></svg> New token
-          </button>
-        }
-      </app-section-header>
+        title="API & MCP"
+        description="Connect the Delta agent to Trama. Give it a token and install the /trama skill, then type /trama TRM-128 in any Delta thread. A token is a password for a script, CI job, AI agent or MCP client (Claude, Cursor…): pick exactly what it may do."
+      />
       @if (!canCreate()) {
         <app-readonly-note>Your role cannot create API tokens in this workspace. You can still see and revoke your own.</app-readonly-note>
       }
@@ -126,57 +130,49 @@ const EXPIRY: Option[] = [
         </app-settings-group>
       }
 
-      <app-settings-group [title]="canAdmin() ? 'All tokens in this workspace' : 'Your tokens'" description="Revoke a token as soon as it leaks or is no longer needed.">
+      <app-settings-section [title]="'1 · ' + (canAdmin() ? 'Tokens' : 'Your tokens')" [caption]="canAdmin() ? 'every token in this workspace' : 'revoke one as soon as it leaks'">
         @for (t of tokens(); track t.id) {
-          <div class="flex min-h-13 flex-wrap items-center gap-3 px-4 py-2.5">
-            <span class="bg-muted text-muted-foreground flex size-7 shrink-0 items-center justify-center rounded-md">
-              <svg [lucideIcon]="keyIcon" [size]="14"></svg>
-            </span>
-            <div class="min-w-0 flex-1">
-              <div class="flex items-center gap-2 text-[13px] font-medium">
-                <span class="truncate">{{ t.name }}</span>
-                <code class="text-muted-foreground font-mono text-[11px] font-normal">{{ t.prefix }}</code>
-                <span class="rounded px-1 py-px text-[10px] font-normal" [class]="scopeClass(t.scope)" [title]="scopeTitle(t)">{{ scopeInfo(t.scope).label }}@if (t.permissions) { · {{ t.permissions.length }} }</span>
-                @if (isExpired(t)) {
-                  <span class="bg-destructive/10 text-destructive rounded px-1 py-px text-[10px] font-normal">Expired</span>
-                }
-              </div>
-              <div class="text-muted-foreground flex min-w-0 flex-wrap items-center gap-x-1.5 text-xs">
-                <span>Created {{ t.createdAt | relativeTime }}</span>
-                <span>·</span>
-                <span>{{ t.lastUsedAt ? 'Used ' + (t.lastUsedAt | relativeTime) : 'Never used' }}</span>
-                @if (t.expiresAt && !isExpired(t)) {
-                  <span>·</span>
-                  <span [title]="t.expiresAt | fullDate">Expires {{ t.expiresAt | relativeTime }}</span>
-                }
-              </div>
+          <div class="border-border flex min-h-[50px] flex-wrap items-center gap-x-3.5 gap-y-1 border-b py-2.5">
+            <div class="flex w-[180px] max-w-full min-w-0 flex-col gap-0.5">
+              <span class="text-foreground truncate font-mono text-[12px] leading-[15px]">{{ t.name }}</span>
+              <span class="text-faint font-mono text-[10px] leading-[13px]">{{ t.prefix }}</span>
             </div>
-            <span class="text-muted-foreground flex shrink-0 items-center gap-1.5 text-xs" title="Acts as">
+            <span class="text-foreground flex w-[110px] min-w-0 items-center gap-1.5 text-[12.5px]" title="Acts as">
               <app-actor-avatar [actor]="t.actor" [size]="18" />
-              {{ actorName(t) }}
+              <span class="truncate">{{ actorName(t) }}</span>
             </span>
-            <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground hover:text-destructive h-7" (click)="revoke(t)">Revoke</button>
+            <span class="border-border text-muted-foreground border px-[7px] py-0.5 font-mono text-[10.5px] leading-[14px]" [title]="scopeTitle(t)">{{ scopeInfo(t.scope).label }}@if (t.permissions) { · {{ t.permissions.length }} }</span>
+            @if (isExpired(t)) {
+              <span class="border-red/40 text-red border px-[7px] py-0.5 font-mono text-[10.5px] leading-[14px]">Expired</span>
+            } @else if (t.expiresAt) {
+              <span class="text-faint font-mono text-[10.5px]" [title]="t.expiresAt | fullDate">expires {{ t.expiresAt | relativeTime }}</span>
+            }
+            <span class="flex-1"></span>
+            <span class="text-faint font-mono text-[10.5px]">{{ t.lastUsedAt ? 'used ' + (t.lastUsedAt | relativeTime) : 'never used' }}</span>
+            <button hlmBtn variant="ghost" class="gap-1.5 px-2.5" [attr.aria-label]="'Revoke ' + t.name" (click)="revoke(t)">
+              <svg [lucideIcon]="closeIcon" [size]="12"></svg>
+              Revoke
+            </button>
           </div>
         } @empty {
-          <div class="text-muted-foreground px-4 py-8 text-center text-[13px]">No tokens yet. Create one to let a script or agent call the API.</div>
+          <div class="text-faint py-8 text-center font-mono text-[11.5px]">No tokens yet. Create one to let a script or agent call the API.</div>
         }
-      </app-settings-group>
+      </app-settings-section>
     </div>
 
-    <app-settings-group title="Using a token" description="Send it in the Authorization header of any API request.">
-      <div class="p-4"><app-connect-snippets [scope]="'write'" /></div>
-    </app-settings-group>
+    <app-settings-section title="2 · On the Delta machine" caption="CLI + skill, or MCP, or the REST API">
+      <div class="pt-3"><app-connect-snippets [scope]="'write'" /></div>
+    </app-settings-section>
   `,
 })
-export class TokensSection {
+export class ApiSection {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** Preselect "acts as" this agent (from Agents → Create token). */
   readonly agentId = input<string>();
 
-  protected readonly plus = LucidePlus;
-  protected readonly keyIcon = LucideKeyRound;
+  protected readonly closeIcon = LucideX;
   protected readonly warn = LucideTriangleAlert;
   protected readonly expiry = EXPIRY;
 

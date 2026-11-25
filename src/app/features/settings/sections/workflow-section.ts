@@ -26,86 +26,74 @@ import { TramaStore } from '../../../core/stores/trama.store';
 import { UiStore } from '../../../core/stores/ui.store';
 import { AppSelect, type Option } from '../../../shared/app-select';
 import { isLucideName, STATUS_LUCIDE } from '../../../shared/lucide-names';
+import { V3Segmented, type V3SegmentOption } from '../../../shared/v3';
 import { SECTION_KIT } from './section-kit';
 
 type Dialog =
   | { kind: 'edit'; entry: StatusEntry }
   | { kind: 'add' };
 
-/** Workspace status catalogs: name, icon and color, plus extra statuses that share a semantic type. */
+/**
+ * Settings · Workflow (v3 frame 13): the status catalogs. Name, icon and color are yours; the type is what
+ * boards, done and canceled still mean, so a new status picks a type that already exists.
+ */
 @Component({
-  selector: 'app-statuses-section',
+  selector: 'app-workflow-section',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, HlmInputImports, LucideDynamicIcon, ...SECTION_KIT],
-  host: { class: 'flex flex-col gap-6' },
+  imports: [NgTemplateOutlet, AppSelect, HlmButtonImports, HlmDialogImports, HlmInputImports, LucideDynamicIcon, V3Segmented, ...SECTION_KIT],
+  host: { class: 'flex flex-col' },
   template: `
     <app-section-header
-      title="Statuses"
-      description="Each subject has its own catalog. Name, icon and color are yours. The type is what boards, done and canceled still mean, so a new status picks a type that already exists."
-    >
-      <div actions>
-        @if (canManage()) {
-          <button hlmBtn size="sm" (click)="openAdd()">
-            <svg [lucideIcon]="plus" [size]="14"></svg>
-            New status
-          </button>
-        }
-      </div>
-    </app-section-header>
+      title="Workflow"
+      description="Statuses are set by people. Linking a thread or opening a PR never changes a status on its own."
+    />
 
     @if (!canManage()) {
       <app-readonly-note>Only admins can edit or add statuses.</app-readonly-note>
     }
 
-    <div class="flex flex-wrap gap-1" role="tablist" aria-label="Status catalogs">
-      @for (subject of subjects; track subject) {
-        <button
-          type="button"
-          role="tab"
-          class="h-7 rounded-md px-2.5 text-xs"
-          [class]="current() === subject ? 'bg-accent text-foreground font-medium' : 'text-muted-foreground hover:text-foreground'"
-          [attr.aria-selected]="current() === subject"
-          (click)="current.set(subject)"
-        >
-          {{ labels[subject] }}
-        </button>
-      }
-    </div>
-
-    <app-settings-group [title]="labels[current()] + ' · ' + entries().length">
+    <app-settings-section title="Statuses" [caption]="caption()">
+      <div aside class="flex items-center gap-3">
+        <v3-segmented aria-label="Status catalogs" [options]="subjectOptions" [value]="current()" (valueChange)="setSubject($event)" />
+        @if (canManage()) {
+          <button hlmBtn variant="ghost" class="gap-1.5 px-2.5" (click)="openAdd()">
+            <svg [lucideIcon]="plus" [size]="13"></svg>
+            Add status
+          </button>
+        }
+      </div>
       @for (entry of entries(); track entry.id) {
-        <div class="flex min-h-14 items-center gap-3 px-4 py-2">
-          <span class="inline-flex size-7 shrink-0 items-center justify-center rounded-md bg-secondary" [style.color]="entry.color">
-            @if (emoji(entry.icon); as mark) {
-              <span class="text-sm leading-none">{{ mark }}</span>
-            } @else {
-              <svg [lucideIcon]="iconFor(entry.icon)" [size]="15"></svg>
-            }
+        <div class="border-border flex min-h-[39px] items-center gap-3.5 border-b py-2">
+          <span class="w-[110px] shrink-0 sm:w-[150px]">
+            <span class="border-border text-foreground inline-flex max-w-full items-center gap-1.5 border px-2 py-[3px] font-mono text-[11px] leading-[13px]">
+              <span class="size-[7px] shrink-0" [style.background]="entry.color" aria-hidden="true"></span>
+              <span class="truncate">{{ entry.name }}</span>
+            </span>
           </span>
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-[13px] font-medium">{{ entry.name }}</div>
-            <div class="text-muted-foreground text-xs">{{ typeLabel(entry.type) }} · {{ usageText(entry) }}</div>
-          </div>
+          <span class="text-text-2 min-w-0 flex-1 truncate text-[13px]">{{ usageText(entry) }}</span>
+          <span class="text-faint hidden font-mono text-[10.5px] sm:inline">{{ typeLabel(entry.type) }}</span>
           @if (canManage()) {
-            <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground" [attr.aria-label]="'Edit ' + entry.name" (click)="openEdit(entry)">
-              <svg [lucideIcon]="pencil" [size]="14"></svg>
-            </button>
-            <button
-              hlmBtn
-              variant="ghost"
-              size="icon-sm"
-              class="text-muted-foreground"
-              [disabled]="!canRemove(entry)"
-              [attr.aria-label]="'Remove ' + entry.name"
-              [attr.title]="removeHint(entry)"
-              (click)="openDelete(entry)"
-            >
-              <svg [lucideIcon]="trash" [size]="14"></svg>
-            </button>
+            <span class="flex shrink-0 items-center">
+              <button hlmBtn variant="ghost" size="icon-sm" class="text-muted-foreground size-6" [attr.aria-label]="'Edit ' + entry.name" (click)="openEdit(entry)">
+                <svg [lucideIcon]="pencil" [size]="13"></svg>
+              </button>
+              <button
+                hlmBtn
+                variant="ghost"
+                size="icon-sm"
+                class="text-muted-foreground size-6"
+                [disabled]="!canRemove(entry)"
+                [attr.aria-label]="'Remove ' + entry.name"
+                [attr.title]="removeHint(entry)"
+                (click)="openDelete(entry)"
+              >
+                <svg [lucideIcon]="trash" [size]="13"></svg>
+              </button>
+            </span>
           }
         </div>
       }
-    </app-settings-group>
+    </app-settings-section>
 
     <hlm-dialog [state]="dlg() ? 'open' : 'closed'" (closed)="dlg.set(null)">
       <hlm-dialog-content *hlmDialogPortal="let ctx" class="max-h-[90svh] overflow-y-auto sm:max-w-md">
@@ -180,12 +168,16 @@ type Dialog =
     </ng-template>
   `,
 })
-export class StatusesSection {
+export class WorkflowSection {
   private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
 
   /** Project health went away with project updates: only task and project statuses are configurable. */
   protected readonly subjects = STATUS_SUBJECTS.filter((s) => s === 'issue' || s === 'project');
+  protected readonly subjectOptions: V3SegmentOption[] = this.subjects.map((s) => ({
+    value: s,
+    label: STATUS_SUBJECT_LABEL[s],
+  }));
   protected readonly labels = STATUS_SUBJECT_LABEL;
   protected readonly nameMax = STATUS_NAME_MAX;
   protected readonly iconChoices = [...STATUS_LUCIDE.keys()];
@@ -202,6 +194,14 @@ export class StatusesSection {
   protected readonly formType = signal('todo');
 
   protected readonly canManage = computed(() => this.store.can('admin'));
+  protected readonly caption = computed(() => {
+    const n = this.entries().length;
+    return `${this.labels[this.current()].toLowerCase()} · ${n} ${n === 1 ? 'status' : 'statuses'}`;
+  });
+  protected setSubject(value: string): void {
+    const subject = this.subjects.find((s) => s === value);
+    if (subject) this.current.set(subject);
+  }
   protected readonly entries = computed(() => this.store.settings().statuses[STATUS_CATALOG_KEY[this.current()]]);
   protected readonly types = computed(() => statusTypes(this.current()));
   protected readonly typeOptions = computed<Option[]>(() =>
