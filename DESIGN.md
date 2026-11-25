@@ -275,37 +275,37 @@ Frame → route → where the code lives. ✓ = rebuilt to the frame; ○ = not 
 |---|---|---|---|
 | 02 Home | `kdjLY` | `/:ws/overview` (`features/home`) | ✓ |
 | 03 Inbox | `blc9n` | `/:ws/inbox` (`features/inbox`) | ✓ |
-| 04 Tasks | `FuEwS` | `/:ws/tasks` | ○ |
-| 05 Board | `XiRmK` | `/:ws/board` | ○ |
-| 06 Task detail | `zkj4G` | `/:ws/tasks/:key` | ○ |
-| 07 Subtask detail | `aRWoY` | `/:ws/tasks/:key` (subtask) | ○ |
-| 08 Project | `b2zsa` | `/:ws/projects/:id` | ○ |
-| 33 Project · Progress | `mOTW9` | project page, Progress tab | ○ |
-| 34 Task detail · Progress | `NuPF6` | task page, Progress | ○ |
-| 09 Timeline | `EclJZ` | `/:ws/timeline` | ○ |
-| 10 Ask | `DlKju` | `/:ws/assistant` → Ask | ○ |
-| 11 Settings · Integrations | `fBrhB` | `/:ws/settings/integrations` | ○ |
-| 12 Settings · API & MCP | `OBY5H` | `/:ws/settings/api` | ○ |
-| 13 Settings (Workflow) | `g2j0Pc` | `/:ws/settings/workflow` | ○ |
-| 26 Settings · Time tracking | `QhLO8` | `/:ws/settings/time` | ○ |
-| 29 Settings · Estimates | `HD9sD` | `/:ws/settings/estimates` | ○ |
-| 23 Time · Timesheet | `D0UiXA` | `/:ws/timer` → Time | ○ |
-| 24 Time · Reports | `oCslP` | Time, Reports tab | ○ |
-| 28 Time · Estimates | `W3f0kj` | Time, Estimates tab | ○ |
-| 14 Command palette | `y79Mt` | ⌘K overlay | ○ |
-| 15 New task | `sQqh6` | create dialog (C) | ○ |
-| 16 Row menu & status | `tag4C` | row context menu | ○ |
-| 17 Assignee picker | `S3hbPD` | assignee picker | ○ |
-| 18 Delete confirm & toasts | `gxGTm` | confirm dialog, toasts | ○ |
-| 25 Log time | `ksks6` | log-time dialog | ○ |
-| 27 Estimate picker | `Q8zHHu` | estimate picker | ○ |
-| 39 / 40 Shared view | `s7FV0`, `O8cGY` | `/shared/:token` | ○ |
-| 41 Views · Share popover | `yPIt3` | views share popover | ○ |
-| 32 Landing page | `BScBt` | `/` | ○ |
-| 35 Changelog | `m60o2E` | `/changelog` | ○ |
-| 36 Roadmap | `suNVb` | `/roadmap` | ○ |
-| 37 Compare | `YWYRc` | `/compare` (new) | ○ |
-| 38 Why Trama | `s115l` | `/why` (new) | ○ |
+| 04 Tasks | `FuEwS` | `/:ws/tasks` | ✓ |
+| 05 Board | `XiRmK` | `/:ws/board` | ✓ |
+| 06 Task detail | `zkj4G` | `/:ws/tasks/:key` | ✓ |
+| 07 Subtask detail | `aRWoY` | `/:ws/tasks/:key` (subtask) | ✓ |
+| 08 Project | `b2zsa` | `/:ws/projects/:id` | ✓ |
+| 33 Project · Progress | `mOTW9` | project page, Progress tab | ✓ |
+| 34 Task detail · Progress | `NuPF6` | task page, Progress | ✓ |
+| 09 Timeline | `EclJZ` | `/:ws/timeline` | ✓ |
+| 10 Ask | `DlKju` | `/:ws/assistant` → Ask | ✓ |
+| 11 Settings · Integrations | `fBrhB` | `/:ws/settings/integrations` | ✓ |
+| 12 Settings · API & MCP | `OBY5H` | `/:ws/settings/api` | ✓ |
+| 13 Settings (Workflow) | `g2j0Pc` | `/:ws/settings/workflow` | ✓ |
+| 26 Settings · Time tracking | `QhLO8` | `/:ws/settings/time` | ✓ |
+| 29 Settings · Estimates | `HD9sD` | `/:ws/settings/estimates` | ✓ |
+| 23 Time · Timesheet | `D0UiXA` | `/:ws/timer` → Time | ✓ |
+| 24 Time · Reports | `oCslP` | Time, Reports tab | ✓ |
+| 28 Time · Estimates | `W3f0kj` | Time, Estimates tab | ✓ |
+| 14 Command palette | `y79Mt` | ⌘K overlay | ✓ |
+| 15 New task | `sQqh6` | create dialog (C) | ✓ |
+| 16 Row menu & status | `tag4C` | row context menu | ✓ |
+| 17 Assignee picker | `S3hbPD` | assignee picker | ✓ |
+| 18 Delete confirm & toasts | `gxGTm` | confirm dialog, toasts | ✓ |
+| 25 Log time | `ksks6` | log-time dialog | ✓ |
+| 27 Estimate picker | `Q8zHHu` | estimate picker | ✓ |
+| 39 / 40 Shared view | `s7FV0`, `O8cGY` | `/shared/:token` | ✓ |
+| 41 Views · Share popover | `yPIt3` | views share popover | ✓ |
+| 32 Landing page | `BScBt` | `/` | ✓ |
+| 35 Changelog | `m60o2E` | `/changelog` | ✓ |
+| 36 Roadmap | `suNVb` | `/roadmap` | ✓ |
+| 37 Compare | `YWYRc` | `/compare` (new) | ✓ |
+| 38 Why Trama | `s115l` | `/why` (new) | ✓ |
 | M1–M11 | `XaLV9` … `j2Ado` | phone layouts of the screens above | ○ |
 | L04, L32–L39 | `Q66DY`, `BLghT`, `iZ8nS`, `Dgvz4`, `xib1g` | light mode references | ○ |
 
