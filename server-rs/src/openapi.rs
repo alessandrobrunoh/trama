@@ -1,0 +1,24 @@
+//! The OpenAPI document: the API's metadata plus each module crate's own document.
+
+use utoipa::OpenApi;
+use utoipa::openapi::OpenApi as Document;
+
+/// Title, version and tags; module paths are merged in by [`api_doc`].
+#[derive(OpenApi)]
+#[openapi(
+    info(
+        title = "Trama API",
+        description = "Tasks, projects and Delta thread records.",
+        license(name = "PolyForm Shield 1.0.0", identifier = "PolyForm-Shield-1.0.0"),
+    ),
+    tags((name = "system", description = "Health and operations")),
+)]
+pub(crate) struct ApiDoc;
+
+/// The full document. Add each new module crate's `ApiDoc` here.
+#[must_use]
+pub fn api_doc() -> Document {
+    let mut doc = ApiDoc::openapi();
+    doc.merge(trama_system::ApiDoc::openapi());
+    doc
+}

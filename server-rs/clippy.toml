@@ -1,0 +1,2 @@
+# Product names that appear in doc comments as prose, not code.
+doc-valid-idents = ["NestJS", "TypeORM", "PostgreSQL", "SeaORM", "OpenAPI", "JavaScript", ".."]
