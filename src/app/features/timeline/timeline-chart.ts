@@ -14,15 +14,13 @@ import {
   viewChild,
   type ElementRef,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { LucideChevronRight, LucideDynamicIcon } from '@lucide/angular';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { format, startOfDay } from 'date-fns';
 import { TramaStore, UiStore, Viewport, isTypingTarget, statusTypeOf } from '../../core';
 import type { Issue, Milestone, Project } from '../../core/contracts/domain';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { StatusIcon } from '../../shared/status';
-import { PreviewLink, isPreviewClick, useKeyboardPreview } from '../issues/list-preview';
 import { ProjectGlyph } from '../projects/project-glyph';
 import { projectStatusView } from '../projects/project-model';
 import {
@@ -123,7 +121,7 @@ interface Band extends AxisBand {
 @Component({
   selector: 'app-timeline-chart',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [LucideDynamicIcon, HlmTooltip, PreviewLink, ProjectGlyph, StatusIcon],
+  imports: [LucideDynamicIcon, HlmTooltip, RouterLink, ProjectGlyph, StatusIcon],
   host: { class: 'relative flex min-h-0 flex-1 flex-col' },
   template: `
     @if (isMobile()) {
@@ -131,8 +129,7 @@ interface Band extends AxisBand {
         @for (row of projectRows(); track row.id) {
           <li>
             <a
-              [appPreviewLink]="['/', slug(), 'projects', row.id]"
-              [previewable]="false"
+              [routerLink]="['/', slug(), 'projects', row.id]"
               class="focus-visible:ring-ring flex flex-col gap-1 px-4 py-3 outline-none focus-visible:ring-1 focus-visible:ring-inset"
             >
               <span class="flex min-w-0 items-center gap-2.5">
@@ -257,10 +254,8 @@ interface Band extends AxisBand {
                         ></svg>
                       </button>
                       <a
-                        [appPreviewLink]="['/', slug(), 'projects', row.id]"
-                        (preview)="showProject(row.id)"
+                        [routerLink]="['/', slug(), 'projects', row.id]"
                         class="focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2 rounded py-1 pe-1 outline-none focus-visible:ring-1"
-                        [attr.aria-current]="isPreviewed(row.id) ? 'true' : null"
                         [attr.aria-label]="row.project.name + ': ' + row.forecast.label + ', ' + row.forecast.done + ' of ' + row.forecast.total + ' tasks done'"
                       >
                         <app-project-glyph [project]="row.project" [size]="16" />
@@ -281,7 +276,7 @@ interface Band extends AxisBand {
                     <div
                       class="relative shrink-0 cursor-default"
                       [style.width.px]="scale().width"
-                      (click)="onChartClick($event, row.id)"
+                      (click)="focusRow(row.id)"
                       (dblclick)="open(row.id)"
                     >
                       @if (row.bar; as bar) {
@@ -374,8 +369,7 @@ interface Band extends AxisBand {
                       [style.width.px]="labelWidth"
                     >
                       <a
-                        [appPreviewLink]="['/', slug(), 'tasks', row.issue.key]"
-                        (preview)="showTask(row.issue)"
+                        [routerLink]="['/', slug(), 'tasks', row.issue.key]"
                         class="focus-visible:ring-ring flex min-w-0 flex-1 items-center gap-2 rounded py-0.5 outline-none focus-visible:ring-1"
                       >
                         <app-status-icon [status]="row.issue.status" [size]="13" />
@@ -386,7 +380,7 @@ interface Band extends AxisBand {
                     <div
                       class="relative shrink-0"
                       [style.width.px]="scale().width"
-                      (click)="onTaskClick($event, row.issue)"
+                      (click)="focusRow(row.issue.id)"
                       (dblclick)="openTask(row.issue)"
                     >
                       <span
@@ -410,8 +404,7 @@ interface Band extends AxisBand {
                       [style.width.px]="labelWidth"
                     >
                       <a
-                        [appPreviewLink]="['/', slug(), 'projects', row.project.id]"
-                        (preview)="showProject(row.project.id)"
+                        [routerLink]="['/', slug(), 'projects', row.project.id]"
                         class="text-muted-foreground hover:text-foreground focus-visible:ring-ring rounded text-xs outline-none focus-visible:ring-1"
                       >+{{ row.count }} more open {{ row.count === 1 ? 'task' : 'tasks' }}</a>
                     </div>
@@ -429,7 +422,6 @@ interface Band extends AxisBand {
 export class TimelineChart {
   private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
-  private readonly pane = inject(RightPaneStore);
   private readonly router = inject(Router);
   private readonly viewport = inject(Viewport);
   private readonly injector = inject(Injector);
@@ -643,16 +635,7 @@ export class TimelineChart {
   });
 
   constructor() {
-    // Arrow keys and j/k are handled by the shell over `[data-row-id]`; the pane follows them.
-    useKeyboardPreview((id) => {
-      const project = this.store.getProject(id);
-      if (project) this.pane.show({ kind: 'project', id });
-      else {
-        const issue = this.store.getIssue(id);
-        if (issue) this.pane.show({ kind: 'task', idOrKey: issue.key });
-      }
-    });
-
+    // Arrow keys and j/k are handled by the shell over `[data-row-id]`.
     // Left / right fold and unfold the focused project.
     const onKey = (e: KeyboardEvent): void => {
       if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || isTypingTarget(e.target)) return;
@@ -698,36 +681,12 @@ export class TimelineChart {
   }
 
   protected highlighted(id: string): boolean {
-    return this.ui.focusedRowId() === id || this.isPreviewed(id);
+    return this.ui.focusedRowId() === id;
   }
 
-  protected isPreviewed(id: string): boolean {
-    const c = this.pane.content();
-    if (c?.kind === 'project') return c.id === id;
-    if (c?.kind === 'task') {
-      const issue = this.store.getIssue(c.idOrKey);
-      return issue?.id === id;
-    }
-    return false;
-  }
-
-  protected showProject(id: string): void {
+  /** A single click on a bar's track focuses its row; a double click (below) opens the page. */
+  protected focusRow(id: string): void {
     this.ui.setFocusedRow(id);
-    this.pane.show({ kind: 'project', id });
-  }
-
-  protected showTask(issue: Issue): void {
-    this.ui.setFocusedRow(issue.id);
-    this.pane.show({ kind: 'task', idOrKey: issue.key });
-  }
-
-  /** A single click on the bar previews; a double click (below) opens the page. */
-  protected onChartClick(e: MouseEvent, id: string): void {
-    if (isPreviewClick(e)) this.showProject(id);
-  }
-
-  protected onTaskClick(e: MouseEvent, issue: Issue): void {
-    if (isPreviewClick(e)) this.showTask(issue);
   }
 
   protected open(id: string): void {

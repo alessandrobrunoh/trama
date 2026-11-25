@@ -12,7 +12,6 @@ import { LucideDynamicIcon } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmToggleGroupImports } from '@spartan-ng/helm/toggle-group';
 import { TramaStore, statusTypeOf } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { oneOf, readJson, writeJson } from '../../core/stores/storage';
 import { StatusBar } from '../../layout/status-bar';
 import { EmptyState } from '../../shared/empty-state';
@@ -111,7 +110,6 @@ const ZOOM_VALUES = ZOOMS.map((z) => z.value);
 })
 export class TimelinePage {
   protected readonly store = inject(TramaStore);
-  private readonly pane = inject(RightPaneStore);
 
   protected readonly zooms = ZOOMS;
   protected readonly todayIcon = LucideCrosshair;
@@ -134,8 +132,6 @@ export class TimelinePage {
   protected readonly summary = computed(() => this.chart()?.summary());
 
   constructor() {
-    // A task previewed on another page has nothing to do with the timeline.
-    if (this.pane.content()?.kind === 'task') this.pane.clear();
     effect(() => writeJson(STORAGE_KEY, { zoom: this.zoom(), showClosed: this.showClosed() }));
   }
 

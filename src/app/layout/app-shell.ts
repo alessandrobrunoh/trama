@@ -2,11 +2,9 @@ import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
-import { KeyboardShortcuts, usePageShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
+import { KeyboardShortcuts } from '../core/keyboard/keyboard-shortcuts.service';
 import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
-import { RightPaneStore } from '../core/stores/right-pane.store';
 import { UiStore } from '../core/stores/ui.store';
-import { RightPane } from './right-pane';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
 import { SearchDialog } from '../features/command/search-dialog';
@@ -23,8 +21,8 @@ import { Viewport } from '../core/viewport';
 
 /**
  * Router parent for `/:workspaceSlug/...`.
- *   desktop: [sidebar | top bar + scrolling content + status bar | right pane]
- *            (⌘B collapses the sidebar, ⌘. the right pane; panes are split by hairlines)
+ *   desktop: [sidebar | top bar + scrolling content + status bar]
+ *            (⌘B collapses the sidebar; the panes are split by a hairline)
  *   mobile (≤768px): the same sidebar becomes a bottom navigation sheet, opened from the mobile bar
  * Global overlays (command palette, shortcuts, destructive confirm) are mounted once here and driven
  * by `UiStore.modal`. The create dialog (features/create) and `/` search (features/command) are mounted here too.
@@ -33,7 +31,6 @@ import { Viewport } from '../core/viewport';
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RightPane,
     RouterOutlet,
     HlmSidebarImports,
     AppSidebar,
@@ -83,7 +80,6 @@ import { Viewport } from '../core/viewport';
         <app-shell-status-bar />
         <app-mobile-nav />
       </main>
-      <app-right-pane />
     </div>
 
     @if (ui.pendingG()) {
@@ -119,7 +115,6 @@ import { Viewport } from '../core/viewport';
 export class AppShell {
   protected readonly ui = inject(UiStore);
   protected readonly viewport = inject(Viewport);
-  private readonly rightPane = inject(RightPaneStore);
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);
   private readonly sidebar = inject(HlmSidebarService);
   /** Installs the document-level shortcut listener (⌘K, ⌘B, ⌘J, C, G-chords, j/k…). */
@@ -129,19 +124,6 @@ export class AppShell {
   private readonly compact = signal(false);
 
   constructor() {
-    // ⌘. toggles the right pane (⌘B owns the sidebar).
-    usePageShortcuts([
-      {
-        keys: 'mod+.',
-        label: 'Toggle preview pane',
-        group: 'General',
-        allowWhileTyping: true,
-        run: (e) => {
-          e.preventDefault();
-          this.rightPane.toggle();
-        },
-      },
-    ]);
     const win = inject(DOCUMENT).defaultView;
     if (win?.matchMedia) {
       const query = win.matchMedia('(min-width: 768px) and (max-width: 1023.98px)');

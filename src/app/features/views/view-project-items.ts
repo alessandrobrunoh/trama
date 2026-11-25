@@ -1,9 +1,8 @@
 // Project rows and board cards for saved views over projects: glyph, name, priority, status,
 // lead and target date. The whole row/card is a link to the project page.
 import { ChangeDetectionStrategy, Component, Directive, computed, inject, input } from '@angular/core';
-import { TramaStore, UiStore, type Project } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
-import { PreviewLink } from '../issues/list-preview';
+import { RouterLink } from '@angular/router';
+import { TramaStore, type Project } from '../../core';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { FullDatePipe } from '../../shared/pipes';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -19,36 +18,21 @@ abstract class ProjectItemBase {
 
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly overdue = computed(() => isOverdue(this.project()));
-
-  private readonly pane = inject(RightPaneStore);
-  private readonly ui = inject(UiStore);
-  /** The right pane shows this project. */
-  protected readonly previewed = computed(() => {
-    const c = this.pane.content();
-    return c?.kind === 'project' && c.id === this.project().id;
-  });
-
-  /** A single click previews the project; Enter, a double click and phones open it. */
-  protected preview(): void {
-    this.ui.setFocusedRow(this.project().id);
-    this.pane.show({ kind: 'project', id: this.project().id });
-  }
 }
 
 /** One dense list row: glyph · name · priority · status · lead · target date. */
 @Component({
   selector: 'app-view-project-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
+  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
   host: { class: 'block' },
   template: `
     @let p = project();
     <a
-      [appPreviewLink]="['/', slug(), 'projects', p.id]"
-      (preview)="preview()"
+      [routerLink]="['/', slug(), 'projects', p.id]"
       [attr.data-row-id]="p.id"
       class="hover:bg-hover focus-visible:bg-hover flex min-h-9 items-center gap-3 px-4 py-1.5 text-[13px] outline-none sm:px-5"
-      [class.bg-selected]="focused() || previewed()"
+      [class.bg-selected]="focused()"
     >
       <app-project-glyph [project]="p" [size]="16" />
       <span class="min-w-0 flex-1 truncate" [class.text-muted-foreground]="p.status === 'canceled'">{{ p.name }}</span>
@@ -75,16 +59,15 @@ export class ViewProjectRow extends ProjectItemBase {}
 @Component({
   selector: 'app-view-project-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
+  imports: [RouterLink, ActorAvatar, FullDatePipe, PriorityIcon, ProjectGlyph, StatusLabel],
   host: { class: 'block' },
   template: `
     @let p = project();
     <a
-      [appPreviewLink]="['/', slug(), 'projects', p.id]"
-      (preview)="preview()"
+      [routerLink]="['/', slug(), 'projects', p.id]"
       [attr.data-row-id]="p.id"
       class="block rounded-lg p-2.5 transition-colors"
-      [class]="focused() || previewed() ? 'bg-selected' : 'bg-background hover:bg-hover'"
+      [class]="focused() ? 'bg-selected' : 'bg-background hover:bg-hover'"
     >
       <span class="flex items-center gap-2">
         <app-project-glyph [project]="p" [size]="16" />

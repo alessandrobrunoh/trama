@@ -7,7 +7,6 @@ import {
   LucideDynamicIcon,
   LucideInbox,
   LucidePanelLeft,
-  LucidePanelRight,
   LucideSearch,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -16,22 +15,19 @@ import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { filter, map, startWith } from 'rxjs';
 import { FavoritesStore } from '../core/stores/favorites.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
-import { RightPaneStore } from '../core/stores/right-pane.store';
 import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport } from '../core/viewport';
 import { Kbd } from '../shared/kbd';
 import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
-import { PANE_SECTIONS } from './right-pane';
 import { PageChrome, type Crumb } from './page-chrome';
 
 /**
  * Main pane header (one slim row, `h-11`): [sidebar toggle + search + inbox, only while the sidebar
  * is collapsed] page title (muted parents, regular weight) · favorite star · stacked avatars of the
- * people involved · live-sync dot … text+icon actions (the page's `appTopBarActions` slot) · the
- * right pane toggle. The sidebar and right pane have their own header rows; all three share the
- * height so the hairline under them reads as one line.
+ * people involved · live-sync dot … text+icon actions (the page's `appTopBarActions` slot). The
+ * sidebar has its own header row of the same height, so the hairline under both reads as one line.
  */
 @Component({
   selector: 'app-top-bar',
@@ -164,7 +160,6 @@ export class TopBar {
   protected readonly sync = inject(SyncStatus);
   protected readonly ui = inject(UiStore);
   protected readonly sidebar = inject(HlmSidebarService);
-  protected readonly rightPane = inject(RightPaneStore);
   private readonly router = inject(Router);
   protected readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
@@ -172,7 +167,6 @@ export class TopBar {
 
   protected readonly sep = LucideChevronRight;
   protected readonly panelLeft = LucidePanelLeft;
-  protected readonly panelRight = LucidePanelRight;
   protected readonly search = LucideSearch;
   protected readonly inbox = LucideInbox;
 
@@ -185,11 +179,6 @@ export class TopBar {
     { initialValue: this.router.url },
   );
 
-  /** The right pane exists on the sections that feed it (inbox, tasks, projects, views). */
-  protected readonly paneAvailable = computed(() => {
-    const section = this.url().split(/[?#]/)[0].split('/').filter(Boolean)[1];
-    return section !== undefined && PANE_SECTIONS.has(section);
-  });
   protected readonly sidebarCollapsed = computed(() => this.sidebar.state() === 'collapsed');
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly inboxCount = computed(

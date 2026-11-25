@@ -1,17 +1,6 @@
-// The task inspector: the contextual right pane of a task. Tabs: Details (property rows with icons, grouped),
-// Subtasks (a collapsible tree) and Time (the timer). `page` is the right pane of the task page; `preview` is
-// what a list shows when a row is selected and adds the key, title, status and description on top plus an
-// "Open" action.
-import {
-  ChangeDetectionStrategy,
-  Component,
-  Injectable,
-  computed,
-  inject,
-  input,
-  signal,
-} from '@angular/core';
-import { RouterLink } from '@angular/router';
+// The task inspector: the property column of the task page. Tabs: Details (property rows with icons, grouped),
+// Subtasks (a collapsible tree) and Time (the timer).
+import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import {
   LucideCircleDot,
   LucideCircleUserRound,
@@ -31,12 +20,10 @@ import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmTabsImports } from '@spartan-ng/helm/tabs';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { TimeEntriesStore, TramaStore, formatSpan } from '../../core';
-import { RightPaneTabs } from '../../layout/page-chrome';
 import { EntityChip } from '../../shared/entity-chip';
 import { InlineText } from '../../shared/inline-edit';
 import { IssueKindLabel } from '../../shared/issue';
 import { LabelPicker } from '../../shared/label-picker';
-import { Markdown } from '../../shared/markdown';
 import { Picker } from '../../shared/picker';
 import { projectOptions } from '../../shared/picker-options';
 import { RelativeTimePipe } from '../../shared/pipes';
@@ -58,26 +45,17 @@ import { trackedOn } from './task-time-model';
 
 export type InspectorTab = 'details' | 'subtasks' | 'time';
 
-/** The task the task page is showing right now (set by the page, read by the inspector in the right pane). */
-@Injectable({ providedIn: 'root' })
-export class TaskPageContext {
-  readonly taskId = signal<string | null>(null);
-}
-
 @Component({
   selector: 'app-task-inspector',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    RouterLink,
     HlmButtonImports,
     HlmTabsImports,
     HlmTooltip,
     LucideDynamicIcon,
-    RightPaneTabs,
     LabelPicker,
     Picker,
     InlineText,
-    Markdown,
     EntityChip,
     IssueKindLabel,
     PropertyRow,
@@ -92,40 +70,11 @@ export class TaskPageContext {
     TaskStatusWizard,
     TaskTime,
   ],
-  host: {
-    class: 'block min-w-0',
-    '[attr.data-mode]': 'effectiveMode()',
-  },
+  host: { class: 'block min-w-0' },
   template: `
     @if (issue(); as i) {
-      @if (effectiveMode() === 'preview') {
-        <div class="px-4 pt-4">
-          <div class="text-muted-foreground flex items-center gap-1.5 text-xs">
-            <app-issue-kind [kind]="i.kind" [size]="13" />
-            <span class="font-mono">{{ i.key }}</span>
-            <a
-              hlmBtn
-              variant="ghost"
-              size="sm"
-              class="ml-auto"
-              [routerLink]="['/', slug(), 'tasks', i.key]"
-              [attr.aria-label]="'Open ' + i.key"
-            >
-              Open <svg [lucideIcon]="openIcon" [size]="13" aria-hidden="true"></svg>
-            </a>
-          </div>
-          <h2 class="mt-1 text-base leading-snug break-words">{{ i.title }}</h2>
-          @if (i.body?.trim()) {
-            <div class="mt-3 max-h-60 overflow-y-auto">
-              <app-markdown [source]="i.body" />
-            </div>
-          }
-        </div>
-      }
-
       <hlm-tabs [tab]="tab()" (tabActivated)="tab.set($any($event))" class="gap-0">
-        <!-- The tab strip lives in the right pane's header row (the shell shows this template there). -->
-        <ng-template appRightPaneTabs>
+        <div class="border-border flex h-10 items-stretch border-b">
           <hlm-tabs-list variant="line" class="h-full w-auto justify-start gap-0.5 p-0 px-2" aria-label="Task inspector">
             <button hlmTabsTrigger="details" class="h-full flex-none px-2.5">Details</button>
             <button hlmTabsTrigger="subtasks" class="h-full flex-none px-2.5">
@@ -141,7 +90,7 @@ export class TaskPageContext {
               }
             </button>
           </hlm-tabs-list>
-        </ng-template>
+        </div>
 
         <div hlmTabsContent="details" class="flex flex-col gap-2 px-2 pt-2 pb-6">
           <!-- Where it stands -->
@@ -386,16 +335,6 @@ export class TaskInspector {
 
   /** A task id or its key (`CORA-142`). */
   readonly idOrKey = input.required<string>();
-  readonly mode = input<'preview' | 'page'>('page');
-
-  private readonly pageTask = inject(TaskPageContext);
-  /**
-   * The shell always renders the pane as a preview; when that pane shows the task the page itself is on, the
-   * page already has the key, title and description, so it is the page-mode inspector.
-   */
-  protected readonly effectiveMode = computed(() =>
-    this.mode() === 'preview' && this.pageTask.taskId() !== this.issue()?.id ? 'preview' : 'page',
-  );
 
   protected readonly tab = signal<InspectorTab>('details');
 

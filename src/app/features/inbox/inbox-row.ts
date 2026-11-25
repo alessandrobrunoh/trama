@@ -1,8 +1,8 @@
 // One row of the Inbox. Line one says why it is here, line two says what it is about. On the right: how long ago,
 // the one action that resolves it, and quieter secondary actions on hover or focus.
 //
-// A single click previews the task in the right pane; Enter or a double click opens it.
-import { ChangeDetectionStrategy, Component, computed, inject, input, output } from '@angular/core';
+// A click on the row, or Enter, opens it.
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import {
   LucideCheck,
@@ -14,12 +14,9 @@ import {
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { Viewport } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { AgoPipe } from '../../shared/ago';
 import { Kbd } from '../../shared/kbd';
 import { StatusIcon } from '../../shared/status';
-import { PreviewLink, isPreviewClick } from '../issues/list-preview';
 import { laterLabel, type InboxEntry } from './inbox-model';
 import { snoozePresets, type SnoozePreset } from '../attention/snooze';
 
@@ -28,7 +25,6 @@ import { snoozePresets, type SnoozePreset } from '../attention/snooze';
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     RouterLink,
-    PreviewLink,
     LucideDynamicIcon,
     HlmButtonImports,
     HlmDropdownMenuImports,
@@ -41,10 +37,9 @@ import { snoozePresets, type SnoozePreset } from '../attention/snooze';
     class: 'group/row relative block outline-none',
     '[attr.data-row-id]': 'entry().id',
     '[attr.data-focused]': 'focused() ? "" : null',
-    '[class.bg-selected]': 'selected()',
-    '[class.hover:bg-hover]': '!selected()',
+    '[class.bg-selected]': 'focused()',
+    '[class.hover:bg-hover]': '!focused()',
     '(click)': 'onRowClick($event)',
-    '(dblclick)': 'onRowDblClick($event)',
   },
   template: `
     @let e = entry();
@@ -67,11 +62,10 @@ import { snoozePresets, type SnoozePreset } from '../attention/snooze';
       </span>
 
       <a
-        [appPreviewLink]="commands()"
+        [routerLink]="commands()"
         [queryParams]="e.query"
-        [previewable]="!!e.issueKey"
         class="flex min-w-0 flex-col gap-0.5 outline-none focus-visible:underline"
-        (preview)="preview.emit()"
+        (click)="visited.emit()"
       >
         <span class="truncate text-[13px] leading-snug" [class.text-muted-foreground]="e.section === 'later'">{{
           e.sentence
@@ -232,9 +226,9 @@ export class InboxRow {
   readonly slug = input.required<string>();
   readonly focused = input(false);
 
-  /** A single click on the row or its title: show the task in the right pane. */
-  readonly preview = output<void>();
-  /** Double click: open the row in full. */
+  /** The title link was followed (it navigates on its own). */
+  readonly visited = output<void>();
+  /** A click on the row outside its controls: open it. */
   readonly open = output<void>();
   /** The row was clicked: it becomes the keyboard-focused row. */
   readonly rowClicked = output<void>();
@@ -246,8 +240,6 @@ export class InboxRow {
   readonly markDone = output<void>();
   readonly markRead = output<void>();
 
-  private readonly pane = inject(RightPaneStore);
-  private readonly viewport = inject(Viewport);
 
   protected readonly checkIcon = LucideCheck;
   protected readonly clockIcon = LucideClock;
@@ -264,23 +256,12 @@ export class InboxRow {
     const a = this.entry().attention;
     return a ? laterLabel(a) : '';
   });
-  protected readonly selected = computed(() => {
-    const key = this.entry().issueKey;
-    const c = this.pane.content();
-    return this.focused() || (!!key && c?.kind === 'task' && c.idOrKey === key);
-  });
-
-  /** A click anywhere on the row (not on a control) previews its task. */
+  /** A plain click anywhere on the row (not on a control) opens it. */
   protected onRowClick(e: MouseEvent): void {
     this.rowClicked.emit();
     const target = e.target instanceof HTMLElement ? e.target : null;
-    if (target?.closest('a, button') || this.viewport.isMobile() || !isPreviewClick(e)) return;
-    if (this.entry().issueKey) this.preview.emit();
-  }
-
-  /** A double click anywhere on the row (not on a control) opens it in full. */
-  protected onRowDblClick(e: MouseEvent): void {
-    const target = e.target instanceof HTMLElement ? e.target : null;
-    if (!target?.closest('a, button')) this.open.emit();
+    if (target?.closest('a, button, [role="menu"]')) return;
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    this.open.emit();
   }
 }

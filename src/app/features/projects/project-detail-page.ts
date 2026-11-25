@@ -1,12 +1,9 @@
 // A project page: the content (overview, milestones, tasks, stats). The project's properties
-// (status, priority, lead, dates…) live in the right pane while the page is open: the page registers
-// itself as the pane's content with `RightPaneStore.setPage`.
+// (status, priority, lead, dates…) sit in a column beside the overview (`ProjectProperties`).
 import {
   ChangeDetectionStrategy,
   Component,
-  DestroyRef,
   computed,
-  effect,
   inject,
   input,
   signal,
@@ -16,7 +13,6 @@ import {
   LucideBox,
   LucideDynamicIcon,
   LucideEllipsis,
-  LucidePanelRight,
   LucidePlus,
   LucideLink,
   LucideTrash2,
@@ -34,8 +30,6 @@ import {
   type DomainEvent,
   type Issue,
 } from '../../core';
-import { RightPaneStore, type RightPaneContent } from '../../core/stores/right-pane.store';
-import { Viewport } from '../../core/viewport';
 import { TopBarActions, usePageCrumbs } from '../../layout/page-chrome';
 import { Clipboard } from '../../core/notify/notifier';
 import { EmptyState } from '../../shared/empty-state';
@@ -50,6 +44,7 @@ import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectLunagest } from './project-lunagest';
+import { ProjectProperties } from './project-properties';
 import { ProjectStatsTab } from './project-stats-tab';
 
 const TABS = ['overview', 'tasks', 'stats'] as const;
@@ -88,6 +83,7 @@ const ACTIVITY_CAP = 20;
     ProjectLunagest,
     ProjectStatsTab,
     ProjectTasksTab,
+    ProjectProperties,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -107,11 +103,6 @@ const ACTIVITY_CAP = 20;
       }
 
       <ng-template appTopBarActions>
-        @if (showDetailsButton()) {
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="pane.toggle()">
-            <svg [lucideIcon]="detailsIcon" [size]="14"></svg>Details
-          </button>
-        }
         @if (canCreateIssue()) {
           <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="newIssue()">
             <svg [lucideIcon]="plus" [size]="14"></svg>Add task
@@ -213,7 +204,8 @@ const ACTIVITY_CAP = 20;
           </div>
         }
         @default {
-          <div class="flex min-w-0 max-w-4xl flex-col gap-8 px-4 py-5 sm:px-5">
+          <div class="flex min-w-0 flex-1 max-lg:flex-col">
+          <div class="flex min-w-0 max-w-4xl flex-1 flex-col gap-8 px-4 py-5 sm:px-5">
             <section aria-label="Description">
               <app-editable-markdown
                 label="description"
@@ -265,6 +257,10 @@ const ACTIVITY_CAP = 20;
               <app-comment-thread [subject]="{ type: 'project', id: p.id }" />
             </section>
           </div>
+          <aside class="border-border shrink-0 max-lg:border-t lg:w-[300px] lg:border-l" aria-label="Project properties">
+            <app-project-properties [id]="p.id" />
+          </aside>
+          </div>
         }
       }
     } @else {
@@ -291,15 +287,12 @@ export class ProjectDetailPage {
   private readonly ui = inject(UiStore);
   private readonly router = inject(Router);
   private readonly clipboard = inject(Clipboard);
-  protected readonly pane = inject(RightPaneStore);
-  private readonly viewport = inject(Viewport);
 
   protected readonly box = LucideBox;
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
   protected readonly plus = LucidePlus;
-  protected readonly detailsIcon = LucidePanelRight;
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
@@ -310,8 +303,6 @@ export class ProjectDetailPage {
   protected readonly canManage = computed(() => this.store.allowed('manageProjects'));
   protected readonly project = computed(() => this.store.getProject(this.id()));
   protected readonly canCreateIssue = computed(() => this.store.can('member'));
-  /** The properties are in the right pane: phones, and a closed pane, get a button to bring it back. */
-  protected readonly showDetailsButton = computed(() => this.viewport.isMobile() || !this.pane.open());
   protected readonly current = computed<Tab>(() => {
     const t = this.tab();
     return (TABS as readonly string[]).includes(t ?? '') ? (t as Tab) : 'overview';
@@ -356,19 +347,6 @@ export class ProjectDetailPage {
     { label: 'Projects', link: ['/', this.slug(), 'projects'] },
     { label: this.project()?.name ?? this.id() ?? '' },
   ]);
-
-  /** The right pane shows this project's properties while the page is open. */
-  private readonly _pane = (() => {
-    const projectId = computed(() => this.project()?.id);
-    let mine: RightPaneContent | null = null;
-    effect(() => {
-      const id = projectId();
-      this.pane.setPage((mine = id ? { kind: 'project', id } : null));
-    });
-    inject(DestroyRef).onDestroy(() => {
-      if (this.pane.pageContent() === mine) this.pane.setPage(null);
-    });
-  })();
 
   private readonly _keys = usePageShortcuts(
     TABS.map((t, i) => ({

@@ -1,6 +1,6 @@
 // The task page: the task's story as a conversation (description, comments, events) with the composer docked
-// at the bottom. Properties live in the right pane (`TaskInspector`, rendered by the shell); the people, the
-// status, the thread link and the actions sit in the top bar.
+// at the bottom, and the property column (`TaskInspector`) beside it; the people, the status, the thread link and
+// the actions sit in the top bar.
 import { DOCUMENT } from '@angular/common';
 import {
   ChangeDetectionStrategy,
@@ -10,7 +10,7 @@ import {
   effect,
   inject,
   input,
-  untracked,
+  signal,
   viewChild,
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
@@ -39,7 +39,6 @@ import {
   type ActorRef,
   type Issue,
 } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { StatusBar } from '../../layout/status-bar';
 import { PageChrome, TopBarActions, usePageCrumbs, type PageTitle } from '../../layout/page-chrome';
 import { CommentComposer } from '../../shared/comments';
@@ -55,7 +54,7 @@ import { SOURCE_LABEL, isClosedIssue } from './issue-model';
 import { IssueCommandDialog, IssueProp } from './issue-prop';
 import { IssueThreadLink } from './issue-thread-link';
 import { ProjectGlyph } from '../projects/project-glyph';
-import { TaskPageContext } from './task-inspector';
+import { TaskInspector } from './task-inspector';
 import { TaskChildren } from './task-children';
 import { TaskStatusWizard } from './task-status-wizard';
 import { buildSubtree, percent } from './task-subtree-model';
@@ -83,6 +82,7 @@ import { buildSubtree, percent } from './task-subtree-model';
     IssueCommandDialog,
     IssueThreadLink,
     ProjectGlyph,
+    TaskInspector,
     TaskStatusWizard,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
@@ -215,6 +215,8 @@ import { buildSubtree, percent } from './task-subtree-model';
         </ng-template>
       </ng-template>
 
+      <div class="flex min-h-0 flex-1 max-md:flex-col">
+      <div class="flex min-h-0 min-w-0 flex-1 flex-col">
       <app-issue-stream #stream [issue]="i" (quote)="composer()?.quote($event)">
         <header class="flex flex-col gap-2">
           <!-- Where it sits: the chain of parents (any depth), then this task's type and key. -->
@@ -263,7 +265,7 @@ import { buildSubtree, percent } from './task-subtree-model';
             [canEdit]="canEdit()"
             (save)="store.updateIssue(i.id, { title: $event })"
           />
-          <!-- The key properties, editable in place; everything else is in the right pane. -->
+          <!-- The key properties, editable in place; everything else is in the property column. -->
           <div class="-ml-1.5 flex flex-wrap items-center gap-x-0.5 gap-y-1" role="group" aria-label="Properties">
             <app-issue-prop [issue]="i" field="status" showLabel />
             <app-issue-prop [issue]="i" field="priority" showLabel />
@@ -282,7 +284,15 @@ import { buildSubtree, percent } from './task-subtree-model';
               <app-task-status-wizard [issue]="i" />
             }
             <app-issue-thread-link variant="action" [issue]="i" [canEdit]="canEdit()" />
-            <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground md:hidden" (click)="openInspector(i.id)">
+            <button
+              hlmBtn
+              variant="ghost"
+              size="sm"
+              class="text-muted-foreground md:hidden"
+              aria-controls="task-details"
+              [attr.aria-expanded]="details()"
+              (click)="details.set(!details())"
+            >
               <svg [lucideIcon]="panelIcon" [size]="14"></svg> All details
             </button>
           </div>
@@ -314,6 +324,17 @@ import { buildSubtree, percent } from './task-subtree-model';
           </app-comment-composer>
         </div>
       }
+      </div>
+      @if (!viewport.isMobile() || details()) {
+        <aside
+          id="task-details"
+          class="border-border shrink-0 overflow-y-auto max-md:border-t md:w-[320px] md:border-l"
+          aria-label="Task details"
+        >
+          <app-task-inspector [idOrKey]="i.id" />
+        </aside>
+      }
+      </div>
 
       <app-status-bar>
         <span class="font-mono">{{ i.key }}</span>
@@ -344,9 +365,9 @@ export class IssueDetailPage {
   private readonly router = inject(Router);
   private readonly document = inject(DOCUMENT);
   private readonly chrome = inject(PageChrome);
-  private readonly rightPane = inject(RightPaneStore);
-  private readonly pageTask = inject(TaskPageContext);
   protected readonly viewport = inject(Viewport);
+  /** Phones: whether the property column is shown below the conversation. */
+  protected readonly details = signal(false);
   protected readonly store = inject(TramaStore);
   protected readonly actions = inject(IssueActions);
   protected readonly ai = inject(AiActions);
@@ -466,28 +487,6 @@ export class IssueDetailPage {
     });
     inject(DestroyRef).onDestroy(() => {
       if (this.chrome.page() === mine) this.chrome.page.set(null);
-    });
-  })();
-
-  /** The right pane shows this task's inspector while the page is open; the reader's open / closed choice stays. */
-  private readonly _pane = (() => {
-    effect(() => {
-      const i = this.issue();
-      if (!i) return;
-      untracked(() => {
-        const wasOpen = this.rightPane.open();
-        this.pageTask.taskId.set(i.id);
-        this.rightPane.show({ kind: 'task', idOrKey: i.id });
-        if (!wasOpen && !this.viewport.isMobile()) this.rightPane.close();
-      });
-    });
-    inject(DestroyRef).onDestroy(() => {
-      const id = this.pageTask.taskId();
-      this.pageTask.taskId.set(null);
-      const content = this.rightPane.content();
-      if (content?.kind === 'task' && (content.idOrKey === id || this.store.getIssue(content.idOrKey)?.id === id)) {
-        this.rightPane.clear();
-      }
     });
   })();
 
@@ -646,10 +645,6 @@ export class IssueDetailPage {
     this.actions.openPrompt(field, this.ids());
   }
 
-  /** Phones: the inspector opens as a sheet. */
-  protected openInspector(id: string): void {
-    this.rightPane.openSheet({ kind: 'task', idOrKey: id });
-  }
 
   protected go(key: string | undefined): void {
     if (key) void this.router.navigate(['/', this.slug(), 'tasks', key]);

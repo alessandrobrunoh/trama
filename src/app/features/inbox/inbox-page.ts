@@ -29,13 +29,11 @@ import {
   usePageShortcuts,
   type AttentionItem,
 } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { StatusBar } from '../../layout/status-bar';
 import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { morningOf, snoozePresets } from '../attention/snooze';
-import { useKeyboardPreview } from '../issues/list-preview';
 import { OnboardingChecklist } from '../onboarding/onboarding-checklist';
 import { DEFAULT_IDLE_DAYS, activityLookup } from '../stats/flow-stats';
 import {
@@ -174,7 +172,7 @@ const UPDATES_VISIBLE = 8;
                   [slug]="slug()"
                   [focused]="ui.focusedRowId() === e.id"
                   (rowClicked)="ui.setFocusedRow(e.id)"
-                  (preview)="preview(e)"
+                  (visited)="visited(e)"
                   (open)="open(e)"
                   (primary)="primary(e)"
                   (snooze)="snooze(e.attention!, $event)"
@@ -219,7 +217,7 @@ const UPDATES_VISIBLE = 8;
                   [slug]="slug()"
                   [focused]="ui.focusedRowId() === e.id"
                   (rowClicked)="ui.setFocusedRow(e.id)"
-                  (preview)="preview(e)"
+                  (visited)="visited(e)"
                   (open)="open(e)"
                   (primary)="primary(e)"
                 />
@@ -277,7 +275,6 @@ export class InboxPage {
   private readonly time = inject(TimeEntriesStore);
   private readonly notifier = inject(Notifier);
   private readonly router = inject(Router);
-  private readonly pane = inject(RightPaneStore);
 
   protected readonly inboxIcon = LucideInbox;
   protected readonly chevron = LucideChevronRight;
@@ -381,12 +378,6 @@ export class InboxPage {
   protected readonly pickedDate = signal<Date | null>(null);
   protected readonly presets = computed(() => (this.snoozeFor() ? snoozePresets() : []));
 
-  /** Arrow keys and j/k show the focused row's task in the right pane. */
-  private readonly _preview = useKeyboardPreview((id) => {
-    const key = this.flat().find((e) => e.id === id)?.issueKey;
-    if (key) this.pane.show({ kind: 'task', idOrKey: key });
-  });
-
   constructor() {
     this.ui.setFocusedRow(null);
     void this.time.load();
@@ -482,14 +473,12 @@ export class InboxPage {
 
   // ───────── row actions ─────────
 
-  /** A single click: show the task in the right pane; an update the person looked at counts as read. */
-  protected preview(e: InboxEntry): void {
-    this.ui.setFocusedRow(e.id);
+  /** The row's link was followed: an update the person looked at counts as read. */
+  protected visited(e: InboxEntry): void {
     if (e.canMarkRead) this.markRead(e);
-    if (e.issueKey) this.pane.show({ kind: 'task', idOrKey: e.issueKey });
   }
 
-  /** Double click: open in full. */
+  /** A click on the row: open it. */
   protected open(e: InboxEntry): void {
     if (e.canMarkRead) this.markRead(e);
     void this.router.navigate(['/', this.slug(), ...e.route], { queryParams: e.query });

@@ -63,7 +63,6 @@ import { ActorAvatar } from '../../shared/actor-avatar';
 import { EmptyState } from '../../shared/empty-state';
 import { IssueKindLabel } from '../../shared/issue';
 import { Kanban, KanbanItemDirective, KanbanLabelDirective } from '../../shared/kanban';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { StatusBar } from '../../layout/status-bar';
 import { Kbd } from '../../shared/kbd';
 import { PriorityIcon } from '../../shared/priority-icon';
@@ -93,7 +92,6 @@ import {
 } from './issue-model';
 import { IssueOptionGlyph, promptOptions } from './issue-options';
 import { buildIssueTree, flatIssueRows, type IssueTreeRow } from './issue-tree';
-import { useKeyboardPreview } from './list-preview';
 import { SearchInput } from '../../shared/search-input';
 
 interface Column {
@@ -750,7 +748,6 @@ export class IssueBoard {
   protected readonly ui = inject(UiStore);
   protected readonly actions = inject(IssueActions);
   protected readonly favorites = inject(FavoritesStore);
-  private readonly pane = inject(RightPaneStore);
   private readonly document = inject(DOCUMENT);
 
   /** Issues this board shows. */
@@ -878,12 +875,6 @@ export class IssueBoard {
     const q = this.search().trim();
     if (q) parts.push(`“${q}”`);
     return parts.join(', ');
-  });
-
-  /** Arrow keys and j/k show the focused task in the right pane. */
-  private readonly _preview = useKeyboardPreview((id) => {
-    const issue = this.issues().find((i) => i.id === id);
-    if (issue) this.pane.show({ kind: 'task', idOrKey: issue.key });
   });
 
   /** Issues inside the current view tab. */

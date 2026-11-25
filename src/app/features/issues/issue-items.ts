@@ -25,7 +25,6 @@ import {
   LucideUserRoundX,
 } from '@lucide/angular';
 import { TramaStore, UiStore, Viewport, fullDate, haptic, shortDate, type Issue } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { Estimate } from '../../shared/estimate';
 import { ProjectChip } from '../../shared/project-chip';
 import { IssueKindLabel } from '../../shared/issue';
@@ -36,18 +35,15 @@ import type { IssueProp as IssuePropName } from './issue-model';
 import { isClosedIssue, quietToggleStatus } from './issue-model';
 import { IssueActions } from './issue-actions';
 import { IssueProp } from './issue-prop';
-import { NeedsYou, PreviewLink, isTaskPreviewed } from './list-preview';
+import { NeedsYou } from './list-preview';
 
 /** Shared bits of row + card. */
 @Directive()
 abstract class IssueItemBase {
   protected readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
-  private readonly pane = inject(RightPaneStore);
   private readonly needs = inject(NeedsYou);
   protected readonly actions = inject(IssueActions);
-  /** The right pane shows this task. */
-  protected readonly previewed = computed(() => isTaskPreviewed(this.pane, this.issue()));
   /** An open attention item is waiting on the current user. */
   protected readonly needsYou = computed(() => this.needs.issueIds().has(this.issue().id));
   readonly issue = input.required<Issue>();
@@ -104,7 +100,7 @@ abstract class IssueItemBase {
     inject(DestroyRef).onDestroy(() => element.removeEventListener('mouseenter', enter));
   }
 
-  /** Shift-click selects a range; the link itself previews or opens (see `PreviewLink`). */
+  /** Shift-click selects a range; a plain click follows the link. */
   protected onLinkClick(e: MouseEvent): void {
     if (e.shiftKey && this.selectable()) {
       e.preventDefault();
@@ -122,13 +118,6 @@ abstract class IssueItemBase {
     this.actions.open(this.issue());
   }
 
-  /** A single click shows the task in the right pane. */
-  protected preview(): void {
-    const issue = this.issue();
-    this.ui.setFocusedRow(issue.id);
-    this.pane.show({ kind: 'task', idOrKey: issue.key });
-  }
-
   protected onCheck(e: MouseEvent): void {
     e.preventDefault();
     e.stopPropagation();
@@ -140,7 +129,7 @@ abstract class IssueItemBase {
 @Component({
   selector: 'app-issue-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, PreviewLink, LucideDynamicIcon, IssueProp, ProjectChip, LabelChips, SwipeRow, PriorityIcon],
+  imports: [RouterLink, LucideDynamicIcon, IssueProp, ProjectChip, LabelChips, SwipeRow, PriorityIcon],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -239,11 +228,9 @@ abstract class IssueItemBase {
       (dblclick)="onDblClick($event)"
     >
       <a
-        [appPreviewLink]="['/', slug(), 'tasks', i.key]"
+        [routerLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
         [attr.aria-label]="i.key + ' ' + i.title"
-        [attr.aria-current]="previewed() ? 'true' : null"
-        (preview)="preview()"
         (click)="onLinkClick($event)"
       ></a>
 
@@ -429,7 +416,7 @@ export class IssueRow extends IssueItemBase {
   protected readonly rowState = computed(
     () =>
       (this.compact() ? 'min-h-8 ' : 'min-h-10 ') +
-      (this.selected() || this.previewed()
+      (this.selected()
         ? 'bg-selected'
         : this.focused()
           ? 'bg-hover'
@@ -441,7 +428,7 @@ export class IssueRow extends IssueItemBase {
 @Component({
   selector: 'app-issue-card',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
+  imports: [RouterLink, LucideDynamicIcon, IssueKindLabel, IssueProp, ProjectChip, Estimate, LabelChips],
   host: { class: 'block' },
   template: `
     @let i = issue();
@@ -449,15 +436,13 @@ export class IssueRow extends IssueItemBase {
     <div
       [attr.data-row-id]="i.id"
       class="group/card relative rounded-lg px-3 py-2.5 transition-colors"
-      [class]="selected() || previewed() ? 'bg-selected' : focused() ? 'bg-background ring-1 ring-ring/40' : 'bg-background hover:bg-hover'"
+      [class]="selected() ? 'bg-selected' : focused() ? 'bg-background ring-1 ring-ring/40' : 'bg-background hover:bg-hover'"
       (dblclick)="onDblClick($event)"
     >
       <a
-        [appPreviewLink]="['/', slug(), 'tasks', i.key]"
+        [routerLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 rounded-lg outline-none focus-visible:ring-2"
         [attr.aria-label]="i.key + ' ' + i.title"
-        [attr.aria-current]="previewed() ? 'true' : null"
-        (preview)="preview()"
         (click)="onLinkClick($event)"
       ></a>
       <div class="flex h-5 items-center gap-1.5">

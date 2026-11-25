@@ -60,7 +60,7 @@ export interface InboxEntry {
   /** Path under the workspace the row opens, and its query. */
   route: readonly string[];
   query?: Record<string, string>;
-  /** Task the right pane previews for this row. */
+  /** Key of the task this row is about. */
   issueKey?: string;
   at: string;
   unread: boolean;

@@ -1,9 +1,9 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { TramaStore, UiStore, statusTypeOf } from '../../core';
 import { ListStateStore } from '../../core/stores/list-state.store';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { TopBarActions } from '../../layout/page-chrome';
 import { StatusBar } from '../../layout/status-bar';
 import { ActorAvatar } from '../../shared/actor-avatar';
@@ -11,7 +11,6 @@ import { EmptyState } from '../../shared/empty-state';
 import { Kbd } from '../../shared/kbd';
 import { PageHeader } from '../../shared/page-header';
 import { FullDatePipe } from '../../shared/pipes';
-import { PreviewLink, useKeyboardPreview } from '../issues/list-preview';
 import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
 import { ProjectGlyph } from './project-glyph';
@@ -29,7 +28,7 @@ import { SearchInput } from '../../shared/search-input';
     SearchInput,
     LabelPicker,
     LabelChips,
-    PreviewLink,
+    RouterLink,
     HlmButtonImports,
     LucideDynamicIcon,
     PageHeader,
@@ -154,14 +153,12 @@ import { SearchInput } from '../../shared/search-input';
             @for (row of g.rows; track row.project.id) {
               @let p = row.project;
               <a
-                [appPreviewLink]="['/', slug(), 'projects', p.id]"
-                (preview)="showProject(p.id)"
+                [routerLink]="['/', slug(), 'projects', p.id]"
                 [attr.data-row-id]="p.id"
-                [attr.aria-current]="isPreviewed(p.id) ? 'true' : null"
                 role="listitem"
                 class="focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset sm:px-5 md:min-h-9 md:flex-nowrap md:py-1.5"
                 [class]="
-                  isPreviewed(p.id) || ui.focusedRowId() === p.id
+                  ui.focusedRowId() === p.id
                     ? 'bg-selected'
                     : 'hover:bg-hover'
                 "
@@ -299,22 +296,6 @@ export class ProjectListPage {
         .filter((p) => statusTypeOf(this.store.settings().statuses.project, p.status) === 'in_progress')
         .length,
   );
-
-  private readonly pane = inject(RightPaneStore);
-
-  /** Arrow keys and j/k show the focused project in the right pane. */
-  private readonly _preview = useKeyboardPreview((id) => this.pane.show({ kind: 'project', id }));
-
-  protected isPreviewed(id: string): boolean {
-    const c = this.pane.content();
-    return c?.kind === 'project' && c.id === id;
-  }
-
-  /** A single click previews the project; Enter, a double click and phones open it. */
-  protected showProject(id: string): void {
-    this.ui.setFocusedRow(id);
-    this.pane.show({ kind: 'project', id });
-  }
 
   protected readonly description = computed(() => {
     const n = this.total();

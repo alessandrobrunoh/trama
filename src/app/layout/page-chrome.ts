@@ -40,12 +40,7 @@ export class PageChrome {
   readonly page = signal<PageTitle | null>(null);
   readonly actions = signal<TemplateRef<unknown> | null>(null);
   /** Content of the slim status bar under the main pane (see `<app-status-bar>`). */
-  readonly statusBar = signal<TemplateRef<unknown> | null>(null);
-  /** Optional replacement for the right pane's tab strip, set by `<ng-template appRightPaneTabs>`. */
-  readonly rightPaneTabs = signal<TemplateRef<unknown> | null>(null);
-  /** Optional extra icon actions in the right pane header, set by `<ng-template appRightPaneActions>`. */
-  readonly rightPaneActions = signal<TemplateRef<unknown> | null>(null);
-}
+  readonly statusBar = signal<TemplateRef<unknown> | null>(null);}
 
 /**
  * Override the breadcrumb trail for the current page (call in an injection context, e.g. a field
@@ -77,22 +72,6 @@ function claimSlot(slot: WritableSignal<TemplateRef<unknown> | null>): void {
 export class TopBarActions {
   constructor() {
     claimSlot(inject(PageChrome).actions);
-  }
-}
-
-/** Replaces the right pane's tab strip (e.g. `Details | Subtasks | Time`) while the host is alive. */
-@Directive({ selector: 'ng-template[appRightPaneTabs]' })
-export class RightPaneTabs {
-  constructor() {
-    claimSlot(inject(PageChrome).rightPaneTabs);
-  }
-}
-
-/** Adds icon actions at the far right of the right pane header while the host is alive. */
-@Directive({ selector: 'ng-template[appRightPaneActions]' })
-export class RightPaneActions {
-  constructor() {
-    claimSlot(inject(PageChrome).rightPaneActions);
   }
 }
 

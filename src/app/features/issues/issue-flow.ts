@@ -15,6 +15,7 @@ import {
   signal,
   viewChild,
 } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import {
   LucideCheck,
   LucideChevronDown,
@@ -24,7 +25,6 @@ import {
 } from '@lucide/angular';
 import { HlmContextMenuImports } from '@spartan-ng/helm/context-menu';
 import { TramaStore, UiStore, fullDate, type Issue, type IssueStatus, type StatusEntry } from '../../core';
-import { RightPaneStore } from '../../core/stores/right-pane.store';
 import { ActorAvatar } from '../../shared/actor-avatar';
 import { StatusIcon } from '../../shared/status';
 import {
@@ -42,7 +42,6 @@ import {
   type FlowTrack,
 } from './issue-flow-model';
 import type { IssueTreeRow } from './issue-tree';
-import { PreviewLink, isTaskPreviewed } from './list-preview';
 
 /** Width of one status column, px. */
 const COL = 128;
@@ -71,7 +70,7 @@ interface Tip {
 @Component({
   selector: 'app-flow-row',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [PreviewLink, HlmContextMenuImports, ActorAvatar, StatusIcon, LucideDynamicIcon],
+  imports: [RouterLink, HlmContextMenuImports, ActorAvatar, StatusIcon, LucideDynamicIcon],
   host: { class: 'block w-max min-w-full', '(mouseenter)': 'onEnter($event)' },
   template: `
     @let i = row().issue;
@@ -87,11 +86,9 @@ interface Tip {
       (pointerleave)="tip.set(null)"
     >
       <a
-        [appPreviewLink]="['/', slug(), 'tasks', i.key]"
+        [routerLink]="['/', slug(), 'tasks', i.key]"
         class="focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-1 focus-visible:ring-inset"
         [attr.aria-label]="summary()"
-        [attr.aria-current]="previewed() ? 'true' : null"
-        (preview)="preview()"
         (click)="onLinkClick($event)"
       ></a>
 
@@ -294,7 +291,6 @@ interface Tip {
 export class FlowRow {
   private readonly store = inject(TramaStore);
   private readonly ui = inject(UiStore);
-  private readonly pane = inject(RightPaneStore);
 
   readonly row = input.required<IssueTreeRow>();
   readonly track = input.required<FlowTrack>();
@@ -319,10 +315,9 @@ export class FlowRow {
   protected readonly slug = computed(() => this.store.slug() ?? '');
   protected readonly tip = signal<Tip | null>(null);
 
-  protected readonly previewed = computed(() => isTaskPreviewed(this.pane, this.row().issue));
   private readonly focused = computed(() => this.ui.focusedRowId() === this.row().issue.id);
   protected readonly state = computed(() =>
-    this.selected() || this.previewed()
+    this.selected()
       ? 'bg-selected'
       : this.focused()
         ? 'bg-hover'
@@ -425,13 +420,6 @@ export class FlowRow {
   protected onEnter(e: MouseEvent): void {
     // Moving over rows during a drag must not change the keyboard action target.
     if (e.buttons === 0 && !this.row().ghost) this.ui.setFocusedRow(this.row().issue.id);
-  }
-
-  /** A single click shows the task in the right pane (a double click or Enter opens it: see `PreviewLink`). */
-  protected preview(): void {
-    const issue: Issue = this.row().issue;
-    this.ui.setFocusedRow(issue.id);
-    this.pane.show({ kind: 'task', idOrKey: issue.key });
   }
 
   protected onLinkClick(e: MouseEvent): void {
