@@ -1,5 +1,6 @@
-// A project page: the content (overview, milestones, tasks, stats). The project's properties
-// (status, priority, lead, dates…) sit in a column beside the overview (`ProjectProperties`).
+// A project page (v3 "08 · Project", "33 · Project · Progress"): the kicker, the serif title and summary, the
+// health badge and the tabs; the roadmap and the milestones beside the rail (about, thread coverage, recent
+// records and the editable properties). The Progress tab adds the burn-up and a sparkline per milestone.
 import {
   ChangeDetectionStrategy,
   Component,
@@ -13,15 +14,12 @@ import {
   LucideBox,
   LucideDynamicIcon,
   LucideEllipsis,
-  LucidePlus,
   LucideLink,
   LucideTrash2,
 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
-import { HlmTabsImports } from '@spartan-ng/helm/tabs';
-import { HlmTooltip } from '@spartan-ng/helm/tooltip';
-import { PROJECT_KEY_MAX } from '../../core/contracts/domain';
+import { PROJECT_KEY_MAX, resolveStatusEntry } from '../../core/contracts/domain';
 import {
   TramaStore,
   UiStore,
@@ -35,27 +33,43 @@ import { Clipboard } from '../../core/notify/notifier';
 import { EmptyState } from '../../shared/empty-state';
 import { StatusBar } from '../../layout/status-bar';
 import { PageHeader } from '../../shared/page-header';
+import { Kbd } from '../../shared/kbd';
+import { V3SectionTitle } from '../../shared/v3';
 import { isClosedIssue } from '../issues/issue-model';
 import { ProjectTasksTab } from '../issues/project-tasks-tab';
-import { ProjectMilestones } from '../milestones/project-milestones';
+import { dayOf, todayDay, usesPoints } from '../milestones/milestone-model';
 import { EventLine } from '../../shared/event-line';
 import { CommentThread } from '../../shared/comments';
 import { EditableMarkdown, InlineText } from '../../shared/inline-edit';
 import { ProjectAiSummaryButton, ProjectIssueSuggestions, ProjectRisksCard } from './project-ai';
+import { ProjectBurnup } from './project-burnup';
+import { buildBurnView, burnBadge, projectTargetDay, type BurnTone } from './project-burnup-model';
 import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectLunagest } from './project-lunagest';
+import { ProjectMilestoneCards } from './project-milestone-cards';
+import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
+import { ProjectRoadmap } from './project-roadmap';
 import { ProjectStatsTab } from './project-stats-tab';
 
-const TABS = ['overview', 'tasks', 'stats'] as const;
+const TABS = ['overview', 'progress', 'tasks', 'stats'] as const;
 type Tab = (typeof TABS)[number];
 const TAB_LABEL: Record<Tab, string> = {
   overview: 'Overview',
+  progress: 'Progress',
   tasks: 'Tasks',
   stats: 'Stats',
 };
 
 const ACTIVITY_CAP = 20;
+
+/** Health colours for a badge derived from the burn-up (a health set by hand uses its catalog colour). */
+const TONE_COLOR: Record<BurnTone, string> = {
+  ok: 'var(--status-done)',
+  warn: 'var(--status-in-progress)',
+  late: 'var(--red)',
+  idle: 'var(--muted-foreground)',
+};
 
 @Component({
   selector: 'app-project-detail-page',
@@ -71,16 +85,19 @@ const ACTIVITY_CAP = 20;
     EditableMarkdown,
     InlineText,
     EventLine,
-    ProjectMilestones,
-    HlmTabsImports,
-    HlmTooltip,
+    Kbd,
     PageHeader,
     StatusBar,
+    V3SectionTitle,
     ProjectAiSummaryButton,
+    ProjectBurnup,
     ProjectIssueSuggestions,
     ProjectRisksCard,
     ProjectGlyphPicker,
     ProjectLunagest,
+    ProjectMilestoneCards,
+    ProjectMilestoneRows,
+    ProjectRoadmap,
     ProjectStatsTab,
     ProjectTasksTab,
     ProjectProperties,
@@ -103,27 +120,29 @@ const ACTIVITY_CAP = 20;
       }
 
       <ng-template appTopBarActions>
-        @if (canCreateIssue()) {
-          <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="newIssue()">
-            <svg [lucideIcon]="plus" [size]="14"></svg>Add task
-          </button>
-        }
-        <button hlmBtn variant="ghost" size="sm" class="text-muted-foreground gap-1.5" (click)="copyLink()">
-          <svg [lucideIcon]="linkIcon" [size]="14"></svg>Copy link
+        <button hlmBtn variant="outline" (click)="openSettings()">
+          Project settings <app-kbd keys="shift+p" />
         </button>
         <button
           hlmBtn
-          variant="ghost"
-          size="icon-sm"
+          variant="outline"
+          size="icon"
           class="text-muted-foreground"
           [hlmDropdownMenuTrigger]="more"
           aria-label="Project actions"
         >
           <svg [lucideIcon]="moreIcon" [size]="16"></svg>
         </button>
+        @if (canCreateIssue()) {
+          <button hlmBtn (click)="newIssue()">New task <app-kbd keys="c" /></button>
+        }
         <ng-template #more>
           <hlm-dropdown-menu class="w-48">
+            <button hlmDropdownMenuItem (triggered)="copyLink()">
+              <svg [lucideIcon]="linkIcon" [size]="14" class="text-muted-foreground"></svg> Copy link
+            </button>
             @if (canManage()) {
+              <hlm-dropdown-menu-separator />
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
                 <svg [lucideIcon]="trash" [size]="14"></svg> Delete project
               </button>
@@ -132,66 +151,79 @@ const ACTIVITY_CAP = 20;
         </ng-template>
       </ng-template>
 
-      <header class="px-4 pt-4 sm:px-5">
-        <div class="flex min-w-0 items-center gap-2.5">
-          <app-project-glyph-picker [project]="p" [canEdit]="canManage()" />
-          <app-inline-text
-            class="min-w-0 flex-1"
-            label="project name"
-            textClass="text-xl tracking-tight"
-            [value]="p.name"
-            [canEdit]="canManage()"
-            (save)="update({ name: $event })"
-          />
-          <app-inline-text
-            class="w-14 shrink-0"
-            label="project tag"
-            textClass="text-muted-foreground bg-muted/60 rounded px-1.5 font-mono text-xs font-medium"
-            [value]="p.key"
-            [canEdit]="canManage()"
-            [maxLength]="projectKeyMax"
-            [mono]="true"
-            hlmTooltip="Project tag; changing it updates this project's task keys"
-            (save)="update({ key: $event })"
-          />
-        </div>
-        <div class="mt-1 flex min-w-0 items-start gap-2">
-          <app-inline-text
-            class="min-w-0 flex-1"
-            label="summary"
-            placeholder="Add a short summary…"
-            textClass="text-muted-foreground text-sm"
-            [value]="p.summary ?? ''"
-            [canEdit]="canManage()"
-            [allowEmpty]="true"
-            (save)="update({ summary: $event.trim() || null })"
-          />
-          @if (canManage()) {
-            <app-project-ai-summary-button [project]="p" />
+      <header class="flex flex-col gap-4 px-4 pt-6 sm:px-10">
+        <div class="flex items-end gap-5">
+          <div class="flex min-w-0 flex-1 flex-col gap-1.5">
+            <div class="flex min-w-0 items-center gap-2 font-mono text-[10.5px] leading-[13px] uppercase">
+              <app-project-glyph-picker class="-my-[11px] -ml-2.5" [project]="p" [canEdit]="canManage()" [size]="12" />
+              <span class="text-faint">Project ·</span>
+              <app-inline-text
+                class="w-14 shrink-0"
+                label="project tag"
+                textClass="text-faint font-mono text-[10.5px] leading-[13px]"
+                [value]="p.key"
+                [canEdit]="canManage()"
+                [maxLength]="projectKeyMax"
+                [mono]="true"
+                title="Project tag; changing it updates this project's task keys"
+                (save)="update({ key: $event })"
+              />
+              @if (p.repository) {
+                <span class="text-faint min-w-0 truncate normal-case">· {{ p.repository }}</span>
+              }
+            </div>
+            <app-inline-text
+              class="min-w-0"
+              label="project name"
+              textClass="font-title text-foreground text-[36px] leading-[40px] tracking-[-0.5px]"
+              [value]="p.name"
+              [canEdit]="canManage()"
+              (save)="update({ name: $event })"
+            />
+            <div class="flex min-w-0 items-start gap-2">
+              <app-inline-text
+                class="min-w-0 flex-1"
+                label="summary"
+                placeholder="Add a short summary…"
+                textClass="text-muted-foreground text-sm"
+                [value]="p.summary ?? ''"
+                [canEdit]="canManage()"
+                [allowEmpty]="true"
+                (save)="update({ summary: $event.trim() || null })"
+              />
+              @if (canManage()) {
+                <app-project-ai-summary-button [project]="p" />
+              }
+            </div>
+          </div>
+          @if (health(); as h) {
+            <span
+              class="text-foreground mb-1 inline-flex shrink-0 items-center gap-1.5 border px-2.5 py-1 font-mono text-[11px] leading-[14px]"
+              [style.border-color]="'color-mix(in srgb, ' + h.color + ' 40%, transparent)'"
+            >
+              <span class="size-[7px] shrink-0" [style.background]="h.color" aria-hidden="true"></span>{{ h.label }}
+            </span>
           }
         </div>
 
-        <hlm-tabs [tab]="current()" (tabActivated)="setTab($event)" class="-mx-4 mt-3 sm:-mx-5">
-          <div class="scrollbar-none overflow-x-auto px-4 sm:px-5">
-            <hlm-tabs-list variant="line" class="h-9 w-max gap-1 p-0" aria-label="Project sections">
-              @for (t of tabs; track t; let i = $index) {
-                <button
-                  [hlmTabsTrigger]="t"
-                  class="h-9 flex-none px-2.5 after:bottom-0"
-                  [hlmTooltip]="tabLabel[t] + ' (' + (i + 1) + ')'"
-                  position="bottom"
-                >
-                  {{ tabLabel[t] }}
-                  @if (counts()[t]) {
-                    <span class="text-muted-foreground ml-1 text-xs tabular-nums">{{
-                      counts()[t]
-                    }}</span>
-                  }
-                </button>
+        <div class="border-border -mb-px flex gap-[22px] border-b" role="tablist" aria-label="Project sections">
+          @for (t of tabs; track t; let i = $index) {
+            <button
+              type="button"
+              role="tab"
+              class="-mb-px flex flex-none items-start gap-1.5 border-b-2 pb-2.5 text-[13px] leading-4 whitespace-nowrap outline-none focus-visible:underline"
+              [class]="current() === t ? 'border-primary text-foreground' : 'text-muted-foreground hover:text-foreground border-transparent'"
+              [attr.aria-selected]="current() === t"
+              [title]="tabLabel[t] + ' (' + (i + 1) + ')'"
+              (click)="setTab(t)"
+            >
+              {{ tabLabel[t] }}
+              @if (counts()[t]) {
+                <span class="text-faint font-mono text-[10.5px] leading-4 tabular-nums">{{ counts()[t] }}</span>
               }
-            </hlm-tabs-list>
-          </div>
-        </hlm-tabs>
+            </button>
+          }
+        </div>
       </header>
 
       @switch (current()) {
@@ -199,67 +231,73 @@ const ACTIVITY_CAP = 20;
           <app-project-tasks-tab [projectId]="p.id" />
         }
         @case ('stats') {
-          <div class="min-w-0 flex-1 px-4 py-5 sm:px-5">
+          <div class="min-w-0 flex-1 px-4 py-5 sm:px-10">
             <app-project-stats-tab [project]="p" />
           </div>
         }
         @default {
           <div class="flex min-w-0 flex-1 max-lg:flex-col">
-          <div class="flex min-w-0 max-w-4xl flex-1 flex-col gap-8 px-4 py-5 sm:px-5">
-            <section aria-label="Description">
-              <app-editable-markdown
-                label="description"
-                placeholder="Describe the outcome, scope and why it matters…"
-                [value]="p.description ?? ''"
-                [canEdit]="canManage()"
-                [uploads]="true"
-                (save)="update({ description: $event.trim() || null })"
-              />
-            </section>
+            <div class="flex min-w-0 flex-1 flex-col gap-[22px] px-4 py-[22px] sm:px-10">
+              <app-project-roadmap [project]="p" />
 
-            <app-project-lunagest [projectId]="p.id" [canManage]="canManage()" />
-
-            @if (canManage()) {
-              <app-project-risks-card [project]="p" />
-              <app-project-issue-suggestions [project]="p" />
-            }
-
-            <app-project-milestones [project]="p" />
-
-            <section>
-              <h2 class="text-muted-foreground mb-1 text-[13px] font-normal">Activity</h2>
-              @if (activity().length) {
-                <div class="flex flex-col">
-                  @for (e of shownActivity(); track e.id) {
-                    <app-event-line [event]="e" [slug]="slug()" />
-                  }
-                </div>
-                @if (activity().length > activityCap && !allActivity()) {
-                  <button
-                    hlmBtn
-                    variant="ghost"
-                    size="sm"
-                    class="text-muted-foreground mt-1"
-                    (click)="allActivity.set(true)"
-                  >
-                    Show all {{ activity().length }}
-                  </button>
-                }
+              @if (current() === 'progress') {
+                <app-project-burnup [project]="p" />
+                <app-project-milestone-rows [project]="p" />
               } @else {
-                <p class="text-muted-foreground text-[13px]">
-                  Nothing has happened here in the recent history.
-                </p>
-              }
-            </section>
+                <app-project-milestone-cards [project]="p" />
 
-            <section>
-              <h2 class="text-muted-foreground mb-2 text-[13px] font-normal">Comments</h2>
-              <app-comment-thread [subject]="{ type: 'project', id: p.id }" />
-            </section>
-          </div>
-          <aside class="border-border shrink-0 max-lg:border-t lg:w-[300px] lg:border-l" aria-label="Project properties">
-            <app-project-properties [id]="p.id" />
-          </aside>
+                <section class="flex flex-col gap-2.5" aria-label="Description">
+                  <v3-section-title title="Description" />
+                  <app-editable-markdown
+                    label="description"
+                    placeholder="Describe the outcome, scope and why it matters…"
+                    [value]="p.description ?? ''"
+                    [canEdit]="canManage()"
+                    [uploads]="true"
+                    (save)="update({ description: $event.trim() || null })"
+                  />
+                </section>
+
+                <app-project-lunagest [projectId]="p.id" [canManage]="canManage()" />
+
+                @if (canManage()) {
+                  <app-project-risks-card [project]="p" />
+                  <app-project-issue-suggestions [project]="p" />
+                }
+
+                <section class="flex flex-col gap-2.5">
+                  <v3-section-title title="Activity" />
+                  @if (activity().length) {
+                    <div class="flex flex-col">
+                      @for (e of shownActivity(); track e.id) {
+                        <app-event-line [event]="e" [slug]="slug()" />
+                      }
+                    </div>
+                    @if (activity().length > activityCap && !allActivity()) {
+                      <button
+                        hlmBtn
+                        variant="ghost"
+                        size="sm"
+                        class="text-muted-foreground self-start"
+                        (click)="allActivity.set(true)"
+                      >
+                        Show all {{ activity().length }}
+                      </button>
+                    }
+                  } @else {
+                    <p class="text-faint font-mono text-[11px]">Nothing has happened here in the recent history.</p>
+                  }
+                </section>
+
+                <section class="flex flex-col gap-2.5">
+                  <v3-section-title title="Comments" />
+                  <app-comment-thread [subject]="{ type: 'project', id: p.id }" />
+                </section>
+              }
+            </div>
+            <aside class="bg-card border-border shrink-0 max-lg:border-t lg:w-[300px] lg:border-l" aria-label="Project properties">
+              <app-project-properties [id]="p.id" />
+            </aside>
           </div>
         }
       }
@@ -292,7 +330,6 @@ export class ProjectDetailPage {
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
-  protected readonly plus = LucidePlus;
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
   protected readonly projectKeyMax = PROJECT_KEY_MAX;
@@ -320,6 +357,31 @@ export class ProjectDetailPage {
   protected readonly milestoneCount = computed(
     () => this.store.milestonesByProject().get(this.id() ?? '')?.length ?? 0,
   );
+
+  /** The health set by hand; else what the burn-up says (once the project has tasks). */
+  protected readonly health = computed<{ label: string; color: string } | null>(() => {
+    const p = this.project();
+    if (!p) return null;
+    if (p.health) {
+      const entry = resolveStatusEntry(this.store.settings().statuses.projectHealth, p.health);
+      return { label: entry?.name ?? p.health, color: entry?.color ?? 'var(--muted-foreground)' };
+    }
+    const issues = this.issues();
+    if (!issues.some((i) => i.status !== 'canceled')) return null;
+    const target = projectTargetDay(p, this.store.milestonesByProject().get(p.id) ?? []);
+    const view = buildBurnView({
+      issues,
+      points: usesPoints(issues, this.store.estimateScale()),
+      startDay: dayOf(p.startDate ?? p.createdAt),
+      targetDay: target,
+      today: todayDay(),
+      endHint: target,
+      pad: 14,
+    });
+    const badge = burnBadge(view.model);
+    return { label: badge.label, color: TONE_COLOR[badge.tone] };
+  });
+
   /** People working on the project: its lead, then the assignees of its open tasks. */
   protected readonly members = computed<ActorRef[]>(() => {
     const ids = new Set<string>();
@@ -348,14 +410,20 @@ export class ProjectDetailPage {
     { label: this.project()?.name ?? this.id() ?? '' },
   ]);
 
-  private readonly _keys = usePageShortcuts(
-    TABS.map((t, i) => ({
+  private readonly _keys = usePageShortcuts([
+    ...TABS.map((t, i) => ({
       keys: String(i + 1),
       label: `${TAB_LABEL[t]} tab`,
       run: () => this.setTab(t),
       when: () => !!this.project(),
     })),
-  );
+    {
+      keys: 'shift+p',
+      label: 'Project settings',
+      run: () => this.openSettings(),
+      when: () => !!this.project(),
+    },
+  ]);
 
   protected setTab(t: string | null | undefined): void {
     if (!t) return;
@@ -364,6 +432,17 @@ export class ProjectDetailPage {
       queryParamsHandling: 'merge',
       replaceUrl: true,
     });
+  }
+
+  /** The properties live in the rail: bring them into view and focus the first one. */
+  protected openSettings(): void {
+    const c = this.current();
+    if (c === 'tasks' || c === 'stats') this.setTab('overview');
+    setTimeout(() => {
+      const el = document.getElementById('project-properties');
+      el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      el?.querySelector<HTMLElement>('button, input')?.focus({ preventScroll: true });
+    }, 80);
   }
 
   protected newIssue(): void {
