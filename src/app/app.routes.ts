@@ -25,7 +25,7 @@ function redirectInbox(path: string, tab: string): Route {
  * `workspaceSlug = input<string>()`.
  *
  * Reserved top-level paths (cannot be workspace slugs): login, register, signup, invite, shared, blog, roadmap,
- * changelog, brand, new-workspace, 404.
+ * changelog, compare, why, brand, new-workspace, 404.
  */
 export const routes: Routes = [
   {

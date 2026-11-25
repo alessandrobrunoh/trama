@@ -50,6 +50,8 @@ export const RESERVED_SLUGS = new Set([
   'blog',
   'roadmap',
   'changelog',
+  'compare',
+  'why',
   'brand',
   '404',
   'new-workspace',
