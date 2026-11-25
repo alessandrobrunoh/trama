@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { LucideBox, LucideDynamicIcon, LucidePlus, LucideSearch, LucideX } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
@@ -13,14 +13,18 @@ import { PageHeader } from '../../shared/page-header';
 import { FullDatePipe } from '../../shared/pipes';
 import { milestoneStats, usesPoints } from '../milestones/milestone-model';
 import { Picker } from '../../shared/picker';
+import { V3Priority } from '../../shared/v3';
 import { ProjectGlyph } from './project-glyph';
 import { isClosed, isOverdue, projectStatusOptions } from './project-model';
-import { PriorityIcon } from '../../shared/priority-icon';
-import { StatusIcon } from '../../shared/status';
 import { LabelPicker } from '../../shared/label-picker';
 import { LabelChips } from '../../shared/label-chip';
 import { SearchInput } from '../../shared/search-input';
 
+/**
+ * `/:workspace/projects`: the projects as the Tasks list draws its tasks (v3 "04 · Tasks"): a filter bar, a band
+ * per project status and one hairline row per project (priority, tag, name and summary, labels, progress, lead,
+ * target date).
+ */
 @Component({
   selector: 'app-project-list-page',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,17 +44,14 @@ import { SearchInput } from '../../shared/search-input';
     StatusBar,
     FullDatePipe,
     ProjectGlyph,
-    PriorityIcon,
-    StatusIcon,
+    V3Priority,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <ng-template appTopBarActions>
       @if (canManage()) {
-        <button hlmBtn size="sm" (click)="create()">
-          <svg [lucideIcon]="plus" [size]="14"></svg>
-          <span>New project</span>
-          <app-kbd keys="c" class="opacity-70 max-sm:hidden" />
+        <button hlmBtn (click)="create()">
+          New project <app-kbd keys="c" class="max-sm:hidden" />
         </button>
       }
     </ng-template>
@@ -74,10 +75,10 @@ import { SearchInput } from '../../shared/search-input';
       }
     </app-status-bar>
 
-    <div class="flex flex-wrap items-center gap-x-2 gap-y-2 px-4 py-2 sm:px-5">
+    <div class="border-border flex min-h-[41.5px] flex-wrap items-center gap-x-2.5 gap-y-2 border-b px-4 py-2.5 sm:px-5">
       <app-search-input noun="projects" [(value)]="search" />
       <div
-        class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto max-sm:basis-full"
+        class="scrollbar-none scroll-fade-x flex min-w-0 flex-1 items-center gap-2.5 overflow-x-auto max-sm:basis-full"
       >
         <app-picker
           variant="chip"
@@ -102,13 +103,14 @@ import { SearchInput } from '../../shared/search-input';
             hlmBtn
             variant="ghost"
             size="sm"
-            class="text-muted-foreground h-7 shrink-0 gap-1 px-2 text-xs"
+            class="h-7 shrink-0 gap-1 px-2"
             (click)="clearFilters()"
           >
             <svg [lucideIcon]="xIcon" [size]="12"></svg>Clear
           </button>
         }
       </div>
+      <span class="text-faint ml-auto font-mono text-[11px] max-lg:hidden">Group: status · Sort: name</span>
     </div>
 
     @if (total() === 0) {
@@ -133,22 +135,12 @@ import { SearchInput } from '../../shared/search-input';
       </app-empty-state>
     } @else {
       <div class="min-h-0 flex-1 overflow-y-auto pb-4" role="list">
-        <div
-          class="text-muted-foreground flex items-center gap-3 px-4 pt-1 text-xs max-md:hidden sm:px-5"
-          aria-hidden="true"
-        >
-          <span class="min-w-0 flex-1"></span>
-          <span class="w-5"></span>
-          <span class="w-28">Progress</span>
-          <span class="w-32">Lead</span>
-          <span class="w-24">Target date</span>
-        </div>
         @for (g of groups(); track g.id) {
           <section [attr.aria-label]="g.label">
-            <h2 class="text-muted-foreground mt-1 flex h-8 items-center gap-2 px-4 text-[13px] font-normal sm:px-5">
-              <app-status-icon [status]="g.id" entity="project" [size]="14" />
-              <span class="text-foreground">{{ g.label }}</span>
-              <span class="tabular-nums">{{ g.rows.length }}</span>
+            <h2 class="bg-card border-border flex h-[30.5px] items-center gap-2.5 border-b px-4 font-normal">
+              <span class="size-2 shrink-0" [style.background]="g.color" aria-hidden="true"></span>
+              <span class="text-foreground font-mono text-[11.5px] leading-[14px]">{{ g.label }}</span>
+              <span class="text-faint font-mono text-[11px] leading-[14px] tabular-nums">{{ g.rows.length }}</span>
             </h2>
             @for (row of g.rows; track row.project.id) {
               @let p = row.project;
@@ -156,16 +148,14 @@ import { SearchInput } from '../../shared/search-input';
                 [routerLink]="['/', slug(), 'projects', p.id]"
                 [attr.data-row-id]="p.id"
                 role="listitem"
-                class="focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-[13px] outline-none focus-visible:ring-1 focus-visible:ring-inset sm:px-5 md:min-h-9 md:flex-nowrap md:py-1.5"
-                [class]="
-                  ui.focusedRowId() === p.id
-                    ? 'bg-selected'
-                    : 'hover:bg-hover'
-                "
+                class="border-border focus-visible:ring-ring flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2 outline-none focus-visible:ring-1 focus-visible:ring-inset md:min-h-[39.5px] md:flex-nowrap md:py-0"
+                [class]="ui.focusedRowId() === p.id ? 'bg-selected' : 'hover:bg-hover'"
               >
+                <v3-priority class="w-[84px] shrink-0 max-md:w-auto" [priority]="p.priority" />
+                <span class="text-faint w-14 shrink-0 font-mono text-[11px] leading-[14px] max-sm:hidden">{{ p.key }}</span>
                 <span class="flex min-w-0 flex-1 items-center gap-2.5">
-                  <app-project-glyph [project]="p" [size]="16" />
-                  <span class="max-w-[14rem] min-w-0 shrink-0 truncate">{{ p.name }}</span>
+                  <app-project-glyph [project]="p" [size]="14" />
+                  <span class="text-foreground max-w-[16rem] min-w-0 shrink-0 truncate text-[13.5px] leading-4">{{ p.name }}</span>
                   @if (p.summary) {
                     <span class="text-muted-foreground min-w-0 flex-1 truncate text-xs max-lg:hidden">{{ p.summary }}</span>
                   }
@@ -174,34 +164,27 @@ import { SearchInput } from '../../shared/search-input';
                   }
                 </span>
                 <span
-                  class="text-muted-foreground flex items-center gap-3 text-xs max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] max-md:text-[13px] md:contents"
+                  class="flex items-center gap-3 max-md:basis-full max-md:flex-wrap max-md:gap-x-4 max-md:gap-y-1 max-md:pl-[26px] md:contents"
                 >
-                  <span class="flex w-5 items-center justify-center max-md:w-auto">
-                    <app-priority-icon [priority]="p.priority" />
-                  </span>
                   <span
-                    class="flex w-28 items-center gap-2 max-md:w-auto"
+                    class="flex w-28 shrink-0 items-center gap-2 max-md:w-auto"
                     [attr.aria-label]="row.percent + '% complete'"
                   >
-                    <span class="bg-foreground/10 h-1 w-14 overflow-hidden rounded-full" aria-hidden="true">
-                      <span
-                        class="bg-status-done block h-full rounded-full"
-                        [style.width.%]="row.percent"
-                      ></span>
+                    <span class="bg-line h-1 w-14" aria-hidden="true">
+                      <span class="bg-status-done block h-full" [style.width.%]="row.percent"></span>
                     </span>
-                    <span class="tabular-nums">{{ row.percent }}%</span>
+                    <span class="text-muted-foreground font-mono text-[11px] leading-[14px] tabular-nums">{{ row.percent }}%</span>
                   </span>
-                  <span class="flex w-32 items-center gap-1.5 max-md:w-auto max-md:max-w-36">
+                  <span class="flex w-[22px] shrink-0 items-center justify-center max-md:w-auto" [attr.title]="row.lead ?? null">
                     @if (p.leadId) {
-                      <app-actor-avatar [actor]="{ type: 'user', id: p.leadId }" [size]="18" />
-                      <span class="truncate">{{ row.lead }}</span>
+                      <app-actor-avatar [actor]="{ type: 'user', id: p.leadId }" [size]="22" />
                     } @else {
-                      <span>—</span>
+                      <span class="text-faint font-mono text-[11px]">—</span>
                     }
                   </span>
                   <span
-                    class="w-24 whitespace-nowrap max-md:hidden"
-                    [class.text-status-blocked]="row.overdue"
+                    class="w-[92px] shrink-0 text-right font-mono text-[11px] leading-[14px] whitespace-nowrap max-md:hidden"
+                    [class]="row.overdue ? 'text-red' : 'text-muted-foreground'"
                   >
                     {{ p.targetDate ? (p.targetDate | fullDate) : '—' }}
                   </span>
@@ -275,7 +258,7 @@ export class ProjectListPage {
       });
   });
 
-  /** Rows under a muted header per project status, in the workspace's status order. */
+  /** Rows under a band per project status, in the workspace's status order. */
   protected readonly groups = computed(() => {
     const rows = this.rows();
     return this.store
