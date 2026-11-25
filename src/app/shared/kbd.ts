@@ -39,11 +39,11 @@ const GLYPHS: Record<string, string> = {
   imports: [HlmKbd],
   host: { class: 'inline-flex items-center gap-0.5' },
   template: `
-    @for (k of parts(); track $index) {
+    @for (k of chips(); track $index) {
       @if (chord() && $index > 0) {
         <span class="text-muted-foreground mx-0.5 text-[11px]">then</span>
       }
-      <kbd hlmKbd class="font-mono text-[11px]">{{ k }}</kbd>
+      <kbd hlmKbd>{{ k }}</kbd>
     }
   `,
 })
@@ -58,5 +58,12 @@ export class Kbd {
     return list
       .filter(Boolean)
       .map((k) => GLYPHS[k.toLowerCase()] ?? (k.length === 1 ? k.toUpperCase() : k));
+  });
+  /** v3: a combo is one key cap ("⌘K", "⇧R"); chords ("g i") and lists stay one cap per key. */
+  protected readonly chips = computed(() => {
+    const raw = this.keys();
+    const parts = this.parts();
+    const combo = !this.chord() && typeof raw === 'string' && raw.includes('+');
+    return combo ? [parts.join(isMac ? '' : '+')] : parts;
   });
 }

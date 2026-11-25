@@ -21,8 +21,7 @@ import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SyncStatus } from '../core/sync/sync-status';
 import { Viewport } from '../core/viewport';
-import { AvatarStack } from '../shared/actor-avatar';
-import { FavoriteButton } from '../shared/favorite-button';
+import { Kbd } from '../shared/kbd';
 import { SECTIONS_WITH_LIST, SECTION_LABELS } from './nav';
 import { PANE_SECTIONS } from './right-pane';
 import { PageChrome, type Crumb } from './page-chrome';
@@ -43,8 +42,7 @@ import { PageChrome, type Crumb } from './page-chrome';
     LucideDynamicIcon,
     HlmButtonImports,
     HlmTooltip,
-    AvatarStack,
-    FavoriteButton,
+    Kbd,
   ],
   host: {
     class:
@@ -133,13 +131,6 @@ import { PageChrome, type Crumb } from './page-chrome';
         </ol>
       </nav>
 
-      @if (actors().length) {
-        <app-avatar-stack [actors]="actors()" [max]="3" [size]="20" class="ms-1 shrink-0" />
-      }
-
-      @if (favoriteTarget(); as t) {
-        <app-favorite-button [type]="t.type" [subjectId]="t.id" class="max-sm:hidden" />
-      }
 
       @if (sync.live() === 'reconnecting' || sync.lastError()) {
         <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status" [attr.aria-label]="sync.lastError() ?? sync.label()">
@@ -153,24 +144,16 @@ import { PageChrome, type Crumb } from './page-chrome';
       <div class="top-bar__actions flex shrink-0 items-center gap-2 empty:hidden">
         @if (chrome.actions(); as tpl) {
           <ng-container *ngTemplateOutlet="tpl" />
+        } @else {
+          <!-- v3 default header actions: Filter (F) · New task (C) -->
+          <button hlmBtn variant="outline" (click)="ui.openModal('search')">
+            Filter <app-kbd keys="f" />
+          </button>
+          @if (store.allowed('createIssues')) {
+            <button hlmBtn (click)="ui.openCreate('issue')">New task <app-kbd keys="c" /></button>
+          }
         }
       </div>
-
-      @if (paneAvailable()) {
-        <button
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground -mr-1"
-          [hlmTooltip]="rightPane.open() ? 'Hide preview  ⌘.' : 'Show preview  ⌘.'"
-          position="bottom"
-          [attr.aria-label]="rightPane.open() ? 'Hide preview pane' : 'Show preview pane'"
-          [attr.aria-pressed]="rightPane.open()"
-          (click)="rightPane.toggle()"
-        >
-          <svg [lucideIcon]="panelRight" [size]="16"></svg>
-        </button>
-      }
     }
   `,
 })
@@ -183,7 +166,7 @@ export class TopBar {
   protected readonly sidebar = inject(HlmSidebarService);
   protected readonly rightPane = inject(RightPaneStore);
   private readonly router = inject(Router);
-  private readonly store = inject(TramaStore);
+  protected readonly store = inject(TramaStore);
   private readonly favorites = inject(FavoritesStore);
   private readonly notifications = inject(NotificationsStore);
 

@@ -43,6 +43,7 @@ import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { FavoritesStore } from '../core/stores/favorites.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
+import { TimeEntriesStore } from '../core/stores/time-entries.store';
 import { TramaStore } from '../core/stores/trama.store';
 import { UiStore } from '../core/stores/ui.store';
 import { SessionStore } from '../core/session/session.store';
@@ -81,29 +82,17 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <div hlmSidebarHeader class="gap-0 p-0">
-      <!-- workspace: red square mark + serif name, mono "slug · N members"; the panel toggle on the right -->
-      <div class="flex items-center gap-2.5 px-3.5 pt-3.5 pb-3">
+      <!-- top row: three window marks, the panel toggle on the right -->
+      <div class="flex items-center gap-2 px-3.5 pt-3.5 pb-2.5">
+        <span class="flex gap-1.5" aria-hidden="true">
+          <span class="size-[9px] bg-[#33363c]"></span>
+          <span class="size-[9px] bg-[#33363c]"></span>
+          <span class="size-[9px] bg-[#33363c]"></span>
+        </span>
+        <span class="flex-1"></span>
         <button
           type="button"
-          class="hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring -m-1 flex min-w-0 flex-1 items-center gap-2.5 p-1 text-start outline-hidden focus-visible:ring-2"
-          [hlmDropdownMenuTrigger]="workspaceMenu"
-          align="start"
-          aria-label="Switch workspace"
-        >
-          <span
-            class="bg-brand font-title flex size-6 shrink-0 items-center justify-center text-[16px] leading-none text-white"
-            aria-hidden="true"
-            >{{ wsInitial() }}</span
-          >
-          <span class="flex min-w-0 flex-1 flex-col gap-px">
-            <span class="font-title text-foreground truncate text-[18px] leading-[1.15]">{{ wsName() }}</span>
-            <span class="text-faint truncate font-mono text-[10px] leading-tight">{{ wsSub() }}</span>
-          </span>
-          <svg [lucideIcon]="chevrons" [size]="13" class="text-faint shrink-0"></svg>
-        </button>
-        <button
-          type="button"
-          class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring flex size-6 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2"
+          class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring -m-1 flex size-[22px] items-center justify-center outline-hidden focus-visible:ring-2"
           hlmTooltip="Hide sidebar  ⌘B"
           position="bottom"
           aria-label="Hide sidebar (⌘B)"
@@ -112,6 +101,26 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
         </button>
       </div>
+      <!-- workspace: red "T" mark, "Trama" in serif, mono "acme · 6 members" -->
+      <button
+        type="button"
+        class="hover:bg-sidebar-accent/50 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex items-center gap-2.5 px-3.5 pt-1 pb-3 text-start outline-hidden focus-visible:ring-2"
+        [hlmDropdownMenuTrigger]="workspaceMenu"
+        align="start"
+        aria-label="Switch workspace"
+      >
+        <span
+          class="bg-brand font-title flex size-6 shrink-0 items-center justify-center text-[16px] leading-none text-white"
+          aria-hidden="true"
+          >T</span
+        >
+        <span class="flex min-w-0 flex-col gap-px">
+          <span class="font-title text-foreground text-[18px] leading-[18px]">Trama</span>
+          <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>
+        </span>
+        <span class="flex-1"></span>
+        <svg [lucideIcon]="chevrons" [size]="13" class="text-faint shrink-0"></svg>
+      </button>
 
       <!-- search or jump (opens the command palette) -->
       <div class="px-3 pb-2.5">
@@ -140,7 +149,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         <div class="mt-4">
           <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'favorites', label: 'Pinned' }" />
           @if (!ui.isFolded('favorites')) {
-            <ul hlmSidebarMenu class="gap-px">
+            <ul hlmSidebarMenu class="mt-px gap-px">
               @for (e of favorites.entries(); track e.favorite.id) {
                 <li hlmSidebarMenuItem class="group/fav relative">
                   <a
@@ -202,7 +211,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
           "
         />
         @if (!ui.isFolded('projects')) {
-          <ul hlmSidebarMenu class="gap-px">
+          <ul hlmSidebarMenu class="mt-px gap-px">
             @for (p of projectRows(); track p.project.id) {
               <li hlmSidebarMenuItem>
                 <a
@@ -236,38 +245,12 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         }
       </div>
 
-      <!-- Workspace: Settings, plus the rest of the app folded under "More" -->
+      <!-- Workspace: Settings (everything else stays one keystroke away: ⌘K, G chords) -->
       <div class="py-1.5">
         <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'workspace', label: 'Workspace' }" />
         @if (!ui.isFolded('workspace')) {
-          <ul hlmSidebarMenu class="gap-px">
+          <ul hlmSidebarMenu class="mt-px gap-px">
             <ng-container *ngTemplateOutlet="navLink; context: { $implicit: settingsItem }" />
-            <li hlmSidebarMenuItem>
-              <button
-                type="button"
-                hlmSidebarMenuButton
-                (click)="ui.toggleFolded('open:more')"
-                [attr.aria-expanded]="moreOpen()"
-                aria-controls="sidebar-more"
-              >
-                <svg [lucideIcon]="more" [size]="15" class="text-muted-foreground"></svg>
-                <span class="flex-1 text-start">More</span>
-                <svg
-                  [lucideIcon]="chevronDown"
-                  [size]="12"
-                  class="text-faint transition-transform"
-                  [class.-rotate-90]="!moreOpen()"
-                  aria-hidden="true"
-                ></svg>
-              </button>
-            </li>
-            @if (moreOpen()) {
-              <div id="sidebar-more" class="contents">
-                @for (item of moreItems(); track item.segment) {
-                  <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
-                }
-              </div>
-            }
           </ul>
         }
       </div>
@@ -284,14 +267,14 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       >
         <span class="flex items-center gap-2">
           <span class="size-[7px] shrink-0" [class]="agentSeen() ? 'bg-status-done' : 'bg-faint'" aria-hidden="true"></span>
-          <span class="text-foreground font-mono text-[10.5px]">Delta · /trama skill</span>
+          <span class="text-foreground font-mono text-[10.5px] leading-[15px]">Delta · /trama skill</span>
         </span>
-        <span class="text-faint truncate font-mono text-[10px]">{{ agentSub() }}</span>
+        <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ agentSub() }}</span>
       </a>
-      <div class="border-sidebar-border flex items-center gap-1 border-t px-2 py-1.5">
+      <div class="border-sidebar-border flex items-center gap-2.5 border-t px-3.5 py-2.5">
         <button
           type="button"
-          class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 min-w-0 flex-1 items-center gap-2.5 px-1.5 text-start outline-hidden focus-visible:ring-2"
+          class="text-foreground hover:text-sidebar-accent-foreground data-open:text-sidebar-accent-foreground focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
           [hlmDropdownMenuTrigger]="userMenu"
           align="start"
           side="top"
@@ -302,53 +285,32 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         </button>
         <a
           [routerLink]="['/', slug(), 'inbox']"
-          class="text-faint hover:text-foreground relative flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          class="text-faint hover:text-foreground relative flex size-[14px] shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
           hlmTooltip="Inbox  G then A"
           position="top"
           [attr.aria-label]="inboxCount() ? 'Inbox, ' + inboxCount() + ' need you' : 'Inbox'"
           closeMobileSidebarOnClick
         >
           <svg [lucideIcon]="bellIcon" [size]="14"></svg>
-          @if (inboxCount() > 0) {
-            <span class="bg-primary absolute top-1.5 right-1.5 size-[5px]" aria-hidden="true"></span>
-          }
         </a>
-        <button
-          type="button"
-          class="text-faint hover:text-foreground data-open:text-foreground flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          [hlmDropdownMenuTrigger]="helpMenu"
-          align="start"
-          side="top"
-          aria-label="Help"
-        >
-          <svg [lucideIcon]="help" [size]="14"></svg>
-        </button>
       </div>
     </div>
 
     <!-- mono uppercase section label ("PROJECTS"); the fold chevron and actions show on hover / focus -->
     <ng-template #sectionLabel let-id let-label="label" let-all="all" let-allLabel="allLabel" let-create="create" let-createLabel="createLabel">
-      <div class="group/sec flex items-center">
+      <div class="group/sec flex h-[13px] items-center">
         <button
           type="button"
-          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex h-6 flex-1 items-center gap-1 px-2.5 font-mono text-[10px] tracking-[0.04em] uppercase outline-hidden focus-visible:ring-2"
+          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex flex-1 items-center font-mono text-[10px] leading-none uppercase outline-hidden focus-visible:ring-2"
           (click)="ui.toggleFolded(id)"
           [attr.aria-expanded]="!ui.isFolded(id)"
         >
           {{ label }}
-          <svg
-            [lucideIcon]="chevronDown"
-            [size]="12"
-            class="transition-[transform,opacity] group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 max-md:opacity-100"
-            [class.-rotate-90]="ui.isFolded(id)"
-            [class.opacity-0]="!ui.isFolded(id)"
-            aria-hidden="true"
-          ></svg>
         </button>
         @if (all) {
           <a
             [routerLink]="['/', slug(), all]"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-sm opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
+            class="text-muted-foreground hover:text-foreground flex size-4 items-center justify-center opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
             [hlmTooltip]="allLabel"
             [attr.aria-label]="allLabel"
             closeMobileSidebarOnClick
@@ -358,7 +320,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
         @if (create) {
           <button
             type="button"
-            class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent flex size-6 items-center justify-center rounded-sm opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
+            class="text-muted-foreground hover:text-foreground flex size-4 items-center justify-center opacity-0 group-hover/sec:opacity-100 group-focus-within/sec:opacity-100 focus-visible:opacity-100"
             [attr.aria-label]="createLabel"
             [hlmTooltip]="createLabel"
             (click)="ui.openCreate(create)"
@@ -393,7 +355,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             class="text-muted-foreground group-data-active/menu-button:text-foreground"
           ></svg>
           <span class="truncate-fade flex-1">{{ item.label }}</span>
-          @if (badge(item.badge); as n) {
+          @if (badge(item.badge, true); as n) {
             @if (ui.sidebarBadgeStyle() === 'dot') {
               <span
                 class="size-[5px] shrink-0"
@@ -569,6 +531,19 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
             Keyboard shortcuts
             <hlm-dropdown-menu-shortcut><app-kbd keys="?" /></hlm-dropdown-menu-shortcut>
           </button>
+          <button hlmDropdownMenuItem (triggered)="go(['/', slug(), 'connect'])">
+            <svg [lucideIcon]="plugIcon" [size]="14"></svg>
+            Connect your agent
+          </button>
+          <button hlmDropdownMenuItem (triggered)="showChecklist()">
+            <svg [lucideIcon]="checklistIcon" [size]="14"></svg>
+            Setup checklist
+          </button>
+          <button hlmDropdownMenuItem (triggered)="openPublic('/changelog')">
+            <svg [lucideIcon]="bookIcon" [size]="14"></svg>
+            What's new
+            <svg [lucideIcon]="externalIcon" [size]="12" class="text-muted-foreground ms-auto"></svg>
+          </button>
         </hlm-dropdown-menu-group>
         <hlm-dropdown-menu-separator />
         <hlm-dropdown-menu-label class="flex items-center justify-between">
@@ -603,6 +578,7 @@ export class AppSidebar {
   protected readonly store = inject(TramaStore);
   protected readonly session = inject(SessionStore);
   protected readonly theme = inject(ThemeService);
+  private readonly timers = inject(TimeEntriesStore);
   protected readonly sidebar = inject(HlmSidebarService);
   private readonly router = inject(Router);
 
@@ -725,9 +701,44 @@ export class AppSidebar {
     });
   }
 
-  protected badge(kind: NavItem['badge']): number {
+  /** My open tasks (not done / canceled / draft). */
+  private readonly mineCount = computed(() => {
+    const me = this.session.user()?.id;
+    if (!me) return 0;
+    return this.store
+      .issues()
+      .filter((i) => i.assigneeId === me && !['done', 'canceled', 'draft'].includes(i.status)).length;
+  });
+  /** Every task except drafts. */
+  private readonly taskCount = computed(
+    () => this.store.issues().filter((i) => i.status !== 'draft').length,
+  );
+  /** My tracked time since Monday, "6h 20m". */
+  private readonly weekTime = computed(() => {
+    const me = this.session.user()?.id;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+    const from = start.getTime();
+    let ms = 0;
+    for (const e of this.timers.entries()) {
+      if (e.userId !== me) continue;
+      const s = Date.parse(e.startedAt);
+      if (s < from) continue;
+      ms += (e.endedAt ? Date.parse(e.endedAt) : Date.now()) - s;
+    }
+    const m = Math.floor(ms / 60000);
+    if (m < 1) return '';
+    return m < 60 ? `${m}m` : `${Math.floor(m / 60)}h ${String(m % 60).padStart(2, '0')}m`;
+  });
+
+  protected badge(kind: NavItem['badge']): number;
+  protected badge(kind: NavItem['badge'], text: true): string | number;
+  protected badge(kind: NavItem['badge'], text?: true): string | number {
     if (kind === 'inbox') return this.store.attentionCount() + this.notifications.updatesUnread();
-    if (kind === 'issues') return this.store.backlogIssueCount();
+    if (kind === 'issues') return this.taskCount();
+    if (kind === 'mine') return this.mineCount();
+    if (kind === 'time') return text ? this.weekTime() : this.weekTime() ? 1 : 0;
     return 0;
   }
 

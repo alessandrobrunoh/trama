@@ -15,7 +15,6 @@ import { AppSidebar } from './sidebar';
 import { ShortcutsDialog } from './shortcuts-dialog';
 import { CustomizeSidebarDialog } from './customize-sidebar-dialog';
 import { TopBar } from './top-bar';
-import { AssistantOverlay } from '../features/ai/assistant-overlay';
 import { MobileHeader } from './mobile-header';
 import { MobileNav } from './mobile-nav';
 import { PullToRefresh } from './mobile-pull-to-refresh';
@@ -45,7 +44,6 @@ import { Viewport } from '../core/viewport';
     ConfirmDialog,
     CreateDialog,
     SearchDialog,
-    AssistantOverlay,
     MobileNav,
     MobileHeader,
     PullToRefresh,
@@ -115,7 +113,6 @@ import { Viewport } from '../core/viewport';
       <app-create-dialog />
       <app-search-dialog />
       <app-confirm-dialog />
-      <app-assistant-overlay />
     }
   `,
 })

@@ -15,9 +15,9 @@ export const buttonVariants = cva(
           'bg-primary text-primary-foreground hover:bg-primary/88 [&_kbd]:bg-white/15 [&_kbd]:text-white [&_kbd]:border-transparent',
         // v3: raised fill + hairline (Btn / Secondary)
         outline:
-          'border-border bg-secondary text-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-foreground',
+          'border-border bg-secondary text-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-foreground [&_kbd]:bg-background [&_kbd]:border-transparent',
         secondary:
-          'border-border bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground',
+          'border-border bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground [&_kbd]:bg-background [&_kbd]:border-transparent',
         // v3: muted mono label, no frame (Btn / Ghost)
         ghost:
           'text-muted-foreground hover:bg-hover hover:text-foreground aria-expanded:bg-selected aria-expanded:text-foreground',
@@ -27,10 +27,11 @@ export const buttonVariants = cva(
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {
+        // v3 buttons: 5px / 10px padding, 6px end padding when a key cap closes the label
         default:
-          'h-8 gap-1.5 px-2.5 has-data-[icon=inline-end]:pe-2 has-data-[icon=inline-start]:ps-2',
+          'h-7 gap-2 px-2.5 has-[kbd]:pe-1.5 has-data-[icon=inline-end]:pe-2 has-data-[icon=inline-start]:ps-2',
         xs: "h-6 gap-1 rounded-[min(var(--radius-md),10px)] px-2 text-xs in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pe-1.5 has-data-[icon=inline-start]:ps-1.5 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(3)]",
-        sm: "h-7 gap-1 rounded-[min(var(--radius-md),12px)] px-2.5 text-[0.8rem] in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pe-1.5 has-data-[icon=inline-start]:ps-1.5 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(3.5)]",
+        sm: "h-7 gap-2 rounded-[min(var(--radius-md),12px)] px-2.5 has-[kbd]:pe-1.5 text-[12px] in-data-[slot=button-group]:rounded-md has-data-[icon=inline-end]:pe-1.5 has-data-[icon=inline-start]:ps-1.5 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(3.5)]",
         lg: 'h-9 gap-1.5 px-2.5 has-data-[icon=inline-end]:pe-3 has-data-[icon=inline-start]:ps-3',
         icon: 'size-8',
         'icon-xs':

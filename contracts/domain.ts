@@ -1976,19 +1976,21 @@ interface StatusSeed<T extends string> {
 // v3 palette (docs/designs, "UI Kit · Foundations"): todo gray · in progress yellow · in review blue · done green.
 const NEUTRAL = '#8c9096';
 const SLATE = '#8c9096';
+const FAINT = '#5e6269';
+const DIM = '#3a3e45';
 const BLUE = '#5274e0';
 const AMBER = '#e2a93b';
 const RED = '#cc4b30';
 const GREEN = '#6fae73';
 
 const ISSUE_STATUS_SEEDS: readonly StatusSeed<IssueStatus>[] = [
-  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: NEUTRAL },
-  { type: 'backlog', name: 'Backlog', icon: 'circle-dashed', color: NEUTRAL },
+  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: FAINT },
+  { type: 'backlog', name: 'Backlog', icon: 'circle-dashed', color: FAINT },
   { type: 'todo', name: 'Todo', icon: 'circle', color: SLATE },
-  { type: 'in_progress', name: 'In Progress', icon: 'circle-dot', color: AMBER },
-  { type: 'in_review', name: 'In Review', icon: 'circle-ellipsis', color: BLUE },
+  { type: 'in_progress', name: 'In progress', icon: 'circle-dot', color: AMBER },
+  { type: 'in_review', name: 'In review', icon: 'circle-ellipsis', color: BLUE },
   { type: 'done', name: 'Done', icon: 'circle-check', color: GREEN },
-  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: NEUTRAL },
+  { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: DIM },
 ];
 
 const PROJECT_STATUS_SEEDS: readonly StatusSeed<ProjectStatus>[] = [

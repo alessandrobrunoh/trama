@@ -22,7 +22,8 @@ export interface NavItem {
   icon: LucideIcon;
   /** G-chord hint, e.g. "g o" */
   keys: string;
-  badge?: 'inbox' | 'issues';
+  /** inbox: needs you + unread · issues: all tasks · mine: my open tasks · time: my time this week */
+  badge?: 'inbox' | 'issues' | 'mine' | 'time';
   /** One-line explanation, shown as the item tooltip and on the page header. */
   hint?: string;
   /** Extra words the command palette matches ("go to inbox" also finds "attention"). */
@@ -56,6 +57,7 @@ export const PRIMARY_NAV: NavItem[] = [
     label: 'My tasks',
     icon: LucideCircleUserRound,
     keys: 'g m',
+    badge: 'mine',
     hint: 'Tasks assigned to you',
     keywords: 'my work assigned mine',
   },
@@ -89,6 +91,7 @@ export const PRIMARY_NAV: NavItem[] = [
     label: 'Time',
     icon: LucideTimer,
     keys: 'g h',
+    badge: 'time',
     hint: 'Timer, timesheet and time logged per task',
     keywords: 'timer timesheet hours log',
   },

@@ -109,13 +109,13 @@ export const routes: Routes = [
     component: AppShell,
     canActivate: [authGuard, workspaceGuard],
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'inbox' },
-      // The Inbox is home; the Overview is the briefing about the whole workspace.
+      { path: '', pathMatch: 'full', redirectTo: 'overview' },
+      // Home (v3): what I work on now, what is next, what needs me. Kept at /overview so links stay valid.
       {
         path: 'overview',
-        title: 'Overview · Trama',
+        title: 'Home · Trama',
         loadComponent: () =>
-          import('./features/overview/overview-page').then((m) => m.OverviewPage),
+          import('./features/home/home-page').then((m) => m.HomePage),
       },
       {
         path: 'assistant',

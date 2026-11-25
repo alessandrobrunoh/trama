@@ -23,7 +23,7 @@ interface PersistedRightPane {
   width: number;
 }
 
-export const RIGHT_PANE_STORAGE_KEY = 'trama.right-pane.v1';
+export const RIGHT_PANE_STORAGE_KEY = 'trama.right-pane.v2';
 export const RIGHT_PANE_MIN_WIDTH = 300;
 export const RIGHT_PANE_MAX_WIDTH = 640;
 export const RIGHT_PANE_DEFAULT_WIDTH = 360;
@@ -49,8 +49,8 @@ export class RightPaneStore {
   /** What the open page itself shows (set by the page, cleared when it goes away). */
   private readonly _page = signal<RightPaneContent | null>(null);
   private readonly _open = signal<boolean>(
-    // First visit: open when the window has room for three panes.
-    typeof this.persisted?.open === 'boolean' ? this.persisted.open : (globalThis.innerWidth ?? 1440) >= 1100,
+    // v3: lists have no preview pane; it opens only on demand (⌘.).
+    typeof this.persisted?.open === 'boolean' ? this.persisted.open : false,
   );
   private readonly _mobileOpen = signal(false);
   private readonly _width = signal<number>(
