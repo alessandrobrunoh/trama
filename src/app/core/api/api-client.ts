@@ -41,7 +41,11 @@ import type {
   Project,
   ProjectAiKind,
   ProjectAiResult,
+  ProjectPlacement,
+  ProjectTransferPreview,
+  ProjectTransferResult,
   Role,
+  SharedProject,
   PublicView,
   SavedView,
   User,
@@ -386,6 +390,31 @@ export class ApiClient {
     /** AI suggestion; the `kind` of the result matches the requested one. */
     ai: (slug: string, projectId: ID, kind: ProjectAiKind) =>
       this.post<ProjectAiResult>(`${this.w(slug)}/projects/${projectId}/ai/${kind}`),
+    /** What moving the project to `target` (a workspace slug) would do. Changes nothing. */
+    transferPreview: (slug: string, id: ID, target: string) =>
+      this.get<ProjectTransferPreview>(
+        `${this.w(slug)}/projects/${id}/transfer-preview`,
+        { target },
+        { quiet: true },
+      ),
+    /** Owner or admin of both workspaces. The project leaves `slug` for `target`. */
+    transfer: (slug: string, id: ID, target: string) =>
+      this.post<ProjectTransferResult>(`${this.w(slug)}/projects/${id}/transfer`, { target }),
+  };
+
+  /** Projects shared with the signed-in person (they are a guest there), and where they show them. */
+  readonly shared = {
+    list: () => this.get<SharedProject[]>('/shared/projects', undefined, { quiet: true }),
+    /** Show the project in one of my workspaces. */
+    place: (projectId: ID, workspaceId: ID) =>
+      this.put<ProjectPlacement>(`/shared/projects/${projectId}/placement`, { workspaceId }),
+    /** Hide it from Shared with me. */
+    hide: (projectId: ID) =>
+      this.put<ProjectPlacement>(`/shared/projects/${projectId}/placement`, { workspaceId: null }),
+    /** Back to Shared with me. */
+    clear: (projectId: ID) => this.del(`/shared/projects/${projectId}/placement`),
+    /** Give up my access to the project. */
+    leave: (projectId: ID) => this.post<void>(`/shared/projects/${projectId}/leave`),
   };
 
   readonly issues = {

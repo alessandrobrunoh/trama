@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { NgTemplateOutlet } from '@angular/common';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
@@ -41,6 +41,7 @@ import { HlmDropdownMenuImports } from '@spartan-ng/helm/dropdown-menu';
 import { HlmSidebarImports, HlmSidebarService } from '@spartan-ng/helm/sidebar';
 import { HlmTooltip } from '@spartan-ng/helm/tooltip';
 import { FavoritesStore } from '../core/stores/favorites.store';
+import { SharedProjectsStore } from '../core/stores/shared-projects.store';
 import { NotificationsStore } from '../core/stores/notifications.store';
 import { TimeEntriesStore } from '../core/stores/time-entries.store';
 import { TramaStore } from '../core/stores/trama.store';
@@ -92,25 +93,28 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
     <div hlmSidebarHeader class="gap-0 p-0">
       <!-- workspace row (44px): logo, "Trama" in serif, mono "acme · 6 members", switcher chevrons, panel toggle -->
       <div class="border-sidebar-border flex h-11 items-center gap-2.5 border-b px-3.5">
-        <button
-          type="button"
-          class="group/ws focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
-          [hlmDropdownMenuTrigger]="workspaceMenu"
-          align="start"
-          aria-label="Switch workspace"
-        >
-          <app-trama-logo [size]="24" />
-          <span class="flex min-w-0 flex-col gap-px">
-            <span class="font-title text-foreground text-[18px] leading-[18px]">Trama</span>
-            <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>
-          </span>
-          <span class="flex-1"></span>
-          <svg
-            [lucideIcon]="chevrons"
-            [size]="13"
-            class="text-faint group-hover/ws:text-foreground group-data-open/ws:text-foreground shrink-0"
-          ></svg>
-        </button>
+        @if (canSwitch()) {
+          <button
+            type="button"
+            class="group/ws focus-visible:ring-sidebar-ring flex min-w-0 flex-1 items-center gap-2.5 text-start outline-hidden focus-visible:ring-2"
+            [hlmDropdownMenuTrigger]="workspaceMenu"
+            align="start"
+            aria-label="Switch workspace"
+          >
+            <ng-container *ngTemplateOutlet="wsIdentity" />
+            <span class="flex-1"></span>
+            <svg
+              [lucideIcon]="chevrons"
+              [size]="13"
+              class="text-faint group-hover/ws:text-foreground group-data-open/ws:text-foreground shrink-0"
+            ></svg>
+          </button>
+        } @else {
+          <!-- one personal workspace and nothing shared: nothing to switch to, so no chevrons -->
+          <div class="flex min-w-0 flex-1 items-center gap-2.5">
+            <ng-container *ngTemplateOutlet="wsIdentity" />
+          </div>
+        }
         <button
           type="button"
           class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring flex size-[14px] shrink-0 items-center justify-center outline-hidden focus-visible:ring-2"
@@ -232,19 +236,79 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                 </a>
               </li>
             } @empty {
-              <li>
+              @if (!shared.placedHere().length) {
+                <li>
+                  <button
+                    type="button"
+                    class="text-faint hover:text-foreground px-2.5 py-1 font-mono text-[11px]"
+                    (click)="ui.openCreate('project')"
+                  >
+                    + New project
+                  </button>
+                </li>
+              }
+            }
+            <!-- projects of other workspaces the person chose to show here; they open at their own workspace -->
+            @for (s of shared.placedHere(); track s.id) {
+              <li hlmSidebarMenuItem class="group/placed relative">
+                <a
+                  hlmSidebarMenuButton
+                  [routerLink]="['/', s.workspace.slug, 'projects', s.id]"
+                  routerLinkActive
+                  #sla="routerLinkActive"
+                  [isActive]="sla.isActive"
+                  [tooltip]="s.name + ' · shared from ' + s.workspace.slug"
+                  closeMobileSidebarOnClick
+                >
+                  <app-project-glyph [project]="$any(s)" [size]="15" />
+                  <span class="truncate-fade flex-1">{{ s.name }}</span>
+                  <span class="text-faint font-mono text-[10px] group-hover/placed:invisible">shared</span>
+                </a>
                 <button
                   type="button"
-                  class="text-faint hover:text-foreground px-2.5 py-1 font-mono text-[11px]"
-                  (click)="ui.openCreate('project')"
+                  class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/placed:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+                  [attr.aria-label]="'Stop showing ' + s.name + ' here'"
+                  hlmTooltip="Back to Shared with me"
+                  (click)="shared.clear(s.id)"
                 >
-                  + New project
+                  <svg [lucideIcon]="closeIcon" [size]="12"></svg>
                 </button>
               </li>
             }
           </ul>
         }
       </div>
+
+      <!-- Shared with me: projects where the person is a guest and has not placed them in a workspace -->
+      @if (shared.unplaced().length || hiddenShared().length) {
+        <div class="py-1.5">
+          <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'shared', label: 'Shared with me' }" />
+          @if (!ui.isFolded('shared')) {
+            <ul hlmSidebarMenu class="mt-px gap-px">
+              @for (s of shared.unplaced(); track s.id) {
+                <ng-container *ngTemplateOutlet="sharedRow; context: { $implicit: s }" />
+              }
+              @if (hiddenShared().length) {
+                <li>
+                  <button
+                    type="button"
+                    class="text-faint hover:text-foreground px-2.5 py-1 font-mono text-[11px]"
+                    [attr.aria-expanded]="showHidden()"
+                    (click)="showHidden.set(!showHidden())"
+                  >
+                    {{ showHidden() ? 'Hide ' : '' }}{{ hiddenShared().length }} hidden
+                  </button>
+                </li>
+                @if (showHidden()) {
+                  @for (s of hiddenShared(); track s.id) {
+                    <ng-container *ngTemplateOutlet="sharedRow; context: { $implicit: s }" />
+                  }
+                }
+              }
+            </ul>
+          }
+        </div>
+      }
 
       <!-- Workspace: Settings (everything else stays one keystroke away: ⌘K, G chords) -->
       <div class="py-1.5">
@@ -334,6 +398,96 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
       </div>
     </ng-template>
 
+    <!-- logo, workspace name in serif and the mono line below it; shared by the switcher and the plain header -->
+    <ng-template #wsIdentity>
+      <app-trama-logo [size]="24" />
+      <span class="flex min-w-0 flex-col gap-px">
+        <span class="font-title text-foreground truncate text-[18px] leading-[18px]">{{ wsName() }}</span>
+        <span class="text-faint truncate font-mono text-[10px] leading-[13px]">{{ wsSub() }}</span>
+      </span>
+    </ng-template>
+
+    <!-- a project shared with me: glyph, name, the owning workspace's slug in mono, row menu -->
+    <ng-template #sharedRow let-s>
+      <li hlmSidebarMenuItem class="group/shared relative">
+        <a
+          hlmSidebarMenuButton
+          [routerLink]="['/', s.workspace.slug, 'projects', s.id]"
+          routerLinkActive
+          #sha="routerLinkActive"
+          [isActive]="sha.isActive"
+          [tooltip]="s.name + ' · ' + s.workspace.name"
+          closeMobileSidebarOnClick
+        >
+          <app-project-glyph [project]="s" [size]="15" />
+          <span class="truncate-fade flex-1">{{ s.name }}</span>
+          <span class="text-faint max-w-[72px] truncate font-mono text-[10px] group-hover/shared:invisible">{{ s.workspace.slug }}</span>
+        </a>
+        <button
+          type="button"
+          class="text-muted-foreground hover:text-foreground hover:bg-sidebar-accent data-open:opacity-100 absolute top-1/2 right-1 flex size-5 -translate-y-1/2 items-center justify-center rounded-sm opacity-0 group-hover/shared:opacity-100 focus-visible:opacity-100 max-md:opacity-100"
+          [attr.aria-label]="'Actions for ' + s.name"
+          [hlmDropdownMenuTrigger]="sharedMenu"
+          [hlmDropdownMenuTriggerData]="{ s: s }"
+          align="start"
+        >
+          <svg [lucideIcon]="more" [size]="13"></svg>
+        </button>
+      </li>
+    </ng-template>
+
+    <ng-template #sharedMenu let-s="s">
+      <hlm-dropdown-menu class="w-56">
+        <hlm-dropdown-menu-group>
+          <button hlmDropdownMenuItem (triggered)="go(['/', s.workspace.slug, 'projects', s.id])">
+            <svg [lucideIcon]="externalIcon" [size]="14"></svg>
+            Open
+          </button>
+          <button hlmDropdownMenuItem [hlmDropdownMenuSubTrigger]="showInMenu" [hlmDropdownMenuTriggerData]="{ s: s }">
+            <svg [lucideIcon]="layers" [size]="14"></svg>
+            Show in
+            <hlm-dropdown-menu-item-sub-indicator />
+          </button>
+          @if (s.placement) {
+            <button hlmDropdownMenuItem (triggered)="shared.clear(s.id)">
+              <svg [lucideIcon]="inboxIcon" [size]="14"></svg>
+              Back to Shared with me
+            </button>
+          } @else {
+            <button hlmDropdownMenuItem (triggered)="shared.hide(s.id)">
+              <svg [lucideIcon]="closeIcon" [size]="14"></svg>
+              Hide from Shared with me
+            </button>
+          }
+        </hlm-dropdown-menu-group>
+        <hlm-dropdown-menu-separator />
+        <button hlmDropdownMenuItem variant="destructive" (triggered)="shared.leave(s.id)">
+          <svg [lucideIcon]="logout" [size]="14"></svg>
+          Leave project
+        </button>
+      </hlm-dropdown-menu>
+    </ng-template>
+
+    <ng-template #showInMenu let-s="s">
+      <hlm-dropdown-menu-sub class="w-64">
+        <hlm-dropdown-menu-label class="text-faint font-mono text-[10px] uppercase">Your workspaces</hlm-dropdown-menu-label>
+        <hlm-dropdown-menu-group>
+          @for (w of session.workspaces(); track w.id) {
+            <button hlmDropdownMenuItem (triggered)="shared.place(s.id, w.id)">
+              <span class="flex-1 truncate text-start">{{ w.name }}</span>
+              @if (s.placement?.workspaceId === w.id) {
+                <svg [lucideIcon]="check" [size]="14" class="text-muted-foreground"></svg>
+              }
+            </button>
+          }
+        </hlm-dropdown-menu-group>
+        <hlm-dropdown-menu-separator />
+        <p class="text-muted-foreground px-2 py-1.5 text-[11px] leading-snug">
+          Only you see it there. Nobody in that workspace gets access.
+        </p>
+      </hlm-dropdown-menu-sub>
+    </ng-template>
+
     <ng-template #navLink let-item>
       <li hlmSidebarMenuItem>
         <a
@@ -388,6 +542,9 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
                 >{{ w.name.slice(0, 1).toUpperCase() }}</span
               >
               <span class="flex-1 truncate text-start">{{ w.name }}</span>
+              @if (w.personal) {
+                <span class="text-faint font-mono text-[10px]">personal</span>
+              }
               @if (w.slug === slug()) {
                 <svg [lucideIcon]="check" [size]="14" class="text-muted-foreground"></svg>
               }
@@ -577,6 +734,7 @@ import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
 export class AppSidebar {
   protected readonly ui = inject(UiStore);
   protected readonly favorites = inject(FavoritesStore);
+  protected readonly shared = inject(SharedProjectsStore);
   protected readonly notifications = inject(NotificationsStore);
   protected readonly store = inject(TramaStore);
   protected readonly session = inject(SessionStore);
@@ -687,8 +845,28 @@ export class AppSidebar {
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
   protected readonly wsInitial = computed(() => this.wsName().trim().charAt(0).toUpperCase() || 'T');
-  /** "acme · 6 members" under the workspace name. */
+  /** The open workspace is the person's own: named after them, nobody else can be added to leave or take it over. */
+  protected readonly isPersonal = computed(
+    () => (this.store.workspace() ?? this.session.workspace())?.personal === true,
+  );
+  /** The switcher shows once there is somewhere else to go: a second workspace or a shared project. */
+  protected readonly canSwitch = computed(
+    () => this.session.workspaces().length > 1 || this.shared.any(),
+  );
+  /** Shared projects the person hid from Shared with me; they can be brought back from there. */
+  protected readonly hiddenShared = computed(() =>
+    this.shared.items().filter((p) => p.placement && !p.placement.workspaceId),
+  );
+  protected readonly showHidden = signal(false);
+  /** "acme · 6 members" under the workspace name; "personal workspace" for the person's own. */
   protected readonly wsSub = computed(() => {
+    if (this.isPersonal()) {
+      const others = this.session.workspaces().length - 1;
+      const sharedCount = this.shared.items().length;
+      if (others > 0) return `personal · ${others} more ${others === 1 ? 'workspace' : 'workspaces'}`;
+      if (sharedCount > 0) return `personal · ${sharedCount} shared ${sharedCount === 1 ? 'project' : 'projects'}`;
+      return 'personal workspace';
+    }
     const n = this.store.memberships().length;
     const slug = this.slug();
     return n ? `${slug} · ${n} ${n === 1 ? 'member' : 'members'}` : slug;

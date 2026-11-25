@@ -13,6 +13,7 @@ import {
 } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import {
+  LucideArrowRightLeft,
   LucideBox,
   LucideDynamicIcon,
   LucideEllipsis,
@@ -51,6 +52,7 @@ import { ProjectGlyphPicker } from './project-glyph';
 import { ProjectMilestoneCards } from './project-milestone-cards';
 import { ProjectMilestoneRows } from './project-milestone-rows';
 import { ProjectProperties } from './project-properties';
+import { ProjectTransferDialog } from './project-transfer-dialog';
 import { ProjectRoadmap } from './project-roadmap';
 import { applyTasksPrefilter, prefilterOf, tasksQuery } from './project-tasks-link';
 
@@ -100,6 +102,7 @@ const TONE_COLOR: Record<BurnTone, string> = {
     ProjectRoadmap,
     ProjectTasksTab,
     ProjectProperties,
+    ProjectTransferDialog,
   ],
   host: { class: 'flex min-h-full min-w-0 flex-col' },
   template: `
@@ -144,6 +147,11 @@ const TONE_COLOR: Record<BurnTone, string> = {
             <button hlmDropdownMenuItem (triggered)="copyLink()">
               <svg [lucideIcon]="linkIcon" [size]="14" class="text-muted-foreground"></svg> Copy link
             </button>
+            @if (canTransfer()) {
+              <button hlmDropdownMenuItem (triggered)="transferOpen.set(true)">
+                <svg [lucideIcon]="transferIcon" [size]="14" class="text-muted-foreground"></svg> Transfer to workspace…
+              </button>
+            }
             @if (canManage()) {
               <hlm-dropdown-menu-separator />
               <button hlmDropdownMenuItem variant="destructive" (triggered)="remove()">
@@ -297,6 +305,9 @@ const TONE_COLOR: Record<BurnTone, string> = {
           </div>
         }
       }
+      @if (canTransfer()) {
+        <app-project-transfer-dialog [project]="p" [(open)]="transferOpen" />
+      }
     } @else {
       <app-empty-state
         [icon]="box"
@@ -330,6 +341,10 @@ export class ProjectDetailPage {
   protected readonly moreIcon = LucideEllipsis;
   protected readonly trash = LucideTrash2;
   protected readonly linkIcon = LucideLink;
+  protected readonly transferIcon = LucideArrowRightLeft;
+  protected readonly transferOpen = signal(false);
+  /** Owners and admins of the open workspace; the target workspace is checked by the server. */
+  protected readonly canTransfer = computed(() => this.store.can('admin'));
   protected readonly tabs = TABS;
   protected readonly tabLabel = TAB_LABEL;
   protected readonly allTasks = tasksQuery();
