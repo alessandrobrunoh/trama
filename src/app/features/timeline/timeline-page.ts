@@ -28,10 +28,10 @@ const GROUPS: readonly { value: TimelineGroup; label: string }[] = [
 const GROUP_VALUES = GROUPS.map((g) => g.value);
 /** Statuses the legend names, in workflow order. */
 const LEGEND: readonly { type: string; label: string }[] = [
-  { type: 'todo', label: 'Todo' },
-  { type: 'in_progress', label: 'In progress' },
-  { type: 'in_review', label: 'In review' },
-  { type: 'done', label: 'Done' },
+  { type: 'todo', label: 'Planning' },
+  { type: 'in_progress', label: 'In Progress' },
+  { type: 'in_review', label: 'In Review' },
+  { type: 'done', label: 'Merged' },
 ];
 
 /** `/:workspace/timeline` (v3 · 09): tasks on one time axis, grouped under their milestone or project. */

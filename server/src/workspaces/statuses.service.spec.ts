@@ -61,6 +61,27 @@ describe('status catalog', () => {
     }
   });
 
+  it('defaults the issue workflow to Backlog, Planning, In Progress, In Review / Waiting Input, Merged', () => {
+    const { issue } = resolveWorkspaceSettings({}).statuses;
+    expect(issue.map((entry) => [entry.type, entry.name])).toEqual([
+      ['backlog', 'Backlog'],
+      ['todo', 'Planning'],
+      ['in_progress', 'In Progress'],
+      ['in_review', 'In Review / Waiting Input'],
+      ['done', 'Merged'],
+      ['canceled', 'Canceled'],
+    ]);
+  });
+
+  it('keeps a stored draft status and still resolves a stored workspace catalog', () => {
+    const stored = [
+      ...defaultStatusCatalog().issue,
+      { id: 'draft', name: 'Draft', icon: 'circle-dashed', color: '#5e6269', type: 'draft' as const },
+    ];
+    const resolved = resolveStatusCatalog({ issue: stored }).issue;
+    expect(resolved.some((entry) => entry.type === 'draft')).toBe(true);
+  });
+
   it('adds a status of a chosen type, icon and color', async () => {
     const { service, ctx, ws, events } = setup();
     await service.create(ctx, 'issue', {

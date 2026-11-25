@@ -80,10 +80,10 @@ export const ISSUE_KINDS = sortedKeys(ISSUE_KIND_META);
 export const ISSUE_STATUS_META: Record<IssueStatus, Meta> = {
   draft: { label: 'Draft', tone: 'muted', order: -1 },
   backlog: { label: 'Backlog', tone: 'muted', order: 0 },
-  todo: { label: 'Todo', tone: 'accent', order: 1 },
-  in_progress: { label: 'In progress', tone: 'info', order: 2 },
-  in_review: { label: 'In review', tone: 'warning', order: 3 },
-  done: { label: 'Done', tone: 'success', order: 4 },
+  todo: { label: 'Planning', tone: 'accent', order: 1 },
+  in_progress: { label: 'In Progress', tone: 'warning', order: 2 },
+  in_review: { label: 'In Review / Waiting Input', tone: 'info', order: 3 },
+  done: { label: 'Merged', tone: 'success', order: 4 },
   canceled: { label: 'Canceled', tone: 'muted', order: 5 },
 };
 export const ISSUE_STATUSES = sortedKeys(ISSUE_STATUS_META);

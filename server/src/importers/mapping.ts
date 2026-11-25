@@ -39,8 +39,9 @@ export function mapLinearPriority(value: number | null | undefined): Priority {
 }
 
 /**
- * Linear states are grouped by `type`: triage and backlog wait, unstarted is todo, started is in progress
- * (or in review when the team named the column that way), completed is done and canceled is canceled.
+ * Linear states are grouped by `type`: triage and backlog wait (Backlog), unstarted is todo (Planning), started is
+ * in progress (or in review / waiting input when the team named the column that way), completed is done (Merged)
+ * and canceled is canceled.
  */
 export function mapLinearStateType(type: string, name = ''): IssueStatus {
   switch (type) {
@@ -50,7 +51,7 @@ export function mapLinearStateType(type: string, name = ''): IssueStatus {
     case 'unstarted':
       return 'todo';
     case 'started':
-      return /review|qa\b|verif|testing/i.test(name) ? 'in_review' : 'in_progress';
+      return /review|qa\b|verif|testing|waiting|blocked|needs? (?:input|info)/i.test(name) ? 'in_review' : 'in_progress';
     case 'completed':
       return 'done';
     case 'canceled':

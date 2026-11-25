@@ -39,6 +39,7 @@ describe('state and priority mapping', () => {
     expect(mapLinearStateType('unstarted')).toBe('todo');
     expect(mapLinearStateType('started', 'In Progress')).toBe('in_progress');
     expect(mapLinearStateType('started', 'Code Review')).toBe('in_review');
+    expect(mapLinearStateType('started', 'Waiting for input')).toBe('in_review');
     expect(mapLinearStateType('completed')).toBe('done');
     expect(mapLinearStateType('canceled')).toBe('canceled');
     expect(mapLinearStateType('something-new')).toBe('backlog');

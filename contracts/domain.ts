@@ -1983,13 +1983,17 @@ const AMBER = '#e2a93b';
 const RED = '#cc4b30';
 const GREEN = '#6fae73';
 
+/**
+ * Default workflow of a new workspace: Backlog → Planning → In Progress → In Review / Waiting Input → Merged.
+ * Ids stay the semantic type so rows that store the enum keep resolving. Canceled stays because duplicates and
+ * "not planned" imports need a canceled type; `draft` is still a valid type (see STATUS_TYPES) but is not seeded.
+ */
 const ISSUE_STATUS_SEEDS: readonly StatusSeed<IssueStatus>[] = [
-  { type: 'draft', name: 'Draft', icon: 'circle-dashed', color: FAINT },
   { type: 'backlog', name: 'Backlog', icon: 'circle-dashed', color: FAINT },
-  { type: 'todo', name: 'Todo', icon: 'circle', color: SLATE },
-  { type: 'in_progress', name: 'In progress', icon: 'circle-dot', color: AMBER },
-  { type: 'in_review', name: 'In review', icon: 'circle-ellipsis', color: BLUE },
-  { type: 'done', name: 'Done', icon: 'circle-check', color: GREEN },
+  { type: 'todo', name: 'Planning', icon: 'circle', color: SLATE },
+  { type: 'in_progress', name: 'In Progress', icon: 'circle-dot', color: AMBER },
+  { type: 'in_review', name: 'In Review / Waiting Input', icon: 'circle-ellipsis', color: BLUE },
+  { type: 'done', name: 'Merged', icon: 'circle-check', color: GREEN },
   { type: 'canceled', name: 'Canceled', icon: 'circle-x', color: DIM },
 ];
 
@@ -2009,7 +2013,7 @@ const PROJECT_HEALTH_SEEDS: readonly StatusSeed<ProjectHealth>[] = [
 ];
 
 const STATUS_TYPES: Record<StatusSubject, readonly string[]> = {
-  issue: ISSUE_STATUS_SEEDS.map((s) => s.type),
+  issue: ['draft', ...ISSUE_STATUS_SEEDS.map((s) => s.type)],
   project: PROJECT_STATUS_SEEDS.map((s) => s.type),
   project_health: PROJECT_HEALTH_SEEDS.map((s) => s.type),
 };
@@ -2038,7 +2042,9 @@ export function statusTypes(subject: StatusSubject): readonly string[] {
 /** Display name of a semantic type, from the seed (not a workspace's renamed copy). */
 export function statusTypeLabel(subject: StatusSubject, type: string): string {
   const entries = defaultStatusCatalog()[STATUS_CATALOG_KEY[subject]];
-  return entries.find((entry) => entry.type === type)?.name ?? type;
+  const name = entries.find((entry) => entry.type === type)?.name;
+  if (name) return name;
+  return type === 'draft' ? 'Draft' : type;
 }
 
 function normalizeStatusEntries<T extends string>(

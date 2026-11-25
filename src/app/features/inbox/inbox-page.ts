@@ -512,7 +512,7 @@ export class InboxPage {
     if (!issue) return;
     this.advanceFocus(e.id);
     const prev = issue.status;
-    const name = resolveStatusEntry(this.store.settings().statuses.issue, 'done')?.name ?? 'Done';
+    const name = resolveStatusEntry(this.store.settings().statuses.issue, 'done')?.name ?? 'Merged';
     if (await this.store.updateIssue(issue.id, { status: 'done' })) {
       this.notifier.success(`${issue.key} → ${name}`, {
         action: { label: 'Undo', run: () => void this.store.updateIssue(issue.id, { status: prev }) },
@@ -525,7 +525,7 @@ export class InboxPage {
     const issue = e.issue;
     if (!issue) return;
     const prev = issue.status;
-    const name = resolveStatusEntry(this.store.settings().statuses.issue, 'in_review')?.name ?? 'In review';
+    const name = resolveStatusEntry(this.store.settings().statuses.issue, 'in_review')?.name ?? 'In Review / Waiting Input';
     if (await this.store.updateIssue(issue.id, { status: 'in_review' })) {
       this.notifier.success(`${issue.key} → ${name}`, {
         action: { label: 'Undo', run: () => void this.store.updateIssue(issue.id, { status: prev }) },

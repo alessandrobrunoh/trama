@@ -140,6 +140,7 @@ export const issueKindOptions = (): PickOption[] =>
   ISSUE_KINDS.map((k) => ({
     value: k,
     label: ISSUE_KIND_META[k].label,
+    kind: 'kind' as const,
   }));
 
 // ───────────────────────── view tabs ─────────────────────────
@@ -157,10 +158,10 @@ export const ISSUE_TABS: {
     id: 'active',
     label: 'Active',
     statuses: ['todo', 'in_progress', 'in_review'],
-    hint: 'Todo, in progress and in review',
+    hint: 'Planning, in progress and in review',
   },
   { id: 'backlog', label: 'Backlog', statuses: ['backlog'], hint: 'Unscheduled demand' },
-  { id: 'done', label: 'Done', statuses: ['done', 'canceled'], hint: 'Done and canceled' },
+  { id: 'done', label: 'Merged', statuses: ['done', 'canceled'], hint: 'Merged and canceled' },
   { id: 'draft', label: 'Drafts', statuses: ['draft'], hint: 'Saved for later' },
 ];
 
