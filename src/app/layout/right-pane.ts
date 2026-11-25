@@ -28,6 +28,7 @@ import { PageChrome } from './page-chrome';
 export const PANE_SECTIONS: ReadonlySet<string> = new Set([
   'inbox',
   'overview',
+  'board',
   'timeline',
   'tasks',
   'issues',

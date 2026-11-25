@@ -57,8 +57,8 @@ const TONE = {
     pill: 'bg-status-proposed/10 border-status-proposed/25',
   },
   review: {
-    text: 'text-status-proposed',
-    pill: 'bg-status-proposed/10 border-status-proposed/25',
+    text: 'text-status-review',
+    pill: 'bg-status-review/10 border-status-review/25',
   },
   danger: { text: 'text-status-rejected', pill: 'bg-status-rejected/10 border-status-rejected/25' },
   ready: {

@@ -1,4 +1,4 @@
-import { DOCUMENT, NgTemplateOutlet } from '@angular/common';
+import { DOCUMENT } from '@angular/common';
 import { ChangeDetectionStrategy, Component, DestroyRef, effect, inject, signal } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { HlmSidebarImports, HlmSidebarService, provideHlmSidebarConfig } from '@spartan-ng/helm/sidebar';
@@ -6,7 +6,6 @@ import { KeyboardShortcuts, usePageShortcuts } from '../core/keyboard/keyboard-s
 import { GO_TO_ROUTES } from '../core/keyboard/shortcuts';
 import { RightPaneStore } from '../core/stores/right-pane.store';
 import { UiStore } from '../core/stores/ui.store';
-import { PageChrome } from './page-chrome';
 import { RightPane } from './right-pane';
 import { CommandPalette } from './command-palette';
 import { CreateDialog } from '../features/create/create-dialog';
@@ -20,6 +19,7 @@ import { AssistantOverlay } from '../features/ai/assistant-overlay';
 import { MobileHeader } from './mobile-header';
 import { MobileNav } from './mobile-nav';
 import { PullToRefresh } from './mobile-pull-to-refresh';
+import { ShellStatusBar } from './shell-status-bar';
 import { Viewport } from '../core/viewport';
 
 /**
@@ -34,7 +34,6 @@ import { Viewport } from '../core/viewport';
   selector: 'app-shell',
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
-    NgTemplateOutlet,
     RightPane,
     RouterOutlet,
     HlmSidebarImports,
@@ -50,12 +49,13 @@ import { Viewport } from '../core/viewport';
     MobileNav,
     MobileHeader,
     PullToRefresh,
+    ShellStatusBar,
   ],
   providers: [
     // ⌘B is owned by core's KeyboardShortcuts (-> UiStore); disable Spartan's own listener.
     provideHlmSidebarConfig({
       sidebarKeyboardShortcut: '',
-      sidebarWidth: '15rem',
+      sidebarWidth: '15.5rem',
       sidebarWidthMobile: '17rem',
       defaultOpen: true,
     }),
@@ -67,11 +67,13 @@ import { Viewport } from '../core/viewport';
       class="bg-primary text-primary-foreground sr-only z-50 rounded-md px-3 py-1.5 text-sm focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
       >Skip to content</a
     >
-    <div hlmSidebarWrapper class="bg-sidebar relative h-svh min-h-0 overflow-hidden max-md:h-dvh">
-      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0 border-e border-sidebar-border" class="[&_[data-slot=sidebar-inner]]:bg-sidebar [&_[data-slot=sidebar-inner]]:max-md:rounded-t-[28px]">
+    <!-- v3 brand stripe: red · hairline · Delta blue -->
+    <div class="brand-stripe fixed inset-x-0 top-0 z-30 max-md:hidden" aria-hidden="true"></div>
+    <div hlmSidebarWrapper class="bg-sidebar relative h-svh min-h-0 overflow-hidden pt-[3px] max-md:h-dvh max-md:pt-0">
+      <hlm-sidebar collapsible="offcanvas" variant="sidebar" mobileSide="bottom" sidebarContainerClass="p-0 border-e border-sidebar-border md:top-[3px]! md:h-[calc(100svh-3px)]!" class="[&_[data-slot=sidebar-inner]]:bg-sidebar">
         <app-sidebar />
       </hlm-sidebar>
-      <main hlmSidebarInset class="h-svh min-w-0 overflow-hidden max-md:h-dvh">
+      <main hlmSidebarInset class="h-[calc(100svh-3px)] min-w-0 overflow-hidden max-md:h-dvh">
         <app-top-bar />
         @if (viewport.isMobile()) {
           <app-mobile-header />
@@ -80,9 +82,7 @@ import { Viewport } from '../core/viewport';
         <div id="main-content" tabindex="-1" class="min-h-0 w-full min-w-0 flex-1 overflow-y-auto overflow-x-hidden outline-none">
           <router-outlet />
         </div>
-        @if (chrome.statusBar(); as bar) {
-          <ng-container *ngTemplateOutlet="bar" />
-        }
+        <app-shell-status-bar />
         <app-mobile-nav />
       </main>
       <app-right-pane />
@@ -121,7 +121,6 @@ import { Viewport } from '../core/viewport';
 })
 export class AppShell {
   protected readonly ui = inject(UiStore);
-  protected readonly chrome = inject(PageChrome);
   protected readonly viewport = inject(Viewport);
   private readonly rightPane = inject(RightPaneStore);
   protected readonly goRoutes = Object.entries(GO_TO_ROUTES);

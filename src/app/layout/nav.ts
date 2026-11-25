@@ -2,13 +2,15 @@ import {
   LucideActivity,
   LucideInbox,
   LucideBox,
+  LucideCalendar,
   LucideChartColumn,
-  LucideChartGantt,
-  LucideCircleDot,
-  LucideGauge,
+  LucideCircleUserRound,
+  LucideHouse,
   LucideLayers,
-  LucideMessageSquare,
+  LucideListTodo,
   LucidePlug,
+  LucideSparkles,
+  LucideSquareKanban,
   LucideTimer,
   type LucideIcon,
 } from '@lucide/angular';
@@ -28,61 +30,86 @@ export interface NavItem {
 }
 
 /**
- * The places people live in, always visible at the top of the sidebar.
- * Inbox merges what used to be My Attention, Notifications and My Work.
+ * The v3 sidebar ("v3 · 01 UI Kit" → Sidebar): Home, Inbox, My tasks, Tasks, Board, Timeline, Time, Ask.
+ * Projects follow as their own list; Settings sits under "Workspace".
  */
 export const PRIMARY_NAV: NavItem[] = [
+  {
+    segment: 'overview',
+    label: 'Home',
+    icon: LucideHouse,
+    keys: 'g o',
+    hint: 'What you are working on, what is next and what needs you',
+    keywords: 'home overview dashboard pulse briefing summary status week',
+  },
   {
     segment: 'inbox',
     label: 'Inbox',
     icon: LucideInbox,
     keys: 'g a',
     badge: 'inbox',
-    hint: 'What needs you, your tasks and what changed: reviews, blockers, mentions and updates',
-    keywords: 'attention notifications needs you updates unread my work my tasks assigned',
+    hint: 'What needs you and what changed: reviews, blockers, mentions and updates',
+    keywords: 'attention notifications needs you updates unread',
   },
   {
-    segment: 'overview',
-    label: 'Overview',
-    icon: LucideGauge,
-    keys: 'g o',
-    hint: 'The workspace as a briefing: what moves, what is stuck, who is on what and which projects are late',
-    keywords: 'dashboard pulse briefing summary status health progress week',
+    segment: 'my-work',
+    label: 'My tasks',
+    icon: LucideCircleUserRound,
+    keys: 'g m',
+    hint: 'Tasks assigned to you',
+    keywords: 'my work assigned mine',
   },
   {
     segment: 'tasks',
     label: 'Tasks',
-    icon: LucideCircleDot,
+    icon: LucideListTodo,
     keys: 'g i',
     badge: 'issues',
-    hint: 'Bugs, requests, and incidents',
-    keywords: 'issues',
+    hint: 'Every task and subtask, from GitHub, GitLab, Jira or created here',
+    keywords: 'issues list',
   },
   {
-    segment: 'projects',
-    label: 'Projects',
-    icon: LucideBox,
-    keys: 'g p',
-    hint: 'Planned outcomes: what we want to achieve, by when, and where',
+    segment: 'board',
+    label: 'Board',
+    icon: LucideSquareKanban,
+    keys: 'g b',
+    hint: 'Tasks as columns by status',
+    keywords: 'kanban columns',
   },
   {
     segment: 'timeline',
     label: 'Timeline',
-    icon: LucideChartGantt,
+    icon: LucideCalendar,
     keys: 'g t',
-    hint: 'All projects on one time axis: milestones, progress and where each is heading',
+    hint: 'Projects and due dates on one time axis',
     keywords: 'roadmap gantt schedule milestones forecast calendar dates',
+  },
+  {
+    segment: 'timer',
+    label: 'Time',
+    icon: LucideTimer,
+    keys: 'g h',
+    hint: 'Timer, timesheet and time logged per task',
+    keywords: 'timer timesheet hours log',
+  },
+  {
+    segment: 'assistant',
+    label: 'Ask',
+    icon: LucideSparkles,
+    keys: '',
+    hint: 'Ask across every thread record: decisions, summaries, changes',
+    keywords: 'assistant ask question records search ai',
   },
 ];
 
 /** Everything else, tucked under "More" in the sidebar. All of it stays one keystroke away (G chords, ⌘K). */
 export const MORE_NAV: NavItem[] = [
   {
-    segment: 'timer',
-    label: 'Timer',
-    icon: LucideTimer,
-    keys: 'g h',
-    hint: 'Start, stop, or add your own time. It stays in Trama.',
+    segment: 'projects',
+    label: 'Projects',
+    icon: LucideBox,
+    keys: 'g p',
+    hint: 'Planned outcomes: what we want to achieve, by when, and where',
   },
   {
     segment: 'views',
@@ -105,13 +132,6 @@ export const MORE_NAV: NavItem[] = [
     icon: LucideChartColumn,
     keys: 'g y',
     hint: 'Finished work, work in progress and estimates',
-  },
-  {
-    segment: 'assistant',
-    label: 'Assistant',
-    icon: LucideMessageSquare,
-    keys: '',
-    hint: 'Chat with Trama about your work',
   },
   {
     segment: 'connect',
@@ -140,10 +160,12 @@ export function orderNav(items: readonly NavItem[], order: readonly string[]): N
 
 /** Breadcrumb section labels for every first path segment. */
 export const SECTION_LABELS: Record<string, string> = {
-  timer: 'Timer',
+  overview: 'Home',
+  board: 'Board',
+  timer: 'Time',
   stats: 'Statistics',
   inbox: 'Inbox',
-  assistant: 'Assistant',
+  assistant: 'Ask',
   connect: 'Connect your agent',
   tasks: 'Tasks',
   issues: 'Tasks',

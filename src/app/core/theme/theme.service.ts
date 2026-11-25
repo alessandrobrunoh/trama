@@ -72,6 +72,7 @@ export class ThemeService {
     } catch {
       /* ignore */
     }
-    return 'system';
+    // The v3 design is dark-first; light stays one ⌘J away.
+    return 'dark';
   }
 }

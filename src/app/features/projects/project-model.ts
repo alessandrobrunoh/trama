@@ -45,7 +45,7 @@ export const projectStatusView = (
   entries = defaultStatusCatalog().project,
 ): { label: string; color: string } => {
   const entry = resolveStatusEntry(entries, status);
-  return { label: entry?.name ?? status, color: entry?.color ?? '#747780' };
+  return { label: entry?.name ?? status, color: entry?.color ?? '#8c9096' };
 };
 
 /** Past its target date and not closed. */

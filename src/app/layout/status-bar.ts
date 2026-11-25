@@ -10,9 +10,9 @@ import {
 import { PageChrome } from './page-chrome';
 
 /**
- * Slim status bar under the main pane (one muted 12px row: breadcrumb-like context on the left,
- * compact controls on the right). A page declares it anywhere in its template; the shell renders it
- * pinned under the scroll area, outside the page, so it never scrolls away:
+ * Page context for the shell's status bar (layout/shell-status-bar.ts), shown between the sync info
+ * and the shortcuts hint. A page declares it anywhere in its template; the shell renders it pinned
+ * under the scroll area, outside the page, so it never scrolls away:
  *
  *   <app-status-bar>
  *     <span>12 tasks</span>
@@ -30,13 +30,9 @@ import { PageChrome } from './page-chrome';
   host: { class: 'hidden' },
   template: `
     <ng-template #bar>
-      <div
-        role="status"
-        class="text-muted-foreground flex h-8 min-w-0 shrink-0 items-center gap-3 border-t border-border bg-background px-3 text-xs max-md:hidden"
-      >
-        <div class="flex min-w-0 flex-1 items-center gap-3 truncate"><ng-content /></div>
-        <div class="flex shrink-0 items-center gap-2"><ng-content select="[end]" /></div>
-      </div>
+      <!-- rendered inside the shell's status bar (layout/shell-status-bar.ts) -->
+      <div class="flex min-w-0 flex-1 items-center gap-3 truncate"><ng-content /></div>
+      <div class="flex shrink-0 items-center gap-2"><ng-content select="[end]" /></div>
     </ng-template>
   `,
 })

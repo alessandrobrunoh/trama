@@ -154,6 +154,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
       },
       {
+        // The same task table, fixed to the board layout (v3 sidebar "Board").
+        path: 'board',
+        title: 'Board · Trama',
+        data: { layout: 'board' },
+        loadComponent: () => import('./features/issues/issue-page').then((m) => m.IssuePage),
+      },
+      {
         path: 'tasks/:key',
         title: 'Task · Trama',
         loadComponent: () =>

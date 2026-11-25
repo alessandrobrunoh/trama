@@ -57,7 +57,7 @@ import { IssueSubtasks } from './issue-subtasks';
       <textarea
         #ta
         rows="1"
-        class="w-full resize-none overflow-hidden rounded-md bg-transparent text-xl leading-snug font-medium tracking-tight outline-none"
+        class="font-title w-full resize-none overflow-hidden bg-transparent text-[34px] leading-[1.15] outline-none"
         aria-label="Task title"
         [value]="draft()"
         (input)="onInput($event)"
@@ -67,7 +67,7 @@ import { IssueSubtasks } from './issue-subtasks';
       ></textarea>
     } @else {
       <h1
-        class="-mx-1 rounded-md px-1 text-xl leading-snug font-medium tracking-tight break-words"
+        class="font-title -mx-1 px-1 text-[34px] leading-[1.15] break-words"
         [class]="canEdit() ? 'hover:bg-hover cursor-text' : ''"
         [attr.role]="canEdit() ? 'button' : null"
         [attr.tabindex]="canEdit() ? 0 : null"

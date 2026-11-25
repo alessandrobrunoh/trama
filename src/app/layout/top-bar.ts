@@ -48,7 +48,7 @@ import { PageChrome, type Crumb } from './page-chrome';
   ],
   host: {
     class:
-      'bg-background border-border sticky top-0 z-10 flex h-11 shrink-0 items-center gap-1.5 border-b px-3 max-md:hidden',
+      'bg-background border-border sticky top-0 z-10 flex h-11 shrink-0 items-center gap-2.5 border-b px-5 max-md:hidden',
   },
   template: `
     @if (!viewport.isMobile()) {
@@ -96,28 +96,37 @@ import { PageChrome, type Crumb } from './page-chrome';
         </div>
       }
 
-      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center gap-1.5">
-        <ol class="flex min-w-0 items-center gap-0.5 text-[13px]">
+      <!-- v3: "acme / Web app / TRM-128 / Title": parents in faint mono, the page in sans -->
+      <nav aria-label="Breadcrumb" class="flex min-w-0 items-center">
+        <ol class="flex min-w-0 items-center gap-1.5">
+          <li class="flex shrink-0 items-center gap-1.5">
+            <a
+              [routerLink]="['/', slug(), 'overview']"
+              class="text-faint hover:text-foreground font-mono text-[11.5px] transition-colors"
+              >{{ slug() }}</a
+            >
+            <span class="text-faint font-mono text-[11.5px]" aria-hidden="true">/</span>
+          </li>
           @for (c of crumbs(); track $index; let last = $last) {
-            <li class="flex min-w-0 items-center gap-1" [class.shrink-0]="!last">
+            <li class="flex min-w-0 items-center gap-1.5" [class.shrink-0]="!last">
               @if (c.link && !last) {
                 <a
                   [routerLink]="c.link"
-                  class="text-muted-foreground hover:text-foreground hover:bg-hover truncate rounded-sm px-1.5 py-0.5 transition-colors"
-                  [class.font-mono]="c.mono"
+                  class="text-faint hover:text-foreground truncate font-mono text-[11.5px] transition-colors"
                   >{{ c.label }}</a
                 >
-              } @else {
+              } @else if (last) {
                 <span
-                  class="truncate px-1.5"
+                  class="text-foreground truncate text-[13px]"
                   [class.font-mono]="c.mono"
-                  [class.text-muted-foreground]="!last"
-                  [attr.aria-current]="last ? 'page' : null"
+                  aria-current="page"
                   >{{ c.label }}</span
                 >
+              } @else {
+                <span class="text-faint truncate font-mono text-[11.5px]">{{ c.label }}</span>
               }
               @if (!last) {
-                <svg [lucideIcon]="sep" [size]="12" class="text-muted-foreground/50 shrink-0" aria-hidden="true"></svg>
+                <span class="text-faint font-mono text-[11.5px]" aria-hidden="true">/</span>
               }
             </li>
           }
@@ -132,10 +141,6 @@ import { PageChrome, type Crumb } from './page-chrome';
         <app-favorite-button [type]="t.type" [subjectId]="t.id" class="max-sm:hidden" />
       }
 
-      @if (description(); as d) {
-        <span class="text-muted-foreground/90 min-w-0 shrink-[20] truncate text-[13px] max-xl:hidden">{{ d }}</span>
-      }
-
       @if (sync.live() === 'reconnecting' || sync.lastError()) {
         <span class="text-status-needs-input flex items-center gap-1.5 text-xs" role="status" [attr.aria-label]="sync.lastError() ?? sync.label()">
           <span class="bg-status-needs-input size-1.5 rounded-full"></span>
@@ -145,7 +150,7 @@ import { PageChrome, type Crumb } from './page-chrome';
 
       <span class="flex-1"></span>
 
-      <div class="top-bar__actions flex shrink-0 items-center gap-0.5 empty:hidden">
+      <div class="top-bar__actions flex shrink-0 items-center gap-2 empty:hidden">
         @if (chrome.actions(); as tpl) {
           <ng-container *ngTemplateOutlet="tpl" />
         }

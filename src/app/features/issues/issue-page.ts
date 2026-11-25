@@ -94,6 +94,7 @@ const EMPTY: Record<IssueViewTab, { title: string; description: string }> = {
       [scope]="scope()"
       [status]="status()"
       [project]="project()"
+      [forceLayout]="layout()"
       [emptyTitle]="empty().title"
       [emptyDescription]="empty().description"
     />
@@ -112,6 +113,8 @@ export class IssuePage {
   readonly project = input<string>();
   /** Query `?view=active|backlog|done` (view tabs). */
   readonly view = input<string>();
+  /** Route data `{ layout: 'board' }` on `/board`: the table fixed to that layout. */
+  readonly layout = input<'board' | null>(null);
 
   protected readonly plus = LucidePlus;
   protected readonly tabs = ISSUE_TABS;
@@ -119,7 +122,7 @@ export class IssuePage {
   protected readonly tab = computed(() => asViewTab(this.view()));
   protected readonly scope = computed(() => tabStatuses(this.tab()));
   protected readonly empty = computed(() => EMPTY[this.tab()]);
-  protected readonly title = computed(() => 'Tasks');
+  protected readonly title = computed(() => (this.layout() === 'board' ? 'Board' : 'Tasks'));
   protected readonly description = computed(
     () => 'Track bugs, requests and incidents from triage through completion.',
   );

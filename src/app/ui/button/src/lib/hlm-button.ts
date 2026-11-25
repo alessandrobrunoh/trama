@@ -6,20 +6,24 @@ import type { ClassValue } from 'clsx';
 import { injectBrnButtonConfig } from './hlm-button.token';
 
 export const buttonVariants = cva(
-  "focus-visible:border-ring focus-visible:ring-ring/50 data-[matches-spartan-invalid=true]:ring-destructive/20 dark:data-[matches-spartan-invalid=true]:ring-destructive/40 data-[matches-spartan-invalid=true]:border-destructive dark:data-[matches-spartan-invalid=true]:border-destructive/50 rounded-md border border-transparent bg-clip-padding text-sm font-medium focus-visible:ring-2 data-[matches-spartan-invalid=true]:ring-3 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] outline-none select-none motion-safe:active:translate-y-px data-disabled:pointer-events-none data-disabled:opacity-50 [&_ng-icon]:pointer-events-none [&_ng-icon]:shrink-0",
+  "focus-visible:border-ring focus-visible:ring-ring/50 data-[matches-spartan-invalid=true]:ring-destructive/20 dark:data-[matches-spartan-invalid=true]:ring-destructive/40 data-[matches-spartan-invalid=true]:border-destructive dark:data-[matches-spartan-invalid=true]:border-destructive/50 rounded-none border border-transparent bg-clip-padding font-mono text-[12px] font-normal focus-visible:ring-2 data-[matches-spartan-invalid=true]:ring-3 [&_ng-icon:not([class*='text-'])]:text-[length:--spacing(4)] group/button inline-flex shrink-0 items-center justify-center whitespace-nowrap transition-[color,background-color,border-color,box-shadow,transform] outline-none select-none motion-safe:active:translate-y-px data-disabled:pointer-events-none data-disabled:opacity-50 [&_ng-icon]:pointer-events-none [&_ng-icon]:shrink-0",
   {
     variants: {
       variant: {
+        // v3: red fill, white mono label (Btn / Primary)
         default:
-          'bg-primary text-primary-foreground hover:bg-primary/90',
+          'bg-primary text-primary-foreground hover:bg-primary/88 [&_kbd]:bg-white/15 [&_kbd]:text-white [&_kbd]:border-transparent',
+        // v3: raised fill + hairline (Btn / Secondary)
         outline:
-          'border-border-strong bg-transparent text-foreground hover:bg-hover aria-expanded:bg-hover aria-expanded:text-foreground',
+          'border-border bg-secondary text-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-foreground',
         secondary:
-          'bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground',
+          'border-border bg-secondary text-secondary-foreground hover:bg-accent aria-expanded:bg-accent aria-expanded:text-secondary-foreground',
+        // v3: muted mono label, no frame (Btn / Ghost)
         ghost:
-          'hover:bg-hover hover:text-foreground aria-expanded:bg-selected aria-expanded:text-foreground',
+          'text-muted-foreground hover:bg-hover hover:text-foreground aria-expanded:bg-selected aria-expanded:text-foreground',
+        // v3: red hairline + red label (Btn / Danger)
         destructive:
-          'bg-destructive/10 hover:bg-destructive/20 focus-visible:ring-destructive/20 dark:focus-visible:ring-destructive/40 dark:bg-destructive/20 text-destructive focus-visible:border-destructive/40 dark:hover:bg-destructive/30',
+          'border-destructive text-destructive bg-transparent hover:bg-destructive/12 focus-visible:ring-destructive/30 [&_kbd]:bg-destructive/15 [&_kbd]:text-destructive [&_kbd]:border-transparent',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

@@ -16,7 +16,7 @@ import { HlmSidebarService } from './hlm-sidebar.service';
 import { injectHlmSidebarConfig } from './hlm-sidebar.token';
 
 const sidebarMenuButtonVariants = cva(
-  'ring-sidebar-ring hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-active:hover:bg-sidebar-accent data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2 rounded-sm px-2 py-1 text-start text-[13px] transition-[width,height,padding,background-color,color] group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 data-active:font-medium peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_ng-icon]:shrink-0 [&_ng-icon]:text-[length:--spacing(4)]',
+  'text-muted-foreground ring-sidebar-ring hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground active:bg-sidebar-accent active:text-sidebar-accent-foreground data-active:bg-sidebar-accent data-active:text-sidebar-accent-foreground data-active:hover:bg-sidebar-accent data-open:hover:bg-sidebar-accent data-open:hover:text-sidebar-accent-foreground gap-2.5 rounded-none px-2.5 py-1 text-start text-[13px] transition-[width,height,padding,background-color,color] group-has-data-[sidebar=menu-action]/menu-item:pe-8 group-data-[collapsible=icon]:size-8! group-data-[collapsible=icon]:p-2! focus-visible:ring-2 data-active:font-medium peer/menu-button group/menu-button flex w-full items-center overflow-hidden outline-hidden disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_ng-icon]:shrink-0 [&_ng-icon]:text-[length:--spacing(4)]',
   {
     variants: {
       variant: {
@@ -25,7 +25,7 @@ const sidebarMenuButtonVariants = cva(
           'bg-background hover:bg-sidebar-accent hover:text-sidebar-accent-foreground shadow-[0_0_0_1px_var(--sidebar-border)] hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
       },
       size: {
-        default: 'h-8 text-[13px] max-md:h-11',
+        default: 'h-[30px] text-[13px] max-md:h-11',
         sm: 'h-7 text-xs',
         lg: 'h-12 text-sm group-data-[collapsible=icon]:p-0!',
       },

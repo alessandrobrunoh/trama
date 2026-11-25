@@ -4,6 +4,8 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive } from '@angular/router';
 import { filter, map, startWith } from 'rxjs';
 import {
+  LucideBell,
+  LucideSquare,
   LucideChevronDown,
   LucideChevronsUpDown,
   LucideCheck,
@@ -50,8 +52,8 @@ import { Kbd } from '../shared/kbd';
 import { StatusIcon } from '../shared/status';
 import { CHANGELOG } from '../features/changelog/changelog-entries';
 import { ProjectGlyph } from '../features/projects/project-glyph';
+import { ago } from '../shared/ago';
 import { MORE_NAV, PRIMARY_NAV, orderNav, type NavItem } from './nav';
-import { SidebarTree } from './sidebar-tree';
 
 /**
  * Sidebar content: icon row (toggle, search, inbox, create), workspace switcher, Inbox / Tasks,
@@ -75,85 +77,59 @@ import { SidebarTree } from './sidebar-tree';
     ActorAvatar,
     StatusIcon,
     ProjectGlyph,
-    SidebarTree,
   ],
   host: { class: 'flex h-full min-h-0 flex-col' },
   template: `
     <div hlmSidebarHeader class="gap-0 p-0">
-      <!-- window-ish icon row: toggle + search on the left, inbox + create on the right -->
-      <div class="pane-header border-sidebar-border border-b px-2">
+      <!-- workspace: red square mark + serif name, mono "slug · N members"; the panel toggle on the right -->
+      <div class="flex items-center gap-2.5 px-3.5 pt-3.5 pb-3">
         <button
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground"
+          type="button"
+          class="hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring -m-1 flex min-w-0 flex-1 items-center gap-2.5 p-1 text-start outline-hidden focus-visible:ring-2"
+          [hlmDropdownMenuTrigger]="workspaceMenu"
+          align="start"
+          aria-label="Switch workspace"
+        >
+          <span
+            class="bg-brand font-title flex size-6 shrink-0 items-center justify-center text-[16px] leading-none text-white"
+            aria-hidden="true"
+            >{{ wsInitial() }}</span
+          >
+          <span class="flex min-w-0 flex-1 flex-col gap-px">
+            <span class="font-title text-foreground truncate text-[18px] leading-[1.15]">{{ wsName() }}</span>
+            <span class="text-faint truncate font-mono text-[10px] leading-tight">{{ wsSub() }}</span>
+          </span>
+          <svg [lucideIcon]="chevrons" [size]="13" class="text-faint shrink-0"></svg>
+        </button>
+        <button
+          type="button"
+          class="text-faint hover:text-foreground focus-visible:ring-sidebar-ring flex size-6 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2"
           hlmTooltip="Hide sidebar  ⌘B"
           position="bottom"
           aria-label="Hide sidebar (⌘B)"
           (click)="sidebar.toggleSidebar()"
         >
-          <svg [lucideIcon]="sidebarIcon" [size]="16"></svg>
-        </button>
-        <button
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground"
-          hlmTooltip="Search  ⌘K"
-          position="bottom"
-          aria-label="Search (⌘K)"
-          (click)="ui.openCommandPalette()"
-        >
-          <svg [lucideIcon]="search" [size]="16"></svg>
-        </button>
-        <span class="flex-1"></span>
-        <a
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground relative"
-          [routerLink]="['/', slug(), 'inbox']"
-          hlmTooltip="Inbox  G then A"
-          position="bottom"
-          [attr.aria-label]="inboxCount() ? 'Inbox, ' + inboxCount() + ' need you' : 'Inbox'"
-        >
-          <svg [lucideIcon]="inboxIcon" [size]="16"></svg>
-          @if (inboxCount() > 0) {
-            <span class="bg-primary ring-sidebar absolute top-1 right-1 size-1.5 rounded-full ring-2" aria-hidden="true"></span>
-          }
-        </a>
-        <button
-          hlmBtn
-          variant="ghost"
-          size="icon-sm"
-          class="text-muted-foreground"
-          [hlmDropdownMenuTrigger]="createMenu"
-          align="end"
-          hlmTooltip="Create  C"
-          position="bottom"
-          aria-label="Create"
-        >
-          <svg [lucideIcon]="newIcon" [size]="16"></svg>
+          <svg [lucideIcon]="sidebarIcon" [size]="14"></svg>
         </button>
       </div>
 
-      <!-- workspace switcher -->
-      <div class="px-2 pt-2 pb-1">
+      <!-- search or jump (opens the command palette) -->
+      <div class="px-3 pb-2.5">
         <button
           type="button"
-          class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-start outline-hidden focus-visible:ring-2"
-          [hlmDropdownMenuTrigger]="workspaceMenu"
-          align="start"
-          aria-label="Switch workspace"
+          class="bg-background border-border text-faint hover:text-muted-foreground hover:border-border-strong focus-visible:ring-sidebar-ring flex h-[30px] w-full items-center gap-2 border px-2 text-start outline-hidden focus-visible:ring-2"
+          aria-label="Search or jump (⌘K)"
+          (click)="ui.openCommandPalette()"
         >
-          <span class="text-muted-foreground min-w-0 flex-1 truncate text-[13px]">{{ wsName() }}</span>
-          <svg [lucideIcon]="chevrons" [size]="14" class="text-muted-foreground shrink-0"></svg>
+          <svg [lucideIcon]="search" [size]="13" class="shrink-0"></svg>
+          <span class="min-w-0 flex-1 truncate font-mono text-[11.5px]">Search or jump…</span>
+          <app-kbd keys="mod+k" />
         </button>
       </div>
     </div>
 
     <div hlmSidebarContent class="gap-0 px-2 pb-2">
-      <ul hlmSidebarMenu class="gap-px">
+      <ul hlmSidebarMenu class="gap-px py-1.5">
         @for (item of primary(); track item.segment) {
           <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
         }
@@ -217,8 +193,8 @@ import { SidebarTree } from './sidebar-tree';
         </div>
       }
 
-      <!-- Projects: a tree (project > open tasks > subtasks) -->
-      <div class="mt-4">
+      <!-- Projects: flat list, open task count on the right -->
+      <div class="py-1.5">
         <ng-container
           *ngTemplateOutlet="
             sectionLabel;
@@ -226,43 +202,22 @@ import { SidebarTree } from './sidebar-tree';
           "
         />
         @if (!ui.isFolded('projects')) {
-          <app-sidebar-tree />
-        }
-      </div>
-
-      <!-- Views -->
-      <div class="mt-4">
-        <ng-container
-          *ngTemplateOutlet="
-            sectionLabel;
-            context: { $implicit: 'views', label: 'Views', all: 'views', allLabel: 'All views', create: 'view', createLabel: 'Create view' }
-          "
-        />
-        @if (!ui.isFolded('views')) {
           <ul hlmSidebarMenu class="gap-px">
-            @for (v of store.views(); track v.id) {
+            @for (p of projectRows(); track p.project.id) {
               <li hlmSidebarMenuItem>
                 <a
                   hlmSidebarMenuButton
-                  [routerLink]="['/', slug(), 'views', v.id]"
+                  [routerLink]="['/', slug(), 'projects', p.project.id]"
                   routerLinkActive
-                  #vla="routerLinkActive"
-                  [isActive]="vla.isActive"
+                  #pla="routerLinkActive"
+                  [isActive]="pla.isActive"
+                  [tooltip]="p.project.name"
                   closeMobileSidebarOnClick
                 >
-                  <svg
-                    [lucideIcon]="viewIcon(v.entity)"
-                    [size]="14"
-                    class="text-muted-foreground"
-                  ></svg>
-                  <span class="truncate-fade flex-1">{{ v.name }}</span>
-                  @if (!v.shared) {
-                    <svg
-                      [lucideIcon]="lock"
-                      [size]="11"
-                      class="text-muted-foreground/70"
-                      aria-label="Private"
-                    ></svg>
+                  <svg [lucideIcon]="squareIcon" [size]="15" class="text-muted-foreground group-data-active/menu-button:text-foreground"></svg>
+                  <span class="truncate-fade flex-1">{{ p.project.name }}</span>
+                  @if (p.open) {
+                    <span class="text-faint font-mono text-[11px] tabular-nums">{{ p.open }}</span>
                   }
                 </a>
               </li>
@@ -270,10 +225,10 @@ import { SidebarTree } from './sidebar-tree';
               <li>
                 <button
                   type="button"
-                  class="text-muted-foreground hover:text-foreground px-2 py-1 text-xs"
-                  (click)="ui.openCreate('view')"
+                  class="text-faint hover:text-foreground px-2.5 py-1 font-mono text-[11px]"
+                  (click)="ui.openCreate('project')"
                 >
-                  Save a filter as a view…
+                  + New project
                 </button>
               </li>
             }
@@ -281,72 +236,102 @@ import { SidebarTree } from './sidebar-tree';
         }
       </div>
 
-      <!-- More: Stats, Timer, Activity, Assistant, Connect, Settings. Folded by default, open on its own pages. -->
-      <div class="mt-4">
-        <button
-          type="button"
-          class="text-muted-foreground hover:text-foreground flex h-7 w-full items-center gap-1 rounded-sm px-2 text-[13px] outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-          (click)="ui.toggleFolded('open:more')"
-          [attr.aria-expanded]="moreOpen()"
-          aria-controls="sidebar-more"
-        >
-          More
-          <svg
-            [lucideIcon]="chevronDown"
-            [size]="12"
-            class="transition-transform"
-            [class.-rotate-90]="!moreOpen()"
-            aria-hidden="true"
-          ></svg>
-        </button>
-        @if (moreOpen()) {
-          <ul hlmSidebarMenu id="sidebar-more" class="gap-px">
-            @for (item of moreItems(); track item.segment) {
-              <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
-            }
+      <!-- Workspace: Settings, plus the rest of the app folded under "More" -->
+      <div class="py-1.5">
+        <ng-container *ngTemplateOutlet="sectionLabel; context: { $implicit: 'workspace', label: 'Workspace' }" />
+        @if (!ui.isFolded('workspace')) {
+          <ul hlmSidebarMenu class="gap-px">
             <ng-container *ngTemplateOutlet="navLink; context: { $implicit: settingsItem }" />
+            <li hlmSidebarMenuItem>
+              <button
+                type="button"
+                hlmSidebarMenuButton
+                (click)="ui.toggleFolded('open:more')"
+                [attr.aria-expanded]="moreOpen()"
+                aria-controls="sidebar-more"
+              >
+                <svg [lucideIcon]="more" [size]="15" class="text-muted-foreground"></svg>
+                <span class="flex-1 text-start">More</span>
+                <svg
+                  [lucideIcon]="chevronDown"
+                  [size]="12"
+                  class="text-faint transition-transform"
+                  [class.-rotate-90]="!moreOpen()"
+                  aria-hidden="true"
+                ></svg>
+              </button>
+            </li>
+            @if (moreOpen()) {
+              <div id="sidebar-more" class="contents">
+                @for (item of moreItems(); track item.segment) {
+                  <ng-container *ngTemplateOutlet="navLink; context: { $implicit: item }" />
+                }
+              </div>
+            }
           </ul>
         }
       </div>
     </div>
 
-    <!-- footer: user menu + help -->
-    <div
-      hlmSidebarFooter
-      class="border-sidebar-border flex-row items-center gap-1 border-t p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]"
-    >
-      <button
-        type="button"
-        class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 min-w-0 flex-1 items-center gap-2 rounded-sm px-2 text-start outline-hidden focus-visible:ring-2"
-        [hlmDropdownMenuTrigger]="userMenu"
-        align="start"
-        side="top"
-        aria-label="User menu"
+    <!-- footer: agent connector, then the user row -->
+    <div hlmSidebarFooter class="gap-0 p-0 pb-[env(safe-area-inset-bottom)]">
+      <a
+        [routerLink]="['/', slug(), 'connect']"
+        class="border-sidebar-border hover:bg-sidebar-accent/50 flex flex-col gap-1 border-t px-3.5 py-2.5 outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+        hlmTooltip="Connect Delta and your agent: install the /trama skill or the CLI"
+        position="top"
+        closeMobileSidebarOnClick
       >
-        <app-actor-avatar [actor]="meRef()" [size]="20" />
-        <span class="min-w-0 flex-1 truncate text-[13px]">{{ session.user()?.name ?? 'Account' }}</span>
-        <svg [lucideIcon]="chevronDown" [size]="14" class="text-muted-foreground shrink-0"></svg>
-      </button>
-      <button
-        hlmBtn
-        variant="ghost"
-        size="icon-sm"
-        class="text-muted-foreground data-open:bg-sidebar-accent shrink-0"
-        [hlmDropdownMenuTrigger]="helpMenu"
-        align="start"
-        side="top"
-        aria-label="Help"
-      >
-        <svg [lucideIcon]="help" [size]="15"></svg>
-      </button>
+        <span class="flex items-center gap-2">
+          <span class="size-[7px] shrink-0" [class]="agentSeen() ? 'bg-status-done' : 'bg-faint'" aria-hidden="true"></span>
+          <span class="text-foreground font-mono text-[10.5px]">Delta · /trama skill</span>
+        </span>
+        <span class="text-faint truncate font-mono text-[10px]">{{ agentSub() }}</span>
+      </a>
+      <div class="border-sidebar-border flex items-center gap-1 border-t px-2 py-1.5">
+        <button
+          type="button"
+          class="text-sidebar-foreground hover:bg-sidebar-accent/60 data-open:bg-sidebar-accent focus-visible:ring-sidebar-ring flex h-8 min-w-0 flex-1 items-center gap-2.5 px-1.5 text-start outline-hidden focus-visible:ring-2"
+          [hlmDropdownMenuTrigger]="userMenu"
+          align="start"
+          side="top"
+          aria-label="User menu"
+        >
+          <app-actor-avatar [actor]="meRef()" [size]="22" />
+          <span class="min-w-0 flex-1 truncate text-[12.5px]">{{ session.user()?.name ?? 'Account' }}</span>
+        </button>
+        <a
+          [routerLink]="['/', slug(), 'inbox']"
+          class="text-faint hover:text-foreground relative flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          hlmTooltip="Inbox  G then A"
+          position="top"
+          [attr.aria-label]="inboxCount() ? 'Inbox, ' + inboxCount() + ' need you' : 'Inbox'"
+          closeMobileSidebarOnClick
+        >
+          <svg [lucideIcon]="bellIcon" [size]="14"></svg>
+          @if (inboxCount() > 0) {
+            <span class="bg-primary absolute top-1.5 right-1.5 size-[5px]" aria-hidden="true"></span>
+          }
+        </a>
+        <button
+          type="button"
+          class="text-faint hover:text-foreground data-open:text-foreground flex size-7 shrink-0 items-center justify-center outline-hidden focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+          [hlmDropdownMenuTrigger]="helpMenu"
+          align="start"
+          side="top"
+          aria-label="Help"
+        >
+          <svg [lucideIcon]="help" [size]="14"></svg>
+        </button>
+      </div>
     </div>
 
-    <!-- sentence-case muted section label; the fold chevron and actions show on hover / focus -->
+    <!-- mono uppercase section label ("PROJECTS"); the fold chevron and actions show on hover / focus -->
     <ng-template #sectionLabel let-id let-label="label" let-all="all" let-allLabel="allLabel" let-create="create" let-createLabel="createLabel">
       <div class="group/sec flex items-center">
         <button
           type="button"
-          class="text-muted-foreground hover:text-foreground focus-visible:ring-sidebar-ring flex h-7 flex-1 items-center gap-1 rounded-sm px-2 text-[13px] outline-hidden focus-visible:ring-2"
+          class="text-faint hover:text-muted-foreground focus-visible:ring-sidebar-ring flex h-6 flex-1 items-center gap-1 px-2.5 font-mono text-[10px] tracking-[0.04em] uppercase outline-hidden focus-visible:ring-2"
           (click)="ui.toggleFolded(id)"
           [attr.aria-expanded]="!ui.isFolded(id)"
         >
@@ -409,21 +394,16 @@ import { SidebarTree } from './sidebar-tree';
           ></svg>
           <span class="truncate-fade flex-1">{{ item.label }}</span>
           @if (badge(item.badge); as n) {
-            @if (ui.sidebarBadgeStyle() === 'dot' || item.badge === 'inbox') {
-              <span class="flex items-center gap-1.5">
-                @if (item.badge === 'inbox' && ui.sidebarBadgeStyle() === 'count') {
-                  <span class="text-primary text-[11px] tabular-nums">{{ n }}</span>
-                }
-                <span
-                  class="size-1.5 shrink-0 rounded-full"
-                  [class.bg-primary]="item.badge === 'inbox'"
-                  [class.bg-muted-foreground]="item.badge !== 'inbox'"
-                  role="img"
-                  [attr.aria-label]="n + ' pending'"
-                ></span>
-              </span>
+            @if (ui.sidebarBadgeStyle() === 'dot') {
+              <span
+                class="size-[5px] shrink-0"
+                [class.bg-primary]="item.badge === 'inbox'"
+                [class.bg-faint]="item.badge !== 'inbox'"
+                role="img"
+                [attr.aria-label]="n + ' pending'"
+              ></span>
             } @else {
-              <span class="text-muted-foreground text-[11px] tabular-nums">{{ n }}</span>
+              <span class="text-faint font-mono text-[11px] tabular-nums" [attr.aria-label]="n + ' pending'">{{ n }}</span>
             }
           }
         </a>
@@ -635,12 +615,36 @@ export class AppSidebar {
       .filter((n) => n.segment !== 'projects')
       .map(withPath),
   );
-  /** "More" entries (Views has its own section). "Only when badged" entries drop out while their badge is empty. */
+  /** "More" entries. "Only when badged" entries drop out while their badge is empty. */
   protected readonly moreItems = computed(() =>
-    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace))
-      .filter((n) => n.segment !== 'views')
-      .map(withPath),
+    this.visible(orderNav(MORE_NAV, this.ui.sidebarOrder().workspace)).map(withPath),
   );
+  /** Active projects with their open (not done / canceled) task count. */
+  protected readonly projectRows = computed(() => {
+    const byProject = this.store.issuesByProject();
+    return this.store
+      .projects()
+      .filter((p) => p.status !== 'completed' && p.status !== 'canceled')
+      .map((project) => ({
+        project,
+        open: (byProject.get(project.id) ?? []).filter(
+          (i) => i.status !== 'done' && i.status !== 'canceled',
+        ).length,
+      }));
+  });
+  /** Most recent use of any workspace API token: the closest honest signal of "the agent synced". */
+  private readonly lastAgentUse = computed(() => {
+    let last: string | undefined;
+    for (const t of this.store.tokens()) {
+      if (t.lastUsedAt && (!last || t.lastUsedAt > last)) last = t.lastUsedAt;
+    }
+    return last;
+  });
+  protected readonly agentSeen = computed(() => !!this.lastAgentUse());
+  protected readonly agentSub = computed(() => {
+    const last = this.lastAgentUse();
+    return last ? `last agent sync ${ago(last)}` : 'not connected yet · set up';
+  });
   protected readonly settingsItem = {
     segment: 'settings',
     path: ['settings', 'profile'],
@@ -671,10 +675,8 @@ export class AppSidebar {
     ),
     { initialValue: this.router.url },
   );
-  protected viewIcon(entity: string): LucideIcon {
-    if (entity === 'issue') return LucideCircleDot;
-    return entity === 'project' ? LucideBox : LucideLayers;
-  }
+  protected readonly squareIcon = LucideSquare;
+  protected readonly bellIcon = LucideBell;
   protected readonly chevrons = LucideChevronsUpDown;
   protected readonly search = LucideSearch;
   protected readonly newIcon = LucideSquarePen;
@@ -704,6 +706,13 @@ export class AppSidebar {
   protected readonly wsName = computed(
     () => this.store.workspace()?.name ?? this.session.workspace()?.name ?? 'Workspace',
   );
+  protected readonly wsInitial = computed(() => this.wsName().trim().charAt(0).toUpperCase() || 'T');
+  /** "acme · 6 members" under the workspace name. */
+  protected readonly wsSub = computed(() => {
+    const n = this.store.memberships().length;
+    const slug = this.slug();
+    return n ? `${slug} · ${n} ${n === 1 ? 'member' : 'members'}` : slug;
+  });
   protected readonly meRef = computed(() => {
     const u = this.session.user();
     return u ? ({ type: 'user', id: u.id } as const) : null;

@@ -685,162 +685,179 @@ html[data-keyboard='open'] .mobile-fab {
   font-style: italic;
   font-display: swap;
 }
+/* Newsreader (variable weight + optical size) for page titles and section headings only. */
+@font-face {
+  font-family: 'Newsreader';
+  src: url('/fonts/newsreader-latin-opsz-normal.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Newsreader';
+  src: url('/fonts/newsreader-latin-opsz-italic.woff2') format('woff2');
+  font-weight: 200 800;
+  font-style: italic;
+  font-display: swap;
+}
 
 /* ───────────────────────── Tokens ─────────────────────────
-   Light is :root, dark is :root.dark (class set by ThemeService).
-   Workspace look: three panes (sidebar | main | right pane). Side panes sit on a light gray
-   (--sidebar, also exposed as --pane), the center is white, panes are split by a single hairline
-   (--border), rows carry no dividers (flat gray hover / selected fills), embedded blocks are cards
-   with a hairline and a 7px radius. Text is IBM Plex Sans in regular weight: hierarchy comes from
-   near-black vs muted gray, not from bold. ONE quiet blue accent (--primary: links, focus, unread
-   dots, primary buttons). The terracotta is the brand color only (--brand: logo mark).
-   Status tones are muted and keep the same meaning in both modes. Use the semantic Tailwind colors
-   (bg-background, text-muted-foreground, text-status-working, …) — never raw hex / palette
-   colors in feature code.
+   Dark is the default (ThemeService); light is :root, dark is :root.dark.
+   v3 look (docs/designs/untitled.pen, "v3 · 01 UI Kit"): an editorial, Delta-like console.
+     · square corners and 1px hairlines everywhere (see "Square corners" below)
+     · Newsreader for page titles and section headings (--font-serif, `font-serif`),
+       IBM Plex Sans for body text (13/14), IBM Plex Mono for labels, ids and shortcuts
+     · red = the primary action and the Trama brand (--primary, --brand)
+     · blue = Delta: threads, thread records, links to Delta (--delta)
+     · status reads as a small colored square + label, never as a filled pill
+   Use the semantic Tailwind colors (bg-background, text-muted-foreground, text-delta, …) — never
+   raw hex / palette colors in feature code.
 
-   Lines are translucent (black/white at low alpha) so they stay faint on any surface tint.
    --border: pane dividers and card edges; --border-strong: control edges;
-   --input: form-control edge (kept visible for contrast).
-
-   Entity accents: tasks are demand (circle glyphs). */
+   --input: form-control edge (kept visible for contrast); --faint: the third text level
+   (timestamps, hints, mono meta). */
 :root {
   color-scheme: light;
-  --radius: 0.4375rem; /* 7px: embedded cards (rounded-lg); controls and menus are 5-6px (rounded-md) */
+  --radius: 0px;
 
   --font-sans: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, Roboto,
     'Helvetica Neue', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: 'Newsreader', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
 
   --background: #ffffff;
-  --foreground: #1f1f22;
-  --card: #fafafb; /* embedded blocks: a faint tint plus a hairline (see Card) */
-  --card-foreground: #1f1f22;
+  --foreground: #17181b;
+  --card: #f7f7f8;
+  --card-foreground: #17181b;
   --popover: #ffffff;
-  --popover-foreground: #1f1f22;
-  --primary: #4560e0; /* quiet blue; white text on it: 5.2:1 */
-  --primary-text: #4560e0;
+  --popover-foreground: #17181b;
+  --primary: #c2432a; /* Trama red; white text on it: 5.1:1 */
+  --primary-text: #b23c24;
   --primary-foreground: #ffffff;
-  --brand: #ad5235;
-  --secondary: #f0f0f2;
-  --secondary-foreground: #2a2a2d;
-  --muted: #f5f5f6;
-  --muted-foreground: #6b6b72; /* >= 4.8:1 on white, sidebar and selected rows: AA for small text everywhere */
-  --accent: #ececee;
-  --accent-foreground: #1f1f22;
-  --destructive: #c2453d;
-  --border: rgb(0 0 0 / 0.08);
-  --border-strong: rgb(0 0 0 / 0.13);
-  --input: rgb(0 0 0 / 0.16);
-  --ring: #4f6bed;
-  /* Row hover / selected fills: flat translucent grays, equally right on white and on the side panes */
-  --hover: rgb(0 0 0 / 0.04);
-  --selected: rgb(0 0 0 / 0.065);
+  --brand: #c2432a;
+  --delta: #3f5fd0;
+  --faint: #8a8d94;
+  --secondary: #f0f1f2;
+  --secondary-foreground: #24262a;
+  --muted: #f4f5f6;
+  --muted-foreground: #62656c;
+  --accent: #ebecee;
+  --accent-foreground: #17181b;
+  --destructive: #c2432a;
+  --border: #e3e4e7;
+  --border-strong: #d3d5d9;
+  --input: #cfd1d5;
+  --ring: #c2432a;
+  --hover: rgb(0 0 0 / 0.035);
+  --selected: rgb(0 0 0 / 0.06);
 
   /* Diff-style rows ("+6 −4") and quoted-comment bars */
-  --diff-add: #2f8a3e;
-  --diff-add-bg: #e3f3e5;
-  --diff-del: #c2453d;
-  --diff-del-bg: #f8e1e1;
-  --comment-bar: #9b7fd1;
+  --diff-add: #3d8a45;
+  --diff-add-bg: #e6f2e7;
+  --diff-del: #c2432a;
+  --diff-del-bg: #f8e4df;
+  --comment-bar: #3f5fd0;
 
-  --chart-1: #4560e0;
-  --chart-2: #2d9d8f;
-  --chart-3: #d19a2a;
-  --chart-4: #8a63d2;
-  --chart-5: #5e6ad2;
+  --chart-1: #3f5fd0;
+  --chart-2: #3d8a45;
+  --chart-3: #b8800f;
+  --chart-4: #c2432a;
+  --chart-5: #62656c;
 
-  --sidebar: #f5f5f6;
+  --sidebar: #f4f5f6;
   --pane: var(--sidebar);
-  --sidebar-foreground: #2c2c30;
-  --sidebar-primary: #4560e0;
+  --sidebar-foreground: #24262a;
+  --sidebar-primary: #c2432a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(0 0 0 / 0.065); /* the flat gray selected row */
-  --sidebar-accent-foreground: #1f1f22;
-  --sidebar-border: var(--border); /* the hairline between panes */
-  --sidebar-ring: #4f6bed;
+  --sidebar-accent: rgb(0 0 0 / 0.06);
+  --sidebar-accent-foreground: #17181b;
+  --sidebar-border: var(--border);
+  --sidebar-ring: #c2432a;
 
-  --entity-decision: #b7791f;
+  --entity-decision: #b8800f;
   --entity-issue: #62646b;
 
   /* tones (the palette behind every status) */
-  --tone-neutral: #747780;
+  --tone-neutral: #74777e;
   --tone-slate: #5f6a7a;
-  --tone-blue: #3f6bd6;
-  --tone-amber: #9c6712;
+  --tone-blue: #3f5fd0;
+  --tone-amber: #a0700e;
   --tone-orange: #bd5320;
-  --tone-violet: #7c5cc4;
-  --tone-red: #c93535;
+  --tone-violet: #6f5cc4;
+  --tone-red: #c2432a;
   --tone-teal: #0f7a6f;
-  --tone-green: #28793f;
+  --tone-green: #3d8a45;
 
-  --shadow-menu: 0 0 0 0.5px rgb(0 0 0 / 0.12), 0 8px 24px -4px rgb(0 0 0 / 0.14), 0 2px 6px rgb(0 0 0 / 0.06);
+  --shadow-menu: 0 0 0 1px var(--border-strong), 0 10px 28px -8px rgb(0 0 0 / 0.18);
   --shadow-panel: none;
 }
 
 :root.dark {
   color-scheme: dark;
 
-  /* Graphite, same structure as light: the side panes are a step darker than the content
-     (sidebar #171719, content #1e1e21), embedded cards a step lighter (#242427). */
-  --background: #1e1e21;
-  --foreground: #ececef;
-  --card: #242427;
-  --card-foreground: #ececef;
-  --popover: #2a2a2e;
-  --popover-foreground: #ececef;
-  --primary: #4f68e8; /* fill: white text 4.7:1 */
-  --primary-text: #8da0ff; /* same hue as text and icons on dark surfaces: 6.6:1 */
+  /* v3 "d-*" palette: content #0F1114, side panes and cards #14161A, raised #1B1E23,
+     hairline #24272D; text #DCDDE0 / muted #8C9096 / faint #5E6269. */
+  --background: #0f1114;
+  --foreground: #dcdde0;
+  --card: #14161a;
+  --card-foreground: #dcdde0;
+  --popover: #1b1e23;
+  --popover-foreground: #dcdde0;
+  --primary: #cc4b30; /* d-red: the primary action */
+  --primary-text: #e2694d; /* red as text on dark surfaces: 5:1 */
   --primary-foreground: #ffffff;
-  --brand: #d9714a;
-  --secondary: #2a2a2e;
-  --secondary-foreground: #ececef;
-  --muted: #232326;
-  --muted-foreground: #9b9ba3; /* >= 5:1 on every dark surface above */
-  --accent: #2e2e32;
-  --accent-foreground: #f5f5f7;
-  --destructive: #eb6a62;
-  --border: rgb(255 255 255 / 0.09);
-  --border-strong: rgb(255 255 255 / 0.14);
-  --input: rgb(255 255 255 / 0.18);
-  --ring: #7d92ff;
-  --hover: rgb(255 255 255 / 0.05);
-  --selected: rgb(255 255 255 / 0.09);
+  --brand: #cc4b30;
+  --delta: #6f8ceb; /* d-blue, lifted for text on dark surfaces */
+  --faint: #5e6269;
+  --secondary: #1b1e23;
+  --secondary-foreground: #dcdde0;
+  --muted: #14161a;
+  --muted-foreground: #8c9096;
+  --accent: #202329;
+  --accent-foreground: #eeeff1;
+  --destructive: #e0644a;
+  --border: #24272d;
+  --border-strong: #2e3138;
+  --input: #2e3138;
+  --ring: #cc4b30;
+  --hover: rgb(255 255 255 / 0.03);
+  --selected: rgb(255 255 255 / 0.055);
 
-  --diff-add: #5fbf71;
-  --diff-add-bg: rgb(63 160 82 / 0.16);
-  --diff-del: #ee7770;
-  --diff-del-bg: rgb(220 80 72 / 0.16);
-  --comment-bar: #a994de;
+  --diff-add: #6fae73;
+  --diff-add-bg: rgb(111 174 115 / 0.12);
+  --diff-del: #e0644a;
+  --diff-del-bg: rgb(204 75 48 / 0.14);
+  --comment-bar: #5274e0;
 
-  --chart-1: #6f86ff;
-  --chart-2: #46b8a8;
-  --chart-3: #e0b04a;
-  --chart-4: #a389e6;
-  --chart-5: #6e79d6;
+  --chart-1: #5274e0;
+  --chart-2: #6fae73;
+  --chart-3: #e2a93b;
+  --chart-4: #cc4b30;
+  --chart-5: #8c9096;
 
-  --sidebar: #171719;
-  --sidebar-foreground: #d6d6db;
-  --sidebar-primary: #4f68e8;
+  --sidebar: #14161a;
+  --sidebar-foreground: #c9cbcf;
+  --sidebar-primary: #cc4b30;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: rgb(255 255 255 / 0.08);
-  --sidebar-accent-foreground: #f5f5f7;
+  --sidebar-accent: #1d2025;
+  --sidebar-accent-foreground: #eeeff1;
   --sidebar-border: var(--border);
-  --sidebar-ring: #7d92ff;
+  --sidebar-ring: #cc4b30;
 
-  --entity-decision: #e0b04a;
-  --entity-issue: #8a8f98;
+  --entity-decision: #e2a93b;
+  --entity-issue: #8c9096;
 
-  --tone-neutral: #868b94;
-  --tone-slate: #8a9bb3;
-  --tone-blue: #6b93f7;
-  --tone-amber: #e0b04a;
-  --tone-orange: #ee8a5c;
-  --tone-violet: #a38bea;
-  --tone-red: #eb5757;
-  --tone-teal: #4cc0b0;
-  --tone-green: #4cb782;
+  --tone-neutral: #8c9096;
+  --tone-slate: #747985;
+  --tone-blue: #6f8ceb;
+  --tone-amber: #e2a93b;
+  --tone-orange: #e07a45;
+  --tone-violet: #9a86e0;
+  --tone-red: #e0644a;
+  --tone-teal: #5fb3a6;
+  --tone-green: #6fae73;
 
-  --shadow-menu: 0 0 0 0.5px rgb(255 255 255 / 0.12), 0 12px 32px -6px rgb(0 0 0 / 0.6), 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-menu: 0 0 0 1px var(--border-strong), 0 14px 36px -10px rgb(0 0 0 / 0.75);
   --shadow-panel: none;
 }
 
@@ -848,6 +865,11 @@ html[data-keyboard='open'] .mobile-fab {
    neutral = not started / inactive · blue = active · amber = waiting on a human ·
    violet = under review · red = broken · teal = ready · green = done. */
 :root {
+  /* Task lifecycle (v3): todo / backlog gray · in progress yellow · in review blue · done green */
+  --status-todo: var(--tone-neutral);
+  --status-in-progress: var(--tone-amber);
+  --status-review: var(--tone-blue);
+  --status-done: var(--tone-green);
   --status-draft: var(--tone-neutral);
   --status-planned: var(--tone-slate);
   --status-working: var(--tone-blue);
@@ -914,7 +936,11 @@ html[data-keyboard='open'] .mobile-fab {
   --ease-out: cubic-bezier(0.2, 0, 0, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
 
+  --font-serif: var(--font-serif);
+
   --color-brand: var(--brand);
+  --color-delta: var(--delta);
+  --color-faint: var(--faint);
   --color-pane: var(--pane);
   --color-diff-add: var(--diff-add);
   --color-diff-add-bg: var(--diff-add-bg);
@@ -937,6 +963,10 @@ html[data-keyboard='open'] .mobile-fab {
   --color-tone-teal: var(--tone-teal);
   --color-tone-green: var(--tone-green);
 
+  --color-status-todo: var(--status-todo);
+  --color-status-in-progress: var(--status-in-progress);
+  --color-status-review: var(--status-review);
+  --color-status-done: var(--status-done);
   --color-status-draft: var(--status-draft);
   --color-status-planned: var(--status-planned);
   --color-status-working: var(--status-working);
@@ -1035,6 +1065,41 @@ html[data-keyboard='open'] .mobile-fab {
    Unlayered on purpose: it must win over the `text-primary` utility. */
 :root.dark .text-primary {
   color: var(--primary-text);
+}
+
+/* Square corners (v3 rule): unlayered, so it wins over every `rounded-*` utility and component
+   style without `!important`. Spinners keep their circle; `.round` opts a node back in. */
+*:not(.animate-spin, .round, input[type='radio']),
+*::before,
+*::after {
+  border-radius: 0;
+}
+
+/* Page titles and section headings: Newsreader, light, slightly tight. */
+@utility font-title {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  font-optical-sizing: auto;
+}
+/* Mono micro-label ("SUBTASKS", "DELTA THREAD", property names): 11px uppercase, wide tracking. */
+@utility label-mono {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+/* The 3px brand stripe on top of the app: red on the left, Delta blue on the right. */
+@utility brand-stripe {
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    var(--brand) 0 25%,
+    var(--border) 25% 75%,
+    var(--comment-bar) 75% 100%
+  );
 }
 
 /* Utilities available to every feature */
