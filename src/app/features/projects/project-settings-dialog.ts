@@ -1,6 +1,7 @@
 // "Project settings" (⇧P): the project's properties in a dialog, so the page itself keeps Pen's rail
 // (about, thread coverage, recent records). Mount `<app-project-settings-dialog [project]="p" [(open)]="open" />`.
 import { ChangeDetectionStrategy, Component, computed, inject, input, model } from '@angular/core';
+import { LucideDynamicIcon, LucideTrash2 } from '@lucide/angular';
 import { HlmButtonImports } from '@spartan-ng/helm/button';
 import { HlmDialogImports } from '@spartan-ng/helm/dialog';
 import { HlmInputImports } from '@spartan-ng/helm/input';
@@ -12,7 +13,7 @@ import { priorityOptions } from '../../shared/picker-options';
 import { FullDatePipe } from '../../shared/pipes';
 import { PropertyRow } from '../../shared/property-row';
 import { V3DialogFoot, V3DialogHead } from '../../shared/v3';
-import { isoFromDate } from '../milestones/milestone-actions';
+import { MilestoneActions, isoFromDate } from '../milestones/milestone-actions';
 import { isOverdue, projectStatusOptions } from './project-model';
 
 @Component({
@@ -25,6 +26,7 @@ import { isOverdue, projectStatusOptions } from './project-model';
     DatePicker,
     FullDatePipe,
     LabelPicker,
+    LucideDynamicIcon,
     Picker,
     PropertyRow,
     V3DialogHead,
@@ -40,7 +42,7 @@ import { isOverdue, projectStatusOptions } from './project-model';
         <v3-dialog-head kicker="PROJECT" (dismiss)="open.set(false)">
           <h2 hlmDialogTitle>Project settings</h2>
         </v3-dialog-head>
-        <p hlmDialogDescription class="sr-only">Status, priority, labels, repository and dates of the project.</p>
+        <p hlmDialogDescription class="sr-only">Status, priority, labels, repository, dates and milestones of the project.</p>
 
         <div id="project-properties" class="flex flex-col gap-0.5 px-3 py-4 text-[13px]">
           <app-property-row label="Status">
@@ -121,6 +123,64 @@ import { isOverdue, projectStatusOptions } from './project-model';
           </app-property-row>
         </div>
 
+        <section aria-label="Milestones" class="border-border flex flex-col gap-1 border-t px-3 py-4 text-[13px]">
+          <h3 class="text-foreground px-1.5 pb-1 font-mono text-[10px] leading-3 uppercase">Milestones</h3>
+          @for (m of milestones(); track m.id; let i = $index) {
+            <div class="flex min-w-0 items-center gap-2">
+              <span class="text-faint w-7 shrink-0 px-1.5 font-mono text-[10.5px]">M{{ i + 1 }}</span>
+              <input
+                hlmInput
+                class="hover:bg-accent focus-visible:border-input h-8 min-w-0 flex-1 border-transparent bg-transparent px-1.5 text-sm shadow-none"
+                [value]="m.name"
+                [disabled]="!canManage()"
+                [attr.aria-label]="'Name of milestone ' + (i + 1)"
+                (change)="milestoneActions.rename(m, $any($event.target).value)"
+              />
+              <app-date-picker
+                class="shrink-0"
+                [label]="'Target date of ' + m.name"
+                triggerClass="h-8 justify-start px-1.5 text-xs"
+                [disabled]="!canManage()"
+                [value]="m.targetDate"
+                (dateChange)="milestoneActions.setDate(m, $event)"
+              >
+                @if (m.targetDate) {
+                  <span>{{ m.targetDate | fullDate }}</span>
+                } @else {
+                  <span class="text-muted-foreground">No date</span>
+                }
+              </app-date-picker>
+              @if (canManage()) {
+                <button
+                  hlmBtn
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="text-faint hover:text-foreground shrink-0"
+                  [attr.aria-label]="'Delete milestone ' + m.name"
+                  (click)="milestoneActions.remove(m)"
+                >
+                  <svg [lucideIcon]="trashIcon" [size]="14"></svg>
+                </button>
+              }
+            </div>
+          } @empty {
+            <p class="text-muted-foreground px-1.5 text-xs leading-4">No milestones yet.</p>
+          }
+          @if (canManage()) {
+            <form class="flex items-center gap-2 pt-1" (submit)="$event.preventDefault(); addMilestone(newName)">
+              <input
+                #newName
+                hlmInput
+                class="h-8 min-w-0 flex-1 px-1.5 text-sm"
+                placeholder="New milestone"
+                aria-label="New milestone name"
+              />
+              <button hlmBtn type="submit" variant="outline" size="sm">Add</button>
+            </form>
+          }
+        </section>
+
         <v3-dialog-foot>
           <button hlmBtn type="button" variant="outline" (click)="open.set(false)">Close</button>
         </v3-dialog-foot>
@@ -130,6 +190,8 @@ import { isOverdue, projectStatusOptions } from './project-model';
 })
 export class ProjectSettingsDialog {
   private readonly store = inject(TramaStore);
+  protected readonly milestoneActions = inject(MilestoneActions);
+  protected readonly trashIcon = LucideTrash2;
 
   readonly project = input.required<Project>();
   readonly open = model(false);
@@ -142,6 +204,15 @@ export class ProjectSettingsDialog {
 
   protected update(patch: Parameters<TramaStore['updateProject']>[1]): void {
     void this.store.updateProject(this.project().id, patch);
+  }
+
+  protected readonly milestones = computed(
+    () => this.store.milestonesByProject().get(this.project().id) ?? [],
+  );
+
+  protected async addMilestone(field: HTMLInputElement): Promise<void> {
+    const created = await this.milestoneActions.create(this.project().id, field.value);
+    if (created) field.value = '';
   }
 
   protected setStatus(v: string | undefined): void {

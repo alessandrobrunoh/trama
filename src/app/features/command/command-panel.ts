@@ -15,6 +15,7 @@ import { Router } from '@angular/router';
 import {
   LucideCircleDot,
   LucideDynamicIcon,
+  LucideFlag,
   LucideListTree,
   LucidePlus,
   LucideSearch,
@@ -29,6 +30,7 @@ import { ISSUE_STATUSES, ISSUE_STATUS_META } from '../../core/meta';
 import { TramaStore } from '../../core/stores/trama.store';
 import { UiStore } from '../../core/stores/ui.store';
 import { ALL_NAV, navForRole } from '../../layout/nav';
+import { MilestoneActions } from '../milestones/milestone-actions';
 import { Kbd } from '../../shared/kbd';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import { fuzzyScore } from './fuzzy';
@@ -164,6 +166,18 @@ export const COMMAND_DIALOG_CLASS =
               </button>
             }
           </hlm-command-group>
+        } @else if (page() === 'milestone') {
+          <hlm-command-group>
+            <hlm-command-group-label>Milestone</hlm-command-group-label>
+            @for (c of milestoneCommands(); track c.id) {
+              <button hlmCommandItem [value]="'milestone ' + c.label" (selected)="exec(c)">
+                <ng-container
+                  [ngTemplateOutlet]="cmdRow"
+                  [ngTemplateOutletContext]="{ $implicit: c }"
+                />
+              </button>
+            }
+          </hlm-command-group>
         } @else {
           @if (results().length) {
             <hlm-command-group>
@@ -229,6 +243,7 @@ export class CommandPanel {
   private readonly store = inject(TramaStore);
   private readonly router = inject(Router);
   private readonly searchSvc = inject(SearchService);
+  private readonly milestoneActions = inject(MilestoneActions);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly command = viewChild(BrnCommand);
 
@@ -236,7 +251,7 @@ export class CommandPanel {
   protected readonly searchIcon = LucideSearch;
 
   protected readonly query = signal('');
-  protected readonly page = signal<'root' | 'status'>('root');
+  protected readonly page = signal<'root' | 'status' | 'milestone'>('root');
   protected readonly loading = signal(false);
   private readonly remote = signal<{ q: string; hits: SearchHit[] } | null>(null);
   private timer: ReturnType<typeof setTimeout> | undefined;
@@ -246,6 +261,7 @@ export class CommandPanel {
 
   protected readonly placeholder = computed(() => {
     if (this.page() === 'status') return 'Set status…';
+    if (this.page() === 'milestone') return 'Set milestone…';
     return this.mode() === 'palette' ? 'Type a command or search…' : 'Search tasks…';
   });
 
@@ -289,6 +305,26 @@ export class CommandPanel {
     }));
   });
 
+  protected readonly milestoneCommands = computed<Cmd[]>(() => {
+    const issue = this.context();
+    const projectId = issue?.projectId;
+    if (!issue || !projectId) return [];
+    const current = this.milestoneActions.milestoneOf(issue, projectId)?.id ?? null;
+    const pick = (id: string | null) => () => {
+      if (id !== current) this.milestoneActions.assign(issue, projectId, id);
+      this.ui.closeModal();
+    };
+    const rows: Cmd[] = (this.store.milestonesByProject().get(projectId) ?? []).map((m, i) => ({
+      id: 'ms:' + m.id,
+      label: m.id === current ? `${m.name} (current)` : m.name,
+      keywords: `M${i + 1}`,
+      icon: LucideFlag,
+      run: pick(m.id),
+    }));
+    if (current) rows.push({ id: 'ms:none', label: 'No milestone', icon: LucideFlag, run: pick(null) });
+    return rows;
+  });
+
   // ─────────────────────────── commands ───────────────────────────
 
   protected readonly actionCommands = computed<Cmd[]>(() => {
@@ -324,8 +360,17 @@ export class CommandPanel {
         keywords: 'state move change',
         icon: LucideCircleDot,
         keys: 's',
-        run: () => this.openStatusPage(),
+        run: () => this.openPage('status'),
       });
+      // The task page in the designs shows no milestone field: the palette is where a task joins one.
+      if (issue.projectId && this.store.milestonesByProject().get(issue.projectId)?.length)
+        out.push({
+          id: 'ctx:milestone',
+          label: 'Set milestone…',
+          keywords: 'milestone phase release',
+          icon: LucideFlag,
+          run: () => this.openPage('milestone'),
+        });
     }
     for (const n of navForRole(ALL_NAV, this.store.isGuest()))
       out.push({
@@ -390,8 +435,8 @@ export class CommandPanel {
     this.command()?.search.set(value);
   }
 
-  private openStatusPage(): void {
-    this.page.set('status');
+  private openPage(page: 'status' | 'milestone'): void {
+    this.page.set(page);
     this.setQuery('');
     this.focusInput();
   }
