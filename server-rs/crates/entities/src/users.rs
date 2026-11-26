@@ -26,8 +26,12 @@ pub enum Relation {
     Agents,
     #[sea_orm(has_many = "super::attention_state::Entity")]
     AttentionState,
+    #[sea_orm(has_many = "super::external_identities::Entity")]
+    ExternalIdentities,
     #[sea_orm(has_many = "super::favorites::Entity")]
     Favorites,
+    #[sea_orm(has_many = "super::integration_connections::Entity")]
+    IntegrationConnections,
     #[sea_orm(has_many = "super::invites::Entity")]
     Invites,
     #[sea_orm(has_many = "super::issues::Entity")]
@@ -36,6 +40,8 @@ pub enum Relation {
     Memberships,
     #[sea_orm(has_many = "super::notifications::Entity")]
     Notifications,
+    #[sea_orm(has_many = "super::project_placements::Entity")]
+    ProjectPlacements,
     #[sea_orm(has_many = "super::projects::Entity")]
     Projects,
     #[sea_orm(has_many = "super::push_subscriptions::Entity")]
@@ -62,9 +68,21 @@ impl Related<super::attention_state::Entity> for Entity {
     }
 }
 
+impl Related<super::external_identities::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ExternalIdentities.def()
+    }
+}
+
 impl Related<super::favorites::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Favorites.def()
+    }
+}
+
+impl Related<super::integration_connections::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::IntegrationConnections.def()
     }
 }
 
@@ -89,6 +107,12 @@ impl Related<super::memberships::Entity> for Entity {
 impl Related<super::notifications::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Notifications.def()
+    }
+}
+
+impl Related<super::project_placements::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProjectPlacements.def()
     }
 }
 

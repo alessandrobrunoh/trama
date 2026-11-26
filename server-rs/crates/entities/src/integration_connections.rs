@@ -8,7 +8,7 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub id: String,
     #[sea_orm(column_name = "workspaceId")]
-    pub workspace_id: String,
+    pub workspace_id: Option<String>,
     pub provider: String,
     pub account: String,
     #[sea_orm(column_name = "baseUrl")]
@@ -26,10 +26,26 @@ pub struct Model {
     pub config: Json,
     #[sea_orm(column_name = "createdAt")]
     pub created_at: DateTimeWithTimeZone,
+    #[sea_orm(column_name = "ownerType")]
+    pub owner_type: String,
+    #[sea_orm(column_name = "ownerUserId")]
+    pub owner_user_id: Option<String>,
+    pub label: String,
+    pub host: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
+    #[sea_orm(has_many = "super::routing_rules::Entity")]
+    RoutingRules,
+    #[sea_orm(
+        belongs_to = "super::users::Entity",
+        from = "Column::OwnerUserId",
+        to = "super::users::Column::Id",
+        on_update = "NoAction",
+        on_delete = "Cascade"
+    )]
+    Users,
     #[sea_orm(has_many = "super::webhook_deliveries::Entity")]
     WebhookDeliveries,
     #[sea_orm(
@@ -40,6 +56,18 @@ pub enum Relation {
         on_delete = "Cascade"
     )]
     Workspaces,
+}
+
+impl Related<super::routing_rules::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RoutingRules.def()
+    }
+}
+
+impl Related<super::users::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::Users.def()
+    }
 }
 
 impl Related<super::webhook_deliveries::Entity> for Entity {

@@ -16,6 +16,7 @@ pub struct Model {
     pub settings: Json,
     #[sea_orm(column_name = "primaryOwnerId")]
     pub primary_owner_id: Option<String>,
+    pub personal: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -46,12 +47,6 @@ pub enum Relation {
     Invites,
     #[sea_orm(has_many = "super::issues::Entity")]
     Issues,
-    #[sea_orm(has_one = "super::lunagest_connections::Entity")]
-    LunagestConnections,
-    #[sea_orm(has_many = "super::lunagest_issue_links::Entity")]
-    LunagestIssueLinks,
-    #[sea_orm(has_many = "super::lunagest_project_links::Entity")]
-    LunagestProjectLinks,
     #[sea_orm(has_many = "super::memberships::Entity")]
     Memberships,
     #[sea_orm(has_many = "super::milestones::Entity")]
@@ -60,8 +55,14 @@ pub enum Relation {
     Notifications,
     #[sea_orm(has_many = "super::outgoing_webhooks::Entity")]
     OutgoingWebhooks,
+    #[sea_orm(has_many = "super::project_placements::Entity")]
+    ProjectPlacements,
     #[sea_orm(has_many = "super::projects::Entity")]
     Projects,
+    #[sea_orm(has_many = "super::routing_rule_items::Entity")]
+    RoutingRuleItems,
+    #[sea_orm(has_many = "super::routing_rules::Entity")]
+    RoutingRules,
     #[sea_orm(has_many = "super::saved_views::Entity")]
     SavedViews,
     #[sea_orm(has_many = "super::time_entries::Entity")]
@@ -162,24 +163,6 @@ impl Related<super::issues::Entity> for Entity {
     }
 }
 
-impl Related<super::lunagest_connections::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LunagestConnections.def()
-    }
-}
-
-impl Related<super::lunagest_issue_links::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LunagestIssueLinks.def()
-    }
-}
-
-impl Related<super::lunagest_project_links::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LunagestProjectLinks.def()
-    }
-}
-
 impl Related<super::memberships::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Memberships.def()
@@ -204,9 +187,27 @@ impl Related<super::outgoing_webhooks::Entity> for Entity {
     }
 }
 
+impl Related<super::project_placements::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProjectPlacements.def()
+    }
+}
+
 impl Related<super::projects::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Projects.def()
+    }
+}
+
+impl Related<super::routing_rule_items::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RoutingRuleItems.def()
+    }
+}
+
+impl Related<super::routing_rules::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RoutingRules.def()
     }
 }
 

@@ -53,6 +53,8 @@ pub struct Model {
     pub parent_id: Option<String>,
     #[sea_orm(column_name = "threadUrl")]
     pub thread_url: Option<String>,
+    #[sea_orm(column_name = "dueDate")]
+    pub due_date: Option<DateTimeWithTimeZone>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -67,8 +69,6 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     SelfRef,
-    #[sea_orm(has_one = "super::lunagest_issue_links::Entity")]
-    LunagestIssueLinks,
     #[sea_orm(
         belongs_to = "super::projects::Entity",
         from = "Column::ProjectId",
@@ -77,6 +77,8 @@ pub enum Relation {
         on_delete = "SetNull"
     )]
     Projects,
+    #[sea_orm(has_many = "super::routing_rule_items::Entity")]
+    RoutingRuleItems,
     #[sea_orm(has_many = "super::time_entries::Entity")]
     TimeEntries,
     #[sea_orm(
@@ -103,15 +105,15 @@ impl Related<super::artifacts::Entity> for Entity {
     }
 }
 
-impl Related<super::lunagest_issue_links::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LunagestIssueLinks.def()
-    }
-}
-
 impl Related<super::projects::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Projects.def()
+    }
+}
+
+impl Related<super::routing_rule_items::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RoutingRuleItems.def()
     }
 }
 

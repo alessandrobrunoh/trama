@@ -41,10 +41,12 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(has_many = "super::issues::Entity")]
     Issues,
-    #[sea_orm(has_one = "super::lunagest_project_links::Entity")]
-    LunagestProjectLinks,
     #[sea_orm(has_many = "super::milestones::Entity")]
     Milestones,
+    #[sea_orm(has_many = "super::project_placements::Entity")]
+    ProjectPlacements,
+    #[sea_orm(has_many = "super::routing_rules::Entity")]
+    RoutingRules,
     #[sea_orm(has_many = "super::time_entries::Entity")]
     TimeEntries,
     #[sea_orm(
@@ -71,15 +73,21 @@ impl Related<super::issues::Entity> for Entity {
     }
 }
 
-impl Related<super::lunagest_project_links::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::LunagestProjectLinks.def()
-    }
-}
-
 impl Related<super::milestones::Entity> for Entity {
     fn to() -> RelationDef {
         Relation::Milestones.def()
+    }
+}
+
+impl Related<super::project_placements::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::ProjectPlacements.def()
+    }
+}
+
+impl Related<super::routing_rules::Entity> for Entity {
+    fn to() -> RelationDef {
+        Relation::RoutingRules.def()
     }
 }
 
