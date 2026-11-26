@@ -15,6 +15,7 @@ which server answered.
 | `trama-contracts` | `crates/contracts` | `contracts/domain.ts` in Rust: wire types, roles and capabilities, member access, settings, status and label catalogs |
 | `trama-entities` | `crates/entities` | SeaORM entities, one module per table (generated, see `lib.rs`) |
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
+| `trama-notifications` | `crates/notifications` | The inbox, notification settings, Web Push (VAPID, `aes128gcm`), and the listener that turns recorded domain events into in-app, push and email notifications |
 | `trama-system` | `crates/system` | `GET /api/health`, `GET /api/config` |
 | `trama-uploads` | `crates/uploads` | File uploads: rules, storage, upload references (`retained`, `assert_attachable`, … for other crates), `/api/w/{slug}/uploads…` |
 
