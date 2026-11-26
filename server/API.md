@@ -117,7 +117,17 @@ Linear-style planning entity: the outcome we want, by when, and where. `Project 
 - `DELETE /:id` (`204`; its milestones are deleted and removed from issues, and its issues become unassigned under the `UNPR` prefix).
 - Events: `project.created|updated|status_changed|health_changed|deleted` (subject `project`). `health_changed` carries `data: { from, to }` (either may be `null`); `updated.data.fields` also lists `health`. Saved and public views can filter, sort and group projects by `health`.
 - `GET /:id/transfer-preview?target=<workspace slug>` and `POST /:id/transfer { target }` (browser session only; owner or admin of this workspace **and** of the target). Moves the project with its milestones, issues (keys kept, so the tag must be free in the target), time entries, comments, artifacts, history and files. Issue and project statuses map to the target's by type and name; labels map by name and are created when missing; guests (people limited to this project) become limited members of the target; assignees, reporters and leads who are not in the target are cleared. One transaction. `404` for a target workspace you do not belong to, `403` when you are not admin there, `409` when something blocks it (tag or issue keys in use, label cap). The preview returns `{ counts, mappings, guests, unassigned, blockers }`.
-- Events: `project.transferred` in the target workspace (`data.from` names the source).
+- Events: `project.transferred` in the target workspace (`data.from` names the source). Project updates move with the project (the health each reported follows the health mapping, or is cleared when the target has no such health).
+
+#### Project updates — `/projects/:id/updates`
+
+Written status updates on a project. `ProjectUpdate { id: pu_…, workspaceId, projectId, author: ActorRef, body, health?, createdAt, editedAt? }`. `body` is markdown, trimmed, 1 to `PROJECT_UPDATE_BODY_MAX` (20000) characters; `health` is a project health catalog id. Visibility follows the project: a project the caller cannot see (a limited member or guest outside it) is `404`, the same as `GET /projects/:id`. Token scopes follow `/projects`: `read` tokens (and `projects:read`) may `GET`; `POST`/`PATCH` need `write` (`projects:write`), `DELETE` needs `projects:delete`.
+
+- `GET /projects/:id/updates` → `ProjectUpdate[]`, newest first (at most the latest 200). Anyone who can see the project can read, guests and organizers included.
+- `POST { body, health? }` (`manageProjects`) → `201 ProjectUpdate`. With `health`, the project's health is set to it as well (through the normal project update, so `project.updated` / `project.health_changed` fire). `400` for an empty or over-long body or an unknown health. Guests and viewers: `403`.
+- `PATCH /:updateId { body?, health? }` (`manageProjects`, **author only**, otherwise `403`) → `ProjectUpdate` with `editedAt` set. `health: null` clears the health of the update. This never changes the project's health: only posting does.
+- `DELETE /:updateId` → `204`; the author, or anyone with `manageProjects` (otherwise `403`). Updates are deleted with their project.
+- Events: `project.update_posted` (subject `project`, `data: { updateId, excerpt, health }`). Live stream: `project_update` `created` / `updated` / `deleted` (`id` is the update id), delivered to whoever can see the project.
 
 ### Shared with me and "Show in" — `/shared` (account routes, browser session only)
 

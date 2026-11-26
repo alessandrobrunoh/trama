@@ -1099,6 +1099,39 @@ export interface Comment {
   updatedAt: ISODate;
 }
 
+/**
+ * A written status update on a project (Project · Updates): what the author says about where things stand,
+ * with the health they reported. GET /api/w/:slug/projects/:id/updates lists them newest first.
+ */
+export interface ProjectUpdate {
+  id: ID;
+  workspaceId: ID;
+  projectId: ID;
+  author: ActorRef;
+  /** Markdown. The first paragraph is the headline shown at the top of the Updates tab. */
+  body: string;
+  /** Project health catalog id reported with the update; posting one also sets the project's health. */
+  health?: string;
+  createdAt: ISODate;
+  /** Set when the author edited the text after posting. */
+  editedAt?: ISODate;
+}
+
+/** Longest project update body, in characters. */
+export const PROJECT_UPDATE_BODY_MAX = 20000;
+
+/** POST /api/w/:slug/projects/:id/updates (needs `manageProjects`). */
+export interface CreateProjectUpdateInput {
+  body: string;
+  health?: string;
+}
+
+/** PATCH /api/w/:slug/projects/:id/updates/:updateId (author only). */
+export interface UpdateProjectUpdateInput {
+  body?: string;
+  health?: string | null;
+}
+
 /** Page size of GET /comments/page: `limit` defaults to `default` and may not exceed `max`. */
 export const COMMENT_PAGE_SIZE = { default: 50, max: 100 } as const;
 
@@ -2528,6 +2561,7 @@ export const WEBHOOK_EVENT_GROUPS: { entity: string; label: string; events: stri
       'project.updated',
       'project.status_changed',
       'project.health_changed',
+      'project.update_posted',
       'project.deleted',
     ],
   },
@@ -2600,6 +2634,7 @@ export interface LiveEvent {
   entity:
     | SubjectType
     | 'comment'
+    | 'project_update'
     | 'view'
     | 'membership'
     | 'invite'
