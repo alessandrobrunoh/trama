@@ -51,6 +51,7 @@ utoipa-scalar = { version = "0.4", features = ["axum"] }
 
 trama-ai = { path = "crates/ai" }
 trama-auth = { path = "crates/auth" }
+trama-comments = { path = "crates/comments" }
 trama-common = { path = "crates/common" }
 trama-contracts = { path = "crates/contracts" }
 trama-core = { path = "crates/core" }
@@ -106,6 +107,7 @@ utoipa.workspace = true
 utoipa-scalar.workspace = true
 trama-ai.workspace = true
 trama-auth.workspace = true
+trama-comments.workspace = true
 trama-common.workspace = true
 trama-core.workspace = true
 trama-events.workspace = true

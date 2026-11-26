@@ -22,6 +22,7 @@ fn routes() -> Routes {
     Routes::new()
         .merge(trama_ai::router())
         .merge(trama_auth::router())
+        .merge(trama_comments::router())
         .merge(trama_events::router())
         .merge(trama_notifications::router())
         .merge(trama_sharing::router())
