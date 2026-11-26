@@ -23,8 +23,10 @@ fn routes() -> Routes {
         .merge(trama_auth::router())
         .merge(trama_events::router())
         .merge(trama_notifications::router())
+        .merge(trama_sharing::router())
         .merge(trama_system::router())
         .merge(trama_uploads::router())
+        .merge(trama_views::router())
 }
 
 /// The whole application over `state`.
