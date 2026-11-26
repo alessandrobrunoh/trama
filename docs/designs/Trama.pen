@@ -87724,7 +87724,7 @@
                               "name": "Dot",
                               "width": 7,
                               "height": 7,
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             {
                               "type": "text",
@@ -87744,10 +87744,10 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-faint"
+                              "fill": "#6E6A63"
                             },
                             "Bmyq8": {
-                              "content": "Backlog"
+                              "content": "Draft"
                             }
                           }
                         },
@@ -87757,10 +87757,10 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-muted"
+                              "fill": "#C9C3B8"
                             },
                             "Bmyq8": {
-                              "content": "Todo"
+                              "content": "Plan"
                             }
                           }
                         },
@@ -87770,7 +87770,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-blue"
+                              "fill": "#14918A"
                             },
                             "Bmyq8": {
                               "content": "In review"
@@ -87783,10 +87783,10 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-green"
+                              "fill": "#7C5CC4"
                             },
                             "Bmyq8": {
-                              "content": "Done"
+                              "content": "Merged"
                             }
                           }
                         },
@@ -87796,10 +87796,10 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-line"
+                              "fill": "#8A857C"
                             },
                             "Bmyq8": {
-                              "content": "Canceled"
+                              "content": "Discarded"
                             }
                           }
                         }
@@ -88693,7 +88693,12 @@
                           "id": "VYFJs",
                           "type": "ref",
                           "ref": "rXgFw",
-                          "name": "Status"
+                          "name": "Status",
+                          "descendants": {
+                            "OAvNr": {
+                              "fill": "#E2A93B"
+                            }
+                          }
                         },
                         {
                           "id": "Q4LkOR",
@@ -88764,10 +88769,10 @@
                           "content": "infra/api!88"
                         },
                         "VYFJs/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "VYFJs/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "z5xu5b": {
                           "stroke": "$d-border"
@@ -88878,7 +88883,12 @@
                           "id": "ZojES",
                           "type": "ref",
                           "ref": "rXgFw",
-                          "name": "Status"
+                          "name": "Status",
+                          "descendants": {
+                            "OAvNr": {
+                              "fill": "#E2A93B"
+                            }
+                          }
                         },
                         {
                           "id": "ag0zX",
@@ -88918,10 +88928,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         }
                       }
                     }
@@ -91157,78 +91167,6 @@
                               }
                             },
                             {
-                              "id": "BeCJA",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav My tasks",
-                              "width": "fill_container",
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "circle-user-round"
-                                },
-                                "c24JVl": {
-                                  "content": "My tasks"
-                                },
-                                "HnfM6": {
-                                  "content": "9"
-                                }
-                              }
-                            },
-                            {
-                              "id": "T9QFLt",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Tasks",
-                              "width": "fill_container",
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "list-checks"
-                                },
-                                "c24JVl": {
-                                  "content": "Tasks"
-                                },
-                                "HnfM6": {
-                                  "content": "128"
-                                }
-                              }
-                            },
-                            {
-                              "id": "mzzvD",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Board",
-                              "width": "fill_container",
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "square-kanban"
-                                },
-                                "c24JVl": {
-                                  "content": "Board"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            },
-                            {
-                              "id": "vZtEb",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Timeline",
-                              "width": "fill_container",
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "calendar-range"
-                                },
-                                "c24JVl": {
-                                  "content": "Timeline"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            },
-                            {
                               "id": "IufVL",
                               "type": "ref",
                               "ref": "P8Bqb",
@@ -91269,24 +91207,115 @@
                         {
                           "type": "frame",
                           "id": "PNQtV",
-                          "name": "Group PROJECTS",
+                          "name": "Group WORKSPACE",
                           "width": "fill_container",
+                          "stroke": "$d-border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
                           "layout": "vertical",
                           "gap": 1,
                           "padding": [
+                            4,
+                            8,
                             6,
                             8
                           ],
                           "children": [
                             {
-                              "type": "text",
-                              "id": "k8mb3",
-                              "name": "GroupLabel",
-                              "fill": "$d-faint",
-                              "content": "PROJECTS",
-                              "fontFamily": "$d-mono",
-                              "fontSize": 10,
-                              "fontWeight": "normal"
+                              "type": "frame",
+                              "id": "G842MJ",
+                              "name": "Divider WORKSPACE",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "padding": [
+                                12,
+                                8,
+                                6,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "kyKxi",
+                                  "name": "DividerLabel",
+                                  "fill": "$d-muted",
+                                  "content": "WORKSPACE",
+                                  "fontFamily": "$d-mono",
+                                  "fontSize": 10,
+                                  "fontWeight": "normal",
+                                  "letterSpacing": 0.6
+                                },
+                                {
+                                  "type": "rectangle",
+                                  "id": "san49",
+                                  "name": "Line",
+                                  "fill": "$d-border",
+                                  "width": "fill_container",
+                                  "height": 1
+                                }
+                              ]
+                            },
+                            {
+                              "id": "T9QFLt",
+                              "type": "ref",
+                              "ref": "P8Bqb",
+                              "name": "Nav Tasks",
+                              "width": "fill_container",
+                              "descendants": {
+                                "S2lzTN": {
+                                  "icon": "list-checks"
+                                },
+                                "c24JVl": {
+                                  "content": "Tasks"
+                                },
+                                "HnfM6": {
+                                  "content": "128"
+                                }
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "H1bHJ3",
+                              "name": "Sub PROJECTS",
+                              "width": "fill_container",
+                              "padding": [
+                                10,
+                                8,
+                                4,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "k8mb3",
+                                  "name": "GroupLabel",
+                                  "fill": "$d-faint",
+                                  "content": "PROJECTS",
+                                  "fontFamily": "$d-mono",
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "hJbl3",
+                                  "name": "Sp",
+                                  "width": "fill_container",
+                                  "height": 1
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "xMPTx",
+                                  "name": "plus",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "$d-faint"
+                                }
+                              ]
                             },
                             {
                               "id": "hk4m6",
@@ -91363,6 +91392,207 @@
                                   "content": "shared"
                                 }
                               }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "f7Pf7",
+                              "name": "More projects",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "padding": [
+                                5,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "sgyRI",
+                                  "name": "chevron-down",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$d-faint"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "bf8dg",
+                                  "name": "View more",
+                                  "fill": "$d-faint",
+                                  "content": "View more",
+                                  "fontFamily": "$d-sans",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "aEcf6",
+                                  "name": "Sp",
+                                  "width": "fill_container",
+                                  "height": 1
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "JE8TQ",
+                                  "name": "+5",
+                                  "fill": "$d-faint",
+                                  "content": "+5",
+                                  "fontFamily": "$d-mono",
+                                  "fontSize": 10.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "frame",
+                              "id": "FxjOA",
+                              "name": "Sub VIEWS",
+                              "width": "fill_container",
+                              "padding": [
+                                10,
+                                8,
+                                4,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "text",
+                                  "id": "HLzkh",
+                                  "name": "GroupLabel",
+                                  "fill": "$d-faint",
+                                  "content": "VIEWS",
+                                  "fontFamily": "$d-mono",
+                                  "fontSize": 10,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "SNanf",
+                                  "name": "Sp",
+                                  "width": "fill_container",
+                                  "height": 1
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "o0FZDA",
+                                  "name": "plus",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "plus",
+                                  "library": "lucide",
+                                  "fill": "$d-faint"
+                                }
+                              ]
+                            },
+                            {
+                              "id": "gj40V",
+                              "type": "ref",
+                              "ref": "P8Bqb",
+                              "name": "View Roadmap",
+                              "width": "fill_container",
+                              "descendants": {
+                                "S2lzTN": {
+                                  "icon": "chart-gantt",
+                                  "fill": "$d-muted"
+                                },
+                                "c24JVl": {
+                                  "content": "Roadmap"
+                                },
+                                "HnfM6": {
+                                  "content": ""
+                                }
+                              }
+                            },
+                            {
+                              "id": "VIPTQ",
+                              "type": "ref",
+                              "ref": "P8Bqb",
+                              "name": "View Sprint board",
+                              "width": "fill_container",
+                              "descendants": {
+                                "S2lzTN": {
+                                  "icon": "square-kanban",
+                                  "fill": "$d-muted"
+                                },
+                                "c24JVl": {
+                                  "content": "Sprint board"
+                                },
+                                "HnfM6": {
+                                  "content": "23"
+                                }
+                              }
+                            },
+                            {
+                              "id": "sx1fU",
+                              "type": "ref",
+                              "ref": "P8Bqb",
+                              "name": "View Bugs this cycle",
+                              "width": "fill_container",
+                              "descendants": {
+                                "S2lzTN": {
+                                  "icon": "bug",
+                                  "fill": "$d-muted"
+                                },
+                                "c24JVl": {
+                                  "content": "Bugs this cycle"
+                                },
+                                "HnfM6": {
+                                  "content": "7"
+                                }
+                              }
+                            },
+                            {
+                              "type": "frame",
+                              "id": "C7air",
+                              "name": "More views",
+                              "width": "fill_container",
+                              "gap": 8,
+                              "padding": [
+                                5,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "EU2j9",
+                                  "name": "chevron-down",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "chevron-down",
+                                  "library": "lucide",
+                                  "fill": "$d-faint"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "Now3j",
+                                  "name": "View more",
+                                  "fill": "$d-faint",
+                                  "content": "View more",
+                                  "fontFamily": "$d-sans",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "J0HeCe",
+                                  "name": "Sp",
+                                  "width": "fill_container",
+                                  "height": 1
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "xonlM",
+                                  "name": "+4",
+                                  "fill": "$d-faint",
+                                  "content": "+4",
+                                  "fontFamily": "$d-mono",
+                                  "fontSize": 10.5,
+                                  "fontWeight": "normal"
+                                }
+                              ]
                             }
                           ]
                         },
@@ -91371,9 +91601,15 @@
                           "id": "Gtvoo",
                           "name": "Group SHARED",
                           "width": "fill_container",
+                          "stroke": "$d-border",
+                          "strokeWidth": {
+                            "top": 1
+                          },
                           "layout": "vertical",
                           "gap": 1,
                           "padding": [
+                            10,
+                            8,
                             6,
                             8
                           ],
@@ -91411,105 +91647,6 @@
                         },
                         {
                           "type": "frame",
-                          "id": "HPLBi",
-                          "name": "Group WORKSPACE",
-                          "width": "fill_container",
-                          "layout": "vertical",
-                          "gap": 1,
-                          "padding": [
-                            6,
-                            8
-                          ],
-                          "children": [
-                            {
-                              "type": "text",
-                              "id": "yMQ5U",
-                              "name": "GroupLabel",
-                              "fill": "$d-faint",
-                              "content": "WORKSPACE",
-                              "fontFamily": "$d-mono",
-                              "fontSize": 10,
-                              "fontWeight": "normal"
-                            },
-                            {
-                              "id": "W3bHS",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Integrations",
-                              "width": "fill_container(232)",
-                              "enabled": false,
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "plug"
-                                },
-                                "c24JVl": {
-                                  "content": "Integrations"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            },
-                            {
-                              "id": "z0nAh",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Trama Desktop",
-                              "width": "fill_container(232)",
-                              "enabled": false,
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "monitor-down"
-                                },
-                                "c24JVl": {
-                                  "content": "Trama Desktop"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            },
-                            {
-                              "id": "CJSlO",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Members",
-                              "width": "fill_container(232)",
-                              "enabled": false,
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "users"
-                                },
-                                "c24JVl": {
-                                  "content": "Members"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            },
-                            {
-                              "id": "qNZ6w",
-                              "type": "ref",
-                              "ref": "P8Bqb",
-                              "name": "Nav Settings",
-                              "width": "fill_container",
-                              "descendants": {
-                                "S2lzTN": {
-                                  "icon": "settings"
-                                },
-                                "c24JVl": {
-                                  "content": "Settings"
-                                },
-                                "HnfM6": {
-                                  "content": ""
-                                }
-                              }
-                            }
-                          ]
-                        },
-                        {
-                          "type": "frame",
                           "id": "MHNHR",
                           "name": "Fill",
                           "width": "fill_container",
@@ -91525,12 +91662,66 @@
                             "top": 1
                           },
                           "layout": "vertical",
-                          "gap": 4,
+                          "gap": 8,
                           "padding": [
                             10,
                             14
                           ],
                           "children": [
+                            {
+                              "type": "frame",
+                              "id": "f9RYO",
+                              "name": "Connect",
+                              "width": "fill_container",
+                              "fill": "$d-elev",
+                              "stroke": "$d-border",
+                              "strokeWidth": 1,
+                              "gap": 8,
+                              "padding": [
+                                7,
+                                8
+                              ],
+                              "alignItems": "center",
+                              "children": [
+                                {
+                                  "type": "icon",
+                                  "id": "GnIcD",
+                                  "name": "plug",
+                                  "width": 13,
+                                  "height": 13,
+                                  "icon": "plug",
+                                  "library": "lucide",
+                                  "fill": "$primary"
+                                },
+                                {
+                                  "type": "text",
+                                  "id": "kbXpl",
+                                  "name": "Connect your agent",
+                                  "fill": "$d-text",
+                                  "content": "Connect your agent",
+                                  "fontFamily": "$d-sans",
+                                  "fontSize": 12.5,
+                                  "fontWeight": "normal"
+                                },
+                                {
+                                  "type": "frame",
+                                  "id": "QzgXM",
+                                  "name": "Sp",
+                                  "width": "fill_container",
+                                  "height": 1
+                                },
+                                {
+                                  "type": "icon",
+                                  "id": "rbV09",
+                                  "name": "arrow-up-right",
+                                  "width": 12,
+                                  "height": 12,
+                                  "icon": "arrow-up-right",
+                                  "library": "lucide",
+                                  "fill": "$d-faint"
+                                }
+                              ]
+                            },
                             {
                               "type": "frame",
                               "id": "zaqB1",
@@ -91615,6 +91806,16 @@
                               "width": 14,
                               "height": 14,
                               "icon": "bell",
+                              "library": "lucide",
+                              "fill": "$d-faint"
+                            },
+                            {
+                              "type": "icon",
+                              "id": "sMJyi",
+                              "name": "settings",
+                              "width": 14,
+                              "height": 14,
+                              "icon": "settings",
                               "library": "lucide",
                               "fill": "$d-faint"
                             }
@@ -92371,7 +92572,12 @@
                               "id": "c7M6Yb",
                               "type": "ref",
                               "ref": "rXgFw",
-                              "name": "Status"
+                              "name": "Status",
+                              "descendants": {
+                                "OAvNr": {
+                                  "fill": "#E2A93B"
+                                }
+                              }
                             }
                           ]
                         },
@@ -93200,7 +93406,7 @@
                               "ref": "rXgFw",
                               "descendants": {
                                 "OAvNr": {
-                                  "fill": "$d-yellow"
+                                  "fill": "#E2A93B"
                                 },
                                 "Bmyq8": {
                                   "content": "In progress"
@@ -93484,7 +93690,7 @@
                               "ref": "rXgFw",
                               "descendants": {
                                 "OAvNr": {
-                                  "fill": "$d-blue"
+                                  "fill": "#14918A"
                                 },
                                 "Bmyq8": {
                                   "content": "In review"
@@ -95302,7 +95508,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "Bmyq8": {
                               "content": "In progress"
@@ -95768,7 +95974,7 @@
                       "id": "R4lg2",
                       "name": "is not Done",
                       "fill": "$d-text",
-                      "content": "is not Done",
+                      "content": "is not Merged",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -96051,7 +96257,7 @@
                       "content": "acme/web#412"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -96112,10 +96318,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -96145,7 +96351,7 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "ZojES/Bmyq8": {
                           "content": "In progress"
@@ -96188,10 +96394,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -96235,10 +96441,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -96285,7 +96491,7 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -96353,7 +96559,7 @@
                       "content": "infra/api!91"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -96490,7 +96696,7 @@
                       "content": "acme/web#397"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-blue"
+                      "fill": "#14918A"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In review"
@@ -96553,7 +96759,7 @@
                       "content": "JIRA OPS-219"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-blue"
+                      "fill": "#14918A"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In review"
@@ -96616,7 +96822,7 @@
                       "id": "xMtu0",
                       "name": "Todo",
                       "fill": "$d-text",
-                      "content": "Todo",
+                      "content": "Plan",
                       "fontFamily": "$d-mono",
                       "fontSize": 11.5,
                       "fontWeight": "normal"
@@ -96695,10 +96901,10 @@
                       "content": "infra/api!88"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#2B3A5C"
@@ -96763,10 +96969,10 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#2B3A5C"
@@ -96831,10 +97037,10 @@
                       "content": "acme/web#350"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#3F3552"
@@ -96899,10 +97105,10 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#4A2C26"
@@ -97041,13 +97247,13 @@
         "mode": "dark"
       },
       "descendants": {
-        "q5z0y3/mzzvD": {
+        "q5z0y3/VIPTQ": {
           "fill": "$d-hover"
         },
-        "q5z0y3/mzzvD/S2lzTN": {
+        "q5z0y3/VIPTQ/S2lzTN": {
           "fill": "$d-text"
         },
-        "q5z0y3/mzzvD/c24JVl": {
+        "q5z0y3/VIPTQ/c24JVl": {
           "fill": "$d-text"
         },
         "lxS9v": {
@@ -97236,7 +97442,7 @@
                           "id": "OGTJ8",
                           "name": "Backlog",
                           "fill": "$d-text",
-                          "content": "Backlog",
+                          "content": "Draft",
                           "fontFamily": "$d-mono",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
@@ -97525,7 +97731,7 @@
                           "id": "F3ab0L",
                           "name": "Todo",
                           "fill": "$d-text",
-                          "content": "Todo",
+                          "content": "Plan",
                           "fontFamily": "$d-mono",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
@@ -98705,7 +98911,7 @@
                           "id": "n1tf8",
                           "name": "Done",
                           "fill": "$d-text",
-                          "content": "Done",
+                          "content": "Merged",
                           "fontFamily": "$d-mono",
                           "fontSize": 11.5,
                           "fontWeight": "normal"
@@ -99249,10 +99455,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -99282,7 +99488,7 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "ZojES/Bmyq8": {
                           "content": "In progress"
@@ -99325,10 +99531,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -99372,10 +99578,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -99825,7 +100031,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "Bmyq8": {
                               "content": "In progress"
@@ -101045,10 +101251,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -101088,10 +101294,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -101135,10 +101341,10 @@
                           "fill": "$d-text"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -101207,7 +101413,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "Bmyq8": {
                               "content": "In progress"
@@ -102461,7 +102667,7 @@
                                       "id": "Rj4C3",
                                       "name": "Done 18",
                                       "fill": "$d-faint",
-                                      "content": "Done 18",
+                                      "content": "Merged 18",
                                       "fontFamily": "$d-mono",
                                       "fontSize": 10.5,
                                       "fontWeight": "normal"
@@ -102542,7 +102748,7 @@
                                       "id": "p51LPk",
                                       "name": "Todo 3",
                                       "fill": "$d-faint",
-                                      "content": "Todo 3",
+                                      "content": "Plan 3",
                                       "fontFamily": "$d-mono",
                                       "fontSize": 10.5,
                                       "fontWeight": "normal"
@@ -103537,13 +103743,13 @@
         "mode": "dark"
       },
       "descendants": {
-        "q5z0y3/vZtEb": {
+        "q5z0y3/gj40V": {
           "fill": "$d-hover"
         },
-        "q5z0y3/vZtEb/S2lzTN": {
+        "q5z0y3/gj40V/S2lzTN": {
           "fill": "$d-text"
         },
-        "q5z0y3/vZtEb/c24JVl": {
+        "q5z0y3/gj40V/c24JVl": {
           "fill": "$d-text"
         },
         "lxS9v": {
@@ -103729,7 +103935,7 @@
                           "id": "Xt7hi",
                           "name": "Todo",
                           "fill": "$d-faint",
-                          "content": "Todo",
+                          "content": "Plan",
                           "fontFamily": "$d-mono",
                           "fontSize": 10.5,
                           "fontWeight": "normal"
@@ -103822,7 +104028,7 @@
                           "id": "S8uNYb",
                           "name": "Done",
                           "fill": "$d-faint",
-                          "content": "Done",
+                          "content": "Merged",
                           "fontFamily": "$d-mono",
                           "fontSize": 10.5,
                           "fontWeight": "normal"
@@ -112288,7 +112494,7 @@
                           "id": "Q1ZxFB",
                           "name": "Todo",
                           "fill": "$d-text",
-                          "content": "Todo",
+                          "content": "Plan",
                           "fontFamily": "$d-mono",
                           "fontSize": 11,
                           "fontWeight": "normal"
@@ -112669,7 +112875,7 @@
                   "content": "Trama"
                 },
                 "VYFJs/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "VYFJs/Bmyq8": {
                   "content": "In progress"
@@ -112738,7 +112944,7 @@
                   "content": "infra/api!91"
                 },
                 "VYFJs/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "VYFJs/Bmyq8": {
                   "content": "In progress"
@@ -112796,7 +113002,7 @@
                   "content": "acme/web#397"
                 },
                 "VYFJs/OAvNr": {
-                  "fill": "$d-blue"
+                  "fill": "#14918A"
                 },
                 "VYFJs/Bmyq8": {
                   "content": "In review"
@@ -113086,14 +113292,14 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-faint"
+                  "fill": "#6E6A63"
                 },
                 {
                   "type": "text",
                   "id": "I95ijG",
                   "name": "Backlog",
                   "fill": "$d-text",
-                  "content": "Backlog",
+                  "content": "Draft",
                   "fontFamily": "$d-sans",
                   "fontSize": 13,
                   "fontWeight": "normal"
@@ -113136,14 +113342,14 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 {
                   "type": "text",
                   "id": "PfehC",
                   "name": "Todo",
                   "fill": "$d-text",
-                  "content": "Todo",
+                  "content": "Plan",
                   "fontFamily": "$d-sans",
                   "fontSize": 13,
                   "fontWeight": "normal"
@@ -113186,7 +113392,7 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 {
                   "type": "text",
@@ -113247,7 +113453,7 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-blue"
+                  "fill": "#14918A"
                 },
                 {
                   "type": "text",
@@ -113280,6 +113486,56 @@
             },
             {
               "type": "frame",
+              "id": "k9w5Tk",
+              "name": "S Needs input",
+              "width": "fill_container",
+              "height": 30,
+              "gap": 10,
+              "padding": [
+                0,
+                10
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "OL4iD",
+                  "name": "Dot",
+                  "width": 8,
+                  "height": 8,
+                  "fill": "#3D5BD9"
+                },
+                {
+                  "type": "text",
+                  "id": "kJtDW",
+                  "name": "Needs input",
+                  "fill": "$d-text",
+                  "content": "Needs input",
+                  "fontFamily": "$d-sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "A9tZF",
+                  "name": "Sp",
+                  "width": "fill_container",
+                  "height": 1
+                },
+                {
+                  "type": "text",
+                  "id": "OOCYi",
+                  "name": "4",
+                  "fill": "$d-faint",
+                  "content": "5",
+                  "fontFamily": "$d-mono",
+                  "fontSize": 10.5,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
               "id": "LaH2c",
               "name": "S Done",
               "width": "fill_container",
@@ -113297,14 +113553,14 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-green"
+                  "fill": "#7C5CC4"
                 },
                 {
                   "type": "text",
                   "id": "VdhIH",
                   "name": "Done",
                   "fill": "$d-text",
-                  "content": "Done",
+                  "content": "Merged",
                   "fontFamily": "$d-sans",
                   "fontSize": 13,
                   "fontWeight": "normal"
@@ -113321,7 +113577,7 @@
                   "id": "l9EDUi",
                   "name": "5",
                   "fill": "$d-faint",
-                  "content": "5",
+                  "content": "6",
                   "fontFamily": "$d-mono",
                   "fontSize": 10.5,
                   "fontWeight": "normal"
@@ -113347,14 +113603,14 @@
                   "name": "Dot",
                   "width": 8,
                   "height": 8,
-                  "fill": "$d-line"
+                  "fill": "#8A857C"
                 },
                 {
                   "type": "text",
                   "id": "oNlQJ",
                   "name": "Canceled",
                   "fill": "$d-text",
-                  "content": "Canceled",
+                  "content": "Discarded",
                   "fontFamily": "$d-sans",
                   "fontSize": 13,
                   "fontWeight": "normal"
@@ -113371,7 +113627,7 @@
                   "id": "b1wQD",
                   "name": "6",
                   "fill": "$d-faint",
-                  "content": "6",
+                  "content": "7",
                   "fontFamily": "$d-mono",
                   "fontSize": 10.5,
                   "fontWeight": "normal"
@@ -116664,10 +116920,10 @@
                   "content": "TRM-131"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 "c7M6Yb/Bmyq8": {
-                  "content": "Todo"
+                  "content": "Plan"
                 },
                 "dx4GI": {
                   "content": "Webhook retries drop GitLab events"
@@ -116713,7 +116969,7 @@
                   "content": "TRM-128"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -116929,7 +117185,7 @@
                       "id": "LfApr",
                       "name": "Not done",
                       "fill": "$d-text",
-                      "content": "Not done",
+                      "content": "Open",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -117008,7 +117264,7 @@
                   "name": "Dot",
                   "width": 7,
                   "height": 7,
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 {
                   "type": "text",
@@ -117042,7 +117298,7 @@
                   "content": "TRM-128"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -117081,7 +117337,7 @@
                   "content": "TRM-136"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -117144,14 +117400,14 @@
                   "name": "Dot",
                   "width": 7,
                   "height": 7,
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 {
                   "type": "text",
                   "id": "GeRyD",
                   "name": "Todo",
                   "fill": "$d-text",
-                  "content": "Todo",
+                  "content": "Plan",
                   "fontFamily": "$d-mono",
                   "fontSize": 11,
                   "fontWeight": "normal"
@@ -117178,10 +117434,10 @@
                   "content": "TRM-131"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 "c7M6Yb/Bmyq8": {
-                  "content": "Todo"
+                  "content": "Plan"
                 },
                 "dx4GI": {
                   "content": "Webhook retries drop GitLab events"
@@ -117227,10 +117483,10 @@
                   "content": "TRM-140"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 "c7M6Yb/Bmyq8": {
-                  "content": "Todo"
+                  "content": "Plan"
                 },
                 "dx4GI": {
                   "content": "Write onboarding copy for connector"
@@ -117419,7 +117675,7 @@
                       "ref": "rXgFw",
                       "descendants": {
                         "OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "Bmyq8": {
                           "content": "In progress"
@@ -118735,10 +118991,10 @@
                       "ref": "rXgFw",
                       "descendants": {
                         "OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         }
                       }
                     },
@@ -119652,7 +119908,7 @@
                   "content": "TRM-128"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -119691,7 +119947,7 @@
                   "content": "TRM-136"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -119740,10 +119996,10 @@
                   "content": "TRM-131"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 "c7M6Yb/Bmyq8": {
-                  "content": "Todo"
+                  "content": "Plan"
                 },
                 "dx4GI": {
                   "content": "Webhook retries drop GitLab events"
@@ -119992,7 +120248,7 @@
                       "id": "ZgS36",
                       "name": "Todo",
                       "fill": "$d-text",
-                      "content": "Todo",
+                      "content": "Plan",
                       "fontFamily": "$d-sans",
                       "fontSize": 13.5,
                       "fontWeight": "normal"
@@ -120302,7 +120558,7 @@
                   "content": "TRM-128"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -120341,7 +120597,7 @@
                   "content": "TRM-136"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 "c7M6Yb/Bmyq8": {
                   "content": "In progress"
@@ -120390,10 +120646,10 @@
                   "content": "TRM-131"
                 },
                 "c7M6Yb/OAvNr": {
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 "c7M6Yb/Bmyq8": {
-                  "content": "Todo"
+                  "content": "Plan"
                 },
                 "dx4GI": {
                   "content": "Webhook retries drop GitLab events"
@@ -120569,14 +120825,14 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-faint"
+                  "fill": "#6E6A63"
                 },
                 {
                   "type": "text",
                   "id": "hpu1G",
                   "name": "Backlog",
                   "fill": "$d-text",
-                  "content": "Backlog",
+                  "content": "Draft",
                   "fontFamily": "$d-sans",
                   "fontSize": 15,
                   "fontWeight": "normal"
@@ -120609,14 +120865,14 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-muted"
+                  "fill": "#C9C3B8"
                 },
                 {
                   "type": "text",
                   "id": "ntGPU",
                   "name": "Todo",
                   "fill": "$d-text",
-                  "content": "Todo",
+                  "content": "Plan",
                   "fontFamily": "$d-sans",
                   "fontSize": 15,
                   "fontWeight": "normal"
@@ -120650,7 +120906,7 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-yellow"
+                  "fill": "#E2A93B"
                 },
                 {
                   "type": "text",
@@ -120700,7 +120956,7 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-blue"
+                  "fill": "#14918A"
                 },
                 {
                   "type": "text",
@@ -120715,6 +120971,46 @@
                 {
                   "type": "frame",
                   "id": "EosOW",
+                  "name": "Sp",
+                  "width": "fill_container",
+                  "height": 1
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "FFuzP",
+              "name": "S Needs input",
+              "width": "fill_container",
+              "height": 44,
+              "gap": 12,
+              "padding": [
+                0,
+                12
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "cZHb1",
+                  "name": "Dot",
+                  "width": 9,
+                  "height": 9,
+                  "fill": "#3D5BD9"
+                },
+                {
+                  "type": "text",
+                  "id": "pm7be",
+                  "name": "Needs input",
+                  "fill": "$d-text",
+                  "content": "Needs input",
+                  "fontFamily": "$d-sans",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "V9Jpc",
                   "name": "Sp",
                   "width": "fill_container",
                   "height": 1
@@ -120740,14 +121036,14 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-green"
+                  "fill": "#7C5CC4"
                 },
                 {
                   "type": "text",
                   "id": "b5pkCq",
                   "name": "Done",
                   "fill": "$d-text",
-                  "content": "Done",
+                  "content": "Merged",
                   "fontFamily": "$d-sans",
                   "fontSize": 15,
                   "fontWeight": "normal"
@@ -120780,14 +121076,14 @@
                   "name": "Dot",
                   "width": 9,
                   "height": 9,
-                  "fill": "$d-line"
+                  "fill": "#8A857C"
                 },
                 {
                   "type": "text",
                   "id": "btQQb",
                   "name": "Canceled",
                   "fill": "$d-text",
-                  "content": "Canceled",
+                  "content": "Discarded",
                   "fontFamily": "$d-sans",
                   "fontSize": 15,
                   "fontWeight": "normal"
@@ -124099,7 +124395,7 @@
                       "id": "U17yh",
                       "name": "  ✓ Todo → In progress (",
                       "fill": "$d-green",
-                      "content": "  ✓ Todo → In progress (asked by Alessandro)",
+                      "content": "  ✓ Plan → In progress (asked by Alessandro)",
                       "fontFamily": "$d-mono",
                       "fontSize": 11.5,
                       "fontWeight": "normal"
@@ -137101,7 +137397,7 @@
                           "id": "ZbonM",
                           "name": "each mark is a Done task",
                           "fill": "$d-faint",
-                          "content": "each mark is a Done task",
+                          "content": "each mark is a Merged task",
                           "fontFamily": "$d-mono",
                           "fontSize": 10.5,
                           "fontWeight": "normal"
@@ -140709,7 +141005,7 @@
                       "fill": "$d-faint",
                       "textGrowth": "fixed-width",
                       "width": "fill_container",
-                      "content": "Done tasks keep their value; the gap teaches the curve.",
+                      "content": "Merged tasks keep their value; the gap teaches the curve.",
                       "lineHeight": 1.5,
                       "fontFamily": "$d-mono",
                       "fontSize": 10.5,
@@ -156155,10 +156451,10 @@
                                       "content": "1"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-green"
+                                      "fill": "#7C5CC4"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Done"
+                                      "content": "Merged"
                                     },
                                     "ag0zX": {
                                       "fill": "#2B3A5C"
@@ -156188,7 +156484,7 @@
                                       "content": "2"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-yellow"
+                                      "fill": "#E2A93B"
                                     },
                                     "ZojES/Bmyq8": {
                                       "content": "In progress"
@@ -156231,10 +156527,10 @@
                                       "content": "2"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-muted"
+                                      "fill": "#C9C3B8"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Todo"
+                                      "content": "Plan"
                                     },
                                     "ag0zX": {
                                       "fill": "#2B3A5C"
@@ -156278,10 +156574,10 @@
                                       "content": "1"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-green"
+                                      "fill": "#7C5CC4"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Done"
+                                      "content": "Merged"
                                     },
                                     "ag0zX": {
                                       "fill": "#4A2C26"
@@ -156750,7 +157046,7 @@
                                       "ref": "rXgFw",
                                       "descendants": {
                                         "OAvNr": {
-                                          "fill": "$d-yellow"
+                                          "fill": "#E2A93B"
                                         },
                                         "Bmyq8": {
                                           "content": "In progress"
@@ -164926,7 +165222,7 @@
                                       "id": "FRMx6",
                                       "name": "L",
                                       "fill": "$d-muted",
-                                      "content": "Done",
+                                      "content": "Merged",
                                       "fontFamily": "$d-sans",
                                       "fontSize": 12,
                                       "fontWeight": "normal"
@@ -165228,10 +165524,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -165261,7 +165557,7 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "ZojES/Bmyq8": {
                           "content": "In progress"
@@ -165304,10 +165600,10 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -165351,10 +165647,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -165804,7 +166100,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "Bmyq8": {
                               "content": "In progress"
@@ -167108,7 +167404,7 @@
                       "id": "uZlpx",
                       "name": "C",
                       "fill": "$d-text",
-                      "content": "Done",
+                      "content": "Merged",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -170204,7 +170500,7 @@
                       "id": "wUJ37",
                       "name": "C",
                       "fill": "$d-text",
-                      "content": "Canceled",
+                      "content": "Discarded",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -171189,7 +171485,7 @@
                       "id": "vs1Ox",
                       "name": "T",
                       "fill": "$d-text",
-                      "content": "Todo",
+                      "content": "Plan",
                       "fontFamily": "$d-sans",
                       "fontSize": 13.5,
                       "fontWeight": "500"
@@ -171857,7 +172153,7 @@
                       "id": "LJDBI",
                       "name": "T",
                       "fill": "$d-text",
-                      "content": "Backlog",
+                      "content": "Draft",
                       "fontFamily": "$d-sans",
                       "fontSize": 13.5,
                       "fontWeight": "500"
@@ -172372,7 +172668,7 @@
                       "id": "qkzps",
                       "name": "T",
                       "fill": "$d-text",
-                      "content": "Done",
+                      "content": "Merged",
                       "fontFamily": "$d-sans",
                       "fontSize": 13.5,
                       "fontWeight": "500"
@@ -172815,13 +173111,13 @@
           "name": "App · Board (Trama Roadmap view)",
           "theme": {},
           "descendants": {
-            "q5z0y3/mzzvD": {
+            "q5z0y3/VIPTQ": {
               "fill": "$d-hover"
             },
-            "q5z0y3/mzzvD/S2lzTN": {
+            "q5z0y3/VIPTQ/S2lzTN": {
               "fill": "$d-text"
             },
-            "q5z0y3/mzzvD/c24JVl": {
+            "q5z0y3/VIPTQ/c24JVl": {
               "fill": "$d-text"
             },
             "lxS9v": {
@@ -173010,7 +173306,7 @@
                               "id": "hins4",
                               "name": "Backlog",
                               "fill": "$d-text",
-                              "content": "Backlog",
+                              "content": "Draft",
                               "fontFamily": "$d-mono",
                               "fontSize": 11.5,
                               "fontWeight": "normal"
@@ -173299,7 +173595,7 @@
                               "id": "Nr4qS",
                               "name": "Todo",
                               "fill": "$d-text",
-                              "content": "Todo",
+                              "content": "Plan",
                               "fontFamily": "$d-mono",
                               "fontSize": 11.5,
                               "fontWeight": "normal"
@@ -174479,7 +174775,7 @@
                               "id": "c66yL",
                               "name": "Done",
                               "fill": "$d-text",
-                              "content": "Done",
+                              "content": "Merged",
                               "fontFamily": "$d-mono",
                               "fontSize": 11.5,
                               "fontWeight": "normal"
@@ -179529,7 +179825,7 @@
                           "id": "NZEY3",
                           "name": "T",
                           "fill": "$d-text",
-                          "content": "Todo",
+                          "content": "Plan",
                           "fontFamily": "$d-sans",
                           "fontSize": 13.5,
                           "fontWeight": "500"
@@ -180197,7 +180493,7 @@
                           "id": "o6bG4",
                           "name": "T",
                           "fill": "$d-text",
-                          "content": "Backlog",
+                          "content": "Draft",
                           "fontFamily": "$d-sans",
                           "fontSize": 13.5,
                           "fontWeight": "500"
@@ -180712,7 +181008,7 @@
                           "id": "boJAH",
                           "name": "T",
                           "fill": "$d-text",
-                          "content": "Done",
+                          "content": "Merged",
                           "fontFamily": "$d-sans",
                           "fontSize": 13.5,
                           "fontWeight": "500"
@@ -183526,7 +183822,7 @@
                           "id": "xaoZS",
                           "name": "L",
                           "fill": "$d-text",
-                          "content": "Done",
+                          "content": "Merged",
                           "fontFamily": "$d-mono",
                           "fontSize": 12.5,
                           "fontWeight": "normal"
@@ -183738,7 +184034,7 @@
                           "id": "PMxkV",
                           "name": "L",
                           "fill": "$d-text",
-                          "content": "Done",
+                          "content": "Merged",
                           "fontFamily": "$d-mono",
                           "fontSize": 12.5,
                           "fontWeight": "normal"
@@ -185755,7 +186051,7 @@
                       "id": "s6cl9",
                       "name": "is not Done",
                       "fill": "$d-text",
-                      "content": "is not Done",
+                      "content": "is not Merged",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -186038,7 +186334,7 @@
                       "content": "acme/web#412"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -186099,10 +186395,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -186132,7 +186428,7 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "ZojES/Bmyq8": {
                           "content": "In progress"
@@ -186175,10 +186471,10 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -186222,10 +186518,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -186272,7 +186568,7 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -186340,7 +186636,7 @@
                       "content": "infra/api!91"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-yellow"
+                      "fill": "#E2A93B"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In progress"
@@ -186477,7 +186773,7 @@
                       "content": "acme/web#397"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-blue"
+                      "fill": "#14918A"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In review"
@@ -186540,7 +186836,7 @@
                       "content": "JIRA OPS-219"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-blue"
+                      "fill": "#14918A"
                     },
                     "VYFJs/Bmyq8": {
                       "content": "In review"
@@ -186603,7 +186899,7 @@
                       "id": "xKZAa",
                       "name": "Todo",
                       "fill": "$d-text",
-                      "content": "Todo",
+                      "content": "Plan",
                       "fontFamily": "$d-mono",
                       "fontSize": 11.5,
                       "fontWeight": "normal"
@@ -186682,10 +186978,10 @@
                       "content": "infra/api!88"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#2B3A5C"
@@ -186750,10 +187046,10 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#2B3A5C"
@@ -186818,10 +187114,10 @@
                       "content": "acme/web#350"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#3F3552"
@@ -186886,10 +187182,10 @@
                       "content": "Trama"
                     },
                     "VYFJs/OAvNr": {
-                      "fill": "$d-muted"
+                      "fill": "#C9C3B8"
                     },
                     "VYFJs/Bmyq8": {
-                      "content": "Todo"
+                      "content": "Plan"
                     },
                     "Q4LkOR": {
                       "fill": "#4A2C26"
@@ -187367,7 +187663,7 @@
                                       "id": "tQeI7",
                                       "name": "L",
                                       "fill": "$d-muted",
-                                      "content": "Done",
+                                      "content": "Merged",
                                       "fontFamily": "$d-sans",
                                       "fontSize": 12,
                                       "fontWeight": "normal"
@@ -187669,10 +187965,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -187702,7 +187998,7 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-yellow"
+                          "fill": "#E2A93B"
                         },
                         "ZojES/Bmyq8": {
                           "content": "In progress"
@@ -187745,10 +188041,10 @@
                           "content": "2"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-muted"
+                          "fill": "#C9C3B8"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Todo"
+                          "content": "Plan"
                         },
                         "ag0zX": {
                           "fill": "#2B3A5C"
@@ -187792,10 +188088,10 @@
                           "content": "1"
                         },
                         "ZojES/OAvNr": {
-                          "fill": "$d-green"
+                          "fill": "#7C5CC4"
                         },
                         "ZojES/Bmyq8": {
-                          "content": "Done"
+                          "content": "Merged"
                         },
                         "ag0zX": {
                           "fill": "#4A2C26"
@@ -188245,7 +188541,7 @@
                           "ref": "rXgFw",
                           "descendants": {
                             "OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "Bmyq8": {
                               "content": "In progress"
@@ -192116,7 +192412,7 @@
                       "id": "KudOA",
                       "name": "C",
                       "fill": "$d-text",
-                      "content": "Done",
+                      "content": "Merged",
                       "fontFamily": "$d-mono",
                       "fontSize": 11,
                       "fontWeight": "normal"
@@ -195501,10 +195797,10 @@
                                       "content": "1"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-green"
+                                      "fill": "#7C5CC4"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Done"
+                                      "content": "Merged"
                                     },
                                     "ag0zX": {
                                       "fill": "#2B3A5C"
@@ -195534,7 +195830,7 @@
                                       "content": "2"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-yellow"
+                                      "fill": "#E2A93B"
                                     },
                                     "ZojES/Bmyq8": {
                                       "content": "In progress"
@@ -195577,10 +195873,10 @@
                                       "content": "2"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-muted"
+                                      "fill": "#C9C3B8"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Todo"
+                                      "content": "Plan"
                                     },
                                     "ag0zX": {
                                       "fill": "#2B3A5C"
@@ -195624,10 +195920,10 @@
                                       "content": "1"
                                     },
                                     "ZojES/OAvNr": {
-                                      "fill": "$d-green"
+                                      "fill": "#7C5CC4"
                                     },
                                     "ZojES/Bmyq8": {
-                                      "content": "Done"
+                                      "content": "Merged"
                                     },
                                     "ag0zX": {
                                       "fill": "#4A2C26"
@@ -196077,7 +196373,7 @@
                                       "ref": "rXgFw",
                                       "descendants": {
                                         "OAvNr": {
-                                          "fill": "$d-yellow"
+                                          "fill": "#E2A93B"
                                         },
                                         "Bmyq8": {
                                           "content": "In progress"
@@ -216777,10 +217073,10 @@
                               "content": "1"
                             },
                             "ZojES/OAvNr": {
-                              "fill": "$d-green"
+                              "fill": "#7C5CC4"
                             },
                             "ZojES/Bmyq8": {
-                              "content": "Done"
+                              "content": "Merged"
                             },
                             "ag0zX": {
                               "fill": "#2B3A5C"
@@ -216810,7 +217106,7 @@
                               "content": "2"
                             },
                             "ZojES/OAvNr": {
-                              "fill": "$d-yellow"
+                              "fill": "#E2A93B"
                             },
                             "ZojES/Bmyq8": {
                               "content": "In progress"
@@ -216853,10 +217149,10 @@
                               "content": "2"
                             },
                             "ZojES/OAvNr": {
-                              "fill": "$d-muted"
+                              "fill": "#C9C3B8"
                             },
                             "ZojES/Bmyq8": {
-                              "content": "Todo"
+                              "content": "Plan"
                             },
                             "ag0zX": {
                               "fill": "#2B3A5C"
@@ -216900,10 +217196,10 @@
                               "content": "1"
                             },
                             "ZojES/OAvNr": {
-                              "fill": "$d-green"
+                              "fill": "#7C5CC4"
                             },
                             "ZojES/Bmyq8": {
-                              "content": "Done"
+                              "content": "Merged"
                             },
                             "ag0zX": {
                               "fill": "#4A2C26"
@@ -217353,7 +217649,7 @@
                               "ref": "rXgFw",
                               "descendants": {
                                 "OAvNr": {
-                                  "fill": "$d-yellow"
+                                  "fill": "#E2A93B"
                                 },
                                 "Bmyq8": {
                                   "content": "In progress"
@@ -247318,7 +247614,7 @@
                           "id": "wT3td",
                           "name": "CLOSED → DONE",
                           "fill": "$d-faint",
-                          "content": "CLOSED → DONE",
+                          "content": "CLOSED → MERGED",
                           "fontFamily": "$d-mono",
                           "fontSize": 10.5,
                           "fontWeight": "normal"
@@ -248892,7 +249188,7 @@
                                       "id": "wdWtX",
                                       "name": "Done",
                                       "fill": "$d-text-2",
-                                      "content": "Done",
+                                      "content": "Merged",
                                       "fontFamily": "$d-mono",
                                       "fontSize": 10.5,
                                       "fontWeight": "normal"
@@ -249033,7 +249329,7 @@
                                       "id": "x6A5h",
                                       "name": "Done",
                                       "fill": "$d-text-2",
-                                      "content": "Done",
+                                      "content": "Merged",
                                       "fontFamily": "$d-mono",
                                       "fontSize": 10.5,
                                       "fontWeight": "normal"
@@ -266897,7 +267193,7 @@
                                           "id": "AF6UV",
                                           "name": "Done 18",
                                           "fill": "$d-faint",
-                                          "content": "Done 18",
+                                          "content": "Merged 18",
                                           "fontFamily": "$d-mono",
                                           "fontSize": 10.5,
                                           "fontWeight": "normal"
@@ -266978,7 +267274,7 @@
                                           "id": "eOaTP",
                                           "name": "Todo 3",
                                           "fill": "$d-faint",
-                                          "content": "Todo 3",
+                                          "content": "Plan 3",
                                           "fontFamily": "$d-mono",
                                           "fontSize": 10.5,
                                           "fontWeight": "normal"
@@ -268921,7 +269217,7 @@
                       "id": "SOaG2",
                       "name": "Done",
                       "fill": "$d-text-2",
-                      "content": "Done",
+                      "content": "Merged",
                       "fontFamily": "$d-mono",
                       "fontSize": 12,
                       "fontWeight": "normal"
@@ -268945,8 +269241,8 @@
         "mode": "dark"
       },
       "clip": true,
-      "width": 1800,
-      "height": 1000,
+      "width": 1860,
+      "height": 1120,
       "fill": "$d-bg-deep",
       "gap": 56,
       "padding": [
@@ -269021,7 +269317,7 @@
                   "name": "Sidebar personal",
                   "x": 0,
                   "y": 0,
-                  "height": 720,
+                  "height": 840,
                   "descendants": {
                     "u3Y70Y": {
                       "content": "Alessandro"
@@ -269032,16 +269328,34 @@
                     "H97ssA": {
                       "enabled": false
                     },
+                    "T9QFLt/HnfM6": {
+                      "content": "18"
+                    },
                     "O06UxA": {
                       "enabled": false
                     },
                     "uIxcO": {
                       "enabled": false
                     },
-                    "Gtvoo": {
+                    "f7Pf7": {
                       "enabled": false
                     },
-                    "CJSlO": {
+                    "FxjOA": {
+                      "enabled": false
+                    },
+                    "gj40V": {
+                      "enabled": false
+                    },
+                    "VIPTQ": {
+                      "enabled": false
+                    },
+                    "sx1fU": {
+                      "enabled": false
+                    },
+                    "C7air": {
+                      "enabled": false
+                    },
+                    "Gtvoo": {
                       "enabled": false
                     }
                   }
@@ -269117,7 +269431,7 @@
                   "name": "Sidebar with shared",
                   "x": 0,
                   "y": 0,
-                  "height": 720,
+                  "height": 840,
                   "descendants": {
                     "u3Y70Y": {
                       "content": "Alessandro"
@@ -269125,13 +269439,31 @@
                     "V6iyL": {
                       "content": "personal · 1 more workspace"
                     },
+                    "T9QFLt/HnfM6": {
+                      "content": "18"
+                    },
                     "O06UxA": {
                       "enabled": false
                     },
                     "uIxcO": {
                       "enabled": false
                     },
-                    "CJSlO": {
+                    "f7Pf7": {
+                      "enabled": false
+                    },
+                    "FxjOA": {
+                      "enabled": false
+                    },
+                    "gj40V": {
+                      "enabled": false
+                    },
+                    "VIPTQ": {
+                      "enabled": false
+                    },
+                    "sx1fU": {
+                      "enabled": false
+                    },
+                    "C7air": {
                       "enabled": false
                     }
                   }
@@ -269207,7 +269539,7 @@
                   "name": "Sidebar acme",
                   "x": 0,
                   "y": 0,
-                  "height": 720,
+                  "height": 840,
                   "descendants": {
                     "HKodp": {
                       "fill": "$d-hover"
@@ -269218,7 +269550,7 @@
                   "type": "frame",
                   "id": "hqB52",
                   "x": 200,
-                  "y": 526,
+                  "y": 656,
                   "name": "Menu",
                   "width": 220,
                   "fill": "$d-elev",
@@ -269429,7 +269761,7 @@
                   "type": "frame",
                   "id": "thD63",
                   "x": 416,
-                  "y": 556,
+                  "y": 686,
                   "name": "Submenu",
                   "width": 200,
                   "fill": "$d-elev",
