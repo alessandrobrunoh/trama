@@ -15,7 +15,9 @@ import { Router } from '@angular/router';
 import {
   LucideCircleDot,
   LucideDynamicIcon,
+  LucideFileCode,
   LucideFlag,
+  LucideHistory,
   LucideListTree,
   LucidePlus,
   LucideSearch,
@@ -34,7 +36,7 @@ import { MilestoneActions } from '../milestones/milestone-actions';
 import { Kbd } from '../../shared/kbd';
 import { StatusIcon, type AnyStatus, type StatusEntity } from '../../shared/status';
 import { fuzzyScore } from './fuzzy';
-import { SearchService, type HitType, type SearchHit } from './search.service';
+import { RECORD_HIT_TYPES, SearchService, type HitType, type SearchHit } from './search.service';
 
 interface Cmd {
   id: string;
@@ -49,8 +51,8 @@ interface Cmd {
   run: () => void;
 }
 
-/** The only thing the palette searches: tasks. */
-const RESULT_TYPE: HitType = 'issue';
+/** Tasks, and what agents keep about them in their thread records (decisions, the records themselves). */
+const RESULT_TYPES: readonly HitType[] = ['issue', ...RECORD_HIT_TYPES];
 
 /** Static items are fuzzy-filtered by the command; result items (value starts with \u0001) always show. */
 export function commandFilter(value: string, search: string): boolean {
@@ -147,7 +149,7 @@ export const COMMAND_DIALOG_CLASS =
         } @else if (query().trim()) {
           <p class="text-foreground">No results for “{{ query().trim() }}”</p>
         } @else {
-          <p>Search tasks.</p>
+          <p>Search tasks and thread records.</p>
         }
       </div>
 
@@ -204,6 +206,34 @@ export const COMMAND_DIALOG_CLASS =
             </hlm-command-group>
           }
 
+          @if (recordResults().length) {
+            <hlm-command-group>
+              <hlm-command-group-label>In thread records</hlm-command-group-label>
+              @for (h of recordResults(); track h.type + h.id) {
+                <button
+                  hlmCommandItem
+                  [value]="'\\u0001' + h.type + ':' + h.id + ':' + h.title"
+                  (selected)="open(h)"
+                >
+                  <svg
+                    [lucideIcon]="h.type === 'decision' ? decisionIcon : recordIcon"
+                    [size]="14"
+                    class="text-muted-foreground shrink-0"
+                    aria-hidden="true"
+                  ></svg>
+                  <span class="min-w-0 truncate">{{ h.type === 'decision' ? '“' + h.title + '”' : h.title }}</span>
+                  <span class="text-faint shrink-0 font-mono text-[10.5px]">{{ h.type }}{{ h.key ? ' · ' + h.key : '' }}</span>
+                  <span class="min-w-0 flex-1"></span>
+                  <span
+                    class="text-faint shrink-0 font-mono text-[10.5px] opacity-0 max-sm:hidden [[data-selected]_&]:opacity-100"
+                    aria-hidden="true"
+                    >↵</span
+                  >
+                </button>
+              }
+            </hlm-command-group>
+          }
+
           @if (mode() === 'palette') {
             <hlm-command-group>
               <hlm-command-group-label>Actions</hlm-command-group-label>
@@ -231,7 +261,7 @@ export const COMMAND_DIALOG_CLASS =
         <span>↑↓ navigate</span>
         <span>↵ open</span>
         <span class="flex-1"></span>
-        <span>{{ loading() ? 'Searching…' : 'Searches tasks' }}</span>
+        <span>{{ loading() ? 'Searching…' : 'Searches tasks and thread records' }}</span>
       </div>
     </hlm-command>
   `,
@@ -249,6 +279,8 @@ export class CommandPanel {
 
   protected readonly filter = commandFilter;
   protected readonly searchIcon = LucideSearch;
+  protected readonly decisionIcon = LucideHistory;
+  protected readonly recordIcon = LucideFileCode;
 
   protected readonly query = signal('');
   protected readonly page = signal<'root' | 'status' | 'milestone'>('root');
@@ -271,9 +303,17 @@ export class CommandPanel {
     const q = this.query().trim();
     if (!q || this.page() !== 'root') return [];
     const r = this.remote();
-    if (r && r.q === q && r.hits.length) return r.hits.filter((h) => h.type === RESULT_TYPE);
+    if (r && r.q === q && r.hits.length) return r.hits.filter((h) => h.type === 'issue');
     // Remote still pending / failed / empty: show what the snapshot knows right now.
-    return this.searchSvc.local(q, 8, RESULT_TYPE);
+    return this.searchSvc.local(q, 8, 'issue');
+  });
+
+  /** "In thread records": decisions and records of tasks. Only the server knows them, so there is no local fallback. */
+  protected readonly recordResults = computed<SearchHit[]>(() => {
+    const q = this.query().trim();
+    const r = this.remote();
+    if (!q || this.page() !== 'root' || !r || r.q !== q) return [];
+    return r.hits.filter((h) => RECORD_HIT_TYPES.includes(h.type)).slice(0, 8);
   });
 
   protected statusOf(id: string): AnyStatus {
@@ -462,7 +502,7 @@ export class CommandPanel {
     this.loading.set(true);
     this.timer = setTimeout(async () => {
       try {
-        const hits = await this.searchSvc.remote(q, 24, [RESULT_TYPE]);
+        const hits = await this.searchSvc.remote(q, 24, RESULT_TYPES);
         if (gen === this.gen) this.remote.set({ q, hits });
       } catch {
         if (gen === this.gen) this.remote.set(null); // offline / endpoint missing: local results stay

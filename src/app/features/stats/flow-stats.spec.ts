@@ -68,6 +68,12 @@ describe('tracked time', () => {
     expect(map.size).toBe(1);
   });
 
+  it('does not count suggested entries', () => {
+    const suggested: TimeEntry = { ...entry('a', 3, 1), source: 'suggested' };
+    expect(trackedByIssue([suggested, entry('a', 5, 1)]).get('a')).toBe(HOUR);
+    expect(trackedIn([suggested], { from: NOW - 10 * HOUR, to: NOW })).toBe(0);
+  });
+
   it('cuts entries at the range edges and can filter by person', () => {
     const entries = [entry('a', 30, 4), entry('a', 2, 1, 'u2')];
     const range = { from: NOW - 28 * HOUR, to: NOW };

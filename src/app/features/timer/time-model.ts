@@ -116,6 +116,7 @@ export interface Seg {
 export function segments(entries: readonly TimeEntry[], now: number): Seg[] {
   const out: Seg[] = [];
   for (const e of entries) {
+    if (e.source === 'suggested') continue; // counts only once a person accepts it
     const start = Date.parse(e.startedAt);
     const end = e.endedAt ? Date.parse(e.endedAt) : now;
     if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
@@ -211,6 +212,39 @@ export function entriesOnDay(segs: readonly Seg[], day: WeekDay): DayEntry[] {
     out.push({ seg, from: Math.max(seg.start, day.from), to: Math.min(seg.end, day.to), ms });
   }
   return out.sort((a, b) => a.from - b.from);
+}
+
+// ───────────────────────────── suggested time ─────────────────────────────
+
+/** A time entry `trama sync` suggested from a thread's active time, as the mobile Time card words it. */
+export interface SuggestionCard {
+  id: string;
+  issueId: string | null;
+  /** `25m`. */
+  amount: string;
+  /** `Tue 07:30 – 07:55 · thread was active`. */
+  when: string;
+}
+
+/** The suggested entries as cards, newest first. Entries that are not suggestions or have no end are skipped. */
+export function suggestionCards(entries: readonly TimeEntry[]): SuggestionCard[] {
+  const out: { card: SuggestionCard; end: number }[] = [];
+  for (const e of entries) {
+    if (e.source !== 'suggested' || !e.endedAt) continue;
+    const start = Date.parse(e.startedAt);
+    const end = Date.parse(e.endedAt);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) continue;
+    out.push({
+      end,
+      card: {
+        id: e.id,
+        issueId: e.issueId,
+        amount: hoursMinutes(end - start),
+        when: `${format(start, 'EEE HH:mm')} – ${format(end, 'HH:mm')} · thread was active`,
+      },
+    });
+  }
+  return out.sort((a, b) => b.end - a.end).map((x) => x.card);
 }
 
 // ───────────────────────────── the report ─────────────────────────────

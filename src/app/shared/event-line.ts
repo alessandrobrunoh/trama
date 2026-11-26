@@ -38,6 +38,7 @@ import { EntityChip, type EntityChipType } from './entity-chip';
 import { FullDatePipe } from './pipes';
 import { StatusIcon, type AnyStatus, type StatusEntity } from './status';
 import { AgoPipe } from './ago';
+import { threadSyncParts } from './thread-sync-event';
 
 /** Coarse event family, used by the Activity page filters. */
 export type EventCategory = 'issue' | 'artifact' | 'comment' | 'other';
@@ -206,6 +207,15 @@ export function describeEvent(e: DomainEvent, store: TramaStore, slug: string): 
         detail: ids.length
           ? `${ids.length} legacy workstream link${ids.length === 1 ? '' : 's'}`
           : 'This event predates Issue-only associations.',
+      };
+    }
+    case 'issue.thread_synced': {
+      const parts = threadSyncParts(d);
+      return {
+        icon: LucideBot,
+        verb: 'synced the record of',
+        subject: issueRef(),
+        detail: parts.length ? parts.join(' · ') : undefined,
       };
     }
     case 'dependency.added':

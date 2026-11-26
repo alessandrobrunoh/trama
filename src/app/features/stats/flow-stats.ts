@@ -71,8 +71,12 @@ export function periodRanges(period: Period, now: number): { cur: Range; prev: R
 
 // ───────────────────────────── tracked time ─────────────────────────────
 
-/** Length of a finished entry in ms; a running timer (no end) or a broken one has no length yet. */
+/**
+ * Length of a finished entry in ms; a running timer (no end) or a broken one has no length yet. A suggested entry
+ * (from `trama sync`) has none either: it counts only once a person accepts it.
+ */
 export function entryMs(e: TimeEntry): number | undefined {
+  if (e.source === 'suggested') return undefined;
   const start = ms(e.startedAt);
   const end = ms(e.endedAt ?? undefined);
   if (start === undefined || end === undefined || end < start) return undefined;
@@ -120,7 +124,7 @@ export interface ActivityInput {
 export function activityLookup(input: ActivityInput): (issue: Issue) => number {
   const timeAt = new Map<string, number>();
   for (const e of input.entries) {
-    if (!e.issueId) continue;
+    if (!e.issueId || e.source === 'suggested') continue;
     const at = e.endedAt ? ms(e.endedAt) : input.now;
     if (at !== undefined && at > (timeAt.get(e.issueId) ?? 0)) timeAt.set(e.issueId, at);
   }

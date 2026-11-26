@@ -39,6 +39,7 @@ import {
   hoursMinutes,
   mondayOf,
   segments,
+  suggestionCards,
   toCsv,
   weekDays,
   weekTitle,
@@ -163,6 +164,26 @@ type Composer = 'closed' | 'start';
               <button hlmBtn variant="outline" type="button" (click)="composer.set('closed')">Cancel</button>
             </div>
           </form>
+        }
+
+        <!-- time suggested from a thread's active time (v3 mobile "10 My time"): it counts once you add it -->
+        @if (suggestions().length) {
+          <div class="flex flex-col gap-3 md:hidden">
+            @for (s of suggestions(); track s.id) {
+              <div class="bg-card border-delta-line flex flex-col gap-2 border border-l-2 px-3.5 py-3" role="group" aria-label="Suggested time">
+                <div class="flex items-center gap-2">
+                  <span class="text-delta font-mono text-[10px] leading-[13px]">SUGGESTED{{ issueKey(s.issueId) ? ' · ' + issueKey(s.issueId) : '' }}</span>
+                  <span class="flex-1"></span>
+                  <span class="text-foreground text-[14px] leading-[18px] font-semibold">{{ s.amount }}</span>
+                </div>
+                <p class="text-text-2 text-[13px] leading-[18px]">{{ s.when }}</p>
+                <div class="flex gap-2">
+                  <button hlmBtn type="button" class="h-9 flex-1" [disabled]="timers.busy()" (click)="timers.accept(s.id)">Add</button>
+                  <button hlmBtn variant="outline" type="button" class="h-9 flex-1" [disabled]="timers.busy()" (click)="timers.dismiss(s.id)">Dismiss</button>
+                </div>
+              </div>
+            }
+          </div>
         }
 
         <!-- week -->
@@ -380,6 +401,8 @@ export class TimerPage {
     segments(this.timers.entries(), this.running() ? this.now() : this.dayStamp()),
   );
   private readonly issuesById = computed(() => new Map(this.store.issues().map((i) => [i.id, i])));
+  /** Time `trama sync` suggested; shown on phones only, as in the mobile "My time" frame. */
+  protected readonly suggestions = computed(() => suggestionCards(this.timers.suggestions()));
   protected readonly grid = computed(() => buildGrid(this.segs(), this.days(), this.issuesById()));
   private readonly lastWeekTotal = computed(() => {
     const prev = weekDays(addDays(this.monday(), -7).getTime(), this.dayStamp());
@@ -443,7 +466,10 @@ export class TimerPage {
     inject(DestroyRef).onDestroy(() => clearInterval(tick));
     effect(() => {
       if (!this.slug() || !this.store.ready()) return;
-      untracked(() => void this.timers.load());
+      untracked(() => {
+        void this.timers.load();
+        void this.timers.loadSuggestions();
+      });
     });
     usePageShortcuts([
       { keys: 't', label: 'Start or stop the timer', run: () => this.toggle() },
