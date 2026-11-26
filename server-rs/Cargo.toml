@@ -18,6 +18,8 @@ argon2 = { version = "0.5.3", features = ["std"] }
 axum = { version = "0.8.9", features = ["macros"] }
 base64 = "0.22"
 chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+# IANA time zone names (workspace `timeZone` setting), matched case-insensitively like `Intl`.
+chrono-tz = { version = "0.10", features = ["case-insensitive"] }
 dotenvy = "0.15"
 hex = "0.4"
 http-body-util = "0.1"
@@ -53,6 +55,7 @@ trama-entities = { path = "crates/entities" }
 trama-events = { path = "crates/events" }
 trama-migration = { path = "crates/migration" }
 trama-system = { path = "crates/system" }
+trama-workspaces = { path = "crates/workspaces" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -101,6 +104,7 @@ trama-core.workspace = true
 trama-events.workspace = true
 trama-migration.workspace = true
 trama-system.workspace = true
+trama-workspaces.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true

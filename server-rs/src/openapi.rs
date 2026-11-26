@@ -15,6 +15,7 @@ use utoipa::openapi::OpenApi as Document;
         (name = "auth", description = "Sign-up, sessions and API token introspection"),
         (name = "events", description = "Activity log and the live event stream"),
         (name = "system", description = "Health and operations"),
+        (name = "workspaces", description = "Workspaces, members, roles, agents, tokens, labels and statuses"),
     ),
 )]
 pub(crate) struct ApiDoc;
@@ -26,5 +27,6 @@ pub fn api_doc() -> Document {
     doc.merge(trama_auth::ApiDoc::openapi());
     doc.merge(trama_events::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
+    doc.merge(trama_workspaces::ApiDoc::openapi());
     doc
 }
