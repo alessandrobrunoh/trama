@@ -16,6 +16,7 @@ use utoipa::openapi::OpenApi as Document;
         (name = "events", description = "Activity log and the live event stream"),
         (name = "notifications", description = "The inbox, notification settings and Web Push"),
         (name = "system", description = "Health and operations"),
+        (name = "uploads", description = "Files stored in the workspace and attached to records"),
     ),
 )]
 pub(crate) struct ApiDoc;
@@ -28,5 +29,6 @@ pub fn api_doc() -> Document {
     doc.merge(trama_events::ApiDoc::openapi());
     doc.merge(trama_notifications::ApiDoc::openapi());
     doc.merge(trama_system::ApiDoc::openapi());
+    doc.merge(trama_uploads::ApiDoc::openapi());
     doc
 }

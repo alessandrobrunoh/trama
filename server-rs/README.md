@@ -17,6 +17,7 @@ which server answered.
 | `trama-migration` | `crates/migration` | Schema migrations, starting from the NestJS baseline |
 | `trama-notifications` | `crates/notifications` | The inbox, notification settings, Web Push (VAPID, `aes128gcm`), and the listener that turns recorded domain events into in-app, push and email notifications |
 | `trama-system` | `crates/system` | `GET /api/health`, `GET /api/config` |
+| `trama-uploads` | `crates/uploads` | File uploads: rules, storage, upload references (`retained`, `assert_attachable`, … for other crates), `/api/w/{slug}/uploads…` |
 
 Each domain gets its own crate as it moves over (`users`, `members`, `invites`,
 `workspaces`, `tasks`, `comments`, `projects`, `time`, …). A module crate exposes:

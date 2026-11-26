@@ -57,6 +57,7 @@ trama-events = { path = "crates/events" }
 trama-migration = { path = "crates/migration" }
 trama-notifications = { path = "crates/notifications" }
 trama-system = { path = "crates/system" }
+trama-uploads = { path = "crates/uploads" }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
@@ -106,6 +107,7 @@ trama-events.workspace = true
 trama-migration.workspace = true
 trama-notifications.workspace = true
 trama-system.workspace = true
+trama-uploads.workspace = true
 
 [dev-dependencies]
 http-body-util.workspace = true
