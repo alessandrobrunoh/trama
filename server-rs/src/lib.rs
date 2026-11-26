@@ -20,6 +20,7 @@ pub use openapi::api_doc;
 /// Every module's routes, each behind its `trama_auth::Gate`. Keep sorted by crate name.
 fn routes() -> Routes {
     Routes::new()
+        .merge(trama_artifacts::router())
         .merge(trama_auth::router())
         .merge(trama_events::router())
         .merge(trama_system::router())
